@@ -1005,13 +1005,25 @@ class VulnerabilitySerializer(serializers.ModelSerializer):
 		scan_history_dict = {}
 		scan_history = vulnerability.scan_history
 		if scan_history:
-			# convert model to dict then use MinimalSerializer to get only username
 			scan_history_dict = model_to_dict(scan_history)
+			scan_history_dict['domain'] = {
+				'name': scan_history.domain.name,
+			}
 			scan_history_dict['initiated_by'] = MinimalUserSerializer(scan_history.initiated_by).data if scan_history.initiated_by else None
 			scan_history_dict['aborted_by'] = MinimalUserSerializer(scan_history.aborted_by).data if scan_history.aborted_by else None
+			scan_history_dict['completed_ago'] = scan_history.get_completed_ago()
 		return scan_history_dict
 
 	class Meta:
 		model = Vulnerability
 		fields = '__all__'
 		depth = 2
+
+
+class MonitoringDiscoverySerializer(serializers.ModelSerializer):
+    domain_name = serializers.CharField(source='domain.name', read_only=True)
+    scan_history_id = serializers.IntegerField(source='scan_history.id', read_only=True, allow_null=True)
+
+    class Meta:
+        model = MonitoringDiscovery
+        fields = ['id', 'domain', 'domain_name', 'discovery_type', 'content', 'discovered_at', 'scan_history_id']

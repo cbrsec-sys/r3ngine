@@ -37,7 +37,17 @@ def index(request, slug):
         # if project not found redirect to 404
         return HttpResponseRedirect(reverse('four_oh_four'))
 
+    try:
+        user_preferences = UserPreferences.objects.get(user=request.user)
+        if user_preferences.ui_version == 'v3':
+            return render(request, 'dashboard/v3_index.html', {'project': project})
+    except Exception as e:
+        # Fallback to legacy dashboard
+        pass
+
+
     domains = Domain.objects.filter(project=project)
+
     subdomains = Subdomain.objects.filter(scan_history__domain__project__slug=project)
     endpoints = EndPoint.objects.filter(scan_history__domain__project__slug=project)
     scan_histories = ScanHistory.objects.filter(domain__project=project)

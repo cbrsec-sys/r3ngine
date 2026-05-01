@@ -3,6 +3,8 @@ from django.urls import path
 from rest_framework import routers
 
 from .views import *
+from api.dashboard_views import DashboardAPIView
+
 
 app_name = 'api'
 router = routers.DefaultRouter()
@@ -21,6 +23,7 @@ router.register(r'listActivityLogs', ListActivityLogsViewSet)
 router.register(r'listScanLogs', ListScanLogsViewSet)
 router.register(r'notifications', InAppNotificationManagerViewSet, basename='notification')
 router.register(r'hackerone-programs', HackerOneProgramViewSet, basename='hackerone_program')
+router.register(r'monitoring', MonitoringDiscoveryViewSet, basename='monitoring')
 
 urlpatterns = [
     url('^', include(router.urls)),
@@ -251,6 +254,12 @@ urlpatterns = [
         UpdateThemeView.as_view(),
         name='update_theme'
     ),
+    path(
+        'dashboard/<slug:slug>/',
+        DashboardAPIView.as_view(),
+        name='dashboard_api'
+    ),
 ]
+
 
 urlpatterns += router.urls

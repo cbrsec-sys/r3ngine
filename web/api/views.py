@@ -582,7 +582,33 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 			)
 			return qs.order_by(order_col)
 
-		return qs.order_by('-id')
+
+class MonitoringDiscoveryViewSet(viewsets.ModelViewSet):
+    queryset = MonitoringDiscovery.objects.all()
+    serializer_class = MonitoringDiscoverySerializer
+
+    def get_queryset(self):
+        slug = self.request.query_params.get('slug')
+        if slug:
+            return self.queryset.filter(domain__project__slug=slug).order_by('-discovered_at')
+        return self.queryset.order_by('-discovered_at')
+
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        slug = self.request.query_params.get('slug')
+        if not slug:
+            return Response({'error': 'Slug is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        project = get_object_or_404(Project, slug=slug)
+        discoveries = MonitoringDiscovery.objects.filter(domain__project=project)
+        
+        stats = {
+            'total_discoveries': discoveries.count(),
+            'subdomain_discoveries': discoveries.filter(discovery_type='subdomain').count(),
+            'endpoint_discoveries': discoveries.filter(discovery_type='directory').count(),
+            'login_discoveries': discoveries.filter(discovery_type='login').count(),
+        }
+        return Response(stats)
 
 
 
