@@ -1,0 +1,153 @@
+{% extends 'base/base.html' %}
+{% load humanize %}
+{% load static %}
+
+{% block title %}
+Profile
+{% endblock title %}
+
+{% block custom_js_css_link %}
+{% endblock custom_js_css_link %}
+
+{% block page_title %}
+My Profile
+{% endblock page_title %}
+
+{% block breadcrumb_title %}
+<li class="breadcrumb-item"><a href="/{{current_project.slug}}/dashboard">Dashboard</a></li>
+<li class="breadcrumb-item active">My Profile</li>
+{% endblock breadcrumb_title %}
+
+{% block main_content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card">
+      <div class="card-body">
+        <h4>Hi {{user.get_username}}!</h4>
+        <div class="row">
+          <div class="col-12 mt-2">
+            <div class="mb-4">
+              <label for="username" class="form-label">Username</label>
+              <input type="text" class="form-control" id="username" placeholder="username" value="@{{user.get_username}}" disabled>
+            </div>
+          </div>
+          <h4>Change Password</h4>
+          <form method="POST">
+            {% csrf_token %}
+            <div class="row">
+              <div class="col-12 mt-2">
+                <label for="old_password" class="form-label">Old Password</label>
+                <input type="password" name="old_password" autocomplete="current-password" autofocus="" required="" id="old_password" class="form-control mb-4 {% if form.errors.old_password %}is-invalid{% endif %}">
+                {% if form.errors.old_password %}
+                  {% for error in form.errors.old_password %}
+                    <p class="text-danger">{{error}}</p>
+                  {% endfor %}
+                {% endif %}
+              </div>
+              <div class="col-6">
+                <label for="new_password1" class="form-label">New Password</label>
+                <input type="password" name="new_password1" autocomplete="new-password" required="" id="new_password1" class="form-control mb-4 {% if form.errors.new_password2 %}is-invalid{% endif %}">
+              </div>
+              <div class="col-6">
+                <label for="new_password2" class="form-label">Confirm Password</label>
+                <input type="password" name="new_password2" autocomplete="new-password" required="" id="new_password2" class="form-control mb-4 {% if form.errors.new_password2 %}is-invalid{% endif %}">
+              </div>
+            </div>
+            {% if form.errors.new_password2 %}
+              {% for error in form.errors.new_password2 %}
+                <p class="text-danger">{{error}}</p>
+              {% endfor %}
+            {% endif %}
+            <input type="submit" class="btn btn-soft-primary float-end" value="Change Password">
+          </form>
+          <h4 class="mt-4">Theme Settings</h4>
+          <div class="row">
+            <div class="col-6 mt-2">
+              <label class="form-label">UI Version</label>
+              <select class="form-select mb-4" id="ui_version_select">
+                <option value="v2" {% if user_preferences.ui_version == 'v2' %}selected{% endif %}>Version 2 (Legacy)</option>
+                <option value="v3" {% if user_preferences.ui_version == 'v3' %}selected{% endif %}>Version 3 (Cyberpunk)</option>
+              </select>
+            </div>
+            <div class="col-6 mt-2" id="v3_intensity_container" style="{% if user_preferences.ui_version == 'v2' %}display: none;{% endif %}">
+              <label class="form-label">Cyberpunk Intensity</label>
+              <select class="form-select mb-4" id="v3_intensity_select">
+                <option value="clean" {% if user_preferences.v3_intensity == 'clean' %}selected{% endif %}>Clean (Professional)</option>
+                <option value="script_kiddie" {% if user_preferences.v3_intensity == 'script_kiddie' %}selected{% endif %}>Script Kiddie (Synthwave)</option>
+                <option value="hacker" {% if user_preferences.v3_intensity == 'hacker' %}selected{% endif %}>Hacker (Matrix)</option>
+              </select>
+            </div>
+          </div>
+          <button class="btn btn-soft-info float-end" onclick="saveThemeSettings()">Save Theme Settings</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock main_content %}
+
+
+{% block page_level_script %}
+<script>
+function saveThemeSettings() {
+    const ui_version = $('#ui_version_select').val();
+    const v3_intensity = $('#v3_intensity_select').val();
+    
+    fetch('/api/update-theme/', {
+        method: 'POST',
+        headers: {
+            'X-CSRFToken': '{{ csrf_token }}',
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            ui_version: ui_version,
+            v3_intensity: v3_intensity
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status) {
+            Snackbar.show({
+                text: 'Theme settings updated successfully!',
+                pos: 'top-right',
+                actionTextColor: '#42A5F5',
+                duration: 1400
+            });
+            // Update body attributes for real-time preview
+            $('body').attr('data-ui-version', data.ui_version);
+            $('body').attr('data-v3-theme', data.v3_intensity);
+
+            // Save to localStorage for pre-login persistence (e.g. login page)
+            localStorage.setItem('rengine-ui-version', data.ui_version);
+            localStorage.setItem('rengine-v3-theme', data.v3_intensity);
+            
+            if (data.ui_version === 'v3') {
+                $('#v3_intensity_container').show();
+            } else {
+                $('#v3_intensity_container').hide();
+            }
+
+            // Force reload to ensure all changes take effect ONLY for V3
+            if (data.ui_version === 'v3') {
+                setTimeout(function() {
+                    location.reload();
+                }, 1000);
+            }
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+    });
+}
+
+$(document).ready(function() {
+    $('#ui_version_select').on('change', function() {
+        if ($(this).val() === 'v3') {
+            $('#v3_intensity_container').fadeIn();
+        } else {
+            $('#v3_intensity_container').fadeOut();
+        }
+    });
+});
+</script>
+{% endblock page_level_script %}

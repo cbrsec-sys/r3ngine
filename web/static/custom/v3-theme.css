@@ -1,0 +1,206 @@
+/* 
+   reNgine v3 Cyberpunk Design System
+   Functional tokens mapped to sub-themes
+*/
+
+:root {
+    /* Transitions */
+    --cyber-transition: 0.3s ease;
+}
+
+/* --- THEME DEFINITIONS --- */
+
+/* CLEAN (Low Intensity) */
+[data-v3-theme="clean"] {
+    --cyber-primary: #00d2ff;
+    --cyber-secondary: #3a7bd5;
+    --cyber-bg: #0f172a; /* Slate 900 */
+    --cyber-bg-alt: #1e293b; /* Slate 800 */
+    --cyber-text: #f8fafc;
+    --cyber-border: rgba(0, 210, 255, 0.2);
+    --cyber-glow: none;
+    --cyber-accent: #00d2ff;
+    --cyber-font: 'Inter', sans-serif;
+    --cyber-noise-opacity: 0.02;
+    --cyber-hover: rgba(0, 210, 255, 0.1);
+}
+
+/* SCRIPT KIDDIE (Balanced Intensity) */
+[data-v3-theme="script_kiddie"] {
+    --cyber-primary: #ff00ff; /* Neon Pink */
+    --cyber-secondary: #00ffff; /* Cyan */
+    --cyber-bg: #0a0a0f;
+    --cyber-bg-alt: #15151e;
+    --cyber-text: #ffffff;
+    --cyber-border: rgba(255, 0, 255, 0.4);
+    --cyber-glow: 0 0 8px rgba(255, 0, 255, 0.5);
+    --cyber-accent: #00ffff;
+    --cyber-font: 'Inter', sans-serif;
+    --cyber-noise-opacity: 0.05;
+    --cyber-hover: rgba(255, 0, 255, 0.15);
+}
+
+/* --- CORE STYLES --- */
+
+[data-ui-version="v3"] {
+    background-color: var(--cyber-bg) !important;
+    color: var(--cyber-text) !important;
+    font-family: var(--cyber-font) !important;
+}
+
+[data-ui-version="v3"] body {
+    background-color: var(--cyber-bg) !important;
+}
+
+/* Component Overrides */
+
+[data-ui-version="v3"] .card {
+    background-color: var(--cyber-bg-alt) !important;
+    border: 1px solid var(--cyber-border) !important;
+    box-shadow: var(--cyber-glow) !important;
+    border-radius: 4px !important;
+}
+
+[data-ui-version="v3"] .card-title, 
+[data-ui-version="v3"] .card-header,
+[data-ui-version="v3"] h1, 
+[data-ui-version="v3"] h2, 
+[data-ui-version="v3"] h3, 
+[data-ui-version="v3"] h4, 
+[data-ui-version="v3"] h5 {
+    color: var(--cyber-primary) !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+[data-ui-version="v3"] .btn-primary {
+    background-color: transparent !important;
+    border: 1px solid var(--cyber-primary) !important;
+    color: var(--cyber-primary) !important;
+    box-shadow: var(--cyber-glow);
+    text-transform: uppercase;
+    font-weight: bold;
+    clip-path: polygon(10% 0, 100% 0, 100% 70%, 90% 100%, 0 100%, 0 30%);
+    transition: var(--cyber-transition);
+}
+
+[data-ui-version="v3"] .btn-primary:hover {
+    background-color: var(--cyber-primary) !important;
+    color: var(--cyber-bg) !important;
+}
+
+/* Nav & Topbar */
+[data-ui-version="v3"] .navbar-custom,
+[data-ui-version="v3"] .topnav-menu {
+    background-color: var(--cyber-bg) !important;
+    border-bottom: 1px solid var(--cyber-border) !important;
+}
+
+[data-ui-version="v3"] .nav-link {
+    color: var(--cyber-text) !important;
+}
+
+[data-ui-version="v3"] .nav-link.active,
+[data-ui-version="v3"] .nav-link:hover {
+    color: var(--cyber-primary) !important;
+    text-shadow: var(--cyber-glow);
+    background-color: #0c0a14bf;
+    
+}
+
+/* Navbar Fixes */
+[data-ui-version="v3"] .topnav,
+[data-ui-version="v3"] .navbar-custom,
+[data-ui-version="v3"] .topnav-menu,
+[data-ui-version="v3"] .topnav-menu-left,
+[data-ui-version="v3"] .logo-box {
+    background-color: var(--cyber-bg) !important;
+    border-bottom: 1px solid var(--cyber-border) !important;
+}
+
+[data-ui-version="v3"] .topnav .container-fluid {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    max-width: 100% !important;
+}
+
+[data-ui-version="v3"] .topnav .badge {
+    margin-right: 20px !important;
+}
+
+[data-ui-version="v3"] .topnav .topnav-menu {
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+[data-ui-version="v3"] #topnav-menu-content {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    margin: 0 !important;
+}
+
+[data-ui-version="v3"] .navbar-nav {
+    width: auto !important;
+    display: flex !important;
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+}
+
+/* Table Header Styling */
+[data-ui-version="v3"] thead th {
+    background-color: var(--cyber-bg-alt) !important;
+    color: var(--cyber-primary) !important;
+    border-bottom: 2px solid var(--cyber-border) !important;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+    padding: 12px 15px !important;
+}
+
+[data-ui-version="v3"] .table-light {
+    background-color: var(--cyber-bg-alt) !important;
+}
+
+/* Login Page Specifics */
+[data-ui-version="v3"].authentication-bg,
+[data-ui-version="v3"] .authentication-bg {
+    background-color: var(--cyber-bg) !important;
+    background-image: radial-gradient(circle at 50% 50%, rgba(0, 210, 255, 0.05) 0%, transparent 80%) !important;
+}
+
+[data-ui-version="v3"] .auth-logo {
+    filter: drop-shadow(var(--cyber-glow));
+    margin-bottom: 2rem;
+}
+
+[data-ui-version="v3"] .alert-primary {
+    background-color: rgba(0, 210, 255, 0.1) !important;
+    border: 1px solid var(--cyber-primary) !important;
+    color: var(--cyber-primary) !important;
+}
+
+/* DataTables */
+[data-ui-version="v3"] table.dataTable {
+    background-color: var(--cyber-bg) !important;
+    border-color: var(--cyber-border) !important;
+}
+
+[data-ui-version="v3"] table.dataTable tbody tr:hover {
+    background-color: var(--cyber-hover) !important;
+    transition: background-color 0.2s ease;
+}
+
+[data-ui-version="v3"] table.dataTable thead th {
+    background-color: var(--cyber-bg-alt) !important;
+    color: var(--cyber-primary) !important;
+    border-bottom: 2px solid var(--cyber-primary) !important;
+}
+
+[data-ui-version="v3"] .page-item.active .page-link {
+    background-color: var(--cyber-primary) !important;
+    border-color: var(--cyber-primary) !important;
+    color: var(--cyber-bg) !important;
+}
+
+
