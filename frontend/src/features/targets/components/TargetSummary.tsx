@@ -220,28 +220,17 @@ export const TargetSummary = () => {
   }
 
   const renderHome = () => (
-    <Box>
-      {/* TOP KPIs ROW */}
-      <Grid container spacing={2} sx={{ mb: 2 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <KPICard title="Times target is scanned" value={data.scan_count} subValue={`${data.this_week_scan_count} Scans this week`} color="#00f3ff" info="The total times this target has been scanned." />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <KPICard title="Subdomains Discovered" value={data.subdomain_count} subValue={`Alive Subdomains: ${data.alive_count}`} color="#00f3ff" info="Total subdomains identified by reNgine." />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <KPICard title="Endpoints Discovered" value={data.endpoint_count} subValue={`Alive Endpoints: ${data.endpoint_alive_count}`} color="#00f3ff" info="Total endpoints discovered across all scans." />
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <KPICard title="Vulnerabilities Discovered" value={data.vulnerability_count} subValue={`${data.critical_count} Critical, ${data.high_count} High`} color="#ff003c" info="Total security vulnerabilities detected." />
-        </Grid>
-      </Grid>
-
-      <Grid container spacing={2}>
+    <Box sx={{ flexGrow: 1 }}>
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: { xs: '1fr', md: '300px 1fr', lg: '350px 1fr' }, 
+        gap: 3,
+        alignItems: 'start'
+      }}>
         {/* COLUMN 1: SIDEBAR */}
-        <Grid item xs={12} md={4} lg={3}>
-          <Stack spacing={2}>
-            <TacticalPanel title="Scan Timeline" icon={Activity}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          <TacticalPanel title="Scan Timeline" icon={Activity}>
+             <Box sx={{ p: 2 }}>
                <Typography component="div" sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', mb: 2 }}>
                   Target <Chip label={data.target_info.name} size="small" sx={{ height: 16, fontSize: '0.6rem', bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} /> has been scanned <b>{data.scan_count}</b> times.
                </Typography>
@@ -270,9 +259,11 @@ export const TargetSummary = () => {
                    </Box>
                  ))}
                </List>
-            </TacticalPanel>
+             </Box>
+          </TacticalPanel>
 
-            <TacticalPanel title="Sub Scans" subHeader={`${data.subscans?.length || 0} Sub Scans`} icon={Layers}>
+          <TacticalPanel title="Sub Scans" subHeader={`${data.subscans?.length || 0} Sub Scans`} icon={Layers}>
+             <Box sx={{ p: 2 }}>
                <Stack spacing={1}>
                  {data.subscans?.slice(0, 8).map((scan: any) => (
                    <Box key={scan.id} sx={{ p: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(0, 243, 255, 0.05)', borderRadius: 1 }}>
@@ -282,9 +273,11 @@ export const TargetSummary = () => {
                    </Box>
                  ))}
                </Stack>
-            </TacticalPanel>
+             </Box>
+          </TacticalPanel>
 
-            <TacticalPanel title="Related Domains" subHeader={`${data.related_domains?.length || 0} Domains related to ${data.target_info.name}`} icon={LinkIcon}>
+          <TacticalPanel title="Related Domains" subHeader={`${data.related_domains?.length || 0} Domains related to ${data.target_info.name}`} icon={LinkIcon}>
+             <Box sx={{ p: 2 }}>
                <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                  {data.related_domains?.map((d: string) => (
                    <Chip 
@@ -297,229 +290,227 @@ export const TargetSummary = () => {
                  ))}
                  {data.related_domains?.length === 0 && <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', py: 2 }}>NO RELATED DOMAINS FOUND</Typography>}
                </Stack>
-            </TacticalPanel>
-
-            <TacticalPanel title="Related TLDs" subHeader={`${data.related_tlds?.length || 0} TLDs related to ${data.target_info.name}`} icon={LinkIcon}>
-               <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                 {data.related_tlds?.map((d: string) => (
-                   <Chip key={d} label={d} size="small" variant="outlined" sx={{ mb: 1, borderColor: 'rgba(255,255,255,0.1)', color: 'rgba(255,255,255,0.7)', fontSize: '0.65rem', fontWeight: 700 }} />
-                 ))}
-                 {data.related_tlds?.length === 0 && <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', py: 2 }}>NO RELATED TLDS FOUND</Typography>}
-               </Stack>
-            </TacticalPanel>
-          </Stack>
-        </Grid>
+             </Box>
+          </TacticalPanel>
+        </Box>
 
         {/* COLUMN 2: MAIN CONTENT */}
-        <Grid item xs={12} md={8} lg={9}>
-          <Grid container spacing={2}>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* TOP KPIs ROW */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', lg: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
+            <KPICard title="Times target is scanned" value={data.scan_count} subValue={`${data.this_week_scan_count} Scans this week`} color="#00f3ff" info="The total times this target has been scanned." />
+            <KPICard title="Subdomains Discovered" value={data.subdomain_count} subValue={`Alive Subdomains: ${data.alive_count}`} color="#00f3ff" info="Total subdomains identified by reNgine." />
+            <KPICard title="Endpoints Discovered" value={data.endpoint_count} subValue={`Alive Endpoints: ${data.endpoint_alive_count}`} color="#00f3ff" info="Total endpoints discovered across all scans." />
+            <KPICard title="Vulnerabilities Discovered" value={data.vulnerability_count} subValue={`${data.critical_count} Critical, ${data.high_count} High`} color="#ff003c" info="Total security vulnerabilities detected." />
+          </Box>
 
-          {/* Target Info & HTTP Chart */}
-          <Grid item xs={12} md={7}>
-            <TacticalPanel title="Target Information" icon={Activity} sx={{ height: 420 }}>
-               <Tabs value={infoTab} onChange={(_, v) => setInfoTab(v)} sx={{ mb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: 32 }}>
-                 {['Domain Info', 'Whois', 'DNS Records', 'Nameservers', 'History'].map((l) => (
-                   <Tab key={l} label={l} sx={{ fontSize: '0.65rem', fontWeight: 900, minHeight: 32, p: 1, color: 'rgba(255,255,255,0.4)', '&.Mui-selected': { color: '#00f3ff' } }} />
-                 ))}
-               </Tabs>
-               
-               {infoTab === 0 && (
-                 <Grid container spacing={3}>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Domain</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#ff003c' }}>{data.target_info.name}</Typography></Grid>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Dnssec</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.dnssec || 'N/A'}</Typography></Grid>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Geolocation</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography></Grid>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Created</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.created || 'N/A'}</Typography></Grid>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Updated</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.updated || 'N/A'}</Typography></Grid>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Expires</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.expires || 'N/A'}</Typography></Grid>
-                   <Grid item xs={12}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Registrar</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#00f3ff' }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography></Grid>
-                 </Grid>
-               )}
-               {/* Other Info Tabs Simplified for length */}
-               {infoTab === 1 && <Typography sx={{ p: 2, fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)' }}>Loading WHOIS Data...</Typography>}
-               {infoTab === 2 && (
-                 <Stack spacing={1}>
-                   {data.domain_info?.dns_records?.map((r: any, idx: number) => (
-                     <Stack key={idx} direction="row" spacing={1} alignItems="center">
-                       <Chip label={r.type.toUpperCase()} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} />
-                       <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{r.name}</Typography>
-                     </Stack>
+          {/* MIDDLE ROW: Target Info & HTTP Chart */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 2 }}>
+            <TacticalPanel title="Target Information" icon={Activity} sx={{ minHeight: 400 }}>
+               <Box sx={{ p: 2 }}>
+                 <Tabs value={infoTab} onChange={(_, v) => setInfoTab(v)} sx={{ mb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: 32 }}>
+                   {['Domain Info', 'Whois', 'DNS Records', 'Nameservers', 'History'].map((l) => (
+                     <Tab key={l} label={l} sx={{ fontSize: '0.65rem', fontWeight: 900, minHeight: 32, p: 1, color: 'rgba(255,255,255,0.4)', '&.Mui-selected': { color: '#00f3ff' } }} />
                    ))}
-                 </Stack>
-               )}
+                 </Tabs>
+                 
+                 {infoTab === 0 && (
+                   <Grid container spacing={3}>
+                     <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Domain</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#ff003c' }}>{data.target_info.name}</Typography></Grid>
+                     <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Dnssec</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.dnssec || 'N/A'}</Typography></Grid>
+                     <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Geolocation</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography></Grid>
+                     <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Created</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.created || 'N/A'}</Typography></Grid>
+                     <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Updated</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.updated || 'N/A'}</Typography></Grid>
+                     <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Expires</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.expires || 'N/A'}</Typography></Grid>
+                     <Grid item xs={12}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Registrar</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#00f3ff' }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography></Grid>
+                   </Grid>
+                 )}
+                 {infoTab === 1 && <Typography sx={{ p: 2, fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)' }}>Loading WHOIS Data...</Typography>}
+                 {infoTab === 2 && (
+                   <Stack spacing={1}>
+                     {data.domain_info?.dns_records?.map((r: any, idx: number) => (
+                       <Stack key={idx} direction="row" spacing={1} alignItems="center">
+                         <Chip label={r.type.toUpperCase()} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} />
+                         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{r.name}</Typography>
+                       </Stack>
+                     ))}
+                   </Stack>
+                 )}
+               </Box>
             </TacticalPanel>
-          </Grid>
-          <Grid item xs={12} md={5}>
-            <TacticalPanel title="HTTP Status Breakdown" icon={Activity} sx={{ height: 420 }}>
-              <Chart 
-                options={{
-                  chart: { type: 'donut', background: 'transparent' },
-                  theme: { mode: 'dark' },
-                  stroke: { show: false },
-                  dataLabels: { enabled: false },
-                  legend: { position: 'bottom', fontSize: '10px' },
-                  colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00']
-                }} 
-                series={data.http_status_breakdown.map((s: any) => s.count)} 
-                type="donut" 
-                height="100%" 
-              />
+            <TacticalPanel title="HTTP Status Breakdown" icon={Activity} sx={{ minHeight: 400 }}>
+              <Box sx={{ p: 2, height: 350 }}>
+                <Chart 
+                  options={{
+                    chart: { type: 'donut', background: 'transparent' },
+                    theme: { mode: 'dark' },
+                    stroke: { show: false },
+                    dataLabels: { enabled: false },
+                    legend: { position: 'bottom', fontSize: '10px', labels: { colors: '#fff' } },
+                    colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00']
+                  }} 
+                  series={data.http_status_breakdown.map((s: any) => s.count)} 
+                  type="donut" 
+                  height="100%" 
+                />
+              </Box>
             </TacticalPanel>
-          </Grid>
+          </Box>
 
-          {/* Geo Map */}
-          <Grid item xs={12}>
-            <TacticalPanel title="Geographical Distribution of Assets" icon={Globe} sx={{ minHeight: 450 }}>
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={9}>
+          {/* Geo Map Section */}
+          <TacticalPanel title="Geographical Distribution of Assets" icon={Globe}>
+            <Box sx={{ p: 2 }}>
+              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '3fr 1fr' }, gap: 2 }}>
+                <Box sx={{ height: 500, bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1 }}>
                   <GeoMap data={data.asset_countries || []} />
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <TableContainer sx={{ maxHeight: 400 }}>
-                    <Table size="small">
-                      <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-                        <TableRow>
-                          <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 900 }}>COUNTRY</TableCell>
-                          <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 900 }}>ASSETS</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {data.asset_countries?.map((c: any) => (
-                          <TableRow key={c.iso}>
-                            <TableCell sx={{ fontSize: '0.7rem', color: '#fff' }}>{c.name}</TableCell>
-                            <TableCell sx={{ fontSize: '0.7rem', color: '#00f3ff', fontWeight: 700 }}>{c.count}</TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                </Grid>
-              </Grid>
-            </TacticalPanel>
-          </Grid>
-
-          {/* Vuln Widgets */}
-          <Grid item xs={12} md={5}>
-            <TacticalPanel title="Vulnerability Breakdown" icon={Shield} sx={{ height: 350 }}>
-              <Chart 
-                options={{
-                  chart: { type: 'donut', background: 'transparent' },
-                  theme: { mode: 'dark' },
-                  stroke: { show: false },
-                  dataLabels: { enabled: false },
-                  plotOptions: { pie: { donut: { labels: { show: true, total: { show: true, label: 'TOTAL', color: '#fff' } } } } },
-                  colors: ['#ff003c', '#ff9f00', '#fffc00', '#00ff62', '#00f3ff']
-                }} 
-                series={[data.critical_count, data.high_count, data.medium_count, data.low_count, data.info_count]} 
-                type="donut" 
-                height="100%" 
-              />
-            </TacticalPanel>
-          </Grid>
-          <Grid item xs={12} md={7}>
-            <TacticalPanel title="Vulnerability Highlights" icon={ShieldAlert} sx={{ height: 350 }}>
-              <TableContainer>
-                <Table size="small">
-                  <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-                    <TableRow>
-                      <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: 900 }}>VULNERABILITY</TableCell>
-                      <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: 900 }}>SEVERITY</TableCell>
-                      <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: 900 }}>URL</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {data.vulnerability_highlights?.map((v: any, idx: number) => (
-                      <TableRow key={idx}>
-                        <TableCell sx={{ fontSize: '0.7rem', color: '#fff', fontWeight: 700 }}>{v.name}</TableCell>
-                        <TableCell><SeverityBadge severity={v.severity} /></TableCell>
-                        <TableCell sx={{ fontSize: '0.65rem', color: '#ff003c', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.http_url}</TableCell>
+                </Box>
+                <TableContainer sx={{ maxHeight: 500 }}>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
+                      <TableRow>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 900 }}>COUNTRY</TableCell>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 900 }}>ASSETS</TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </TacticalPanel>
-          </Grid>
+                    </TableHead>
+                    <TableBody>
+                      {data.asset_countries?.map((c: any) => (
+                        <TableRow key={c.iso} sx={{ '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' } }}>
+                          <TableCell sx={{ fontSize: '0.7rem', color: '#fff' }}>{c.name}</TableCell>
+                          <TableCell sx={{ fontSize: '0.7rem', color: '#00f3ff', fontWeight: 700 }}>{c.count}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            </Box>
+          </TacticalPanel>
 
-          {/* Common CVEs / CWEs / Tags */}
-          <Grid item xs={12} md={4}>
-            <TacticalPanel title="Most Common CVE IDs" icon={BarChart2} sx={{ height: 280 }}>
-              <Chart 
-                options={{
-                  chart: { type: 'bar', toolbar: { show: false } },
-                  plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
-                  xaxis: { categories: data.most_common_cve?.map((c: any) => c.name) },
-                  colors: ['#ff003c']
-                }} 
-                series={[{ data: data.most_common_cve?.map((c: any) => c.nused) }]} 
-                type="bar" 
-                height="100%" 
-              />
-            </TacticalPanel>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <TacticalPanel title="Most Common CWE IDs" icon={BarChart2} sx={{ height: 280 }}>
-              <Chart 
-                options={{
-                  chart: { type: 'bar', toolbar: { show: false } },
-                  plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
-                  xaxis: { categories: data.most_common_cwe?.map((c: any) => c.name) },
-                  colors: ['#ff9f00']
-                }} 
-                series={[{ data: data.most_common_cwe?.map((c: any) => c.nused) }]} 
-                type="bar" 
-                height="100%" 
-              />
-            </TacticalPanel>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <TacticalPanel title="Most Common Tags" icon={BarChart2} sx={{ height: 280 }}>
-              <Chart 
-                options={{
-                  chart: { type: 'bar', toolbar: { show: false } },
-                  plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
-                  xaxis: { categories: data.most_common_tags?.map((c: any) => c.name) },
-                  colors: ['#00ff62']
-                }} 
-                series={[{ data: data.most_common_tags?.map((c: any) => c.nused) }]} 
-                type="bar" 
-                height="100%" 
-              />
-            </TacticalPanel>
-          </Grid>
+          {/* Vulnerability Widgets */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '5fr 7fr' }, gap: 2 }}>
+             <TacticalPanel title="Vulnerability Severity" icon={ShieldAlert}>
+               <Box sx={{ p: 2, height: 350 }}>
+                 <Chart 
+                    options={{
+                      chart: { type: 'pie', background: 'transparent' },
+                      theme: { mode: 'dark' },
+                      labels: ['Critical', 'High', 'Medium', 'Low', 'Info'],
+                      colors: ['#ff003c', '#ff8c00', '#fffc00', '#00f3ff', 'rgba(255,255,255,0.2)'],
+                      legend: { position: 'bottom', labels: { colors: '#fff' } }
+                    }}
+                    series={[data.critical_count || 0, data.high_count || 0, data.medium_count || 0, data.low_count || 0, data.info_count || 0]}
+                    type="pie"
+                    height="100%"
+                 />
+               </Box>
+             </TacticalPanel>
+             <TacticalPanel title="Vulnerability Highlights" icon={Shield}>
+                <TableContainer sx={{ p: 1 }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem' }}>NAME</TableCell>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem' }}>SEVERITY</TableCell>
+                        <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem' }}>DATE</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {data.vulnerability_highlights?.map((v: any, idx: number) => (
+                        <TableRow key={idx}>
+                          <TableCell sx={{ fontSize: '0.7rem', color: '#fff', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.name}</TableCell>
+                          <TableCell><SeverityBadge severity={v.severity} /></TableCell>
+                          <TableCell sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>{v.discovered_date}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+             </TacticalPanel>
+          </Box>
 
-          {/* Footer Cards */}
-          <Grid item xs={12} md={4}>
-            <TacticalPanel title="IP Addresses" subHeader="*Highlighted yellow are CDN" icon={Database} sx={{ height: 300 }}>
-               <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                 {data.domain_info?.historical_ips?.map((ip: any) => (
-                   <Chip key={ip.ip} label={ip.ip} size="small" sx={{ mb: 1, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff', border: '1px solid rgba(0,243,255,0.2)' }} />
-                 ))}
-               </Stack>
-            </TacticalPanel>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <TacticalPanel title="Discovered Ports" subHeader="*Highlighted red are uncommon" icon={Server} sx={{ height: 300 }}>
-               <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                 {data.discovered_ports?.map((p: any) => (
-                   <Chip key={p.number} label={`${p.number}/${p.service_name}`} size="small" sx={{ mb: 1, bgcolor: 'rgba(112,0,255,0.1)', color: '#7000ff', border: '1px solid rgba(112,0,255,0.2)' }} />
-                 ))}
-               </Stack>
-            </TacticalPanel>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <TacticalPanel title="Discovered Technologies" icon={Cpu} sx={{ height: 300 }}>
-               <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
-                 {data.discovered_technologies?.map((t: any) => (
-                   <Chip key={t.name} label={t.name} size="small" sx={{ mb: 1, bgcolor: 'rgba(255,252,0,0.1)', color: '#fffc00', border: '1px solid rgba(255,252,0,0.2)' }} />
-                 ))}
-               </Stack>
-            </TacticalPanel>
-          </Grid>
-        </Grid>
-      </Grid>
-    </Grid>
-  </Box>
-);
+          {/* Infrastructure Widgets */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2 }}>
+              <TacticalPanel title="Most Common CVE IDs" icon={BarChart2} sx={{ height: 280 }}>
+                <Box sx={{ p: 1, height: '100%' }}>
+                  <Chart 
+                    options={{
+                      chart: { type: 'bar', toolbar: { show: false } },
+                      plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
+                      xaxis: { categories: data.most_common_cve?.map((c: any) => c.name) },
+                      colors: ['#ff003c']
+                    }} 
+                    series={[{ data: data.most_common_cve?.map((c: any) => c.nused) }]} 
+                    type="bar" 
+                    height="100%" 
+                  />
+                </Box>
+              </TacticalPanel>
+              <TacticalPanel title="Most Common CWE IDs" icon={BarChart2} sx={{ height: 280 }}>
+                <Box sx={{ p: 1, height: '100%' }}>
+                  <Chart 
+                    options={{
+                      chart: { type: 'bar', toolbar: { show: false } },
+                      plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
+                      xaxis: { categories: data.most_common_cwe?.map((c: any) => c.name) },
+                      colors: ['#ff9f00']
+                    }} 
+                    series={[{ data: data.most_common_cwe?.map((c: any) => c.nused) }]} 
+                    type="bar" 
+                    height="100%" 
+                  />
+                </Box>
+              </TacticalPanel>
+              <TacticalPanel title="Most Common Tags" icon={BarChart2} sx={{ height: 280 }}>
+                <Box sx={{ p: 1, height: '100%' }}>
+                  <Chart 
+                    options={{
+                      chart: { type: 'bar', toolbar: { show: false } },
+                      plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
+                      xaxis: { categories: data.most_common_tags?.map((c: any) => c.name) },
+                      colors: ['#00ff62']
+                    }} 
+                    series={[{ data: data.most_common_tags?.map((c: any) => c.nused) }]} 
+                    type="bar" 
+                    height="100%" 
+                  />
+                </Box>
+              </TacticalPanel>
+          </Box>
+
+          {/* Footer Info Cards */}
+          <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2 }}>
+              <TacticalPanel title="IP Addresses" icon={Database} sx={{ height: 300 }}>
+                 <Box sx={{ p: 2 }}>
+                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                     {data.domain_info?.historical_ips?.map((ip: any) => (
+                       <Chip key={ip.ip} label={ip.ip} size="small" sx={{ mb: 1, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff', border: '1px solid rgba(0,243,255,0.2)' }} />
+                     ))}
+                   </Stack>
+                 </Box>
+              </TacticalPanel>
+              <TacticalPanel title="Discovered Ports" icon={Server} sx={{ height: 300 }}>
+                 <Box sx={{ p: 2 }}>
+                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                     {data.discovered_ports?.map((p: any) => (
+                       <Chip key={p.number} label={`${p.number}/${p.service_name}`} size="small" sx={{ mb: 1, bgcolor: 'rgba(112,0,255,0.1)', color: '#7000ff', border: '1px solid rgba(112,0,255,0.2)' }} />
+                     ))}
+                   </Stack>
+                 </Box>
+              </TacticalPanel>
+              <TacticalPanel title="Technologies" icon={Cpu} sx={{ height: 300 }}>
+                 <Box sx={{ p: 2 }}>
+                   <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                     {data.discovered_technologies?.map((t: any) => (
+                       <Chip key={t.name} label={t.name} size="small" sx={{ mb: 1, bgcolor: 'rgba(255,252,0,0.1)', color: '#fffc00', border: '1px solid rgba(255,252,0,0.2)' }} />
+                     ))}
+                   </Stack>
+                 </Box>
+              </TacticalPanel>
+          </Box>
+        </Box>
+      </Box>
+    </Box>
+  );
 
   const renderSubdomains = () => (
     <TacticalPanel title="All Discovered Subdomains" icon={Globe}>
