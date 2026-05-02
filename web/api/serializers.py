@@ -11,7 +11,22 @@ from targetApp.models import *
 from dashboard.models import InAppNotification
 
 
+
+class ProjectSerializer(serializers.ModelSerializer):
+	insert_date_humanized = serializers.SerializerMethodField()
+
+	class Meta:
+		model = Project
+		fields = '__all__'
+
+	def get_insert_date_humanized(self, obj):
+		if obj.insert_date:
+			return naturaltime(obj.insert_date).title()
+
+
 class HackerOneProgramAttributesSerializer(serializers.Serializer):
+
+
 	"""
 		Serializer for HackerOne Program
 		IMP: THIS is not a model serializer, programs will not be stored in db

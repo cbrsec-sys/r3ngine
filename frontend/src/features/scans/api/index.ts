@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { ScanHistory } from '../types';
+import type { ScanHistory, ScheduledScan } from '../types';
 
 export const useScans = (projectSlug: string) => {
   return useQuery<ScanHistory[]>({
@@ -57,6 +57,62 @@ export const useInitiateScan = (projectSlug: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scans', projectSlug] });
+    },
+  });
+};
+
+export const useScheduledScans = () => {
+  return useQuery<ScheduledScan[]>({
+    queryKey: ['scheduled-scans'],
+    queryFn: async () => {
+      const response = await fetch('/api/scheduledScans/', {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data : data.results || [];
+    },
+  });
+};
+
+export const useToggleScheduledScan = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/scheduledScans/${id}/toggle/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scheduled-scans'] });
+    },
+  });
+};
+
+export const useBulkDeleteScheduledScans = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: number[]) => {
+      const response = await fetch('/api/scheduledScans/bulk_delete/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ ids }),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scheduled-scans'] });
     },
   });
 };

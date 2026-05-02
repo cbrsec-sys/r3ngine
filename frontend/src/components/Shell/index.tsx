@@ -40,6 +40,8 @@ import {
   ChevronDown,
   LayoutGrid,
   Sliders,
+  Clock,
+  Globe,
   Plus,
   LogOut,
   User as UserIcon
@@ -71,9 +73,23 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const navItems: NavItem[] = [
     { title: 'Dashboard', icon: <Home size={20} />, path: `/${projectSlug}/dashboard`, color: '#7000ff' },
     { title: 'Projects', icon: <Folder size={20} />, path: `/${projectSlug}/projects`, color: '#00f3ff' },
+
+
     { title: 'Targets', icon: <Target size={20} />, path: `/${projectSlug}/targets`, color: '#00f3ff' },
     { title: 'Monitoring', icon: <Monitor size={20} />, path: `/${projectSlug}/monitoring`, color: '#00f3ff' },
-    { title: 'Scan History', icon: <Activity size={20} />, path: `/${projectSlug}/scans`, color: '#00f3ff' },
+    { 
+      title: 'Scan History', 
+      icon: <Activity size={20} />, 
+      path: `/${projectSlug}/scans`, 
+      color: '#00f3ff',
+      children: [
+        { title: 'Scan History', path: `/${projectSlug}/scans` },
+        { title: 'Sub Scan History', path: `/${projectSlug}/scans/sub` },
+        { title: 'Scheduled Scan', path: `/${projectSlug}/scans/scheduled` },
+        { title: 'All Subdomains', path: `/${projectSlug}/subdomains` },
+        { title: 'All Endpoints', path: `/${projectSlug}/endpoints` },
+      ]
+    },
     { title: 'Vulnerabilities', icon: <ShieldAlert size={20} />, path: `/${projectSlug}/vulns`, color: '#00f3ff' },
     { title: 'Todo', icon: <CheckSquare size={20} />, path: `/${projectSlug}/todo`, color: '#00f3ff' },
     { title: 'Organization', icon: <Briefcase size={20} />, path: `/${projectSlug}/org`, color: '#00f3ff' },
@@ -133,15 +149,21 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       >
         <List sx={{ px: 1, mt: 2 }}>
           {navItems.map((item) => {
-            const isActive = activePath === item.path;
+            const hasChildren = item.children && item.children.length > 0;
+            const isOpen = openItems.includes(item.title);
+            const isActive = activePath.startsWith(item.path);
             const itemColor = isActive ? '#7000ff' : '#00f3ff';
             
             return (
               <React.Fragment key={item.title}>
                 <ListItem disablePadding sx={{ mb: 0.5 }}>
                   <ListItemButton 
-                    component={Link}
-                    to={item.path}
+                    {...(hasChildren ? {
+                      onClick: () => handleToggle(item.title)
+                    } : {
+                      component: Link,
+                      to: item.path
+                    })}
                     sx={{ 
                       borderRadius: 2,
                       minHeight: 48,
@@ -164,20 +186,64 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                     </ListItemIcon>
                     
                     {isHovered && (
-                      <ListItemText 
-                        primary={
-                          <Typography variant="body2" sx={{ 
-                            fontWeight: 600, 
-                            color: isActive ? '#7000ff' : 'rgba(255,255,255,0.6)',
-                            fontSize: '0.85rem'
-                          }}>
-                            {item.title}
-                          </Typography>
-                        } 
-                      />
+                      <>
+                        <ListItemText 
+                          primary={
+                            <Typography variant="body2" sx={{ 
+                              fontWeight: 600, 
+                              color: isActive ? '#7000ff' : 'rgba(255,255,255,0.6)',
+                              fontSize: '0.85rem'
+                            }}>
+                              {item.title}
+                            </Typography>
+                          } 
+                        />
+                        {hasChildren && (
+                          isOpen ? <ChevronDown size={14} style={{ opacity: 0.5 }} /> : <ChevronRight size={14} style={{ opacity: 0.5 }} />
+                        )}
+                      </>
                     )}
                   </ListItemButton>
                 </ListItem>
+                
+                {hasChildren && isHovered && (
+                  <Collapse in={isOpen} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding sx={{ ml: 2 }}>
+                      {item.children?.map((child) => {
+                        const isChildActive = activePath === child.path;
+                        return (
+                          <ListItemButton
+                            key={child.title}
+                            component={Link}
+                            to={child.path}
+                            sx={{
+                              py: 0.5,
+                              borderRadius: 1,
+                              mb: 0.2,
+                              bgcolor: isChildActive ? 'rgba(112, 0, 255, 0.1)' : 'transparent',
+                              '&:hover': {
+                                bgcolor: 'rgba(0, 243, 255, 0.05)',
+                              }
+                            }}
+                          >
+                            <ListItemText
+                              primary={
+                                <Typography variant="caption" sx={{
+                                  fontWeight: isChildActive ? 700 : 500,
+                                  color: isChildActive ? '#7000ff' : 'rgba(255,255,255,0.4)',
+                                  fontSize: '0.75rem',
+                                  letterSpacing: 0.5
+                                }}>
+                                  {child.title}
+                                </Typography>
+                              }
+                            />
+                          </ListItemButton>
+                        );
+                      })}
+                    </List>
+                  </Collapse>
+                )}
               </React.Fragment>
             );
           })}
@@ -252,10 +318,15 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
             {/* Action Group */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5 }}>
+              <Box 
+                component={Link} 
+                to={`/${projectSlug}/projects`}
+                sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5, textDecoration: 'none' }}
+              >
                 <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Projects</Typography>
-                <ChevronDown size={14} style={{ opacity: 0.5 }} />
+                <ChevronDown size={14} style={{ opacity: 0.5, color: 'rgba(255,255,255,0.6)' }} />
               </Box>
+
 
               <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5 }}>
                 <Plus size={14} style={{ opacity: 0.6 }} />

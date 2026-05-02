@@ -14,8 +14,9 @@ urlpatterns = [
         name='dashboardIndex'),
     path(
         '<slug:slug>/monitoring/',
-        views.monitoring_dashboard,
+        views.index,
         name='monitoring_dashboard'),
+
     path(
         '<slug:slug>/profile/',
         views.profile,
@@ -38,8 +39,9 @@ urlpatterns = [
         name='four_oh_four'),
     path(
         '<slug:slug>/projects/',
-        views.projects,
+        views.index,
         name='list_projects'),
+
     path(
         'delete/project/<int:id>',
         views.delete_project,
@@ -76,6 +78,14 @@ urlpatterns = [
         '<slug:slug>/wordlists/',
         views.index,
         name='wordlists_v3'),
+    path(
+        '<slug:slug>/subdomains/',
+        views.index,
+        name='subdomains_v3'),
+    path(
+        '<slug:slug>/endpoints/',
+        views.index,
+        name='endpoints_v3'),
     path(
         '<slug:slug>/api/graph/scan/<int:scan_id>/data/',
         views.get_graph_data,

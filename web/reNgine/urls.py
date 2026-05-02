@@ -25,8 +25,10 @@ urlpatterns = [
         'admin/',
         admin.site.urls),
     path(
-        '',
-        include('dashboard.urls')),
+        'api/',
+        include(
+            'api.urls',
+            'api')),
     path(
         'target/',
         include('targetApp.urls')),
@@ -48,15 +50,15 @@ urlpatterns = [
         auth_views.LogoutView.as_view(template_name='base/logout.html'),
         name='logout'),
     path(
-        'api/',
-        include(
-            'api.urls',
-            'api')),
+        '',
+        include('dashboard.urls')),
     path(
         'media/<path:path>', 
         serve_protected_media, 
         name='serve_protected_media'
     ),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+
+
 # ] + static(settings.MEDIA_URL, document_root=settings.RENGINE_RESULTS) + \
     

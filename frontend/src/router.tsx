@@ -4,10 +4,14 @@ import { DashboardPage } from "./features/dashboard";
 import { TargetList, TargetSummary } from "./features/targets";
 import { MonitoringPage } from "./features/monitoring";
 import { EnginesPage } from "./features/engines";
-import { ScanList } from "./features/scans/components/ScanList";
+import { ProjectsPage } from "./features/projects";
+import { ScanList, ScheduledScansPage } from "./features/scans";
+import { EndpointsPage } from "./features/endpoints";
+import { SubdomainsPage } from "./features/subdomains";
+
 import { PlaceholderPage } from "./components/PlaceholderPage";
 import { Box, Typography, Button } from "@mui/material";
-import { AlertCircle, Home, RefreshCw, Activity, ShieldAlert } from "lucide-react";
+import { AlertCircle, Home, RefreshCw, Activity, ShieldAlert, Clock, Globe, Target } from "lucide-react";
 
 // Root Route
 const rootRoute = createRootRoute({
@@ -25,6 +29,13 @@ const projectRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "$projectSlug",
 });
+
+const projectsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "projects",
+  component: ProjectsPage,
+});
+
 
 // Dashboard Route
 const dashboardRoute = createRoute({
@@ -75,6 +86,113 @@ const scansRoute = createRoute({
   component: ScanList,
 });
 
+// Sub Scans Route
+const subScansRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "scans/sub",
+  component: () => <PlaceholderPage title="Sub Scan History" icon={<Activity size={48} />} />,
+});
+
+// Scheduled Scans Route
+const scheduledScansRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "scans/scheduled",
+  component: ScheduledScansPage,
+  loader: async ({ params: { projectSlug } }) => {
+    return { projectSlug };
+  },
+  pendingComponent: () => (
+    <Box sx={{ 
+      height: '80vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      gap: 3
+    }}>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
+      </Box>
+      <Typography sx={{ 
+        fontFamily: 'Orbitron', 
+        fontWeight: 900, 
+        letterSpacing: 2, 
+        fontSize: '14px',
+        color: '#00f3ff',
+        textAlign: 'center'
+      }}>
+        ACCESSING TACTICAL REGISTRY... <br/>
+        <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>RETRIEVING SCHEDULED OPERATIONS... PLEASE WAIT</span>
+      </Typography>
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.5); opacity: 1; }
+          }
+        `}
+      </style>
+    </Box>
+  )
+});
+
+// All Subdomains Route
+const subdomainsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "subdomains",
+  component: SubdomainsPage,
+  loader: async ({ params: { projectSlug } }) => {
+    // This triggers the pendingComponent while the initial fetch is happening
+    // We don't necessarily need to return the data here since useQuery handles it,
+    // but having a promise here ensures the "pending" state is active.
+    return { projectSlug };
+  },
+  pendingComponent: () => (
+    <Box sx={{ 
+      height: '80vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      gap: 3
+    }}>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
+      </Box>
+      <Typography sx={{ 
+        fontFamily: 'Orbitron', 
+        fontWeight: 900, 
+        letterSpacing: 2, 
+        fontSize: '14px',
+        color: '#00f3ff',
+        textAlign: 'center'
+      }}>
+        INITIALIZING TACTICAL DATA... <br/>
+        <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>FETCHING SUBDOMAINS... PLEASE WAIT</span>
+      </Typography>
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.5); opacity: 1; }
+          }
+        `}
+      </style>
+    </Box>
+  )
+});
+
+// All Endpoints Route
+const endpointsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "endpoints",
+  component: EndpointsPage,
+});
+
 // Vulnerabilities Route
 const vulnsRoute = createRoute({
   getParentRoute: () => projectRoute,
@@ -86,12 +204,18 @@ const vulnsRoute = createRoute({
 const routeTree = rootRoute.addChildren([
   rootRedirectRoute,
   projectRoute.addChildren([
+    projectsRoute,
     dashboardRoute,
+
     targetListRoute,
     targetSummaryRoute,
     monitoringRoute,
     enginesRoute,
     scansRoute,
+    subScansRoute,
+    scheduledScansRoute,
+    subdomainsRoute,
+    endpointsRoute,
     vulnsRoute,
   ]),
 ]);

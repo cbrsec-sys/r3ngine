@@ -237,7 +237,8 @@ def all_subdomains(request, slug):
         .count()
     )
     context = {
-        'scan_history_id': id,
+        'current_project': get_object_or_404(Project, slug=slug),
+        'scan_history_id': '',
         'scan_history_active': 'active',
         'scan_engines': scan_engines,
         'subdomain_count': subdomains.values('name').distinct().count(),

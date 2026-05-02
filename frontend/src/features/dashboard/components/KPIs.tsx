@@ -1,10 +1,10 @@
 import React from 'react';
 import { Box, Grid, Typography, Card, CardContent, useTheme } from '@mui/material';
-import { 
-  Globe, 
-  Layers, 
-  Target, 
-  AlertTriangle, 
+import {
+  Globe,
+  Layers,
+  Target,
+  AlertTriangle,
   ShieldAlert,
   Key
 } from 'lucide-react';
@@ -20,10 +20,10 @@ interface KpiCardProps {
 
 const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color, subtitle }) => {
   return (
-    <Card sx={{ 
-      height: '100%', 
-      bgcolor: 'rgba(5, 5, 15, 0.4)', 
-      backdropFilter: 'blur(12px)', 
+    <Card sx={{
+      height: '100%',
+      bgcolor: 'rgba(5, 5, 15, 0.4)',
+      backdropFilter: 'blur(12px)',
       border: '1px solid rgba(255, 255, 255, 0.05)',
       position: 'relative',
       overflow: 'hidden',
@@ -35,12 +35,12 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color, subtitle }
       }
     }}>
       <CardContent sx={{ p: 3 }}>
-        <Box 
+        <Box
           className="kpi-icon-bg"
-          sx={{ 
-            position: 'absolute', 
-            right: -15, 
-            top: -15, 
+          sx={{
+            position: 'absolute',
+            right: -15,
+            top: -15,
             opacity: 0.08,
             transition: 'all 0.3s ease',
             color: color
@@ -48,12 +48,12 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color, subtitle }
         >
           {React.cloneElement(icon as React.ReactElement, { size: 100 })}
         </Box>
-        
+
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5 }}>
-          <Box sx={{ 
-            p: 1.2, 
-            borderRadius: 2, 
-            bgcolor: `${color}15`, 
+          <Box sx={{
+            p: 1.2,
+            borderRadius: 2,
+            bgcolor: `${color}15`,
             color: color,
             display: 'flex',
             mr: 1.5,
@@ -62,9 +62,9 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color, subtitle }
           }}>
             {React.cloneElement(icon as React.ReactElement, { size: 22 })}
           </Box>
-          <Typography variant="overline" sx={{ 
-            fontWeight: 800, 
-            letterSpacing: 2, 
+          <Typography variant="overline" sx={{
+            fontWeight: 800,
+            letterSpacing: 2,
             color: 'text.secondary',
             fontFamily: 'Orbitron'
           }}>
@@ -72,21 +72,21 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color, subtitle }
           </Typography>
         </Box>
 
-        <Typography variant="h3" sx={{ 
-          fontWeight: 900, 
-          mb: 0.5, 
+        <Typography variant="h3" sx={{
+          fontWeight: 900,
+          mb: 0.5,
           fontFamily: 'Orbitron',
           letterSpacing: -1,
           color: '#fff'
         }}>
           {value.toLocaleString()}
         </Typography>
-        
+
         {subtitle && (
-          <Typography variant="caption" sx={{ 
-            color: 'text.secondary', 
-            fontWeight: 600, 
-            display: 'flex', 
+          <Typography variant="caption" sx={{
+            color: 'text.secondary',
+            fontWeight: 600,
+            display: 'flex',
             alignItems: 'center',
             '&::before': {
               content: '""',
@@ -109,47 +109,47 @@ export const KpiGrid: React.FC<{ data: DashboardData['kpis'] }> = ({ data }) => 
   return (
     <Grid container spacing={3}>
       <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
-        <KpiCard 
-          title="TARGETS" 
-          value={data.domain_count} 
-          icon={<Globe />} 
-          color="#00f3ff" 
+        <KpiCard
+          title="TARGETS"
+          value={data.domain_count}
+          icon={<Globe />}
+          color="#00f3ff"
           subtitle="Registered Domains"
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
-        <KpiCard 
-          title="SUBDOMAINS" 
-          value={data.subdomain_count} 
-          icon={<Layers />} 
-          color="#7000ff" 
+        <KpiCard
+          title="SUBDOMAINS"
+          value={data.subdomain_count}
+          icon={<Layers />}
+          color="#7000ff"
           subtitle={`${data.alive_count} Active Assets`}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
-        <KpiCard 
-          title="ENDPOINTS" 
-          value={data.endpoint_count} 
-          icon={<Target />} 
-          color="#ff00f7" 
+        <KpiCard
+          title="ENDPOINTS"
+          value={data.endpoint_count}
+          icon={<Target />}
+          color="#ff00f7"
           subtitle={`${data.endpoint_alive_count} Total Alive`}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
-        <KpiCard 
-          title="VULNS" 
-          value={data.vulnerability_count} 
-          icon={<AlertTriangle />} 
-          color="#ff003c" 
+        <KpiCard
+          title="VULNS"
+          value={data.vulnerability_count}
+          icon={<AlertTriangle />}
+          color="#ff003c"
           subtitle={`${data.critical_count} Critical Risks`}
         />
       </Grid>
       <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
-        <KpiCard 
-          title="LEAKS" 
-          value={data.secret_leak_count} 
-          icon={<Key />} 
-          color="#fffc00" 
+        <KpiCard
+          title="LEAKS"
+          value={data.secret_leak_count}
+          icon={<Key />}
+          color="#fffc00"
           subtitle="Sensitive Data Found"
         />
       </Grid>

@@ -14,6 +14,10 @@ from datetime import datetime
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import JSONRenderer
+
+
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_204_NO_CONTENT, HTTP_202_ACCEPTED
 from rest_framework.decorators import action
 from django.core.exceptions import ObjectDoesNotExist
@@ -502,9 +506,29 @@ class LLMVulnerabilityReportGenerator(APIView):
 		return Response(response)
 
 
+
+class ProjectViewSet(viewsets.ModelViewSet):
+	queryset = Project.objects.all().order_by('-insert_date')
+	serializer_class = ProjectSerializer
+	permission_classes = [IsAuthenticated]
+	renderer_classes = [JSONRenderer]
+
+
+	@action(detail=True, methods=['post'])
+	def delete_project(self, request, pk=None):
+		if not request.user.has_perm('dashboard.modify_targets'):
+			return Response({'status': False, 'message': 'Permission Denied'}, status=403)
+		project = self.get_object()
+		project.delete()
+		return Response({'status': True})
+
+
 class CreateProjectApi(APIView):
+
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_TARGETS
+	renderer_classes = [JSONRenderer]
+
 
 	def get(self, request):
 		req = self.request

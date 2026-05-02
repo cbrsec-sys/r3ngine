@@ -24,3 +24,17 @@ export interface ScanHistory {
     username: string;
   } | null;
 }
+
+export interface ScheduledScan {
+  id: number;
+  name: string;
+  task: string;
+  description: string;
+  frequency: string;
+  enabled: boolean;
+  last_run_at: string | null;
+  total_run_count: number;
+  one_off: boolean;
+  kwargs: string;
+  date_changed: string;
+}
