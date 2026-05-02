@@ -5,7 +5,7 @@ import { TargetList, TargetSummary } from "./features/targets";
 import { MonitoringPage } from "./features/monitoring";
 import { EnginesPage } from "./features/engines";
 import { ProjectsPage } from "./features/projects";
-import { ScanList, ScheduledScansPage, SubScansPage, ScanHistoryPage } from "./features/scans";
+import { ScanList, ScheduledScansPage, SubScansPage, ScanHistoryPage, ScanDetailPage } from "./features/scans";
 import { EndpointsPage } from "./features/endpoints";
 import { SubdomainsPage } from "./features/subdomains";
 
@@ -241,6 +241,13 @@ const vulnsRoute = createRoute({
   component: () => <PlaceholderPage title="Vulnerabilities" icon={<ShieldAlert size={48} />} />,
 });
 
+// Scan History Detail Route
+const scanDetailRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "scan/detail/$scanId",
+  component: ScanDetailPage,
+});
+
 // Route Tree
 const routeTree = rootRoute.addChildren([
   rootRedirectRoute,
@@ -254,6 +261,7 @@ const routeTree = rootRoute.addChildren([
     enginesRoute,
     scansRoute,
     subScansRoute,
+    scanDetailRoute,
     scheduledScansRoute,
     subdomainsRoute,
     endpointsRoute,

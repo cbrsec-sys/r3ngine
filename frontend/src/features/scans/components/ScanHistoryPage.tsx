@@ -52,7 +52,7 @@ import {
   useDeleteScan, 
   useBulkScanAction 
 } from '../api';
-import { useParams } from '@tanstack/react-router';
+import { useParams, Link as RouterLink } from '@tanstack/react-router';
 
 export const ScanHistoryPage: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
@@ -328,7 +328,8 @@ export const ScanHistoryPage: React.FC = () => {
                         <Button
                           variant="contained"
                           size="small"
-                          href={`/${projectSlug}/scan/detail/${scan.id}`}
+                          component={RouterLink}
+                          to={`/${projectSlug}/scan/detail/${scan.id}`}
                           sx={{ 
                             bgcolor: 'rgba(0, 243, 255, 0.1)', 
                             color: '#00f3ff', 

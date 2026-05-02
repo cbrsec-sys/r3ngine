@@ -69,7 +69,7 @@ interface CountryData {
   count: number;
 }
 
-export const GeoMap: React.FC<{ data: CountryData[] }> = ({ data }) => {
+export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = ({ data, disableCard = false }) => {
   const theme = useTheme();
 
   const colorScale = scaleLinear<string>()
@@ -85,6 +85,161 @@ export const GeoMap: React.FC<{ data: CountryData[] }> = ({ data }) => {
       (d.iso.toUpperCase() === "GB" && geoName === "UNITED KINGDOM")
     );
   };
+
+  const content = (
+    <Grid container sx={{ flexGrow: 1, minHeight: 0 }}>
+      {/* Map Column */}
+      <Grid size={{ xs: 12, md: 8 }} sx={{ position: 'relative', bgcolor: 'rgba(0,0,0,0.3)', height: 500 }}>
+        {/* Zoom Controls Overlay */}
+        <Box sx={{ position: 'absolute', top: 10, left: 10, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <IconButton
+            size="small"
+            sx={{ bgcolor: 'rgba(5, 5, 20, 0.8)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1, p: 0.5, '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+          >
+            <Plus size={14} />
+          </IconButton>
+          <IconButton
+            size="small"
+            sx={{ bgcolor: 'rgba(5, 5, 20, 0.8)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1, p: 0.5, '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+          >
+            <Box sx={{ width: 14, height: 2, bgcolor: 'currentColor' }} />
+          </IconButton>
+        </Box>
+
+        <ComposableMap projectionConfig={{ scale: 200, center: [15, 5] }} style={{ width: "100%", height: "100%" }}>
+          <defs>
+            <pattern id="dotPattern" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="0.8" fill="rgba(0, 243, 255, 0.2)" />
+            </pattern>
+            <pattern id="dotPatternActive" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
+              <circle cx="1" cy="1" r="1" fill="rgba(0, 243, 255, 0.8)" />
+            </pattern>
+            <filter id="glow">
+              <feGaussianBlur stdDeviation="1.5" result="coloredBlur" />
+              <feMerge>
+                <feMergeNode in="coloredBlur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          </defs>
+          <ZoomableGroup zoom={1} maxZoom={3}>
+            <Geographies geography={geoUrl}>
+              {({ geographies }) =>
+                geographies.map((geo) => {
+                  const country = findCountry(geo);
+                  return (
+                    <g key={geo.rsmKey}>
+                      {/* Base Layer for Background Color/Glow */}
+                      <Geography
+                        geography={geo}
+                        fill={country ? "rgba(0, 243, 255, 0.15)" : "rgba(255, 255, 255, 0.02)"}
+                        stroke="rgba(0, 243, 255, 0.1)"
+                        strokeWidth={0.3}
+                        style={{
+                          default: { outline: "none" },
+                          hover: { fill: "rgba(0, 243, 255, 0.3)", cursor: 'pointer' },
+                          pressed: { outline: "none" }
+                        }}
+                      />
+                      {/* Pattern Layer */}
+                      <Geography
+                        geography={geo}
+                        fill={country ? "url(#dotPatternActive)" : "url(#dotPattern)"}
+                        stroke="none"
+                        pointerEvents="none"
+                        style={{
+                          default: {
+                            outline: "none",
+                            filter: country ? "url(#glow)" : "none"
+                          }
+                        }}
+                      />
+                    </g>
+                  );
+                })
+              }
+            </Geographies>
+
+            {/* Markers for Countries with Assets */}
+            {data.map((country) => {
+              const coords = countryCentroids[country.iso.toUpperCase()];
+              if (!coords) return null;
+              return (
+                <Marker key={country.iso} coordinates={coords}>
+                  <Tooltip title={`${country.name}: ${country.count} Assets`} arrow>
+                    <g>
+                      <circle r={4} fill="rgba(0, 243, 255, 0.2)" />
+                      <foreignObject x="-10" y="-10" width="20" height="20">
+                        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}>
+                          <PulsingDot color="#00f3ff" />
+                        </div>
+                      </foreignObject>
+                    </g>
+                  </Tooltip>
+                </Marker>
+              );
+            })}
+          </ZoomableGroup>
+        </ComposableMap>
+      </Grid>
+
+      {/* List Column */}
+      <Grid size={{ xs: 12, md: 4 }} sx={{ borderLeft: '1px solid rgba(0, 243, 255, 0.1)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 500 }}>
+        <TableContainer sx={{ flexGrow: 1, overflow: 'auto', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderRadius: 2 } }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ bgcolor: 'rgba(5,5,15,0.98)', borderBottom: '2px solid #7000ff', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'Orbitron', py: 1.5 }}>COUNTRY</TableCell>
+                <TableCell align="right" sx={{ bgcolor: 'rgba(5,5,15,0.98)', borderBottom: '2px solid #7000ff', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'Orbitron', py: 1.5 }}>ASSETS</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {data.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={2} align="center" sx={{ py: 4, border: 'none', opacity: 0.5 }}>
+                    <Typography variant="caption" sx={{ letterSpacing: 1 }}>NO_NODES_DETECTED</Typography>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                data.sort((a, b) => b.count - a.count).map((country) => (
+                  <TableRow key={country.iso} sx={{ '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)' } }}>
+                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.03)', py: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Box
+                          component="img"
+                          src={`https://flagcdn.com/w20/${country.iso.toLowerCase()}.png`}
+                          alt={country.name}
+                          sx={{
+                            width: 20,
+                            height: 14,
+                            borderRadius: '2px',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            boxShadow: '0 0 5px rgba(0,0,0,0.5)'
+                          }}
+                        />
+                        <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: 'rgba(255,255,255,0.9)' }}>
+                          {country.name}
+                        </Typography>
+                      </Box>
+                    </TableCell>
+                    <TableCell align="right" sx={{ borderBottom: '1px solid rgba(255,255,255,0.03)', py: 2 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 900, fontSize: '0.85rem', color: '#b6b9baff', fontFamily: 'Orbitron' }}>
+                        {country.count}
+                      </Typography>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Grid>
+    </Grid>
+  );
+
+  if (disableCard) {
+    return content;
+  }
 
   return (
     <Card sx={{
@@ -110,155 +265,7 @@ export const GeoMap: React.FC<{ data: CountryData[] }> = ({ data }) => {
             Geographical Distribution of Assets
           </Typography>
         </Box>
-
-        <Grid container sx={{ flexGrow: 1, minHeight: 0 }}>
-          {/* Map Column */}
-          <Grid size={{ xs: 12, md: 8 }} sx={{ position: 'relative', bgcolor: 'rgba(0,0,0,0.3)', height: '100%' }}>
-            {/* Zoom Controls Overlay */}
-            <Box sx={{ position: 'absolute', top: 10, left: 10, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-              <IconButton
-                size="small"
-                sx={{ bgcolor: 'rgba(5, 5, 20, 0.8)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1, p: 0.5, '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
-              >
-                <Plus size={14} />
-              </IconButton>
-              <IconButton
-                size="small"
-                sx={{ bgcolor: 'rgba(5, 5, 20, 0.8)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1, p: 0.5, '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
-              >
-                <Box sx={{ width: 14, height: 2, bgcolor: 'currentColor' }} />
-              </IconButton>
-            </Box>
-
-            <ComposableMap projectionConfig={{ scale: 200, center: [15, 5] }} style={{ width: "100%", height: "100%" }}>
-              <defs>
-                <pattern id="dotPattern" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
-                  <circle cx="1" cy="1" r="0.8" fill="rgba(0, 243, 255, 0.2)" />
-                </pattern>
-                <pattern id="dotPatternActive" x="0" y="0" width="4" height="4" patternUnits="userSpaceOnUse">
-                  <circle cx="1" cy="1" r="1" fill="rgba(0, 243, 255, 0.8)" />
-                </pattern>
-                <filter id="glow">
-                  <feGaussianBlur stdDeviation="1.5" result="coloredBlur" />
-                  <feMerge>
-                    <feMergeNode in="coloredBlur" />
-                    <feMergeNode in="SourceGraphic" />
-                  </feMerge>
-                </filter>
-              </defs>
-              <ZoomableGroup zoom={1} maxZoom={3}>
-                <Geographies geography={geoUrl}>
-                  {({ geographies }) =>
-                    geographies.map((geo) => {
-                      const country = findCountry(geo);
-                      return (
-                        <g key={geo.rsmKey}>
-                          {/* Base Layer for Background Color/Glow */}
-                          <Geography
-                            geography={geo}
-                            fill={country ? "rgba(0, 243, 255, 0.15)" : "rgba(255, 255, 255, 0.02)"}
-                            stroke="rgba(0, 243, 255, 0.1)"
-                            strokeWidth={0.3}
-                            style={{
-                              default: { outline: "none" },
-                              hover: { fill: "rgba(0, 243, 255, 0.3)", cursor: 'pointer' },
-                              pressed: { outline: "none" }
-                            }}
-                          />
-                          {/* Pattern Layer */}
-                          <Geography
-                            geography={geo}
-                            fill={country ? "url(#dotPatternActive)" : "url(#dotPattern)"}
-                            stroke="none"
-                            pointerEvents="none"
-                            style={{
-                              default: {
-                                outline: "none",
-                                filter: country ? "url(#glow)" : "none"
-                              }
-                            }}
-                          />
-                        </g>
-                      );
-                    })
-                  }
-                </Geographies>
-
-                {/* Markers for Countries with Assets */}
-                {data.map((country) => {
-                  const coords = countryCentroids[country.iso.toUpperCase()];
-                  if (!coords) return null;
-                  return (
-                    <Marker key={country.iso} coordinates={coords}>
-                      <Tooltip title={`${country.name}: ${country.count} Assets`} arrow>
-                        <g>
-                          <circle r={4} fill="rgba(0, 243, 255, 0.2)" />
-                          <foreignObject x="-10" y="-10" width="20" height="20">
-                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}>
-                              <PulsingDot color="#00f3ff" />
-                            </div>
-                          </foreignObject>
-                        </g>
-                      </Tooltip>
-                    </Marker>
-                  );
-                })}
-              </ZoomableGroup>
-            </ComposableMap>
-          </Grid>
-
-          {/* List Column */}
-          <Grid size={{ xs: 12, md: 4 }} sx={{ borderLeft: '1px solid rgba(0, 243, 255, 0.1)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
-            <TableContainer sx={{ flexGrow: 1, overflow: 'auto', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderRadius: 2 } }}>
-              <Table size="small" stickyHeader>
-                <TableHead>
-                  <TableRow>
-                    <TableCell sx={{ bgcolor: 'rgba(5,5,15,0.98)', borderBottom: '2px solid #7000ff', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'Orbitron', py: 1.5 }}>COUNTRY</TableCell>
-                    <TableCell align="right" sx={{ bgcolor: 'rgba(5,5,15,0.98)', borderBottom: '2px solid #7000ff', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'Orbitron', py: 1.5 }}>ASSETS</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {data.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={2} align="center" sx={{ py: 4, border: 'none', opacity: 0.5 }}>
-                        <Typography variant="caption" sx={{ letterSpacing: 1 }}>NO_NODES_DETECTED</Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    data.sort((a, b) => b.count - a.count).map((country) => (
-                      <TableRow key={country.iso} sx={{ '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)' } }}>
-                        <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.03)', py: 2 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Box
-                              component="img"
-                              src={`https://flagcdn.com/w20/${country.iso.toLowerCase()}.png`}
-                              alt={country.name}
-                              sx={{
-                                width: 20,
-                                height: 14,
-                                borderRadius: '2px',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                boxShadow: '0 0 5px rgba(0,0,0,0.5)'
-                              }}
-                            />
-                            <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: 'rgba(255,255,255,0.9)' }}>
-                              {country.name}
-                            </Typography>
-                          </Box>
-                        </TableCell>
-                        <TableCell align="right" sx={{ borderBottom: '1px solid rgba(255,255,255,0.03)', py: 2 }}>
-                          <Typography variant="body2" sx={{ fontWeight: 900, fontSize: '0.85rem', color: '#b6b9baff', fontFamily: 'Orbitron' }}>
-                            {country.count}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Grid>
-        </Grid>
+        {content}
       </CardContent>
     </Card>
   );

@@ -67,6 +67,10 @@ urlpatterns = [
         views.index,
         name='scans_v3'),
     path(
+        '<slug:slug>/scan/detail/<int:id>',
+        views.index,
+        name='scan_detail_v3'),
+    path(
         '<slug:slug>/scans/scheduled',
         views.index,
         name='scheduled_scans_v3'),

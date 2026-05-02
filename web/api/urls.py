@@ -5,6 +5,8 @@ from rest_framework import routers
 from .views import *
 from .dashboard_views import DashboardAPIView
 from .target_summary_views import TargetSummaryAPIView
+from .scan_summary_views import ScanSummaryAPIView
+
 from .scheduled_scans import ScheduledScanViewSet
 from .subscans import SubScanViewSet
 from .scan_history import ScanHistoryViewSet
@@ -304,6 +306,11 @@ urlpatterns = [
         'target-summary/<slug:slug>/<int:id>/',
         TargetSummaryAPIView.as_view(),
         name='target_summary_api'
+    ),
+    path(
+        'scan-summary/<slug:slug>/<int:id>/',
+        ScanSummaryAPIView.as_view(),
+        name='scan_summary_api'
     ),
 ]
 

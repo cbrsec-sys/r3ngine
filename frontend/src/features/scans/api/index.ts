@@ -251,3 +251,19 @@ export const useBulkScanAction = (projectSlug: string) => {
     },
   });
 };
+
+export const useScanSummary = (projectSlug: string, scanId: number) => {
+  return useQuery({
+    queryKey: ['scan-summary', projectSlug, scanId],
+    queryFn: async () => {
+      const response = await fetch(`/api/scan-summary/${projectSlug}/${scanId}/`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return response.json();
+    },
+    enabled: !!projectSlug && !!scanId,
+  });
+};
