@@ -452,30 +452,11 @@ export const ScanDetailPage = () => {
 
   const renderHomeContent = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      {/* Row 1: Squares (Widgets) */}
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={4}>
-           <Box sx={{ height: '400px' }}>
-              <MostCommonVulns vulns={data.most_common_vulnerability} />
-           </Box>
-        </Grid>
-        <Grid item xs={12} md={4}>
-           <Box sx={{ height: '400px' }}>
-              <VulnHighlights highlights={data.vulnerability_highlights} />
-           </Box>
-        </Grid>
-        <Grid item xs={12} md={4}>
-           <Box sx={{ height: '400px' }}>
-              <ReconNotes notes={data.todo_notes} />
-           </Box>
-        </Grid>
-      </Grid>
-
-      {/* Row 2: Target Information and HTTP Status Charts */}
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={8}>
-          <TacticalPanel title="Target Information" icon={<Activity size={14} />}>
-             <Box sx={{ p: 2 }}>
+      {/* Row 1: Target Information and HTTP Status Charts (MOVED UP) */}
+      <Grid container spacing={2} alignItems="stretch">
+        <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
+          <TacticalPanel title="Target Information" icon={<Activity size={14} />} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+             <Box sx={{ p: 2, flex: 1 }}>
                <Tabs value={infoTab} onChange={(_, v) => setInfoTab(v)} sx={{ mb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: 32 }}>
                  {['Domain Info', 'Whois', 'DNS Records', 'Nameservers', 'History'].map((l) => (
                    <Tab key={l} label={l} sx={{ fontSize: '0.65rem', fontWeight: 900, minHeight: 32, p: 1, color: 'rgba(255,255,255,0.4)', '&.Mui-selected': { color: '#00f3ff' } }} />
@@ -484,13 +465,45 @@ export const ScanDetailPage = () => {
                
                {infoTab === 0 && (
                  <Grid container spacing={3}>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Domain</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#ff003c' }}>{data.target_info.name}</Typography></Grid>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Dnssec</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.dnssec || 'N/A'}</Typography></Grid>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Geolocation</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography></Grid>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Created</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.created || 'N/A'}</Typography></Grid>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Updated</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.updated || 'N/A'}</Typography></Grid>
-                   <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Expires</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.expires || 'N/A'}</Typography></Grid>
-                   <Grid item xs={12}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Registrar</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#00f3ff' }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography></Grid>
+                   {/* Column 1: ID & Origin */}
+                   <Grid item xs={6}>
+                     <Stack spacing={2.5}>
+                       <Box>
+                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Domain</Typography>
+                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: '#ff003c', fontFamily: 'Orbitron', wordBreak: 'break-all' }}>{data.target_info.name}</Typography>
+                       </Box>
+                       <Box>
+                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Dnssec</Typography>
+                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>{data.domain_info?.dnssec || 'N/A'}</Typography>
+                       </Box>
+                       <Box>
+                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Geolocation</Typography>
+                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography>
+                       </Box>
+                       <Box>
+                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Created</Typography>
+                         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.created?.split('T')[0] || 'N/A'}</Typography>
+                       </Box>
+                     </Stack>
+                   </Grid>
+
+                   {/* Column 2: Maintenance & Registrar */}
+                   <Grid item xs={6}>
+                     <Stack spacing={2.5}>
+                       <Box>
+                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Updated</Typography>
+                         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.updated?.split('T')[0] || 'N/A'}</Typography>
+                       </Box>
+                       <Box>
+                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Expires</Typography>
+                         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.expires?.split('T')[0] || 'N/A'}</Typography>
+                       </Box>
+                       <Box>
+                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Registrar</Typography>
+                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f3ff' }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography>
+                       </Box>
+                     </Stack>
+                   </Grid>
                  </Grid>
                )}
                {infoTab === 1 && (
@@ -523,20 +536,22 @@ export const ScanDetailPage = () => {
              </Box>
           </TacticalPanel>
         </Grid>
-        <Grid item xs={12} md={4}>
-           <TacticalPanel title="HTTP Status Breakdown" icon={<Activity size={14} />}>
-             <Box sx={{ p: 2, height: '100%', minHeight: 300 }}>
+        <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
+           <TacticalPanel title="HTTP Status Breakdown" icon={<Activity size={14} />} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+             <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
                <Chart 
                  options={{
                    chart: { type: 'donut', background: 'transparent' },
                    theme: { mode: 'dark' },
                    stroke: { show: false },
+                   labels: data.http_status_breakdown.map((s: any) => `HTTP ${s.http_status}`),
                    dataLabels: { enabled: false },
                    legend: { position: 'bottom', fontSize: '10px', labels: { colors: 'rgba(255,255,255,0.7)' } },
                    colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00']
                  }} 
                  series={data.http_status_breakdown.map((s: any) => s.count)} 
                  type="donut" 
+                 width="100%"
                  height={300} 
                />
              </Box>
@@ -544,12 +559,31 @@ export const ScanDetailPage = () => {
         </Grid>
       </Grid>
 
-      {/* Row 3: GeoMap */}
+      {/* Row 2: GeoMap (MOVED UP) */}
       <TacticalPanel title="Geographical Distribution" icon={<Globe size={14} />}>
         <Box sx={{ p: 0 }}>
           <GeoMap data={data.asset_countries || []} disableCard={true} />
         </Box>
       </TacticalPanel>
+
+      {/* Row 3: Recon/Vuln Summaries (MOVED DOWN) */}
+      <Grid container spacing={2}>
+        <Grid item xs={12} md={4}>
+           <Box sx={{ height: '400px' }}>
+              <MostCommonVulns vulns={data.most_common_vulnerability} />
+           </Box>
+        </Grid>
+        <Grid item xs={12} md={4}>
+           <Box sx={{ height: '400px' }}>
+              <VulnHighlights highlights={data.vulnerability_highlights} />
+           </Box>
+        </Grid>
+        <Grid item xs={12} md={4}>
+           <Box sx={{ height: '400px' }}>
+              <ReconNotes notes={data.todo_notes} />
+           </Box>
+        </Grid>
+      </Grid>
     </Box>
   );
   const renderBuckets = () => (
