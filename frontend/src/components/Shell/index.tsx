@@ -272,7 +272,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 fontFamily: 'Orbitron', 
                 letterSpacing: 2,
                 color: '#ff00ff',
-                textShadow: '0 0 12px rgba(255, 0, 255, 0.8)',
+                textShadow: '0 0 12px rgba(255, 0, 115, 0.8)',
                 fontSize: '1.4rem',
                 mr: 1.5,
                 textTransform: 'lowercase'

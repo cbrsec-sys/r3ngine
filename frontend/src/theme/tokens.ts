@@ -8,7 +8,7 @@ export const neonTokens = {
     cyan: '#00f0ff',
     pink: '#ff2bd6',
     purple: '#8a5cff',
-    blue: '#3cf2ff',
+    blue: '#38a1cfff',
   },
   cyber: {
     text: '#e6f1ff',

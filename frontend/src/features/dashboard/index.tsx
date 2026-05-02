@@ -67,7 +67,7 @@ export const DashboardPage: React.FC = () => {
 
       <KpiGrid data={data.kpis} />
 
-      <Grid container spacing={3} sx={{ mt: 3 }} alignItems="stretch">
+      <Grid container spacing={3} sx={{ mt: 3 }}>
         {/* Row 2: Activity & GeoMap */}
         <Grid size={{ xs: 12, md: 4 }}>
           <ActivityFeed data={data} />
