@@ -3,7 +3,8 @@ from django.urls import path
 from rest_framework import routers
 
 from .views import *
-from api.dashboard_views import DashboardAPIView
+from .dashboard_views import DashboardAPIView
+from .target_summary_views import TargetSummaryAPIView
 
 
 app_name = 'api'
@@ -108,6 +109,14 @@ urlpatterns = [
         ListEngines.as_view(),
         name='listEngines'),
     path(
+        'listWordlists/',
+        ListWordlists.as_view(),
+        name='listWordlists'),
+    path(
+        'listConfigurations/',
+        ListConfigurations.as_view(),
+        name='listConfigurations'),
+    path(
         'listSubScans/',
         ListSubScans.as_view(),
         name='listSubScans'),
@@ -204,6 +213,26 @@ urlpatterns = [
         DeleteMultipleRows.as_view(),
         name='delete_rows'),
     path(
+        'action/engine/create/',
+        CreateEngine.as_view(),
+        name='create_engine'),
+    path(
+        'action/wordlist/upload/',
+        UploadWordlist.as_view(),
+        name='upload_wordlist'),
+    path(
+        'action/wordlist/read/',
+        GetWordlistContent.as_view(),
+        name='read_wordlist'),
+    path(
+        'action/engine/get/',
+        GetEngineDetails.as_view(),
+        name='get_engine_details'),
+    path(
+        'action/engine/update/',
+        UpdateEngine.as_view(),
+        name='update_engine'),
+    path(
         'toggle/subdomain/important/',
         ToggleSubdomainImportantStatus.as_view(),
         name='toggle_subdomain'),
@@ -211,6 +240,10 @@ urlpatterns = [
         'action/initiate/subtask/',
         InitiateSubTask.as_view(),
         name='initiate_subscan'),
+    path(
+        'action/initiate/scan/',
+        InitiateScan.as_view(),
+        name='initiate_scan'),
     path(
         'action/stop/scan/',
         StopScan.as_view(),
@@ -258,6 +291,11 @@ urlpatterns = [
         'dashboard/<slug:slug>/',
         DashboardAPIView.as_view(),
         name='dashboard_api'
+    ),
+    path(
+        'target-summary/<slug:slug>/<int:id>/',
+        TargetSummaryAPIView.as_view(),
+        name='target_summary_api'
     ),
 ]
 

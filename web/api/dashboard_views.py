@@ -17,7 +17,7 @@ from startScan.models import (
 
 
 from api.dashboard_serializers import DashboardDataSerializer
-from api.serializers import VulnerabilitySerializer, ScanHistorySerializer
+from api.serializers import VulnerabilitySerializer, ScanHistorySerializer, ScanActivitySerializer
 
 from django.conf import settings
 
@@ -98,10 +98,17 @@ class DashboardAPIView(APIView):
             'most_common_cwe': CweId.objects.filter(cwe_ids__in=vulnerabilities).annotate(count=Count('cwe_ids')).order_by('-count')[:7].values('name', 'count'),
             'most_common_tags': VulnerabilityTags.objects.filter(vuln_tags__in=vulnerabilities).annotate(count=Count('vuln_tags')).order_by('-count')[:7].values('name', 'count'),
             'asset_countries': CountryISO.objects.filter(ipaddress__in=ip_addresses).annotate(count=Count('ipaddress')).order_by('-count').values('name', 'iso', 'count'),
-            'most_vulnerable_targets': domains.annotate(vuln_count=Count('scanhistory__vulnerability')).order_by('-vuln_count')[:7].values('name', 'vuln_count'),
-            'activity_feed': ScanHistorySerializer(scan_histories.order_by('-start_scan_date')[:10], many=True).data,
-
-
+            'most_vulnerable_targets': domains.annotate(
+                vuln_count=Count('scanhistory__vulnerability'),
+                critical_count=Count('scanhistory__vulnerability', filter=Q(scanhistory__vulnerability__severity=4)),
+                high_count=Count('scanhistory__vulnerability', filter=Q(scanhistory__vulnerability__severity=3)),
+                medium_count=Count('scanhistory__vulnerability', filter=Q(scanhistory__vulnerability__severity=2)),
+                low_count=Count('scanhistory__vulnerability', filter=Q(scanhistory__vulnerability__severity=1)),
+                info_count=Count('scanhistory__vulnerability', filter=Q(scanhistory__vulnerability__severity=0)),
+                unknown_count=Count('scanhistory__vulnerability', filter=Q(scanhistory__vulnerability__severity=-1)),
+            ).order_by('-vuln_count')[:7].values('name', 'vuln_count', 'critical_count', 'high_count', 'medium_count', 'low_count', 'info_count', 'unknown_count'),
+            'most_common_vulnerabilities': vulnerabilities.values('name', 'severity').annotate(count=Count('id')).order_by('-count')[:7],
+            'activity_feed': ScanActivitySerializer(ScanActivity.objects.filter(scan_of__domain__project=project).order_by('-time')[:10], many=True).data,
             'vulnerability_feed': VulnerabilitySerializer(vulnerabilities.order_by('-discovered_date')[:10], many=True).data,
         }
 

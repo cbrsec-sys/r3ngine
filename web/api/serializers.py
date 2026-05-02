@@ -98,10 +98,12 @@ class DomainSerializer(serializers.ModelSerializer):
 		return obj.get_recent_scan_id()
 
 	def get_insert_date(self, obj):
-		return naturalday(obj.insert_date).title()
+		if obj.insert_date:
+			return naturalday(obj.insert_date).title()
 
 	def get_insert_date_humanized(self, obj):
-		return naturaltime(obj.insert_date).title()
+		if obj.insert_date:
+			return naturaltime(obj.insert_date).title()
 
 	def get_start_scan_date(self, obj):
 		if obj.start_scan_date:
@@ -257,9 +259,31 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			'error_message',
 			'domain',
 			'scan_type',
-			'initiated_by'
+			'initiated_by',
+			'max_severity',
+			'engine_name'
 		]
 		depth = 1
+
+	def get_max_severity(self, scan_history):
+		from startScan.models import Vulnerability
+		max_vuln = Vulnerability.objects.filter(scan_history=scan_history).order_by('-severity').first()
+		if max_vuln:
+			severity_map = {
+				4: 'critical',
+				3: 'high',
+				2: 'medium',
+				1: 'low',
+				0: 'info',
+				-1: 'unknown'
+			}
+			return severity_map.get(max_vuln.severity, 'unknown')
+		return 'none'
+
+	def get_engine_name(self, scan_history):
+		if scan_history.scan_type:
+			return scan_history.scan_type.engine_name
+		return 'Standard'
 
 	def get_subdomain_count(self, scan_history):
 		if scan_history.get_subdomain_count:
@@ -1027,3 +1051,33 @@ class MonitoringDiscoverySerializer(serializers.ModelSerializer):
     class Meta:
         model = MonitoringDiscovery
         fields = ['id', 'domain', 'domain_name', 'discovery_type', 'content', 'discovered_at', 'scan_history_id']
+
+
+class ScanActivitySerializer(serializers.ModelSerializer):
+	domain = serializers.SerializerMethodField('get_domain_name')
+	completed_ago = serializers.SerializerMethodField('get_completed_ago')
+
+	class Meta:
+		model = ScanActivity
+		fields = ['id', 'title', 'name', 'time', 'status', 'domain', 'completed_ago']
+
+	def get_domain_name(self, activity):
+		if activity.scan_of:
+			return activity.scan_of.domain.name
+		return ''
+
+	def get_completed_ago(self, activity):
+		return naturaltime(activity.time).title()
+
+
+class WordlistSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Wordlist
+		fields = '__all__'
+
+
+class ConfigurationSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Configuration
+		fields = '__all__'
+

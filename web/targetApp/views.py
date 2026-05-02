@@ -489,24 +489,14 @@ def target_summary(request, slug, id):
     context['scan_engines'] = EngineType.objects.order_by('engine_name').all()
 
     # Subdomains
-    subdomains = (
-        Subdomain.objects
-        .filter(target_domain__id=id)
-        .values('name')
-        .distinct()
-    )
-    context['subdomain_count'] = subdomains.count()
-    context['alive_count'] = subdomains.filter(http_status__exact=200).count()
+    subdomain_qs = Subdomain.objects.filter(target_domain__id=id)
+    context['subdomain_count'] = subdomain_qs.values('name').distinct().count()
+    context['alive_count'] = subdomain_qs.filter(http_status__exact=200).count()
 
     # Endpoints
-    endpoints = (
-        EndPoint.objects
-        .filter(target_domain__id=id)
-        .values('http_url')
-        .distinct()
-    )
-    context['endpoint_count'] = endpoints.count()
-    context['endpoint_alive_count'] = endpoints.filter(http_status__exact=200).count()
+    endpoint_qs = EndPoint.objects.filter(target_domain__id=id)
+    context['endpoint_count'] = endpoint_qs.values('http_url').distinct().count()
+    context['endpoint_alive_count'] = endpoint_qs.filter(http_status__exact=200).count()
 
     # Vulnerabilities
     vulnerabilities = Vulnerability.objects.filter(target_domain__id=id)
@@ -565,10 +555,10 @@ def target_summary(request, slug, id):
 
     # HTTP Statuses
     context['http_status_breakdown'] = (
-        subdomains
+        subdomain_qs
         .exclude(http_status=0)
         .values('http_status')
-        .annotate(Count('http_status'))
+        .annotate(count=Count('http_status'))
     )
 
     # CVEs
@@ -590,14 +580,14 @@ def target_summary(request, slug, id):
     )
 
     # Country ISOs
-    subdomains = Subdomain.objects.filter(target_domain__id=id)
-    ip_addresses = IpAddress.objects.filter(ip_addresses__in=subdomains)
+    ip_addresses = IpAddress.objects.filter(ip_addresses__in=subdomain_qs)
     context['asset_countries'] = (
         CountryISO.objects
         .filter(ipaddress__in=ip_addresses)
         .annotate(count=Count('iso'))
         .order_by('-count')
     )
+
 
     context['slug'] = slug
     

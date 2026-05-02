@@ -92,38 +92,60 @@ export const ActivityFeed: React.FC<{ data: DashboardData }> = ({ data }) => {
           <Typography variant="body2" color="text.secondary">No recent scans.</Typography>
         ) : (
           data.activity_feed.map((scan, i) => (
-            <React.Fragment key={scan.id}>
-              <ListItem sx={{ px: 1, py: 1.5, borderRadius: 1, '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.03)' } }}>
-                <ListItemText 
-                  primary={
-                    <Typography variant="body2" sx={{ fontWeight: 600, color: '#e6f1ff' }}>
-                      {scan.domain.name}
-                    </Typography>
-                  }
-                  secondary={
-                    <Typography variant="caption" sx={{ opacity: 0.6, display: 'block' }}>
-                      {`${scan.scan_type?.engine_name || 'Standard'} • ${scan.completed_ago || 'Tactical Active'}`}
-                    </Typography>
-                  }
+            <Box 
+              key={scan.id} 
+              sx={{ 
+                mb: 1, 
+                p: 1.2, 
+                borderRadius: 2, 
+                bgcolor: 'rgba(255,255,255,0.02)', 
+                border: '1px solid rgba(0, 243, 255, 0.1)',
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  bgcolor: 'rgba(0, 243, 255, 0.05)',
+                  borderColor: 'rgba(0, 243, 255, 0.4)',
+                  boxShadow: '0 0 10px rgba(0, 243, 255, 0.1)'
+                }
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                <Box 
+                  sx={{ 
+                    width: 6, 
+                    height: 6, 
+                    borderRadius: '50%', 
+                    bgcolor: scan.status === 2 ? '#00ff62' : '#ff9f00', 
+                    mr: 1.2, 
+                    boxShadow: scan.status === 2 ? '0 0 8px #00ff62' : '0 0 8px #ff9f00' 
+                  }} 
                 />
-                <Box sx={{ ml: 2 }}>
-                   <Chip 
-                    label={String(scan.scan_status).toUpperCase()} 
-                    size="small" 
-                    variant="outlined"
-                    sx={{ 
-                      fontSize: '0.6rem', 
-                      fontWeight: 800,
-                      borderRadius: 1,
-                      borderColor: String(scan.scan_status).toLowerCase().includes('success') ? 'success.main' : 'warning.main',
-                      color: String(scan.scan_status).toLowerCase().includes('success') ? 'success.main' : 'warning.main',
-                      boxShadow: String(scan.scan_status).toLowerCase().includes('success') ? '0 0 5px rgba(0, 255, 136, 0.3)' : 'none'
-                    }} 
-                  />
+                <Typography variant="body2" sx={{ fontWeight: 800, color: '#fff', fontSize: '0.8rem', flex: 1 }}>
+                  {scan.title}
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Box sx={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center',
+                  px: 1, 
+                  py: 0.2, 
+                  borderRadius: 0.5, 
+                  bgcolor: 'rgba(0, 243, 255, 0.05)', 
+                  border: '1px solid rgba(0, 243, 255, 0.2)',
+                }}>
+                  <Typography variant="body2" sx={{ color: '#00f3ff', fontWeight: 700, fontSize: '0.65rem' }}>
+                    {scan.domain}
+                  </Typography>
                 </Box>
-              </ListItem>
-              {i < data.activity_feed.length - 1 && <Divider sx={{ opacity: 0.05 }} />}
-            </React.Fragment>
+
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem' }}>
+                  {scan.completed_ago}
+                </Typography>
+              </Box>
+            </Box>
           ))
         )}
       </List>

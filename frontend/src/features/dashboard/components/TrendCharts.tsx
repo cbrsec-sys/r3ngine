@@ -42,7 +42,7 @@ export const TrendCharts: React.FC<{ data: DashboardData['trends'] }> = ({ data 
 
   return (
     <Card sx={{ 
-      height: '100%', 
+      height: 500, 
       bgcolor: 'rgba(5, 5, 15, 0.6)', 
       backdropFilter: 'blur(10px)', 
       border: '1px solid rgba(0, 243, 255, 0.1)',

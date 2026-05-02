@@ -32,10 +32,13 @@ import {
 } from 'lucide-react';
 import { useScans } from '../api';
 import { useAppContext } from '../../../context/AppContext';
+import { useParams } from '@tanstack/react-router';
+import { StartScanModal } from './StartScanModal';
 
 export const ScanList: React.FC = () => {
-  const { projectName } = useAppContext();
-  const { data: scans, isLoading } = useScans(projectName || 'default');
+  const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { data: scans, isLoading } = useScans(projectSlug);
+  const [isStartScanModalOpen, setIsStartScanModalOpen] = React.useState(false);
 
   const getStatusChip = (status: number) => {
     switch (status) {
@@ -69,22 +72,6 @@ export const ScanList: React.FC = () => {
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
             HISTORICAL MISSION LOGS & ACTIVE DEPLOYMENTS
           </Typography>
-        </Box>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-           <Button 
-            variant="outlined" 
-            startIcon={<Play size={18} />}
-            sx={{ 
-              borderColor: '#00f3ff',
-              color: '#00f3ff',
-              '&:hover': { borderColor: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)' },
-              fontFamily: 'Orbitron',
-              fontWeight: 800,
-              px: 3
-            }}
-          >
-            New Scan
-          </Button>
         </Box>
       </Box>
 
@@ -136,40 +123,44 @@ export const ScanList: React.FC = () => {
               {scans?.map((scan) => (
                 <TableRow key={scan.id} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }, transition: 'all 0.2s' }}>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#fff' }}>{scan.domain.name}</Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontWeight: 600 }}>{scan.scan_type.engine_name}</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#fff' }}>{scan.domain?.name || 'N/A'}</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontWeight: 600 }}>{scan.engine_name || scan.scan_type?.engine_name || 'Standard'}</Typography>
                   </TableCell>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', minWidth: 150 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       <LinearProgress 
                         variant="determinate" 
-                        value={scan.current_progress} 
+                        value={scan.current_progress || 0} 
                         sx={{ 
                           flexGrow: 1, 
                           height: 4, 
                           borderRadius: 2,
                           bgcolor: 'rgba(255,255,255,0.05)',
                           '& .MuiLinearProgress-bar': {
-                            bgcolor: '#00f3ff',
-                            boxShadow: '0 0 10px rgba(0, 243, 255, 0.5)'
+                            bgcolor: scan.scan_status === -1 ? '#ff003c' : '#00f3ff',
+                            boxShadow: `0 0 10px ${scan.scan_status === -1 ? 'rgba(255, 0, 60, 0.5)' : 'rgba(0, 243, 255, 0.5)'}`
                           }
                         }} 
                       />
-                      <Typography variant="caption" sx={{ fontWeight: 900, color: '#00f3ff', width: 35 }}>{Math.round(scan.current_progress)}%</Typography>
+                      <Typography variant="caption" sx={{ fontWeight: 900, color: scan.scan_status === -1 ? '#ff003c' : '#00f3ff', width: 35 }}>
+                        {Math.round(scan.current_progress || 0)}%
+                      </Typography>
                     </Box>
                   </TableCell>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Box sx={{ display: 'flex', gap: 1.5 }}>
-                      <Tooltip title="Subdomains">
+                      <Tooltip title="Subdomains Found">
                         <Box sx={{ textAlign: 'center' }}>
                           <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>SUB</Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 900, color: '#fff' }}>{scan.subdomain_count}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 900, color: '#fff' }}>{scan.subdomain_count || 0}</Typography>
                         </Box>
                       </Tooltip>
-                      <Tooltip title="Vulnerabilities">
+                      <Tooltip title="Vulnerabilities Detected">
                         <Box sx={{ textAlign: 'center' }}>
                           <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>VUL</Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 900, color: '#ff003c' }}>{scan.vulnerability_count}</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 900, color: (scan.vulnerability_count || 0) > 0 ? '#ff003c' : '#fff' }}>
+                            {scan.vulnerability_count || 0}
+                          </Typography>
                         </Box>
                       </Tooltip>
                     </Box>
@@ -180,16 +171,22 @@ export const ScanList: React.FC = () => {
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
                       <Clock size={12} style={{ color: 'rgba(255,255,255,0.4)' }} />
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>{scan.completed_ago || 'Active'}</Typography>
+                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>{scan.completed_ago || (scan.scan_status === 1 ? 'Active' : 'N/A')}</Typography>
                     </Box>
                     <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem' }}>
-                      Duration: {scan.elapsed_time}
+                      Time: {scan.elapsed_time || '0s'}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                       <Tooltip title="View Detailed Report">
-                        <IconButton size="small" sx={{ color: '#00f3ff', '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}>
+                        <IconButton 
+                          size="small" 
+                          component="a"
+                          href={`/scan/detail/${scan.id}`}
+                          target="_blank"
+                          sx={{ color: '#00f3ff', '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                        >
                           <Eye size={16} />
                         </IconButton>
                       </Tooltip>

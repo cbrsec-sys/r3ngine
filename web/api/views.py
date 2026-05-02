@@ -24,7 +24,13 @@ from recon_note.models import *
 from reNgine.celery import app
 from reNgine.common_func import *
 from reNgine.database_utils import *
-from reNgine.definitions import ABORTED_TASK
+from reNgine.definitions import (
+	ABORTED_TASK,
+	PERM_MODIFY_TARGETS,
+	PERM_MODIFY_SCAN_CONFIGURATIONS,
+	PERM_MODIFY_WORDLISTS,
+	PERM_INITATE_SCANS_SUBSCANS
+)
 from reNgine.tasks import *
 from reNgine.llm import *
 from reNgine.utilities import is_safe_path
@@ -549,13 +555,13 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 	serializer_class = DomainSerializer
 
 	def get_queryset(self):
+		queryset = Domain.objects.all()
 		slug = self.request.GET.get('slug', None)
 		if slug:
-			self.queryset = self.queryset.filter(project__slug=slug)
-		return self.queryset
+			queryset = queryset.filter(project__slug=slug)
+		return queryset
 
 	def filter_queryset(self, qs):
-		qs = self.queryset.filter()
 		search_value = self.request.GET.get(u'search[value]', None)
 		_order_col = self.request.GET.get(u'order[0][column]', None)
 		_order_direction = self.request.GET.get(u'order[0][dir]', None)
@@ -575,12 +581,13 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 			if _order_direction == 'desc':
 				order_col = f'-{order_col}'
 
-			qs = self.queryset.filter(
+			qs = qs.filter(
 				Q(name__icontains=search_value) |
 				Q(description__icontains=search_value) |
 				Q(domains__name__icontains=search_value)
 			)
 			return qs.order_by(order_col)
+		return qs
 
 
 class MonitoringDiscoveryViewSet(viewsets.ModelViewSet):
@@ -1120,11 +1127,189 @@ class DeleteMultipleRows(APIView):
 			elif data['type'] == 'organization':
 				for row in data['rows']:
 					Organization.objects.get(id=row).delete()
+			elif data['type'] == 'scan_engine':
+				for row in data['rows']:
+					EngineType.objects.get(id=row).delete()
+			elif data['type'] == 'wordlist':
+				for row in data['rows']:
+					Wordlist.objects.get(id=row).delete()
+			elif data['type'] == 'target':
+				for row in data['rows']:
+					Domain.objects.get(id=row).delete()
+			elif data['type'] == 'scan_history':
+				for row in data['rows']:
+					ScanHistory.objects.get(id=row).delete()
 			response = True
 		except Exception as e:
 			response = False
 
 		return Response({'status': response})
+
+
+class CreateEngine(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def post(self, request):
+		data = request.data
+		name = data.get('engine_name')
+		yaml_configuration = data.get('yaml_configuration')
+
+		if not name or not yaml_configuration:
+			return Response({
+				'status': False,
+				'message': 'Name and YAML configuration are required'
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			EngineType.objects.create(
+				engine_name=name,
+				yaml_configuration=yaml_configuration
+			)
+			return Response({
+				'status': True,
+				'message': 'Engine created successfully'
+			})
+		except Exception as e:
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UploadWordlist(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_WORDLISTS
+
+	def post(self, request):
+		data = request.data
+		name = data.get('name')
+		short_name = data.get('short_name')
+		upload_file = request.FILES.get('upload_file')
+
+		if not name or not short_name or not upload_file:
+			return Response({
+				'status': False,
+				'message': 'Name, short name and file are required'
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			wordlist_content = upload_file.read().decode('UTF-8', "ignore")
+			wordlist_dir = '/usr/src/wordlist/'
+			if not os.path.exists(wordlist_dir):
+				os.makedirs(wordlist_dir)
+
+			file_path = os.path.join(wordlist_dir, f"{short_name}.txt")
+			with open(file_path, 'w') as f:
+				f.write(wordlist_content)
+
+			Wordlist.objects.create(
+				name=name,
+				short_name=short_name,
+				count=wordlist_content.count('\n')
+			)
+			return Response({
+				'status': True,
+				'message': 'Wordlist uploaded successfully'
+			})
+		except Exception as e:
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GetWordlistContent(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_WORDLISTS
+
+	def get(self, request):
+		wordlist_id = request.query_params.get('wordlist_id')
+		if not wordlist_id:
+			return Response({
+				'status': False,
+				'message': 'Wordlist ID is required'
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			wordlist = Wordlist.objects.get(id=wordlist_id)
+			file_path = f'/usr/src/wordlist/{wordlist.short_name}.txt'
+			if os.path.exists(file_path):
+				with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+					# Read first 1000 lines or something to avoid huge responses
+					content = "".join([next(f) for _ in range(1000)])
+					return Response({
+						'status': True,
+						'content': content,
+						'name': wordlist.name
+					})
+			return Response({
+				'status': False,
+				'message': 'File not found'
+			}, status=status.HTTP_404_NOT_FOUND)
+		except Exception as e:
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GetEngineDetails(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def get(self, request):
+		engine_id = request.query_params.get('engine_id')
+		if not engine_id:
+			return Response({
+				'status': False,
+				'message': 'Engine ID is required'
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			engine = EngineType.objects.get(id=engine_id)
+			return Response({
+				'status': True,
+				'engine_name': engine.engine_name,
+				'yaml_configuration': engine.yaml_configuration
+			})
+		except Exception as e:
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UpdateEngine(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def post(self, request):
+		data = request.data
+		engine_id = data.get('engine_id')
+		name = data.get('engine_name')
+		yaml_configuration = data.get('yaml_configuration')
+
+		if not engine_id or not name or not yaml_configuration:
+			return Response({
+				'status': False,
+				'message': 'Engine ID, name and YAML configuration are required'
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			engine = EngineType.objects.get(id=engine_id)
+			engine.engine_name = name
+			engine.yaml_configuration = yaml_configuration
+			engine.save()
+			return Response({
+				'status': True,
+				'message': 'Engine updated successfully'
+			})
+		except Exception as e:
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class StopScan(APIView):
@@ -1227,7 +1412,98 @@ class StopScan(APIView):
 		return Response(response)
 
 
+class InitiateScan(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+	def post(self, request):
+		data = request.data
+		domain_ids = data.get('domain_id')
+		engine_id = data.get('engine_id')
+		
+		try:
+			# Convert single ID to list for uniform processing
+			if not isinstance(domain_ids, list):
+				domain_ids = [domain_ids]
+
+			results = []
+			errors = []
+
+			for domain_id in domain_ids:
+				try:
+					domain = Domain.objects.get(pk=domain_id)
+					
+					# Extract optional scan parameters
+					subdomains_in = data.get('importSubdomainTextArea', [])
+					subdomains_out = data.get('outOfScopeSubdomainTextarea', [])
+					starting_point_path = data.get('startingPointPath', '').strip()
+					excluded_paths = data.get('excludedPaths', [])
+					if isinstance(excluded_paths, str):
+						excluded_paths = [path.strip() for path in excluded_paths.split(',')]
+					
+					custom_dorks = data.get('customDorkTextarea', '').strip() if data.get('customDorkSwitch') else None
+					api_discovery_tools = data.get('api_discovery_tools', [])
+					kr_wordlist = data.get('kr_wordlist', 'routes-large.kite')
+					spiderfoot_scan = data.get('spiderfoot_scan', False)
+
+					# Create ScanHistory object
+					scan_history_id = create_scan_object(
+						host_id=domain_id,
+						engine_id=engine_id,
+						initiated_by_id=request.user.id
+					)
+					scan = ScanHistory.objects.get(pk=scan_history_id)
+					if custom_dorks:
+						scan.cfg_custom_dorks = custom_dorks
+						scan.save()
+
+					# Start the celery task
+					kwargs = {
+						'scan_history_id': scan.id,
+						'domain_id': domain.id,
+						'engine_id': engine_id,
+						'scan_type': LIVE_SCAN,
+						'results_dir': '/usr/src/scan_results',
+						'imported_subdomains': subdomains_in,
+						'out_of_scope_subdomains': subdomains_out,
+						'starting_point_path': starting_point_path,
+						'excluded_paths': excluded_paths,
+						'custom_dorks': custom_dorks,
+						'api_discovery_tools': api_discovery_tools,
+						'kr_wordlist': kr_wordlist,
+						'enable_spiderfoot_scan': spiderfoot_scan,
+						'initiated_by_id': request.user.id
+					}
+					initiate_scan.apply_async(kwargs=kwargs)
+					results.append({'domain': domain.name, 'scan_id': scan.id})
+					
+				except Exception as e:
+					logger.error(f"Error initiating scan for domain {domain_id}: {str(e)}")
+					errors.append({'domain_id': domain_id, 'error': str(e)})
+
+			if not results:
+				return Response({
+					'status': False,
+					'message': 'Failed to initiate any scans',
+					'errors': errors
+				}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+			return Response({
+				'status': True,
+				'message': f'Successfully initiated {len(results)} scan(s)',
+				'results': results,
+				'errors': errors if errors else None
+			})
+		except Exception as e:
+			logger.error(e)
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class InitiateSubTask(APIView):
+
 	permission_classes = [HasPermission]
 	permission_required = PERM_INITATE_SCANS_SUBSCANS
 
@@ -1840,6 +2116,20 @@ class ListOrganizations(APIView):
 		organizations = Organization.objects.all()
 		organization_serializer = OrganizationSerializer(organizations, many=True)
 		return Response({'organizations': organization_serializer.data})
+
+
+class ListWordlists(APIView):
+	def get(self, request, format=None):
+		wordlists = Wordlist.objects.all()
+		wordlist_serializer = WordlistSerializer(wordlists, many=True)
+		return Response({'wordlists': wordlist_serializer.data})
+
+
+class ListConfigurations(APIView):
+	def get(self, request, format=None):
+		configurations = Configuration.objects.all()
+		configuration_serializer = ConfigurationSerializer(configurations, many=True)
+		return Response({'configurations': configuration_serializer.data})
 
 
 class ListTargetsInOrganization(APIView):

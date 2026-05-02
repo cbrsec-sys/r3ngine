@@ -38,9 +38,37 @@ export interface DashboardData {
   most_common_cwe: Array<{ name: string; count: number }>;
   most_common_tags: Array<{ name: string; count: number }>;
   asset_countries: { name: string; iso: string; count: number }[];
-  most_vulnerable_targets: { name: string; vuln_count: number }[];
-  activity_feed: any[];
-  vulnerability_feed: any[];
+  most_vulnerable_targets: {
+    name: string;
+    vuln_count: number;
+    critical_count: number;
+    high_count: number;
+    medium_count: number;
+    low_count: number;
+    info_count: number;
+    unknown_count: number;
+  }[];
+  most_common_vulnerabilities: {
+    name: string;
+    severity: number;
+    count: number;
+  }[];
+  activity_feed: Array<{
+    id: number;
+    domain: string;
+    title: string;
+    name: string;
+    status: number;
+    completed_ago: string;
+    time: string;
+  }>;
+  vulnerability_feed: Array<{
+    id: number;
+    name: string;
+    severity: number;
+    http_url: string;
+    discovered_date: string;
+  }>;
 }
 
 export const useDashboardData = (projectSlug: string) => {

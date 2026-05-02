@@ -53,6 +53,30 @@ urlpatterns = [
         views.attack_surface,
         name='attack_surface'),
     path(
+        '<slug:slug>/targets/',
+        views.index,
+        name='targets_v3'),
+    path(
+        '<slug:slug>/target/<int:id>/summary',
+        views.index,
+        name='target_summary_v3'),
+    path(
+        '<slug:slug>/scans/',
+        views.index,
+        name='scans_v3'),
+    path(
+        '<slug:slug>/vulns/',
+        views.index,
+        name='vulnerabilities_v3'),
+    path(
+        '<slug:slug>/engines/',
+        views.index,
+        name='engines_v3'),
+    path(
+        '<slug:slug>/wordlists/',
+        views.index,
+        name='wordlists_v3'),
+    path(
         '<slug:slug>/api/graph/scan/<int:scan_id>/data/',
         views.get_graph_data,
         name='get_graph_data'),

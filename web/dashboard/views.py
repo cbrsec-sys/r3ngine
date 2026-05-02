@@ -30,7 +30,7 @@ from reNgine.graph_utils import Neo4jManager
 
 logger = logging.getLogger(__name__)
 
-def index(request, slug):
+def index(request, slug, *args, **kwargs):
     try:
         project = Project.objects.get(slug=slug)
     except Exception as e:
@@ -314,7 +314,14 @@ def search(request, slug):
 
 
 def four_oh_four(request):
-    return render(request, '404.html')
+    try:
+        return render(request, '404.html')
+    except Exception as e:
+        logger.error(f"Error in 404 handler: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        from django.http import HttpResponse
+        return HttpResponse("404 Not Found (and 404 handler crashed)", status=404)
 
 
 def projects(request, slug):

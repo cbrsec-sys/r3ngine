@@ -49,6 +49,7 @@ class DashboardDataSerializer(serializers.Serializer):
     most_common_tags = DashboardDistributionItemSerializer(many=True)
     asset_countries = DashboardGeoSerializer(many=True)
     most_vulnerable_targets = serializers.ListField()
+    most_common_vulnerabilities = serializers.ListField()
     activity_feed = serializers.ListField()
 
     vulnerability_feed = serializers.ListField()

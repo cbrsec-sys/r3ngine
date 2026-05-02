@@ -1,10 +1,13 @@
 import { createRootRoute, createRoute, createRouter, Outlet, Link } from "@tanstack/react-router";
 import { Shell } from "./components/Shell";
 import { DashboardPage } from "./features/dashboard";
-import { TargetList } from "./features/targets";
+import { TargetList, TargetSummary } from "./features/targets";
 import { MonitoringPage } from "./features/monitoring";
+import { EnginesPage } from "./features/engines";
+import { ScanList } from "./features/scans/components/ScanList";
+import { PlaceholderPage } from "./components/PlaceholderPage";
 import { Box, Typography, Button } from "@mui/material";
-import { AlertCircle, Home, RefreshCw } from "lucide-react";
+import { AlertCircle, Home, RefreshCw, Activity, ShieldAlert } from "lucide-react";
 
 // Root Route
 const rootRoute = createRootRoute({
@@ -14,6 +17,7 @@ const rootRoute = createRootRoute({
     </Shell>
   ),
   notFoundComponent: () => <NotFound />,
+  errorComponent: (props) => <ErrorComponent {...props} />,
 });
 
 // Project-specific layout route
@@ -43,11 +47,39 @@ const targetListRoute = createRoute({
   component: TargetList,
 });
 
+// Target Summary Route
+const targetSummaryRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "target/$targetId/summary",
+  component: TargetSummary,
+});
+
 // Monitoring Route
 const monitoringRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: "monitoring",
   component: MonitoringPage,
+});
+
+// Engines Route
+const enginesRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "engines",
+  component: EnginesPage,
+});
+
+// Scans Route
+const scansRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "scans",
+  component: ScanList,
+});
+
+// Vulnerabilities Route
+const vulnsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "vulns",
+  component: () => <PlaceholderPage title="Vulnerabilities" icon={<ShieldAlert size={48} />} />,
 });
 
 // Route Tree
@@ -56,7 +88,11 @@ const routeTree = rootRoute.addChildren([
   projectRoute.addChildren([
     dashboardRoute,
     targetListRoute,
+    targetSummaryRoute,
     monitoringRoute,
+    enginesRoute,
+    scansRoute,
+    vulnsRoute,
   ]),
 ]);
 
@@ -158,6 +194,36 @@ function NotFound() {
           RECONNECT SIGNAL
         </Button>
       </Box>
+    </Box>
+  );
+}
+
+function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+  return (
+    <Box
+      sx={{
+        height: '80vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
+        alignItems: 'center',
+        textAlign: 'center',
+        p: 3
+      }}
+    >
+      <AlertCircle size={80} color="#ff003c" style={{ marginBottom: 20 }} />
+      <Typography variant="h3" sx={{ fontFamily: 'Orbitron', mb: 2, color: '#fff' }}>SYSTEM_CRASH</Typography>
+      <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.7)', mb: 4, maxWidth: 600 }}>
+        An unexpected error occurred in the tactical interface. 
+        Error: {error.message}
+      </Typography>
+      <Button 
+        variant="contained" 
+        onClick={reset}
+        sx={{ bgcolor: '#ff003c', '&:hover': { bgcolor: '#cc0030' } }}
+      >
+        REBOOT INTERFACE
+      </Button>
     </Box>
   );
 }

@@ -230,8 +230,9 @@ export const GeoMap: React.FC<{ data: CountryData[] }> = ({ data }) => {
                         <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.03)', py: 2 }}>
                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                             <Box
-                              component="span"
-                              className={`fi fi-${country.iso.toLowerCase()}`}
+                              component="img"
+                              src={`https://flagcdn.com/w20/${country.iso.toLowerCase()}.png`}
+                              alt={country.name}
                               sx={{
                                 width: 20,
                                 height: 14,
