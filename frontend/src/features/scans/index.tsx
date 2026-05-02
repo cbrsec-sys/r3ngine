@@ -1,4 +1,6 @@
 export * from './components/ScanList';
-export { default as ScheduledScansPage } from './components/ScheduledScansPage';
+export * from './components/ScheduledScansPage';
+export * from './components/SubScansPage';
+export * from './components/ScanHistoryPage';
 export * from './api';
 export * from './types';

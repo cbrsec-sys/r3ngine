@@ -38,3 +38,18 @@ export interface ScheduledScan {
   kwargs: string;
   date_changed: string;
 }
+
+export interface SubScan {
+  id: number;
+  type: string;
+  start_scan_date: string;
+  stop_scan_date: string | null;
+  status: number;
+  subdomain: number;
+  subdomain_name: string;
+  engine: string;
+  time_taken: string;
+  elapsed_time: string;
+  completed_ago: string;
+  error_message: string | null;
+}

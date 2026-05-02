@@ -5,7 +5,7 @@ import { TargetList, TargetSummary } from "./features/targets";
 import { MonitoringPage } from "./features/monitoring";
 import { EnginesPage } from "./features/engines";
 import { ProjectsPage } from "./features/projects";
-import { ScanList, ScheduledScansPage } from "./features/scans";
+import { ScanList, ScheduledScansPage, SubScansPage, ScanHistoryPage } from "./features/scans";
 import { EndpointsPage } from "./features/endpoints";
 import { SubdomainsPage } from "./features/subdomains";
 
@@ -83,14 +83,55 @@ const enginesRoute = createRoute({
 const scansRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: "scans",
-  component: ScanList,
+  component: ScanHistoryPage,
+  loader: async ({ params: { projectSlug } }) => {
+    return { projectSlug };
+  },
 });
 
 // Sub Scans Route
 const subScansRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: "scans/sub",
-  component: () => <PlaceholderPage title="Sub Scan History" icon={<Activity size={48} />} />,
+  component: SubScansPage,
+  loader: async ({ params: { projectSlug } }) => {
+    return { projectSlug };
+  },
+  pendingComponent: () => (
+    <Box sx={{ 
+      height: '80vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      gap: 3
+    }}>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
+      </Box>
+      <Typography sx={{ 
+        fontFamily: 'Orbitron', 
+        fontWeight: 900, 
+        letterSpacing: 2, 
+        fontSize: '14px',
+        color: '#00f3ff',
+        textAlign: 'center'
+      }}>
+        ACCESSING TACTICAL REGISTRY... <br/>
+        <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>RETRIEVING SUB SCANS... PLEASE WAIT</span>
+      </Typography>
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.5); opacity: 1; }
+          }
+        `}
+      </style>
+    </Box>
+  )
 });
 
 // Scheduled Scans Route

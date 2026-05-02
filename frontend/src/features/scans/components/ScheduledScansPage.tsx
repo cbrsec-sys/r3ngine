@@ -9,7 +9,8 @@ import {
   Tooltip,
   Switch,
   Chip,
-  CircularProgress
+  CircularProgress,
+  TablePagination
 } from '@mui/material';
 import { 
   Search, 
@@ -19,19 +20,22 @@ import {
   Play, 
   CheckCircle2, 
   XCircle,
-  MoreVertical,
   AlertCircle,
   Zap
 } from 'lucide-react';
 import { useScheduledScans, useToggleScheduledScan, useBulkDeleteScheduledScans } from '../api';
 
-const ScheduledScansPage: React.FC = () => {
+export const ScheduledScansPage: React.FC = () => {
   const { data, isLoading, isError } = useScheduledScans();
   const toggleMutation = useToggleScheduledScan();
   const bulkDeleteMutation = useBulkDeleteScheduledScans();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
+  
+  // Pagination State
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const filteredData = useMemo(() => {
     if (!data) return [];
@@ -40,6 +44,20 @@ const ScheduledScansPage: React.FC = () => {
       scan.name.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [data, searchQuery]);
+
+  const paginatedData = useMemo(() => {
+    const startIndex = page * rowsPerPage;
+    return filteredData.slice(startIndex, startIndex + rowsPerPage);
+  }, [filteredData, page, rowsPerPage]);
+
+  const handlePageChange = (_: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleRowsPerPageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
@@ -199,14 +217,14 @@ const ScheduledScansPage: React.FC = () => {
                   <Typography sx={{ mt: 2, fontFamily: 'monospace', color: '#00f3ff' }}>ACCESSING TACTICAL REGISTRY...</Typography>
                 </td>
               </tr>
-            ) : filteredData.length === 0 ? (
+            ) : paginatedData.length === 0 ? (
               <tr>
                 <td colSpan={8} style={{ padding: '60px', textAlign: 'center' }}>
                   <Typography sx={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>NO SCHEDULED OPERATIONS DETECTED</Typography>
                 </td>
               </tr>
             ) : (
-              filteredData.map((scan) => (
+              paginatedData.map((scan) => (
                 <tr 
                   key={scan.id} 
                   style={{ 
@@ -294,6 +312,25 @@ const ScheduledScansPage: React.FC = () => {
             )}
           </tbody>
         </table>
+
+        {/* Pagination Section */}
+        <TablePagination
+          component="div"
+          count={filteredData.length}
+          page={page}
+          onPageChange={handlePageChange}
+          rowsPerPage={rowsPerPage}
+          onRowsPerPageChange={handleRowsPerPageChange}
+          sx={{
+            color: '#00f3ff',
+            fontFamily: 'monospace',
+            borderTop: '1px solid rgba(0, 243, 255, 0.1)',
+            '& .MuiTablePagination-selectIcon': { color: '#00f3ff' },
+            '& .MuiTablePagination-actions': { color: '#00f3ff' },
+            '& .MuiTablePagination-select': { fontFamily: 'monospace' },
+            '& .MuiTablePagination-displayedRows': { fontFamily: 'monospace' },
+          }}
+        />
       </Box>
 
       {/* Footer Info */}
@@ -317,5 +354,3 @@ const ScheduledScansPage: React.FC = () => {
     </Box>
   );
 };
-
-export default ScheduledScansPage;

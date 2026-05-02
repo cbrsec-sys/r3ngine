@@ -6,6 +6,8 @@ from .views import *
 from .dashboard_views import DashboardAPIView
 from .target_summary_views import TargetSummaryAPIView
 from .scheduled_scans import ScheduledScanViewSet
+from .subscans import SubScanViewSet
+from .scan_history import ScanHistoryViewSet
 
 
 app_name = 'api'
@@ -27,7 +29,9 @@ router.register(r'notifications', InAppNotificationManagerViewSet, basename='not
 router.register(r'hackerone-programs', HackerOneProgramViewSet, basename='hackerone_program')
 router.register(r'monitoring', MonitoringDiscoveryViewSet, basename='monitoring')
 router.register(r'projects', ProjectViewSet, basename='projects')
-router.register(r'scheduledScans', ScheduledScanViewSet)
+router.register(r'scheduledScans', ScheduledScanViewSet, basename='scheduled-scans')
+router.register(r'subscans', SubScanViewSet, basename='subscans')
+router.register(r'listScans', ScanHistoryViewSet, basename='list-scans')
 
 
 urlpatterns = [

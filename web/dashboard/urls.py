@@ -67,6 +67,14 @@ urlpatterns = [
         views.index,
         name='scans_v3'),
     path(
+        '<slug:slug>/scans/scheduled',
+        views.index,
+        name='scheduled_scans_v3'),
+    path(
+        '<slug:slug>/scans/sub',
+        views.index,
+        name='subscans_history_v3'),
+    path(
         '<slug:slug>/vulns/',
         views.index,
         name='vulnerabilities_v3'),

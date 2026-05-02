@@ -252,6 +252,8 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 	completed_ago = serializers.SerializerMethodField('get_completed_ago')
 	organizations = serializers.SerializerMethodField('get_organizations')
 	initiated_by = MinimalUserSerializer(read_only=True)
+	max_severity = serializers.SerializerMethodField('get_max_severity')
+	engine_name = serializers.SerializerMethodField('get_engine_name')
 
 	class Meta:
 		model = ScanHistory
@@ -276,7 +278,8 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			'scan_type',
 			'initiated_by',
 			'max_severity',
-			'engine_name'
+			'engine_name',
+			'cfg_starting_point_path'
 		]
 		depth = 1
 
