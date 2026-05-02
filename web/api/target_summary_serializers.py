@@ -70,6 +70,10 @@ class TargetSummarySerializer(serializers.Serializer):
     exposed_count = serializers.IntegerField()
     email_count = serializers.IntegerField()
     employees_count = serializers.IntegerField()
+    secret_leaks_count = serializers.IntegerField(required=False)
+    exploitable_count = serializers.IntegerField(required=False)
+    buckets_count = serializers.IntegerField(required=False)
+    matched_gf_count = serializers.DictField(required=False)
     
     # Discovery
     monitoring_discoveries = serializers.ListField()

@@ -11,8 +11,9 @@ from startScan.models import (
     Subdomain, EndPoint, Vulnerability, 
     VulnerabilityTags, IpAddress, Port, Technology, 
     MonitoringDiscovery, CountryISO, CveId, CweId,
-    Email, Employee, ScanHistory, SubScan, ScanActivity
+    Email, Employee, ScanHistory, SubScan, ScanActivity, SecretLeak
 )
+from recon_note.models import TodoNote
 
 from api.target_summary_serializers import TargetSummarySerializer, TacticalScanHistorySerializer
 from api.serializers import MonitoringDiscoverySerializer, SubScanSerializer
@@ -136,8 +137,20 @@ class ScanSummaryAPIView(APIView):
                 'title': activity.title,
                 'time': activity.time,
                 'status': status_map.get(activity.status, 'UNKNOWN'),
-                'name': activity.name
+                'name': activity.name,
+                'error_message': activity.error_message if hasattr(activity, 'error_message') else None
             })
+
+        # Extra counts
+        emails = Email.objects.filter(emails=scan)
+        exposed_count = emails.exclude(password__isnull=True).count()
+        secret_leaks = SecretLeak.objects.filter(scan_history=scan)
+        secret_leaks_count = secret_leaks.count()
+        exploitable_count = vulnerabilities.exclude(exploit_url__isnull=True).exclude(exploit_url__exact='').count()
+        matched_gf_count = {}
+        if scan.used_gf_patterns:
+            for gf in scan.used_gf_patterns.split(','):
+                matched_gf_count[gf] = endpoint_qs.filter(matched_gf_patterns__icontains=gf).count()
 
         data = {
             'subdomain_count': subdomain_count,
@@ -158,9 +171,14 @@ class ScanSummaryAPIView(APIView):
             'most_common_cwe': list(most_common_cwe),
             'asset_countries': list(asset_countries),
             'http_status_breakdown': list(http_status_breakdown),
-            'exposed_count': 0,
-            'email_count': Email.objects.filter(emails=scan).count(),
+            'exposed_count': exposed_count,
+            'secret_leaks_count': secret_leaks_count,
+            'exploitable_count': exploitable_count,
+            'matched_gf_count': matched_gf_count,
+            'buckets_count': scan.buckets.count(),
+            'email_count': emails.count(),
             'employees_count': Employee.objects.filter(employees=scan).count(),
+            'todo_notes': list(TodoNote.objects.filter(scan_history=scan).values('id', 'title', 'description', 'is_done', 'is_important')),
             'monitoring_discoveries_list': MonitoringDiscoverySerializer(monitoring_discoveries, many=True).data,
             'subscans': SubScanSerializer(subscans, many=True).data,
             'recent_scans': recent_scans_data,
@@ -175,9 +193,9 @@ class ScanSummaryAPIView(APIView):
             'scan_count': scan_count,
             'this_week_scan_count': this_week_scan_count,
             'vulnerability_highlights': list(vulnerabilities.order_by('-severity', '-discovered_date')[:10].values('name', 'severity', 'http_url', 'discovered_date')),
-            'subdomains': list(subdomain_qs.order_by('name')[:100].values('name', 'http_status', 'page_title')),
-            'endpoints': list(endpoint_qs.order_by('http_url')[:100].values('http_url', 'http_status', 'content_type')),
-            'vulnerabilities': list(vulnerabilities.order_by('-severity')[:100].values('name', 'severity', 'description')),
+            'subdomains': list(subdomain_qs.order_by('name')[:100].values('name', 'http_status', 'page_title', 'http_url', 'origin_ip')),
+            'endpoints': list(endpoint_qs.order_by('http_url')[:100].values('http_url', 'http_status', 'content_type', 'techs__name')),
+            'vulnerabilities': list(vulnerabilities.order_by('-severity')[:100].values('name', 'severity', 'description', 'http_url')),
             'monitoring_discoveries': list(monitoring_discoveries.values('id', 'discovery_type', 'content')),
             # Scan specific data
             'scan_info': {
@@ -189,10 +207,17 @@ class ScanSummaryAPIView(APIView):
                 'duration': int((scan.stop_scan_date - scan.start_scan_date).total_seconds()) if scan.stop_scan_date else int((timezone.now() - scan.start_scan_date).total_seconds()),
                 'progress': scan.get_progress() or 0,
                 'cfg_starting_point_path': scan.cfg_starting_point_path,
-                'cfg_imported_subdomains': len(scan.cfg_imported_subdomains) if scan.cfg_imported_subdomains else 0,
-                'cfg_out_of_scope_subdomains': len(scan.cfg_out_of_scope_subdomains) if scan.cfg_out_of_scope_subdomains else 0,
-                'cfg_excluded_paths': len(scan.cfg_excluded_paths) if scan.cfg_excluded_paths else 0,
+                'cfg_imported_subdomains': scan.cfg_imported_subdomains or [],
+                'cfg_out_of_scope_subdomains': scan.cfg_out_of_scope_subdomains or [],
+                'cfg_excluded_paths': scan.cfg_excluded_paths or [],
+                'tasks': scan.tasks or [],
+                'used_gf_patterns': scan.used_gf_patterns.split(',') if scan.used_gf_patterns else [],
             },
+            'exposed_count': exposed_count,
+            'secret_leaks_count': secret_leaks_count,
+            'exploitable_count': exploitable_count,
+            'matched_gf_count': matched_gf_count,
+            'buckets_count': scan.buckets.count(),
             'timeline': timeline_data
         }
 

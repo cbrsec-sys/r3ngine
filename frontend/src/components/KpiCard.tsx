@@ -1,5 +1,6 @@
 import React from 'react';
 import { Box, Typography, Card, CardContent } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material';
 
 export interface KpiCardProps {
   title: string;
@@ -8,9 +9,10 @@ export interface KpiCardProps {
   color: string;
   subtitle?: string;
   className?: string;
+  sx?: SxProps<Theme>;
 }
 
-export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, color, subtitle }) => {
+export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, color, subtitle, sx }) => {
   return (
     <Card 
       sx={{ 
@@ -27,7 +29,8 @@ export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, colo
           borderColor: color,
           boxShadow: `0 0 15px ${color}22`,
           '& .kpi-icon-bg': { opacity: 0.15, transform: 'scale(1.1) rotate(-10deg)' }
-        }
+        },
+        ...sx
       }}
     >
       <CardContent sx={{ p: 3 }}>
