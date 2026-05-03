@@ -267,3 +267,20 @@ export const useScanSummary = (projectSlug: string, scanId: number) => {
     enabled: !!projectSlug && !!scanId,
   });
 };
+
+export const useSecretLeaks = (projectSlug: string, scanId: number) => {
+  return useQuery({
+    queryKey: ['secret-leaks', projectSlug, scanId],
+    queryFn: async () => {
+      const response = await fetch(`/api/scan-summary/${projectSlug}/${scanId}/`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      return data.secret_leaks || [];
+    },
+    enabled: !!projectSlug && !!scanId,
+  });
+};

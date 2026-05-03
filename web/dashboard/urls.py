@@ -99,6 +99,10 @@ urlpatterns = [
         views.index,
         name='endpoints_v3'),
     path(
+        '<slug:slug>/todo/',
+        views.index,
+        name='todo_v3'),
+    path(
         '<slug:slug>/api/graph/scan/<int:scan_id>/data/',
         views.get_graph_data,
         name='get_graph_data'),

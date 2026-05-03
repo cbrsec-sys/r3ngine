@@ -8,6 +8,7 @@ import { ProjectsPage } from "./features/projects";
 import { ScanList, ScheduledScansPage, SubScansPage, ScanHistoryPage, ScanDetailPage } from "./features/scans";
 import { EndpointsPage } from "./features/endpoints";
 import { SubdomainsPage } from "./features/subdomains";
+import { TodoPage } from "./features/todos";
 
 import { PlaceholderPage } from "./components/PlaceholderPage";
 import { Box, Typography, Button } from "@mui/material";
@@ -234,11 +235,60 @@ const endpointsRoute = createRoute({
   component: EndpointsPage,
 });
 
+// Todo Route
+const todoRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "todo",
+  component: TodoPage,
+});
+
+import { VulnerabilityList } from "./features/vulnerabilities";
+
 // Vulnerabilities Route
 const vulnsRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: "vulns",
-  component: () => <PlaceholderPage title="Vulnerabilities" icon={<ShieldAlert size={48} />} />,
+  component: VulnerabilityList,
+  loader: async ({ params: { projectSlug } }) => {
+    // Add a slight delay to ensure the tactical spinner is visible and smooth
+    await new Promise(resolve => setTimeout(resolve, 800));
+    return { projectSlug };
+  },
+  pendingComponent: () => (
+    <Box sx={{ 
+      height: '80vh', 
+      display: 'flex', 
+      flexDirection: 'column', 
+      alignItems: 'center', 
+      justifyContent: 'center',
+      gap: 3
+    }}>
+      <Box sx={{ display: 'flex', gap: 1 }}>
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
+      </Box>
+      <Typography sx={{ 
+        fontFamily: 'Orbitron', 
+        fontWeight: 900, 
+        letterSpacing: 2, 
+        fontSize: '14px',
+        color: '#00f3ff',
+        textAlign: 'center'
+      }}>
+        INITIALIZING TACTICAL DATA... <br/>
+        <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>FETCHING VULNERABILITIES... PLEASE WAIT</span>
+      </Typography>
+      <style>
+        {`
+          @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.5; }
+            50% { transform: scale(1.5); opacity: 1; }
+          }
+        `}
+      </style>
+    </Box>
+  )
 });
 
 // Scan History Detail Route
@@ -265,6 +315,7 @@ const routeTree = rootRoute.addChildren([
     scheduledScansRoute,
     subdomainsRoute,
     endpointsRoute,
+    todoRoute,
     vulnsRoute,
   ]),
 ]);

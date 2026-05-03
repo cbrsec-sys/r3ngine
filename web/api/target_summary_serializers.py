@@ -103,6 +103,7 @@ class TargetSummarySerializer(serializers.Serializer):
     endpoints = serializers.ListField(required=False)
     vulnerabilities = serializers.ListField(required=False)
     monitoring_discoveries_list = serializers.ListField(required=False)
+    secret_leaks = serializers.ListField(required=False)
     
     # Scan specific
     scan_info = serializers.DictField(required=False)

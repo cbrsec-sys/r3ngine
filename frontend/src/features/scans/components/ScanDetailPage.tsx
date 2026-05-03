@@ -28,7 +28,9 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  LinearProgress
+  LinearProgress,
+  FormControlLabel,
+  Checkbox
 } from '@mui/material';
 import { 
   Activity, 
@@ -64,13 +66,21 @@ import {
   Eye,
   Mail,
   Users,
-  Key
+  Key,
+  Bug
 } from 'lucide-react';
 import { useScanSummary } from '../api';
 import Chart from 'react-apexcharts';
 import { GeoMap } from '../../dashboard/components/GeoMap';
 import { KpiCard } from '../../../components/KpiCard';
+import { SubdomainsTab } from './SubdomainsTab';
+import { DirectoriesTab } from './DirectoriesTab';
+import { EndpointsTab } from './EndpointsTab';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { VulnerabilityTable } from '../../vulnerabilities/components/VulnerabilityTable';
+import { SecretLeaksTab } from './SecretLeaksTab';
+import { AttackSurfaceTab } from './AttackSurfaceTab';
+import VisualizationTab from './VisualizationTab';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   const configs: any = {
@@ -131,6 +141,19 @@ const StatusBadge: React.FC<{ status: number }> = ({ status }) => {
       {config.label}
     </Box>
   );
+};
+
+const formatTimeAgo = (date: string) => {
+  if (!date) return 'N/A';
+  const now = new Date();
+  const past = new Date(date);
+  const diffMs = now.getTime() - past.getTime();
+  const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
+  const days = Math.floor(diffHrs / 24);
+  const hrs = diffHrs % 24;
+  
+  if (days > 0) return `${days} days, ${hrs} hours ago`;
+  return `${hrs} hours ago`;
 };
 
 const TimelineItem: React.FC<{ activity: any }> = ({ activity }) => {
@@ -214,18 +237,26 @@ const TimelineItem: React.FC<{ activity: any }> = ({ activity }) => {
   );
 };
 
-const SubScanWidget: React.FC<{ subscans: any[] }> = ({ subscans }) => {
+const SubScanWidget: React.FC<{ subscans: any[], targetName: string }> = ({ subscans, targetName }) => {
   return (
     <Stack spacing={1.5}>
+      <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#ff00ff', mb: 1, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+        SUB SCAN HISTORY FOR <Box component="span" sx={{ px: 0.5, bgcolor: 'rgba(255,0,255,0.1)', border: '1px solid rgba(255,0,255,0.2)', borderRadius: 0.5, color: '#ff00ff' }}>{targetName}</Box>
+      </Typography>
       {subscans?.map((sub: any) => (
-        <Box key={sub.id} sx={{ p: 1.5, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-           <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 1 }}>
-              <Typography sx={{ fontSize: '0.7rem', fontWeight: 900, color: '#00f3ff' }}>{sub.engine_name}</Typography>
-              <StatusBadge status={sub.status} />
+        <Box key={sub.id} sx={{ p: 1.5, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
+           <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, bgcolor: sub.status === 2 ? '#00ff62' : '#ffc107' }} />
+           <Stack spacing={1}>
+              <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#00f3ff', textTransform: 'uppercase' }}>
+                {sub.engine} ON {sub.subdomain_name}
+              </Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                 <StatusBadge status={sub.status} />
+              </Stack>
+              <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
+                 {sub.completed_ago} Took {sub.time_taken}
+              </Typography>
            </Stack>
-           <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>
-              STARTED: {new Date(sub.start_scan_date).toLocaleString()}
-           </Typography>
         </Box>
       ))}
       {(!subscans || subscans.length === 0) && (
@@ -235,60 +266,324 @@ const SubScanWidget: React.FC<{ subscans: any[] }> = ({ subscans }) => {
   );
 };
 
-const MostCommonVulns: React.FC<{ vulns: any[] }> = ({ vulns }) => (
-  <TacticalPanel title="Most Common Vulnerabilities" icon={<ShieldAlert size={14} />}>
-    <Stack spacing={1.5}>
-      {vulns?.slice(0, 5).map((v: any, idx: number) => (
-        <Box key={idx} sx={{ p: 1.5, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', transition: 'all 0.2s', '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' } }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff' }}>{v.name}</Typography>
-            <SeverityBadge severity={v.severity} />
-          </Stack>
-          <Typography sx={{ fontSize: '0.7rem', color: '#00f3ff', fontWeight: 900, mt: 0.5, fontFamily: 'Orbitron' }}>{v.count} OCCURRENCES</Typography>
-        </Box>
-      ))}
-      {(!vulns || vulns.length === 0) && (
-        <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center', py: 4 }}>NO COMMON VULNERABILITIES</Typography>
-      )}
-    </Stack>
-  </TacticalPanel>
-);
+const VulnerabilityBreakdown: React.FC<{ counts: any, exploitable: number }> = ({ counts, exploitable }) => {
+  const series = [counts.critical, counts.high, counts.medium, counts.low, counts.info, counts.unknown, exploitable];
+  const labels = ['Critical', 'High', 'Medium', 'Low', 'Info', 'Unknown', 'Exploitable'];
+  const colors = ['#ff003c', '#ff5722', '#ff9800', '#ffeb3b', '#2196f3', '#9e9e9e', '#00ff62'];
 
-const ReconNotes: React.FC<{ notes: any[] }> = ({ notes }) => (
-  <TacticalPanel title="Recon Notes / Tasks" icon={<FileText size={14} />}>
-    <Stack spacing={1.5}>
-      {notes?.map((n: any) => (
-        <Box key={n.id} sx={{ p: 1.5, borderRadius: 1, bgcolor: n.is_done ? 'rgba(0,255,98,0.02)' : 'rgba(255,255,255,0.03)', border: `1px solid ${n.is_important ? 'rgba(255,159,0,0.3)' : 'rgba(255,255,255,0.05)'}` }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-             <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: n.is_done ? 'rgba(255,255,255,0.4)' : '#fff', textDecoration: n.is_done ? 'line-through' : 'none' }}>{n.title}</Typography>
-             {n.is_important && <Chip label="IMPORTANT" size="small" sx={{ height: 16, fontSize: '0.5rem', bgcolor: 'rgba(255,159,0,0.1)', color: '#ff9f00' }} />}
-          </Stack>
-          <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>{n.description}</Typography>
-        </Box>
-      ))}
-      {(!notes || notes.length === 0) && (
-        <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center', py: 4 }}>NO RECON NOTES FOUND</Typography>
-      )}
-    </Stack>
-  </TacticalPanel>
-);
+  return (
+    <TacticalPanel title="Vulnerability Breakdown" icon={<Bug size={14} />} sx={{ height: '100%' }}>
+       <Box sx={{ p: 1 }}>
+         <Grid container spacing={1} sx={{ mb: 2, textAlign: 'center' }}>
+            {labels.map((l, i) => (
+               <Grid item xs={1.7} key={l}>
+                  <Typography sx={{ fontSize: '0.6rem', color: colors[i], fontWeight: 800, textTransform: 'uppercase' }}>{l.substring(0, 4)}</Typography>
+                  <Typography sx={{ fontSize: '0.8rem', fontWeight: 900, color: colors[i] }}>{series[i] || 0}</Typography>
+               </Grid>
+            ))}
+         </Grid>
+         <Chart 
+            options={{
+              chart: { type: 'donut', background: 'transparent' },
+              theme: { mode: 'dark' },
+              stroke: { show: false },
+              labels: labels,
+              dataLabels: { enabled: false },
+              legend: { show: true, position: 'bottom', fontSize: '10px', labels: { colors: 'rgba(255,255,255,0.7)' } },
+              colors: colors,
+              plotOptions: {
+                pie: {
+                  donut: {
+                    size: '65%',
+                    labels: {
+                      show: true,
+                      total: {
+                        show: true,
+                        label: 'Total',
+                        color: 'rgba(255,255,255,0.4)',
+                        fontSize: '12px',
+                        formatter: () => counts.total.toString()
+                      },
+                      value: { color: '#fff', fontSize: '20px', fontWeight: 900 }
+                    }
+                  }
+                }
+              }
+            }} 
+            series={series} 
+            type="donut" 
+            height={280} 
+         />
+       </Box>
+    </TacticalPanel>
+  );
+};
 
 const VulnHighlights: React.FC<{ highlights: any[] }> = ({ highlights }) => (
-  <TacticalPanel title="Vulnerability Highlights" icon={<ShieldAlert size={14} />}>
-    <Stack spacing={1.5}>
-      {highlights?.slice(0, 5).map((v: any, idx: number) => (
-        <Box key={idx} sx={{ p: 1.5, borderRadius: 1, bgcolor: 'rgba(255,0,60,0.02)', border: '1px solid rgba(255,0,60,0.1)', transition: 'all 0.2s', '&:hover': { bgcolor: 'rgba(255,0,60,0.04)' } }}>
-          <Stack direction="row" justifyContent="space-between" alignItems="center">
-            <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff' }}>{v.name}</Typography>
-            <SeverityBadge severity={v.severity} />
-          </Stack>
-          <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', mt: 0.5, wordBreak: 'break-all', fontFamily: 'monospace' }}>{v.http_url}</Typography>
-        </Box>
-      ))}
-      {(!highlights || highlights.length === 0) && (
-        <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center', py: 4 }}>NO VULNERABILITY HIGHLIGHTS</Typography>
+  <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <TableContainer sx={{ flex: 1, overflow: 'auto', maxHeight: 450 }}>
+      <Table size="small" stickyHeader>
+        <TableHead>
+          <TableRow sx={{ '& th': { borderBottom: '2px solid #7000ff', bgcolor: '#12121c', color: '#00f3ff', fontSize: '0.7rem', fontWeight: 900, py: 1.5 } }}>
+            <TableCell>TYPE</TableCell>
+            <TableCell>VULNERABILITY</TableCell>
+            <TableCell>SEVERITY</TableCell>
+            <TableCell>VULNERABLE URL</TableCell>
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {(highlights || []).map((v: any, idx: number) => (
+            <TableRow key={idx} sx={{ '& td': { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 2 } }}>
+              <TableCell>
+                <Box sx={{ 
+                  bgcolor: 'rgba(33,150,243,0.1)', 
+                  color: '#2196f3', 
+                  fontSize: '0.6rem', 
+                  fontWeight: 900, 
+                  px: 1, 
+                  py: 0.5, 
+                  borderRadius: 0.5,
+                  display: 'inline-block',
+                  textTransform: 'lowercase'
+                }}>
+                  {v.severity === 0 ? 'info' : 'vuln'}
+                </Box>
+              </TableCell>
+              <TableCell>
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff', mb: 0.5 }}>{v.name}</Typography>
+                <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>
+                  Discovered: {formatTimeAgo(v.discovered_date)}
+                </Typography>
+              </TableCell>
+              <TableCell>
+                <SeverityBadge severity={v.severity} />
+              </TableCell>
+              <TableCell>
+                <Typography sx={{ 
+                  fontSize: '0.7rem', 
+                  color: '#ff003c', 
+                  fontWeight: 600,
+                  wordBreak: 'break-all'
+                }}>
+                  {v.http_url}
+                </Typography>
+              </TableCell>
+            </TableRow>
+          ))}
+          {(!highlights || highlights.length === 0) && (
+            <TableRow>
+              <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO VULNERABILITY HIGHLIGHTS</TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  </TacticalPanel>
+);
+
+const MostVulnerableSubdomain: React.FC<{ vulnerabilities: any[], sx?: any }> = ({ vulnerabilities, sx = {} }) => {
+  const [ignoreInfo, setIgnoreInfo] = useState(false);
+  
+  const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => v.severity > 0) : vulnerabilities;
+  
+  const subdomainCounts = filteredVulns.reduce((acc: any, v: any) => {
+    const host = new URL(v.http_url).hostname;
+    acc[host] = (acc[host] || 0) + 1;
+    return acc;
+  }, {});
+  
+  const sorted = Object.entries(subdomainCounts).sort((a: any, b: any) => b[1] - a[1]);
+  const mostVulnerable = sorted[0];
+
+  return (
+    <TacticalPanel 
+      title="MOST VULNERABLE SUBDOMAIN" 
+      icon={<ShieldAlert size={14} color="#ff003c" />}
+      sx={{ height: '100%', ...sx }}
+      headerAction={
+        <FormControlLabel
+          control={<Checkbox size="small" checked={ignoreInfo} onChange={(e) => setIgnoreInfo(e.target.checked)} sx={{ color: 'rgba(255,255,255,0.4)', '&.Mui-checked': { color: '#00f3ff' } }} />}
+          label={<Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 800 }}>Ignore Info Vulnerabilities</Typography>}
+        />
+      }
+    >
+      <Box sx={{ p: 2 }}>
+        {mostVulnerable ? (
+          <Box sx={{ bgcolor: 'rgba(255,0,60,0.05)', border: '1px solid rgba(255,0,60,0.1)', p: 2, borderRadius: 1 }}>
+            <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#ff003c', mb: 1 }}>{mostVulnerable[0]}</Typography>
+            <Typography sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>Total Vulnerabilities: <Box component="span" sx={{ color: '#ff003c', fontWeight: 900 }}>{mostVulnerable[1]}</Box></Typography>
+          </Box>
+        ) : (
+          <Box sx={{ bgcolor: 'rgba(255,252,0,0.1)', border: '1px solid rgba(255,252,0,0.2)', p: 2, borderRadius: 1 }}>
+            <Typography sx={{ fontSize: '0.75rem', color: '#fffc00', fontWeight: 700, mb: 1 }}>Could not find most vulnerable targets.</Typography>
+            <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,252,0,0.6)' }}>Once the vulnerability scan is performed, reNgine will identify the most vulnerable targets.</Typography>
+          </Box>
+        )}
+      </Box>
+    </TacticalPanel>
+  );
+};
+
+const MostCommonVulnsWidget: React.FC<{ vulnerabilities: any[], sx?: any }> = ({ vulnerabilities = [], sx = {} }) => {
+  const [ignoreInfo, setIgnoreInfo] = useState(false);
+  const filtered = ignoreInfo ? vulnerabilities.filter(v => v.severity !== 0 && v.severity !== 'Info') : vulnerabilities;
+  
+  // Calculate common vulns from the full vulnerabilities list to ensure Info vulns are included
+  const commonMap = filtered.reduce((acc: any, v: any) => {
+    acc[v.name] = acc[v.name] || { name: v.name, count: 0, severity: v.severity };
+    acc[v.name].count += 1;
+    return acc;
+  }, {});
+  
+  const data = Object.values(commonMap).sort((a: any, b: any) => b.count - a.count).slice(0, 10);
+
+  return (
+    <TacticalPanel 
+      title="MOST COMMON VULNERABILITIES" 
+      icon={<Bug size={14} color="#ff003c" />}
+      sx={{ height: '100%', ...sx }}
+      headerAction={
+        <FormControlLabel
+          control={<Checkbox size="small" checked={ignoreInfo} onChange={(e) => setIgnoreInfo(e.target.checked)} sx={{ color: 'rgba(255,255,255,0.4)', '&.Mui-checked': { color: '#00f3ff' } }} />}
+          label={<Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 800 }}>Ignore Info Vulnerabilities</Typography>}
+        />
+      }
+    >
+      <TableContainer sx={{ flex: 1, overflow: 'auto' }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ '& th': { borderBottom: '2px solid rgba(255,255,255,0.05)', color: '#00f3ff', fontSize: '0.65rem', fontWeight: 900 } }}>
+              <TableCell>VULNERABILITY NAME</TableCell>
+              <TableCell align="center">COUNT</TableCell>
+              <TableCell align="right">SEVERITY</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {data.map((v: any, i: number) => (
+              <TableRow key={i} sx={{ '& td': { borderBottom: '1px solid rgba(255,255,255,0.03)', py: 1 } }}>
+                <TableCell sx={{ color: '#ff00ff', fontSize: '0.7rem', fontWeight: 800 }}>{v.name}</TableCell>
+                <TableCell align="center">
+                  <Box sx={{ display: 'inline-block', px: 1, border: '1px solid #ff003c', color: '#ff003c', borderRadius: 0.5, fontSize: '0.65rem', fontWeight: 900 }}>
+                    {v.count}
+                  </Box>
+                </TableCell>
+                <TableCell align="right">
+                   <SeverityBadge severity={typeof v.severity === 'string' ? (v.severity === 'Critical' ? 4 : v.severity === 'High' ? 3 : v.severity === 'Medium' ? 2 : v.severity === 'Low' ? 1 : 0) : v.severity} />
+                </TableCell>
+              </TableRow>
+            ))}
+            {data.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>NO VULNERABILITIES FOUND</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </TacticalPanel>
+  );
+};
+
+const ImportantSubdomainsWidget: React.FC<{ subdomains: any[], sx?: any }> = ({ subdomains = [], sx = {} }) => (
+  <TacticalPanel title="IMPORTANT SUBDOMAINS" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#ff00ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{subdomains.length}</Box>} sx={{ height: '100%', ...sx }}>
+    <Box sx={{ p: 2 }}>
+      {subdomains.length > 0 ? (
+        <Grid container spacing={1}>
+          {subdomains.map((s: any, i: number) => (
+            <Grid item key={i}>
+              <Box sx={{ px: 1.5, py: 0.5, bgcolor: 'rgba(0,243,255,0.05)', border: '1px solid rgba(0,243,255,0.1)', borderRadius: 1, color: '#00f3ff', fontSize: '0.7rem', fontWeight: 700 }}>
+                {s.name}
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      ) : (
+        <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>No subdomains marked as important!</Typography>
       )}
-    </Stack>
+    </Box>
+  </TacticalPanel>
+);
+
+const ReconNotesWidget: React.FC<{ notes: any[], sx?: any }> = ({ notes = [], sx = {} }) => (
+  <TacticalPanel 
+    title="RECON NOTE/TODO" 
+    icon={<Box sx={{ width: 14, height: 14, bgcolor: '#2196f3', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notes.length}</Box>}
+    headerAction={<Plus size={14} color="#00f3ff" style={{ cursor: 'pointer' }} />}
+    sx={{ height: '100%', ...sx }}
+  >
+    <Box sx={{ p: 2 }}>
+      {notes.length > 0 ? (
+        <Stack spacing={1}>
+          {notes.map((n: any) => (
+            <Box key={n.id} sx={{ p: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1, display: 'flex', gap: 1.5 }}>
+              <Checkbox size="small" checked={n.is_done} sx={{ color: 'rgba(255,255,255,0.2)', p: 0 }} />
+              <Box>
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: n.is_done ? 'rgba(255,255,255,0.3)' : '#fff', textDecoration: n.is_done ? 'line-through' : 'none' }}>{n.title}</Typography>
+                <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>{n.description}</Typography>
+              </Box>
+            </Box>
+          ))}
+        </Stack>
+      ) : (
+        <Box>
+          <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>No todos or notes...</Typography>
+          <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)' }}>You can add todo for individual subdomains or you can also add using + symbol above.</Typography>
+        </Box>
+      )}
+    </Box>
+  </TacticalPanel>
+);
+
+const IpAddressesWidget: React.FC<{ subdomains: any[], sx?: any }> = ({ subdomains = [], sx = {} }) => {
+  const ips = Array.from(new Set(subdomains.map(s => s.origin_ip).filter(ip => ip && ip !== '0.0.0.0')));
+  return (
+    <TacticalPanel title="IP ADDRESSES" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ips.length}</Box>} sx={{ height: '100%', ...sx }}>
+      <Box sx={{ p: 2 }}>
+        <Typography sx={{ fontSize: '0.6rem', color: '#fffc00', textAlign: 'right', mb: 1, fontWeight: 700 }}>*IP Addresses highlighted with yellow are CDN IP</Typography>
+        <Grid container spacing={1}>
+          {ips.map((ip, i) => (
+            <Grid item key={i}>
+              <Box sx={{ px: 1, py: 0.4, bgcolor: 'rgba(33,150,243,0.1)', border: '1px solid rgba(33,150,243,0.2)', borderRadius: 0.5, color: '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
+                {ip}
+              </Box>
+            </Grid>
+          ))}
+        </Grid>
+      </Box>
+    </TacticalPanel>
+  );
+};
+
+const DiscoveredPortsWidget: React.FC<{ ports: any[], sx?: any }> = ({ ports = [], sx = {} }) => (
+  <TacticalPanel title="DISCOVERED PORTS" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ports.length}</Box>} sx={{ height: '100%', ...sx }}>
+    <Box sx={{ p: 2 }}>
+      <Typography sx={{ fontSize: '0.6rem', color: '#fffc00', textAlign: 'right', mb: 1, fontWeight: 700 }}>*Ports highlighted with red are uncommon Ports</Typography>
+      <Grid container spacing={1}>
+        {ports.map((p, i) => (
+          <Grid item key={i}>
+            <Box sx={{ px: 1, py: 0.4, bgcolor: p.is_uncommon ? 'rgba(255,0,60,0.1)' : 'rgba(33,150,243,0.1)', border: `1px solid ${p.is_uncommon ? 'rgba(255,0,60,0.2)' : 'rgba(33,150,243,0.2)'}`, borderRadius: 0.5, color: p.is_uncommon ? '#ff003c' : '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
+              {p.number}/{p.service_name}
+            </Box>
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
+  </TacticalPanel>
+);
+
+const DiscoveredTechWidget: React.FC<{ techs: any[], sx?: any }> = ({ techs = [], sx = {} }) => (
+  <TacticalPanel title="DISCOVERED TECHNOLOGIES" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{techs.length}</Box>} sx={{ height: '100%', ...sx }}>
+    <Box sx={{ p: 2 }}>
+      <Grid container spacing={1}>
+        {techs.map((t, i) => (
+          <Grid item key={i}>
+            <Box sx={{ px: 1, py: 0.4, bgcolor: 'rgba(33,150,243,0.1)', border: '1px solid rgba(33,150,243,0.2)', borderRadius: 0.5, color: '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
+              {t.name}
+            </Box>
+          </Grid>
+        ))}
+      </Grid>
+    </Box>
   </TacticalPanel>
 );
 
@@ -316,7 +611,8 @@ export const ScanDetailPage = () => {
     { label: 'VULNERABILITIES', icon: ShieldAlert, show: data.vulnerability_count > 0 },
     { label: 'EXPLOITS', icon: Zap, show: data.exploitable_count > 0 },
     { label: 'OSINT', icon: Search, show: data.scan_info.tasks?.includes('osint') },
-    { label: 'LEAKS', icon: Shield, show: data.secret_leaks_count > 0 },
+    { label: 'LEAKS', icon: Shield },
+    { label: 'ATTACK SURFACE', icon: MapIcon },
     { label: 'RECON NOTES', icon: FileText },
     { label: 'VISUALIZATION', icon: BarChart2 },
   ].filter(t => t.show !== false);
@@ -444,7 +740,7 @@ export const ScanDetailPage = () => {
 
       <TacticalPanel title="Sub Scan History" icon={<Activity size={14} />}>
          <Box sx={{ p: 1 }}>
-            <SubScanWidget subscans={data.subscans} />
+            <SubScanWidget subscans={data.subscans} targetName={data.target_info.name} />
          </Box>
       </TacticalPanel>
     </Box>
@@ -566,24 +862,45 @@ export const ScanDetailPage = () => {
         </Box>
       </TacticalPanel>
 
-      {/* Row 3: Recon/Vuln Summaries (MOVED DOWN) */}
-      <Grid container spacing={2}>
-        <Grid item xs={12} md={4}>
-           <Box sx={{ height: '400px' }}>
-              <MostCommonVulns vulns={data.most_common_vulnerability} />
-           </Box>
+      {/* Row 3: Vulnerability Distribution & Highlights */}
+      <Grid container spacing={2} alignItems="stretch" sx={{ mb: 2 }}>
+        <Grid item xs={12} md={3} sx={{ display: 'flex' }}>
+           <VulnerabilityBreakdown 
+             counts={{
+               critical: data.critical_count,
+               high: data.high_count,
+               medium: data.medium_count,
+               low: data.low_count,
+               info: data.info_count,
+               unknown: data.unknown_count,
+               total: data.vulnerability_count
+             }} 
+             exploitable={data.exploitable_count}
+           />
         </Grid>
-        <Grid item xs={12} md={4}>
-           <Box sx={{ height: '400px' }}>
-              <VulnHighlights highlights={data.vulnerability_highlights} />
-           </Box>
-        </Grid>
-        <Grid item xs={12} md={4}>
-           <Box sx={{ height: '400px' }}>
-              <ReconNotes notes={data.todo_notes} />
-           </Box>
+        <Grid item xs={12} md={9} sx={{ display: 'flex' }}>
+           <VulnHighlights highlights={data.vulnerability_highlights} />
         </Grid>
       </Grid>
+
+      {/* Row 4: Vulnerability Deep Dive */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '4fr 8fr' }, gap: 2, mb: 2, alignItems: 'stretch' }}>
+         <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
+         <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
+      </Box>
+
+      {/* Row 5: Contextual Assets */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 2, alignItems: 'stretch' }}>
+         <ImportantSubdomainsWidget subdomains={data.important_subdomains} sx={{ height: '100%' }} />
+         <ReconNotesWidget notes={data.todo_notes} sx={{ height: '100%' }} />
+      </Box>
+
+      {/* Row 6: Infrastructure & Fingerprinting */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2, alignItems: 'stretch' }}>
+         <IpAddressesWidget subdomains={data.subdomains} sx={{ height: '100%' }} />
+         <DiscoveredPortsWidget ports={data.discovered_ports} sx={{ height: '100%' }} />
+         <DiscoveredTechWidget techs={data.discovered_technologies} sx={{ height: '100%' }} />
+      </Box>
     </Box>
   );
   const renderBuckets = () => (
@@ -669,26 +986,15 @@ export const ScanDetailPage = () => {
   );
 
   const renderLeaks = () => (
-    <TacticalPanel title="Credential & Leak Intelligence" icon={<Shield size={14} />}>
-       <TableContainer>
-         <Table size="small">
-           <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-             <TableRow>
-               <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>TOOL</TableCell>
-               <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>TYPE</TableCell>
-               <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>SOURCE</TableCell>
-               <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>MATCH</TableCell>
-             </TableRow>
-           </TableHead>
-           <TableBody>
-              {/* Leaks data mapping would go here */}
-              <TableRow>
-                 <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO SECRETS OR LEAKS DETECTED</TableCell>
-              </TableRow>
-           </TableBody>
-         </Table>
-       </TableContainer>
-    </TacticalPanel>
+    <SecretLeaksTab projectSlug={projectSlug} scanId={parseInt(scanId)} />
+  );
+
+  const renderAttackSurface = () => (
+    <AttackSurfaceTab projectSlug={projectSlug} scanId={parseInt(scanId)} />
+  );
+
+  const renderVisualization = () => (
+    <VisualizationTab projectSlug={projectSlug} scanId={parseInt(scanId)} />
   );
 
   const renderExploits = () => (
@@ -713,116 +1019,18 @@ export const ScanDetailPage = () => {
   );
 
   const renderSubdomains = () => (
-    <TacticalPanel title="Discovered Subdomains" icon={<Globe size={14} />}>
-      <TableContainer>
-        <Table size="small">
-          <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-            <TableRow>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>SUBDOMAIN</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>IP ADDRESS</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>STATUS</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>PORT</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {(data.subdomains || []).map((s: any, idx: number) => (
-              <TableRow key={idx} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
-                <TableCell sx={{ color: '#fff', fontWeight: 700 }}>{s.name}</TableCell>
-                <TableCell sx={{ color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace' }}>{s.ip || 'N/A'}</TableCell>
-                <TableCell>
-                  <Chip 
-                    label={s.http_status || '200'} 
-                    size="small" 
-                    sx={{ 
-                      height: 20, 
-                      fontSize: '0.65rem', 
-                      bgcolor: (s.http_status >= 400) ? 'rgba(255,0,60,0.1)' : 'rgba(0,255,98,0.1)',
-                      color: (s.http_status >= 400) ? '#ff003c' : '#00ff62'
-                    }} 
-                  />
-                </TableCell>
-                <TableCell sx={{ color: 'rgba(255,255,255,0.5)' }}>{s.port || '80'}</TableCell>
-              </TableRow>
-            ))}
-            {(!data.subdomains || data.subdomains.length === 0) && (
-              <TableRow>
-                <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO SUBDOMAINS DISCOVERED</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </TacticalPanel>
+    <SubdomainsTab projectSlug={projectSlug} scanId={parseInt(scanId)} />
   );
 
   const renderEndpoints = () => (
-    <TacticalPanel title="Discovered Endpoints" icon={<LinkIcon size={14} />}>
-      <TableContainer>
-        <Table size="small">
-          <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-            <TableRow>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>URL / ENDPOINT</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>STATUS</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>TECH</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {(data.endpoints || []).map((e: any, idx: number) => (
-              <TableRow key={idx} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
-                <TableCell sx={{ color: '#fff', fontWeight: 600, wordBreak: 'break-all' }}>{e.http_url}</TableCell>
-                <TableCell>
-                  <Chip label={e.status_code || '200'} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.6rem' }} />
-                </TableCell>
-                <TableCell>
-                   <Stack direction="row" spacing={0.5}>
-                     {e.technologies?.slice(0, 2).map((t: string) => (
-                       <Chip key={t} label={t} size="small" sx={{ height: 16, fontSize: '0.55rem', bgcolor: 'rgba(255,255,255,0.05)' }} />
-                     ))}
-                   </Stack>
-                </TableCell>
-              </TableRow>
-            ))}
-            {(!data.endpoints || data.endpoints.length === 0) && (
-              <TableRow>
-                <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO ENDPOINTS DISCOVERED</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </TacticalPanel>
+    <EndpointsTab projectSlug={projectSlug} scanId={parseInt(scanId)} matchedGfCounts={data.matched_gf_count} />
+  );
+  const renderDirectories = () => (
+    <DirectoriesTab projectSlug={projectSlug} scanId={parseInt(scanId)} />
   );
 
   const renderVulnerabilities = () => (
-    <TacticalPanel title="Security Vulnerabilities" icon={<ShieldAlert size={14} />}>
-      <TableContainer>
-        <Table size="small">
-          <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-            <TableRow>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>VULNERABILITY</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>SEVERITY</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>TARGET</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {(data.vulnerabilities || []).map((v: any, idx: number) => (
-              <TableRow key={idx} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
-                <TableCell sx={{ color: '#fff', fontWeight: 700 }}>{v.name}</TableCell>
-                <TableCell>
-                  <SeverityBadge severity={v.severity} />
-                </TableCell>
-                <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem' }}>{v.http_url}</TableCell>
-              </TableRow>
-            ))}
-            {(!data.vulnerabilities || data.vulnerabilities.length === 0) && (
-              <TableRow>
-                <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO VULNERABILITIES DETECTED</TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    </TacticalPanel>
+    <VulnerabilityTable projectSlug={projectSlug} scanId={parseInt(scanId)} />
   );
 
   return (
@@ -878,14 +1086,16 @@ export const ScanDetailPage = () => {
       </Box>
 
       {/* MAIN TWO-COLUMN LAYOUT (Sidebar Left, Content Right) */}
-      <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start', flexWrap: { xs: 'wrap', lg: 'nowrap' } }}>
+      <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start', flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
         
-        {/* LEFT COLUMN: Scan Metadata & Timeline */}
-        <Box sx={{ width: { xs: '100%', lg: '320px' }, flexShrink: 0, position: { lg: 'sticky' }, top: 70 }}>
-           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-             {renderSidebar()}
-           </Box>
-        </Box>
+        {/* LEFT COLUMN: Scan Metadata & Timeline (Only on HOME tab) */}
+        {tabs[activeTab]?.label === 'HOME' && (
+          <Box sx={{ width: { xs: '100%', md: '320px' }, flexShrink: 0, position: { md: 'sticky' }, top: 70 }}>
+             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+               {renderSidebar()}
+             </Box>
+          </Box>
+        )}
 
         {/* RIGHT COLUMN: Discovery Content */}
         <Box sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -902,7 +1112,7 @@ export const ScanDetailPage = () => {
                     md: 'repeat(4, 1fr)' 
                   }, 
                   gap: 2,
-                  maxWidth: 900 // Constrain the total width to keep squares reasonably sized
+                  maxWidth: 1200
                 }}>
                    <KpiCard 
                      title="SUBDOMAINS" 
@@ -945,15 +1155,18 @@ export const ScanDetailPage = () => {
               /* Discovery-Specific Tab Content */
               <Box>
                 {tabs[activeTab]?.label === 'SUBDOMAINS' && renderSubdomains()}
+                {tabs[activeTab]?.label === 'DIRECTORIES' && renderDirectories()}
                 {tabs[activeTab]?.label === 'URLS' && renderEndpoints()}
                 {tabs[activeTab]?.label === 'VULNERABILITIES' && renderVulnerabilities()}
                 {tabs[activeTab]?.label === 'BUCKETS' && renderBuckets()}
                 {tabs[activeTab]?.label === 'OSINT' && renderOSINT()}
                 {tabs[activeTab]?.label === 'LEAKS' && renderLeaks()}
-                {tabs[activeTab]?.label === 'RECON NOTES' && <ReconNotes notes={data.todo_notes} />}
+                {tabs[activeTab]?.label === 'ATTACK SURFACE' && renderAttackSurface()}
+                {tabs[activeTab]?.label === 'VISUALIZATION' && renderVisualization()}
+                {tabs[activeTab]?.label === 'RECON NOTES' && <ReconNotesWidget notes={data.todo_notes} />}
                 {tabs[activeTab]?.label === 'EXPLOITS' && renderExploits()}
                 
-                {!['HOME', 'SUBDOMAINS', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES'].includes(tabs[activeTab]?.label) && (
+                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION'].includes(tabs[activeTab]?.label) && (
                   <Box sx={{ p: 4, textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 2 }}>
                     <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE_STAGING_AREA: {tabs[activeTab]?.label}</Typography>
                     <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem', mt: 1 }}>SYNCHRONIZING DATA FROM LEGACY INTERFACE...</Typography>

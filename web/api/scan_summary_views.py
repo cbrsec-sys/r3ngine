@@ -16,7 +16,7 @@ from startScan.models import (
 from recon_note.models import TodoNote
 
 from api.target_summary_serializers import TargetSummarySerializer, TacticalScanHistorySerializer
-from api.serializers import MonitoringDiscoverySerializer, SubScanSerializer
+from api.serializers import MonitoringDiscoverySerializer, SubScanSerializer, SecretLeakSerializer
 
 class ScanSummaryAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -197,6 +197,7 @@ class ScanSummaryAPIView(APIView):
             'endpoints': list(endpoint_qs.order_by('http_url')[:100].values('http_url', 'http_status', 'content_type', 'techs__name')),
             'vulnerabilities': list(vulnerabilities.order_by('-severity')[:100].values('name', 'severity', 'description', 'http_url')),
             'monitoring_discoveries': list(monitoring_discoveries.values('id', 'discovery_type', 'content')),
+            'secret_leaks': SecretLeakSerializer(secret_leaks[:100], many=True).data,
             # Scan specific data
             'scan_info': {
                 'id': scan.id,

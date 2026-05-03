@@ -1,15 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
 import type { SubdomainResponse } from '../types';
 
-export const useSubdomains = (projectSlug: string, page = 1, searchQuery = '') => {
+export const useSubdomains = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, onlyDirectory = false) => {
   return useQuery<SubdomainResponse>({
-    queryKey: ['subdomains', projectSlug, page, searchQuery],
+    queryKey: ['subdomains', projectSlug, page, searchQuery, scanId, onlyDirectory],
     queryFn: async () => {
       const url = new URL(`${window.location.origin}/api/listDatatableSubdomain/`);
       url.searchParams.append('project', projectSlug);
       url.searchParams.append('page', page.toString());
       if (searchQuery) {
         url.searchParams.append('search[value]', searchQuery);
+      }
+      if (scanId) {
+        url.searchParams.append('scan_id', scanId.toString());
+      }
+      if (onlyDirectory) {
+        url.searchParams.append('only_directory', 'true');
       }
       url.searchParams.append('format', 'json');
 

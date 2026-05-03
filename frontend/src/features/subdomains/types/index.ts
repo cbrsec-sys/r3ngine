@@ -19,6 +19,23 @@ export interface Waf {
   manufacturer: string | null;
 }
 
+export interface DirectoryFile {
+  name: string; // base64 encoded
+  url: string;
+  http_status: number;
+  length: number;
+  lines: number | null;
+  words: number | null;
+  content_type: string;
+}
+
+export interface DirectoryScan {
+  id: number;
+  scanned_date: string;
+  formatted_date_for_id: string;
+  directory_files: DirectoryFile[];
+}
+
 export interface Subdomain {
   id: number;
   name: string;
@@ -45,6 +62,7 @@ export interface Subdomain {
   subscan_count: number;
   vuln_count: number | null;
   discovered_date: string | null;
+  directories?: DirectoryScan[];
 }
 
 export interface SubdomainResponse {

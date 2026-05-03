@@ -1099,3 +1099,9 @@ class ConfigurationSerializer(serializers.ModelSerializer):
 		model = Configuration
 		fields = '__all__'
 
+
+class SecretLeakSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = SecretLeak
+		fields = '__all__'
+

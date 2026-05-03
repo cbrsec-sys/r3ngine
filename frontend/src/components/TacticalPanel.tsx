@@ -8,6 +8,8 @@ interface TacticalPanelProps {
   children: React.ReactNode;
   className?: string;
   borderColor?: string;
+  sx?: any;
+  headerAction?: React.ReactNode;
 }
 
 export const TacticalPanel: React.FC<TacticalPanelProps> = ({ 
@@ -15,7 +17,9 @@ export const TacticalPanel: React.FC<TacticalPanelProps> = ({
   icon, 
   children, 
   className,
-  borderColor = '#00f0ff'
+  borderColor = '#00f0ff',
+  sx = {},
+  headerAction
 }) => {
   return (
     <Card 
@@ -32,6 +36,7 @@ export const TacticalPanel: React.FC<TacticalPanelProps> = ({
           borderColor: 'rgba(0, 240, 255, 0.4)',
           boxShadow: `0 0 10px rgba(0, 240, 255, 0.6), 0 0 20px rgba(0, 240, 255, 0.3)`
         },
+        ...sx,
         /* Dual Gradient Glow */
         '&::before': {
           content: '""',
@@ -65,22 +70,23 @@ export const TacticalPanel: React.FC<TacticalPanelProps> = ({
       }}
     >
       <CardContent sx={{ position: 'relative', zIndex: 2 }}>
-        {title && (
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5 }}>
-            {icon && <Box sx={{ mr: 1.5, display: 'flex', filter: 'drop-shadow(0 0 5px rgba(0, 240, 255, 0.5))' }}>{icon}</Box>}
-            <Typography variant="h6" sx={{ 
-              fontSize: '0.75rem', 
-              fontWeight: 800, 
-              textTransform: 'uppercase', 
-              letterSpacing: 2.5,
-              fontFamily: 'Orbitron',
-              color: '#8ba4c0',
-              textShadow: '0 0 10px rgba(255, 43, 214, 0.4)'
-            }}>
-              {title}
-            </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5, justifyContent: 'space-between' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              {icon && <Box sx={{ mr: 1.5, display: 'flex', filter: 'drop-shadow(0 0 5px rgba(0, 240, 255, 0.5))' }}>{icon}</Box>}
+              <Typography variant="h6" sx={{ 
+                fontSize: '0.75rem', 
+                fontWeight: 800, 
+                textTransform: 'uppercase', 
+                letterSpacing: 2.5,
+                fontFamily: 'Orbitron',
+                color: '#8ba4c0',
+                textShadow: '0 0 10px rgba(255, 43, 214, 0.4)'
+              }}>
+                {title}
+              </Typography>
+            </Box>
+            {headerAction && <Box>{headerAction}</Box>}
           </Box>
-        )}
         {children}
       </CardContent>
     </Card>

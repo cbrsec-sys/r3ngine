@@ -53,3 +53,13 @@ export interface SubScan {
   completed_ago: string;
   error_message: string | null;
 }
+export interface SecretLeak {
+  id: number;
+  tool_name: string;
+  secret_type: string;
+  source_url: string;
+  match_content: string;
+  status: 'unverified' | 'verified' | 'false_positive';
+  discovered_date: string;
+  subdomain: number | null;
+}
