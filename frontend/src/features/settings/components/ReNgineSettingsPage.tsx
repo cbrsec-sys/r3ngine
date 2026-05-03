@@ -171,14 +171,14 @@ export const ReNgineSettingsPage: React.FC = () => {
             
             <Box sx={{ flex: '0 1 auto' }}>
               <Grid container spacing={3}>
-                <Grid size={{ xs: 12, sm: 4 }}>
+                <Grid size={{xs: 12, sm: 4}} >
                   <MetricCard 
                     label="TOTAL_STORAGE" 
                     value={`${systemInfo?.total || 0} GB`} 
                     icon={<Database size={20} color="#ffd600" />} 
                   />
                 </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
+                <Grid size={{xs: 12, sm: 4}} >
                   <MetricCard 
                     label="USED_SPACE" 
                     value={`${systemInfo?.used || 0} GB`} 
@@ -186,7 +186,7 @@ export const ReNgineSettingsPage: React.FC = () => {
                     statusColor={gaugeColor}
                   />
                 </Grid>
-                <Grid size={{ xs: 12, sm: 4 }}>
+                <Grid size={{xs: 12, sm: 4}} >
                   <MetricCard 
                     label="FREE_SPACE" 
                     value={`${systemInfo?.free || 0} GB`} 

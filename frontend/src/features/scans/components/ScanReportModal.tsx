@@ -37,12 +37,12 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
   };
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={onClose}
       maxWidth="sm"
       fullWidth
-      PaperProps={{
+      paperprops={{
         sx: {
           bgcolor: '#0d0c14',
           backgroundImage: 'linear-gradient(rgba(0, 243, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 243, 255, 0.02) 1px, transparent 1px)',
@@ -53,10 +53,10 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
         }
       }}
     >
-      <DialogTitle sx={{ 
-        m: 0, 
-        p: 2, 
-        bgcolor: 'rgba(0, 243, 255, 0.05)', 
+      <DialogTitle sx={{
+        m: 0,
+        p: 2,
+        bgcolor: 'rgba(0, 243, 255, 0.05)',
         borderBottom: '1px solid rgba(0, 243, 255, 0.1)',
         display: 'flex',
         alignItems: 'center',
@@ -64,10 +64,10 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
       }}>
         <Stack direction="row" spacing={1.5} alignItems="center">
           <FileText size={20} color="#00f3ff" />
-          <Typography sx={{ 
-            fontFamily: 'Orbitron', 
-            fontWeight: 900, 
-            color: '#fff', 
+          <Typography sx={{
+            fontFamily: 'Orbitron',
+            fontWeight: 900,
+            color: '#fff',
             letterSpacing: '0.1rem',
             fontSize: '1rem'
           }}>
@@ -82,11 +82,11 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
       <DialogContent sx={{ p: 3 }}>
         <Stack spacing={4}>
           <Box>
-            <Typography sx={{ 
-              color: '#00f3ff', 
-              fontFamily: 'Orbitron', 
-              fontSize: '0.75rem', 
-              fontWeight: 800, 
+            <Typography sx={{
+              color: '#00f3ff',
+              fontFamily: 'Orbitron',
+              fontSize: '0.75rem',
+              fontWeight: 800,
               mb: 2,
               display: 'flex',
               alignItems: 'center',
@@ -97,25 +97,25 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
             <FormControl component="fieldset">
               <RadioGroup value={reportType} onChange={(e) => setReportType(e.target.value)}>
                 <Stack spacing={1}>
-                  <FormControlLabel 
-                    value="full" 
-                    control={<Radio sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />} 
+                  <FormControlLabel
+                    value="full"
+                    control={<Radio sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
                     label={
                       <Box>
                         <Typography sx={{ color: '#fff', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'Orbitron' }}>Full Scan Report</Typography>
                         <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem' }}>Includes all findings: subdomains, endpoints, and vulnerabilities.</Typography>
                       </Box>
-                    } 
+                    }
                   />
-                  <FormControlLabel 
-                    value="vulnerability" 
-                    control={<Radio sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />} 
+                  <FormControlLabel
+                    value="vulnerability"
+                    control={<Radio sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
                     label={
                       <Box>
                         <Typography sx={{ color: '#fff', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'Orbitron' }}>Vulnerability Report</Typography>
                         <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem' }}>Focuses specifically on detected security vulnerabilities.</Typography>
                       </Box>
-                    } 
+                    }
                   />
                 </Stack>
               </RadioGroup>
@@ -125,11 +125,11 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
           <Divider sx={{ borderColor: 'rgba(0, 243, 255, 0.1)' }} />
 
           <Box>
-            <Typography sx={{ 
-              color: '#00f3ff', 
-              fontFamily: 'Orbitron', 
-              fontSize: '0.75rem', 
-              fontWeight: 800, 
+            <Typography sx={{
+              color: '#00f3ff',
+              fontFamily: 'Orbitron',
+              fontSize: '0.75rem',
+              fontWeight: 800,
               mb: 2,
               display: 'flex',
               alignItems: 'center',
@@ -141,23 +141,23 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
               <Box>
                 <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.7rem', fontWeight: 800, mb: 1, fontFamily: 'Orbitron' }}>TEMPLATE</Typography>
                 <RadioGroup row value={reportTemplate} onChange={(e) => setReportTemplate(e.target.value)}>
-                  <FormControlLabel 
-                    value="default" 
-                    control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />} 
-                    label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Default</Typography>} 
+                  <FormControlLabel
+                    value="default"
+                    control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
+                    label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Default</Typography>}
                   />
-                  <FormControlLabel 
-                    value="modern" 
-                    control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />} 
-                    label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Modern (V3)</Typography>} 
+                  <FormControlLabel
+                    value="modern"
+                    control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
+                    label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Modern (V3)</Typography>}
                   />
                 </RadioGroup>
               </Box>
 
               <FormControlLabel
                 control={
-                  <Checkbox 
-                    checked={ignoreInfoVuln} 
+                  <Checkbox
+                    checked={ignoreInfoVuln}
                     onChange={(e) => setIgnoreInfoVuln(e.target.checked)}
                     sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }}
                   />
@@ -170,11 +170,11 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
       </DialogContent>
 
       <DialogActions sx={{ p: 3, bgcolor: 'rgba(0, 243, 255, 0.02)', borderTop: '1px solid rgba(0, 243, 255, 0.1)' }}>
-        <Button 
-          onClick={onClose} 
-          sx={{ 
-            color: 'rgba(255,255,255,0.5)', 
-            fontFamily: 'Orbitron', 
+        <Button
+          onClick={onClose}
+          sx={{
+            color: 'rgba(255,255,255,0.5)',
+            fontFamily: 'Orbitron',
             fontWeight: 800,
             fontSize: '0.7rem',
             '&:hover': { color: '#fff' }
@@ -182,14 +182,14 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
         >
           CANCEL
         </Button>
-        <Button 
+        <Button
           onClick={handleDownload}
           variant="contained"
           startIcon={<Download size={16} />}
-          sx={{ 
-            bgcolor: '#00f3ff', 
-            color: '#000', 
-            fontFamily: 'Orbitron', 
+          sx={{
+            bgcolor: '#00f3ff',
+            color: '#000',
+            fontFamily: 'Orbitron',
             fontWeight: 900,
             fontSize: '0.7rem',
             px: 3,

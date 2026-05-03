@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
-import { 
-  Box, 
-  Drawer, 
-  AppBar, 
-  Toolbar, 
-  List, 
-  Typography, 
-  Divider, 
-  IconButton, 
-  ListItem, 
-  ListItemButton, 
-  ListItemIcon, 
+import {
+  Box,
+  Drawer,
+  AppBar,
+  Toolbar,
+  List,
+  Typography,
+  Divider,
+  IconButton,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
   ListItemText,
   Avatar,
   Menu,
@@ -24,10 +24,10 @@ import {
   Badge
 } from '@mui/material';
 
-import { 
+import {
   Home,
   Folder,
-  Target, 
+  Target,
   Monitor,
   Activity,
   ShieldAlert,
@@ -36,9 +36,9 @@ import {
   Cpu,
   Command,
   Settings,
-  Bell, 
-  Search, 
-  ChevronRight, 
+  Bell,
+  Search,
+  ChevronRight,
   ChevronDown,
   LayoutGrid,
   Sliders,
@@ -55,15 +55,17 @@ import {
 import { useTheme } from '@mui/material/styles';
 import { Link, useRouterState, useParams } from '@tanstack/react-router';
 import { useAppContext } from '../../context/AppContext';
-import { 
-  WhoisModal, 
-  CMSDetectorModal, 
-  CVELookupModal, 
-  WAFDetectorModal 
+import {
+  WhoisModal,
+  CMSDetectorModal,
+  CVELookupModal,
+  WAFDetectorModal
 } from '../../features/tools/components/ToolboxModals';
 import { NotificationsDropdown } from '../../features/notifications/components/NotificationsDropdown';
 import { useUnreadCount } from '../../features/notifications/api';
 import { ScanHistoryDrawer } from '../../features/scans/components/ScanHistoryDrawer';
+import { CheckForUpdateModal } from '../../features/settings/components/CheckForUpdateModal';
+import { useRengineUpdateCheck } from '../../features/settings/api';
 
 const drawerWidth = 260;
 const collapsedWidth = 72;
@@ -87,6 +89,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [openTool, setOpenTool] = useState<string | null>(null);
   const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
   const [scanHistoryOpen, setScanHistoryOpen] = useState(false);
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
 
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: unreadData } = useUnreadCount(projectSlug);
@@ -98,10 +102,10 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
     { title: 'Targets', icon: <Target size={20} />, path: `/${projectSlug}/targets`, color: '#00f3ff' },
     { title: 'Monitoring', icon: <Monitor size={20} />, path: `/${projectSlug}/monitoring`, color: '#00f3ff' },
-    { 
-      title: 'Scan History', 
-      icon: <Activity size={20} />, 
-      path: `/${projectSlug}/scans`, 
+    {
+      title: 'Scan History',
+      icon: <Activity size={20} />,
+      path: `/${projectSlug}/scans`,
       color: '#00f3ff',
       children: [
         { title: 'Scan History', path: `/${projectSlug}/scans` },
@@ -116,10 +120,10 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     { title: 'Organization', icon: <Briefcase size={20} />, path: `/${projectSlug}/org`, color: '#00f3ff' },
     { title: 'Scan Engine', icon: <Cpu size={20} />, path: `/${projectSlug}/engines`, color: '#00f3ff' },
     { title: 'Bounty Hub', icon: <Command size={20} />, path: `/${projectSlug}/bounty`, color: '#00f3ff' },
-    { 
-      title: 'Settings', 
-      icon: <Settings size={20} />, 
-      path: `/${projectSlug}/settings`, 
+    {
+      title: 'Settings',
+      icon: <Settings size={20} />,
+      path: `/${projectSlug}/settings`,
       color: '#00f3ff',
       children: [
         { title: 'Proxies', path: `/${projectSlug}/settings/proxies` },
@@ -136,7 +140,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   ];
 
   const handleToggle = (title: string) => {
-    setOpenItems(prev => 
+    setOpenItems(prev =>
       prev.includes(title) ? prev.filter(i => i !== title) : [...prev, title]
     );
   };
@@ -161,6 +165,37 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const routerState = useRouterState();
   const activePath = routerState.location.pathname;
 
+  const updateCheck = useRengineUpdateCheck();
+
+  React.useEffect(() => {
+    const lastCheck = localStorage.getItem('last_update_checked');
+    const today = new Date().toLocaleDateString();
+
+    if (lastCheck !== today) {
+      updateCheck.mutateAsync().then(data => {
+        if (data.update_available) {
+          setUpdateAvailable(true);
+          localStorage.setItem('update_available', 'true');
+        } else {
+          setUpdateAvailable(false);
+          localStorage.setItem('update_available', 'false');
+        }
+        localStorage.setItem('last_update_checked', today);
+      }).catch(err => console.error('Auto update check failed', err));
+    } else {
+      // Check if update_available is in localStorage from a previous session
+      const wasUpdateAvailable = localStorage.getItem('update_available') === 'true';
+      if (wasUpdateAvailable) {
+        setUpdateAvailable(true);
+      }
+    }
+  }, []);
+
+  const handleUpdateCheckClick = () => {
+    setUpdateModalOpen(true);
+    handleMenuClose();
+  };
+
   const quickAddItems = [
     { title: 'Target', icon: <Target size={16} />, path: `/${projectSlug}/targets` },
     { title: 'Organization', icon: <Briefcase size={16} />, path: `/${projectSlug}/org` },
@@ -177,8 +212,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   ];
 
   return (
-    <Box sx={{ 
-      display: 'flex', 
+    <Box sx={{
+      display: 'flex',
       minHeight: '100vh',
       bgcolor: 'transparent'
     }}>
@@ -239,50 +274,50 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             const isOpen = openItems.includes(item.title);
             const isActive = activePath.startsWith(item.path);
             const itemColor = isActive ? '#7000ff' : '#00f3ff';
-            
+
             return (
               <React.Fragment key={item.title}>
                 <ListItem disablePadding sx={{ mb: 0.5 }}>
-                  <ListItemButton 
+                  <ListItemButton
                     {...(hasChildren ? {
                       onClick: () => handleToggle(item.title)
                     } : {
                       component: Link,
                       to: item.path
                     })}
-                    sx={{ 
+                    sx={{
                       borderRadius: 2,
                       minHeight: 48,
                       justifyContent: isHovered ? 'initial' : 'center',
                       px: 2.5,
                       bgcolor: isActive ? 'rgba(112, 0, 255, 0.15)' : 'transparent',
-                      '&:hover': { 
+                      '&:hover': {
                         bgcolor: isActive ? 'rgba(112, 0, 255, 0.2)' : 'rgba(0, 243, 255, 0.05)',
                       }
                     }}
                   >
-                    <ListItemIcon sx={{ 
-                      minWidth: 0, 
-                      mr: isHovered ? 2 : 'auto', 
+                    <ListItemIcon sx={{
+                      minWidth: 0,
+                      mr: isHovered ? 2 : 'auto',
                       justifyContent: 'center',
                       color: itemColor,
                       filter: `drop-shadow(0 0 5px ${itemColor}aa)`
                     }}>
                       {item.icon}
                     </ListItemIcon>
-                    
+
                     {isHovered && (
                       <>
-                        <ListItemText 
+                        <ListItemText
                           primary={
-                            <Typography variant="body2" sx={{ 
-                              fontWeight: 600, 
+                            <Typography variant="body2" sx={{
+                              fontWeight: 600,
                               color: isActive ? '#7000ff' : 'rgba(255,255,255,0.6)',
                               fontSize: '0.85rem'
                             }}>
                               {item.title}
                             </Typography>
-                          } 
+                          }
                         />
                         {hasChildren && (
                           isOpen ? <ChevronDown size={14} style={{ opacity: 0.5 }} /> : <ChevronRight size={14} style={{ opacity: 0.5 }} />
@@ -291,7 +326,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                     )}
                   </ListItemButton>
                 </ListItem>
-                
+
                 {hasChildren && isHovered && (
                   <Collapse in={isOpen} timeout="auto" unmountOnExit>
                     <List component="div" disablePadding sx={{ ml: 2 }}>
@@ -336,10 +371,10 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         </List>
       </Drawer>
 
-      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Floating Topbar */}
-        <AppBar position="fixed" sx={{ 
-          bgcolor: 'rgba(10, 10, 15, 0.95)', 
+        <AppBar position="fixed" sx={{
+          bgcolor: 'rgba(10, 10, 15, 0.95)',
           backdropFilter: 'blur(12px)',
           border: '1px solid rgba(255, 255, 255, 0.05)',
           borderRadius: 4,
@@ -353,9 +388,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
           <Toolbar sx={{ px: '16px !important', minHeight: '64px !important' }}>
             {/* Logo Section */}
             <Box sx={{ display: 'flex', alignItems: 'center', mr: 4 }}>
-              <Typography variant="h6" sx={{ 
-                fontWeight: 900, 
-                fontFamily: 'Orbitron', 
+              <Typography variant="h6" sx={{
+                fontWeight: 900,
+                fontFamily: 'Orbitron',
                 letterSpacing: 2,
                 color: '#ff00ff',
                 textShadow: '0 0 12px rgba(255, 0, 115, 0.8)',
@@ -366,18 +401,18 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               }}>
                 r3ngine
               </Typography>
-              <Chip 
-                label={version} 
-                size="small" 
-                sx={{ 
-                  height: 18, 
-                  fontSize: '0.6rem', 
-                  fontWeight: 800, 
-                  bgcolor: 'transparent', 
-                  border: '1px solid #ff00ff', 
+              <Chip
+                label={version}
+                size="small"
+                sx={{
+                  height: 18,
+                  fontSize: '0.6rem',
+                  fontWeight: 800,
+                  bgcolor: 'transparent',
+                  border: '1px solid #ff00ff',
                   color: '#ff00ff',
                   borderRadius: 1
-                }} 
+                }}
               />
             </Box>
 
@@ -386,25 +421,25 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             {/* Action Group */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
               {/* Universal Search */}
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                bgcolor: 'rgba(255, 255, 255, 0.03)', 
-                px: 2, 
-                py: 0.5, 
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                bgcolor: 'rgba(255, 255, 255, 0.03)',
+                px: 2,
+                py: 0.5,
                 borderRadius: 10,
                 width: 240,
                 border: '1px solid rgba(255,255,255,0.05)',
                 '&:hover': { borderColor: 'rgba(0, 243, 255, 0.3)' }
               }}>
-                <InputBase 
-                  placeholder="Universal Search..." 
+                <InputBase
+                  placeholder="Universal Search..."
                   sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', flex: 1, ml: 1 }}
                 />
                 <Search size={14} style={{ color: '#ff00ff', opacity: 0.8 }} />
               </Box>
-              <Box 
-                component={Link} 
+              <Box
+                component={Link}
                 to={`/${projectSlug}/projects`}
                 sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5, textDecoration: 'none' }}
               >
@@ -413,7 +448,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               </Box>
 
 
-              <Box 
+              <Box
                 onClick={handleQuickAddOpen}
                 sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5 }}
               >
@@ -423,10 +458,10 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               </Box>
 
               <Box sx={{ display: 'flex', gap: 1, mx: 2 }}>
-                <IconButton 
+                <IconButton
                   onClick={handleToolboxOpen}
-                  size="small" 
-                  sx={{ 
+                  size="small"
+                  sx={{
                     color: toolboxAnchorEl ? '#00f3ff' : 'rgba(255,255,255,0.5)',
                     bgcolor: toolboxAnchorEl ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
                     boxShadow: toolboxAnchorEl ? '0 0 15px rgba(0, 243, 255, 0.3)' : 'none',
@@ -438,10 +473,10 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 >
                   <LayoutGrid size={18} />
                 </IconButton>
-                <IconButton 
+                <IconButton
                   onClick={handleNotificationOpen}
-                  size="small" 
-                  sx={{ 
+                  size="small"
+                  sx={{
                     color: notificationAnchorEl ? '#00f3ff' : 'rgba(255,255,255,0.5)',
                     bgcolor: notificationAnchorEl ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
                     '&:hover': {
@@ -458,11 +493,11 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }} onClick={handleMenuOpen}>
-                <Avatar 
+                <Avatar
                   src="https://api.dicebear.com/7.x/bottts-neutral/svg?seed=hacker&backgroundColor=transparent"
-                  sx={{ 
-                    width: 32, 
-                    height: 32, 
+                  sx={{
+                    width: 32,
+                    height: 32,
                     bgcolor: 'rgba(255,255,255,0.05)',
                     border: '1px solid rgba(0, 243, 255, 0.3)',
                     p: 0.2
@@ -479,7 +514,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               anchorEl={quickAddAnchorEl}
               open={Boolean(quickAddAnchorEl)}
               onClose={handleQuickAddClose}
-              PaperProps={{
+              paperprops={{
                 sx: {
                   bgcolor: 'rgba(10, 10, 15, 0.95)',
                   backdropFilter: 'blur(12px)',
@@ -507,9 +542,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
               {quickAddItems.map((item) => (
-                <MenuItem 
-                  key={item.title} 
-                  component={Link} 
+                <MenuItem
+                  key={item.title}
+                  component={Link}
                   to={item.path}
                   onClick={handleQuickAddClose}
                   sx={{ textDecoration: 'none' }}
@@ -526,7 +561,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               anchorEl={toolboxAnchorEl}
               open={Boolean(toolboxAnchorEl)}
               onClose={handleToolboxClose}
-              PaperProps={{
+              paperprops={{
                 sx: {
                   bgcolor: 'rgba(10, 10, 15, 0.98)',
                   backdropFilter: 'blur(15px)',
@@ -553,11 +588,11 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
               <Box sx={{ px: 2, py: 1, mb: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Typography sx={{ 
-                  color: '#ff00ff', 
-                  fontFamily: 'Orbitron', 
-                  fontSize: '0.75rem', 
-                  fontWeight: 900, 
+                <Typography sx={{
+                  color: '#ff00ff',
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.75rem',
+                  fontWeight: 900,
                   letterSpacing: '3px',
                   textShadow: '0 0 10px rgba(255, 0, 255, 0.5)'
                 }}>
@@ -596,11 +631,11 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                         }
                       }}
                     >
-                      <Box 
+                      <Box
                         className="icon-box"
-                        sx={{ 
-                          mb: 2, 
-                          color: 'rgba(255,255,255,0.3)', 
+                        sx={{
+                          mb: 2,
+                          color: 'rgba(255,255,255,0.3)',
                           transition: 'all 0.3s',
                           display: 'flex',
                           transform: 'scale(1)',
@@ -611,9 +646,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       >
                         {item.icon}
                       </Box>
-                      <Typography className="item-text" sx={{ 
-                        fontSize: '0.7rem', 
-                        color: 'rgba(255,255,255,0.4)', 
+                      <Typography className="item-text" sx={{
+                        fontSize: '0.7rem',
+                        color: 'rgba(255,255,255,0.4)',
                         fontFamily: 'Orbitron',
                         textAlign: 'center',
                         fontWeight: 700,
@@ -634,23 +669,29 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             <CVELookupModal open={openTool === 'cve'} onClose={() => setOpenTool(null)} />
             <WAFDetectorModal open={openTool === 'waf'} onClose={() => setOpenTool(null)} />
 
-            <NotificationsDropdown 
-              anchorEl={notificationAnchorEl} 
-              onClose={handleNotificationClose} 
+            <NotificationsDropdown
+              anchorEl={notificationAnchorEl}
+              onClose={handleNotificationClose}
               projectSlug={projectSlug}
             />
 
-            <ScanHistoryDrawer 
-              open={scanHistoryOpen} 
-              onClose={() => setScanHistoryOpen(false)} 
-              projectSlug={projectSlug} 
+            <ScanHistoryDrawer
+              open={scanHistoryOpen}
+              onClose={() => setScanHistoryOpen(false)}
+              projectSlug={projectSlug}
+            />
+
+            <CheckForUpdateModal
+              open={updateModalOpen}
+              onClose={() => setUpdateModalOpen(false)}
+              onUpdateFound={setUpdateAvailable}
             />
 
             <Menu
               anchorEl={anchorEl}
               open={Boolean(anchorEl)}
               onClose={handleMenuClose}
-              PaperProps={{
+              paperprops={{
                 sx: {
                   bgcolor: 'rgba(10, 10, 15, 0.98)',
                   backdropFilter: 'blur(15px)',
@@ -688,34 +729,39 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                   Welcome root!
                 </Typography>
               </Box>
-              
+
               <MenuItem onClick={handleMenuClose} component={Link} to={`/${projectSlug}/settings/profile`}>
                 <UserIcon size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
                 <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>My Account</Typography>
               </MenuItem>
-              
+
               <MenuItem onClick={handleMenuClose}>
                 <Target size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
                 <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Disable Bug Bounty Mode</Typography>
               </MenuItem>
-              
+
               <MenuItem onClick={handleMenuClose} component={Link} to={`/${projectSlug}/settings/admin`}>
                 <Settings size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
                 <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Admin Settings</Typography>
               </MenuItem>
-              
+
               <Divider sx={{ bgcolor: 'rgba(255,255,255,0.05)', my: 1 }} />
-              
-              <MenuItem onClick={handleMenuClose}>
+
+              <MenuItem onClick={handleUpdateCheckClick}>
                 <RefreshCw size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
-                <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Check reNgine Update</Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                  <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Check reNgine Update</Typography>
+                  {updateAvailable && (
+                    <Typography sx={{ fontSize: '0.6rem', color: '#ff0055', fontWeight: 800 }}>Update Available!</Typography>
+                  )}
+                </Box>
               </MenuItem>
-              
+
               <Divider sx={{ bgcolor: 'rgba(255,255,255,0.05)', my: 1 }} />
-              
-              <MenuItem 
-                onClick={handleMenuClose} 
-                component="a" 
+
+              <MenuItem
+                onClick={handleMenuClose}
+                component="a"
                 href="/logout"
                 sx={{ '&:hover': { color: '#ff003c !important', bgcolor: 'rgba(255, 0, 60, 0.1) !important' } }}
               >
@@ -727,18 +773,21 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         </AppBar>
 
         {/* Page Content */}
-        <Box 
-          component="main" 
-          sx={{ 
-            flexGrow: 1, 
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
             pt: 12,
-            px: 3,
+            px: { xs: 1, md: 3 },
             pb: 4,
-            overflow: 'auto',
-            position: 'relative'
+            overflowX: 'hidden',
+            overflowY: 'auto',
+            position: 'relative',
+            width: '100%',
+            minWidth: 0
           }}
         >
-          <Box sx={{ position: 'relative', zIndex: 1, width: '100%' }}>
+          <Box sx={{ position: 'relative', zIndex: 1, width: '100%', minWidth: 0 }}>
             {children}
           </Box>
         </Box>

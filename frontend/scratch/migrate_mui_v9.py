@@ -20,8 +20,8 @@ def migrate_mui(filepath):
     # InputLabelProps migration
     content = re.sub(r'InputLabelProps={{([^}]+)}}', r'slotProps={{ label: {\1} }}', content)
     
-    # PaperProps migration
-    content = re.sub(r'PaperProps={{([^}]+)}}', r'slotProps={{ paper: {\1} }}', content)
+    # paperprops migration
+    content = re.sub(r'paperprops={{([^}]+)}}', r'slotProps={{ paper: {\1} }}', content)
 
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write(content)

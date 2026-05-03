@@ -1,26 +1,26 @@
 import React, { useState } from 'react';
-import { 
-  Drawer, 
-  Box, 
-  Typography, 
-  IconButton, 
-  Tabs, 
-  Tab, 
-  Stack, 
-  Chip, 
-  Button, 
+import {
+  Drawer,
+  Box,
+  Typography,
+  IconButton,
+  Tabs,
+  Tab,
+  Stack,
+  Chip,
+  Button,
   CircularProgress,
   Divider,
   Paper
 } from '@mui/material';
-import { 
-  X, 
-  Clock, 
-  Play, 
-  CheckCircle2, 
-  AlertTriangle, 
-  Trash2, 
-  StopCircle, 
+import {
+  X,
+  Clock,
+  Play,
+  CheckCircle2,
+  AlertTriangle,
+  Trash2,
+  StopCircle,
   RefreshCw,
   Search,
   Activity,
@@ -57,10 +57,10 @@ const getStatusText = (status: number) => {
 };
 
 const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) => void, onDelete: (id: number) => void }) => (
-  <Paper sx={{ 
-    p: 2, 
-    mb: 2, 
-    bgcolor: 'rgba(20, 20, 25, 0.5)', 
+  <Paper sx={{
+    p: 2,
+    mb: 2,
+    bgcolor: 'rgba(20, 20, 25, 0.5)',
     border: '1px solid rgba(255,255,255,0.05)',
     borderRadius: 2,
     position: 'relative',
@@ -74,14 +74,14 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
   }}>
     {/* Decorative line */}
     <Box sx={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, bgcolor: getStatusColor(scan.scan_status) }} />
-    
+
     <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
       <Box>
-        <Typography sx={{ 
-          fontFamily: 'Orbitron', 
-          fontWeight: 900, 
-          fontSize: '0.75rem', 
-          color: getStatusColor(scan.scan_status), 
+        <Typography sx={{
+          fontFamily: 'Orbitron',
+          fontWeight: 900,
+          fontSize: '0.75rem',
+          color: getStatusColor(scan.scan_status),
           textTransform: 'uppercase',
           letterSpacing: 1
         }}>
@@ -91,18 +91,18 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
           {scan.scan_status === 1 ? 'Running Since ' : 'Scan Completed '} {scan.completed_ago || 'just now'}
         </Typography>
       </Box>
-      <Chip 
-        label={getStatusText(scan.scan_status)} 
-        size="small" 
-        sx={{ 
-          height: 20, 
-          fontSize: '0.6rem', 
-          fontWeight: 900, 
-          bgcolor: `${getStatusColor(scan.scan_status)}22`, 
+      <Chip
+        label={getStatusText(scan.scan_status)}
+        size="small"
+        sx={{
+          height: 20,
+          fontSize: '0.6rem',
+          fontWeight: 900,
+          bgcolor: `${getStatusColor(scan.scan_status)}22`,
           color: getStatusColor(scan.scan_status),
           border: `1px solid ${getStatusColor(scan.scan_status)}44`,
           fontFamily: 'Orbitron'
-        }} 
+        }}
       />
     </Stack>
 
@@ -120,8 +120,8 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
 
     <Stack direction="row" spacing={1} justifyContent="flex-end">
       {scan.scan_status === 1 && (
-        <Button 
-          size="small" 
+        <Button
+          size="small"
           startIcon={<StopCircle size={14} />}
           onClick={() => onStop(scan.id)}
           sx={{ fontSize: '0.65rem', color: '#ff003c', '&:hover': { bgcolor: 'rgba(255,0,60,0.1)' } }}
@@ -129,8 +129,8 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
           STOP
         </Button>
       )}
-      <IconButton 
-        size="small" 
+      <IconButton
+        size="small"
         onClick={() => onDelete(scan.id)}
         sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#ff003c' } }}
       >
@@ -141,10 +141,10 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
 );
 
 const TaskItem = ({ task, onStop }: { task: any, onStop?: (id: number) => void }) => (
-  <Paper sx={{ 
-    p: 2, 
-    mb: 2, 
-    bgcolor: 'rgba(20, 20, 25, 0.5)', 
+  <Paper sx={{
+    p: 2,
+    mb: 2,
+    bgcolor: 'rgba(20, 20, 25, 0.5)',
     border: '1px solid rgba(255,255,255,0.05)',
     borderRadius: 2,
     position: 'relative',
@@ -157,10 +157,10 @@ const TaskItem = ({ task, onStop }: { task: any, onStop?: (id: number) => void }
   }}>
     <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
       <Box>
-        <Typography sx={{ 
-          fontFamily: 'Orbitron', 
-          fontWeight: 900, 
-          fontSize: '0.7rem', 
+        <Typography sx={{
+          fontFamily: 'Orbitron',
+          fontWeight: 900,
+          fontSize: '0.7rem',
           color: '#7000ff',
           letterSpacing: 0.5
         }}>
@@ -170,32 +170,32 @@ const TaskItem = ({ task, onStop }: { task: any, onStop?: (id: number) => void }
           Running Since {task.elapsed_time || 'just now'}
         </Typography>
       </Box>
-      <Chip 
-        label="In Progress" 
-        size="small" 
-        sx={{ 
-          height: 20, 
-          fontSize: '0.6rem', 
-          fontWeight: 900, 
-          bgcolor: 'rgba(0, 243, 255, 0.1)', 
+      <Chip
+        label="In Progress"
+        size="small"
+        sx={{
+          height: 20,
+          fontSize: '0.6rem',
+          fontWeight: 900,
+          bgcolor: 'rgba(0, 243, 255, 0.1)',
           color: '#00f3ff',
           border: '1px solid rgba(0, 243, 255, 0.3)',
           fontFamily: 'Orbitron'
-        }} 
+        }}
       />
     </Stack>
 
     {onStop && (
       <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <Button 
-          size="small" 
+        <Button
+          size="small"
           variant="outlined"
           startIcon={<AlertTriangle size={12} />}
-          sx={{ 
-            fontSize: '0.6rem', 
-            color: '#ff003c', 
+          sx={{
+            fontSize: '0.6rem',
+            color: '#ff003c',
             borderColor: 'rgba(255,0,60,0.3)',
-            '&:hover': { borderColor: '#ff003c', bgcolor: 'rgba(255,0,60,0.05)' } 
+            '&:hover': { borderColor: '#ff003c', bgcolor: 'rgba(255,0,60,0.05)' }
           }}
         >
           Stop
@@ -207,20 +207,20 @@ const TaskItem = ({ task, onStop }: { task: any, onStop?: (id: number) => void }
 
 const SectionHeader = ({ title, count }: { title: string, count?: number }) => (
   <Box sx={{ mb: 2, mt: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-    <Typography sx={{ 
-      fontFamily: 'Orbitron', 
-      fontSize: '0.65rem', 
-      fontWeight: 900, 
+    <Typography sx={{
+      fontFamily: 'Orbitron',
+      fontSize: '0.65rem',
+      fontWeight: 900,
       color: 'rgba(255,255,255,0.5)',
       letterSpacing: 2
     }}>
       {title}
     </Typography>
     {count !== undefined && count > 0 && (
-      <Chip 
-        label={`${count} ACTIVE`} 
-        size="small" 
-        sx={{ height: 18, fontSize: '0.55rem', fontWeight: 900, bgcolor: '#00f3ff', color: '#000', fontFamily: 'Orbitron' }} 
+      <Chip
+        label={`${count} ACTIVE`}
+        size="small"
+        sx={{ height: 18, fontSize: '0.55rem', fontWeight: 900, bgcolor: '#00f3ff', color: '#000', fontFamily: 'Orbitron' }}
       />
     )}
   </Box>
@@ -237,7 +237,7 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
       anchor="right"
       open={open}
       onClose={onClose}
-      PaperProps={{
+      paperprops={{
         sx: {
           width: 450,
           bgcolor: 'rgba(5, 5, 10, 0.98)',
@@ -251,13 +251,13 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
       {/* Header */}
       <Box sx={{ p: 2.5, borderBottom: '1px solid rgba(0, 243, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ 
-            width: 32, 
-            height: 32, 
-            borderRadius: 1, 
-            bgcolor: 'rgba(0, 243, 255, 0.1)', 
-            display: 'flex', 
-            alignItems: 'center', 
+          <Box sx={{
+            width: 32,
+            height: 32,
+            borderRadius: 1,
+            bgcolor: 'rgba(0, 243, 255, 0.1)',
+            display: 'flex',
+            alignItems: 'center',
             justifyContent: 'center',
             border: '1px solid rgba(0, 243, 255, 0.2)'
           }}>
@@ -283,8 +283,8 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
       </Box>
 
       {/* Tabs */}
-      <Tabs 
-        value={activeTab} 
+      <Tabs
+        value={activeTab}
         onChange={(_, v) => setActiveTab(v)}
         sx={{
           borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -340,11 +340,11 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
           <Box>
             {status?.tasks?.running?.length > 0 ? (
               <>
-                <Box sx={{ 
-                  mb: 3, 
-                  p: 1.5, 
-                  bgcolor: '#00f3ff22', 
-                  borderRadius: 1, 
+                <Box sx={{
+                  mb: 3,
+                  p: 1.5,
+                  bgcolor: '#00f3ff22',
+                  borderRadius: 1,
                   border: '1px solid #00f3ff44',
                   textAlign: 'center'
                 }}>
@@ -354,7 +354,7 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
                 </Box>
                 <SectionHeader title="CURRENTLY RUNNING" />
                 {status.tasks.running.map((task: any) => (
-                  <TaskItem key={task.id} task={task} onStop={() => {}} />
+                  <TaskItem key={task.id} task={task} onStop={() => { }} />
                 ))}
               </>
             ) : (

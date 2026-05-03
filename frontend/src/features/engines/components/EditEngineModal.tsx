@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  Button, 
-  TextField, 
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
   Box,
   Typography,
   IconButton,
@@ -52,10 +52,10 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
   const handleSubmit = async () => {
     if (!name || !yaml || !engineId) return;
     try {
-      await updateEngine.mutateAsync({ 
-        engine_id: engineId, 
-        engine_name: name, 
-        yaml_configuration: yaml 
+      await updateEngine.mutateAsync({
+        engine_id: engineId,
+        engine_name: name,
+        yaml_configuration: yaml
       });
       onClose();
     } catch (error) {
@@ -64,12 +64,12 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
   };
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{
+      paperprops={{
         sx: {
           bgcolor: '#0a0a0c',
           border: '1px solid rgba(0, 243, 255, 0.2)',
@@ -79,9 +79,9 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
         }
       }}
     >
-      <DialogTitle sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <DialogTitle sx={{
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'space-between',
         borderBottom: '1px solid rgba(0, 243, 255, 0.1)',
         pb: 2
@@ -122,18 +122,18 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
               }}
             />
 
-            <Box sx={{ 
-              position: 'relative', 
-              width: '100%', 
+            <Box sx={{
+              position: 'relative',
+              width: '100%',
               height: 500,
               bgcolor: 'rgba(255,255,255,0.03)',
               border: '1px solid rgba(255,255,255,0.1)',
               borderRadius: 1,
               overflow: 'hidden'
             }}>
-              <pre 
+              <pre
                 ref={backgroundRef}
-                style={{ 
+                style={{
                   position: 'absolute',
                   top: 0,
                   left: 0,
@@ -156,7 +156,7 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
                   const cleanLine = line.replace('\r', '');
                   const isComment = cleanLine.trim().startsWith('#');
                   const keyMatch = cleanLine.match(/^(\s*)([^#\s][^:]+:)(.*)$/);
-                  
+
                   if (isComment) {
                     return (
                       <span key={i} style={{ color: 'rgba(255,255,255,0.3)' }}>
@@ -168,13 +168,13 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
                   if (keyMatch) {
                     const [full, indent, key, rest] = keyMatch;
                     const isTopLevel = indent.length === 0;
-                    
+
                     return (
                       <span key={i}>
                         <span>{indent}</span>
-                        <span style={{ 
-                          color: isTopLevel ? '#ff3333' : '#e5c07b', 
-                          fontWeight: isTopLevel ? 900 : 400 
+                        <span style={{
+                          color: isTopLevel ? '#ff3333' : '#e5c07b',
+                          fontWeight: isTopLevel ? 900 : 400
                         }}>
                           {key}
                         </span>
@@ -231,19 +231,19 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
       </DialogContent>
 
       <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <Button 
+        <Button
           onClick={onClose}
           sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}
         >
           CANCEL
         </Button>
-        <Button 
+        <Button
           onClick={handleSubmit}
           disabled={!name || !yaml || updateEngine.isPending || loading}
           variant="contained"
           startIcon={<Save size={16} />}
-          sx={{ 
-            bgcolor: '#00f3ff', 
+          sx={{
+            bgcolor: '#00f3ff',
             color: '#000',
             fontFamily: 'Orbitron',
             fontWeight: 900,

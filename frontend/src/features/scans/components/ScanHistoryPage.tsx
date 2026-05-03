@@ -388,7 +388,7 @@ export const ScanHistoryPage: React.FC = () => {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
-        PaperProps={{
+        paperprops={{
           sx: {
             bgcolor: '#0d0c14',
             border: '1px solid rgba(0, 243, 255, 0.2)',

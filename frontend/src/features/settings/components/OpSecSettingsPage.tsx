@@ -193,7 +193,7 @@ export const OpSecSettingsPage: React.FC = () => {
               { id: 'balanced', title: 'BALANCED', icon: Activity, color: '#4caf50', desc: 'Optimized for reliability. 100ms delay, 10% jitter, random UA, WAF bypass.' },
               { id: 'aggressive', title: 'AGGRESSIVE', icon: Zap, color: '#f44336', desc: 'Low stealth. Fast scans. Only random UA and basic WAF bypass enabled.' }
             ].map((preset) => (
-              <Grid size={{ xs: 12, md: 4 }} key={preset.id}>
+              <Grid size={{xs: 12, md: 4}} key={preset.id}>
                 <Card 
                   onClick={() => applyPreset(preset.id as any)}
                   sx={{ 
@@ -220,7 +220,7 @@ export const OpSecSettingsPage: React.FC = () => {
         </Box>
 
         <Grid container spacing={3}>
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{xs: 12, md: 6}} >
             <TacticalPanel title="IDENTITY & TRAFFIC" icon={<User size={20} />}>
               <Stack spacing={2} sx={{ p: 1 }}>
                 <FormControlLabel
@@ -239,7 +239,7 @@ export const OpSecSettingsPage: React.FC = () => {
             </TacticalPanel>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{xs: 12, md: 6}} >
             <TacticalPanel title="TIMING & RATE LIMITING" icon={<Clock size={20} />}>
               <Stack spacing={3} sx={{ p: 1 }}>
                 <Box>
@@ -309,7 +309,7 @@ export const OpSecSettingsPage: React.FC = () => {
             </TacticalPanel>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{xs: 12, md: 6}} >
             <TacticalPanel title="NETWORK" icon={<Globe size={20} />}>
               <Stack spacing={3} sx={{ p: 1 }}>
                 <FormControl fullWidth size="small">
@@ -347,7 +347,7 @@ export const OpSecSettingsPage: React.FC = () => {
             </TacticalPanel>
           </Grid>
 
-          <Grid size={{ xs: 12, md: 6 }}>
+          <Grid size={{xs: 12, md: 6}} >
             <TacticalPanel title="POST-PROCESSING" icon={<Monitor size={20} />}>
               <Stack spacing={2} sx={{ p: 1 }}>
                 <FormControlLabel

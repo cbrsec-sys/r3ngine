@@ -58,7 +58,7 @@ const StatCard: React.FC<{
 export const MonitoringStats: React.FC<{ stats: StatsType }> = ({ stats }) => {
   return (
     <Grid container spacing={3}>
-      <Grid size={{ xs: 12 }} sm={6} md={3}>
+      <Grid xs={12} sm={6} md={3}>
         <StatCard 
           title="Total Discoveries" 
           value={stats.total_discoveries} 
@@ -66,7 +66,7 @@ export const MonitoringStats: React.FC<{ stats: StatsType }> = ({ stats }) => {
           color="#00f3ff" 
         />
       </Grid>
-      <Grid size={{ xs: 12 }} sm={6} md={3}>
+      <Grid xs={12} sm={6} md={3}>
         <StatCard 
           title="New Subdomains" 
           value={stats.subdomain_discoveries} 
@@ -74,7 +74,7 @@ export const MonitoringStats: React.FC<{ stats: StatsType }> = ({ stats }) => {
           color="#00ff62" 
         />
       </Grid>
-      <Grid size={{ xs: 12 }} sm={6} md={3}>
+      <Grid xs={12} sm={6} md={3}>
         <StatCard 
           title="New Directories" 
           value={stats.endpoint_discoveries} 
@@ -82,7 +82,7 @@ export const MonitoringStats: React.FC<{ stats: StatsType }> = ({ stats }) => {
           color="#7000ff" 
         />
       </Grid>
-      <Grid size={{ xs: 12 }} sm={6} md={3}>
+      <Grid xs={12} sm={6} md={3}>
         <StatCard 
           title="Login Pages" 
           value={stats.login_discoveries} 

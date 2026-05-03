@@ -130,7 +130,7 @@ export const ReportSettingsPage: React.FC = () => {
                 THEME_COLORS
               </Typography>
               <Grid container spacing={3}>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                <Grid size={{xs: 12, sm: 6}} >
                   <Typography variant="caption" sx={{ color: '#00f3ff', mb: 1, display: 'block', fontWeight: 600 }}>PRIMARY_COLOR</Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for Main Title, Footer Background, and Page Counters.
@@ -157,7 +157,7 @@ export const ReportSettingsPage: React.FC = () => {
                     />
                   </Box>
                 </Grid>
-                <Grid size={{ xs: 12, sm: 6 }}>
+                <Grid size={{xs: 12, sm: 6}} >
                   <Typography variant="caption" sx={{ color: '#ffd600', mb: 1, display: 'block', fontWeight: 600 }}>SECONDARY_COLOR</Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for the report cover background.

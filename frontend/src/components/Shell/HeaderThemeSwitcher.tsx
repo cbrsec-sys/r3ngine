@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  IconButton, 
-  Menu, 
-  MenuItem, 
-  Typography, 
-  Box, 
-  Tooltip 
+import {
+  IconButton,
+  Menu,
+  MenuItem,
+  Typography,
+  Box,
+  Tooltip
 } from '@mui/material';
 import { Palette, Check } from 'lucide-react';
 import type { ThemeType } from '../../theme/tokens';
@@ -41,10 +41,10 @@ export const HeaderThemeSwitcher: React.FC = () => {
   return (
     <>
       <Tooltip title="Switch Theme">
-        <IconButton 
+        <IconButton
           onClick={handleOpen}
-          size="small" 
-          sx={{ 
+          size="small"
+          sx={{
             color: anchorEl ? '#00f3ff' : 'rgba(255,255,255,0.5)',
             bgcolor: anchorEl ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
             '&:hover': {
@@ -61,7 +61,7 @@ export const HeaderThemeSwitcher: React.FC = () => {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleClose}
-        PaperProps={{
+        paperprops={{
           sx: {
             bgcolor: 'rgba(10, 10, 15, 0.98)',
             backdropFilter: 'blur(15px)',
@@ -77,22 +77,22 @@ export const HeaderThemeSwitcher: React.FC = () => {
         anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
       >
         <Box sx={{ px: 2, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.05)', mb: 1 }}>
-          <Typography sx={{ 
-            fontSize: '0.7rem', 
-            color: '#00f3ff', 
-            fontFamily: 'Orbitron', 
-            fontWeight: 800, 
-            letterSpacing: 1 
+          <Typography sx={{
+            fontSize: '0.7rem',
+            color: '#00f3ff',
+            fontFamily: 'Orbitron',
+            fontWeight: 800,
+            letterSpacing: 1
           }}>
             THEME SELECTOR
           </Typography>
         </Box>
 
         {themes.map((t) => (
-          <MenuItem 
-            key={t.id} 
+          <MenuItem
+            key={t.id}
             onClick={() => handleSelect(t.id)}
-            sx={{ 
+            sx={{
               py: 1.5,
               px: 2.5,
               gap: 2,

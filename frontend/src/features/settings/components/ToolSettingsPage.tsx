@@ -218,7 +218,7 @@ export const ToolSettingsPage: React.FC = () => {
 
         <TabPanel value={tabValue} index={0}>
           <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 3 }}>
+            <Grid size={{xs: 12, md: 3}} >
               <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.1)', width: '100%' }}>
                 <Typography variant="h6" sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '14px', mb: 2 }}>
                   UPLOAD GF PATTERNS
@@ -292,7 +292,7 @@ export const ToolSettingsPage: React.FC = () => {
               </Box>
             </Grid>
 
-            <Grid size={{ xs: 12, md: 9 }}>
+            <Grid size={{xs: 12, md: 9}} >
               {editingFile && editingFile.key === 'gf_pattern' ? (
                 <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.2)', width: '100%' }}>
                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

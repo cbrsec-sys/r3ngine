@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { 
-  Box, 
-  Typography, 
-  InputBase, 
-  Button, 
-  IconButton, 
+import {
+  Box,
+  Typography,
+  InputBase,
+  Button,
+  IconButton,
   CircularProgress,
   Pagination,
   Stack,
@@ -12,11 +12,11 @@ import {
   Menu,
   MenuItem
 } from '@mui/material';
-import { 
-  Search, 
-  Copy, 
-  Download, 
-  Filter, 
+import {
+  Search,
+  Copy,
+  Download,
+  Filter,
   LayoutGrid,
   ChevronDown
 } from 'lucide-react';
@@ -72,35 +72,35 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
     <Box>
       {/* High-Fidelity Search Bar and Pattern Dropdown */}
       <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <Box sx={{ 
-          display: 'flex', 
-          bgcolor: 'rgba(255,255,255,0.03)', 
-          borderRadius: '4px', 
+        <Box sx={{
+          display: 'flex',
+          bgcolor: 'rgba(255,255,255,0.03)',
+          borderRadius: '4px',
           overflow: 'hidden',
           flex: 1,
           border: '1px solid rgba(0, 243, 255, 0.2)',
           boxShadow: '0 0 20px rgba(0, 243, 255, 0.05)'
         }}>
-          <InputBase 
+          <InputBase
             placeholder={selectedGfPattern ? `Search within ${selectedGfPattern.toUpperCase()} endpoints...` : "Filter Endpoints..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-            sx={{ 
-              flex: 1, 
-              px: 3, 
-              py: 1.5, 
+            sx={{
+              flex: 1,
+              px: 3,
+              py: 1.5,
               fontSize: '0.9rem',
               color: '#fff',
               '&::placeholder': { color: 'rgba(255,255,255,0.3)', opacity: 1 }
             }}
           />
-          <Button 
+          <Button
             onClick={handleSearch}
             startIcon={<Search size={18} />}
-            sx={{ 
-              bgcolor: 'rgba(0, 243, 255, 0.1)', 
-              color: '#00f3ff', 
+            sx={{
+              bgcolor: 'rgba(0, 243, 255, 0.1)',
+              color: '#00f3ff',
               px: 4,
               borderRadius: 0,
               fontWeight: 800,
@@ -139,7 +139,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
               anchorEl={anchorEl}
               open={Boolean(anchorEl)}
               onClose={handleMenuClose}
-              PaperProps={{
+              paperprops={{
                 sx: {
                   bgcolor: '#0a0a0f',
                   border: '1px solid rgba(0, 243, 255, 0.2)',
@@ -195,7 +195,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
         </Box>
 
         {/* Responsive Endpoints Table */}
-        <Box sx={{ 
+        <Box sx={{
           overflowX: 'auto',
           width: '100%',
           '&::-webkit-scrollbar': { height: '6px' },
@@ -203,8 +203,8 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
         }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
             <thead>
-              <tr style={{ 
-                textAlign: 'left', 
+              <tr style={{
+                textAlign: 'left',
                 borderBottom: '1px solid rgba(255,255,255,0.1)',
                 backgroundColor: 'rgba(255,255,255,0.02)'
               }}>
@@ -227,25 +227,25 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography sx={{ 
-                          fontSize: '12px', 
-                          fontWeight: 500, 
-                          color: '#fff', 
+                        <Typography sx={{
+                          fontSize: '12px',
+                          fontWeight: 500,
+                          color: '#fff',
                           textDecoration: 'none',
                           wordBreak: 'break-all',
                           '&:hover': { color: '#00f3ff' }
                         }} component="a" href={endpoint.http_url} target="_blank">
                           {endpoint.http_url}
                         </Typography>
-                        <IconButton 
-                          size="small" 
+                        <IconButton
+                          size="small"
                           onClick={() => copyToClipboard(endpoint.http_url)}
                           sx={{ color: 'rgba(255,255,255,0.2)', p: 0.5, '&:hover': { color: '#00f3ff' } }}
                         >
                           <Copy size={12} />
                         </IconButton>
                       </Box>
-                      
+
                       {/* Tech Badges */}
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                         {endpoint.webserver && (
@@ -262,11 +262,11 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                     </Box>
                   </td>
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
-                    <Box sx={{ 
+                    <Box sx={{
                       display: 'inline-flex',
-                      px: 1.2, 
-                      py: 0.4, 
-                      borderRadius: 0.5, 
+                      px: 1.2,
+                      py: 0.4,
+                      borderRadius: 0.5,
                       bgcolor: `${getStatusColor(endpoint.http_status)}15`,
                       border: `1px solid ${getStatusColor(endpoint.http_status)}44`
                     }}>
@@ -283,10 +283,10 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       {endpoint.matched_gf_patterns?.split(',').map((tag, idx) => (
-                        <Box key={idx} sx={{ 
-                          px: 1, 
-                          py: 0.2, 
-                          bgcolor: 'rgba(255, 0, 60, 0.1)', 
+                        <Box key={idx} sx={{
+                          px: 1,
+                          py: 0.2,
+                          bgcolor: 'rgba(255, 0, 60, 0.1)',
                           border: '1px solid rgba(255, 0, 60, 0.3)',
                           borderRadius: 0.5,
                           display: 'inline-block',
@@ -325,9 +325,9 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
 
         {/* Tactical Pagination */}
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <Pagination 
-            count={Math.ceil((data?.count || 0) / 100)} 
-            page={page} 
+          <Pagination
+            count={Math.ceil((data?.count || 0) / 100)}
+            page={page}
             onChange={(_, v) => setPage(v)}
             size="small"
             sx={{

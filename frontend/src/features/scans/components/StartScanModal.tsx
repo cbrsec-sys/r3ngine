@@ -29,12 +29,12 @@ interface StartScanModalProps {
   projectSlug: string;
 }
 
-export const StartScanModal: React.FC<StartScanModalProps> = ({ 
-  open, 
-  onClose, 
-  domainIds, 
+export const StartScanModal: React.FC<StartScanModalProps> = ({
+  open,
+  onClose,
+  domainIds,
   domainNames,
-  projectSlug 
+  projectSlug
 }) => {
   const [formData, setFormData] = useState({
     engine_id: '' as number | '',
@@ -73,17 +73,17 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
     reset();
   };
 
-  const targetLabel = domainNames.length > 1 
+  const targetLabel = domainNames.length > 1
     ? `${domainNames.length} SELECTED TARGETS`
     : domainNames[0]?.toUpperCase() || 'N/A';
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={handleClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{
+      paperprops={{
         sx: {
           bgcolor: 'rgba(10, 10, 20, 0.95)',
           backdropFilter: 'blur(20px)',
@@ -93,27 +93,27 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
         }
       }}
     >
-      <DialogTitle sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+      <DialogTitle sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
         borderBottom: '1px solid rgba(255,255,255,0.05)',
         pb: 2
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ 
-            p: 1, 
-            borderRadius: 2, 
-            bgcolor: 'rgba(0, 255, 98, 0.1)', 
+          <Box sx={{
+            p: 1,
+            borderRadius: 2,
+            bgcolor: 'rgba(0, 255, 98, 0.1)',
             color: '#00ff62',
             display: 'flex'
           }}>
             <Zap size={20} />
           </Box>
           <Box>
-            <Typography variant="h6" sx={{ 
-              fontFamily: 'Orbitron', 
-              fontWeight: 800, 
+            <Typography variant="h6" sx={{
+              fontFamily: 'Orbitron',
+              fontWeight: 800,
               letterSpacing: 1,
               color: '#fff',
               lineHeight: 1.2
@@ -133,9 +133,9 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
       <form onSubmit={handleSubmit}>
         <DialogContent sx={{ mt: 2 }}>
           {error && (
-            <Alert severity="error" sx={{ 
-              mb: 3, 
-              bgcolor: 'rgba(255, 0, 60, 0.1)', 
+            <Alert severity="error" sx={{
+              mb: 3,
+              bgcolor: 'rgba(255, 0, 60, 0.1)',
               color: '#ff003c',
               border: '1px solid rgba(255, 0, 60, 0.2)',
               '& .MuiAlert-icon': { color: '#ff003c' }
@@ -145,7 +145,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
           )}
 
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }} >
               <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 800, mb: 1, display: 'block' }}>
                 PRIMARY CONFIGURATION
               </Typography>
@@ -171,8 +171,8 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
 
                 <FormControlLabel
                   control={
-                    <Switch 
-                      checked={formData.spiderfoot_scan} 
+                    <Switch
+                      checked={formData.spiderfoot_scan}
                       onChange={(e) => setFormData({ ...formData, spiderfoot_scan: e.target.checked })}
                       sx={switchStyles}
                     />
@@ -188,8 +188,8 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
 
                 <FormControlLabel
                   control={
-                    <Switch 
-                      checked={formData.customDorkSwitch} 
+                    <Switch
+                      checked={formData.customDorkSwitch}
                       onChange={(e) => setFormData({ ...formData, customDorkSwitch: e.target.checked })}
                       sx={switchStyles}
                     />
@@ -216,7 +216,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
               </Box>
             </Grid>
 
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: 6 }} >
               <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 800, mb: 1, display: 'block' }}>
                 ADVANCED SCOPE
               </Typography>
@@ -250,9 +250,9 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
         </DialogContent>
 
         <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <Button 
-            onClick={handleClose} 
-            sx={{ 
+          <Button
+            onClick={handleClose}
+            sx={{
               color: 'rgba(255,255,255,0.5)',
               fontFamily: 'Orbitron',
               fontSize: '0.7rem',
@@ -298,7 +298,7 @@ const fieldStyles = {
     '&.Mui-focused fieldset': { borderColor: '#00ff62' },
     bgcolor: 'rgba(255,255,255,0.03)',
   },
-  '& .MuiInputLabel-root': { 
+  '& .MuiInputLabel-root': {
     color: 'rgba(255,255,255,0.4)',
     '&.Mui-focused': { color: '#00ff62' }
   },

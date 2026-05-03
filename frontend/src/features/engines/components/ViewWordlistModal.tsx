@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  Button, 
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
   Box,
   Typography,
   IconButton,
@@ -41,12 +41,12 @@ export const ViewWordlistModal: React.FC<ViewWordlistModalProps> = ({ open, onCl
   }, [open, wordlistId]);
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{
+      paperprops={{
         sx: {
           bgcolor: '#0a0a0c',
           border: '1px solid rgba(255, 0, 255, 0.2)',
@@ -56,9 +56,9 @@ export const ViewWordlistModal: React.FC<ViewWordlistModalProps> = ({ open, onCl
         }
       }}
     >
-      <DialogTitle sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <DialogTitle sx={{
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'space-between',
         borderBottom: '1px solid rgba(255, 0, 255, 0.1)',
         pb: 2
@@ -80,9 +80,9 @@ export const ViewWordlistModal: React.FC<ViewWordlistModalProps> = ({ open, onCl
             <CircularProgress sx={{ color: '#ff00ff' }} />
           </Box>
         ) : (
-          <Box 
+          <Box
             component="pre"
-            sx={{ 
+            sx={{
               bgcolor: 'rgba(255,255,255,0.03)',
               p: 2,
               borderRadius: 1,
@@ -104,7 +104,7 @@ export const ViewWordlistModal: React.FC<ViewWordlistModalProps> = ({ open, onCl
       </DialogContent>
 
       <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <Button 
+        <Button
           onClick={onClose}
           sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}
         >

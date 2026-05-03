@@ -1,11 +1,11 @@
 import React from 'react';
-import { 
-  Box, 
-  Typography, 
-  Menu, 
-  IconButton, 
-  Stack, 
-  Button, 
+import {
+  Box,
+  Typography,
+  Menu,
+  IconButton,
+  Stack,
+  Button,
   Divider,
   List,
   ListItem,
@@ -23,10 +23,10 @@ interface NotificationsDropdownProps {
   projectSlug?: string;
 }
 
-export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({ 
-  anchorEl, 
-  onClose, 
-  projectSlug 
+export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
+  anchorEl,
+  onClose,
+  projectSlug
 }) => {
   const { data: notifications, isLoading } = useNotifications(projectSlug);
   const markAllRead = useMarkAllRead();
@@ -50,7 +50,7 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
       open={open}
       onClose={onClose}
       disableScrollLock
-      PaperProps={{
+      paperprops={{
         sx: {
           width: 360,
           maxHeight: 500,
@@ -70,15 +70,15 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
             NOTIFICATIONS
           </Typography>
           <Stack direction="row" spacing={1}>
-            <Button 
-              size="small" 
+            <Button
+              size="small"
               onClick={() => markAllRead.mutate(projectSlug)}
               sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', '&:hover': { color: '#00f3ff' } }}
             >
               Mark all read
             </Button>
-            <Button 
-              size="small" 
+            <Button
+              size="small"
               onClick={() => clearAll.mutate(projectSlug)}
               sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', '&:hover': { color: '#ff003c' } }}
             >
@@ -95,10 +95,10 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
           </Box>
         ) : notifications?.length > 0 ? (
           notifications.map((notif: any) => (
-            <ListItem 
+            <ListItem
               key={notif.id}
               onClick={() => markRead.mutate(notif.id)}
-              sx={{ 
+              sx={{
                 borderBottom: '1px solid rgba(255,255,255,0.03)',
                 cursor: 'pointer',
                 bgcolor: notif.is_read ? 'transparent' : 'rgba(0, 243, 255, 0.03)',
@@ -121,12 +121,12 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
                     </Typography>
                   </Stack>
                 }
-                primaryTypographyProps={{ 
-                  sx: { 
-                    fontSize: '0.8rem', 
-                    fontWeight: notif.is_read ? 500 : 900, 
-                    color: notif.is_read ? 'rgba(255,255,255,0.8)' : '#fff' 
-                  } 
+                primaryTypographyProps={{
+                  sx: {
+                    fontSize: '0.8rem',
+                    fontWeight: notif.is_read ? 500 : 900,
+                    color: notif.is_read ? 'rgba(255,255,255,0.8)' : '#fff'
+                  }
                 }}
               />
             </ListItem>

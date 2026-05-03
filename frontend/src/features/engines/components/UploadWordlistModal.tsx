@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  Button, 
-  TextField, 
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
   Box,
   Typography,
   IconButton,
@@ -33,7 +33,7 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
 
   const handleSubmit = async () => {
     if (!name || !shortName || !file) return;
-    
+
     const formData = new FormData();
     formData.append('name', name);
     formData.append('short_name', shortName);
@@ -51,12 +51,12 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
   };
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={onClose}
       maxWidth="sm"
       fullWidth
-      PaperProps={{
+      paperprops={{
         sx: {
           bgcolor: '#0a0a0c',
           border: '1px solid rgba(255, 0, 255, 0.2)',
@@ -66,9 +66,9 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
         }
       }}
     >
-      <DialogTitle sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <DialogTitle sx={{
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'space-between',
         borderBottom: '1px solid rgba(255, 0, 255, 0.1)',
         pb: 2
@@ -136,9 +136,9 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
               onChange={handleFileChange}
             />
             <label htmlFor="wordlist-file-input">
-              <Paper sx={{ 
-                p: 3, 
-                bgcolor: 'rgba(255,255,255,0.02)', 
+              <Paper sx={{
+                p: 3,
+                bgcolor: 'rgba(255,255,255,0.02)',
                 border: '1px dashed rgba(255,0,255,0.3)',
                 cursor: 'pointer',
                 display: 'flex',
@@ -162,18 +162,18 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
       </DialogContent>
 
       <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <Button 
+        <Button
           onClick={onClose}
           sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}
         >
           CANCEL
         </Button>
-        <Button 
+        <Button
           onClick={handleSubmit}
           disabled={!name || !shortName || !file || uploadWordlist.isPending}
           variant="contained"
-          sx={{ 
-            bgcolor: '#ff00ff', 
+          sx={{
+            bgcolor: '#ff00ff',
             color: '#fff',
             fontFamily: 'Orbitron',
             fontWeight: 900,

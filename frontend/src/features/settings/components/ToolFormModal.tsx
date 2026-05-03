@@ -135,7 +135,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
       <form onSubmit={handleSubmit}>
         <DialogContent sx={{ mt: 2 }}>
           <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{xs: 12, md: 6}} >
               <TextField
                 fullWidth
                 label="Tool Name"
@@ -148,7 +148,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{xs: 12, md: 6}} >
               <TextField
                 fullWidth
                 label="Logo URL"
@@ -160,7 +160,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid size={{xs: 12}} >
               <TextField
                 fullWidth
                 label="Description"
@@ -174,7 +174,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{xs: 12, md: 6}} >
               <TextField
                 fullWidth
                 label="GitHub URL"
@@ -187,7 +187,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{xs: 12, md: 6}} >
               <TextField
                 fullWidth
                 label="License URL"
@@ -199,7 +199,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid size={{xs: 12}} >
               <Typography variant="caption" sx={{ color: 'rgba(0,243,255,0.5)', mb: 1, display: 'block' }}>
                 COMMAND CONFIGURATION
               </Typography>
@@ -248,7 +248,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid size={{ xs: 12 }}>
+            <Grid size={{xs: 12}} >
               <Box sx={{ p: 2, border: '1px solid rgba(0,243,255,0.1)', borderRadius: 1, bgcolor: 'rgba(0,243,255,0.02)' }}>
                 <FormControlLabel
                   control={

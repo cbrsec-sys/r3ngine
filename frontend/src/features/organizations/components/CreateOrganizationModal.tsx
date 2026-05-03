@@ -29,7 +29,7 @@ interface CreateOrganizationModalProps {
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
 const MenuProps = {
-  PaperProps: {
+  paperprops: {
     style: {
       maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
       width: 250,
@@ -95,10 +95,10 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
   const isSaving = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose} 
-      maxWidth="md" 
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
       fullWidth
       slotProps={{
         paper: {
@@ -157,8 +157,8 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
               multiple
               value={selectedDomains}
               onChange={(e) => setSelectedDomains(typeof e.target.value === 'string' ? e.target.value.split(',').map(Number) : e.target.value)}
-              input={<OutlinedInput label="Select Targets" sx={{ 
-                color: '#fff', 
+              input={<OutlinedInput label="Select Targets" sx={{
+                color: '#fff',
                 '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a2e' },
                 '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' }
               }} />}
@@ -167,15 +167,15 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
                   {selected.map((value) => {
                     const target = availableTargets?.find(t => t.id === value);
                     return (
-                      <Chip 
-                        key={value} 
-                        label={target?.name || value} 
-                        sx={{ 
-                          backgroundColor: 'rgba(0, 243, 255, 0.1)', 
+                      <Chip
+                        key={value}
+                        label={target?.name || value}
+                        sx={{
+                          backgroundColor: 'rgba(0, 243, 255, 0.1)',
                           color: '#00f3ff',
                           border: '1px solid rgba(0, 243, 255, 0.3)',
                           '& .MuiChip-deleteIcon': { color: '#00f3ff' }
-                        }} 
+                        }}
                       />
                     );
                   })}
@@ -191,7 +191,7 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
                 <MenuItem disabled>No available targets</MenuItem>
               ) : (
                 availableTargets?.map((target) => (
-                  <MenuItem key={target.id} value={target.id} sx={{ 
+                  <MenuItem key={target.id} value={target.id} sx={{
                     '&.Mui-selected': { backgroundColor: 'rgba(0, 243, 255, 0.2)' },
                     '&:hover': { backgroundColor: 'rgba(0, 243, 255, 0.1)' }
                   }}>

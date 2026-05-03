@@ -109,6 +109,16 @@ export interface RengineSystemSettings {
   consumed_percent: number;
 }
 
+export interface RengineUpdateResponse {
+  status: boolean;
+  update_available: boolean;
+  latest_version: string | null;
+  current_version: string;
+  redirect_link: string;
+  changelog?: string;
+  message?: string;
+}
+
 export interface InstalledTool {
   id: number;
   name: string;
@@ -553,6 +563,17 @@ export const useRengineSystemSettings = () => {
         headers: { 'Accept': 'application/json' }
       });
       return response.data;
+    },
+  });
+};
+
+export const useRengineUpdateCheck = () => {
+  return useMutation({
+    mutationFn: async () => {
+      const response = await axios.get('/api/rengine/update/', {
+        headers: { 'Accept': 'application/json' }
+      });
+      return response.data as RengineUpdateResponse;
     },
   });
 };

@@ -27,7 +27,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ open, onClose 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!projectName.trim()) return;
-    
+
     createProject(projectName, {
       onSuccess: () => {
         onClose();
@@ -43,10 +43,10 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ open, onClose 
   };
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={handleClose}
-      PaperProps={{
+      paperprops={{
         sx: {
           bgcolor: 'rgba(10, 10, 20, 0.95)',
           backdropFilter: 'blur(20px)',
@@ -58,26 +58,26 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ open, onClose 
         }
       }}
     >
-      <DialogTitle sx={{ 
-        display: 'flex', 
-        justifyContent: 'space-between', 
+      <DialogTitle sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
         alignItems: 'center',
         borderBottom: '1px solid rgba(255,255,255,0.05)',
         pb: 2
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Box sx={{ 
-            p: 1, 
-            borderRadius: 2, 
-            bgcolor: 'rgba(0, 243, 255, 0.1)', 
+          <Box sx={{
+            p: 1,
+            borderRadius: 2,
+            bgcolor: 'rgba(0, 243, 255, 0.1)',
             color: '#00f3ff',
             display: 'flex'
           }}>
             <FolderPlus size={20} />
           </Box>
-          <Typography variant="h6" sx={{ 
-            fontFamily: 'Orbitron', 
-            fontWeight: 800, 
+          <Typography variant="h6" sx={{
+            fontFamily: 'Orbitron',
+            fontWeight: 800,
             letterSpacing: 1,
             color: '#fff'
           }}>
@@ -92,9 +92,9 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ open, onClose 
       <form onSubmit={handleSubmit}>
         <DialogContent sx={{ mt: 3 }}>
           {error && (
-            <Alert severity="error" sx={{ 
-              mb: 3, 
-              bgcolor: 'rgba(255, 0, 60, 0.1)', 
+            <Alert severity="error" sx={{
+              mb: 3,
+              bgcolor: 'rgba(255, 0, 60, 0.1)',
               color: '#ff003c',
               border: '1px solid rgba(255, 0, 60, 0.2)',
               '& .MuiAlert-icon': { color: '#ff003c' }
@@ -120,9 +120,9 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ open, onClose 
         </DialogContent>
 
         <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <Button 
-            onClick={handleClose} 
-            sx={{ 
+          <Button
+            onClick={handleClose}
+            sx={{
               color: 'rgba(255,255,255,0.5)',
               fontFamily: 'Orbitron',
               fontSize: '0.7rem',
@@ -168,7 +168,7 @@ const fieldStyles = {
     '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
     bgcolor: 'rgba(255,255,255,0.03)',
   },
-  '& .MuiInputLabel-root': { 
+  '& .MuiInputLabel-root': {
     color: 'rgba(255,255,255,0.4)',
     '&.Mui-focused': { color: '#00f3ff' }
   },

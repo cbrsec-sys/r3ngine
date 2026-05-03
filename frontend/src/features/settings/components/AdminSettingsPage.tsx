@@ -122,11 +122,11 @@ export const AdminSettingsPage: React.FC = () => {
   return (
     <Box sx={{ p: 4, maxWidth: '1200px', margin: '0 auto' }}>
       <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Typography 
-          variant="h4" 
-          sx={{ 
-            fontFamily: 'Orbitron', 
-            fontWeight: 900, 
+        <Typography
+          variant="h4"
+          sx={{
+            fontFamily: 'Orbitron',
+            fontWeight: 900,
             letterSpacing: 2,
             color: '#fff',
             textShadow: '0 0 15px rgba(0, 243, 255, 0.3)'
@@ -147,7 +147,7 @@ export const AdminSettingsPage: React.FC = () => {
             fontSize: '11px',
             px: 3,
             height: '36px',
-            '&:hover': { 
+            '&:hover': {
               bgcolor: '#00c8d4',
               boxShadow: '0 0 15px rgba(0, 243, 255, 0.4)'
             }
@@ -182,23 +182,23 @@ export const AdminSettingsPage: React.FC = () => {
                 <TableCell sx={{ color: '#fff' }}>{user.username}</TableCell>
                 <TableCell sx={{ color: '#fff' }}>{user.full_name}</TableCell>
                 <TableCell>
-                  <Chip 
-                    label={user.role.replace('_', ' ').toUpperCase()} 
+                  <Chip
+                    label={user.role.replace('_', ' ').toUpperCase()}
                     size="small"
-                    sx={{ 
-                      backgroundColor: 'rgba(188, 0, 255, 0.1)', 
-                      color: '#bc00ff', 
+                    sx={{
+                      backgroundColor: 'rgba(188, 0, 255, 0.1)',
+                      color: '#bc00ff',
                       border: '1px solid rgba(188, 0, 255, 0.3)',
                       fontFamily: 'Orbitron',
                       fontSize: '0.7rem'
-                    }} 
+                    }}
                   />
                 </TableCell>
                 <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>{user.date_joined_humanized}</TableCell>
                 <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>{user.last_login_humanized}</TableCell>
                 <TableCell>
-                  <Chip 
-                    label={user.is_active ? 'ACTIVE' : 'INACTIVE'} 
+                  <Chip
+                    label={user.is_active ? 'ACTIVE' : 'INACTIVE'}
                     size="small"
                     color={user.is_active ? 'success' : 'error'}
                     variant="outlined"
@@ -228,10 +228,10 @@ export const AdminSettingsPage: React.FC = () => {
         </Table>
       </TableContainer>
 
-      <Dialog 
-        open={isModalOpen} 
+      <Dialog
+        open={isModalOpen}
         onClose={handleCloseModal}
-        PaperProps={{
+        paperprops={{
           sx: {
             background: 'rgba(10, 25, 41, 0.95)',
             backdropFilter: 'blur(20px)',
@@ -281,8 +281,8 @@ export const AdminSettingsPage: React.FC = () => {
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
           <Button onClick={handleCloseModal} sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>CANCEL</Button>
-          <Button 
-            variant="contained" 
+          <Button
+            variant="contained"
             onClick={handleSubmit}
             sx={{
               backgroundColor: '#00f3ff',

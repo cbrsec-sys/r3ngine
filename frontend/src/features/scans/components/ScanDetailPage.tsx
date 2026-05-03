@@ -273,48 +273,51 @@ const VulnerabilityBreakdown: React.FC<{ counts: any, exploitable: number }> = (
   const colors = ['#ff003c', '#ff5722', '#ff9800', '#ffeb3b', '#2196f3', '#9e9e9e', '#00ff62'];
 
   return (
-    <TacticalPanel title="Vulnerability Breakdown" icon={<Bug size={14} />} sx={{ height: '100%' }}>
-       <Box sx={{ p: 1 }}>
-         <Grid container spacing={1} sx={{ mb: 2, textAlign: 'center' }}>
+    <TacticalPanel title="Vulnerability Breakdown" icon={<Bug size={14} />} sx={{ height: '100%', '& .MuiCardContent-root': { pb: '10px !important' } }}>
+       <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, textAlign: 'center', width: '100%', px: 1 }}>
             {labels.map((l, i) => (
-               <Grid size={{ xs: 1.7 }} key={l}>
-                  <Typography sx={{ fontSize: '0.6rem', color: colors[i], fontWeight: 800, textTransform: 'uppercase' }}>{l.substring(0, 4)}</Typography>
-                  <Typography sx={{ fontSize: '0.8rem', fontWeight: 900, color: colors[i] }}>{series[i] || 0}</Typography>
-               </Grid>
+               <Box key={l} sx={{ flex: 1 }}>
+                  <Typography sx={{ fontSize: '0.6rem', color: colors[i], fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>{l.substring(0, 4)}</Typography>
+                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: colors[i] }}>{series[i] || 0}</Typography>
+               </Box>
             ))}
-         </Grid>
-         <Chart 
-            options={{
-              chart: { type: 'donut', background: 'transparent' },
-              theme: { mode: 'dark' },
-              stroke: { show: false },
-              labels: labels,
-              dataLabels: { enabled: false },
-              legend: { show: true, position: 'bottom', fontSize: '10px', labels: { colors: 'rgba(255,255,255,0.7)' } },
-              colors: colors,
-              plotOptions: {
-                pie: {
-                  donut: {
-                    size: '65%',
-                    labels: {
-                      show: true,
-                      total: {
+         </Box>
+         <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+           <Chart 
+              options={{
+                chart: { type: 'donut', background: 'transparent' },
+                theme: { mode: 'dark' },
+                stroke: { show: false },
+                labels: labels,
+                dataLabels: { enabled: false },
+                legend: { show: true, position: 'bottom', fontSize: '10px', labels: { colors: 'rgba(255,255,255,0.7)' } },
+                colors: colors,
+                plotOptions: {
+                  pie: {
+                    donut: {
+                      size: '65%',
+                      labels: {
                         show: true,
-                        label: 'Total',
-                        color: 'rgba(255,255,255,0.4)',
-                        fontSize: '12px',
-                        formatter: () => counts.total.toString()
-                      },
-                      value: { color: '#fff', fontSize: '20px', fontWeight: 900 }
+                        total: {
+                          show: true,
+                          label: 'Total',
+                          color: 'rgba(255,255,255,0.4)',
+                          fontSize: '12px',
+                          formatter: () => counts.total.toString()
+                        },
+                        value: { color: '#fff', fontSize: '20px', fontWeight: 900 }
+                      }
                     }
                   }
                 }
-              }
-            }} 
-            series={series} 
-            type="donut" 
-            height={280} 
-         />
+              }} 
+              series={series} 
+              type="donut" 
+              width="100%"
+              height={260} 
+           />
+         </Box>
        </Box>
     </TacticalPanel>
   );
@@ -322,7 +325,7 @@ const VulnerabilityBreakdown: React.FC<{ counts: any, exploitable: number }> = (
 
 const VulnHighlights: React.FC<{ highlights: any[] }> = ({ highlights }) => (
   <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-    <TableContainer sx={{ flex: 1, overflow: 'auto', maxHeight: 450 }}>
+    <TableContainer sx={{ flex: 1, overflow: 'auto', maxHeight: 380 }}>
       <Table size="small" stickyHeader>
         <TableHead>
           <TableRow sx={{ '& th': { borderBottom: '2px solid #7000ff', bgcolor: '#12121c', color: '#00f3ff', fontSize: '0.7rem', fontWeight: 900, py: 1.5 } }}>
@@ -489,15 +492,13 @@ const ImportantSubdomainsWidget: React.FC<{ subdomains: any[], sx?: any }> = ({ 
   <TacticalPanel title="IMPORTANT SUBDOMAINS" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#ff00ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{subdomains.length}</Box>} sx={{ height: '100%', ...sx }}>
     <Box sx={{ p: 2 }}>
       {subdomains.length > 0 ? (
-        <Grid container spacing={1}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           {subdomains.map((s: any, i: number) => (
-            <Grid size="grow" key={i}>
-              <Box sx={{ px: 1.5, py: 0.5, bgcolor: 'rgba(0,243,255,0.05)', border: '1px solid rgba(0,243,255,0.1)', borderRadius: 1, color: '#00f3ff', fontSize: '0.7rem', fontWeight: 700 }}>
-                {s.name}
-              </Box>
-            </Grid>
+            <Box key={i} sx={{ px: 1.5, py: 0.5, bgcolor: 'rgba(0,243,255,0.05)', border: '1px solid rgba(0,243,255,0.1)', borderRadius: 1, color: '#00f3ff', fontSize: '0.7rem', fontWeight: 700 }}>
+              {s.name}
+            </Box>
           ))}
-        </Grid>
+        </Box>
       ) : (
         <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>No subdomains marked as important!</Typography>
       )}
@@ -541,15 +542,13 @@ const IpAddressesWidget: React.FC<{ subdomains: any[], sx?: any }> = ({ subdomai
     <TacticalPanel title="IP ADDRESSES" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ips.length}</Box>} sx={{ height: '100%', ...sx }}>
       <Box sx={{ p: 2 }}>
         <Typography sx={{ fontSize: '0.6rem', color: '#fffc00', textAlign: 'right', mb: 1, fontWeight: 700 }}>*IP Addresses highlighted with yellow are CDN IP</Typography>
-        <Grid container spacing={1}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           {ips.map((ip, i) => (
-          <Grid size="grow" key={i}>
-              <Box sx={{ px: 1, py: 0.4, bgcolor: 'rgba(33,150,243,0.1)', border: '1px solid rgba(33,150,243,0.2)', borderRadius: 0.5, color: '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
-                {ip}
-              </Box>
-            </Grid>
+            <Box key={i} sx={{ px: 1, py: 0.4, bgcolor: 'rgba(33,150,243,0.1)', border: '1px solid rgba(33,150,243,0.2)', borderRadius: 0.5, color: '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
+              {ip}
+            </Box>
           ))}
-        </Grid>
+        </Box>
       </Box>
     </TacticalPanel>
   );
@@ -559,15 +558,13 @@ const DiscoveredPortsWidget: React.FC<{ ports: any[], sx?: any }> = ({ ports = [
   <TacticalPanel title="DISCOVERED PORTS" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ports.length}</Box>} sx={{ height: '100%', ...sx }}>
     <Box sx={{ p: 2 }}>
       <Typography sx={{ fontSize: '0.6rem', color: '#fffc00', textAlign: 'right', mb: 1, fontWeight: 700 }}>*Ports highlighted with red are uncommon Ports</Typography>
-      <Grid container spacing={1}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
         {ports.map((p, i) => (
-          <Grid size="grow" key={i}>
-            <Box sx={{ px: 1, py: 0.4, bgcolor: p.is_uncommon ? 'rgba(255,0,60,0.1)' : 'rgba(33,150,243,0.1)', border: `1px solid ${p.is_uncommon ? 'rgba(255,0,60,0.2)' : 'rgba(33,150,243,0.2)'}`, borderRadius: 0.5, color: p.is_uncommon ? '#ff003c' : '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
-              {p.number}/{p.service_name}
-            </Box>
-          </Grid>
+          <Box key={i} sx={{ px: 1, py: 0.4, bgcolor: p.is_uncommon ? 'rgba(255,0,60,0.1)' : 'rgba(33,150,243,0.1)', border: `1px solid ${p.is_uncommon ? 'rgba(255,0,60,0.2)' : 'rgba(33,150,243,0.2)'}`, borderRadius: 0.5, color: p.is_uncommon ? '#ff003c' : '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
+            {p.number}/{p.service_name}
+          </Box>
         ))}
-      </Grid>
+      </Box>
     </Box>
   </TacticalPanel>
 );
@@ -575,15 +572,13 @@ const DiscoveredPortsWidget: React.FC<{ ports: any[], sx?: any }> = ({ ports = [
 const DiscoveredTechWidget: React.FC<{ techs: any[], sx?: any }> = ({ techs = [], sx = {} }) => (
   <TacticalPanel title="DISCOVERED TECHNOLOGIES" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{techs.length}</Box>} sx={{ height: '100%', ...sx }}>
     <Box sx={{ p: 2 }}>
-      <Grid container spacing={1}>
+      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
         {techs.map((t, i) => (
-          <Grid size="grow" key={i}>
-            <Box sx={{ px: 1, py: 0.4, bgcolor: 'rgba(33,150,243,0.1)', border: '1px solid rgba(33,150,243,0.2)', borderRadius: 0.5, color: '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
-              {t.name}
-            </Box>
-          </Grid>
+          <Box key={i} sx={{ px: 1, py: 0.4, bgcolor: 'rgba(33,150,243,0.1)', border: '1px solid rgba(33,150,243,0.2)', borderRadius: 0.5, color: '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
+            {t.name}
+          </Box>
         ))}
-      </Grid>
+      </Box>
     </Box>
   </TacticalPanel>
 );
@@ -749,9 +744,9 @@ export const ScanDetailPage = () => {
   );
 
   const renderHomeContent = () => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%' }}>
       {/* Row 1: Target Information and HTTP Status Charts (MOVED UP) */}
-      <Grid container spacing={2} alignItems="stretch">
+      <Grid container spacing={2} alignItems="stretch" sx={{ width: '100%', m: 0 }}>
         <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex' }}>
           <TacticalPanel title="Target Information" icon={<Activity size={14} />} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
              <Box sx={{ p: 2, flex: 1 }}>
@@ -865,44 +860,54 @@ export const ScanDetailPage = () => {
       </TacticalPanel>
 
       {/* Row 3: Vulnerability Distribution & Highlights */}
-      <Grid container spacing={2} alignItems="stretch" sx={{ mb: 2 }}>
-        <Grid size={{ xs: 12, md: 3 }} sx={{ display: 'flex' }}>
-           <VulnerabilityBreakdown 
-             counts={{
-               critical: data.critical_count,
-               high: data.high_count,
-               medium: data.medium_count,
-               low: data.low_count,
-               info: data.info_count,
-               unknown: data.unknown_count,
-               total: data.vulnerability_count
-             }} 
-             exploitable={data.exploitable_count}
-           />
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 2, mb: 2, width: '100%' }}>
+         <VulnerabilityBreakdown 
+           counts={{
+             critical: data.critical_count,
+             high: data.high_count,
+             medium: data.medium_count,
+             low: data.low_count,
+             info: data.info_count,
+             unknown: data.unknown_count,
+             total: data.vulnerability_count
+           }} 
+           exploitable={data.exploitable_count}
+         />
+         <VulnHighlights highlights={data.vulnerability_highlights} />
+      </Box>
+
+      {/* Row 4: Vulnerability Deep Dive */}
+      <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>
+        <Grid size={{ xs: 12, md: 4 }}>
+           <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
         </Grid>
-        <Grid size={{ xs: 12, md: 9 }} sx={{ display: 'flex' }}>
-           <VulnHighlights highlights={data.vulnerability_highlights} />
+        <Grid size={{ xs: 12, md: 8 }}>
+           <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
         </Grid>
       </Grid>
 
-      {/* Row 4: Vulnerability Deep Dive */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '4fr 8fr' }, gap: 2, mb: 2, alignItems: 'stretch' }}>
-         <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
-         <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
-      </Box>
-
       {/* Row 5: Contextual Assets */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2, mb: 2, alignItems: 'stretch' }}>
-         <ImportantSubdomainsWidget subdomains={data.important_subdomains} sx={{ height: '100%' }} />
-         <ReconNotesWidget notes={data.todo_notes} sx={{ height: '100%' }} />
-      </Box>
+      <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
+           <ImportantSubdomainsWidget subdomains={data.important_subdomains} sx={{ height: '100%' }} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 6 }}>
+           <ReconNotesWidget notes={data.todo_notes} sx={{ height: '100%' }} />
+        </Grid>
+      </Grid>
 
       {/* Row 6: Infrastructure & Fingerprinting */}
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2, alignItems: 'stretch' }}>
-         <IpAddressesWidget subdomains={data.subdomains} sx={{ height: '100%' }} />
-         <DiscoveredPortsWidget ports={data.discovered_ports} sx={{ height: '100%' }} />
-         <DiscoveredTechWidget techs={data.discovered_technologies} sx={{ height: '100%' }} />
-      </Box>
+      <Grid container spacing={2} sx={{ width: '100%', m: 0 }}>
+        <Grid size={{ xs: 12, md: 4 }}>
+           <IpAddressesWidget subdomains={data.subdomains} sx={{ height: '100%' }} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+           <DiscoveredPortsWidget ports={data.discovered_ports} sx={{ height: '100%' }} />
+        </Grid>
+        <Grid size={{ xs: 12, md: 4 }}>
+           <DiscoveredTechWidget techs={data.discovered_technologies} sx={{ height: '100%' }} />
+        </Grid>
+      </Grid>
     </Box>
   );
   const renderBuckets = () => (
@@ -940,8 +945,8 @@ export const ScanDetailPage = () => {
   );
 
   const renderOSINT = () => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3 }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%' }}>
+      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, width: '100%' }}>
          <TacticalPanel title="Employees/People Found" icon={<Users size={14} />}>
             <TableContainer>
               <Table size="small">
@@ -1107,11 +1112,25 @@ export const ScanDetailPage = () => {
       </Box>
 
       {/* MAIN TWO-COLUMN LAYOUT (Sidebar Left, Content Right) */}
-      <Box sx={{ display: 'flex', gap: 3, alignItems: 'flex-start', flexWrap: { xs: 'wrap', md: 'nowrap' } }}>
+      <Box sx={{ 
+        display: 'grid', 
+        gridTemplateColumns: tabs[activeTab]?.label === 'HOME' 
+          ? { xs: '1fr', lg: '320px 1fr' } 
+          : '1fr',
+        gap: 3, 
+        alignItems: 'start', 
+        width: '100%', 
+        minWidth: 0 
+      }}>
         
         {/* LEFT COLUMN: Scan Metadata & Timeline (Only on HOME tab) */}
         {tabs[activeTab]?.label === 'HOME' && (
-          <Box sx={{ width: { xs: '100%', md: '320px' }, flexShrink: 0, position: { md: 'sticky' }, top: 70 }}>
+          <Box sx={{ 
+            position: { lg: 'sticky' }, 
+            top: 70,
+            transition: 'all 0.3s ease',
+            minWidth: 0
+          }}>
              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                {renderSidebar()}
              </Box>
@@ -1119,7 +1138,7 @@ export const ScanDetailPage = () => {
         )}
 
         {/* RIGHT COLUMN: Discovery Content */}
-        <Box sx={{ flexGrow: 1, minWidth: 0 }}>
+        <Box sx={{ minWidth: 0, width: '100%' }}>
           {/* Tab Content Display */}
           <Box sx={{ minHeight: '60vh' }}>
             {tabs[activeTab]?.label === 'HOME' ? (
@@ -1133,7 +1152,7 @@ export const ScanDetailPage = () => {
                     md: 'repeat(4, 1fr)' 
                   }, 
                   gap: 2,
-                  maxWidth: 1200
+                  width: '100%'
                 }}>
                    <KpiCard 
                      title="SUBDOMAINS" 

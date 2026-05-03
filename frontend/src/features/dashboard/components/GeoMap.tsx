@@ -87,9 +87,9 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
   };
 
   const content = (
-    <Grid container sx={{ flexGrow: 1, minHeight: 0 }}>
+    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, minHeight: 0, width: '100%', height: 500 }}>
       {/* Map Column */}
-      <Grid size={{ xs: 12, md: 8 }} sx={{ position: 'relative', bgcolor: 'rgba(0,0,0,0.3)', height: 500 }}>
+      <Box sx={{ flex: '1 1 65%', position: 'relative', bgcolor: 'rgba(0,0,0,0.3)', height: '100%' }}>
         {/* Zoom Controls Overlay */}
         <Box sx={{ position: 'absolute', top: 10, left: 10, zIndex: 10, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
           <IconButton
@@ -181,16 +181,16 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
             })}
           </ZoomableGroup>
         </ComposableMap>
-      </Grid>
+      </Box>
 
       {/* List Column */}
-      <Grid size={{ xs: 12, md: 4 }} sx={{ borderLeft: '1px solid rgba(0, 243, 255, 0.1)', overflow: 'hidden', display: 'flex', flexDirection: 'column', height: 500 }}>
-        <TableContainer sx={{ flexGrow: 1, overflow: 'auto', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderRadius: 2 } }}>
-          <Table size="small" stickyHeader>
+      <Box sx={{ width: { xs: '100%', md: '35%' }, borderLeft: { xs: 'none', md: '1px solid rgba(0, 243, 255, 0.1)' }, borderTop: { xs: '1px solid rgba(0, 243, 255, 0.1)', md: 'none' }, overflow: 'hidden', display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <TableContainer sx={{ flexGrow: 1, overflow: 'auto', width: '100%', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderRadius: 2 } }}>
+          <Table size="small" stickyHeader sx={{ width: '100%' }}>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ bgcolor: 'rgba(5,5,15,0.98)', borderBottom: '2px solid #7000ff', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'Orbitron', py: 1.5 }}>COUNTRY</TableCell>
-                <TableCell align="right" sx={{ bgcolor: 'rgba(5,5,15,0.98)', borderBottom: '2px solid #7000ff', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'Orbitron', py: 1.5 }}>ASSETS</TableCell>
+                <TableCell sx={{ bgcolor: 'rgba(5,5,15,0.98)', borderBottom: '2px solid #7000ff', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'Orbitron', py: 1.5, width: '100%' }}>COUNTRY</TableCell>
+                <TableCell align="right" sx={{ bgcolor: 'rgba(5,5,15,0.98)', borderBottom: '2px solid #7000ff', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'Orbitron', py: 1.5, whiteSpace: 'nowrap' }}>ASSETS</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -233,8 +233,8 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
             </TableBody>
           </Table>
         </TableContainer>
-      </Grid>
-    </Grid>
+      </Box>
+    </Box>
   );
 
   if (disableCard) {

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Grid, 
-  InputBase, 
-  Button, 
-  IconButton, 
+import {
+  Box,
+  Typography,
+  Grid,
+  InputBase,
+  Button,
+  IconButton,
   Tooltip,
   CircularProgress,
   Pagination,
@@ -16,18 +16,18 @@ import {
   ListItemText,
   Chip
 } from '@mui/material';
-import { 
-  Search, 
-  Zap, 
-  Eye, 
-  FilePlus, 
-  MoreHorizontal, 
-  Download, 
-  ChevronRight, 
-  ExternalLink, 
-  AlertTriangle, 
-  Trash2, 
-  Copy, 
+import {
+  Search,
+  Zap,
+  Eye,
+  FilePlus,
+  MoreHorizontal,
+  Download,
+  ChevronRight,
+  ExternalLink,
+  AlertTriangle,
+  Trash2,
+  Copy,
   FileText,
   Shield
 } from 'lucide-react';
@@ -70,7 +70,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   };
 
   const toggleSelectAsset = (id: number) => {
-    setSelectedAssets(prev => 
+    setSelectedAssets(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -103,10 +103,10 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
       {/* Tactical Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4, mt: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ 
-            fontWeight: 900, 
-            fontFamily: 'Orbitron', 
-            letterSpacing: 3, 
+          <Typography variant="h5" sx={{
+            fontWeight: 900,
+            fontFamily: 'Orbitron',
+            letterSpacing: 3,
             color: '#fff',
             textTransform: 'uppercase'
           }}>
@@ -119,10 +119,10 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
       </Box>
 
       {/* Enterprise-Grade Search Bar */}
-      <Box sx={{ 
-        display: 'flex', 
-        bgcolor: 'rgba(255,255,255,0.03)', 
-        borderRadius: '4px', 
+      <Box sx={{
+        display: 'flex',
+        bgcolor: 'rgba(255,255,255,0.03)',
+        borderRadius: '4px',
         overflow: 'hidden',
         mb: 3,
         border: '1px solid rgba(0, 243, 255, 0.1)',
@@ -135,25 +135,25 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         <Box sx={{ display: 'flex', alignItems: 'center', pl: 2, color: 'rgba(255,255,255,0.3)' }}>
           <Search size={18} />
         </Box>
-        <InputBase 
+        <InputBase
           placeholder="Filter Subdomains (e.g. name=google.com, http_status=200)"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          sx={{ 
-            flex: 1, 
-            px: 2, 
-            py: 1, 
+          sx={{
+            flex: 1,
+            px: 2,
+            py: 1,
             fontSize: '0.9rem',
             color: '#fff',
             '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 }
           }}
         />
-        <Button 
+        <Button
           onClick={handleSearch}
-          sx={{ 
-            bgcolor: 'rgba(0, 243, 255, 0.1)', 
-            color: '#00f3ff', 
+          sx={{
+            bgcolor: 'rgba(0, 243, 255, 0.1)',
+            color: '#00f3ff',
             px: 4,
             borderRadius: 0,
             fontWeight: 700,
@@ -170,11 +170,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
       {/* Tactical Panel */}
       <TacticalPanel>
         {/* Tactical Table Header (Legacy Parity) */}
-        <Box sx={{ 
-          p: 2, 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between', 
+        <Box sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
           bgcolor: 'rgba(255,255,255,0.01)'
         }}>
@@ -204,7 +204,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         </Box>
 
         {/* Responsive Subdomains Table */}
-        <Box sx={{ 
+        <Box sx={{
           overflowX: 'auto',
           width: '100%',
           '&::-webkit-scrollbar': { height: '6px' },
@@ -212,14 +212,14 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1200px', tableLayout: 'fixed' }}>
             <thead>
-              <tr style={{ 
-                textAlign: 'left', 
+              <tr style={{
+                textAlign: 'left',
                 borderBottom: '1px solid rgba(255,255,255,0.1)',
                 backgroundColor: 'rgba(255,255,255,0.02)'
               }}>
                 <th style={{ width: '40px', padding: '12px 16px', textAlign: 'center' }}>
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     checked={selectedAssets.length === data?.results.length && data?.results.length > 0}
                     onChange={toggleSelectAll}
                     style={{ width: '14px', height: '14px', accentColor: '#00f3ff', cursor: 'pointer', opacity: 0.6 }}
@@ -241,11 +241,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   <td colSpan={9} style={{ padding: '80px', textAlign: 'center' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                       <CircularProgress size={32} sx={{ color: '#00f3ff', filter: 'drop-shadow(0 0 8px #00f3ff)' }} />
-                      <Typography sx={{ 
-                        fontSize: '10px', 
-                        fontWeight: 900, 
-                        color: 'rgba(0, 243, 255, 0.5)', 
-                        fontFamily: 'Orbitron', 
+                      <Typography sx={{
+                        fontSize: '10px',
+                        fontWeight: 900,
+                        color: 'rgba(0, 243, 255, 0.5)',
+                        fontFamily: 'Orbitron',
                         letterSpacing: 2,
                         textTransform: 'uppercase'
                       }}>
@@ -255,19 +255,19 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   </td>
                 </tr>
               ) : data?.results.map((sub) => (
-                <tr key={sub.id} style={{ 
-                  borderBottom: '1px solid rgba(255,255,255,0.05)', 
+                <tr key={sub.id} style={{
+                  borderBottom: '1px solid rgba(255,255,255,0.05)',
                   backgroundColor: selectedAssets.includes(sub.id) ? 'rgba(0, 243, 255, 0.02)' : (sub.is_important ? 'rgba(255, 0, 60, 0.03)' : 'transparent'),
                   transition: 'background 0.2s'
                 }}>
                   <td style={{ padding: '12px 16px', verticalAlign: 'middle', textAlign: 'center' }}>
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       checked={selectedAssets.includes(sub.id)}
                       onChange={() => toggleSelectAsset(sub.id)}
-                      style={{ 
-                        width: '14px', 
-                        height: '14px', 
+                      style={{
+                        width: '14px',
+                        height: '14px',
                         accentColor: '#00f3ff',
                         cursor: 'pointer',
                         opacity: 0.6
@@ -282,7 +282,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                           <Copy size={12} />
                         </IconButton>
                       </Box>
-                      
+
                       {/* Asset Intelligence Badges (Legacy Feature) */}
                       <Box sx={{ display: 'flex', gap: 1.5, mt: 0.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -313,11 +313,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                     </Box>
                   </td>
                   <td style={{ padding: '12px 16px' }}>
-                    <Box sx={{ 
+                    <Box sx={{
                       display: 'inline-flex',
-                      px: 1.2, 
-                      py: 0.4, 
-                      borderRadius: 0.5, 
+                      px: 1.2,
+                      py: 0.4,
+                      borderRadius: 0.5,
                       bgcolor: `${getStatusColor(sub.http_status)}20`,
                       border: `1px solid ${getStatusColor(sub.http_status)}40`,
                     }}>
@@ -329,14 +329,14 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   <td style={{ padding: '12px 16px' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       {sub.ip_addresses?.map(ip => (
-                        <Typography 
+                        <Typography
                           key={`ip-${sub.id}-${ip.id}`}
-                          sx={{ 
-                            fontSize: '11px', 
+                          sx={{
+                            fontSize: '11px',
                             color: ip.is_cdn ? '#ffae00' : 'rgba(255,255,255,0.5)',
                             fontFamily: 'monospace',
                             fontWeight: 600
-                          }} 
+                          }}
                         >
                           {ip.address}
                         </Typography>
@@ -346,13 +346,13 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   <td style={{ padding: '12px 16px' }}>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {sub.ip_addresses?.flatMap(ip => ip.ports.map(port => ({ ...port, ipId: ip.id }))).map(port => (
-                        <Box 
+                        <Box
                           key={`port-${sub.id}-${port.ipId}-${port.id}`}
-                          sx={{ 
+                          sx={{
                             px: 1,
                             py: 0.2,
                             borderRadius: 0.5,
-                            bgcolor: port.is_uncommon ? 'rgba(255, 0, 60, 0.1)' : 'rgba(255,255,255,0.05)', 
+                            bgcolor: port.is_uncommon ? 'rgba(255, 0, 60, 0.1)' : 'rgba(255,255,255,0.05)',
                             border: '1px solid rgba(255,255,255,0.1)'
                           }}
                         >
@@ -375,19 +375,19 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     {sub.screenshot_path ? (
-                      <Box sx={{ 
-                        width: 50, 
-                        height: 30, 
-                        borderRadius: 0.5, 
-                        overflow: 'hidden', 
+                      <Box sx={{
+                        width: 50,
+                        height: 30,
+                        borderRadius: 0.5,
+                        overflow: 'hidden',
                         border: '1px solid rgba(255,255,255,0.1)',
                         cursor: 'pointer',
                         '&:hover': { borderColor: '#00f3ff', transform: 'scale(1.5)', zIndex: 10 },
                         transition: 'all 0.2s'
                       }}>
-                        <img 
-                          src={`/media/${sub.screenshot_path}`} 
-                          alt="Visual" 
+                        <img
+                          src={`/media/${sub.screenshot_path}`}
+                          alt="Visual"
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       </Box>
@@ -428,9 +428,9 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         {/* Tactical Pagination */}
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <Stack spacing={2}>
-            <Pagination 
-              count={Math.ceil((data?.count || 0) / 50)} 
-              page={page} 
+            <Pagination
+              count={Math.ceil((data?.count || 0) / 50)}
+              page={page}
               onChange={(_, v) => setPage(v)}
               size="small"
               sx={{
@@ -456,7 +456,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleActionClose}
-        PaperProps={{
+        paperprops={{
           sx: {
             bgcolor: '#001a24',
             border: '1px solid rgba(0, 243, 255, 0.2)',

@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  Dialog, 
-  DialogTitle, 
-  DialogContent, 
-  DialogActions, 
-  Button, 
-  TextField, 
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  TextField,
   Box,
   Typography,
   IconButton
@@ -36,12 +36,12 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
   };
 
   return (
-    <Dialog 
-      open={open} 
+    <Dialog
+      open={open}
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{
+      paperprops={{
         sx: {
           bgcolor: '#0a0a0c',
           border: '1px solid rgba(0, 243, 255, 0.2)',
@@ -51,9 +51,9 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
         }
       }}
     >
-      <DialogTitle sx={{ 
-        display: 'flex', 
-        alignItems: 'center', 
+      <DialogTitle sx={{
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'space-between',
         borderBottom: '1px solid rgba(0, 243, 255, 0.1)',
         pb: 2
@@ -115,18 +115,18 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
       </DialogContent>
 
       <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <Button 
+        <Button
           onClick={onClose}
           sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}
         >
           CANCEL
         </Button>
-        <Button 
+        <Button
           onClick={handleSubmit}
           disabled={!name || !yaml || createEngine.isPending}
           variant="contained"
-          sx={{ 
-            bgcolor: '#00f3ff', 
+          sx={{
+            bgcolor: '#00f3ff',
             color: '#000',
             fontFamily: 'Orbitron',
             fontWeight: 900,
