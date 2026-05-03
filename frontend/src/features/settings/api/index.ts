@@ -632,7 +632,7 @@ export const useUsers = () => {
     queryKey: ['users'],
     queryFn: async () => {
       const response = await axios.get('/api/users/');
-      return response.data;
+      return Array.isArray(response.data) ? response.data : response.data.results;
     },
   });
 };

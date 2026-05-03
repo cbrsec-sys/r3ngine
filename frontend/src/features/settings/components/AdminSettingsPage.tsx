@@ -27,7 +27,8 @@ import {
   UserPlus as PersonAddIcon,
   Power as PowerIcon,
 } from 'lucide-react';
-import { useUsers, useCreateUser, useToggleUserStatus, useUpdateUser, useDeleteUser, User } from '../api';
+import { useUsers, useCreateUser, useToggleUserStatus, useUpdateUser, useDeleteUser } from '../api';
+import type { User } from '../api';
 
 const textFieldStyle = {
   '& .MuiOutlinedInput-root': {
@@ -120,24 +121,35 @@ export const AdminSettingsPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 4, maxWidth: '1200px', margin: '0 auto' }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-        <Typography variant="h4" sx={{ 
-          fontFamily: 'Orbitron, sans-serif', 
-          color: '#00f3ff',
-          textShadow: '0 0 10px rgba(0, 243, 255, 0.5)'
-        }}>
+      <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Typography 
+          variant="h4" 
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontWeight: 900, 
+            letterSpacing: 2,
+            color: '#fff',
+            textShadow: '0 0 15px rgba(0, 243, 255, 0.3)'
+          }}
+        >
           USER MANAGEMENT
         </Typography>
+        <Box sx={{ flexGrow: 1, height: '1px', background: 'linear-gradient(90deg, rgba(0, 243, 255, 0.5), transparent)' }} />
         <Button
           variant="contained"
-          startIcon={<PersonAddIcon />}
+          startIcon={<PersonAddIcon size={18} />}
           onClick={() => handleOpenModal()}
           sx={{
-            background: 'linear-gradient(45deg, #00f3ff 30%, #bc00ff 90%)',
+            bgcolor: '#00f3ff',
             color: '#000',
-            fontWeight: 'bold',
-            '&:hover': {
-              boxShadow: '0 0 20px rgba(0, 243, 255, 0.6)',
+            fontFamily: 'Orbitron',
+            fontWeight: 900,
+            fontSize: '11px',
+            px: 3,
+            height: '36px',
+            '&:hover': { 
+              bgcolor: '#00c8d4',
+              boxShadow: '0 0 15px rgba(0, 243, 255, 0.4)'
             }
           }}
         >

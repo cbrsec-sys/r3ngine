@@ -23,7 +23,7 @@ const ChartCard: React.FC<{ title: string; children: React.ReactNode; height?: n
       <Typography variant="h6" sx={{ mb: 2, fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: 'primary.main', fontFamily: 'Orbitron' }}>
         {title}
       </Typography>
-      <Box sx={{ mt: 1, flexGrow: 1, overflow: 'auto' }}>
+      <Box sx={{ mt: 1, flexGrow: 1, overflow: 'hidden' }}>
         {children}
       </Box>
     </CardContent>
@@ -179,7 +179,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               options={getBarOptions(data.most_used_tech.map(t => t.name))} 
               series={[{ name: 'Usage', data: data.most_used_tech.map(t => t.count) }]} 
               type="bar" 
-              height={300} 
+              height={280} 
             />
           </ChartCard>
         </Grid>
@@ -227,7 +227,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               }} 
               series={data.most_used_port.map(p => p.count)} 
               type="donut" 
-              height={300} 
+              height={280} 
             />
           </ChartCard>
         </Grid>
@@ -238,7 +238,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               options={getBarOptions(data.most_common_cwe.map(c => c.name), '#7000ff')} 
               series={[{ name: 'Occurrences', data: data.most_common_cwe.map(c => c.count) }]} 
               type="bar" 
-              height={300} 
+              height={280} 
             />
           </ChartCard>
         </Grid>
@@ -249,7 +249,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               options={getBarOptions(data.most_used_ip.map(ip => ip.address || 'Unknown'), '#00ff62')} 
               series={[{ name: 'Usage', data: data.most_used_ip.map(ip => ip.count) }]} 
               type="bar" 
-              height={300} 
+              height={280} 
             />
           </ChartCard>
         </Grid>

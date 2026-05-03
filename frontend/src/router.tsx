@@ -19,6 +19,7 @@ import {
   LlmToolkitPage,
   ReportSettingsPage,
   ReNgineSettingsPage,
+  NotificationSettingsPage,
   ProfileSettingsPage,
   AdminSettingsPage,
 } from "./features/settings";

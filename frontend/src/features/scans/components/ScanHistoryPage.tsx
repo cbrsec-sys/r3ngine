@@ -1,13 +1,13 @@
 import React from 'react';
-import { 
-  Box, 
-  Card, 
-  Typography, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
+import {
+  Box,
+  Card,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
   TableRow,
   Chip,
   IconButton,
@@ -23,12 +23,12 @@ import {
   Paper,
   CircularProgress
 } from '@mui/material';
-import { 
-  Search, 
-  Activity, 
-  Clock, 
-  CheckCircle2, 
-  XCircle, 
+import {
+  Search,
+  Activity,
+  Clock,
+  CheckCircle2,
+  XCircle,
   Play,
   StopCircle,
   MoreVertical,
@@ -42,17 +42,19 @@ import {
   Download,
   Terminal,
   Shield,
+  Bug,
   Layers,
   ChevronRight,
   Globe
 } from 'lucide-react';
-import { 
-  useScansHistory, 
-  useStopScan, 
-  useDeleteScan, 
-  useBulkScanAction 
+import {
+  useScansHistory,
+  useStopScan,
+  useDeleteScan,
+  useBulkScanAction
 } from '../api';
 import { useParams, Link as RouterLink } from '@tanstack/react-router';
+import { ScanReportModal } from './ScanReportModal';
 
 export const ScanHistoryPage: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
@@ -67,6 +69,8 @@ export const ScanHistoryPage: React.FC = () => {
   const [selected, setSelected] = React.useState<number[]>([]);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [activeScanId, setActiveScanId] = React.useState<number | null>(null);
+  const [reportScanId, setReportScanId] = React.useState<number | null>(null);
+  const [reportModalOpen, setReportModalOpen] = React.useState(false);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, id: number) => {
     setAnchorEl(event.currentTarget);
@@ -108,7 +112,7 @@ export const ScanHistoryPage: React.FC = () => {
 
   const isSelected = (id: number) => selected.indexOf(id) !== -1;
 
-  const filteredScans = scans?.filter(scan => 
+  const filteredScans = scans?.filter(scan =>
     scan.domain?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
     scan.engine_name?.toLowerCase().includes(searchQuery.toLowerCase())
   ) || [];
@@ -120,7 +124,7 @@ export const ScanHistoryPage: React.FC = () => {
       case 2: // Success
         return <Chip label="SUCCESS" size="small" sx={{ bgcolor: 'rgba(0, 255, 98, 0.1)', color: '#00ff62', border: '1px solid rgba(0, 255, 98, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<CheckCircle2 size={12} />} />;
       case 1: // Running
-        return <Chip label="RUNNING" size="small" sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<RefreshCw size={12} className="spin" />} />;
+        return <Chip label="PENDING" size="small" sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<RefreshCw size={12} className="spin" />} />;
       case -1: // Pending
         return <Chip label="PENDING" size="small" sx={{ bgcolor: 'rgba(255, 171, 0, 0.1)', color: '#ffab00', border: '1px solid rgba(255, 171, 0, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<Clock size={12} />} />;
       case 3: // Aborted
@@ -154,18 +158,18 @@ export const ScanHistoryPage: React.FC = () => {
         <Box sx={{ display: 'flex', gap: 2 }}>
           {selected.length > 0 && (
             <>
-              <Button 
-                variant="outlined" 
-                color="error" 
+              <Button
+                variant="outlined"
+                color="error"
                 startIcon={<StopCircle size={18} />}
                 onClick={() => bulkActionMutation.mutate({ action: 'bulk_stop', ids: selected })}
                 sx={{ fontFamily: 'Orbitron', fontSize: '0.7rem', fontWeight: 800, borderColor: '#ff003c', color: '#ff003c' }}
               >
                 STOP SELECTED
               </Button>
-              <Button 
-                variant="outlined" 
-                color="error" 
+              <Button
+                variant="outlined"
+                color="error"
                 startIcon={<Trash2 size={18} />}
                 onClick={() => bulkActionMutation.mutate({ action: 'bulk_delete', ids: selected })}
                 sx={{ fontFamily: 'Orbitron', fontSize: '0.7rem', fontWeight: 800, borderColor: '#ff003c', color: '#ff003c' }}
@@ -184,7 +188,7 @@ export const ScanHistoryPage: React.FC = () => {
             size="small"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            sx={{ 
+            sx={{
               width: 350,
               '& .MuiOutlinedInput-root': {
                 color: '#fff',
@@ -223,21 +227,22 @@ export const ScanHistoryPage: React.FC = () => {
                 <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>STATUS</TableCell>
                 <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>PROGRESS</TableCell>
                 <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>TIMELINE</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)', textAlign: 'right' }}>ACTION</TableCell>
+                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)', textAlign: 'left', width: 140, pr: 3 }}>ACTION</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {paginatedScans.map((scan) => {
                 const isItemSelected = isSelected(scan.id);
+                const displayProgress = scan.scan_status === 2 ? 100 : (scan.current_progress || 0);
                 return (
-                  <TableRow 
-                    key={scan.id} 
+                  <TableRow
+                    key={scan.id}
                     hover
                     onClick={() => handleClick(scan.id)}
                     role="checkbox"
                     aria-checked={isItemSelected}
                     selected={isItemSelected}
-                    sx={{ 
+                    sx={{
                       '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.02) !important' },
                       '&.Mui-selected': { bgcolor: 'rgba(0, 243, 255, 0.05) !important' },
                       transition: 'all 0.2s',
@@ -275,17 +280,17 @@ export const ScanHistoryPage: React.FC = () => {
                         </Tooltip>
                         <Tooltip title="Vulnerabilities Detected">
                           <Box sx={{ bgcolor: 'rgba(255, 0, 60, 0.1)', color: '#ff003c', px: 1, py: 0.5, borderRadius: '2px', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Shield size={12} />
+                            <Bug size={12} />
                             <Typography variant="caption" sx={{ fontWeight: 900, fontFamily: 'Orbitron' }}>{scan.vulnerability_count || 0}</Typography>
                           </Box>
                         </Tooltip>
                       </Box>
                     </TableCell>
                     <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <Chip 
-                        label={scan.engine_name || scan.scan_type?.engine_name || 'STANDARD'} 
-                        size="small" 
-                        sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.6rem', fontWeight: 800, fontFamily: 'Orbitron' }} 
+                      <Chip
+                        label={scan.engine_name || scan.scan_type?.engine_name || 'STANDARD'}
+                        size="small"
+                        sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.6rem', fontWeight: 800, fontFamily: 'Orbitron' }}
                       />
                     </TableCell>
                     <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -293,22 +298,22 @@ export const ScanHistoryPage: React.FC = () => {
                     </TableCell>
                     <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', minWidth: 120 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <LinearProgress 
-                          variant="determinate" 
-                          value={scan.current_progress || 0} 
-                          sx={{ 
-                            flexGrow: 1, 
-                            height: 4, 
+                        <LinearProgress
+                          variant="determinate"
+                          value={displayProgress}
+                          sx={{
+                            flexGrow: 1,
+                            height: 4,
                             borderRadius: 0,
                             bgcolor: 'rgba(255,255,255,0.05)',
                             '& .MuiLinearProgress-bar': {
                               bgcolor: scan.scan_status === 0 || scan.scan_status === 3 ? '#ff003c' : '#00f3ff',
                               boxShadow: `0 0 10px ${scan.scan_status === 0 || scan.scan_status === 3 ? 'rgba(255, 0, 60, 0.5)' : 'rgba(0, 243, 255, 0.5)'}`
                             }
-                          }} 
+                          }}
                         />
                         <Typography variant="caption" sx={{ fontWeight: 900, color: '#fff', fontSize: '0.65rem', fontFamily: 'Orbitron', minWidth: 30 }}>
-                          {Math.round(scan.current_progress || 0)}%
+                          {Math.round(displayProgress)}%
                         </Typography>
                       </Box>
                     </TableCell>
@@ -323,16 +328,16 @@ export const ScanHistoryPage: React.FC = () => {
                         ELAPSED: {scan.elapsed_time || '0s'}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
+                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
                         <Button
                           variant="contained"
                           size="small"
                           component={RouterLink}
                           to={`/${projectSlug}/scan/detail/${scan.id}`}
-                          sx={{ 
-                            bgcolor: 'rgba(0, 243, 255, 0.1)', 
-                            color: '#00f3ff', 
+                          sx={{
+                            bgcolor: 'rgba(0, 243, 255, 0.1)',
+                            color: '#00f3ff',
                             border: '1px solid rgba(0, 243, 255, 0.3)',
                             fontFamily: 'Orbitron',
                             fontSize: '0.6rem',
@@ -342,8 +347,8 @@ export const ScanHistoryPage: React.FC = () => {
                         >
                           RESULTS
                         </Button>
-                        <IconButton 
-                          size="small" 
+                        <IconButton
+                          size="small"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleMenuOpen(e, scan.id);
@@ -370,7 +375,7 @@ export const ScanHistoryPage: React.FC = () => {
             setRowsPerPage(parseInt(e.target.value, 10));
             setPage(0);
           }}
-          sx={{ 
+          sx={{
             color: 'rgba(255,255,255,0.5)',
             borderTop: '1px solid rgba(0, 243, 255, 0.1)',
             '& .MuiTablePagination-selectIcon': { color: 'rgba(255,255,255,0.5)' },
@@ -434,10 +439,27 @@ export const ScanHistoryPage: React.FC = () => {
         }} sx={{ color: '#ff003c !important', '& svg': { color: '#ff003c !important' } }}>
           <Trash2 size={14} /> DELETE SCAN
         </MenuItem>
-        <MenuItem onClick={handleMenuClose}>
+        <MenuItem onClick={() => {
+          if (activeScanId) {
+            setReportScanId(activeScanId);
+            setReportModalOpen(true);
+          }
+          handleMenuClose();
+        }}>
           <FileText size={14} /> SCAN REPORT
         </MenuItem>
       </Menu>
+
+      {reportScanId && (
+        <ScanReportModal
+          open={reportModalOpen}
+          onClose={() => {
+            setReportModalOpen(false);
+            setReportScanId(null);
+          }}
+          scanId={reportScanId}
+        />
+      )}
     </Box>
   );
 };

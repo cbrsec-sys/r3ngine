@@ -56,6 +56,7 @@ import {
   FileText,
   BarChart2,
   ShieldAlert,
+  Bug,
   ChevronUp,
   ChevronDown,
   History,
@@ -66,8 +67,7 @@ import {
   Eye,
   Mail,
   Users,
-  Key,
-  Bug
+  Key
 } from 'lucide-react';
 import { useScanSummary } from '../api';
 import Chart from 'react-apexcharts';
@@ -81,6 +81,7 @@ import { VulnerabilityTable } from '../../vulnerabilities/components/Vulnerabili
 import { SecretLeaksTab } from './SecretLeaksTab';
 import { AttackSurfaceTab } from './AttackSurfaceTab';
 import VisualizationTab from './VisualizationTab';
+import { ScanReportModal } from './ScanReportModal';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   const configs: any = {
@@ -113,8 +114,8 @@ const StatusBadge: React.FC<{ status: number }> = ({ status }) => {
   const configs: any = {
     [-1]: { label: 'PENDING', color: '#ff9f00', icon: Clock },
     [0]: { label: 'FAILED', color: '#ff003c', icon: AlertTriangle },
-    [1]: { label: 'RUNNING', color: '#00f3ff', icon: Activity },
-    [2]: { label: 'COMPLETED', color: '#00ff62', icon: Shield },
+    [1]: { label: 'PENDING', color: '#00f3ff', icon: Activity },
+    [2]: { label: 'SUCCESS', color: '#00ff62', icon: Shield },
     [3]: { label: 'ABORTED', color: '#ff003c', icon: AlertTriangle },
   };
   const config = configs[status] || { label: 'UNKNOWN', color: '#fff', icon: Info };
@@ -592,6 +593,7 @@ export const ScanDetailPage = () => {
   const { data, isLoading } = useScanSummary(projectSlug, parseInt(scanId));
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
+  const [reportModalOpen, setReportModalOpen] = useState(false);
 
   if (isLoading || !data) {
     return (
@@ -1042,8 +1044,27 @@ export const ScanDetailPage = () => {
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN_DETAIL</Typography>
             <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info.name}</Typography>
           </Box>
-          <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
-            <span>SCANS</span> / <span>DETAIL</span> / <span style={{ color: '#00f3ff' }}>{data.target_info.name}</span>
+          <Stack direction="row" spacing={2} alignItems="center">
+            <Button
+              variant="contained"
+              startIcon={<FileText size={16} />}
+              onClick={() => setReportModalOpen(true)}
+              sx={{
+                bgcolor: 'rgba(0, 243, 255, 0.1)',
+                color: '#00f3ff',
+                border: '1px solid rgba(0, 243, 255, 0.3)',
+                fontFamily: 'Orbitron',
+                fontSize: '0.65rem',
+                fontWeight: 900,
+                px: 2,
+                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+              }}
+            >
+              GENERATE REPORT
+            </Button>
+            <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+              <span>SCANS</span> / <span>DETAIL</span> / <span style={{ color: '#00f3ff' }}>{data.target_info.name}</span>
+            </Stack>
           </Stack>
         </Stack>
       </Box>
@@ -1135,7 +1156,7 @@ export const ScanDetailPage = () => {
                      value={data.vulnerability_count} 
                      subtitle={`${data.critical_count} CRITICAL`} 
                      color="#ff003c"
-                     icon={ShieldAlert}
+                     icon={Bug}
                      sx={{ aspectRatio: '1/1', height: '100%' }}
                    />
                    <KpiCard 
@@ -1177,6 +1198,11 @@ export const ScanDetailPage = () => {
           </Box>
         </Box>
       </Box>
+      <ScanReportModal 
+        open={reportModalOpen} 
+        onClose={() => setReportModalOpen(false)} 
+        scanId={parseInt(scanId)} 
+      />
     </Box>
   );
 };

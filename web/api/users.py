@@ -5,7 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rolepermissions.roles import assign_role, clear_roles
 from api.serializers import UserSerializer
-from api.permissions import PERM_MODIFY_SYSTEM_CONFIGURATIONS
+from reNgine.definitions import PERM_MODIFY_SYSTEM_CONFIGURATIONS
 
 User = get_user_model()
 

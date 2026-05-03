@@ -357,7 +357,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 textShadow: '0 0 12px rgba(255, 0, 115, 0.8)',
                 fontSize: '1.4rem',
                 mr: 1.5,
-                ml: 1.5,
+                ml: 12,
                 textTransform: 'lowercase'
               }}>
                 r3ngine
@@ -434,7 +434,6 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 >
                   <LayoutGrid size={18} />
                 </IconButton>
-                <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}><Sliders size={18} /></IconButton>
                 <IconButton 
                   onClick={handleNotificationOpen}
                   size="small" 
@@ -474,7 +473,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                     p: 0.2
                   }}
                 >
-                  <img src="https://img.icons8.com/color/48/000000/hacker.png" width="24" alt="avatar" />
+                  <img src="https://api.dicebear.com/7.x/bottts-neutral/svg?seed=hacker&backgroundColor=transparent" width="24" alt="avatar" />
                 </Avatar>
                 <Box sx={{ ml: 1, display: 'flex', alignItems: 'center' }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>root</Typography>

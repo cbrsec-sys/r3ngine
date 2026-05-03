@@ -1,37 +1,34 @@
-import { createTheme, alpha } from '@mui/material/styles';
-import { neonTokens } from './tokens';
+import { createTheme, alpha, type Theme } from '@mui/material/styles';
+import { themeTokens } from './tokens';
 
-export const neonHackerTheme = createTheme({
+const baseTypography = {
+  fontFamily: '"Inter", "Cerebri Sans", sans-serif',
+  h1: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
+  h2: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
+  h3: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
+  h4: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
+  h5: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '1px' },
+  h6: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '1px' },
+};
+
+// Hacker Theme (Cyberpunk)
+export const hackerTheme: Theme = createTheme({
   palette: {
     mode: 'dark',
-    primary: {
-      main: neonTokens.neon.cyan,
-    },
-    secondary: {
-      main: neonTokens.neon.pink,
-    },
+    primary: { main: themeTokens.hacker.neon.cyan },
+    secondary: { main: themeTokens.hacker.neon.pink },
     background: {
-      default: neonTokens.bg.primary,
-      paper: neonTokens.bg.secondary,
+      default: themeTokens.hacker.bg.primary,
+      paper: themeTokens.hacker.bg.secondary,
     },
     text: {
-      primary: neonTokens.cyber.text,
-      secondary: alpha(neonTokens.cyber.text, 0.7),
+      primary: themeTokens.hacker.cyber.text,
+      secondary: alpha(themeTokens.hacker.cyber.text, 0.7),
     },
-    divider: neonTokens.cyber.border,
+    divider: themeTokens.hacker.cyber.border,
   },
-  typography: {
-    fontFamily: '"Inter", "Cerebri Sans", sans-serif',
-    h1: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
-    h2: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
-    h3: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
-    h4: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
-    h5: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '1px' },
-    h6: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '1px' },
-  },
-  shape: {
-    borderRadius: 18,
-  },
+  typography: baseTypography,
+  shape: { borderRadius: 18 },
   components: {
     MuiCard: {
       styleOverrides: {
@@ -43,18 +40,8 @@ export const neonHackerTheme = createTheme({
           transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
           '&:hover': {
             transform: 'translateY(-6px) scale(1.005)',
-            boxShadow: neonTokens.cyber.glow.cyan,
-            borderColor: alpha(neonTokens.neon.cyan, 0.4),
-          },
-          '&::before': {
-            content: '""',
-            position: 'absolute',
-            inset: 0,
-            borderRadius: 'inherit',
-            background: `radial-gradient(circle at 20% 20%, ${alpha(neonTokens.neon.pink, 0.15)}, transparent 50%), radial-gradient(circle at 80% 80%, ${alpha(neonTokens.neon.cyan, 0.1)}, transparent 50%)`,
-            opacity: 0.6,
-            pointerEvents: 'none',
-            zIndex: 0,
+            boxShadow: themeTokens.hacker.cyber.glow.cyan,
+            borderColor: alpha(themeTokens.hacker.neon.cyan, 0.4),
           },
         },
       },
@@ -66,12 +53,11 @@ export const neonHackerTheme = createTheme({
           letterSpacing: '1px',
           fontWeight: 700,
           borderRadius: '8px',
-          transition: '0.3s',
         },
         containedPrimary: {
-          boxShadow: `0 0 10px ${alpha(neonTokens.neon.cyan, 0.3)}`,
+          boxShadow: `0 0 10px ${alpha(themeTokens.hacker.neon.cyan, 0.3)}`,
           '&:hover': {
-            boxShadow: `0 0 20px ${alpha(neonTokens.neon.cyan, 0.6)}`,
+            boxShadow: `0 0 20px ${alpha(themeTokens.hacker.neon.cyan, 0.6)}`,
           },
         },
       },
@@ -79,9 +65,8 @@ export const neonHackerTheme = createTheme({
     MuiCssBaseline: {
       styleOverrides: `
         body {
-          background-color: ${neonTokens.bg.primary};
-          color: ${neonTokens.cyber.text};
-          overflow-x: hidden;
+          background-color: ${themeTokens.hacker.bg.primary};
+          color: ${themeTokens.hacker.cyber.text};
         }
         @keyframes scanline-move {
           0% { background-position: 0 0; }
@@ -103,3 +88,122 @@ export const neonHackerTheme = createTheme({
     },
   },
 });
+
+// Clean Theme (Cyan Focus)
+export const cleanTheme: Theme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: { main: themeTokens.clean.primary }, // #00d2ff
+    secondary: { main: themeTokens.clean.secondary },
+    background: {
+      default: themeTokens.clean.bg.primary, // #0f172a
+      paper: themeTokens.clean.bg.secondary,
+    },
+    text: {
+      primary: themeTokens.clean.text,
+      secondary: alpha(themeTokens.clean.text, 0.7),
+    },
+    divider: themeTokens.clean.border,
+  },
+  typography: {
+    ...baseTypography,
+    h1: { ...baseTypography.h1, fontFamily: '"Inter", sans-serif' },
+    h2: { ...baseTypography.h2, fontFamily: '"Inter", sans-serif' },
+    h3: { ...baseTypography.h3, fontFamily: '"Inter", sans-serif' },
+    h4: { ...baseTypography.h4, fontFamily: '"Inter", sans-serif' },
+    h5: { ...baseTypography.h5, fontFamily: '"Inter", sans-serif' },
+    h6: { ...baseTypography.h6, fontFamily: '"Inter", sans-serif' },
+  },
+  shape: { borderRadius: 4 },
+  components: {
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          backgroundColor: themeTokens.clean.bg.secondary,
+          border: `1px solid ${themeTokens.clean.border}`,
+          borderRadius: 4,
+          boxShadow: 'none',
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'uppercase',
+          letterSpacing: '1px',
+          fontWeight: 'bold',
+          borderRadius: 4,
+        },
+      },
+    },
+    MuiCssBaseline: {
+      styleOverrides: `
+        body {
+          background-color: ${themeTokens.clean.bg.primary};
+          color: ${themeTokens.clean.text};
+        }
+      `,
+    },
+  },
+});
+
+// Script Kiddie Theme (Magenta Focus)
+export const scriptKiddieTheme: Theme = createTheme({
+  palette: {
+    mode: 'dark',
+    primary: { main: themeTokens.script_kiddie.primary }, // #ff00ff
+    secondary: { main: themeTokens.script_kiddie.secondary },
+    background: {
+      default: themeTokens.script_kiddie.bg.primary, // #0a0a0f
+      paper: themeTokens.script_kiddie.bg.secondary,
+    },
+    text: {
+      primary: themeTokens.script_kiddie.text,
+      secondary: alpha(themeTokens.script_kiddie.text, 0.7),
+    },
+    divider: themeTokens.script_kiddie.border,
+  },
+  typography: baseTypography,
+  shape: { borderRadius: 0 },
+  components: {
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          backgroundColor: themeTokens.script_kiddie.bg.secondary,
+          border: `1px solid ${themeTokens.script_kiddie.border}`,
+          boxShadow: themeTokens.script_kiddie.glow,
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'uppercase',
+          fontWeight: 'bold',
+          borderRadius: 0,
+          border: `1px solid ${themeTokens.script_kiddie.primary}`,
+          '&:hover': {
+            backgroundColor: themeTokens.script_kiddie.primary,
+            color: themeTokens.script_kiddie.bg.primary,
+          },
+        },
+      },
+    },
+    MuiCssBaseline: {
+      styleOverrides: `
+        body {
+          background-color: ${themeTokens.script_kiddie.bg.primary};
+          color: ${themeTokens.script_kiddie.text};
+        }
+        h1, h2, h3, h4, h5, h6 {
+            color: ${themeTokens.script_kiddie.primary};
+        }
+      `,
+    },
+
+  },
+});
+
+export const neonHackerTheme = hackerTheme;
+
+
