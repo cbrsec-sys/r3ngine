@@ -5,7 +5,7 @@ import { TargetList, TargetSummary } from "./features/targets";
 import { MonitoringPage } from "./features/monitoring";
 import { EnginesPage } from "./features/engines";
 import { ProjectsPage } from "./features/projects";
-import { ScanList, ScheduledScansPage, SubScansPage, ScanHistoryPage, ScanDetailPage } from "./features/scans";
+import { ScheduledScansPage, SubScansPage, ScanHistoryPage, ScanDetailPage } from "./features/scans";
 import { EndpointsPage } from "./features/endpoints";
 import { SubdomainsPage } from "./features/subdomains";
 import { TodoPage } from "./features/todos";
@@ -25,9 +25,8 @@ import {
 } from "./features/settings";
 
 
-import { PlaceholderPage } from "./components/PlaceholderPage";
 import { Box, Typography, Button } from "@mui/material";
-import { AlertCircle, Home, RefreshCw, Activity, ShieldAlert, Clock, Globe, Target } from "lucide-react";
+import { AlertCircle, Home, RefreshCw } from "lucide-react";
 
 // Root Route
 const rootRoute = createRootRoute({

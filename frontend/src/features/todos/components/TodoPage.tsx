@@ -120,12 +120,14 @@ export const TodoPage: React.FC = () => {
             placeholder="Search tactical notes..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={18} color="rgba(255,255,255,0.3)" />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search size={18} color="rgba(255,255,255,0.3)" />
+                  </InputAdornment>
+                ),
+              }
             }}
             sx={{
               '& .MuiOutlinedInput-root': {
@@ -226,13 +228,15 @@ export const TodoPage: React.FC = () => {
                       '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.3)' }
                     }}
                     MenuProps={{
-                      PaperProps: {
-                        sx: { 
-                          bgcolor: '#0a0a0f', 
-                          border: '1px solid rgba(0, 243, 255, 0.2)', 
-                          color: '#fff',
-                          width: 500,
-                          maxWidth: 500
+                      slotProps: {
+                        paper: {
+                          sx: { 
+                            bgcolor: '#0a0a0f', 
+                            border: '1px solid rgba(0, 243, 255, 0.2)', 
+                            color: '#fff',
+                            width: 500,
+                            maxWidth: 500
+                          }
                         }
                       }
                     }}
@@ -263,13 +267,15 @@ export const TodoPage: React.FC = () => {
                       '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.3)' }
                     }}
                     MenuProps={{
-                      PaperProps: {
-                        sx: { 
-                          bgcolor: '#0a0a0f', 
-                          border: '1px solid rgba(0, 243, 255, 0.2)', 
-                          color: '#fff',
-                          width: 500,
-                          maxWidth: 500
+                      slotProps: {
+                        paper: {
+                          sx: { 
+                            bgcolor: '#0a0a0f', 
+                            border: '1px solid rgba(0, 243, 255, 0.2)', 
+                            color: '#fff',
+                            width: 500,
+                            maxWidth: 500
+                          }
                         }
                       }
                     }}
@@ -326,13 +332,15 @@ export const TodoPage: React.FC = () => {
       <Dialog 
         open={!!selectedNote} 
         onClose={() => setSelectedNote(null)}
-        PaperProps={{
-          sx: {
-            bgcolor: '#0a0a0f',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
-            boxShadow: '0 0 30px rgba(0, 243, 255, 0.1)',
-            borderRadius: '16px',
-            minWidth: '500px'
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#0a0a0f',
+              border: '1px solid rgba(0, 243, 255, 0.2)',
+              boxShadow: '0 0 30px rgba(0, 243, 255, 0.1)',
+              borderRadius: '16px',
+              minWidth: '500px'
+            }
           }
         }}
       >

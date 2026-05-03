@@ -12,8 +12,7 @@ import {
   Paper,
   Alert
 } from '@mui/material';
-import { X, Search, Globe, Bug, ShieldAlert, FileText, ExternalLink, RefreshCw } from 'lucide-react';
-import { TacticalPanel } from '../../../components/TacticalPanel';
+import { X, Search, Globe, Bug, ShieldAlert } from 'lucide-react';
 import { useWhois, useCMSDetector, useCVEDetails, useWafDetector } from '../api';
 
 interface ToolModalProps {
@@ -29,21 +28,23 @@ const ToolDialog: React.FC<{ open: boolean; onClose: () => void; title: string; 
     onClose={onClose}
     maxWidth="md"
     fullWidth
-    PaperProps={{
-      sx: {
-        bgcolor: 'rgba(10, 10, 15, 0.95)',
-        backdropFilter: 'blur(20px)',
-        border: `1px solid ${color}44`,
-        borderRadius: 4,
-        backgroundImage: 'none',
-        boxShadow: `0 0 40px ${color}11`,
-        overflow: 'hidden'
+    slotProps={{
+      paper: {
+        sx: {
+          bgcolor: 'rgba(10, 10, 15, 0.95)',
+          backdropFilter: 'blur(20px)',
+          border: `1px solid ${color}44`,
+          borderRadius: 4,
+          backgroundImage: 'none',
+          boxShadow: `0 0 40px ${color}11`,
+          overflow: 'hidden'
+        }
       }
     }}
   >
     <Box sx={{ p: 0.5, background: `linear-gradient(90deg, ${color}, transparent)` }} />
     <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-      <Stack direction="row" spacing={2} alignItems="center">
+      <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
         <Box sx={{ color }}>{icon}</Box>
         <Typography variant="h6" sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.9rem', letterSpacing: 2, color }}>
           {title}
@@ -61,7 +62,7 @@ const ToolDialog: React.FC<{ open: boolean; onClose: () => void; title: string; 
 
 export const WhoisModal: React.FC<ToolModalProps> = ({ open, onClose }) => {
   const [target, setTarget] = useState('');
-  const { data, refetch, isFetching, error } = useWhois(target);
+  const { data, refetch, isFetching } = useWhois(target);
 
   return (
     <ToolDialog open={open} onClose={onClose} title="WHOIS_LOOKUP" icon={<Globe size={20} />} color="#00f3ff">

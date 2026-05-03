@@ -167,7 +167,7 @@ export const LlmToolkitPage: React.FC = () => {
 
       <Grid container spacing={3}>
         {/* Provider Sidebar */}
-        <Grid item xs={12} lg={3}>
+        <Grid size={{ xs: 12 }} lg={3}>
           <TacticalPanel title="LLM_PROVIDERS" icon={<Brain size={18} />}>
             <Stack spacing={1}>
               {providers.map((p) => (
@@ -210,7 +210,7 @@ export const LlmToolkitPage: React.FC = () => {
         </Grid>
 
         {/* Main Config Area */}
-        <Grid item xs={12} lg={selectedProvider === 'ollama' ? 6 : 9}>
+        <Grid size={{ xs: 12 }} lg={selectedProvider === 'ollama' ? 6 : 9}>
           <TacticalPanel 
             title={`${selectedProvider.toUpperCase()}_CONFIGURATION`}
             icon={<Settings size={18} />}
@@ -439,7 +439,7 @@ export const LlmToolkitPage: React.FC = () => {
 
         {/* Model Info Sidebar (Ollama only) */}
         {selectedProvider === 'ollama' && (
-          <Grid item xs={12} lg={3}>
+          <Grid size={{ xs: 12 }} lg={3}>
             <TacticalPanel title="MODEL_INSIGHTS" icon={<Info size={18} />}>
               {!currentModel ? (
                 <Box sx={{ textAlign: 'center', py: 4 }}>

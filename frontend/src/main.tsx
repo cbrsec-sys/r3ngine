@@ -4,14 +4,16 @@ import { ThemeProvider, CssBaseline } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { neonHackerTheme } from './theme';
 import App from './App';
+import './index.css';
 
+// @ts-ignore
 import '@fontsource/orbitron';
+// @ts-ignore
 import '@fontsource/inter';
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      suspense: true,
       refetchOnWindowFocus: false,
       retry: 1,
     },

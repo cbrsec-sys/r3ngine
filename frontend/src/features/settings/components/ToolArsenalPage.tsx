@@ -315,13 +315,15 @@ export const ToolArsenalPage: React.FC = () => {
                   anchorEl={anchorEl[tool.id]}
                   open={Boolean(anchorEl[tool.id])}
                   onClose={() => handleMenuClose(tool.id)}
-                  PaperProps={{
-                    sx: { 
-                      bgcolor: '#0a0a0a', 
-                      color: '#fff', 
-                      border: '1px solid rgba(0,243,255,0.2)',
-                      '& .MuiMenuItem-root': { fontSize: '11px', fontFamily: 'Orbitron' },
-                      '& .MuiMenuItem-root:hover': { bgcolor: 'rgba(0,243,255,0.1)' }
+                  slotProps={{
+                    paper: {
+                      sx: { 
+                        bgcolor: '#0a0a0a', 
+                        color: '#fff', 
+                        border: '1px solid rgba(0,243,255,0.2)',
+                        '& .MuiMenuItem-root': { fontSize: '11px', fontFamily: 'Orbitron' },
+                        '& .MuiMenuItem-root:hover': { bgcolor: 'rgba(0,243,255,0.1)' }
+                      }
                     }
                   }}
                 >
@@ -333,7 +335,7 @@ export const ToolArsenalPage: React.FC = () => {
                       <Trash2 size={14} style={{ marginRight: 8 }} /> UNINSTALL
                     </MenuItem>
                   )}
-                  <MenuItem onClick={() => { handleMenuClose(tool.id); handleAction('force_pull_latest', tool.id); }}>
+                  <MenuItem onClick={() => { handleMenuClose(tool.id); handleAction('force_pull_latest', tool.id, tool.name); }}>
                     <RefreshCcw size={14} style={{ marginRight: 8, color: '#00e676' }} /> FORCE PULL
                   </MenuItem>
                 </Menu>

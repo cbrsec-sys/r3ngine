@@ -13,6 +13,7 @@ import {
   CircularProgress,
   List,
   ListItem,
+  ListItemButton,
   ListItemText,
   ListItemSecondaryAction,
   Divider,
@@ -217,7 +218,7 @@ export const ToolSettingsPage: React.FC = () => {
 
         <TabPanel value={tabValue} index={0}>
           <Grid container spacing={2}>
-            <Grid item xs={12} md={3}>
+            <Grid size={{ xs: 12, md: 3 }}>
               <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.1)', width: '100%' }}>
                 <Typography variant="h6" sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '14px', mb: 2 }}>
                   UPLOAD GF PATTERNS
@@ -265,18 +266,25 @@ export const ToolSettingsPage: React.FC = () => {
                     {toolSettings?.gf_patterns.map((pattern) => (
                       <ListItem 
                         key={pattern}
-                        button
-                        onClick={() => handleEditGF(pattern)}
+                        disablePadding
                         sx={{ 
-                          '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' },
                           borderBottom: '1px solid rgba(255,255,255,0.05)'
                         }}
                       >
-                        <ListItemText 
-                          primary={pattern} 
-                          primaryTypographyProps={{ sx: { color: 'rgba(255,255,255,0.8)', fontSize: '13px' } }}
-                        />
-                        <ChevronRight size={14} color="rgba(255,255,255,0.3)" />
+                        <ListItemButton
+                          onClick={() => handleEditGF(pattern)}
+                          sx={{ 
+                            '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' },
+                          }}
+                        >
+                          <ListItemText 
+                            primary={pattern} 
+                            slotProps={{
+                              primary: { sx: { color: 'rgba(255,255,255,0.8)', fontSize: '13px' } }
+                            }}
+                          />
+                          <ChevronRight size={14} color="rgba(255,255,255,0.3)" />
+                        </ListItemButton>
                       </ListItem>
                     ))}
                   </List>
@@ -284,7 +292,7 @@ export const ToolSettingsPage: React.FC = () => {
               </Box>
             </Grid>
 
-            <Grid item xs={12} md={9}>
+            <Grid size={{ xs: 12, md: 9 }}>
               {editingFile && editingFile.key === 'gf_pattern' ? (
                 <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.2)', width: '100%' }}>
                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -318,15 +326,17 @@ export const ToolSettingsPage: React.FC = () => {
                     value={fileContent}
                     onChange={(e) => setFileContent(e.target.value)}
                     variant="standard"
-                    InputProps={{
-                      disableUnderline: true,
-                      sx: { 
-                        fontFamily: 'monospace', 
-                        color: '#a9b7c6', 
-                        bgcolor: '#1e1e1e', 
-                        p: 2,
-                        fontSize: '13px',
-                        border: '1px solid rgba(0,243,255,0.1)'
+                    slotProps={{
+                      input: {
+                        disableUnderline: true,
+                        sx: { 
+                          fontFamily: 'monospace', 
+                          color: '#a9b7c6', 
+                          bgcolor: '#1e1e1e', 
+                          p: 2,
+                          fontSize: '13px',
+                          border: '1px solid rgba(0,243,255,0.1)'
+                        }
                       }
                     }}
                   />
@@ -402,27 +412,34 @@ export const ToolSettingsPage: React.FC = () => {
                   {toolSettings?.nuclei_templates?.map((template) => (
                     <ListItem 
                       key={template}
-                      button
-                      selected={editingFile?.key === 'nuclei_template' && editingFile?.name === template}
-                      onClick={() => handleViewNucleiTemplate(template)}
+                      disablePadding
                       sx={{ 
                         borderBottom: '1px solid rgba(255,255,255,0.05)',
-                        '&.Mui-selected': {
-                          bgcolor: 'rgba(0,243,255,0.1)',
-                          borderLeft: '3px solid #00f3ff'
-                        },
-                        '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' }
                       }}
                     >
-                      <ListItemText 
-                        primary={template} 
-                        primaryTypographyProps={{ 
-                          sx: { 
-                            color: (editingFile?.key === 'nuclei_template' && editingFile?.name === template) ? '#00f3ff' : 'rgba(255,255,255,0.8)', 
-                            fontSize: '12px' 
-                          } 
+                      <ListItemButton
+                        selected={editingFile?.key === 'nuclei_template' && editingFile?.name === template}
+                        onClick={() => handleViewNucleiTemplate(template)}
+                        sx={{ 
+                          '&.Mui-selected': {
+                            bgcolor: 'rgba(0,243,255,0.1)',
+                            borderLeft: '3px solid #00f3ff'
+                          },
+                          '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' }
                         }}
-                      />
+                      >
+                        <ListItemText 
+                          primary={template} 
+                          slotProps={{
+                            primary: { 
+                              sx: { 
+                                color: (editingFile?.key === 'nuclei_template' && editingFile?.name === template) ? '#00f3ff' : 'rgba(255,255,255,0.8)', 
+                                fontSize: '12px' 
+                              } 
+                            }
+                          }}
+                        />
+                      </ListItemButton>
                     </ListItem>
                   ))}
                 </List>
@@ -448,18 +465,19 @@ export const ToolSettingsPage: React.FC = () => {
                     fullWidth
                     rows={28}
                     value={fileContent}
-                    readOnly
                     variant="standard"
-                    InputProps={{
-                      readOnly: true,
-                      disableUnderline: true,
-                      sx: { 
-                        fontFamily: 'monospace', 
-                        color: '#a9b7c6', 
-                        bgcolor: '#1e1e1e', 
-                        p: 2,
-                        fontSize: '13px',
-                        border: '1px solid rgba(0,243,255,0.1)'
+                    slotProps={{
+                      input: {
+                        readOnly: true,
+                        disableUnderline: true,
+                        sx: { 
+                          fontFamily: 'monospace', 
+                          color: '#a9b7c6', 
+                          bgcolor: '#1e1e1e', 
+                          p: 2,
+                          fontSize: '13px',
+                          border: '1px solid rgba(0,243,255,0.1)'
+                        }
                       }
                     }}
                   />
@@ -494,30 +512,35 @@ export const ToolSettingsPage: React.FC = () => {
                 {configFiles.map((file) => (
                   <ListItem 
                     key={file.key}
-                    button
-                    selected={editingFile?.key === file.key}
-                    onClick={() => handleEditConfig(file.key, file.name)}
-                    sx={{
-                      '&.Mui-selected': {
-                        bgcolor: 'rgba(0,243,255,0.1)',
-                        borderLeft: '3px solid #00f3ff'
-                      },
-                      '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' }
-                    }}
+                    disablePadding
                   >
-                    <Box sx={{ mr: 2, color: editingFile?.key === file.key ? '#00f3ff' : 'rgba(255,255,255,0.5)' }}>
-                      {file.icon}
-                    </Box>
-                    <ListItemText 
-                      primary={file.name} 
-                      primaryTypographyProps={{ 
-                        sx: { 
-                          color: editingFile?.key === file.key ? '#00f3ff' : 'rgba(255,255,255,0.7)',
-                          fontSize: '13px',
-                          fontFamily: 'Orbitron'
-                        } 
-                      }} 
-                    />
+                    <ListItemButton
+                      selected={editingFile?.key === file.key}
+                      onClick={() => handleEditConfig(file.key, file.name)}
+                      sx={{
+                        '&.Mui-selected': {
+                          bgcolor: 'rgba(0,243,255,0.1)',
+                          borderLeft: '3px solid #00f3ff'
+                        },
+                        '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' }
+                      }}
+                    >
+                      <Box sx={{ mr: 2, color: editingFile?.key === file.key ? '#00f3ff' : 'rgba(255,255,255,0.5)' }}>
+                        {file.icon}
+                      </Box>
+                      <ListItemText 
+                        primary={file.name} 
+                        slotProps={{
+                          primary: { 
+                            sx: { 
+                              color: editingFile?.key === file.key ? '#00f3ff' : 'rgba(255,255,255,0.7)',
+                              fontSize: '13px',
+                              fontFamily: 'Orbitron'
+                            } 
+                          }
+                        }} 
+                      />
+                    </ListItemButton>
                   </ListItem>
                 ))}
               </List>
@@ -548,15 +571,17 @@ export const ToolSettingsPage: React.FC = () => {
                     value={fileContent}
                     onChange={(e) => setFileContent(e.target.value)}
                     variant="standard"
-                    InputProps={{
-                      disableUnderline: true,
-                      sx: { 
-                        fontFamily: 'monospace', 
-                        color: '#a9b7c6', 
-                        bgcolor: '#1e1e1e', 
-                        p: 2,
-                        fontSize: '13px',
-                        border: '1px solid rgba(0,243,255,0.1)'
+                    slotProps={{
+                      input: {
+                        disableUnderline: true,
+                        sx: { 
+                          fontFamily: 'monospace', 
+                          color: '#a9b7c6', 
+                          bgcolor: '#1e1e1e', 
+                          p: 2,
+                          fontSize: '13px',
+                          border: '1px solid rgba(0,243,255,0.1)'
+                        }
                       }
                     }}
                   />

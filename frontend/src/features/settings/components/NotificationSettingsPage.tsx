@@ -116,7 +116,7 @@ export const NotificationSettingsPage: React.FC = () => {
     <Box sx={{ p: { xs: 2, md: 4 }, maxWidth: 1100, margin: '0 auto' }}>
       <Grid container spacing={4}>
         {/* Header Section */}
-        <Grid item xs={12} md={7} sx={{ mb: 2 }}>
+        <Grid size={{ xs: 12, md: 7 }} sx={{ mb: 2 }}>
           <Box>
             <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', mb: 1, letterSpacing: 2 }}>
               NOTIFICATION_LINKS
@@ -126,7 +126,7 @@ export const NotificationSettingsPage: React.FC = () => {
             </Typography>
           </Box>
         </Grid>
-        <Grid item xs={12} md={5} sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
+        <Grid size={{ xs: 12, md: 5 }} sx={{ display: 'flex', alignItems: 'flex-start', mb: 2 }}>
           <Stack direction="row" spacing={2} sx={{ width: '100%', justifyContent: 'flex-end' }}>
             <Button
               variant="outlined"
@@ -167,7 +167,7 @@ export const NotificationSettingsPage: React.FC = () => {
         </Grid>
 
         {/* Notification Channels */}
-        <Grid item xs={12} md={7}>
+        <Grid size={{ xs: 12, md: 7 }}>
           <TacticalPanel title="CHANNEL_CONFIG">
             <Stack spacing={4} sx={{ p: 2 }}>
               {/* Slack */}
@@ -261,7 +261,7 @@ export const NotificationSettingsPage: React.FC = () => {
                   />
                 </Stack>
                 <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
+                  <Grid size={{ xs: 12 }} sm={6}>
                     <TextField
                       fullWidth
                       label="Bot Token"
@@ -279,7 +279,7 @@ export const NotificationSettingsPage: React.FC = () => {
                       }}
                     />
                   </Grid>
-                  <Grid item xs={12} sm={6}>
+                  <Grid size={{ xs: 12 }} sm={6}>
                     <TextField
                       fullWidth
                       label="Chat ID"
@@ -341,7 +341,7 @@ export const NotificationSettingsPage: React.FC = () => {
         </Grid>
 
         {/* Triggers and Advanced */}
-        <Grid item xs={12} md={5}>
+        <Grid size={{ xs: 12, md: 5 }}>
           <Stack spacing={4}>
             <TacticalPanel title="TRIGGER_EVENTS">
               <Stack spacing={2} sx={{ p: 2 }}>

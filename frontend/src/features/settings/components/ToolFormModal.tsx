@@ -102,13 +102,15 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{
-        sx: {
-          bgcolor: '#0a0a0a',
-          border: '1px solid rgba(0,243,255,0.2)',
-          color: '#fff',
-          backgroundImage: 'linear-gradient(rgba(0,243,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,243,255,0.05) 1px, transparent 1px)',
-          backgroundSize: '20px 20px'
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: '#0a0a0a',
+            border: '1px solid rgba(0,243,255,0.2)',
+            color: '#fff',
+            backgroundImage: 'linear-gradient(rgba(0,243,255,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0,243,255,0.05) 1px, transparent 1px)',
+            backgroundSize: '20px 20px'
+          }
         }
       }}
     >
@@ -133,7 +135,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
       <form onSubmit={handleSubmit}>
         <DialogContent sx={{ mt: 2 }}>
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="Tool Name"
@@ -142,11 +144,11 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 onChange={handleChange}
                 variant="outlined"
                 required
-                InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                slotProps={{ inputLabel: { sx: { color: 'rgba(0,243,255,0.7)' } } }}
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="Logo URL"
@@ -154,11 +156,11 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 value={formData.logo_url}
                 onChange={handleChange}
                 variant="outlined"
-                InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                slotProps={{ inputLabel: { sx: { color: 'rgba(0,243,255,0.7)' } } }}
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <TextField
                 fullWidth
                 label="Description"
@@ -168,11 +170,11 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 variant="outlined"
                 multiline
                 rows={2}
-                InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                slotProps={{ inputLabel: { sx: { color: 'rgba(0,243,255,0.7)' } } }}
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="GitHub URL"
@@ -181,11 +183,11 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 onChange={handleChange}
                 variant="outlined"
                 required
-                InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                slotProps={{ inputLabel: { sx: { color: 'rgba(0,243,255,0.7)' } } }}
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <TextField
                 fullWidth
                 label="License URL"
@@ -193,11 +195,11 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 value={formData.license_url}
                 onChange={handleChange}
                 variant="outlined"
-                InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                slotProps={{ inputLabel: { sx: { color: 'rgba(0,243,255,0.7)' } } }}
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Typography variant="caption" sx={{ color: 'rgba(0,243,255,0.5)', mb: 1, display: 'block' }}>
                 COMMAND CONFIGURATION
               </Typography>
@@ -210,7 +212,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 variant="outlined"
                 required
                 placeholder="e.g. go install github.com/project/tool@latest"
-                InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                slotProps={{ inputLabel: { sx: { color: 'rgba(0,243,255,0.7)' } } }}
                 sx={{ mb: 2, '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
               <TextField
@@ -221,7 +223,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 onChange={handleChange}
                 variant="outlined"
                 placeholder="e.g. go install github.com/project/tool@latest"
-                InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                slotProps={{ inputLabel: { sx: { color: 'rgba(0,243,255,0.7)' } } }}
                 sx={{ mb: 2, '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
               <TextField
@@ -232,7 +234,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 onChange={handleChange}
                 variant="outlined"
                 placeholder="e.g. tool --version"
-                InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                slotProps={{ inputLabel: { sx: { color: 'rgba(0,243,255,0.7)' } } }}
                 sx={{ mb: 2, '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
               <TextField
@@ -242,11 +244,11 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 value={formData.version_match_regex}
                 onChange={handleChange}
                 variant="outlined"
-                InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                slotProps={{ inputLabel: { sx: { color: 'rgba(0,243,255,0.7)' } } }}
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
-            <Grid item xs={12}>
+            <Grid size={{ xs: 12 }}>
               <Box sx={{ p: 2, border: '1px solid rgba(0,243,255,0.1)', borderRadius: 1, bgcolor: 'rgba(0,243,255,0.02)' }}>
                 <FormControlLabel
                   control={
@@ -268,7 +270,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                     onChange={handleChange}
                     variant="outlined"
                     placeholder="e.g. tool_name -d {TARGET} -o {OUTPUT}"
-                    InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                    slotProps={{ inputLabel: { sx: { color: 'rgba(0,243,255,0.7)' } } }}
                     sx={{ mt: 2, '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
                   />
                 )}

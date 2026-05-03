@@ -177,7 +177,11 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   ];
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#05050a' }}>
+    <Box sx={{ 
+      display: 'flex', 
+      minHeight: '100vh',
+      bgcolor: 'transparent'
+    }}>
       {/* Sidebar - Mini Drawer Style */}
       <Drawer
         variant="permanent"
@@ -450,21 +454,12 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                     <Bell size={18} />
                   </Badge>
                 </IconButton>
-                <IconButton 
-                  size="small" 
-                  onClick={() => setScanHistoryOpen(true)}
-                  sx={{ 
-                    color: scanHistoryOpen ? '#00f3ff' : 'rgba(255,255,255,0.5)',
-                    bgcolor: scanHistoryOpen ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
-                    '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)' } 
-                  }}
-                >
-                  <Activity size={18} />
-                </IconButton>
+                {/* Removed extra icon */}
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }} onClick={handleMenuOpen}>
                 <Avatar 
+                  src="https://api.dicebear.com/7.x/bottts-neutral/svg?seed=hacker&backgroundColor=transparent"
                   sx={{ 
                     width: 32, 
                     height: 32, 
@@ -472,9 +467,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                     border: '1px solid rgba(0, 243, 255, 0.3)',
                     p: 0.2
                   }}
-                >
-                  <img src="https://api.dicebear.com/7.x/bottts-neutral/svg?seed=hacker&backgroundColor=transparent" width="24" alt="avatar" />
-                </Avatar>
+                />
                 <Box sx={{ ml: 1, display: 'flex', alignItems: 'center' }}>
                   <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>root</Typography>
                   <ChevronDown size={14} style={{ opacity: 0.4, marginLeft: 4 }} />
@@ -742,21 +735,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             px: 3,
             pb: 4,
             overflow: 'auto',
-            position: 'relative',
-            background: `linear-gradient(rgba(5, 5, 10, 0.85), rgba(5, 5, 10, 0.85)), url("/staticfiles/img/neon_city.png") no-repeat center center fixed`,
-            backgroundSize: 'cover',
-            '&::before': {
-              content: '""',
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E")`,
-              opacity: 0.05,
-              pointerEvents: 'none',
-              zIndex: 0
-            }
+            position: 'relative'
           }}
         >
           <Box sx={{ position: 'relative', zIndex: 1, width: '100%' }}>

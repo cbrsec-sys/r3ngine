@@ -145,7 +145,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
           )}
 
           <Grid container spacing={3}>
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 800, mb: 1, display: 'block' }}>
                 PRIMARY CONFIGURATION
               </Typography>
@@ -216,7 +216,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
               </Box>
             </Grid>
 
-            <Grid item xs={12} md={6}>
+            <Grid size={{ xs: 12, md: 6 }}>
               <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 800, mb: 1, display: 'block' }}>
                 ADVANCED SCOPE
               </Typography>

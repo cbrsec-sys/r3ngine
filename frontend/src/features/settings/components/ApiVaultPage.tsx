@@ -168,7 +168,7 @@ export const ApiVaultPage: React.FC = () => {
         </Alert>
 
         <Grid container spacing={3}>
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <TacticalPanel title="OSINT & DISCOVERY" icon={<Globe size={20} />}>
               <Box sx={{ p: 1 }}>
                 <KeyField 
@@ -207,7 +207,7 @@ export const ApiVaultPage: React.FC = () => {
             </TacticalPanel>
           </Grid>
 
-          <Grid item xs={12} md={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Stack spacing={3}>
               <TacticalPanel title="CENSYS CONFIGURATION" icon={<Search size={20} />}>
                 <Box sx={{ p: 1 }}>
@@ -215,7 +215,7 @@ export const ApiVaultPage: React.FC = () => {
                     Censys keys are used for origin discovery and SSL serial matching.
                   </Typography>
                   <Grid container spacing={2}>
-                    <Grid item xs={12}>
+                    <Grid size={{ xs: 12 }}>
                       <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API ID</Typography>
                       <TextField
                         fullWidth
@@ -233,7 +233,7 @@ export const ApiVaultPage: React.FC = () => {
                         }}
                       />
                     </Grid>
-                    <Grid item xs={12}>
+                    <Grid size={{ xs: 12 }}>
                       <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API SECRET</Typography>
                       <TextField
                         fullWidth
@@ -280,7 +280,7 @@ export const ApiVaultPage: React.FC = () => {
                     Used to import targets, bookmarked programs, and submit automated reports.
                   </Typography>
                   <Grid container spacing={2}>
-                    <Grid item xs={12}>
+                    <Grid size={{ xs: 12 }}>
                       <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>USERNAME (NOT EMAIL)</Typography>
                       <TextField
                         fullWidth
@@ -298,7 +298,7 @@ export const ApiVaultPage: React.FC = () => {
                         }}
                       />
                     </Grid>
-                    <Grid item xs={12}>
+                    <Grid size={{ xs: 12 }}>
                       <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API TOKEN</Typography>
                       <TextField
                         fullWidth

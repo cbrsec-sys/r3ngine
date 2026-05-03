@@ -227,13 +227,13 @@ export const ScanHistoryPage: React.FC = () => {
                 <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>STATUS</TableCell>
                 <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>PROGRESS</TableCell>
                 <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>TIMELINE</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)', textAlign: 'left', width: 140, pr: 3 }}>ACTION</TableCell>
+                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)', textAlign: 'left', width: 140 }}>ACTION</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {paginatedScans.map((scan) => {
                 const isItemSelected = isSelected(scan.id);
-                const displayProgress = scan.scan_status === 2 ? 100 : (scan.current_progress || 0);
+                const displayProgress = (scan.scan_status === 2 || scan.scan_status === 0 || scan.scan_status === 3) ? 100 : (scan.current_progress || 0);
                 return (
                   <TableRow
                     key={scan.id}
@@ -328,7 +328,7 @@ export const ScanHistoryPage: React.FC = () => {
                         ELAPSED: {scan.elapsed_time || '0s'}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'center' }}>
+                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'left' }}>
                       <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
                         <Button
                           variant="contained"

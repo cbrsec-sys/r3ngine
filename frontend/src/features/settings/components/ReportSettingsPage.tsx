@@ -130,7 +130,7 @@ export const ReportSettingsPage: React.FC = () => {
                 THEME_COLORS
               </Typography>
               <Grid container spacing={3}>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography variant="caption" sx={{ color: '#00f3ff', mb: 1, display: 'block', fontWeight: 600 }}>PRIMARY_COLOR</Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for Main Title, Footer Background, and Page Counters.
@@ -157,7 +157,7 @@ export const ReportSettingsPage: React.FC = () => {
                     />
                   </Box>
                 </Grid>
-                <Grid item xs={12} sm={6}>
+                <Grid size={{ xs: 12, sm: 6 }}>
                   <Typography variant="caption" sx={{ color: '#ffd600', mb: 1, display: 'block', fontWeight: 600 }}>SECONDARY_COLOR</Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for the report cover background.
@@ -201,12 +201,14 @@ export const ReportSettingsPage: React.FC = () => {
                       label="Company Name"
                       value={form.company_name}
                       onChange={(e) => setForm({ ...form, company_name: e.target.value })}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Building2 size={18} color="rgba(0, 243, 255, 0.5)" />
-                          </InputAdornment>
-                        ),
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Building2 size={18} color="rgba(0, 243, 255, 0.5)" />
+                            </InputAdornment>
+                          ),
+                        }
                       }}
                       variant="outlined"
                       sx={{ '& .MuiOutlinedInput-root': { color: '#fff' } }}
@@ -218,12 +220,14 @@ export const ReportSettingsPage: React.FC = () => {
                       label="Company Address"
                       value={form.company_address}
                       onChange={(e) => setForm({ ...form, company_address: e.target.value })}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <MapPin size={18} color="rgba(0, 243, 255, 0.5)" />
-                          </InputAdornment>
-                        ),
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <MapPin size={18} color="rgba(0, 243, 255, 0.5)" />
+                            </InputAdornment>
+                          ),
+                        }
                       }}
                       variant="outlined"
                       sx={{ '& .MuiOutlinedInput-root': { color: '#fff' } }}
@@ -239,12 +243,14 @@ export const ReportSettingsPage: React.FC = () => {
                       placeholder="https://company.com"
                       value={form.company_website}
                       onChange={(e) => setForm({ ...form, company_website: e.target.value })}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Globe size={18} color="rgba(0, 243, 255, 0.5)" />
-                          </InputAdornment>
-                        ),
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Globe size={18} color="rgba(0, 243, 255, 0.5)" />
+                            </InputAdornment>
+                          ),
+                        }
                       }}
                       variant="outlined"
                       sx={{ '& .MuiOutlinedInput-root': { color: '#fff' } }}
@@ -257,12 +263,14 @@ export const ReportSettingsPage: React.FC = () => {
                       placeholder="email@yourcompany.com"
                       value={form.company_email}
                       onChange={(e) => setForm({ ...form, company_email: e.target.value })}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <Mail size={18} color="rgba(0, 243, 255, 0.5)" />
-                          </InputAdornment>
-                        ),
+                      slotProps={{
+                        input: {
+                          startAdornment: (
+                            <InputAdornment position="start">
+                              <Mail size={18} color="rgba(0, 243, 255, 0.5)" />
+                            </InputAdornment>
+                          ),
+                        }
                       }}
                       variant="outlined"
                       sx={{ '& .MuiOutlinedInput-root': { color: '#fff' } }}

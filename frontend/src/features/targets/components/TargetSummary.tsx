@@ -152,7 +152,7 @@ export const TargetSummary = () => {
                 {data.recent_scans?.map((scan: any) => (
                   <Box key={scan.id} sx={{ mb: 2, pl: 2, borderLeft: '2px solid rgba(0, 243, 255, 0.2)', position: 'relative' }}>
                     <Box sx={{ position: 'absolute', left: -5, top: 0, width: 8, height: 8, borderRadius: '50%', bgcolor: '#00f3ff' }} />
-                    <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 0.5 }}>
+                    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                       <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#fff' }}>{scan.engine_name}</Typography>
                       <Chip
                         label={scan.scan_status === 2 ? 'Completed' : 'Scanning'}
@@ -161,10 +161,10 @@ export const TargetSummary = () => {
                       />
                     </Stack>
                     <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block', mb: 1 }}>{scan.completed_ago}</Typography>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                       <Typography sx={{ fontSize: '0.7rem', color: '#00f3ff', fontWeight: 700 }}>{scan.subdomain_count} Subdomains Discovered</Typography>
                       {scan.subdomain_diff !== 0 && (
-                        <Stack direction="row" spacing={0.5} alignItems="center">
+                        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
                           {scan.subdomain_diff > 0 ? <ChevronUp size={12} color="#00ff62" /> : <ChevronDown size={12} color="#ff003c" />}
                           <Typography sx={{ fontSize: '0.65rem', fontWeight: 900, color: scan.subdomain_diff > 0 ? '#00ff62' : '#ff003c' }}>{Math.abs(scan.subdomain_diff)}</Typography>
                         </Stack>
@@ -315,21 +315,25 @@ export const TargetSummary = () => {
                 </Tabs>
 
                 {infoTab === 0 && (
-                  <Grid container spacing={3}>
-                    <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Domain</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#ff003c' }}>{data.target_info.name}</Typography></Grid>
-                    <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Dnssec</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.dnssec || 'N/A'}</Typography></Grid>
-                    <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Geolocation</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography></Grid>
-                    <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Created</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.created || 'N/A'}</Typography></Grid>
-                    <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Updated</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.updated || 'N/A'}</Typography></Grid>
-                    <Grid item xs={4}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Expires</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.expires || 'N/A'}</Typography></Grid>
-                    <Grid item xs={12}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Registrar</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#00f3ff' }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography></Grid>
-                  </Grid>
+                  <Box sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: 'repeat(3, 1fr)', 
+                    gap: 3 
+                  }}>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Domain</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#ff003c' }}>{data.target_info.name}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Dnssec</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.dnssec || 'N/A'}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Geolocation</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Created</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.created || 'N/A'}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Updated</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.updated || 'N/A'}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Expires</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.expires || 'N/A'}</Typography></Box>
+                    <Box sx={{ gridColumn: 'span 3' }}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Registrar</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#00f3ff' }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography></Box>
+                  </Box>
                 )}
                 {infoTab === 1 && <Typography sx={{ p: 2, fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)' }}>Loading WHOIS Data...</Typography>}
                 {infoTab === 2 && (
                   <Stack spacing={1}>
                     {data.domain_info?.dns_records?.map((r: any, idx: number) => (
-                      <Stack key={idx} direction="row" spacing={1} alignItems="center">
+                      <Stack key={idx} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                         <Chip label={r.type.toUpperCase()} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} />
                         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{r.name}</Typography>
                       </Stack>
@@ -413,7 +417,7 @@ export const TargetSummary = () => {
                     xaxis: { categories: data.most_common_cve?.map((c: any) => c.name) },
                     colors: ['#ff003c']
                   }}
-                  series={[{ data: data.most_common_cve?.map((c: any) => c.nused) }]}
+                  series={[{ data: data.most_common_cve?.map((c: any) => c.count || c.nused) }]}
                   type="bar"
                   height="100%"
                 />
@@ -428,7 +432,7 @@ export const TargetSummary = () => {
                     xaxis: { categories: data.most_common_cwe?.map((c: any) => c.name) },
                     colors: ['#ff9f00']
                   }}
-                  series={[{ data: data.most_common_cwe?.map((c: any) => c.nused) }]}
+                  series={[{ data: data.most_common_cwe?.map((c: any) => c.count || c.nused) }]}
                   type="bar"
                   height="100%"
                 />
@@ -443,7 +447,7 @@ export const TargetSummary = () => {
                     xaxis: { categories: data.most_common_tags?.map((c: any) => c.name) },
                     colors: ['#00ff62']
                   }}
-                  series={[{ data: data.most_common_tags?.map((c: any) => c.nused) }]}
+                  series={[{ data: data.most_common_tags?.map((c: any) => c.count || c.nused) }]}
                   type="bar"
                   height="100%"
                 />
@@ -536,7 +540,7 @@ export const TargetSummary = () => {
     <Box sx={{ p: 2 }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>TARGET_SUMMARY</Typography>
             <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {targetId} | TARGET: {data.target_info.name}</Typography>
@@ -564,7 +568,7 @@ export const TargetSummary = () => {
             <Tab 
               key={idx} 
               label={
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                   <tab.icon size={14} />
                   <span>{tab.label}</span>
                 </Stack>

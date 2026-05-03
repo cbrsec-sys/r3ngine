@@ -30,12 +30,20 @@ export const AddTargetModal: React.FC<AddTargetModalProps> = ({ open, onClose, p
     h1_team_handle: '',
   });
 
-  const { data: organizations, isLoading: loadingOrgs } = useOrganizations(projectSlug);
+  const { data: organizations, isLoading: loadingOrgs } = useOrganizations();
   const { mutate: addTarget, isPending, error, reset } = useAddTarget(projectSlug);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    addTarget(formData, {
+    const organization_ids = formData.organization 
+      ? organizations?.filter(org => org.name === formData.organization).map(org => org.id)
+      : [];
+
+    addTarget({ 
+      domain_name: formData.domain_name, 
+      project_slug: projectSlug,
+      organization_ids: organization_ids
+    }, {
       onSuccess: () => {
         onClose();
         setFormData({
@@ -58,15 +66,17 @@ export const AddTargetModal: React.FC<AddTargetModalProps> = ({ open, onClose, p
     <Dialog 
       open={open} 
       onClose={handleClose}
-      PaperProps={{
-        sx: {
-          bgcolor: 'rgba(10, 10, 20, 0.95)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0, 243, 255, 0.2)',
-          borderRadius: 4,
-          backgroundImage: 'radial-gradient(circle at top right, rgba(0, 243, 255, 0.05), transparent)',
-          maxWidth: 500,
-          width: '100%'
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: 'rgba(10, 10, 20, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0, 243, 255, 0.2)',
+            borderRadius: 4,
+            backgroundImage: 'radial-gradient(circle at top right, rgba(0, 243, 255, 0.05), transparent)',
+            maxWidth: 500,
+            width: '100%'
+          }
         }
       }}
     >
@@ -124,8 +134,10 @@ export const AddTargetModal: React.FC<AddTargetModalProps> = ({ open, onClose, p
               onChange={(e) => setFormData({ ...formData, domain_name: e.target.value })}
               placeholder="example.com"
               sx={fieldStyles}
-              InputProps={{
-                startAdornment: <Globe size={18} style={{ marginRight: 12, color: '#00f3ff' }} />
+              slotProps={{
+                input: {
+                  startAdornment: <Globe size={18} style={{ marginRight: 12, color: '#00f3ff' }} />
+                }
               }}
             />
 
@@ -136,8 +148,10 @@ export const AddTargetModal: React.FC<AddTargetModalProps> = ({ open, onClose, p
               value={formData.organization}
               onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
               sx={fieldStyles}
-              InputProps={{
-                startAdornment: <Building2 size={18} style={{ marginRight: 12, color: 'rgba(255,255,255,0.4)' }} />
+              slotProps={{
+                input: {
+                  startAdornment: <Building2 size={18} style={{ marginRight: 12, color: 'rgba(255,255,255,0.4)' }} />
+                }
               }}
             >
               <MenuItem value="">
@@ -157,8 +171,10 @@ export const AddTargetModal: React.FC<AddTargetModalProps> = ({ open, onClose, p
               onChange={(e) => setFormData({ ...formData, h1_team_handle: e.target.value })}
               placeholder="Optional team handle"
               sx={fieldStyles}
-              InputProps={{
-                startAdornment: <Terminal size={18} style={{ marginRight: 12, color: 'rgba(255,255,255,0.4)' }} />
+              slotProps={{
+                input: {
+                  startAdornment: <Terminal size={18} style={{ marginRight: 12, color: 'rgba(255,255,255,0.4)' }} />
+                }
               }}
             />
 

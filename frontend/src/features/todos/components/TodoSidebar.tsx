@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Button, List, ListItem, ListItemIcon, ListItemText, Badge } from '@mui/material';
+import { Box, Typography, Button, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Badge } from '@mui/material';
 import { List as ListIcon, CheckCircle, AlertOctagon, Plus } from 'lucide-react';
 
 interface TodoSidebarProps {
@@ -26,48 +26,51 @@ export const TodoSidebar: React.FC<TodoSidebarProps> = ({ activeFilter, setActiv
         {menuItems.map((item) => (
           <ListItem 
             key={item.id}
-            button
-            onClick={() => setActiveFilter(item.id as any)}
-            sx={{ 
-              mb: 1, 
-              borderRadius: '12px',
-              bgcolor: activeFilter === item.id ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
-              border: activeFilter === item.id ? '1px solid rgba(0, 243, 255, 0.2)' : '1px solid transparent',
-              '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.03)' },
-              transition: 'all 0.3s ease'
-            }}
+            disablePadding
+            sx={{ mb: 1 }}
           >
-            <ListItemIcon sx={{ minWidth: 40, color: activeFilter === item.id ? item.color : 'rgba(255,255,255,0.4)' }}>
-              <item.icon size={20} />
-            </ListItemIcon>
-            <ListItemText 
-              primary={
-                <Typography sx={{ 
-                  fontFamily: 'Orbitron', 
-                  fontSize: '0.75rem', 
-                  fontWeight: 800,
-                  color: activeFilter === item.id ? '#fff' : 'rgba(255,255,255,0.5)',
-                  letterSpacing: 1
-                }}>
-                  {item.label.toUpperCase()}
-                </Typography>
-              } 
-            />
-            {item.count > 0 && (
-              <Badge 
-                badgeContent={item.count} 
-                sx={{ 
-                  '& .MuiBadge-badge': { 
-                    bgcolor: item.color, 
-                    color: '#000', 
-                    fontWeight: 900,
-                    fontFamily: 'Orbitron',
-                    fontSize: '0.6rem',
-                    boxShadow: `0 0 10px ${item.color}`
-                  } 
-                }} 
+            <ListItemButton
+              onClick={() => setActiveFilter(item.id as any)}
+              sx={{ 
+                borderRadius: '12px',
+                bgcolor: activeFilter === item.id ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
+                border: activeFilter === item.id ? '1px solid rgba(0, 243, 255, 0.2)' : '1px solid transparent',
+                '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.03)' },
+                transition: 'all 0.3s ease'
+              }}
+            >
+              <ListItemIcon sx={{ minWidth: 40, color: activeFilter === item.id ? item.color : 'rgba(255,255,255,0.4)' }}>
+                <item.icon size={20} />
+              </ListItemIcon>
+              <ListItemText 
+                primary={
+                  <Typography sx={{ 
+                    fontFamily: 'Orbitron', 
+                    fontSize: '0.75rem', 
+                    fontWeight: 800,
+                    color: activeFilter === item.id ? '#fff' : 'rgba(255,255,255,0.5)',
+                    letterSpacing: 1
+                  }}>
+                    {item.label.toUpperCase()}
+                  </Typography>
+                } 
               />
-            )}
+              {item.count > 0 && (
+                <Badge 
+                  badgeContent={item.count} 
+                  sx={{ 
+                    '& .MuiBadge-badge': { 
+                      bgcolor: item.color, 
+                      color: '#000', 
+                      fontWeight: 900,
+                      fontFamily: 'Orbitron',
+                      fontSize: '0.6rem',
+                      boxShadow: `0 0 10px ${item.color}`
+                    } 
+                  }} 
+                />
+              )}
+            </ListItemButton>
           </ListItem>
         ))}
       </List>

@@ -176,10 +176,10 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Most Used Technologies">
             <Chart 
-              options={getBarOptions(data.most_used_tech.map(t => t.name))} 
-              series={[{ name: 'Usage', data: data.most_used_tech.map(t => t.count) }]} 
+              options={getBarOptions(data.most_used_tech.slice(0, 8).map(t => t.name))} 
+              series={[{ name: 'Usage', data: data.most_used_tech.slice(0, 8).map(t => t.count) }]} 
               type="bar" 
-              height={280} 
+              height={240} 
             />
           </ChartCard>
         </Grid>
@@ -223,11 +223,11 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
             <Chart 
               options={{
                 ...donutOptions,
-                labels: data.most_used_port.map(p => `${p.number}/${p.service_name}`)
+                labels: data.most_used_port.slice(0, 5).map(p => `${p.number}/${p.service_name}`)
               }} 
-              series={data.most_used_port.map(p => p.count)} 
+              series={data.most_used_port.slice(0, 5).map(p => p.count)} 
               type="donut" 
-              height={280} 
+              height={240} 
             />
           </ChartCard>
         </Grid>
@@ -235,10 +235,10 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Most Common CWE">
             <Chart 
-              options={getBarOptions(data.most_common_cwe.map(c => c.name), '#7000ff')} 
-              series={[{ name: 'Occurrences', data: data.most_common_cwe.map(c => c.count) }]} 
+              options={getBarOptions(data.most_common_cwe.slice(0, 8).map(c => c.name), '#7000ff')} 
+              series={[{ name: 'Occurrences', data: data.most_common_cwe.slice(0, 8).map(c => c.count) }]} 
               type="bar" 
-              height={280} 
+              height={240} 
             />
           </ChartCard>
         </Grid>
@@ -246,10 +246,10 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Top IP Addresses">
             <Chart 
-              options={getBarOptions(data.most_used_ip.map(ip => ip.address || 'Unknown'), '#00ff62')} 
-              series={[{ name: 'Usage', data: data.most_used_ip.map(ip => ip.count) }]} 
+              options={getBarOptions(data.most_used_ip.slice(0, 8).map(ip => ip.address || 'Unknown'), '#00ff62')} 
+              series={[{ name: 'Usage', data: data.most_used_ip.slice(0, 8).map(ip => ip.count) }]} 
               type="bar" 
-              height={280} 
+              height={240} 
             />
           </ChartCard>
         </Grid>

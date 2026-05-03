@@ -174,7 +174,7 @@ export const ProfileSettingsPage: React.FC = () => {
 
         <Grid container spacing={4}>
           {/* Username Section */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1, textTransform: 'uppercase', letterSpacing: 1 }}>
               Username
             </Typography>
@@ -183,12 +183,14 @@ export const ProfileSettingsPage: React.FC = () => {
               value="@root"
               disabled
               variant="outlined"
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <User size={18} color="rgba(255,255,255,0.3)" />
-                  </InputAdornment>
-                ),
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <User size={18} color="rgba(255,255,255,0.3)" />
+                    </InputAdornment>
+                  ),
+                }
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {
@@ -200,12 +202,12 @@ export const ProfileSettingsPage: React.FC = () => {
             />
           </Grid>
 
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Divider sx={{ borderColor: 'rgba(0, 243, 255, 0.1)', my: 2 }} />
           </Grid>
 
           {/* Change Password Section */}
-          <Grid item xs={12}>
+          <Grid size={{ xs: 12 }}>
             <Typography 
               variant="h6" 
               sx={{ 
@@ -225,7 +227,7 @@ export const ProfileSettingsPage: React.FC = () => {
 
             <form onSubmit={handlePasswordChange}>
               <Grid container spacing={3}>
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                   <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.6)', mb: 1 }}>
                     Old Password
                   </Typography>
@@ -237,20 +239,22 @@ export const ProfileSettingsPage: React.FC = () => {
                     onChange={handleInputChange}
                     required
                     placeholder="Enter old password"
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton onClick={() => setShowOldPassword(!showOldPassword)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                            {showOldPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
+                    slotProps={{
+                      input: {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton onClick={() => setShowOldPassword(!showOldPassword)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                              {showOldPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }
                     }}
                     sx={textFieldStyle}
                   />
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.6)', mb: 1 }}>
                     New Password
                   </Typography>
@@ -262,20 +266,22 @@ export const ProfileSettingsPage: React.FC = () => {
                     onChange={handleInputChange}
                     required
                     placeholder="Enter new password"
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton onClick={() => setShowNewPassword(!showNewPassword)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                            {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
+                    slotProps={{
+                      input: {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton onClick={() => setShowNewPassword(!showNewPassword)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                              {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }
                     }}
                     sx={textFieldStyle}
                   />
                 </Grid>
 
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.6)', mb: 1 }}>
                     Confirm Password
                   </Typography>
@@ -287,20 +293,22 @@ export const ProfileSettingsPage: React.FC = () => {
                     onChange={handleInputChange}
                     required
                     placeholder="Confirm new password"
-                    InputProps={{
-                      endAdornment: (
-                        <InputAdornment position="end">
-                          <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                            {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                          </IconButton>
-                        </InputAdornment>
-                      ),
+                    slotProps={{
+                      input: {
+                        endAdornment: (
+                          <InputAdornment position="end">
+                            <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                            </IconButton>
+                          </InputAdornment>
+                        ),
+                      }
                     }}
                     sx={textFieldStyle}
                   />
                 </Grid>
 
-                <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
+                <Grid size={{ xs: 12 }} sx={{ display: 'flex', justifyContent: 'flex-end', mt: 2 }}>
                   <Button
                     type="submit"
                     variant="contained"

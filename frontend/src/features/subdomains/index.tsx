@@ -116,7 +116,7 @@ export const SubdomainsPage: React.FC = () => {
             Subdomain Inventory
           </Typography>
           <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
-            V3.0 PROJECT_ASSETS_RECON_ACTIVE
+            V3.0 PROJECT ASSET RECON ACTIVE
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -458,16 +458,18 @@ export const SubdomainsPage: React.FC = () => {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleActionClose}
-        PaperProps={{
-          sx: {
-            bgcolor: '#001a24',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
-            color: '#fff',
-            '& .MuiMenuItem-root': {
-              fontSize: '12px',
-              fontWeight: 600,
-              fontFamily: 'Inter',
-              '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' }
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#001a24',
+              border: '1px solid rgba(0, 243, 255, 0.2)',
+              color: '#fff',
+              '& .MuiMenuItem-root': {
+                fontSize: '12px',
+                fontWeight: 600,
+                fontFamily: 'Inter',
+                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' }
+              }
             }
           }
         }}

@@ -54,7 +54,7 @@ export const hackerTheme: Theme = createTheme({
           fontWeight: 700,
           borderRadius: '8px',
         },
-        containedPrimary: {
+        contained: {
           boxShadow: `0 0 10px ${alpha(themeTokens.hacker.neon.cyan, 0.3)}`,
           '&:hover': {
             boxShadow: `0 0 20px ${alpha(themeTokens.hacker.neon.cyan, 0.6)}`,
@@ -65,24 +65,14 @@ export const hackerTheme: Theme = createTheme({
     MuiCssBaseline: {
       styleOverrides: `
         body {
-          background-color: ${themeTokens.hacker.bg.primary};
+          background-color: #05050a;
+          background-image: linear-gradient(rgba(5, 5, 10, 0.5), rgba(5, 5, 10, 0.75)), url("/staticfiles/img/neon_city.png");
+          background-size: cover;
+          background-position: center;
+          background-attachment: fixed;
+          background-repeat: no-repeat;
           color: ${themeTokens.hacker.cyber.text};
-        }
-        @keyframes scanline-move {
-          0% { background-position: 0 0; }
-          100% { background-position: 0 100%; }
-        }
-        body::after {
-          content: " ";
-          display: block;
-          position: fixed;
-          top: 0; left: 0; bottom: 0; right: 0;
-          background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.2) 50%), url("https://grainy-gradients.vercel.app/noise.svg");
-          background-size: 100% 3px, 200px 200px;
-          z-index: 9999;
-          pointer-events: none;
-          opacity: 0.12;
-          animation: scanline-move 10s linear infinite;
+          margin: 0;
         }
       `,
     },
@@ -93,10 +83,10 @@ export const hackerTheme: Theme = createTheme({
 export const cleanTheme: Theme = createTheme({
   palette: {
     mode: 'dark',
-    primary: { main: themeTokens.clean.primary }, // #00d2ff
+    primary: { main: themeTokens.clean.primary },
     secondary: { main: themeTokens.clean.secondary },
     background: {
-      default: themeTokens.clean.bg.primary, // #0f172a
+      default: themeTokens.clean.bg.primary,
       paper: themeTokens.clean.bg.secondary,
     },
     text: {
@@ -151,10 +141,10 @@ export const cleanTheme: Theme = createTheme({
 export const scriptKiddieTheme: Theme = createTheme({
   palette: {
     mode: 'dark',
-    primary: { main: themeTokens.script_kiddie.primary }, // #ff00ff
+    primary: { main: themeTokens.script_kiddie.primary },
     secondary: { main: themeTokens.script_kiddie.secondary },
     background: {
-      default: themeTokens.script_kiddie.bg.primary, // #0a0a0f
+      default: themeTokens.script_kiddie.bg.primary,
       paper: themeTokens.script_kiddie.bg.secondary,
     },
     text: {
@@ -200,10 +190,7 @@ export const scriptKiddieTheme: Theme = createTheme({
         }
       `,
     },
-
   },
 });
 
 export const neonHackerTheme = hackerTheme;
-
-

@@ -195,12 +195,14 @@ export const TargetList: React.FC = () => {
                 '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
               }
             }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                  </InputAdornment>
+                ),
+              }
             }}
           />
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

@@ -100,13 +100,15 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
       onClose={onClose} 
       maxWidth="md" 
       fullWidth
-      PaperProps={{
-        sx: {
-          backgroundColor: '#0a0a0f',
-          backgroundImage: 'linear-gradient(to bottom right, rgba(0, 243, 255, 0.05), rgba(255, 0, 60, 0.05))',
-          border: '1px solid #1a1a2e',
-          color: '#fff',
-          boxShadow: '0 0 20px rgba(0, 0, 0, 0.5)',
+      slotProps={{
+        paper: {
+          sx: {
+            backgroundColor: '#0a0a0f',
+            backgroundImage: 'linear-gradient(to bottom right, rgba(0, 243, 255, 0.05), rgba(255, 0, 60, 0.05))',
+            border: '1px solid #1a1a2e',
+            color: '#fff',
+            boxShadow: '0 0 20px rgba(0, 0, 0, 0.5)',
+          }
         }
       }}
     >
@@ -127,7 +129,9 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
             InputProps={{
               sx: { color: '#fff', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a2e' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' } }
             }}
-            InputLabelProps={{ sx: { color: 'rgba(255, 255, 255, 0.7)' } }}
+            slotProps={{
+              inputLabel: { sx: { color: 'rgba(255, 255, 255, 0.7)' } }
+            }}
           />
           <TextField
             label="Description (Optional)"
@@ -140,7 +144,9 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
             InputProps={{
               sx: { color: '#fff', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a2e' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' } }
             }}
-            InputLabelProps={{ sx: { color: 'rgba(255, 255, 255, 0.7)' } }}
+            slotProps={{
+              inputLabel: { sx: { color: 'rgba(255, 255, 255, 0.7)' } }
+            }}
           />
 
           <FormControl fullWidth>

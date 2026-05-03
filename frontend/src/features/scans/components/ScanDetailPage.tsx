@@ -277,7 +277,7 @@ const VulnerabilityBreakdown: React.FC<{ counts: any, exploitable: number }> = (
        <Box sx={{ p: 1 }}>
          <Grid container spacing={1} sx={{ mb: 2, textAlign: 'center' }}>
             {labels.map((l, i) => (
-               <Grid item xs={1.7} key={l}>
+               <Grid size={{ xs: 1.7 }} key={l}>
                   <Typography sx={{ fontSize: '0.6rem', color: colors[i], fontWeight: 800, textTransform: 'uppercase' }}>{l.substring(0, 4)}</Typography>
                   <Typography sx={{ fontSize: '0.8rem', fontWeight: 900, color: colors[i] }}>{series[i] || 0}</Typography>
                </Grid>
@@ -491,7 +491,7 @@ const ImportantSubdomainsWidget: React.FC<{ subdomains: any[], sx?: any }> = ({ 
       {subdomains.length > 0 ? (
         <Grid container spacing={1}>
           {subdomains.map((s: any, i: number) => (
-            <Grid item key={i}>
+            <Grid size="grow" key={i}>
               <Box sx={{ px: 1.5, py: 0.5, bgcolor: 'rgba(0,243,255,0.05)', border: '1px solid rgba(0,243,255,0.1)', borderRadius: 1, color: '#00f3ff', fontSize: '0.7rem', fontWeight: 700 }}>
                 {s.name}
               </Box>
@@ -543,7 +543,7 @@ const IpAddressesWidget: React.FC<{ subdomains: any[], sx?: any }> = ({ subdomai
         <Typography sx={{ fontSize: '0.6rem', color: '#fffc00', textAlign: 'right', mb: 1, fontWeight: 700 }}>*IP Addresses highlighted with yellow are CDN IP</Typography>
         <Grid container spacing={1}>
           {ips.map((ip, i) => (
-            <Grid item key={i}>
+          <Grid size="grow" key={i}>
               <Box sx={{ px: 1, py: 0.4, bgcolor: 'rgba(33,150,243,0.1)', border: '1px solid rgba(33,150,243,0.2)', borderRadius: 0.5, color: '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
                 {ip}
               </Box>
@@ -561,7 +561,7 @@ const DiscoveredPortsWidget: React.FC<{ ports: any[], sx?: any }> = ({ ports = [
       <Typography sx={{ fontSize: '0.6rem', color: '#fffc00', textAlign: 'right', mb: 1, fontWeight: 700 }}>*Ports highlighted with red are uncommon Ports</Typography>
       <Grid container spacing={1}>
         {ports.map((p, i) => (
-          <Grid item key={i}>
+          <Grid size="grow" key={i}>
             <Box sx={{ px: 1, py: 0.4, bgcolor: p.is_uncommon ? 'rgba(255,0,60,0.1)' : 'rgba(33,150,243,0.1)', border: `1px solid ${p.is_uncommon ? 'rgba(255,0,60,0.2)' : 'rgba(33,150,243,0.2)'}`, borderRadius: 0.5, color: p.is_uncommon ? '#ff003c' : '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
               {p.number}/{p.service_name}
             </Box>
@@ -577,7 +577,7 @@ const DiscoveredTechWidget: React.FC<{ techs: any[], sx?: any }> = ({ techs = []
     <Box sx={{ p: 2 }}>
       <Grid container spacing={1}>
         {techs.map((t, i) => (
-          <Grid item key={i}>
+          <Grid size="grow" key={i}>
             <Box sx={{ px: 1, py: 0.4, bgcolor: 'rgba(33,150,243,0.1)', border: '1px solid rgba(33,150,243,0.2)', borderRadius: 0.5, color: '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
               {t.name}
             </Box>
@@ -652,14 +652,14 @@ export const ScanDetailPage = () => {
              <Box sx={{ height: '1px', bgcolor: 'rgba(255,255,255,0.05)', mx: -2 }} />
 
              <Grid container spacing={3}>
-                <Grid item xs={6}>
+                <Grid size={{ xs: 6 }}>
                    <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', mb: 1, fontWeight: 700 }}>ENGINE</Typography>
                    <Stack direction="row" spacing={1} alignItems="center">
                       <Cpu size={16} color="#00f3ff" />
                       <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>{data.scan_info.engine_name}</Typography>
                    </Stack>
                 </Grid>
-                <Grid item xs={6}>
+                <Grid size={{ xs: 6 }}>
                    <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', mb: 1, fontWeight: 700 }}>DURATION</Typography>
                    <Stack direction="row" spacing={1} alignItems="center">
                       <Timer size={16} color="#fffc00" />
@@ -752,7 +752,7 @@ export const ScanDetailPage = () => {
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       {/* Row 1: Target Information and HTTP Status Charts (MOVED UP) */}
       <Grid container spacing={2} alignItems="stretch">
-        <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex' }}>
           <TacticalPanel title="Target Information" icon={<Activity size={14} />} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
              <Box sx={{ p: 2, flex: 1 }}>
                <Tabs value={infoTab} onChange={(_, v) => setInfoTab(v)} sx={{ mb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: 32 }}>
@@ -764,7 +764,7 @@ export const ScanDetailPage = () => {
                {infoTab === 0 && (
                  <Grid container spacing={3}>
                    {/* Column 1: ID & Origin */}
-                   <Grid item xs={6}>
+                   <Grid size={{ xs: 6 }}>
                      <Stack spacing={2.5}>
                        <Box>
                          <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Domain</Typography>
@@ -786,7 +786,7 @@ export const ScanDetailPage = () => {
                    </Grid>
 
                    {/* Column 2: Maintenance & Registrar */}
-                   <Grid item xs={6}>
+                   <Grid size={{ xs: 6 }}>
                      <Stack spacing={2.5}>
                        <Box>
                          <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Updated</Typography>
@@ -834,7 +834,7 @@ export const ScanDetailPage = () => {
              </Box>
           </TacticalPanel>
         </Grid>
-        <Grid item xs={12} md={6} sx={{ display: 'flex' }}>
+        <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex' }}>
            <TacticalPanel title="HTTP Status Breakdown" icon={<Activity size={14} />} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
              <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
                <Chart 
@@ -866,7 +866,7 @@ export const ScanDetailPage = () => {
 
       {/* Row 3: Vulnerability Distribution & Highlights */}
       <Grid container spacing={2} alignItems="stretch" sx={{ mb: 2 }}>
-        <Grid item xs={12} md={3} sx={{ display: 'flex' }}>
+        <Grid size={{ xs: 12, md: 3 }} sx={{ display: 'flex' }}>
            <VulnerabilityBreakdown 
              counts={{
                critical: data.critical_count,
@@ -880,7 +880,7 @@ export const ScanDetailPage = () => {
              exploitable={data.exploitable_count}
            />
         </Grid>
-        <Grid item xs={12} md={9} sx={{ display: 'flex' }}>
+        <Grid size={{ xs: 12, md: 9 }} sx={{ display: 'flex' }}>
            <VulnHighlights highlights={data.vulnerability_highlights} />
         </Grid>
       </Grid>
