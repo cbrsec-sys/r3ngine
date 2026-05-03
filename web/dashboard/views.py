@@ -19,6 +19,9 @@ from django.urls import reverse
 from rolepermissions.roles import assign_role, clear_roles
 from rolepermissions.decorators import has_permission_decorator
 from django.template.defaultfilters import slugify
+from django.contrib.auth import authenticate, login
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.conf import settings
 
 
 from startScan.models import *
@@ -310,6 +313,7 @@ def on_user_logged_in(sender, request, **kwargs):
 
 
 def search(request, slug):
+    # Verified edit
     return render(request, 'dashboard/search.html')
 
 
@@ -471,8 +475,6 @@ def onboarding(request):
                 )
 
     context['error'] = error
-    
-
     context['openai_key'] = OpenAiAPIKey.objects.first()
     context['netlas_key'] = NetlasAPIKey.objects.first()
     context['chaos_key'] = ChaosAPIKey.objects.first()
@@ -545,3 +547,49 @@ def get_graph_data(request, slug, scan_id):
     data = graph.get_cytoscape_json(scan_id)
     graph.close()
     return JsonResponse(data)
+
+
+@ensure_csrf_cookie
+def login_v3(request):
+    if request.method == 'POST':
+        try:
+            # Check if it's a multipart form or JSON
+            if 'application/json' in (request.content_type or ''):
+                data = json.loads(request.body)
+                username = data.get('username')
+                password = data.get('password')
+            else:
+                username = request.POST.get('username')
+                password = request.POST.get('password')
+                
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                # Check if there is any project, if so redirect to dashboard of first project
+                project = Project.objects.first()
+                redirect_url = reverse('dashboardIndex', kwargs={'slug': project.slug}) if project else reverse('onboarding')
+                return JsonResponse({
+                    'status': True,
+                    'redirect_url': redirect_url
+                })
+            else:
+                return JsonResponse({
+                    'status': False,
+                    'message': 'Invalid username or password.'
+                })
+        except Exception as e:
+            return JsonResponse({
+                'status': False,
+                'message': str(e)
+            })
+            
+    if request.user.is_authenticated:
+        project = Project.objects.first()
+        if project:
+            return redirect('dashboardIndex', slug=project.slug)
+        return redirect('onboarding')
+        
+    return render(request, 'dashboard/v3_index.html', {
+        'debug': settings.DEBUG,
+        'project': {'name': 'reNgine'} # Fallback for title
+    })

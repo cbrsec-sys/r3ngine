@@ -93,7 +93,7 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
           <Box sx={{ p: 4, textAlign: 'center' }}>
             <CircularProgress size={20} sx={{ color: '#00f3ff' }} />
           </Box>
-        ) : notifications?.length > 0 ? (
+        ) : (Array.isArray(notifications) && notifications.length > 0) ? (
           notifications.map((notif: any) => (
             <ListItem
               key={notif.id}

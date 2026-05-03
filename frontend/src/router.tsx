@@ -23,18 +23,29 @@ import {
   ProfileSettingsPage,
   AdminSettingsPage,
 } from "./features/settings";
+import { LoginPage } from "./features/auth/components/LoginPage";
 
 
 import { Box, Typography, Button } from "@mui/material";
 import { AlertCircle, Home, RefreshCw } from "lucide-react";
+import { useRouterState } from "@tanstack/react-router";
 
 // Root Route
 const rootRoute = createRootRoute({
-  component: () => (
-    <Shell>
-      <Outlet />
-    </Shell>
-  ),
+  component: () => {
+    const routerState = useRouterState();
+    const isLoginPage = routerState.location.pathname.startsWith('/login');
+    
+    if (isLoginPage) {
+      return <Outlet />;
+    }
+    
+    return (
+      <Shell>
+        <Outlet />
+      </Shell>
+    );
+  },
   notFoundComponent: () => <NotFound />,
   errorComponent: (props) => <ErrorComponent {...props} />,
 });
@@ -387,8 +398,16 @@ const scanDetailRoute = createRoute({
   component: ScanDetailPage,
 });
 
+// Login Route
+const loginRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "login",
+  component: LoginPage,
+});
+
 // Route Tree
 const routeTree = rootRoute.addChildren([
+  loginRoute,
   rootRedirectRoute,
   projectRoute.addChildren([
     projectsRoute,

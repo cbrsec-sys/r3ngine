@@ -1,0 +1,209 @@
+import React, { useState } from 'react';
+import { 
+  Box, 
+  Paper, 
+  Typography, 
+  TextField, 
+  Button, 
+  IconButton, 
+  InputAdornment,
+  Alert,
+  Link
+} from '@mui/material';
+import { Eye, EyeOff, User, Lock, ExternalLink } from 'lucide-react';
+import { useAppContext } from '../../../context/AppContext';
+import { useLogin } from '../api';
+
+export const LoginPage: React.FC = () => {
+  const { version } = useAppContext();
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const loginMutation = useLogin();
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const formData = new FormData();
+    formData.append('username', username);
+    formData.append('password', password);
+
+    try {
+      const response = await loginMutation.mutateAsync(formData);
+      if (response.status) {
+        window.location.href = response.redirect_url || '/';
+      } else {
+        setError(response.message || 'Invalid username or password.');
+      }
+    } catch (err: any) {
+      setError('An error occurred during login. Please try again.');
+    }
+  };
+
+  return (
+    <Box sx={{ 
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundImage: 'url("/staticfiles/img/neon_city.png")',
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+      backgroundRepeat: 'no-repeat',
+      position: 'relative',
+      '&::before': {
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        bgcolor: 'rgba(0, 0, 0, 0.6)',
+        backdropFilter: 'blur(4px)'
+      }
+    }}>
+      <Paper elevation={24} sx={{ 
+        position: 'relative',
+        zIndex: 1,
+        width: '100%',
+        maxWidth: 400,
+        bgcolor: 'rgba(10, 10, 15, 0.9)',
+        backdropFilter: 'blur(20px)',
+        border: '1px solid rgba(0, 243, 255, 0.3)',
+        borderRadius: 4,
+        p: 4,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        boxShadow: '0 0 40px rgba(0, 243, 255, 0.2)'
+      }}>
+        <Box sx={{ mb: 3, textAlign: 'center' }}>
+          <img src="/staticfiles/img/logo-lg.png" alt="reNgine Logo" style={{ height: 80, marginBottom: 16 }} />
+          <Typography variant="h5" sx={{ 
+            fontFamily: 'Orbitron', 
+            fontWeight: 900, 
+            letterSpacing: 2, 
+            color: '#00f3ff',
+            textShadow: '0 0 10px rgba(0, 243, 255, 0.5)'
+          }}>
+            LOGIN TO RENGINE
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)', mt: 1, display: 'block' }}>
+            Current release: v{version}
+          </Typography>
+        </Box>
+
+        <Alert severity="info" sx={{ 
+          width: '100%', 
+          mb: 3, 
+          bgcolor: 'rgba(0, 243, 255, 0.1)', 
+          color: '#00f3ff',
+          border: '1px solid rgba(0, 243, 255, 0.2)',
+          '& .MuiAlert-icon': { color: '#00f3ff' }
+        }}>
+          <Link href="https://rengine.wiki" target="_blank" sx={{ color: 'inherit', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none' }}>
+            Learn how to create reNgine account <ExternalLink size={14} />
+          </Link>
+        </Alert>
+
+        {error && (
+          <Alert severity="error" sx={{ width: '100%', mb: 3 }}>
+            {error}
+          </Alert>
+        )}
+
+        <form onSubmit={handleSubmit} style={{ width: '100%' }}>
+          <Box sx={{ mb: 3 }}>
+            <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 1, display: 'block', fontWeight: 800 }}>
+              Username
+            </Typography>
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Typography sx={{ color: 'rgba(255, 255, 255, 0.5)', fontWeight: 'bold', mr: 1 }}>@</Typography>
+                  </InputAdornment>
+                ),
+                sx: {
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  color: '#fff',
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.1)' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.5)' },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' }
+                }
+              }}
+            />
+          </Box>
+
+          <Box sx={{ mb: 4 }}>
+            <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.7)', mb: 1, display: 'block', fontWeight: 800 }}>
+              Password
+            </Typography>
+            <TextField
+              fullWidth
+              type={showPassword ? 'text' : 'password'}
+              variant="outlined"
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Lock size={18} color="rgba(255, 255, 255, 0.5)" />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton onClick={() => setShowPassword(!showPassword)} sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </IconButton>
+                  </InputAdornment>
+                ),
+                sx: {
+                  bgcolor: 'rgba(255, 255, 255, 0.05)',
+                  color: '#fff',
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.1)' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.5)' },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' }
+                }
+              }}
+            />
+          </Box>
+
+          <Button
+            type="submit"
+            fullWidth
+            variant="contained"
+            disabled={loginMutation.isPending}
+            sx={{ 
+              py: 1.5,
+              bgcolor: '#00f3ff',
+              color: '#000',
+              fontFamily: 'Orbitron',
+              fontWeight: 900,
+              letterSpacing: 1,
+              '&:hover': { bgcolor: '#00d4df' },
+              '&.Mui-disabled': { bgcolor: 'rgba(0, 243, 255, 0.3)', color: 'rgba(0, 0, 0, 0.5)' }
+            }}
+          >
+            {loginMutation.isPending ? 'AUTHENTICATING...' : 'LOG IN'}
+          </Button>
+        </form>
+
+        <Box sx={{ mt: 4, textAlign: 'center' }}>
+          <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.4)' }}>
+            Issues or feature requests? <Link href="https://github.com/whiterabb17/rengine/issues" target="_blank" sx={{ color: '#00f3ff' }}>Raise issue on Github.</Link>
+          </Typography>
+        </Box>
+      </Paper>
+    </Box>
+  );
+};

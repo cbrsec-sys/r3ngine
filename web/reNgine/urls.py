@@ -9,6 +9,7 @@ from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 
 from reNgine.views import serve_protected_media
+from dashboard import views as dashboard_views
 
 from .openapi_info import info
 
@@ -43,7 +44,7 @@ urlpatterns = [
         include('recon_note.urls')),
     path(
         'login/',
-        auth_views.LoginView.as_view(template_name='base/login.html'),
+        dashboard_views.login_v3,
         name='login'),
     path(
         'logout/',
