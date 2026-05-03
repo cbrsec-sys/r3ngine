@@ -1106,3 +1106,8 @@ class SecretLeakSerializer(serializers.ModelSerializer):
 		model = SecretLeak
 		fields = '__all__'
 
+
+class VulnerabilityReportSettingSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = VulnerabilityReportSetting
+		fields = '__all__'

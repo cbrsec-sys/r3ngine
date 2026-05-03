@@ -69,6 +69,28 @@ export interface ApiVaultSettings {
   hackerone_key: string;
 }
 
+export interface ReportSettings {
+  primary_color: string;
+  secondary_color: string;
+  company_name: string;
+  company_address: string;
+  company_email: string;
+  company_website: string;
+  show_rengine_banner: boolean;
+  show_executive_summary: boolean;
+  executive_summary_description: string;
+  enable_llm_report_generation: boolean;
+  show_footer: boolean;
+  footer_text: string;
+}
+
+export interface RengineSystemSettings {
+  total: number;
+  used: number;
+  free: number;
+  consumed_percent: number;
+}
+
 export interface InstalledTool {
   id: number;
   name: string;
@@ -83,6 +105,8 @@ export interface InstalledTool {
   install_command: string;
   update_command: string | null;
   version_lookup_command: string | null;
+  version_match_regex?: string;
+  subdomain_gathering_command?: string;
 }
 
 export interface FileContentResponse {
@@ -469,6 +493,76 @@ export const useOllamaPullStatus = (slug: string, model: string | null) => {
         return false;
       }
       return 2000;
+    },
+  });
+};
+
+export const useReportSettings = () => {
+  return useQuery<ReportSettings>({
+    queryKey: ['report-settings'],
+    queryFn: async () => {
+      const response = await axios.get('/api/report-settings/', {
+        headers: { 'Accept': 'application/json' }
+      });
+      return response.data;
+    },
+  });
+};
+
+export const useUpdateReportSettings = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Partial<ReportSettings>) => {
+      const response = await axios.post('/api/report-settings/', data, {
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'Accept': 'application/json'
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['report-settings'] });
+    },
+  });
+};
+
+export const useRengineSystemSettings = () => {
+  return useQuery<RengineSystemSettings>({
+    queryKey: ['rengine-system-settings'],
+    queryFn: async () => {
+      const response = await axios.get('/api/rengine/system-settings/', {
+        headers: { 'Accept': 'application/json' }
+      });
+      return response.data;
+    },
+  });
+};
+
+export const useDeleteAllScanResults = () => {
+  return useMutation({
+    mutationFn: async () => {
+      const response = await axios.post('/scan/delete/scan_results/', {}, {
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'Accept': 'application/json'
+        }
+      });
+      return response.data;
+    },
+  });
+};
+
+export const useDeleteAllScreenshots = () => {
+  return useMutation({
+    mutationFn: async () => {
+      const response = await axios.post('/scan/delete/screenshots/', {}, {
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'Accept': 'application/json'
+        }
+      });
+      return response.data;
     },
   });
 };

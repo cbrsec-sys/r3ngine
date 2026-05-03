@@ -106,7 +106,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         { title: 'Tool Settings', path: `/${projectSlug}/settings/tool-settings` },
         { title: 'API Vault', path: `/${projectSlug}/settings/api-vault` },
         { title: 'LLM Toolkit', path: `/${projectSlug}/settings/llm-toolkit` },
-        { title: 'Tools Arsenal', path: `/${projectSlug}/settings/tools-arsenal` },
+        { title: 'Tool Arsenal', path: `/${projectSlug}/settings/tools-arsenal` },
         { title: 'Report Settings', path: `/${projectSlug}/settings/report-settings` },
         { title: 'reNgine Settings', path: `/${projectSlug}/settings/rengine-settings` },
         { title: 'Notification Settings', path: `/${projectSlug}/settings/notifications` },
@@ -148,6 +148,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               duration: theme.transitions.duration.enteringScreen,
             }),
             overflowX: 'hidden',
+            overflowY: 'auto',
             boxSizing: 'border-box',
             borderRight: 'none',
             bgcolor: 'rgba(10, 10, 20, 0.8)',
@@ -155,11 +156,26 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             backgroundImage: 'none',
             borderRadius: '0 30px 30px 0',
             height: 'fit-content',
+            maxHeight: 'calc(100vh - 40px)',
             top: '50%',
             transform: 'translateY(-50%)',
             border: '1px solid rgba(0, 243, 255, 0.1)',
             boxShadow: '0 0 30px rgba(0,0,0,0.5)',
-            py: 2
+            py: 2,
+            /* Custom Scrollbar */
+            '&::-webkit-scrollbar': {
+              width: '4px',
+            },
+            '&::-webkit-scrollbar-track': {
+              background: 'transparent',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: 'rgba(0, 243, 255, 0.2)',
+              borderRadius: '10px',
+              '&:hover': {
+                background: 'rgba(0, 243, 255, 0.4)',
+              },
+            },
           },
         }}
       >
@@ -404,7 +420,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             }
           }}
         >
-          <Box sx={{ position: 'relative', zIndex: 1 }}>
+          <Box sx={{ position: 'relative', zIndex: 1, width: '100%' }}>
             {children}
           </Box>
         </Box>

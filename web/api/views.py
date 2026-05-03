@@ -33,7 +33,8 @@ from reNgine.definitions import (
 	PERM_MODIFY_TARGETS,
 	PERM_MODIFY_SCAN_CONFIGURATIONS,
 	PERM_MODIFY_WORDLISTS,
-	PERM_INITATE_SCANS_SUBSCANS
+	PERM_INITATE_SCANS_SUBSCANS,
+	PERM_MODIFY_SCAN_REPORT
 )
 from reNgine.tasks import *
 from reNgine.llm import *
@@ -656,7 +657,7 @@ class WafDetector(APIView):
 			return Response(response)
 		
 		wafw00f_command = f'wafw00f {url}'
-		_, output = run_command(wafw00f_command, remove_ansi_sequence=True)
+		_, output = run_command.run(wafw00f_command, shell=True, remove_ansi_sequence=True)
 		regex = r"behind (.*?) WAF"
 		group = re.search(regex, output)
 		if group:
@@ -1640,6 +1641,26 @@ class RengineUpdateCheck(APIView):
 		return Response(return_response)
 
 
+class RengineSystemSettingsAPIView(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
+
+	def get(self, request):
+		import shutil
+		total, used, _ = shutil.disk_usage("/")
+		total_gb = total // (2**30)
+		used_gb = used // (2**30)
+		free_gb = total_gb - used_gb
+		consumed_percent = int(100 * float(used_gb) / float(total_gb)) if total_gb > 0 else 0
+
+		return Response({
+			'total': total_gb,
+			'used': used_gb,
+			'free': free_gb,
+			'consumed_percent': consumed_percent
+		})
+
+
 class UninstallTool(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
@@ -1673,8 +1694,8 @@ class UninstallTool(APIView):
 		else:
 			return Response({'status': False, 'message': 'Cannot uninstall tool!'})
 
-		run_command(uninstall_command)
-		run_command.apply_async(args=(uninstall_command,))
+		run_command.run(uninstall_command, shell=True)
+		run_command.apply_async(args=(uninstall_command,), kwargs={'shell': True})
 
 		tool.delete()
 
@@ -1709,9 +1730,42 @@ class UpdateTool(APIView):
 
 		
 		try:
-			run_command(update_command, shell=True)
-			run_command.apply_async(args=[update_command], kwargs={'shell': True})
-			return Response({'status': True, 'message': tool.name + ' updated successfully.'})
+			# Execute via Celery and wait for result to ensure success
+			task = run_command.delay(update_command, shell=True)
+			res = task.get(timeout=300) # Updates can take time
+			return_code, output = res[0], res[1]
+			
+			if return_code == 0:
+				return Response({'status': True, 'message': tool.name + ' updated successfully.'})
+			else:
+				# Log the failure output for debugging
+				logger.error(f"Update failed for {tool.name}: {output}")
+				return Response({'status': False, 'message': f'Update failed: {output[:200]}...'})
+		except Exception as e:
+			logger.error(str(e))
+			return Response({'status': False, 'message': str(e)})
+
+class UninstallTool(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
+
+	def get(self, request):
+		req = self.request
+		tool_id = req.query_params.get('tool_id')
+		if not InstalledExternalTool.objects.filter(id=tool_id).exists():
+			return Response({'status': False, 'message': 'Tool Not found'})
+		tool = InstalledExternalTool.objects.get(id=tool_id)
+		
+		try:
+			task = run_command.delay(tool.uninstall_command, shell=True)
+			res = task.get(timeout=60)
+			return_code, output = res[0], res[1]
+			
+			if return_code == 0:
+				tool.delete()
+				return Response({'status': True, 'message': tool.name + ' uninstalled successfully.'})
+			else:
+				return Response({'status': False, 'message': f'Uninstall failed: {output[:200]}'})
 		except Exception as e:
 			logger.error(str(e))
 			return Response({'status': False, 'message': str(e)})
@@ -1742,16 +1796,38 @@ class GetExternalToolCurrentVersion(APIView):
 			return Response({'status': False, 'message': 'Version Lookup command not provided.'})
 
 		version_number = None
-		_, stdout = run_command(tool.version_lookup_command)
+		try:
+			# Execute via Celery to ensure we are in the same environment as the workers
+			task = run_command.delay(tool.version_lookup_command, shell=True)
+			res = task.get(timeout=60)
+			return_code, stdout = res[0], res[1]
+			
+			if return_code != 0:
+				logger.warning(f"Version lookup failed for {tool.name} with code {return_code}: {stdout}")
+				return Response({'status': False, 'message': 'Tool not found or check failed.'})
+		except Exception as e:
+			logger.error(f"Error running version lookup command via Celery: {str(e)}")
+			return Response({'status': False, 'message': f'Error running version lookup command: {str(e)}'})
+
 		if tool.version_match_regex:
 			version_number = re.search(re.compile(tool.version_match_regex), str(stdout))
 		else:
-			version_match_regex = r'(?i:v)?(\d+(?:\.\d+){2,})'
+			# Improved regex: must look like a version and NOT be part of a path
+			# Looks for version at start of line or preceded by space, and not followed by /
+			version_match_regex = r'(?:^|\s)(?i:v)?(\d+\.\d+(?:\.\d+)*)(?!\/)'
 			version_number = re.search(version_match_regex, str(stdout))
+		
 		if not version_number:
-			return Response({'status': False, 'message': 'Invalid version lookup command.'})
+			return Response({'status': False, 'message': 'Tool installed but version could not be parsed.'})
 
-		return Response({'status': True, 'version_number': version_number.group(0), 'tool_name': tool.name})
+		# Use group(1) to get the captured version number without the leading space
+		version = version_number.group(1) if version_number.groups() else version_number.group(0)
+		
+		# Final check: if version is just a single digit, it's probably wrong (unless it matches a strict regex)
+		if not tool.version_match_regex and len(version.strip()) < 3 and '.' not in version:
+			return Response({'status': False, 'message': 'Invalid version parsed.'})
+
+		return Response({'status': True, 'version_number': version.strip(), 'tool_name': tool.name})
 
 
 
@@ -1780,24 +1856,41 @@ class GithubToolCheckGetLatestRelease(APIView):
 		tool_github_url = tool.github_url.replace('http://github.com/', '').replace('https://github.com/', '')
 		tool_github_url = remove_lead_and_trail_slash(tool_github_url)
 		github_api = f'https://api.github.com/repos/{tool_github_url}/releases'
-		response = requests.get(github_api).json()
+		try:
+			res = requests.get(github_api, timeout=10)
+			if res.status_code == 403:
+				return Response({'status': False, 'message': 'GitHub Rate Limit Exceeded'})
+			response = res.json()
+		except requests.exceptions.Timeout:
+			return Response({'status': False, 'message': 'GitHub API Timeout'})
+		except Exception as e:
+			return Response({'status': False, 'message': f'Error fetching from GitHub: {str(e)}'})
+
 		# check if api rate limit exceeded
-		if 'message' in response and response['message'] == 'RateLimited':
-			return Response({'status': False, 'message': 'RateLimited'})
-		elif 'message' in response and response['message'] == 'Not Found':
-			return Response({'status': False, 'message': 'Not Found'})
-		elif not response:
-			return Response({'status': False, 'message': 'Not Found'})
+		if isinstance(response, dict) and 'message' in response:
+			if 'rate limit' in response['message'].lower():
+				return Response({'status': False, 'message': 'RateLimited'})
+			elif 'Not Found' in response['message']:
+				return Response({'status': False, 'message': 'Repository Not Found'})
+		
+		if not response or not isinstance(response, list):
+			return Response({'status': False, 'message': 'No releases found'})
 
 		# only send latest release
 		response = response[0]
 
+		# Try to find a version string in tag_name or name
+		latest_version = response.get('tag_name') or response.get('name') or 'Unknown'
+		# If tag_name was used, use name as a secondary identifier
+		release_name = response.get('name') or response.get('tag_name') or 'Unknown'
+
 		api_response = {
 			'status': True,
-			'url': response['url'],
-			'id': response['id'],
-			'name': response['name'],
-			'changelog': response['body'],
+			'url': response.get('html_url'),
+			'id': response.get('id'),
+			'name': release_name,
+			'version_number': latest_version,
+			'changelog': response.get('body'),
 		}
 		return Response(api_response)
 
@@ -1910,7 +2003,7 @@ class CMSDetector(APIView):
 			cms_detector_command += ' --random-agent --batch --follow-redirect'
 			cms_detector_command += f' -u {url}'
 
-			_, output = run_command(cms_detector_command, remove_ansi_sequence=True)
+			_, output = run_command.run(cms_detector_command, shell=True, remove_ansi_sequence=True)
 
 			response['message'] = 'Could not detect CMS!'
 
@@ -2005,7 +2098,7 @@ class GetFileContents(APIView):
 		if 'nuclei_config' in req.query_params:
 			path = "/root/.config/nuclei/config.yaml"
 			if not os.path.exists(path):
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -2015,7 +2108,7 @@ class GetFileContents(APIView):
 		if 'subfinder_config' in req.query_params:
 			path = "/root/.config/subfinder/config.yaml"
 			if not os.path.exists(path):
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -2025,7 +2118,7 @@ class GetFileContents(APIView):
 		if 'naabu_config' in req.query_params:
 			path = "/root/.config/naabu/config.yaml"
 			if not os.path.exists(path):
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -2035,7 +2128,7 @@ class GetFileContents(APIView):
 		if 'theharvester_config' in req.query_params:
 			path = "/usr/src/github/theHarvester/api-keys.yaml"
 			if not os.path.exists(path):
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -2046,7 +2139,7 @@ class GetFileContents(APIView):
 			path = "/root/.config/spiderfoot.cfg"
 			if not os.path.exists(path):
 				# Create a default config or just touch
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -2056,7 +2149,7 @@ class GetFileContents(APIView):
 		if 'amass_config' in req.query_params:
 			path = "/root/.config/amass.ini"
 			if not os.path.exists(path):
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -3636,3 +3729,25 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 					print(e)
 
 		return qs
+
+class ReportSettingsAPIView(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_REPORT
+
+	def get(self, request):
+		report_setting = VulnerabilityReportSetting.objects.first()
+		if not report_setting:
+			# Create default settings if not exists
+			report_setting = VulnerabilityReportSetting.objects.create()
+		serializer = VulnerabilityReportSettingSerializer(report_setting)
+		return Response(serializer.data)
+
+	def post(self, request):
+		report_setting = VulnerabilityReportSetting.objects.first()
+		if not report_setting:
+			report_setting = VulnerabilityReportSetting.objects.create()
+		serializer = VulnerabilityReportSettingSerializer(report_setting, data=request.data, partial=True)
+		if serializer.is_valid():
+			serializer.save()
+			return Response(serializer.data)
+		return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

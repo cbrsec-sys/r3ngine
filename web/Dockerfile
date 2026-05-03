@@ -13,7 +13,8 @@ RUN ARCH=$(dpkg --print-architecture) \
 # Labels and Credits
 LABEL \
     name="reNgine" \
-    author="Yogesh Ojha <yogesh.ojha11@gmail.com>" \
+    author="Reboot Dev: MistrHyd3 (https://github.com/whiterabb17) \
+    Original By: Yogesh Ojha <yogesh.ojha11@gmail.com>" \
     description="reNgine is a automated pipeline of recon process, useful for information gathering during web application penetration testing."
 
 # Environment Variables
@@ -119,14 +120,17 @@ RUN printf "\
     github.com/hahwul/dalfox/v2@latest\n\
     github.com/projectdiscovery/katana/cmd/katana@latest\n\
     github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest\n\
-    github.com/sa7mon/s3scanner@latest\n" | \
+    github.com/sa7mon/s3scanner@latest\n\
+    github.com/gitleaks/gitleaks/v8@latest\n\
+    github.com/trufflesecurity/trufflehog/v3@latest\n\
+    github.com/michenriksen/aquatone@latest\n" | \
     xargs -L1 go install -ldflags="-s -w" -v && \
     rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
 
-# Install Arjun, InQL
-RUN pip3 install arjun inql
+# Install Arjun, InQL, Netlas
+RUN pip3 install arjun inql netlas
 
-# Clone LinkFinder, ParamSpider, JSParser
+# Clone and install managed tools
 RUN git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder && \
     cd /usr/src/github/LinkFinder && pip3 install -r requirements.txt && python3 setup.py install
 
@@ -135,6 +139,18 @@ RUN git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/Param
 
 RUN git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep && \
     cd /usr/src/github/semgrep && pip3 install .
+
+RUN git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r && \
+    cd /usr/src/github/Sublist3r && pip3 install -r requirements.txt
+
+RUN git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll && \
+    cd /usr/src/github/OneForAll && pip3 install -r requirements.txt
+
+RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
+    cd /usr/src/github/theHarvester && pip3 install -r requirements/base.txt
+
+RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
+    cd /usr/src/github/ctfr && pip3 install -r requirements.txt
 
 RUN wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_amd64.tar.gz && \
     tar -xvf kiterunner_1.0.2_linux_amd64.tar.gz && \

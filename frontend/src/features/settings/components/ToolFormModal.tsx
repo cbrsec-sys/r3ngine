@@ -14,7 +14,7 @@ import {
   IconButton
 } from '@mui/material';
 import { X, Save, Hammer } from 'lucide-react';
-import { InstalledTool } from '../api';
+import type { InstalledTool } from '../api';
 
 interface ToolFormModalProps {
   open: boolean;
@@ -38,7 +38,9 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
     install_command: '',
     update_command: '',
     version_lookup_command: '',
-    is_subdomain_gathering: false
+    version_match_regex: '[vV]*(\\d+\\.)?(\\d+\\.)?(\\*|\\d+)',
+    is_subdomain_gathering: false,
+    subdomain_gathering_command: 'tool_name -d {TARGET} -o {OUTPUT}'
   });
 
   useEffect(() => {
@@ -52,7 +54,9 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
         install_command: tool.install_command || '',
         update_command: tool.update_command || '',
         version_lookup_command: tool.version_lookup_command || '',
-        is_subdomain_gathering: tool.is_subdomain_gathering || false
+        version_match_regex: tool.version_match_regex || '[vV]*(\\d+\\.)?(\\d+\\.)?(\\*|\\d+)',
+        is_subdomain_gathering: tool.is_subdomain_gathering || false,
+        subdomain_gathering_command: tool.subdomain_gathering_command || 'tool_name -d {TARGET} -o {OUTPUT}'
       });
     } else {
       setFormData({
@@ -64,7 +68,9 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
         install_command: '',
         update_command: '',
         version_lookup_command: '',
-        is_subdomain_gathering: false
+        version_match_regex: '[vV]*(\\d+\\.)?(\\d+\\.)?(\\*|\\d+)',
+        is_subdomain_gathering: false,
+        subdomain_gathering_command: 'tool_name -d {TARGET} -o {OUTPUT}'
       });
     }
   }, [tool, open]);
@@ -227,21 +233,46 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                 variant="outlined"
                 placeholder="e.g. tool --version"
                 InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                sx={{ mb: 2, '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
+              />
+              <TextField
+                fullWidth
+                label="Version Match Regex"
+                name="version_match_regex"
+                value={formData.version_match_regex}
+                onChange={handleChange}
+                variant="outlined"
+                InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
                 sx={{ '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
               />
             </Grid>
             <Grid item xs={12}>
-              <FormControlLabel
-                control={
-                  <Checkbox 
-                    name="is_subdomain_gathering"
-                    checked={formData.is_subdomain_gathering}
+              <Box sx={{ p: 2, border: '1px solid rgba(0,243,255,0.1)', borderRadius: 1, bgcolor: 'rgba(0,243,255,0.02)' }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox 
+                      name="is_subdomain_gathering"
+                      checked={formData.is_subdomain_gathering}
+                      onChange={handleChange}
+                      sx={{ color: '#00f3ff', '&.Mui-checked': { color: '#00f3ff' } }}
+                    />
+                  }
+                  label={<Typography sx={{ color: 'rgba(255,255,255,0.8)', fontFamily: 'Orbitron', fontSize: '12px' }}>USED_FOR_SUBDOMAIN_GATHERING</Typography>}
+                />
+                {formData.is_subdomain_gathering && (
+                  <TextField
+                    fullWidth
+                    label="Subdomain Gathering Command"
+                    name="subdomain_gathering_command"
+                    value={formData.subdomain_gathering_command}
                     onChange={handleChange}
-                    sx={{ color: '#00f3ff', '&.Mui-checked': { color: '#00f3ff' } }}
+                    variant="outlined"
+                    placeholder="e.g. tool_name -d {TARGET} -o {OUTPUT}"
+                    InputLabelProps={{ sx: { color: 'rgba(0,243,255,0.7)' } }}
+                    sx={{ mt: 2, '& .MuiOutlinedInput-root': { color: '#fff', '& fieldset': { borderColor: 'rgba(255,255,255,0.2)' } } }}
                   />
-                }
-                label={<Typography sx={{ color: 'rgba(255,255,255,0.8)' }}>Used for subdomain gathering</Typography>}
-              />
+                )}
+              </Box>
             </Grid>
           </Grid>
         </DialogContent>

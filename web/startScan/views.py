@@ -508,7 +508,7 @@ def delete_scan(request, id):
     obj = get_object_or_404(ScanHistory, id=id)
     if request.method == "POST":
         delete_dir = obj.results_dir
-        run_command('rm -rf ' + delete_dir)
+        run_command.run('rm -rf ' + delete_dir, shell=True)
         obj.delete()
         messageData = {'status': 'true'}
         messages.add_message(
@@ -832,7 +832,7 @@ def delete_all_scan_results(request):
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def delete_all_screenshots(request):
     if request.method == 'POST':
-        run_command('rm -rf /usr/src/scan_results/*')
+        run_command.run('rm -rf /usr/src/scan_results/*', shell=True)
         messageData = {'status': 'true'}
         messages.add_message(
             request,
@@ -1036,7 +1036,7 @@ def delete_scans(request, slug):
                 continue
             scan = get_object_or_404(ScanHistory, id=value)
             delete_dir = scan.results_dir
-            run_command('rm -rf ' + delete_dir)
+            run_command.run('rm -rf ' + delete_dir, shell=True)
             scan.delete()
         messages.add_message(
             request,

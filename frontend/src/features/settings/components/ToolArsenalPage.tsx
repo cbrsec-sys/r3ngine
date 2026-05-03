@@ -31,21 +31,30 @@ import {
   Shield,
   Zap,
   Cpu,
-  Plus
+  Plus,
+  Edit3,
+  RefreshCcw
 } from 'lucide-react';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { 
   useToolArsenal, 
   useToolVersion, 
   useUpdateTool, 
-  useUninstallTool 
+  useUninstallTool,
+  useAddTool,
+  useModifyTool
 } from '../api';
-import { useParams, Link } from '@tanstack/react-router';
+import type { InstalledTool } from '../api';
+import { useParams } from '@tanstack/react-router';
+import { ToolFormModal } from './ToolFormModal';
 
 export const ToolArsenalPage: React.FC = () => {
-  const { projectSlug } = useParams({ from: '/$projectSlug/settings/tool-arsenal' });
+  const { projectSlug } = useParams({ from: '/$projectSlug/settings/tools-arsenal' });
   const [filter, setFilter] = useState<'all' | 'default' | 'custom'>('all');
-  const [toolVersions, setToolVersions] = useState<Record<number, string>>({});
+  const [currentVersions, setCurrentVersions] = useState<Record<number, string>>({});
+  const [latestVersions, setLatestVersions] = useState<Record<number, string>>({});
+  const [loadingTools, setLoadingTools] = useState<Record<number, boolean>>({});
+  const [versionError, setVersionError] = useState<Record<number, string>>({});
   const [anchorEl, setAnchorEl] = useState<{ [key: number]: HTMLElement | null }>({});
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({
     open: false,
@@ -79,31 +88,59 @@ export const ToolArsenalPage: React.FC = () => {
     }
   }, [arsenal?.tools]);
 
-  const handleFetchVersion = (toolId: number, type: 'current' | 'latest') => {
+  const handleFetchVersion = (toolId: number, type: 'current' | 'latest' = 'latest') => {
+    setLoadingTools(prev => ({ ...prev, [toolId]: true }));
+    setVersionError(prev => ({ ...prev, [toolId]: '' }));
+    
+    // Safety timeout to prevent infinite spinning
+    const timeoutId = setTimeout(() => {
+      setLoadingTools(prev => {
+        if (prev[toolId]) {
+          setVersionError(err => ({ ...err, [toolId]: 'TIMEOUT' }));
+          return { ...prev, [toolId]: false };
+        }
+        return prev;
+      });
+    }, 15000);
+
     fetchVersion.mutate({ toolId, type }, {
       onSuccess: (data) => {
+        clearTimeout(timeoutId);
+        setLoadingTools(prev => ({ ...prev, [toolId]: false }));
         if (data.status) {
           const version = data.version_number || data.name || 'Unknown';
-          setToolVersions(prev => ({ ...prev, [toolId]: version }));
-          if (type === 'latest') {
-             setSnackbar({ open: true, message: `Latest version for tool is ${version}`, severity: 'info' });
+          if (type === 'current') {
+            setCurrentVersions(prev => ({ ...prev, [toolId]: version }));
+          } else {
+            setLatestVersions(prev => ({ ...prev, [toolId]: version }));
+            setSnackbar({ open: true, message: `LATEST VERSION FOR TOOL IS ${version.toUpperCase()}`, severity: 'info' });
           }
         } else {
-           setToolVersions(prev => ({ ...prev, [toolId]: data.message || 'Error' }));
+          setVersionError(prev => ({ ...prev, [toolId]: data.message || 'ERROR' }));
         }
+      },
+      onError: (error: any) => {
+        clearTimeout(timeoutId);
+        setLoadingTools(prev => ({ ...prev, [toolId]: false }));
+        setVersionError(prev => ({ ...prev, [toolId]: error.response?.data?.message || 'UNABLE TO CHECK VERSION' }));
       }
     });
   };
 
-  const handleUpdate = (toolId: number, toolName: string) => {
-    setSnackbar({ open: true, message: `Updating ${toolName}...`, severity: 'info' });
+  const handleAction = (action: string, toolId: number, toolName: string) => {
+    setSnackbar({ open: true, message: `UPDATING ${toolName.toUpperCase()}...`, severity: 'info' });
     updateTool.mutate(toolId, {
       onSuccess: (data) => {
-        setSnackbar({ open: true, message: data.message || `${toolName} updated successfully`, severity: 'success' });
+        setSnackbar({ open: true, message: data.message?.toUpperCase() || `${toolName.toUpperCase()} UPDATED SUCCESSFULLY`, severity: 'success' });
         handleFetchVersion(toolId, 'current');
+        setLatestVersions(prev => {
+          const newState = { ...prev };
+          delete newState[toolId];
+          return newState;
+        });
       },
       onError: () => {
-        setSnackbar({ open: true, message: `Failed to update ${toolName}`, severity: 'error' });
+        setSnackbar({ open: true, message: `FAILED TO UPDATE ${toolName.toUpperCase()}`, severity: 'error' });
       }
     });
   };
@@ -162,197 +199,294 @@ export const ToolArsenalPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', mb: 1 }}>
+          <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', mb: 1, letterSpacing: '2px' }}>
             TOOL_ARSENAL
           </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-            Manage and update external security tools.
+          <Typography variant="body2" sx={{ color: 'rgba(0,243,255,0.6)', fontFamily: 'monospace' }}>
+            {`// Manage external security components and update routines`}
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <ButtonGroup variant="outlined" size="small">
-            <Button 
-              onClick={() => setFilter('all')}
-              sx={{ 
-                bgcolor: filter === 'all' ? 'rgba(0,243,255,0.1)' : 'transparent',
-                color: filter === 'all' ? '#00f3ff' : 'rgba(255,255,255,0.5)',
-                borderColor: 'rgba(0,243,255,0.3)'
-              }}
-            >
-              ALL
-            </Button>
-            <Button 
-              onClick={() => setFilter('default')}
-              sx={{ 
-                bgcolor: filter === 'default' ? 'rgba(0,243,255,0.1)' : 'transparent',
-                color: filter === 'default' ? '#00f3ff' : 'rgba(255,255,255,0.5)',
-                borderColor: 'rgba(0,243,255,0.3)'
-              }}
-            >
-              DEFAULT
-            </Button>
-            <Button 
-              onClick={() => setFilter('custom')}
-              sx={{ 
-                bgcolor: filter === 'custom' ? 'rgba(0,243,255,0.1)' : 'transparent',
-                color: filter === 'custom' ? '#00f3ff' : 'rgba(255,255,255,0.5)',
-                borderColor: 'rgba(0,243,255,0.3)'
-              }}
-            >
-              CUSTOM
-            </Button>
+            {(['all', 'default', 'custom'] as const).map((f) => (
+              <Button 
+                key={f}
+                onClick={() => setFilter(f)}
+                sx={{ 
+                  bgcolor: filter === f ? 'rgba(0,243,255,0.1)' : 'transparent',
+                  color: filter === f ? '#00f3ff' : 'rgba(255,255,255,0.5)',
+                  borderColor: filter === f ? '#00f3ff' : 'rgba(0,243,255,0.3)',
+                  fontFamily: 'Orbitron',
+                  fontSize: '10px',
+                  px: 2,
+                  '&:hover': {
+                    borderColor: '#00f3ff',
+                    bgcolor: 'rgba(0,243,255,0.05)'
+                  }
+                }}
+              >
+                {f.toUpperCase()}
+              </Button>
+            ))}
           </ButtonGroup>
           <Button
-            component={Link}
-            to={`/${projectSlug}/settings/tool-arsenal/add`}
             variant="contained"
             startIcon={<Plus size={18} />}
-            sx={{ bgcolor: '#00f3ff', color: '#000', fontWeight: 'bold', '&:hover': { bgcolor: '#00d8e4' } }}
+            onClick={() => setModal({ open: true })}
+            sx={{ 
+              bgcolor: '#00f3ff', 
+              color: '#000', 
+              fontWeight: 'bold', 
+              fontFamily: 'Orbitron',
+              fontSize: '11px',
+              '&:hover': { bgcolor: '#00d8e4' },
+              boxShadow: '0 0 15px rgba(0,243,255,0.3)'
+            }}
           >
-            ADD TOOL
+            ADD_TOOL
           </Button>
         </Box>
       </Box>
 
-      <Grid container spacing={3}>
+      <Box sx={{ 
+        display: 'grid',
+        gridTemplateColumns: {
+          xs: '1fr',
+          sm: 'repeat(2, 1fr)',
+          md: 'repeat(3, 1fr)',
+          lg: 'repeat(4, 1fr)',
+          xl: 'repeat(5, 1fr)'
+        },
+        gap: 3,
+        width: '100%'
+      }}>
         {filteredTools.map((tool) => (
-          <Grid item xs={12} sm={6} md={4} lg={3} key={tool.id}>
+          <Box key={tool.id} sx={{ height: '100%' }}>
             <Card sx={{ 
-              bgcolor: 'rgba(0,0,0,0.3)', 
-              border: `1px solid ${tool.is_default ? 'rgba(0,243,255,0.2)' : 'rgba(255,0,60,0.2)'}`,
-              height: '100%',
+              bgcolor: 'rgba(10, 10, 15, 0.85)', 
+              border: `1px solid ${tool.is_default ? 'rgba(0, 243, 255, 0.15)' : 'rgba(255, 0, 255, 0.15)'}`,
+              height: '580px',
+              width: '100%',
               display: 'flex',
               flexDirection: 'column',
               position: 'relative',
+              overflow: 'hidden',
+              backdropFilter: 'blur(10px)',
               '&:hover': {
-                borderColor: tool.is_default ? '#00f3ff' : '#ff003c',
-                boxShadow: `0 0 15px ${tool.is_default ? 'rgba(0,243,255,0.1)' : 'rgba(255,0,60,0.1)'}`
+                border: `1px solid ${tool.is_default ? '#00f3ff' : '#ff00ff'}`,
+                boxShadow: `0 0 20px ${tool.is_default ? 'rgba(0, 243, 255, 0.1)' : 'rgba(255, 0, 255, 0.1)'}`,
+                transform: 'translateY(-2px)',
+                transition: 'all 0.3s ease'
               }
             }}>
+              {/* Top Badge */}
               <Box sx={{ 
                 position: 'absolute', 
-                top: 10, 
-                left: 10,
-                zIndex: 1
+                top: 0, 
+                left: 0, 
+                bgcolor: tool.is_default ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255, 0, 255, 0.2)',
+                color: tool.is_default ? '#00f3ff' : '#ff00ff',
+                px: 1,
+                py: 0.5,
+                fontSize: '9px',
+                fontWeight: 'bold',
+                fontFamily: 'Orbitron',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                zIndex: 1,
+                borderBottomRightRadius: '4px',
+                border: '1px solid rgba(255,255,255,0.05)'
               }}>
-                <Chip 
-                  label={tool.is_default ? "DEFAULT" : "CUSTOM"} 
-                  size="small"
-                  sx={{ 
-                    height: 16, 
-                    fontSize: '8px', 
-                    fontFamily: 'Orbitron',
-                    bgcolor: tool.is_default ? 'rgba(0,243,255,0.1)' : 'rgba(255,0,60,0.1)',
-                    color: tool.is_default ? '#00f3ff' : '#ff003c',
-                    border: `1px solid ${tool.is_default ? '#00f3ff' : '#ff003c'}`
-                  }}
-                />
+                <Shield size={10} />
+                {tool.is_default ? 'DEFAULT' : 'CUSTOM'}
               </Box>
 
-              {!tool.is_default && (
-                <Box sx={{ position: 'absolute', top: 5, right: 5, zIndex: 1 }}>
-                  <IconButton size="small" onClick={(e) => handleMenuOpen(tool.id, e)} sx={{ color: 'rgba(255,255,255,0.5)' }}>
-                    <MoreVertical size={16} />
-                  </IconButton>
-                  <Menu
-                    anchorEl={anchorEl[tool.id]}
-                    open={Boolean(anchorEl[tool.id])}
-                    onClose={() => handleMenuClose(tool.id)}
-                    PaperProps={{
-                      sx: { bgcolor: '#0a0a0a', border: '1px solid rgba(255,255,255,0.1)', color: '#fff' }
-                    }}
-                  >
-                    <MenuItem onClick={() => {
-                      handleMenuClose(tool.id);
-                      // Navigate to edit
-                    }}>
-                      <Wrench size={14} style={{ marginRight: 8 }} /> Modify
+              {/* Action Menu */}
+              <Box sx={{ position: 'absolute', top: 5, right: 5, zIndex: 2 }}>
+                <IconButton 
+                  size="small" 
+                  onClick={(e) => handleMenuOpen(tool.id, e)}
+                  sx={{ color: 'rgba(255,255,255,0.4)', '&:hover': { color: '#00f3ff' } }}
+                >
+                  <MoreVertical size={16} />
+                </IconButton>
+                <Menu
+                  anchorEl={anchorEl[tool.id]}
+                  open={Boolean(anchorEl[tool.id])}
+                  onClose={() => handleMenuClose(tool.id)}
+                  PaperProps={{
+                    sx: { 
+                      bgcolor: '#0a0a0a', 
+                      color: '#fff', 
+                      border: '1px solid rgba(0,243,255,0.2)',
+                      '& .MuiMenuItem-root': { fontSize: '11px', fontFamily: 'Orbitron' },
+                      '& .MuiMenuItem-root:hover': { bgcolor: 'rgba(0,243,255,0.1)' }
+                    }
+                  }}
+                >
+                  <MenuItem onClick={() => { handleMenuClose(tool.id); setModal({ open: true, tool }); }}>
+                    <Edit3 size={14} style={{ marginRight: 8, color: '#00f3ff' }} /> MODIFY
+                  </MenuItem>
+                  {!tool.is_default && (
+                    <MenuItem onClick={() => { handleMenuClose(tool.id); handleUninstall(tool.id, tool.name); }} sx={{ color: '#ff1744' }}>
+                      <Trash2 size={14} style={{ marginRight: 8 }} /> UNINSTALL
                     </MenuItem>
-                    <Divider sx={{ bgcolor: 'rgba(255,255,255,0.1)' }} />
-                    <MenuItem onClick={() => {
-                      handleMenuClose(tool.id);
-                      handleUninstall(tool.id, tool.name);
-                    }} sx={{ color: '#ff003c' }}>
-                      <Trash2 size={14} style={{ marginRight: 8 }} /> Uninstall
-                    </MenuItem>
-                  </Menu>
-                </Box>
-              )}
+                  )}
+                  <MenuItem onClick={() => { handleMenuClose(tool.id); handleAction('force_pull_latest', tool.id); }}>
+                    <RefreshCcw size={14} style={{ marginRight: 8, color: '#00e676' }} /> FORCE PULL
+                  </MenuItem>
+                </Menu>
+              </Box>
 
-              <CardContent sx={{ textAlign: 'center', pt: 4, flexGrow: 1 }}>
+              <CardContent sx={{ p: 3, pt: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', flexGrow: 1, overflow: 'hidden' }}>
+                {/* Logo/Icon */}
                 <Avatar 
                   src={tool.logo_url || undefined}
                   sx={{ 
-                    width: 50, 
-                    height: 50, 
-                    mx: 'auto', 
+                    width: 60, 
+                    height: 60, 
                     mb: 2, 
-                    bgcolor: 'rgba(255,255,255,0.05)',
+                    bgcolor: 'rgba(255,255,255,0.03)',
                     border: '1px solid rgba(255,255,255,0.1)'
                   }}
                 >
-                  {!tool.logo_url && <Cpu size={24} color="rgba(255,255,255,0.3)" />}
+                  {!tool.logo_url && <Hammer size={30} color="rgba(0,243,255,0.4)" />}
                 </Avatar>
-                <Typography variant="h6" sx={{ fontFamily: 'Orbitron', fontSize: '16px', color: '#fff', mb: 1 }}>
-                  {tool.name}
-                </Typography>
-                
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 0.5, mb: 2 }}>
-                  {tool.is_subdomain_gathering && (
-                    <Chip label="SUBDOMAIN" size="small" sx={{ height: 18, fontSize: '9px', bgcolor: 'rgba(0,243,255,0.05)', color: '#00f3ff' }} />
+
+                <Box sx={{ height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
+                  <Typography variant="h6" sx={{ 
+                    fontFamily: 'Orbitron', 
+                    fontWeight: 'bold', 
+                    color: '#fff', 
+                    textAlign: 'center', 
+                    fontSize: '18px', 
+                    letterSpacing: '1px',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden'
+                  }}>
+                    {tool.name.toUpperCase()}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+                  <Typography component="a" href={tool.github_url} target="_blank" sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none', '&:hover': { color: '#00f3ff' } }}>
+                    GITHUB <ExternalLink size={10} />
+                  </Typography>
+                  {tool.license_url && (
+                    <Typography component="a" href={tool.license_url} target="_blank" sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none', '&:hover': { color: '#00f3ff' } }}>
+                      LICENSE <ExternalLink size={10} />
+                    </Typography>
                   )}
-                  <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                     <Link from={`/${projectSlug}/settings/tool-arsenal`} to={tool.github_url} target="_blank" style={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', textDecoration: 'none', display: 'flex', alignItems: 'center' }}>
-                      GITHUB <ExternalLink size={10} style={{ marginLeft: 2 }} />
-                    </Link>
-                  </Box>
                 </Box>
 
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', mb: 2, minHeight: 40, display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-                  {tool.description}
-                </Typography>
+                {/* Divider */}
+                <Box sx={{ width: '40px', height: '2px', bgcolor: tool.is_default ? '#00f3ff' : '#ff00ff', mb: 3, opacity: 0.5 }} />
 
-                <Box sx={{ mt: 'auto', p: 1, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', display: 'block', mb: 0.5 }}>
-                    CURRENT VERSION
-                  </Typography>
-                  <Typography variant="body2" sx={{ color: '#00f3ff', fontFamily: 'monospace', fontWeight: 'bold' }}>
-                    {toolVersions[tool.id] || (fetchVersion.isPending ? '...' : '---')}
-                  </Typography>
-                </Box>
+                 {/* Version Section */}
+                 <Box sx={{ textAlign: 'center', mb: 3 }}>
+                   <Typography sx={{ color: '#ff00ff', fontSize: '9px', fontFamily: 'Orbitron', fontWeight: 'bold', letterSpacing: '1px', mb: 1 }}>
+                     INSTALLED VERSION
+                   </Typography>
+                   <Box sx={{ 
+                     bgcolor: 'rgba(0,0,0,0.3)', 
+                     px: 2, 
+                     py: 0.5, 
+                     borderRadius: '4px',
+                     border: versionError[tool.id] ? '1px solid rgba(255, 23, 68, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+                     display: 'inline-block',
+                     minWidth: '80px'
+                   }}>
+                     <Typography sx={{ 
+                       color: versionError[tool.id] ? '#ff1744' : (currentVersions[tool.id] ? '#00f3ff' : 'rgba(255,255,255,0.2)'), 
+                       fontSize: versionError[tool.id] ? '9px' : '13px', 
+                       fontFamily: 'monospace', 
+                       fontWeight: 'bold' 
+                     }}>
+                       {versionError[tool.id] 
+                         ? versionError[tool.id].toUpperCase() 
+                         : (currentVersions[tool.id] || 'NOT DETECTED')}
+                     </Typography>
+                   </Box>
+                   
+                   {latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] && (
+                     <Box sx={{ mt: 1 }}>
+                       <Typography sx={{ color: '#00e676', fontSize: '9px', fontFamily: 'Orbitron', fontWeight: 'bold' }}>
+                         NEW VERSION AVAILABLE: {latestVersions[tool.id]}
+                       </Typography>
+                     </Box>
+                   )}
+                 </Box>
+ 
+                 {/* Description Area - Grows but fits in fixed height card */}
+                 <Box sx={{ 
+                   flexGrow: 1, 
+                   width: '100%', 
+                   overflowY: 'auto', 
+                   mb: 2,
+                   px: 1,
+                   display: 'flex',
+                   flexDirection: 'column',
+                   '&::-webkit-scrollbar': { width: '4px' },
+                   '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,243,255,0.1)', borderRadius: '10px' }
+                 }}>
+                   <Typography variant="body2" sx={{ 
+                     color: 'rgba(255,255,255,0.5)', 
+                     textAlign: 'center', 
+                     fontSize: '11px', 
+                     lineHeight: 1.6,
+                   }}>
+                     {tool.description}
+                   </Typography>
+                 </Box>
+ 
+                 <Box sx={{ mt: 'auto', width: '100%', pt: 2 }}>
+                   <Button 
+                     fullWidth
+                     variant={latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? "contained" : "outlined"} 
+                     startIcon={loadingTools[tool.id] ? <CircularProgress size={14} color="inherit" /> : (latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? <Download size={14} /> : <RefreshCcw size={14} />)}
+                     onClick={() => {
+                       if (latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id]) {
+                         handleAction('update', tool.id, tool.name);
+                       } else {
+                         handleFetchVersion(tool.id, 'latest');
+                       }
+                     }}
+                     disabled={loadingTools[tool.id]}
+                     sx={{ 
+                       borderColor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00e676' : 'rgba(0,243,255,0.2)', 
+                       bgcolor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00e676' : 'transparent',
+                       color: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#000' : '#00f3ff',
+                       fontSize: '10px',
+                       fontWeight: 'bold',
+                       fontFamily: 'Orbitron',
+                       py: 1,
+                       '&:hover': { 
+                         bgcolor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00c853' : 'rgba(0,243,255,0.1)', 
+                         borderColor: '#00f3ff' 
+                       }
+                     }}
+                   >
+                     {loadingTools[tool.id] 
+                       ? 'PROCESSING...' 
+                       : (latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? 'INSTALL UPDATE' : 'CHECK UPDATE')}
+                   </Button>
+                 </Box>
               </CardContent>
-
-              <CardActions sx={{ p: 2, pt: 0 }}>
-                <Button 
-                  fullWidth 
-                  size="small"
-                  variant="outlined"
-                  startIcon={<RefreshCw size={14} className={fetchVersion.isPending ? 'animate-spin' : ''} />}
-                  onClick={() => handleFetchVersion(tool.id, 'latest')}
-                  sx={{ 
-                    borderColor: 'rgba(0,243,255,0.3)', 
-                    color: '#00f3ff',
-                    fontSize: '11px',
-                    '&:hover': { borderColor: '#00f3ff', bgcolor: 'rgba(0,243,255,0.05)' }
-                  }}
-                >
-                  CHECK UPDATE
-                </Button>
-                <Tooltip title="Force Update">
-                  <IconButton 
-                    size="small" 
-                    onClick={() => handleUpdate(tool.id, tool.name)}
-                    sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff' } }}
-                  >
-                    <Download size={14} />
-                  </IconButton>
-                </Tooltip>
-              </CardActions>
-              {updateTool.isPending && <LinearProgress sx={{ height: 2, bgcolor: 'transparent', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />}
+              {loadingTools[tool.id] && <LinearProgress sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, bgcolor: 'transparent', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />}
             </Card>
-          </Grid>
+          </Box>
         ))}
-      </Grid>
+      </Box>
+
+      <ToolFormModal
+        open={modal.open}
+        tool={modal.tool}
+        onClose={() => setModal({ open: false })}
+        onSubmit={handleFormSubmit}
+      />
 
       <Snackbar
         open={snackbar.open}
@@ -364,11 +498,14 @@ export const ToolArsenalPage: React.FC = () => {
           severity={snackbar.severity as any}
           sx={{ 
             width: '100%', 
-            bgcolor: snackbar.severity === 'success' ? '#1b5e20' : snackbar.severity === 'error' ? '#d32f2f' : '#01579b', 
-            color: '#fff' 
+            bgcolor: snackbar.severity === 'success' ? '#00c853' : snackbar.severity === 'error' ? '#ff1744' : '#2979ff', 
+            color: '#000',
+            fontWeight: 'bold',
+            fontFamily: 'Orbitron',
+            fontSize: '12px'
           }}
         >
-          {snackbar.message}
+          {snackbar.message.toUpperCase()}
         </Alert>
       </Snackbar>
 
@@ -386,3 +523,4 @@ export const ToolArsenalPage: React.FC = () => {
     </Box>
   );
 };
+

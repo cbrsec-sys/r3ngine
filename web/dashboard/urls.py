@@ -119,7 +119,7 @@ urlpatterns = [
         views.index,
         name='tool_settings_v3'),
     path(
-        '<slug:slug>/settings/tool-arsenal',
+        '<slug:slug>/settings/tools-arsenal',
         views.index,
         name='tool_arsenal_v3'),
     path(
@@ -130,6 +130,14 @@ urlpatterns = [
         '<slug:slug>/settings/llm-toolkit',
         views.index,
         name='llm_toolkit_v3'),
+    path(
+        '<slug:slug>/settings/report-settings',
+        views.index,
+        name='report_settings_v3'),
+    path(
+        '<slug:slug>/settings/rengine-settings',
+        views.index,
+        name='rengine_settings_v3'),
     path(
         '<slug:slug>/bounty',
         views.index,

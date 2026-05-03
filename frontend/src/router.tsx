@@ -16,7 +16,9 @@ import {
   ToolSettingsPage, 
   ToolArsenalPage,
   ApiVaultPage,
-  LlmToolkitPage
+  LlmToolkitPage,
+  ReportSettingsPage,
+  ReNgineSettingsPage
 } from "./features/settings";
 
 
@@ -280,7 +282,7 @@ const toolSettingsRoute = createRoute({
 
 const toolArsenalRoute = createRoute({
   getParentRoute: () => projectRoute,
-  path: "settings/tool-arsenal",
+  path: "settings/tools-arsenal",
   component: ToolArsenalPage,
 });
 
@@ -294,6 +296,18 @@ const llmToolkitSettingsRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: "settings/llm-toolkit",
   component: LlmToolkitPage,
+});
+
+const reportSettingsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/report-settings",
+  component: ReportSettingsPage,
+});
+
+const rengineSettingsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/rengine-settings",
+  component: ReNgineSettingsPage,
 });
 
 
@@ -378,6 +392,8 @@ const routeTree = rootRoute.addChildren([
     toolArsenalRoute,
     apiVaultSettingsRoute,
     llmToolkitSettingsRoute,
+    reportSettingsRoute,
+    rengineSettingsRoute,
     vulnsRoute,
 
   ]),

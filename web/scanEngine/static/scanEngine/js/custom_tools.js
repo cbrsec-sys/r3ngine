@@ -4,7 +4,7 @@ function load_gf_template(pattern_name){
 	});
 	swal.showLoading();
 
-  $.getJSON(`/api/getFileContents?gf_pattern&name=${pattern_name}&format=json`, function(response) {
+  $.getJSON(`/api/5s?gf_pattern&name=${pattern_name}&format=json`, function(response) {
     swal.close();
     if (response.status) {
       $('#modal_title').empty();

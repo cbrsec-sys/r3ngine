@@ -219,6 +219,10 @@ urlpatterns = [
         RengineUpdateCheck.as_view(),
         name='check_rengine_update'),
     path(
+        'rengine/system-settings/',
+        RengineSystemSettingsAPIView.as_view(),
+        name='rengine_system_settings'),
+    path(
         'action/subdomain/delete/',
         DeleteSubdomain.as_view(),
         name='delete_subdomain'),
@@ -306,6 +310,11 @@ urlpatterns = [
         name='update_theme'
     ),
     path(
+        'report-settings/',
+        ReportSettingsAPIView.as_view(),
+        name='report_settings'
+    ),
+    path(
         'dashboard/<slug:slug>/',
         DashboardAPIView.as_view(),
         name='dashboard_api'
@@ -321,7 +330,6 @@ urlpatterns = [
         name='scan_summary_api'
     ),
 ]
-
 
 
 urlpatterns += router.urls

@@ -5,3 +5,5 @@ export * from './components/ToolSettingsPage';
 export * from './components/ToolArsenalPage';
 export * from './components/ApiVaultPage';
 export * from './components/LlmToolkitPage';
+export * from './components/ReportSettingsPage';
+export * from './components/ReNgineSettingsPage';
