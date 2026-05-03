@@ -217,6 +217,8 @@ def tool_specific_settings(request, slug):
                     file.write(gf_file.read().decode("utf-8"))
                     file.close()
                     upload_count += 1
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'success', 'message': f'{upload_count} GF files successfully uploaded'})
             messages.add_message(request, messages.INFO, f'{upload_count} GF files successfully uploaded')
             return http.HttpResponseRedirect(reverse('tool_settings', kwargs={'slug': slug}))
 
@@ -234,6 +236,10 @@ def tool_specific_settings(request, slug):
                     file.write(nuclei_file.read().decode("utf-8"))
                     file.close()
                     upload_count += 1
+            if request.headers.get('Accept') == 'application/json':
+                if upload_count == 0:
+                     return http.JsonResponse({'status': 'error', 'message': 'Invalid Nuclei Pattern, upload only *.yaml extension'}, status=400)
+                return http.JsonResponse({'status': 'success', 'message': f'{upload_count} Nuclei Patterns successfully uploaded'})
             if upload_count == 0:
                 messages.add_message(request, messages.ERROR, 'Invalid Nuclei Pattern, upload only *.yaml extension')
             messages.add_message(request, messages.INFO, f'{upload_count} Nuclei Patterns successfully uploaded')
@@ -242,30 +248,40 @@ def tool_specific_settings(request, slug):
         elif 'nuclei_config_text_area' in request.POST:
             with open('/root/.config/nuclei/config.yaml', "w") as fhandle:
                 fhandle.write(request.POST.get('nuclei_config_text_area'))
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'success', 'message': 'Nuclei config updated!'})
             messages.add_message(request, messages.INFO, 'Nuclei config updated!')
             return http.HttpResponseRedirect(reverse('tool_settings', kwargs={'slug': slug}))
 
         elif 'subfinder_config_text_area' in request.POST:
             with open('/root/.config/subfinder/config.yaml', "w") as fhandle:
                 fhandle.write(request.POST.get('subfinder_config_text_area'))
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'success', 'message': 'Subfinder config updated!'})
             messages.add_message(request, messages.INFO, 'Subfinder config updated!')
             return http.HttpResponseRedirect(reverse('tool_settings', kwargs={'slug': slug}))
 
         elif 'naabu_config_text_area' in request.POST:
             with open('/root/.config/naabu/config.yaml', "w") as fhandle:
                 fhandle.write(request.POST.get('naabu_config_text_area'))
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'success', 'message': 'Naabu config updated!'})
             messages.add_message(request, messages.INFO, 'Naabu config updated!')
             return http.HttpResponseRedirect(reverse('tool_settings', kwargs={'slug': slug}))
 
         elif 'amass_config_text_area' in request.POST:
             with open('/root/.config/amass.ini', "w") as fhandle:
                 fhandle.write(request.POST.get('amass_config_text_area'))
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'success', 'message': 'Amass config updated!'})
             messages.add_message(request, messages.INFO, 'Amass config updated!')
             return http.HttpResponseRedirect(reverse('tool_settings', kwargs={'slug': slug}))
 
         elif 'theharvester_config_text_area' in request.POST:
             with open('/usr/src/github/theHarvester/api-keys.yaml', "w") as fhandle:
                 fhandle.write(request.POST.get('theharvester_config_text_area'))
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'success', 'message': 'theHarvester config updated!'})
             messages.add_message(request, messages.INFO, 'theHarvester config updated!')
             return http.HttpResponseRedirect(reverse('tool_settings', kwargs={'slug': slug}))
 
@@ -273,16 +289,29 @@ def tool_specific_settings(request, slug):
             # Use /root/.config/spiderfoot.cfg as persistent config
             with open('/root/.config/spiderfoot.cfg', "w") as fhandle:
                 fhandle.write(request.POST.get('spiderfoot_config_text_area'))
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'success', 'message': 'SpiderFoot config updated!'})
             messages.add_message(request, messages.INFO, 'SpiderFoot config updated!')
             return http.HttpResponseRedirect(reverse('tool_settings', kwargs={'slug': slug}))
+
+    gf_list = []
+    try:
+        gf_list = (subprocess.check_output(['gf', '-list'])).decode("utf-8").split('\n')
+    except:
+        pass
+    nuclei_custom_pattern = [os.path.basename(f) for f in glob.glob("/root/nuclei-templates/*.yaml")]
+    
+    if request.headers.get('Accept') == 'application/json':
+        return http.JsonResponse({
+            'gf_patterns': sorted([p for p in gf_list if p]),
+            'nuclei_templates': sorted(nuclei_custom_pattern)
+        })
 
     context['settings_nav_active'] = 'active'
     context['tool_settings_li'] = 'active'
     context['settings_ul_show'] = 'show'
-    gf_list = (subprocess.check_output(['gf', '-list'])).decode("utf-8")
-    nuclei_custom_pattern = [f for f in glob.glob("/root/nuclei-templates/*.yaml")]
     context['nuclei_templates'] = nuclei_custom_pattern
-    context['gf_patterns'] = sorted(gf_list.split('\n'))
+    context['gf_patterns'] = sorted([p for p in gf_list if p])
     return render(request, 'scanEngine/settings/tool.html', context)
 
 
@@ -408,12 +437,34 @@ def opsec_settings(request, slug):
 
         if form.is_valid():
             form.save()
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'success', 'message': 'OpSec Settings updated.'})
             messages.add_message(
                 request,
                 messages.INFO,
                 'OpSec Settings updated.')
             return http.HttpResponseRedirect(reverse('opsec_settings', kwargs={'slug': slug}))
-    
+        else:
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+
+    if request.headers.get('Accept') == 'application/json':
+        return http.JsonResponse({
+            'enable_opsec': opsec.enable_opsec if opsec else False,
+            'enable_random_ua': opsec.enable_random_ua if opsec else False,
+            'enable_waf_bypass': opsec.enable_waf_bypass if opsec else False,
+            'enable_ja3_randomization': opsec.enable_ja3_randomization if opsec else False,
+            'enable_rate_limit': opsec.enable_rate_limit if opsec else False,
+            'max_rps': opsec.max_rps if opsec else 10,
+            'enable_delay': opsec.enable_delay if opsec else False,
+            'delay_ms': opsec.delay_ms if opsec else 0,
+            'enable_jitter': opsec.enable_jitter if opsec else False,
+            'jitter_percent': opsec.jitter_percent if opsec else 0,
+            'http_protocol': opsec.http_protocol if opsec else "http1.1",
+            'custom_dns_servers': opsec.custom_dns_servers if opsec else "",
+            'enable_metadata_stripping': opsec.enable_metadata_stripping if opsec else False,
+        })
+
     context['settings_nav_active'] = 'active'
     context['opsec_settings_li'] = 'active'
     context['settings_ul_show'] = 'show'
@@ -545,8 +596,29 @@ def get_proxy_task_status(request, slug, task_id):
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def tool_arsenal_section(request, slug):
-    context = {}
     tools = InstalledExternalTool.objects.all().order_by('id')
+    
+    if request.headers.get('Accept') == 'application/json':
+        tools_list = []
+        for tool in tools:
+            tools_list.append({
+                'id': tool.id,
+                'name': tool.name,
+                'description': tool.description,
+                'logo_url': tool.logo_url,
+                'github_url': tool.github_url,
+                'license_url': tool.license_url,
+                'is_default': tool.is_default,
+                'is_subdomain_gathering': tool.is_subdomain_gathering,
+                'is_github_cloned': tool.is_github_cloned,
+                'github_clone_path': tool.github_clone_path,
+                'install_command': tool.install_command,
+                'update_command': tool.update_command,
+                'version_lookup_command': tool.version_lookup_command,
+            })
+        return http.JsonResponse({'status': 'success', 'tools': tools_list})
+
+    context = {}
     context['installed_tools'] = tools
     return render(request, 'scanEngine/settings/tool_arsenal.html', context)
 
@@ -718,6 +790,8 @@ def api_vault(request, slug):
         delete_sf_key = request.POST.get('delete_sf_key')
         if delete_sf_key:
             SpiderfootAPIKey.objects.filter(id=delete_sf_key).delete()
+        if request.headers.get('Accept') == 'application/json':
+            return http.JsonResponse({'status': 'success', 'message': 'API Vault updated successfully'})
 
     openai_key = OpenAiAPIKey.objects.first()
     netlas_key = NetlasAPIKey.objects.first()
@@ -742,6 +816,18 @@ def api_vault(request, slug):
     context['leaklookup_key'] = LeakLookupAPIKey.objects.first()
     context['spiderfoot_keys'] = SpiderfootAPIKey.objects.all()
     
+    if request.headers.get('Accept') == 'application/json':
+        return http.JsonResponse({
+            'netlas_key': netlas_key.key if netlas_key else "",
+            'chaos_key': chaos_key.key if chaos_key else "",
+            'shodan_key': shodan_key.key if shodan_key else "",
+            'censys_id': censys_key.api_id if censys_key else "",
+            'censys_secret': censys_key.api_secret if censys_key else "",
+            'leaklookup_key': context['leaklookup_key'].key if context['leaklookup_key'] else "",
+            'hackerone_username': hackerone_username or "",
+            'hackerone_key': hackerone_key or "",
+        })
+
     return render(request, 'scanEngine/settings/api.html', context)
 
 
@@ -752,16 +838,16 @@ def add_tool(request, slug):
         form = ExternalToolForm(request.POST)
         if form.is_valid():
             # add tool
-            install_command = form.data['install_command']
+            install_command = form.cleaned_data['install_command']
             github_clone_path = None
             if 'git clone' in install_command:
                 project_name = install_command.split('/')[-1]
-                install_command = install_command + ' /usr/src/github/' + project_name + ' && pip install -r /usr/src/github/' + project_name + '/requirements.txt'
+                # If project name ends with .git remove it
+                if project_name.endswith('.git'):
+                    project_name = project_name[:-4]
                 github_clone_path = '/usr/src/github/' + project_name
-                # if github cloned we also need to install requirements, atleast found in the main dir
-                install_command = 'pip3 install -r /usr/src/github/' + project_name + '/requirements.txt'
+                install_command = install_command + ' ' + github_clone_path + ' && pip3 install -r ' + github_clone_path + '/requirements.txt'
 
-            run_command(install_command)
             run_command.apply_async(args=(install_command,))
             saved_form = form.save()
             if github_clone_path:
@@ -769,11 +855,17 @@ def add_tool(request, slug):
                 tool.github_clone_path = github_clone_path
                 tool.save()
 
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'success', 'message': 'External Tool Successfully Added!'})
+
             messages.add_message(
                 request,
                 messages.INFO,
                 'External Tool Successfully Added!')
             return http.HttpResponseRedirect(reverse('tool_arsenal', kwargs={'slug': slug}))
+        else:
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
     context = {
             'settings_nav_active': 'active',
             'form': form
@@ -784,16 +876,21 @@ def add_tool(request, slug):
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def modify_tool_in_arsenal(request, slug, id):
     external_tool = get_object_or_404(InstalledExternalTool, id=id)
-    form = ExternalToolForm()
+    form = ExternalToolForm(instance=external_tool)
     if request.method == "POST":
         form = ExternalToolForm(request.POST, instance=external_tool)
         if form.is_valid():
             form.save()
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'success', 'message': 'Tool modified successfully'})
             messages.add_message(
                 request,
                 messages.INFO,
                 'Tool modified successfully')
             return http.HttpResponseRedirect(reverse('tool_arsenal', kwargs={'slug': slug}))
+        else:
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
     else:
         form.set_value(external_tool)
     context = {

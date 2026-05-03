@@ -10,7 +10,13 @@ import { EndpointsPage } from "./features/endpoints";
 import { SubdomainsPage } from "./features/subdomains";
 import { TodoPage } from "./features/todos";
 import { OrganizationPage } from "./features/organizations";
-import { ProxySettingsPage } from "./features/settings/components/ProxySettingsPage";
+import { 
+  ProxySettingsPage, 
+  OpSecSettingsPage, 
+  ToolSettingsPage, 
+  ToolArsenalPage,
+  ApiVaultPage 
+} from "./features/settings";
 
 import { PlaceholderPage } from "./components/PlaceholderPage";
 import { Box, Typography, Button } from "@mui/material";
@@ -258,6 +264,30 @@ const proxySettingsRoute = createRoute({
   component: ProxySettingsPage,
 });
 
+const opsecSettingsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/opsec",
+  component: OpSecSettingsPage,
+});
+
+const toolSettingsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/tool-settings",
+  component: ToolSettingsPage,
+});
+
+const toolArsenalRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/tool-arsenal",
+  component: ToolArsenalPage,
+});
+
+const apiVaultSettingsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/api-vault",
+  component: ApiVaultPage,
+});
+
 import { VulnerabilityList } from "./features/vulnerabilities";
 
 // Vulnerabilities Route
@@ -334,6 +364,10 @@ const routeTree = rootRoute.addChildren([
     todoRoute,
     organizationsRoute,
     proxySettingsRoute,
+    opsecSettingsRoute,
+    toolSettingsRoute,
+    toolArsenalRoute,
+    apiVaultSettingsRoute,
     vulnsRoute,
   ]),
 ]);

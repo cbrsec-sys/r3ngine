@@ -111,6 +111,22 @@ urlpatterns = [
         views.index,
         name='proxy_settings_v3'),
     path(
+        '<slug:slug>/settings/opsec',
+        views.index,
+        name='opsec_settings_v3'),
+    path(
+        '<slug:slug>/settings/tool-settings',
+        views.index,
+        name='tool_settings_v3'),
+    path(
+        '<slug:slug>/settings/tool-arsenal',
+        views.index,
+        name='tool_arsenal_v3'),
+    path(
+        '<slug:slug>/settings/api-vault',
+        views.index,
+        name='api_vault_v3'),
+    path(
         '<slug:slug>/bounty',
         views.index,
         name='bounty_v3'),
