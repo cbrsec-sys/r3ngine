@@ -1,9 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { VulnerabilityResponse } from '../types';
 
-export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = '', scanId?: number) => {
+export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, targetId?: number) => {
   return useQuery<VulnerabilityResponse>({
-    queryKey: ['vulnerabilities', projectSlug, page, searchQuery, scanId],
+    queryKey: ['vulnerabilities', projectSlug, page, searchQuery, scanId, targetId],
     queryFn: async () => {
       const url = new URL(`${window.location.origin}/api/listVulnerability/`);
       url.searchParams.append('project', projectSlug);
@@ -15,6 +15,10 @@ export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = 
       
       if (scanId) {
         url.searchParams.append('scan_history', scanId.toString());
+      }
+
+      if (targetId) {
+        url.searchParams.append('target_id', targetId.toString());
       }
       
       url.searchParams.append('format', 'json');

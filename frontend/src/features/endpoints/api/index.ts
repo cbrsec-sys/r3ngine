@@ -1,9 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
 import type { EndpointResponse } from '../types';
 
-export const useEndpoints = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, gfTag?: string) => {
+export const useEndpoints = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, gfTag?: string, targetId?: number) => {
   return useQuery<EndpointResponse>({
-    queryKey: ['endpoints', projectSlug, page, searchQuery, scanId, gfTag],
+    queryKey: ['endpoints', projectSlug, page, searchQuery, scanId, gfTag, targetId],
     queryFn: async () => {
       const url = new URL(`${window.location.origin}/api/listEndpoints/`);
       url.searchParams.append('project', projectSlug);
@@ -15,6 +15,10 @@ export const useEndpoints = (projectSlug: string, page = 1, searchQuery = '', sc
       
       if (scanId) {
         url.searchParams.append('scan_history', scanId.toString());
+      }
+
+      if (targetId) {
+        url.searchParams.append('target_id', targetId.toString());
       }
       
       if (gfTag) {

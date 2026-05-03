@@ -1111,3 +1111,7 @@ class VulnerabilityReportSettingSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = VulnerabilityReportSetting
 		fields = '__all__'
+class NotificationSettingsSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Notification
+		fields = '__all__'

@@ -37,10 +37,11 @@ import { TacticalPanel } from '../../../components/TacticalPanel';
 
 interface SubdomainsTabProps {
   projectSlug: string;
-  scanId: number;
+  scanId?: number;
+  targetId?: number;
 }
 
-export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId }) => {
+export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId, targetId }) => {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
@@ -48,7 +49,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedAssets, setSelectedAssets] = useState<number[]>([]);
 
-  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId);
+  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, false, targetId);
   const [isReady, setIsReady] = useState(false);
 
   React.useEffect(() => {

@@ -18,7 +18,8 @@ import {
   ApiVaultPage,
   LlmToolkitPage,
   ReportSettingsPage,
-  ReNgineSettingsPage
+  ReNgineSettingsPage,
+  NotificationSettingsPage
 } from "./features/settings";
 
 
@@ -310,6 +311,12 @@ const rengineSettingsRoute = createRoute({
   component: ReNgineSettingsPage,
 });
 
+const notificationSettingsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/notifications",
+  component: NotificationSettingsPage,
+});
+
 
 import { VulnerabilityList } from "./features/vulnerabilities";
 
@@ -394,6 +401,7 @@ const routeTree = rootRoute.addChildren([
     llmToolkitSettingsRoute,
     reportSettingsRoute,
     rengineSettingsRoute,
+    notificationSettingsRoute,
     vulnsRoute,
 
   ]),

@@ -33,17 +33,18 @@ import type { DirectoryScan, DirectoryFile } from '../../subdomains/types';
 
 interface DirectoriesTabProps {
   projectSlug: string;
-  scanId: number;
+  scanId?: number;
+  targetId?: number;
 }
 
-export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, scanId }) => {
+export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, scanId, targetId }) => {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [expandedSubdomains, setExpandedSubdomains] = useState<Record<number, boolean>>({});
   const [expandedScans, setExpandedScans] = useState<Record<string, boolean>>({});
 
-  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, true);
+  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, true, targetId);
 
   const handleSearch = () => {
     setPage(1);

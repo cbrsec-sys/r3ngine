@@ -329,6 +329,11 @@ urlpatterns = [
         ScanSummaryAPIView.as_view(),
         name='scan_summary_api'
     ),
+    path(
+        'notification-settings/',
+        NotificationSettingsAPIView.as_view(),
+        name='notification_settings_api'
+    ),
 ]
 
 

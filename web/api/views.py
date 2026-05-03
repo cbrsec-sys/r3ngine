@@ -3751,3 +3751,27 @@ class ReportSettingsAPIView(APIView):
 			serializer.save()
 			return Response(serializer.data)
 		return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class NotificationSettingsAPIView(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def get(self, request):
+		notification = Notification.objects.first()
+		if not notification:
+			notification = Notification.objects.create()
+		serializer = NotificationSettingsSerializer(notification)
+		return Response(serializer.data)
+
+	def post(self, request):
+		notification = Notification.objects.first()
+		serializer = NotificationSettingsSerializer(notification, data=request.data, partial=True)
+		if serializer.is_valid():
+			serializer.save()
+			# Send test messages if requested or on every save (to match legacy)
+			if request.data.get('send_test', True):
+				send_slack_message('*reNgine*\nCongratulations! your notification services are working.')
+				send_lark_message('*reNgine*\nCongratulations! your notification services are working.')
+				send_telegram_message('*reNgine*\nCongratulations! your notification services are working.')
+				send_discord_message('**reNgine**\nCongratulations! your notification services are working.')
+			return Response({'status': True, 'message': 'Notification settings updated and test message sent.'})
+		return Response(serializer.errors, status=400)

@@ -135,6 +135,10 @@ urlpatterns = [
         views.index,
         name='report_settings_v3'),
     path(
+        '<slug:slug>/settings/notifications',
+        views.index,
+        name='notifications_v3'),
+    path(
         '<slug:slug>/settings/rengine-settings',
         views.index,
         name='rengine_settings_v3'),

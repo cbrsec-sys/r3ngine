@@ -7,3 +7,4 @@ export * from './components/ApiVaultPage';
 export * from './components/LlmToolkitPage';
 export * from './components/ReportSettingsPage';
 export * from './components/ReNgineSettingsPage';
+export * from './components/NotificationSettingsPage';

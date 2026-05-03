@@ -60,10 +60,17 @@ export const ReNgineSettingsPage: React.FC = () => {
     );
   }
 
+  const percent = systemInfo?.consumed_percent || 0;
+  const isDanger = percent >= 90;
+  const isWarning = percent >= 70;
+
+  const gaugeColor = isDanger ? '#ff1100' : (isWarning ? '#ffcc00' : '#00f3ff');
+  const gradientColor = isDanger ? '#cc0000' : (isWarning ? '#997700' : '#0084ff');
+
   const chartOptions: any = {
     chart: {
       type: "radialBar",
-      offsetY: -20,
+      offsetY: -30,
       sparkline: {
         enabled: true
       }
@@ -103,22 +110,23 @@ export const ReNgineSettingsPage: React.FC = () => {
       type: 'gradient',
       gradient: {
         shade: 'dark',
-        shadeIntensity: 0.15,
-        inverseColors: false,
+        type: 'horizontal',
+        shadeIntensity: 0.5,
+        gradientToColors: [gradientColor],
+        inverseColors: true,
         opacityFrom: 1,
         opacityTo: 1,
-        stops: [0, 50, 65, 91],
-        gradientToColors: ['#ff0055']
-      },
+        stops: [0, 100]
+      }
     },
     stroke: {
-      dashArray: 4
+      lineCap: 'round'
     },
     labels: ['Storage Used'],
-    colors: ['#00f3ff'],
+    colors: [gaugeColor],
   };
 
-  const series = [systemInfo?.consumed_percent || 0];
+  const series = [percent];
 
   return (
     <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
@@ -133,17 +141,35 @@ export const ReNgineSettingsPage: React.FC = () => {
         </Box>
 
         <TacticalPanel title="STORAGE_METRICS">
-          <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: 'center', p: 2 }}>
-            <Box sx={{ width: 300, height: 200, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+          <Box sx={{ 
+            display: 'flex', 
+            flexDirection: { xs: 'column', md: 'row' }, 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            gap: { xs: 4, md: 8 }
+          }}>
+            <Box sx={{ width: 300, display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
               <Chart 
                 options={chartOptions} 
                 series={series} 
                 type="radialBar" 
-                height={350}
+                height={320}
               />
+              <Box sx={{ position: 'absolute', bottom: 10, textAlign: 'center' }}>
+                <Typography sx={{ 
+                  fontFamily: 'Orbitron', 
+                  fontSize: '0.6rem', 
+                  fontWeight: 900, 
+                  color: gaugeColor,
+                  letterSpacing: 2,
+                  textTransform: 'uppercase'
+                }}>
+                  {isDanger ? 'CRITICAL_LEVEL' : (isWarning ? 'WARNING_LEVEL' : 'STABLE_LEVEL')}
+                </Typography>
+              </Box>
             </Box>
             
-            <Box sx={{ flex: 1, px: { md: 4 }, mt: { xs: 4, md: 0 } }}>
+            <Box sx={{ flex: '0 1 auto' }}>
               <Grid container spacing={3}>
                 <Grid item xs={12} sm={4}>
                   <MetricCard 
@@ -156,14 +182,16 @@ export const ReNgineSettingsPage: React.FC = () => {
                   <MetricCard 
                     label="USED_SPACE" 
                     value={`${systemInfo?.used || 0} GB`} 
-                    icon={<HardDrive size={20} color="#ff0055" />} 
+                    icon={<HardDrive size={20} color={gaugeColor} />} 
+                    statusColor={gaugeColor}
                   />
                 </Grid>
                 <Grid item xs={12} sm={4}>
                   <MetricCard 
                     label="FREE_SPACE" 
                     value={`${systemInfo?.free || 0} GB`} 
-                    icon={<Database size={20} color="#00f3ff" />} 
+                    icon={<Database size={20} color="#00ff9d" />} 
+                    statusColor="#00ff9d"
                   />
                 </Grid>
               </Grid>
@@ -207,14 +235,20 @@ export const ReNgineSettingsPage: React.FC = () => {
   );
 };
 
-const MetricCard: React.FC<{ label: string; value: string; icon: React.ReactNode }> = ({ label, value, icon }) => (
+const MetricCard: React.FC<{ label: string; value: string; icon: React.ReactNode; statusColor?: string }> = ({ label, value, icon, statusColor }) => (
   <Paper sx={{ 
     p: 2, 
     bgcolor: 'rgba(255,255,255,0.02)', 
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: '1px solid',
+    borderColor: statusColor ? `${statusColor}33` : 'rgba(255,255,255,0.05)',
     display: 'flex',
     flexDirection: 'column',
-    gap: 1
+    gap: 1,
+    transition: 'all 0.3s ease',
+    '&:hover': {
+      bgcolor: 'rgba(255,255,255,0.04)',
+      borderColor: statusColor ? statusColor : 'rgba(255,255,255,0.1)',
+    }
   }}>
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       {icon}

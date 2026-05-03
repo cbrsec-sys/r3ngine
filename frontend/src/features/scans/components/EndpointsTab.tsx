@@ -27,18 +27,19 @@ import { copyToClipboard } from '../../endpoints/utils/copy';
 
 interface EndpointsTabProps {
   projectSlug: string;
-  scanId: number;
+  scanId?: number;
   matchedGfCounts?: Array<{ matched_gf_patterns: string; count: number }>;
+  targetId?: number;
 }
 
-export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId, matchedGfCounts }) => {
+export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId, matchedGfCounts, targetId }) => {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [selectedGfPattern, setSelectedGfPattern] = useState<string | undefined>(undefined);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
 
-  const { data, isLoading } = useEndpoints(projectSlug, page, activeSearch, scanId, selectedGfPattern);
+  const { data, isLoading } = useEndpoints(projectSlug, page, activeSearch, scanId, selectedGfPattern, targetId);
 
   const handleSearch = () => {
     setPage(1);
