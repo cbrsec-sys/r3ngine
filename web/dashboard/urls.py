@@ -147,6 +147,10 @@ urlpatterns = [
         views.index,
         name='profile_v3'),
     path(
+        '<slug:slug>/settings/admin',
+        views.index,
+        name='admin_v3'),
+    path(
         '<slug:slug>/bounty',
         views.index,
         name='bounty_v3'),

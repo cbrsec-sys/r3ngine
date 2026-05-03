@@ -19,8 +19,8 @@ import {
   LlmToolkitPage,
   ReportSettingsPage,
   ReNgineSettingsPage,
-  NotificationSettingsPage,
-  ProfileSettingsPage
+  ProfileSettingsPage,
+  AdminSettingsPage,
 } from "./features/settings";
 
 
@@ -324,6 +324,12 @@ const profileSettingsRoute = createRoute({
   component: ProfileSettingsPage,
 });
 
+const adminSettingsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/admin",
+  component: AdminSettingsPage,
+});
+
 
 import { VulnerabilityList } from "./features/vulnerabilities";
 
@@ -410,6 +416,7 @@ const routeTree = rootRoute.addChildren([
     rengineSettingsRoute,
     notificationSettingsRoute,
     profileSettingsRoute,
+    adminSettingsRoute,
     vulnsRoute,
 
   ]),

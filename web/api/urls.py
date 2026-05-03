@@ -10,6 +10,7 @@ from .scan_summary_views import ScanSummaryAPIView
 from .scheduled_scans import ScheduledScanViewSet
 from .subscans import SubScanViewSet
 from .scan_history import ScanHistoryViewSet
+from .users import UserManageViewSet
 
 
 app_name = 'api'
@@ -34,6 +35,7 @@ router.register(r'projects', ProjectViewSet, basename='projects')
 router.register(r'scheduledScans', ScheduledScanViewSet, basename='scheduled-scans')
 router.register(r'subscans', SubScanViewSet, basename='subscans')
 router.register(r'listScans', ScanHistoryViewSet, basename='list-scans')
+router.register(r'users', UserManageViewSet, basename='users')
 
 
 urlpatterns = [

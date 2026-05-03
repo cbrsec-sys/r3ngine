@@ -137,7 +137,7 @@ RUN ARCH=$(dpkg --print-architecture) \
 # Install Aquatone
 RUN ARCH=$(dpkg --print-architecture) \
     && wget https://github.com/michenriksen/aquatone/releases/download/v1.7.0/aquatone_linux_${ARCH}_1.7.0.zip \
-    && unzip aquatone_linux_${ARCH}_1.7.0.zip \
+    && unzip -o aquatone_linux_${ARCH}_1.7.0.zip \
     && mv aquatone /usr/local/bin/ \
     && rm -rf aquatone_linux_${ARCH}_1.7.0.zip README.md LICENSE.txt
 
@@ -161,7 +161,7 @@ RUN git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll &
     cd /usr/src/github/OneForAll && pip3 install -r requirements.txt
 
 RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
-    cd /usr/src/github/theHarvester && pip3 install -r requirements/base.txt
+    cd /usr/src/github/theHarvester && uv sync
 
 RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
     cd /usr/src/github/ctfr && pip3 install -r requirements.txt
