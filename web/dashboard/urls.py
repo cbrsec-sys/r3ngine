@@ -143,6 +143,10 @@ urlpatterns = [
         views.index,
         name='rengine_settings_v3'),
     path(
+        '<slug:slug>/settings/profile',
+        views.index,
+        name='profile_v3'),
+    path(
         '<slug:slug>/bounty',
         views.index,
         name='bounty_v3'),

@@ -19,7 +19,9 @@ import {
   InputBase,
   Collapse,
   Button,
-  Chip
+  Chip,
+  Grid,
+  Badge
 } from '@mui/material';
 
 import { 
@@ -43,12 +45,25 @@ import {
   Clock,
   Globe,
   Plus,
+  RefreshCw,
   LogOut,
-  User as UserIcon
+  User as UserIcon,
+  Wrench,
+  List as ListIcon,
+  Bug
 } from 'lucide-react';
 import { useTheme } from '@mui/material/styles';
 import { Link, useRouterState, useParams } from '@tanstack/react-router';
 import { useAppContext } from '../../context/AppContext';
+import { 
+  WhoisModal, 
+  CMSDetectorModal, 
+  CVELookupModal, 
+  WAFDetectorModal 
+} from '../../features/tools/components/ToolboxModals';
+import { NotificationsDropdown } from '../../features/notifications/components/NotificationsDropdown';
+import { useUnreadCount } from '../../features/notifications/api';
+import { ScanHistoryDrawer } from '../../features/scans/components/ScanHistoryDrawer';
 
 const drawerWidth = 260;
 const collapsedWidth = 72;
@@ -67,8 +82,14 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [isHovered, setIsHovered] = useState(false);
   const [openItems, setOpenItems] = useState<string[]>([]);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [quickAddAnchorEl, setQuickAddAnchorEl] = useState<null | HTMLElement>(null);
+  const [toolboxAnchorEl, setToolboxAnchorEl] = useState<null | HTMLElement>(null);
+  const [openTool, setOpenTool] = useState<string | null>(null);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
+  const [scanHistoryOpen, setScanHistoryOpen] = useState(false);
 
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { data: unreadData } = useUnreadCount(projectSlug);
 
   const navItems: NavItem[] = [
     { title: 'Dashboard', icon: <Home size={20} />, path: `/${projectSlug}/dashboard`, color: '#7000ff' },
@@ -123,8 +144,37 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => setAnchorEl(event.currentTarget);
   const handleMenuClose = () => setAnchorEl(null);
 
+  const handleQuickAddOpen = (event: React.MouseEvent<HTMLElement>) => setQuickAddAnchorEl(event.currentTarget);
+  const handleQuickAddClose = () => setQuickAddAnchorEl(null);
+
+  const handleToolboxOpen = (event: React.MouseEvent<HTMLElement>) => setToolboxAnchorEl(event.currentTarget);
+  const handleToolboxClose = () => setToolboxAnchorEl(null);
+
+  const handleToolClick = (tool: string) => {
+    setOpenTool(tool);
+    handleToolboxClose();
+  };
+
+  const handleNotificationOpen = (event: React.MouseEvent<HTMLElement>) => setNotificationAnchorEl(event.currentTarget);
+  const handleNotificationClose = () => setNotificationAnchorEl(null);
+
   const routerState = useRouterState();
   const activePath = routerState.location.pathname;
+
+  const quickAddItems = [
+    { title: 'Target', icon: <Target size={16} />, path: `/${projectSlug}/targets` },
+    { title: 'Organization', icon: <Briefcase size={16} />, path: `/${projectSlug}/org` },
+    { title: 'Scan Engine', icon: <Cpu size={16} />, path: `/${projectSlug}/engines` },
+    { title: 'External Tool', icon: <Wrench size={16} />, path: `/${projectSlug}/settings/tools-arsenal` },
+    { title: 'Wordlist', icon: <ListIcon size={16} />, path: `/${projectSlug}/engines` },
+  ];
+
+  const toolboxItems = [
+    { id: 'whois', title: 'Whois', icon: <Globe size={28} />, color: '#00f3ff' },
+    { id: 'cms', title: 'CMS Detector', icon: <Search size={28} />, color: '#00f3ff' },
+    { id: 'cve', title: 'CVE Lookup', icon: <Bug size={28} />, color: '#ff00ff' },
+    { id: 'waf', title: 'WAF Detector', icon: <ShieldAlert size={28} />, color: '#ff9800' },
+  ];
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: '#05050a' }}>
@@ -307,6 +357,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 textShadow: '0 0 12px rgba(255, 0, 115, 0.8)',
                 fontSize: '1.4rem',
                 mr: 1.5,
+                ml: 1.5,
                 textTransform: 'lowercase'
               }}>
                 r3ngine
@@ -326,8 +377,11 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               />
             </Box>
 
-            {/* Universal Search */}
-            <Box sx={{ flex: 1, display: 'flex', justifyContent: 'center' }}>
+            <Box sx={{ flexGrow: 1 }} />
+
+            {/* Action Group */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+              {/* Universal Search */}
               <Box sx={{ 
                 display: 'flex', 
                 alignItems: 'center', 
@@ -335,8 +389,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 px: 2, 
                 py: 0.5, 
                 borderRadius: 10,
-                width: '100%',
-                maxWidth: 320,
+                width: 240,
                 border: '1px solid rgba(255,255,255,0.05)',
                 '&:hover': { borderColor: 'rgba(0, 243, 255, 0.3)' }
               }}>
@@ -346,10 +399,6 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 />
                 <Search size={14} style={{ color: '#ff00ff', opacity: 0.8 }} />
               </Box>
-            </Box>
-
-            {/* Action Group */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
               <Box 
                 component={Link} 
                 to={`/${projectSlug}/projects`}
@@ -360,17 +409,59 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               </Box>
 
 
-              <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5 }}>
+              <Box 
+                onClick={handleQuickAddOpen}
+                sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5 }}
+              >
                 <Plus size={14} style={{ opacity: 0.6 }} />
                 <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Quick Add</Typography>
                 <ChevronDown size={14} style={{ opacity: 0.5 }} />
               </Box>
 
-              <Box sx={{ display: 'flex', gap: 1.5, mx: 2 }}>
-                <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}><LayoutGrid size={18} /></IconButton>
+              <Box sx={{ display: 'flex', gap: 1, mx: 2 }}>
+                <IconButton 
+                  onClick={handleToolboxOpen}
+                  size="small" 
+                  sx={{ 
+                    color: toolboxAnchorEl ? '#00f3ff' : 'rgba(255,255,255,0.5)',
+                    bgcolor: toolboxAnchorEl ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
+                    boxShadow: toolboxAnchorEl ? '0 0 15px rgba(0, 243, 255, 0.3)' : 'none',
+                    '&:hover': {
+                      color: '#00f3ff',
+                      bgcolor: 'rgba(0, 243, 255, 0.05)',
+                    }
+                  }}
+                >
+                  <LayoutGrid size={18} />
+                </IconButton>
                 <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}><Sliders size={18} /></IconButton>
-                <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}><Bell size={18} /></IconButton>
-                <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}><Activity size={18} /></IconButton>
+                <IconButton 
+                  onClick={handleNotificationOpen}
+                  size="small" 
+                  sx={{ 
+                    color: notificationAnchorEl ? '#00f3ff' : 'rgba(255,255,255,0.5)',
+                    bgcolor: notificationAnchorEl ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
+                    '&:hover': {
+                      color: '#00f3ff',
+                      bgcolor: 'rgba(0, 243, 255, 0.05)',
+                    }
+                  }}
+                >
+                  <Badge badgeContent={unreadData?.count} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
+                    <Bell size={18} />
+                  </Badge>
+                </IconButton>
+                <IconButton 
+                  size="small" 
+                  onClick={() => setScanHistoryOpen(true)}
+                  sx={{ 
+                    color: scanHistoryOpen ? '#00f3ff' : 'rgba(255,255,255,0.5)',
+                    bgcolor: scanHistoryOpen ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
+                    '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)' } 
+                  }}
+                >
+                  <Activity size={18} />
+                </IconButton>
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }} onClick={handleMenuOpen}>
@@ -391,6 +482,255 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 </Box>
               </Box>
             </Box>
+
+            <Menu
+              anchorEl={quickAddAnchorEl}
+              open={Boolean(quickAddAnchorEl)}
+              onClose={handleQuickAddClose}
+              PaperProps={{
+                sx: {
+                  bgcolor: 'rgba(10, 10, 15, 0.95)',
+                  backdropFilter: 'blur(12px)',
+                  border: '1px solid rgba(0, 243, 255, 0.2)',
+                  borderRadius: 2,
+                  minWidth: 200,
+                  mt: 1.5,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+                  '& .MuiMenuItem-root': {
+                    py: 1.5,
+                    px: 2.5,
+                    gap: 2,
+                    color: 'rgba(255,255,255,0.7)',
+                    fontFamily: 'Orbitron',
+                    fontSize: '0.75rem',
+                    letterSpacing: '1px',
+                    '&:hover': {
+                      bgcolor: 'rgba(0, 243, 255, 0.1)',
+                      color: '#00f3ff',
+                    }
+                  }
+                }
+              }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              {quickAddItems.map((item) => (
+                <MenuItem 
+                  key={item.title} 
+                  component={Link} 
+                  to={item.path}
+                  onClick={handleQuickAddClose}
+                  sx={{ textDecoration: 'none' }}
+                >
+                  <Box sx={{ display: 'flex', color: 'inherit' }}>{item.icon}</Box>
+                  <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>
+                    {item.title}
+                  </Typography>
+                </MenuItem>
+              ))}
+            </Menu>
+
+            <Menu
+              anchorEl={toolboxAnchorEl}
+              open={Boolean(toolboxAnchorEl)}
+              onClose={handleToolboxClose}
+              PaperProps={{
+                sx: {
+                  bgcolor: 'rgba(10, 10, 15, 0.98)',
+                  backdropFilter: 'blur(15px)',
+                  border: '1px solid rgba(0, 243, 255, 0.2)',
+                  borderRadius: 3,
+                  p: 2.5,
+                  width: 320,
+                  mt: 1.5,
+                  boxShadow: '0 10px 40px rgba(0,0,0,0.9)',
+                  overflow: 'hidden',
+                  '&::before': {
+                    content: '""',
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    height: '2px',
+                    background: 'linear-gradient(90deg, #00f3ff, #ff00ff)',
+                    zIndex: 1
+                  }
+                }
+              }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <Box sx={{ px: 2, py: 1, mb: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography sx={{ 
+                  color: '#ff00ff', 
+                  fontFamily: 'Orbitron', 
+                  fontSize: '0.75rem', 
+                  fontWeight: 900, 
+                  letterSpacing: '3px',
+                  textShadow: '0 0 10px rgba(255, 0, 255, 0.5)'
+                }}>
+                  TOOLBOX
+                </Typography>
+                <Box sx={{ width: 40, height: 1, bgcolor: 'rgba(255,0,255,0.2)' }} />
+              </Box>
+              <Grid container spacing={2}>
+                {toolboxItems.map((item) => (
+                  <Grid item xs={6} key={item.title}>
+                    <Box
+                      onClick={() => handleToolClick(item.id)}
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        p: 2.5,
+                        borderRadius: 2,
+                        cursor: 'pointer',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        border: '1px solid transparent',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.03)',
+                          borderColor: 'rgba(255, 255, 255, 0.05)',
+                          transform: 'translateY(-4px)',
+                          boxShadow: `0 4px 20px ${item.color}15`,
+                          '& .icon-box': {
+                            color: item.color,
+                            filter: `drop-shadow(0 0 12px ${item.color}cc)`
+                          },
+                          '& .item-text': {
+                            color: '#fff',
+                            textShadow: `0 0 8px ${item.color}aa`
+                          }
+                        }
+                      }}
+                    >
+                      <Box 
+                        className="icon-box"
+                        sx={{ 
+                          mb: 2, 
+                          color: 'rgba(255,255,255,0.3)', 
+                          transition: 'all 0.3s',
+                          display: 'flex',
+                          transform: 'scale(1)',
+                          '& svg': {
+                            filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.1))'
+                          }
+                        }}
+                      >
+                        {item.icon}
+                      </Box>
+                      <Typography className="item-text" sx={{ 
+                        fontSize: '0.7rem', 
+                        color: 'rgba(255,255,255,0.4)', 
+                        fontFamily: 'Orbitron',
+                        textAlign: 'center',
+                        fontWeight: 700,
+                        letterSpacing: '1.2px',
+                        transition: 'all 0.3s',
+                        textTransform: 'uppercase'
+                      }}>
+                        {item.title}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </Menu>
+
+            <WhoisModal open={openTool === 'whois'} onClose={() => setOpenTool(null)} />
+            <CMSDetectorModal open={openTool === 'cms'} onClose={() => setOpenTool(null)} />
+            <CVELookupModal open={openTool === 'cve'} onClose={() => setOpenTool(null)} />
+            <WAFDetectorModal open={openTool === 'waf'} onClose={() => setOpenTool(null)} />
+
+            <NotificationsDropdown 
+              anchorEl={notificationAnchorEl} 
+              onClose={handleNotificationClose} 
+              projectSlug={projectSlug}
+            />
+
+            <ScanHistoryDrawer 
+              open={scanHistoryOpen} 
+              onClose={() => setScanHistoryOpen(false)} 
+              projectSlug={projectSlug} 
+            />
+
+            <Menu
+              anchorEl={anchorEl}
+              open={Boolean(anchorEl)}
+              onClose={handleMenuClose}
+              PaperProps={{
+                sx: {
+                  bgcolor: 'rgba(10, 10, 15, 0.98)',
+                  backdropFilter: 'blur(15px)',
+                  border: '1px solid rgba(0, 243, 255, 0.2)',
+                  borderRadius: 2,
+                  minWidth: 240,
+                  mt: 1.5,
+                  boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+                  overflow: 'hidden',
+                  '& .MuiMenuItem-root': {
+                    py: 1.5,
+                    px: 2.5,
+                    gap: 2,
+                    color: 'rgba(255,255,255,0.7)',
+                    fontFamily: 'Orbitron',
+                    fontSize: '0.75rem',
+                    letterSpacing: '1px',
+                    transition: 'all 0.2s',
+                    '&:hover': {
+                      bgcolor: 'rgba(0, 243, 255, 0.1)',
+                      color: '#00f3ff',
+                      '& .menu-icon': {
+                        color: '#00f3ff',
+                        filter: 'drop-shadow(0 0 5px #00f3ffaa)'
+                      }
+                    }
+                  }
+                }
+              }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.05)', mb: 1 }}>
+                <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: 0.5 }}>
+                  Welcome root!
+                </Typography>
+              </Box>
+              
+              <MenuItem onClick={handleMenuClose} component={Link} to={`/${projectSlug}/settings/profile`}>
+                <UserIcon size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
+                <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>My Account</Typography>
+              </MenuItem>
+              
+              <MenuItem onClick={handleMenuClose}>
+                <Target size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
+                <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Disable Bug Bounty Mode</Typography>
+              </MenuItem>
+              
+              <MenuItem onClick={handleMenuClose} component={Link} to={`/${projectSlug}/settings/admin`}>
+                <Settings size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
+                <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Admin Settings</Typography>
+              </MenuItem>
+              
+              <Divider sx={{ bgcolor: 'rgba(255,255,255,0.05)', my: 1 }} />
+              
+              <MenuItem onClick={handleMenuClose}>
+                <RefreshCw size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
+                <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Check reNgine Update</Typography>
+              </MenuItem>
+              
+              <Divider sx={{ bgcolor: 'rgba(255,255,255,0.05)', my: 1 }} />
+              
+              <MenuItem 
+                onClick={handleMenuClose} 
+                component="a" 
+                href="/logout"
+                sx={{ '&:hover': { color: '#ff003c !important', bgcolor: 'rgba(255, 0, 60, 0.1) !important' } }}
+              >
+                <LogOut size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
+                <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Logout</Typography>
+              </MenuItem>
+            </Menu>
           </Toolbar>
         </AppBar>
 

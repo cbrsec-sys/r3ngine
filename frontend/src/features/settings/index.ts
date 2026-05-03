@@ -8,3 +8,4 @@ export * from './components/LlmToolkitPage';
 export * from './components/ReportSettingsPage';
 export * from './components/ReNgineSettingsPage';
 export * from './components/NotificationSettingsPage';
+export * from './components/ProfileSettingsPage';

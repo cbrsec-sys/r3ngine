@@ -284,3 +284,63 @@ export const useSecretLeaks = (projectSlug: string, scanId: number) => {
     enabled: !!projectSlug && !!scanId,
   });
 };
+
+export const useScanStatus = (projectSlug: string) => {
+  return useQuery({
+    queryKey: ['scan-status', projectSlug],
+    queryFn: async () => {
+      const response = await fetch(`/api/scan_status/?project=${projectSlug}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return response.json();
+    },
+    enabled: !!projectSlug,
+    refetchInterval: 10000, // Poll every 10 seconds
+  });
+};
+
+export const useStopScanAction = (projectSlug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/action/stop/scan/?scan_id=${id}`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+    }
+  });
+};
+
+export const useDeleteScanAction = (projectSlug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/action/rows/delete/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          rows: [id],
+          model: 'ScanHistory'
+        })
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+    }
+  });
+};

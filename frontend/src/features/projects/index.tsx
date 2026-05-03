@@ -1,13 +1,13 @@
 import React from 'react';
-import { 
-  Box, 
-  Card, 
-  Typography, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
+import {
+  Box,
+  Card,
+  Typography,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
   TableRow,
   Chip,
   IconButton,
@@ -15,10 +15,10 @@ import {
   LinearProgress,
   Tooltip
 } from '@mui/material';
-import { 
-  Folder, 
-  Plus, 
-  Trash2, 
+import {
+  Folder,
+  Plus,
+  Trash2,
   ChevronRight,
   ExternalLink
 } from 'lucide-react';
@@ -45,7 +45,7 @@ export const ProjectsPage: React.FC = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
           <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', letterSpacing: 2 }}>
-            ALL_PROJECTS
+            ALL PROJECTS
           </Typography>
           <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontFamily: 'Orbitron', letterSpacing: 1 }}>
             Central Control / Project Management
@@ -65,14 +65,14 @@ export const ProjectsPage: React.FC = () => {
             '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderColor: '#00f3ff' }
           }}
         >
-          CREATE_NEW_PROJECT
+          CREATE NEW PROJECT
         </Button>
       </Box>
 
       {/* Projects Table Card */}
-      <Card sx={{ 
-        bgcolor: 'rgba(10, 10, 25, 0.8)', 
-        backdropFilter: 'blur(10px)', 
+      <Card sx={{
+        bgcolor: 'rgba(10, 10, 25, 0.8)',
+        backdropFilter: 'blur(10px)',
         border: '1px solid rgba(255, 255, 255, 0.05)',
         borderRadius: 3,
         overflow: 'hidden'
@@ -81,21 +81,21 @@ export const ProjectsPage: React.FC = () => {
           <Table>
             <TableHead sx={{ bgcolor: 'rgba(50, 20, 80, 0.3)' }}>
               <TableRow>
-                <TableCell sx={headerStyles}>PROJECT NAME</TableCell>
+                <TableCell sx={{ ...headerStyles, pl: 10 }}>PROJECT NAME</TableCell>
                 <TableCell sx={headerStyles}>SLUG</TableCell>
                 <TableCell sx={{ ...headerStyles, textAlign: 'center' }}>ACTIONS</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {projects?.map((project) => (
-                <TableRow 
-                  key={project.id} 
-                  sx={{ 
+                <TableRow
+                  key={project.id}
+                  sx={{
                     '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.03)' },
                     transition: 'all 0.2s'
                   }}
                 >
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', pl: 10 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                       <Typography variant="body1" sx={{ fontWeight: 800, color: '#fff' }}>
                         {project.name}
@@ -106,12 +106,12 @@ export const ProjectsPage: React.FC = () => {
                     </Box>
                   </TableCell>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
-                    <Chip 
-                      label={project.slug} 
+                    <Chip
+                      label={project.slug}
                       size="small"
-                      sx={{ 
-                        bgcolor: 'rgba(0, 243, 255, 0.05)', 
-                        color: '#00f3ff', 
+                      sx={{
+                        bgcolor: 'rgba(0, 243, 255, 0.05)',
+                        color: '#00f3ff',
                         fontWeight: 700,
                         fontSize: '0.65rem',
                         borderRadius: 1,
@@ -139,12 +139,12 @@ export const ProjectsPage: React.FC = () => {
                       >
                         OPEN_DASHBOARD
                       </Button>
-                      <IconButton 
+                      <IconButton
                         onClick={() => handleDelete(project.id, project.name)}
-                        size="small" 
-                        sx={{ 
-                          color: '#ff003c', 
-                          bgcolor: 'rgba(255, 0, 60, 0.05)', 
+                        size="small"
+                        sx={{
+                          color: '#ff003c',
+                          bgcolor: 'rgba(255, 0, 60, 0.05)',
                           borderRadius: 1,
                           '&:hover': { bgcolor: 'rgba(255, 0, 60, 0.15)' }
                         }}
@@ -160,9 +160,9 @@ export const ProjectsPage: React.FC = () => {
         </TableContainer>
       </Card>
 
-      <AddProjectModal 
-        open={isAddModalOpen} 
-        onClose={() => setIsAddModalOpen(false)} 
+      <AddProjectModal
+        open={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
       />
     </Box>
   );

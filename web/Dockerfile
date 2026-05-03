@@ -71,7 +71,8 @@ RUN apt install -y --no-install-recommends \
     sslscan \
     medusa \
     proxychains4 \
-    jq
+    jq \
+    unzip
 
 RUN add-apt-repository ppa:mozillateam/ppa
 
@@ -121,11 +122,24 @@ RUN printf "\
     github.com/projectdiscovery/katana/cmd/katana@latest\n\
     github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest\n\
     github.com/sa7mon/s3scanner@latest\n\
-    github.com/gitleaks/gitleaks/v8@latest\n\
-    github.com/trufflesecurity/trufflehog/v3@latest\n\
-    github.com/michenriksen/aquatone@latest\n" | \
+    github.com/zricethezav/gitleaks/v8@latest\n" | \
     xargs -L1 go install -ldflags="-s -w" -v && \
     rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
+
+# Install Trufflehog
+RUN ARCH=$(dpkg --print-architecture) \
+    && TRUFFLEHOG_VERSION=$(curl -s https://api.github.com/repos/trufflesecurity/trufflehog/releases/latest | jq -r .tag_name | sed 's/v//') \
+    && wget https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH}.tar.gz \
+    && tar -xvf trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH}.tar.gz \
+    && mv trufflehog /usr/local/bin/ \
+    && rm -rf trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH}.tar.gz
+
+# Install Aquatone
+RUN ARCH=$(dpkg --print-architecture) \
+    && wget https://github.com/michenriksen/aquatone/releases/download/v1.7.0/aquatone_linux_${ARCH}_1.7.0.zip \
+    && unzip aquatone_linux_${ARCH}_1.7.0.zip \
+    && mv aquatone /usr/local/bin/ \
+    && rm -rf aquatone_linux_${ARCH}_1.7.0.zip README.md LICENSE.txt
 
 # Install Arjun, InQL, Netlas
 RUN pip3 install arjun inql netlas
@@ -152,10 +166,11 @@ RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarves
 RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
     cd /usr/src/github/ctfr && pip3 install -r requirements.txt
 
-RUN wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_amd64.tar.gz && \
-    tar -xvf kiterunner_1.0.2_linux_amd64.tar.gz && \
+RUN ARCH=$(dpkg --print-architecture) \
+    && wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
+    tar -xvf kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
     mv kr /usr/local/bin/ && \
-    rm -rf kiterunner_1.0.2_linux_amd64.tar.gz
+    rm -rf kiterunner_1.0.2_linux_${ARCH}.tar.gz
 
 # Download Kiterunner Wordlist
 RUN mkdir -p /usr/src/wordlist/kr && \
