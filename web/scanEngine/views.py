@@ -363,11 +363,23 @@ def proxy_settings(request, slug):
 
         if form.is_valid():
             form.save()
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'success', 'message': 'Proxies updated.'})
             messages.add_message(
                 request,
                 messages.INFO,
                 'Proxies updated.')
             return http.HttpResponseRedirect(reverse('proxy_settings', kwargs={'slug': slug}))
+        else:
+            if request.headers.get('Accept') == 'application/json':
+                return http.JsonResponse({'status': 'error', 'errors': form.errors}, status=400)
+
+    if request.headers.get('Accept') == 'application/json':
+        return http.JsonResponse({
+            'use_proxy': proxy.use_proxy if proxy else False,
+            'proxies': proxy.proxies if proxy else ""
+        })
+
     context['settings_nav_active'] = 'active'
     context['proxy_settings_li'] = 'active'
     context['settings_ul_show'] = 'show'

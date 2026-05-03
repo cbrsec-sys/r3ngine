@@ -95,7 +95,23 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     { title: 'Organization', icon: <Briefcase size={20} />, path: `/${projectSlug}/org`, color: '#00f3ff' },
     { title: 'Scan Engine', icon: <Cpu size={20} />, path: `/${projectSlug}/engines`, color: '#00f3ff' },
     { title: 'Bounty Hub', icon: <Command size={20} />, path: `/${projectSlug}/bounty`, color: '#00f3ff' },
-    { title: 'Settings', icon: <Settings size={20} />, path: `/${projectSlug}/settings`, color: '#00f3ff' },
+    { 
+      title: 'Settings', 
+      icon: <Settings size={20} />, 
+      path: `/${projectSlug}/settings`, 
+      color: '#00f3ff',
+      children: [
+        { title: 'Proxies', path: `/${projectSlug}/settings/proxies` },
+        { title: 'OpSec Settings', path: `/${projectSlug}/settings/opsec` },
+        { title: 'Tool Settings', path: `/${projectSlug}/settings/tool-settings` },
+        { title: 'API Vault', path: `/${projectSlug}/settings/api-vault` },
+        { title: 'LLM Toolkit', path: `/${projectSlug}/settings/llm-toolkit` },
+        { title: 'Tools Arsenal', path: `/${projectSlug}/settings/tools-arsenal` },
+        { title: 'Report Settings', path: `/${projectSlug}/settings/report-settings` },
+        { title: 'reNgine Settings', path: `/${projectSlug}/settings/rengine-settings` },
+        { title: 'Notification Settings', path: `/${projectSlug}/settings/notifications` },
+      ]
+    },
   ];
 
   const handleToggle = (title: string) => {

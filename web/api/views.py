@@ -2142,6 +2142,67 @@ class ListOrganizations(APIView):
 		return Response({'organizations': organization_serializer.data})
 
 
+class CreateOrganization(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		data = request.data
+		name = data.get('name')
+		description = data.get('description', '')
+		domains = data.get('domains', [])
+		slug = data.get('slug')
+
+		if not name or not slug:
+			return Response({'status': False, 'message': 'Name and project slug are required'}, status=400)
+
+		try:
+			project = Project.objects.get(slug=slug)
+			organization = Organization.objects.create(
+				name=name,
+				description=description,
+				project=project,
+				insert_date=timezone.now()
+			)
+			for domain_id in domains:
+				domain = Domain.objects.get(id=domain_id)
+				organization.domains.add(domain)
+			return Response({'status': True, 'message': 'Organization created successfully', 'id': organization.id})
+		except Exception as e:
+			return Response({'status': False, 'message': str(e)}, status=400)
+
+
+class UpdateOrganization(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		data = request.data
+		org_id = data.get('id')
+		name = data.get('name')
+		description = data.get('description', '')
+		domains = data.get('domains', [])
+
+		if not org_id or not name:
+			return Response({'status': False, 'message': 'ID and Name are required'}, status=400)
+
+		try:
+			organization = Organization.objects.get(id=org_id)
+			organization.name = name
+			organization.description = description
+			organization.save()
+			
+			# Update domains
+			organization.domains.clear()
+			for domain_id in domains:
+				domain = Domain.objects.get(id=domain_id)
+				organization.domains.add(domain)
+				
+			return Response({'status': True, 'message': 'Organization updated successfully'})
+		except Exception as e:
+			return Response({'status': False, 'message': str(e)}, status=400)
+
+
 class ListWordlists(APIView):
 	def get(self, request, format=None):
 		wordlists = Wordlist.objects.all()

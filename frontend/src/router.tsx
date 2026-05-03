@@ -9,6 +9,8 @@ import { ScanList, ScheduledScansPage, SubScansPage, ScanHistoryPage, ScanDetail
 import { EndpointsPage } from "./features/endpoints";
 import { SubdomainsPage } from "./features/subdomains";
 import { TodoPage } from "./features/todos";
+import { OrganizationPage } from "./features/organizations";
+import { ProxySettingsPage } from "./features/settings/components/ProxySettingsPage";
 
 import { PlaceholderPage } from "./components/PlaceholderPage";
 import { Box, Typography, Button } from "@mui/material";
@@ -57,6 +59,13 @@ const targetListRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: "targets",
   component: TargetList,
+});
+
+// Organizations Route
+const organizationsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "org",
+  component: OrganizationPage,
 });
 
 // Target Summary Route
@@ -242,6 +251,13 @@ const todoRoute = createRoute({
   component: TodoPage,
 });
 
+// Settings Routes
+const proxySettingsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/proxies",
+  component: ProxySettingsPage,
+});
+
 import { VulnerabilityList } from "./features/vulnerabilities";
 
 // Vulnerabilities Route
@@ -316,6 +332,8 @@ const routeTree = rootRoute.addChildren([
     subdomainsRoute,
     endpointsRoute,
     todoRoute,
+    organizationsRoute,
+    proxySettingsRoute,
     vulnsRoute,
   ]),
 ]);

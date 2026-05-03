@@ -103,6 +103,18 @@ urlpatterns = [
         views.index,
         name='todo_v3'),
     path(
+        '<slug:slug>/org/',
+        views.index,
+        name='organizations_v3'),
+    path(
+        '<slug:slug>/settings/proxies',
+        views.index,
+        name='proxy_settings_v3'),
+    path(
+        '<slug:slug>/bounty',
+        views.index,
+        name='bounty_v3'),
+    path(
         '<slug:slug>/api/graph/scan/<int:scan_id>/data/',
         views.get_graph_data,
         name='get_graph_data'),

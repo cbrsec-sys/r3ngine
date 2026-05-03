@@ -115,6 +115,14 @@ urlpatterns = [
         ListOrganizations.as_view(),
         name='listOrganizations'),
     path(
+        'createOrganization/',
+        CreateOrganization.as_view(),
+        name='createOrganization'),
+    path(
+        'updateOrganization/',
+        UpdateOrganization.as_view(),
+        name='updateOrganization'),
+    path(
         'listEngines/',
         ListEngines.as_view(),
         name='listEngines'),
