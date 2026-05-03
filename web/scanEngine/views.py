@@ -632,6 +632,7 @@ def llm_toolkit_section(request, slug):
     }
     # Sync OpenAI from vault if LLMConfig doesn't have it
     from dashboard.models import OpenAiAPIKey
+    from reNgine.definitions import OPENAI
     openai_vault = OpenAiAPIKey.objects.first()
     if openai_vault:
         openai_config, created = LLMConfig.objects.get_or_create(provider=OPENAI)
@@ -648,7 +649,21 @@ def llm_toolkit_section(request, slug):
     context['active_provider'] = active_config.provider if active_config else 'ollama'
     context['active_config'] = active_config
     
+    if request.headers.get('Accept') == 'application/json':
+        return http.JsonResponse({
+            'llm_configs': [
+                {
+                    'provider': c.provider,
+                    'api_key': c.api_key,
+                    'selected_model': c.selected_model,
+                    'is_active': c.is_active
+                } for c in configs
+            ],
+            'active_provider': context['active_provider']
+        })
+
     return render(request, 'scanEngine/settings/llm_toolkit.html', context)
+
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def update_llm_settings(request, slug):

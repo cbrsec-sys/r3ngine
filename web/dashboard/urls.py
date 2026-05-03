@@ -127,6 +127,10 @@ urlpatterns = [
         views.index,
         name='api_vault_v3'),
     path(
+        '<slug:slug>/settings/llm-toolkit',
+        views.index,
+        name='llm_toolkit_v3'),
+    path(
         '<slug:slug>/bounty',
         views.index,
         name='bounty_v3'),

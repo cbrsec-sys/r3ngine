@@ -15,8 +15,10 @@ import {
   OpSecSettingsPage, 
   ToolSettingsPage, 
   ToolArsenalPage,
-  ApiVaultPage 
+  ApiVaultPage,
+  LlmToolkitPage
 } from "./features/settings";
+
 
 import { PlaceholderPage } from "./components/PlaceholderPage";
 import { Box, Typography, Button } from "@mui/material";
@@ -288,6 +290,13 @@ const apiVaultSettingsRoute = createRoute({
   component: ApiVaultPage,
 });
 
+const llmToolkitSettingsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "settings/llm-toolkit",
+  component: LlmToolkitPage,
+});
+
+
 import { VulnerabilityList } from "./features/vulnerabilities";
 
 // Vulnerabilities Route
@@ -368,7 +377,9 @@ const routeTree = rootRoute.addChildren([
     toolSettingsRoute,
     toolArsenalRoute,
     apiVaultSettingsRoute,
+    llmToolkitSettingsRoute,
     vulnsRoute,
+
   ]),
 ]);
 

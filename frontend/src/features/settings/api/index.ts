@@ -1,6 +1,29 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 
+export interface LLMConfig {
+  provider: string;
+  api_key: string;
+  selected_model: string;
+  is_active: boolean;
+}
+
+export interface LLMModel {
+  name: string;
+  expertise?: string;
+  size?: string;
+  suggested_ram?: string;
+  description?: string;
+  is_local?: boolean;
+}
+
+export interface OllamaPullStatus {
+  status: 'running' | 'success' | 'failed';
+  log: string;
+}
+
+
+
 export interface ProxySettings {
   use_proxy: boolean;
   proxies: string;
@@ -381,3 +404,71 @@ export const useUpdateApiVault = (slug: string) => {
   });
 };
 
+export const useLlmToolkit = (slug: string) => {
+  return useQuery<{ llm_configs: LLMConfig[]; active_provider: string }>({
+    queryKey: ['llm-toolkit', slug],
+    queryFn: async () => {
+      const response = await axios.get(`/scanEngine/${slug}/llm_toolkit`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      return response.data;
+    },
+  });
+};
+
+export const useLlmModels = (slug: string, provider: string, apiKey: string) => {
+  return useQuery<LLMModel[]>({
+    queryKey: ['llm-models', slug, provider, apiKey],
+    queryFn: async () => {
+      const response = await axios.get(`/scanEngine/${slug}/fetch_llm_models`, {
+        params: { provider, api_key: apiKey }
+      });
+      return response.data.models;
+    },
+    enabled: !!provider && (provider === 'ollama' || !!apiKey),
+  });
+};
+
+export const useUpdateLlmSettings = (slug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: { provider: string; api_key: string; selected_model: string; is_active: boolean; action: 'save' | 'pull' }) => {
+      const formData = new FormData();
+      formData.append('provider', data.provider);
+      formData.append('api_key', data.api_key);
+      formData.append('selected_model', data.selected_model);
+      formData.append('is_active', data.is_active ? 'true' : 'false');
+      formData.append('action', data.action);
+      
+      const response = await axios.post(`/scanEngine/${slug}/update_llm_settings`, formData, {
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'Accept': 'application/json'
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['llm-toolkit', slug] });
+    },
+  });
+};
+
+export const useOllamaPullStatus = (slug: string, model: string | null) => {
+  return useQuery<OllamaPullStatus>({
+    queryKey: ['ollama-pull-status', slug, model],
+    queryFn: async () => {
+      const response = await axios.get(`/scanEngine/${slug}/get_ollama_pull_status`, {
+        params: { model }
+      });
+      return response.data;
+    },
+    enabled: !!model,
+    refetchInterval: (data) => {
+      if (data && (data.status === 'success' || data.status === 'failed')) {
+        return false;
+      }
+      return 2000;
+    },
+  });
+};

@@ -4,3 +4,4 @@ export * from './components/OpSecSettingsPage';
 export * from './components/ToolSettingsPage';
 export * from './components/ToolArsenalPage';
 export * from './components/ApiVaultPage';
+export * from './components/LlmToolkitPage';
