@@ -19,8 +19,12 @@ export const DashboardPage: React.FC = () => {
 
   React.useEffect(() => {
     if (data) {
-      setVersion(data.rengine_version);
-      setProjectName(data.project_info.name.toUpperCase());
+      if (data.rengine_version) {
+        setVersion(data.rengine_version);
+      }
+      if (data.project_info?.name) {
+        setProjectName(data.project_info.name.toUpperCase());
+      }
     }
   }, [data, setVersion, setProjectName]);
 

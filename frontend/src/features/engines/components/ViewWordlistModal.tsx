@@ -46,13 +46,15 @@ export const ViewWordlistModal: React.FC<ViewWordlistModalProps> = ({ open, onCl
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      paperprops={{
-        sx: {
-          bgcolor: '#0a0a0c',
-          border: '1px solid rgba(255, 0, 255, 0.2)',
-          boxShadow: '0 0 30px rgba(255, 0, 255, 0.1)',
-          backgroundImage: 'linear-gradient(rgba(255, 0, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px)',
-          backgroundSize: '20px 20px',
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: '#0a0a0c',
+            border: '1px solid rgba(255, 0, 255, 0.2)',
+            boxShadow: '0 0 30px rgba(255, 0, 255, 0.1)',
+            backgroundImage: 'linear-gradient(rgba(255, 0, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }
         }
       }}
     >
@@ -81,7 +83,7 @@ export const ViewWordlistModal: React.FC<ViewWordlistModalProps> = ({ open, onCl
           </Box>
         ) : (
           <Box
-            component="pre"
+            component="div"
             sx={{
               bgcolor: 'rgba(255,255,255,0.03)',
               p: 2,
@@ -92,7 +94,8 @@ export const ViewWordlistModal: React.FC<ViewWordlistModalProps> = ({ open, onCl
               fontSize: '0.85rem',
               overflow: 'auto',
               flexGrow: 1,
-              m: 0
+              m: 0,
+              whiteSpace: 'pre-wrap'
             }}
           >
             {content || 'PAYLOAD_EMPTY_OR_UNAVAILABLE'}

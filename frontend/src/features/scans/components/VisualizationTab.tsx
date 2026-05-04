@@ -107,16 +107,16 @@ const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId
       let left = root;
       let right = root;
       root.eachBefore(node => {
-        if (node.x < left.x) left = node;
-        if (node.x > right.x) right = node;
+        if (node.x! < left.x!) left = node;
+        if (node.x! > right.x!) right = node;
       });
 
-      const height = right.x - left.x + margin.top + margin.bottom;
+      const height = right.x! - left.x! + margin.top + margin.bottom;
 
       const transition = svg.transition()
         .duration(duration)
-        .attr("viewBox", [-margin.left, left.x - margin.top, width, height] as any)
-        .tween("resize", window.ResizeObserver ? null : () => () => svg.dispatch("toggle"));
+        .attr("viewBox", [-margin.left, left.x! - margin.top, width, height] as any)
+        .tween("resize", (window.ResizeObserver ? null : () => () => svg.dispatch("toggle")) as any);
 
       // Update nodes
       const node = g.selectAll("g.node")
@@ -257,7 +257,7 @@ const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId
     <TacticalPanel 
       title="SCAN RESULT VISUALIZATION" 
       icon={<Maximize2 size={14} />}
-      actions={
+      headerAction={
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <FormControlLabel
             control={

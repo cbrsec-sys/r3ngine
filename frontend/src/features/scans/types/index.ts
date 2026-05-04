@@ -23,6 +23,8 @@ export interface ScanHistory {
   initiated_by: {
     username: string;
   } | null;
+  engine_name?: string;
+  cfg_starting_point_path?: string;
 }
 
 export interface ScheduledScan {

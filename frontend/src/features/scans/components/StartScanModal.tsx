@@ -83,13 +83,15 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
       onClose={handleClose}
       maxWidth="md"
       fullWidth
-      paperprops={{
-        sx: {
-          bgcolor: 'rgba(10, 10, 20, 0.95)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0, 255, 98, 0.2)',
-          borderRadius: 4,
-          backgroundImage: 'radial-gradient(circle at top right, rgba(0, 255, 98, 0.05), transparent)',
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: 'rgba(10, 10, 20, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0, 255, 98, 0.2)',
+            borderRadius: 4,
+            backgroundImage: 'radial-gradient(circle at top right, rgba(0, 255, 98, 0.05), transparent)',
+          }
         }
       }}
     >
@@ -156,10 +158,12 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
                   fullWidth
                   required
                   value={formData.engine_id}
-                  onChange={(e) => setFormData({ ...formData, engine_id: e.target.value as number })}
+                  onChange={(e) => setFormData({ ...formData, engine_id: Number(e.target.value) })}
                   sx={fieldStyles}
-                  InputProps={{
-                    startAdornment: <Shield size={18} style={{ marginRight: 12, color: '#00ff62' }} />
+                  slotProps={{
+                    input: {
+                      startAdornment: <Shield size={18} style={{ marginRight: 12, color: '#00ff62' }} />
+                    }
                   }}
                 >
                   {engines?.map((engine) => (

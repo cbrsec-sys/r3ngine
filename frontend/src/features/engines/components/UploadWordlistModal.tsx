@@ -56,13 +56,15 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
       onClose={onClose}
       maxWidth="sm"
       fullWidth
-      paperprops={{
-        sx: {
-          bgcolor: '#0a0a0c',
-          border: '1px solid rgba(255, 0, 255, 0.2)',
-          boxShadow: '0 0 30px rgba(255, 0, 255, 0.1)',
-          backgroundImage: 'linear-gradient(rgba(255, 0, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px)',
-          backgroundSize: '20px 20px',
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: '#0a0a0c',
+            border: '1px solid rgba(255, 0, 255, 0.2)',
+            boxShadow: '0 0 30px rgba(255, 0, 255, 0.1)',
+            backgroundImage: 'linear-gradient(rgba(255, 0, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }
         }
       }}
     >

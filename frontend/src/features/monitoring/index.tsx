@@ -81,7 +81,7 @@ export const MonitoringPage: React.FC = () => {
       {/* KPI Stats Grid - MUI Grid for stability */}
       <Grid container spacing={3} sx={{ mb: 6 }}>
         {kpis.map((kpi, index) => (
-          <Grid key={index} xs={12} sm={6} md={3}>
+          <Grid key={index} size={{ xs: 12, sm: 6, md: 3 }}>
             <KpiCard 
               title={kpi.title}
               value={kpi.value}

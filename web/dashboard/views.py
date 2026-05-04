@@ -19,7 +19,7 @@ from django.urls import reverse
 from rolepermissions.roles import assign_role, clear_roles
 from rolepermissions.decorators import has_permission_decorator
 from django.template.defaultfilters import slugify
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.conf import settings
 
@@ -201,7 +201,7 @@ def index(request, slug, *args, **kwargs):
 
     context['asset_countries'] = CountryISO.objects.filter(ipaddress__in=ip_addresses).annotate(count=Count('ipaddress')).order_by('-count')
 
-    return render(request, 'dashboard/index.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def profile(request, slug):
@@ -218,7 +218,7 @@ def profile(request, slug):
             messages.error(request, 'Please correct the error below.')
     else:
         form = PasswordChangeForm(request.user)
-    return render(request, 'dashboard/profile.html', {
+    return render(request, 'dashboard/v3_index.html', {
         'form': form
     })
 
@@ -229,7 +229,7 @@ def admin_interface(request, slug):
     users = UserModel.objects.all().order_by('date_joined')
     return render(
         request,
-        'dashboard/admin.html',
+        'dashboard/v3_index.html',
         {
             'users': users
         }
@@ -314,12 +314,12 @@ def on_user_logged_in(sender, request, **kwargs):
 
 def search(request, slug):
     # Verified edit
-    return render(request, 'dashboard/search.html')
+    return render(request, 'dashboard/v3_index.html')
 
 
 def four_oh_four(request):
     try:
-        return render(request, '404.html')
+        return render(request, 'dashboard/v3_index.html') # Or a specific 404 page if SPA handles it
     except Exception as e:
         logger.error(f"Error in 404 handler: {str(e)}")
         import traceback
@@ -331,7 +331,7 @@ def four_oh_four(request):
 def projects(request, slug):
     context = {}
     context['projects'] = Project.objects.all()
-    return render(request, 'dashboard/projects.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
@@ -487,7 +487,7 @@ def onboarding(request):
         user=request.user
     )
 
-    return render(request, 'dashboard/onboarding.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 
@@ -497,7 +497,7 @@ def list_bountyhub_programs(request, slug):
     platform = request.GET.get('platform') or 'hackerone'
     context['platform'] = platform.capitalize()
     
-    return render(request, 'dashboard/bountyhub_programs.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
     
 
 def monitoring_dashboard(request, slug):
@@ -528,7 +528,7 @@ def monitoring_dashboard(request, slug):
         'login_discoveries': login_discoveries,
     }
     
-    return render(request, 'dashboard/monitoring.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def attack_surface(request, slug, scan_id):
@@ -539,12 +539,31 @@ def attack_surface(request, slug, scan_id):
         'scan': scan,
         'attack_surface_active': 'active'
     }
-    return render(request, 'dashboard/attack_surface.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
+
+
+def target_attack_surface(request, slug, target_id):
+    project = get_object_or_404(Project, slug=slug)
+    target = get_object_or_404(Domain, id=target_id)
+    context = {
+        'project': project,
+        'target': target,
+        'attack_surface_active': 'active'
+    }
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def get_graph_data(request, slug, scan_id):
     graph = Neo4jManager()
     data = graph.get_cytoscape_json(scan_id)
+    graph.close()
+    return JsonResponse(data)
+
+
+def get_target_graph_data(request, slug, target_id):
+    target = get_object_or_404(Domain, id=target_id)
+    graph = Neo4jManager()
+    data = graph.get_target_graph_data(target.name)
     graph.close()
     return JsonResponse(data)
 
@@ -592,4 +611,12 @@ def login_v3(request):
     return render(request, 'dashboard/v3_index.html', {
         'debug': settings.DEBUG,
         'project': {'name': 'reNgine'} # Fallback for title
+    })
+
+
+def logout_v3(request):
+    logout(request)
+    return render(request, 'dashboard/v3_index.html', {
+        'debug': settings.DEBUG,
+        'project': {'name': 'reNgine'}
     })

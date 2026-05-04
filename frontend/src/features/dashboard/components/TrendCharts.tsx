@@ -57,7 +57,7 @@ export const TrendCharts: React.FC<{ data: DashboardData['trends'] }> = ({ data 
           <Chart 
             options={areaOptions} 
             series={series} 
-            type="area" 
+            type="area" as any 
             height="100%"
           />
         </Box>

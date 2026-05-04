@@ -5,6 +5,7 @@ export interface Project {
   name: string;
   slug: string;
   insert_date: string;
+  insert_date_humanized?: string;
 }
 
 export const useProjects = () => {

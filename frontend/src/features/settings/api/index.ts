@@ -206,7 +206,8 @@ export const useProxyTaskStatus = (slug: string, taskId: string | null) => {
       return response.data;
     },
     enabled: !!taskId,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
+      const data = query.state.data as ProxyTaskStatus | undefined;
       if (data && (data.status === 'SUCCESS' || data.status === 'FAILURE')) {
         return false;
       }
@@ -516,7 +517,8 @@ export const useOllamaPullStatus = (slug: string, model: string | null) => {
       return response.data;
     },
     enabled: !!model,
-    refetchInterval: (data) => {
+    refetchInterval: (query) => {
+      const data = query.state.data as OllamaPullStatus | undefined;
       if (data && (data.status === 'success' || data.status === 'failed')) {
         return false;
       }

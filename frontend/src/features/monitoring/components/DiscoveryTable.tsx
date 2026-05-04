@@ -16,9 +16,9 @@ import {
 } from '@mui/material';
 import { Eye, ExternalLink, ShieldAlert } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
-import type { Discovery } from '../api';
+import type { MonitoringDiscovery } from '../types';
 
-export const DiscoveryTable: React.FC<{ discoveries: Discovery[], projectSlug: string }> = ({ discoveries, projectSlug }) => {
+export const DiscoveryTable: React.FC<{ discoveries: MonitoringDiscovery[], projectSlug: string }> = ({ discoveries, projectSlug }) => {
   const getTypeColor = (type: string) => {
     switch (type.toLowerCase()) {
       case 'subdomain': return '#00ff62';
@@ -60,6 +60,7 @@ export const DiscoveryTable: React.FC<{ discoveries: Discovery[], projectSlug: s
             <TableBody>
               {discoveries.map((discovery) => {
                 const color = getTypeColor(discovery.discovery_type);
+                const content = typeof discovery.content === 'string' ? JSON.parse(discovery.content) : discovery.content;
                 return (
                   <TableRow key={discovery.id} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }, borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
                     <TableCell>
@@ -84,22 +85,22 @@ export const DiscoveryTable: React.FC<{ discoveries: Discovery[], projectSlug: s
                     </TableCell>
                     <TableCell>
                       <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem' }}>
-                        {discovery.content.name || discovery.content.url || 'N/A'}
+                        {content.name || content.url || 'N/A'}
                       </Typography>
                     </TableCell>
                     <TableCell>
                       <Box sx={{ display: 'flex', gap: 1 }}>
-                        {discovery.content.status && (
+                        {content.status && (
                           <Chip 
-                            label={discovery.content.status} 
+                            label={content.status} 
                             size="small" 
                             variant="outlined" 
                             sx={{ height: 18, fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)' }} 
                           />
                         )}
-                        {discovery.content.title && (
+                        {content.title && (
                           <Typography variant="caption" sx={{ opacity: 0.4 }}>
-                            {discovery.content.title.substring(0, 30)}...
+                            {content.title.substring(0, 30)}...
                           </Typography>
                         )}
                       </Box>

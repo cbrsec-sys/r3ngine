@@ -60,14 +60,16 @@ export const CheckForUpdateModal: React.FC<CheckForUpdateModalProps> = ({ open, 
       onClose={handleClose}
       maxWidth="md"
       fullWidth
-      paperprops={{
-        sx: {
-          bgcolor: 'rgba(10, 10, 20, 0.95)',
-          backdropFilter: 'blur(15px)',
-          border: '1px solid rgba(0, 243, 255, 0.2)',
-          borderRadius: 4,
-          boxShadow: '0 0 40px rgba(0, 243, 255, 0.1)',
-          backgroundImage: 'none'
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: 'rgba(10, 10, 20, 0.95)',
+            backdropFilter: 'blur(15px)',
+            border: '1px solid rgba(0, 243, 255, 0.2)',
+            borderRadius: 4,
+            boxShadow: '0 0 40px rgba(0, 243, 255, 0.1)',
+            backgroundImage: 'none'
+          }
         }
       }}
     >

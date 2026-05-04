@@ -5,7 +5,8 @@ import { TacticalPanel } from '../../../components/TacticalPanel';
 
 interface AttackSurfaceTabProps {
   projectSlug: string;
-  scanId: number;
+  scanId?: number;
+  targetId?: number;
 }
 
 declare global {
@@ -14,11 +15,18 @@ declare global {
   }
 }
 
-export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug, scanId }) => {
+// Generate a color palette for scans
+const SCAN_COLORS = [
+  '#00f3ff', '#7000ff', '#ff00f7', '#ff003c', '#ff9f00', 
+  '#fffc00', '#00ff62', '#2196f3', '#ec4899', '#8b5cf6'
+];
+
+export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug, scanId, targetId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [scanColorMap, setScanColorMap] = useState<Record<number, string>>({});
 
   useEffect(() => {
     // Load Cytoscape from CDN if not already loaded
@@ -34,9 +42,28 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
 
     async function initGraph() {
       try {
-        const response = await fetch(`/${projectSlug}/api/graph/scan/${scanId}/data/`);
+        let apiUrl = `/${projectSlug}/api/graph/scan/${scanId}/data/`;
+        if (targetId && (!scanId || scanId === 0)) {
+            apiUrl = `/${projectSlug}/api/graph/target/${targetId}/data/`;
+        }
+
+        const response = await fetch(apiUrl);
         const elements = await response.json();
         
+        // Build scan color map if we have multiple scans
+        const uniqueScans = new Set<number>();
+        elements.nodes.forEach((n: any) => {
+            if (n.data.scan_ids) {
+                n.data.scan_ids.forEach((id: number) => uniqueScans.add(id));
+            }
+        });
+        
+        const colorMap: Record<number, string> = {};
+        Array.from(uniqueScans).forEach((id, index) => {
+            colorMap[id] = SCAN_COLORS[index % SCAN_COLORS.length];
+        });
+        setScanColorMap(colorMap);
+
         if (containerRef.current && window.cytoscape) {
           cyRef.current = window.cytoscape({
             container: containerRef.current,
@@ -57,9 +84,18 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
                         'text-opacity': 0,
                         'width': 30,
                         'height': 30,
-                        'border-width': 2,
-                        'border-color': 'data(color)',
-                        'border-opacity': 0.5,
+                        'border-width': (ele: any) => {
+                            const scanIds = ele.data('scan_ids') || [];
+                            return scanIds.length > 0 ? 3 : 1;
+                        },
+                        'border-color': (ele: any) => {
+                            const scanIds = ele.data('scan_ids') || [];
+                            if (scanIds.length > 0) {
+                                return colorMap[scanIds[0]] || '#00f3ff';
+                            }
+                            return 'data(color)';
+                        },
+                        'border-opacity': 0.8,
                         'overlay-padding': '6px',
                         'z-index': 1
                     }
@@ -71,14 +107,32 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
                         'height': 60,
                         'font-size': '14px',
                         'font-weight': 'bold',
-                        'text-opacity': 1
+                        'text-opacity': 1,
+                        'shape': 'diamond'
+                    }
+                },
+                {
+                    selector: 'node[type = "Scan"]',
+                    style: {
+                        'width': 40,
+                        'height': 40,
+                        'shape': 'hexagon',
+                        'background-color': (ele: any) => colorMap[ele.data('id')] || '#fff',
+                        'text-opacity': 1,
+                        'font-size': '12px'
                     }
                 },
                 {
                     selector: 'edge',
                     style: {
                         'width': 1.5,
-                        'line-color': 'rgba(148, 163, 184, 0.2)',
+                        'line-color': (ele: any) => {
+                            const scanIds = ele.data('scan_ids') || [];
+                            if (scanIds.length > 0) {
+                                return colorMap[scanIds[0]] || 'rgba(148, 163, 184, 0.2)';
+                            }
+                            return 'rgba(148, 163, 184, 0.2)';
+                        },
                         'target-arrow-color': 'rgba(148, 163, 184, 0.2)',
                         'target-arrow-shape': 'triangle',
                         'curve-style': 'bezier',
@@ -86,7 +140,8 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
                         'color': '#94a3b8',
                         'text-rotation': 'autorotate',
                         'text-margin-y': '-10px',
-                        'text-opacity': 0
+                        'text-opacity': 0,
+                        'opacity': 0.4
                     }
                 },
                 {
@@ -177,7 +232,7 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
         cyRef.current.destroy();
       }
     };
-  }, [projectSlug, scanId]);
+  }, [projectSlug, scanId, targetId]);
 
   const handleSearch = (query: string) => {
     setSearchQuery(query);
@@ -223,7 +278,7 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
     const pngContent = cyRef.current.png({ full: true, bg: '#0f172a' });
     const link = document.createElement('a');
     link.href = pngContent;
-    link.download = `attack-surface-scan-${scanId}.png`;
+    link.download = `attack-surface-${targetId ? 'target-' + targetId : 'scan-' + scanId}.png`;
     link.click();
   };
 
@@ -237,7 +292,7 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
           color: '#fff',
           textTransform: 'uppercase'
         }}>
-          Attack Surface Map
+          Attack Surface Map {targetId ? `(Target Coverage)` : `(Scan #${scanId})`}
         </Typography>
         <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
           V3.0 INFRASTRUCTURE_GRAPH_VISUALIZATION
@@ -288,18 +343,32 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
             zIndex: 2
           }}>
              <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.5)', fontWeight: 900, mb: 1, textTransform: 'uppercase' }}>Legend</Typography>
-             <Stack spacing={0.5}>
-                {[
-                  { label: 'Domain', color: '#3b82f6' },
-                  { label: 'Subdomain', color: '#10b981' },
-                  { label: 'IP Address', color: '#f59e0b' },
-                  { label: 'Vulnerability', color: '#ef4444' }
-                ].map(item => (
-                  <Stack key={item.label} direction="row" alignItems="center" spacing={1}>
-                    <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: item.color }} />
-                    <Typography sx={{ fontSize: '0.7rem', color: '#e2e8f0', fontWeight: 600 }}>{item.label}</Typography>
-                  </Stack>
-                ))}
+             <Stack spacing={1}>
+                <Stack spacing={0.5}>
+                    <Typography sx={{ fontSize: '0.55rem', color: 'rgba(0,243,255,0.6)', fontWeight: 800 }}>NODE TYPES</Typography>
+                    {[
+                      { label: 'Domain', color: '#3b82f6' },
+                      { label: 'Subdomain', color: '#10b981' },
+                      { label: 'IP Address', color: '#f59e0b' },
+                      { label: 'Vulnerability', color: '#ef4444' }
+                    ].map(item => (
+                      <Stack key={item.label} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                        <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: item.color }} />
+                        <Typography sx={{ fontSize: '0.7rem', color: '#e2e8f0', fontWeight: 600 }}>{item.label}</Typography>
+                      </Stack>
+                    ))}
+                </Stack>
+                {Object.keys(scanColorMap).length > 0 && (
+                    <Stack spacing={0.5} sx={{ mt: 1, pt: 1, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
+                        <Typography sx={{ fontSize: '0.55rem', color: 'rgba(0,243,255,0.6)', fontWeight: 800 }}>SCAN IDENTIFIERS</Typography>
+                        {Object.entries(scanColorMap).map(([id, color]) => (
+                            <Stack key={id} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                                <Box sx={{ width: 8, height: 2, bgcolor: color }} />
+                                <Typography sx={{ fontSize: '0.65rem', color: '#e2e8f0', fontWeight: 600 }}>Scan #{id}</Typography>
+                            </Stack>
+                        ))}
+                    </Stack>
+                )}
              </Stack>
           </Box>
         </Box>

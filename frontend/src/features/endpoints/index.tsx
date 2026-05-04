@@ -1,24 +1,24 @@
 import React, { useState } from 'react';
 import { useParams } from '@tanstack/react-router';
-import { 
-  Box, 
-  Container, 
-  Typography, 
-  Grid, 
-  InputBase, 
-  Button, 
-  IconButton, 
+import {
+  Box,
+  Container,
+  Typography,
+  Grid,
+  InputBase,
+  Button,
+  IconButton,
   Tooltip,
   CircularProgress,
   Pagination,
   Stack,
   Chip
 } from '@mui/material';
-import { 
-  Search, 
-  Copy, 
-  Download, 
-  Filter, 
+import {
+  Search,
+  Copy,
+  Download,
+  Filter,
   LayoutGrid,
   ExternalLink,
   ChevronRight,
@@ -57,17 +57,17 @@ export const EndpointsPage: React.FC = () => {
       {/* Tactical Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4 }}>
         <Box>
-          <Typography variant="h5" sx={{ 
-            fontWeight: 900, 
-            fontFamily: 'Orbitron', 
-            letterSpacing: 3, 
+          <Typography variant="h5" sx={{
+            fontWeight: 900,
+            fontFamily: 'Orbitron',
+            letterSpacing: 3,
             color: '#fff',
             textTransform: 'uppercase'
           }}>
             Endpoint Discovery
           </Typography>
           <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
-            V3.0 ASSET_INVENTORY_ACTIVE
+            V3.0 ENDPOINT INVENTORY ACTIVE
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -78,34 +78,34 @@ export const EndpointsPage: React.FC = () => {
       </Box>
 
       {/* High-Fidelity Search Bar (Image 12 Style) */}
-      <Box sx={{ 
-        display: 'flex', 
-        bgcolor: '#f5f5f5', 
-        borderRadius: '4px', 
+      <Box sx={{
+        display: 'flex',
+        bgcolor: '#f5f5f5',
+        borderRadius: '4px',
         overflow: 'hidden',
         mb: 4,
         boxShadow: '0 0 20px rgba(0, 243, 255, 0.1)'
       }}>
-        <InputBase 
+        <InputBase
           placeholder="Filter Endpoints"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          sx={{ 
-            flex: 1, 
-            px: 3, 
-            py: 1.5, 
+          sx={{
+            flex: 1,
+            px: 3,
+            py: 1.5,
             fontSize: '1rem',
             color: '#333',
             '&::placeholder': { color: '#999', opacity: 1 }
           }}
         />
-        <Button 
+        <Button
           onClick={handleSearch}
           startIcon={<Search size={18} />}
-          sx={{ 
-            bgcolor: '#002e3c', 
-            color: '#00f3ff', 
+          sx={{
+            bgcolor: '#002e3c',
+            color: '#00f3ff',
             px: 4,
             borderRadius: 0,
             fontWeight: 800,
@@ -140,7 +140,7 @@ export const EndpointsPage: React.FC = () => {
         </Box>
 
         {/* Responsive Endpoints Table */}
-        <Box sx={{ 
+        <Box sx={{
           overflowX: 'auto',
           width: '100%',
           '&::-webkit-scrollbar': { height: '6px' },
@@ -148,8 +148,8 @@ export const EndpointsPage: React.FC = () => {
         }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1200px', tableLayout: 'fixed' }}>
             <thead>
-              <tr style={{ 
-                textAlign: 'left', 
+              <tr style={{
+                textAlign: 'left',
                 borderBottom: '1px solid rgba(255,255,255,0.1)',
                 backgroundColor: 'rgba(255,255,255,0.02)'
               }}>
@@ -173,10 +173,10 @@ export const EndpointsPage: React.FC = () => {
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography sx={{ 
-                          fontSize: '13px', 
-                          fontWeight: 500, 
-                          color: '#00f3ff', 
+                        <Typography sx={{
+                          fontSize: '13px',
+                          fontWeight: 500,
+                          color: '#00f3ff',
                           textDecoration: 'none',
                           wordBreak: 'break-all',
                           maxWidth: '400px',
@@ -185,14 +185,14 @@ export const EndpointsPage: React.FC = () => {
                           {endpoint.http_url}
                         </Typography>
                       </Box>
-                      
+
                       {/* Tech Badges (Image 12 Style) */}
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mt: 0.5 }}>
                         {endpoint.webserver && (
-                          <Box sx={{ 
-                            px: 1, 
-                            py: 0.2, 
-                            bgcolor: 'rgba(112, 0, 255, 0.1)', 
+                          <Box sx={{
+                            px: 1,
+                            py: 0.2,
+                            bgcolor: 'rgba(112, 0, 255, 0.1)',
                             border: '1px solid rgba(112, 0, 255, 0.3)',
                             borderRadius: 1
                           }}>
@@ -200,10 +200,10 @@ export const EndpointsPage: React.FC = () => {
                           </Box>
                         )}
                         {endpoint.techs?.map(tech => (
-                          <Box key={tech.id} sx={{ 
-                            px: 1, 
-                            py: 0.2, 
-                            bgcolor: 'rgba(0, 243, 255, 0.1)', 
+                          <Box key={tech.id} sx={{
+                            px: 1,
+                            py: 0.2,
+                            bgcolor: 'rgba(0, 243, 255, 0.1)',
                             border: '1px solid rgba(0, 243, 255, 0.3)',
                             borderRadius: 1
                           }}>
@@ -211,9 +211,9 @@ export const EndpointsPage: React.FC = () => {
                           </Box>
                         ))}
                       </Box>
-                      
-                      <IconButton 
-                        size="small" 
+
+                      <IconButton
+                        size="small"
                         onClick={() => copyToClipboard(endpoint.http_url)}
                         sx={{ alignSelf: 'flex-start', color: 'rgba(0, 243, 255, 0.5)', p: 0.5, '&:hover': { color: '#00f3ff' } }}
                       >
@@ -222,11 +222,11 @@ export const EndpointsPage: React.FC = () => {
                     </Box>
                   </td>
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
-                    <Box sx={{ 
+                    <Box sx={{
                       display: 'inline-flex',
-                      px: 1.5, 
-                      py: 0.5, 
-                      borderRadius: 1, 
+                      px: 1.5,
+                      py: 0.5,
+                      borderRadius: 1,
                       bgcolor: `${getStatusColor(endpoint.http_status)}15`,
                       border: `1px solid ${getStatusColor(endpoint.http_status)}44`,
                       boxShadow: `0 0 10px ${getStatusColor(endpoint.http_status)}22`
@@ -244,10 +244,10 @@ export const EndpointsPage: React.FC = () => {
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       {endpoint.matched_gf_patterns?.split(',').map((tag, idx) => (
-                        <Box key={idx} sx={{ 
-                          px: 1, 
-                          py: 0.2, 
-                          bgcolor: 'rgba(255, 0, 60, 0.1)', 
+                        <Box key={idx} sx={{
+                          px: 1,
+                          py: 0.2,
+                          bgcolor: 'rgba(255, 0, 60, 0.1)',
                           border: '1px solid rgba(255, 0, 60, 0.3)',
                           borderRadius: 1,
                           display: 'inline-block',
@@ -285,9 +285,9 @@ export const EndpointsPage: React.FC = () => {
         {/* Tactical Pagination */}
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <Stack spacing={2}>
-            <Pagination 
-              count={Math.ceil((data?.count || 0) / 100)} 
-              page={page} 
+            <Pagination
+              count={Math.ceil((data?.count || 0) / 100)}
+              page={page}
               onChange={(_, v) => setPage(v)}
               size="small"
               sx={{

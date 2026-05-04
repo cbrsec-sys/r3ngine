@@ -29,14 +29,16 @@ interface CreateOrganizationModalProps {
 const ITEM_HEIGHT = 48;
 const ITEM_PADDING_TOP = 8;
 const MenuProps = {
-  paperprops: {
-    style: {
-      maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
-      width: 250,
-      backgroundColor: '#0a0a0f',
-      border: '1px solid #1a1a2e',
-      color: '#fff',
-    },
+  slotProps: {
+    paper: {
+      style: {
+        maxHeight: ITEM_HEIGHT * 4.5 + ITEM_PADDING_TOP,
+        width: 250,
+        backgroundColor: '#0a0a0f',
+        border: '1px solid #1a1a2e',
+        color: '#fff',
+      },
+    }
   },
 };
 
@@ -126,10 +128,10 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
             onChange={(e) => setName(e.target.value)}
             variant="outlined"
             required
-            InputProps={{
-              sx: { color: '#fff', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a2e' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' } }
-            }}
             slotProps={{
+              input: {
+                sx: { color: '#fff', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a2e' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' } }
+              },
               inputLabel: { sx: { color: 'rgba(255, 255, 255, 0.7)' } }
             }}
           />
@@ -141,10 +143,10 @@ export const CreateOrganizationModal: React.FC<CreateOrganizationModalProps> = (
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             variant="outlined"
-            InputProps={{
-              sx: { color: '#fff', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a2e' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' } }
-            }}
             slotProps={{
+              input: {
+                sx: { color: '#fff', '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a2e' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' } }
+              },
               inputLabel: { sx: { color: 'rgba(255, 255, 255, 0.7)' } }
             }}
           />

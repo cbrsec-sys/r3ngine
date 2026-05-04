@@ -456,16 +456,18 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleActionClose}
-        paperprops={{
-          sx: {
-            bgcolor: '#001a24',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
-            color: '#fff',
-            '& .MuiMenuItem-root': {
-              fontSize: '12px',
-              fontWeight: 600,
-              fontFamily: 'Inter',
-              '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' }
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#001a24',
+              border: '1px solid rgba(0, 243, 255, 0.2)',
+              color: '#fff',
+              '& .MuiMenuItem-root': {
+                fontSize: '12px',
+                fontWeight: 600,
+                fontFamily: 'Inter',
+                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' }
+              }
             }
           }
         }}

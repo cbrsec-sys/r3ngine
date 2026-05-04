@@ -171,12 +171,14 @@ export const ScheduledScansPage: React.FC = () => {
               '&:before, &:after': { borderBottomColor: 'rgba(0, 243, 255, 0.3)' }
             }
           }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search size={18} color="#00f3ff" />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search size={18} color="#00f3ff" />
+                </InputAdornment>
+              ),
+            }
           }}
         />
       </Box>
@@ -299,7 +301,7 @@ export const ScheduledScansPage: React.FC = () => {
                       <Tooltip title="DELETE">
                         <IconButton 
                           size="small" 
-                          onClick={() => handleSelectOne(scan.id) || handleDeleteMultiple()}
+                          onClick={() => { handleSelectOne(scan.id); handleDeleteMultiple(); }}
                           sx={{ color: '#ff003c', '&:hover': { bgcolor: 'rgba(255, 0, 60, 0.1)' } }}
                         >
                           <Trash2 size={16} />

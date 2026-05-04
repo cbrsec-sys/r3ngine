@@ -46,7 +46,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color, subtitle }
             color: color
           }}
         >
-          {React.cloneElement(icon as React.ReactElement, { size: 100 })}
+          {React.cloneElement(icon as React.ReactElement<any>, { size: 100 })}
         </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5 }}>
@@ -60,7 +60,7 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color, subtitle }
             border: `1px solid ${color}33`,
             boxShadow: `0 0 15px ${color}22`
           }}>
-            {React.cloneElement(icon as React.ReactElement, { size: 22 })}
+            {React.cloneElement(icon as React.ReactElement<any>, { size: 22 })}
           </Box>
           <Typography variant="overline" sx={{
             fontWeight: 800,
