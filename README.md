@@ -1,9 +1,9 @@
 <p align="center">
-<a href="https://rengine.wiki"><img src=".github/screenshots/banner.gif" alt=""/></a>
+<a href="https://rengine.wiki"><img src="frontend/public/img/r3ngine_logo.png" height="520px" width="520px" alt=""/></a>
 </p>
 
 <p align="center">
-  <h3>Official v3 Rebirth: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
+  <h3 align="center">Official v3 Rebirth: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
 </p>
 
 <p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.1-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
