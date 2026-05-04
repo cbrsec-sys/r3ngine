@@ -514,26 +514,28 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               anchorEl={quickAddAnchorEl}
               open={Boolean(quickAddAnchorEl)}
               onClose={handleQuickAddClose}
-              paperprops={{
-                sx: {
-                  bgcolor: 'rgba(10, 10, 15, 0.95)',
-                  backdropFilter: 'blur(12px)',
-                  border: '1px solid rgba(0, 243, 255, 0.2)',
-                  borderRadius: 2,
-                  minWidth: 200,
-                  mt: 1.5,
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
-                  '& .MuiMenuItem-root': {
-                    py: 1.5,
-                    px: 2.5,
-                    gap: 2,
-                    color: 'rgba(255,255,255,0.7)',
-                    fontFamily: 'Orbitron',
-                    fontSize: '0.75rem',
-                    letterSpacing: '1px',
-                    '&:hover': {
-                      bgcolor: 'rgba(0, 243, 255, 0.1)',
-                      color: '#00f3ff',
+              slotProps={{
+                paper: {
+                  sx: {
+                    bgcolor: 'rgba(10, 10, 15, 0.95)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(0, 243, 255, 0.2)',
+                    borderRadius: 2,
+                    minWidth: 200,
+                    mt: 1.5,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+                    '& .MuiMenuItem-root': {
+                      py: 1.5,
+                      px: 2.5,
+                      gap: 2,
+                      color: 'rgba(255,255,255,0.7)',
+                      fontFamily: 'Orbitron',
+                      fontSize: '0.75rem',
+                      letterSpacing: '1px',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 243, 255, 0.1)',
+                        color: '#00f3ff',
+                      }
                     }
                   }
                 }
@@ -561,26 +563,28 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               anchorEl={toolboxAnchorEl}
               open={Boolean(toolboxAnchorEl)}
               onClose={handleToolboxClose}
-              paperprops={{
-                sx: {
-                  bgcolor: 'rgba(10, 10, 15, 0.98)',
-                  backdropFilter: 'blur(15px)',
-                  border: '1px solid rgba(0, 243, 255, 0.2)',
-                  borderRadius: 3,
-                  p: 2.5,
-                  width: 320,
-                  mt: 1.5,
-                  boxShadow: '0 10px 40px rgba(0,0,0,0.9)',
-                  overflow: 'hidden',
-                  '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    height: '2px',
-                    background: 'linear-gradient(90deg, #00f3ff, #ff00ff)',
-                    zIndex: 1
+              slotProps={{
+                paper: {
+                  sx: {
+                    bgcolor: 'rgba(10, 10, 15, 0.98)',
+                    backdropFilter: 'blur(15px)',
+                    border: '1px solid rgba(0, 243, 255, 0.2)',
+                    borderRadius: 3,
+                    p: 2.5,
+                    width: 320,
+                    mt: 1.5,
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.9)',
+                    overflow: 'hidden',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '2px',
+                      background: 'linear-gradient(90deg, #00f3ff, #ff00ff)',
+                      zIndex: 1
+                    }
                   }
                 }
               }}
@@ -602,7 +606,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               </Box>
               <Grid container spacing={2}>
                 {toolboxItems.map((item) => (
-                  <Grid item xs={6} key={item.title}>
+                  <Grid size={{ xs: 6 }} key={item.title}>
                     <Box
                       onClick={() => handleToolClick(item.id)}
                       sx={{
@@ -691,31 +695,33 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               anchorEl={anchorEl}
               open={Boolean(anchorEl)}
               onClose={handleMenuClose}
-              paperprops={{
-                sx: {
-                  bgcolor: 'rgba(10, 10, 15, 0.98)',
-                  backdropFilter: 'blur(15px)',
-                  border: '1px solid rgba(0, 243, 255, 0.2)',
-                  borderRadius: 2,
-                  minWidth: 240,
-                  mt: 1.5,
-                  boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
-                  overflow: 'hidden',
-                  '& .MuiMenuItem-root': {
-                    py: 1.5,
-                    px: 2.5,
-                    gap: 2,
-                    color: 'rgba(255,255,255,0.7)',
-                    fontFamily: 'Orbitron',
-                    fontSize: '0.75rem',
-                    letterSpacing: '1px',
-                    transition: 'all 0.2s',
-                    '&:hover': {
-                      bgcolor: 'rgba(0, 243, 255, 0.1)',
-                      color: '#00f3ff',
-                      '& .menu-icon': {
+              slotProps={{
+                paper: {
+                  sx: {
+                    bgcolor: 'rgba(10, 10, 15, 0.98)',
+                    backdropFilter: 'blur(15px)',
+                    border: '1px solid rgba(0, 243, 255, 0.2)',
+                    borderRadius: 2,
+                    minWidth: 240,
+                    mt: 1.5,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+                    overflow: 'hidden',
+                    '& .MuiMenuItem-root': {
+                      py: 1.5,
+                      px: 2.5,
+                      gap: 2,
+                      color: 'rgba(255,255,255,0.7)',
+                      fontFamily: 'Orbitron',
+                      fontSize: '0.75rem',
+                      letterSpacing: '1px',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 243, 255, 0.1)',
                         color: '#00f3ff',
-                        filter: 'drop-shadow(0 0 5px #00f3ffaa)'
+                        '& .menu-icon': {
+                          color: '#00f3ff',
+                          filter: 'drop-shadow(0 0 5px #00f3ffaa)'
+                        }
                       }
                     }
                   }

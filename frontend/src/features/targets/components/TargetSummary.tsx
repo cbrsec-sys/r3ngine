@@ -347,7 +347,7 @@ export const TargetSummary = () => {
                 <Chart
                   options={{
                     chart: { type: 'donut', background: 'transparent' },
-                    theme: { mode: 'dark' },
+                    theme: { mode: 'dark' as any },
                     stroke: { show: false },
                     dataLabels: { enabled: false },
                     legend: { position: 'bottom', fontSize: '10px', labels: { colors: '#fff' } },
@@ -371,7 +371,7 @@ export const TargetSummary = () => {
                 <Chart
                   options={{
                     chart: { type: 'pie', background: 'transparent' },
-                    theme: { mode: 'dark' },
+                    theme: { mode: 'dark' as any },
                     labels: ['Critical', 'High', 'Medium', 'Low', 'Info'],
                     colors: ['#ff003c', '#ff8c00', '#fffc00', '#00f3ff', 'rgba(255,255,255,0.2)'],
                     legend: { position: 'bottom', labels: { colors: '#fff' } }

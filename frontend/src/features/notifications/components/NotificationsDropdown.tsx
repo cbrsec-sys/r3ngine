@@ -50,22 +50,24 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
       open={open}
       onClose={onClose}
       disableScrollLock
-      paperprops={{
-        sx: {
-          width: 360,
-          maxHeight: 500,
-          bgcolor: 'rgba(10, 10, 15, 0.95)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0, 243, 255, 0.2)',
-          borderRadius: 2,
-          backgroundImage: 'none',
-          mt: 1.5,
-          '& .MuiList-root': { p: 0 }
+      slotProps={{
+        paper: {
+          sx: {
+            width: 360,
+            maxHeight: 500,
+            bgcolor: 'rgba(10, 10, 15, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0, 243, 255, 0.2)',
+            borderRadius: 2,
+            backgroundImage: 'none',
+            mt: 1.5,
+            '& .MuiList-root': { p: 0 }
+          }
         }
       }}
     >
       <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.75rem', letterSpacing: 1, color: '#00f3ff' }}>
             NOTIFICATIONS
           </Typography>
@@ -121,11 +123,13 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
                     </Typography>
                   </Stack>
                 }
-                primaryTypographyProps={{
-                  sx: {
-                    fontSize: '0.8rem',
-                    fontWeight: notif.is_read ? 500 : 900,
-                    color: notif.is_read ? 'rgba(255,255,255,0.8)' : '#fff'
+                slotProps={{
+                  primary: {
+                    sx: {
+                      fontSize: '0.8rem',
+                      fontWeight: notif.is_read ? 500 : 900,
+                      color: notif.is_read ? 'rgba(255,255,255,0.8)' : '#fff'
+                    }
                   }
                 }}
               />

@@ -61,16 +61,18 @@ export const HeaderThemeSwitcher: React.FC = () => {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleClose}
-        paperprops={{
-          sx: {
-            bgcolor: 'rgba(10, 10, 15, 0.98)',
-            backdropFilter: 'blur(15px)',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
-            borderRadius: 2,
-            minWidth: 200,
-            mt: 1.5,
-            boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
-            overflow: 'hidden',
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: 'rgba(10, 10, 15, 0.98)',
+              backdropFilter: 'blur(15px)',
+              border: '1px solid rgba(0, 243, 255, 0.2)',
+              borderRadius: 2,
+              minWidth: 200,
+              mt: 1.5,
+              boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+              overflow: 'hidden',
+            }
           }
         }}
         transformOrigin={{ horizontal: 'right', vertical: 'top' }}

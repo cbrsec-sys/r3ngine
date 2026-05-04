@@ -126,18 +126,20 @@ export const LoginPage: React.FC = () => {
               placeholder="username"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Typography sx={{ color: 'rgba(255, 255, 255, 0.5)', fontWeight: 'bold', mr: 1 }}>@</Typography>
-                  </InputAdornment>
-                ),
-                sx: {
-                  bgcolor: 'rgba(255, 255, 255, 0.05)',
-                  color: '#fff',
-                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.5)' },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' }
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Typography sx={{ color: 'rgba(255, 255, 255, 0.5)', fontWeight: 'bold', mr: 1 }}>@</Typography>
+                    </InputAdornment>
+                  ),
+                  sx: {
+                    bgcolor: 'rgba(255, 255, 255, 0.05)',
+                    color: '#fff',
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.1)' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.5)' },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' }
+                  }
                 }
               }}
             />
@@ -154,25 +156,27 @@ export const LoginPage: React.FC = () => {
               placeholder="Password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Lock size={18} color="rgba(255, 255, 255, 0.5)" />
-                  </InputAdornment>
-                ),
-                endAdornment: (
-                  <InputAdornment position="end">
-                    <IconButton onClick={() => setShowPassword(!showPassword)} sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
-                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                    </IconButton>
-                  </InputAdornment>
-                ),
-                sx: {
-                  bgcolor: 'rgba(255, 255, 255, 0.05)',
-                  color: '#fff',
-                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.5)' },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' }
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Lock size={18} color="rgba(255, 255, 255, 0.5)" />
+                    </InputAdornment>
+                  ),
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowPassword(!showPassword)} sx={{ color: 'rgba(255, 255, 255, 0.5)' }}>
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                  sx: {
+                    bgcolor: 'rgba(255, 255, 255, 0.05)',
+                    color: '#fff',
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.1)' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.5)' },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' }
+                  }
                 }
               }}
             />

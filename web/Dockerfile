@@ -1,4 +1,12 @@
-# Base image
+# Stage 1: Build Frontend
+FROM node:20-alpine AS frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN npm install --legacy-peer-deps
+COPY frontend/ ./
+RUN npm run build
+
+# Stage 2: Final Image
 FROM ubuntu:22.04
 
 ARG GECKOVERSION=0.36.0
@@ -202,8 +210,22 @@ RUN nuclei -update-templates
 # update chaos
 RUN chaos -update
 
+# Pre-download common wordlists
+RUN mkdir -p /usr/src/wordlist && \
+    wget https://raw.githubusercontent.com/maurosoria/dirsearch/master/db/dicc.txt -O /usr/src/wordlist/dicc.txt && \
+    wget https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/deepmagic.com-prefixes-top50000.txt -O /usr/src/wordlist/deepmagic.com-prefixes-top50000.txt
+
+# Pre-clone nmap scripts and other tools
+RUN mkdir -p /usr/src/github && \
+    git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan && \
+    ln -s /usr/src/github/scipag_vulscan /usr/share/nmap/scripts/vulscan && \
+    git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK && \
+    pip3 install -r /usr/src/github/CMSeeK/requirements.txt && \
+    git clone https://github.com/m3n0sd0n4ld/GooFuzz.git /usr/src/github/goofuzz && \
+    chmod +x /usr/src/github/goofuzz/GooFuzz
+
 # Copy requirements
-COPY ./requirements.txt /tmp/requirements.txt
+COPY web/requirements.txt /tmp/requirements.txt
 RUN pip3 install --upgrade pip setuptools wheel
 RUN pip3 install -r /tmp/requirements.txt --no-cache-dir
 
@@ -215,4 +237,13 @@ RUN pip3 install --no-cache-dir fuzzywuzzy \
     netaddr
 
 # Copy source code
-COPY . /usr/src/app/
+COPY web/ /usr/src/app/
+RUN mkdir -p /usr/src/app/custom_engines
+
+# Copy built frontend
+COPY --from=frontend-builder /app/frontend/dist /usr/src/frontend/dist
+COPY frontend/templates /usr/src/frontend/templates
+
+# Ensure SPA index.html is available as a Django template
+RUN mkdir -p /usr/src/frontend/templates/dashboard && \
+    cp /usr/src/frontend/dist/index.html /usr/src/frontend/templates/dashboard/v3_index.html

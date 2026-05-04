@@ -28,13 +28,13 @@ from targetApp.models import *
 def scan_history(request, slug):
     host = ScanHistory.objects.filter(domain__project__slug=slug).order_by('-start_scan_date')
     context = {'scan_history_active': 'active', "scan_history": host}
-    return render(request, 'startScan/history.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def subscan_history(request, slug):
     subscans = SubScan.objects.filter(scan_history__domain__project__slug=slug).order_by('-start_scan_date')
     context = {'scan_history_active': 'active', "subscans": subscans}
-    return render(request, 'startScan/subscan_history.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def detail_scan(request, id, slug):
@@ -222,7 +222,7 @@ def detail_scan(request, id, slug):
         last_scan = last_scans.order_by('-start_scan_date')[1]
         ctx['last_scan'] = last_scan
 
-    return render(request, 'startScan/detail_scan.html', ctx)
+    return render(request, 'dashboard/v3_index.html', ctx)
 
 
 def all_subdomains(request, slug):
@@ -245,7 +245,7 @@ def all_subdomains(request, slug):
         'alive_count': alive_subdomains.values('name').distinct().count(),
         'important_count': important_subdomains
     }
-    return render(request, 'startScan/subdomains.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 def detail_vuln_scan(request, slug, id=None):
     if id:
@@ -254,14 +254,14 @@ def detail_vuln_scan(request, slug, id=None):
         context = {'scan_history_id': id, 'history': history}
     else:
         context = {'vuln_scan_active': 'true'}
-    return render(request, 'startScan/vulnerabilities.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def all_endpoints(request, slug):
     context = {
         'scan_history_active': 'active'
     }
-    return render(request, 'startScan/endpoints.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 @has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
 def start_scan_ui(request, slug, domain_id):
@@ -366,7 +366,7 @@ def start_scan_ui(request, slug, domain_id):
         'starting_point_path': starting_point_path,
         'selected_engine_id': selected_engine_id,
     }
-    return render(request, 'startScan/start_scan_ui.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
@@ -455,7 +455,7 @@ def start_multiple_scan(request, slug):
         'custom_engine_count': custom_engine_count,
         'excluded_paths': excluded_paths
     }
-    return render(request, 'startScan/start_multiple_scan_ui.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 def export_subdomains(request, scan_id):
     subdomain_list = Subdomain.objects.filter(scan_history__id=scan_id)
@@ -707,7 +707,7 @@ def schedule_scan(request, host_id, slug):
         'custom_engine_count': custom_engine_count,
         'excluded_paths': excluded_paths
     }
-    return render(request, 'startScan/schedule_scan_ui.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def scheduled_scan_view(request, slug):
@@ -720,7 +720,7 @@ def scheduled_scan_view(request, slug):
         'scheduled_scan_active': 'active',
         'scheduled_tasks': scheduled_tasks,
     }
-    return render(request, 'startScan/schedule_scan_list.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_RESULTS, redirect_url=FOUR_OH_FOUR_URL)
@@ -847,7 +847,7 @@ def visualise(request, id):
         'scan_id': id,
         'scan_history': scan,
     }
-    return render(request, 'startScan/visualise.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
@@ -914,7 +914,7 @@ def start_organization_scan(request, id, slug):
         'custom_engine_count': custom_engine_count,
         'excluded_paths': excluded_paths
     }
-    return render(request, 'organization/start_scan.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
@@ -1025,7 +1025,7 @@ def schedule_organization_scan(request, slug, id):
         'custom_engine_count': custom_engine_count,
         'excluded_paths': excluded_paths
     }
-    return render(request, 'organization/schedule_scan_ui.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_RESULTS, redirect_url=FOUR_OH_FOUR_URL)
@@ -1052,7 +1052,7 @@ def customize_report(request, id):
         'scan_id': id,
         'scan_history': scan,
     }
-    return render(request, 'startScan/customize_report.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_REPORT, redirect_url=FOUR_OH_FOUR_URL)

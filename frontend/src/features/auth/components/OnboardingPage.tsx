@@ -101,7 +101,7 @@ export const OnboardingPage: React.FC = () => {
       <Box sx={{ maxWidth: 900, width: '100%' }}>
         {/* Header */}
         <Box sx={{ textAlign: 'center', mb: 6 }}>
-          <Stack direction="row" spacing={2} justifyContent="center" alignItems="center" sx={{ mb: 2 }}>
+          <Stack direction="row" spacing={2} sx={{ justifyContent: "center", alignItems: "center", mb: 2 }}>
             <Box sx={{
               width: 50,
               height: 50,
@@ -206,7 +206,7 @@ export const OnboardingPage: React.FC = () => {
                 Create an additional system operator with specific access privileges.
               </Typography>
               <Grid container spacing={3}>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <TextField
                     fullWidth
                     label="Username"
@@ -223,7 +223,7 @@ export const OnboardingPage: React.FC = () => {
                     }}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <TextField
                     fullWidth
                     label="Password"
@@ -241,7 +241,7 @@ export const OnboardingPage: React.FC = () => {
                     }}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <FormControl fullWidth>
                     <InputLabel sx={{ color: 'rgba(255,255,255,0.5)' }}>Role</InputLabel>
                     <Select
@@ -279,7 +279,7 @@ export const OnboardingPage: React.FC = () => {
               <Typography sx={SECTION_TITLE_STYLE}>
                 <Shield size={18} /> OPERATIONAL_MODE
               </Typography>
-              <Stack direction="row" justifyContent="space-between" alignItems="center">
+              <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
                 <Box>
                   <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 600 }}>
                     BUG_BOUNTY_MODE
@@ -329,7 +329,7 @@ export const OnboardingPage: React.FC = () => {
               </Typography>
               
               <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <TextField
                     fullWidth
                     label="OpenAI Key"
@@ -339,7 +339,7 @@ export const OnboardingPage: React.FC = () => {
                     helperText="Used for AI vulnerability descriptions and report writing."
                   />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <TextField
                     fullWidth
                     label="Chaos Key"
@@ -348,7 +348,7 @@ export const OnboardingPage: React.FC = () => {
                     helperText="Project Discovery Chaos dataset access."
                   />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <TextField
                     fullWidth
                     label="HackerOne Username"
@@ -356,7 +356,7 @@ export const OnboardingPage: React.FC = () => {
                     onChange={(e) => setForm({ ...form, username_hackerone: e.target.value })}
                   />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <TextField
                     fullWidth
                     label="HackerOne API Token"
@@ -364,7 +364,7 @@ export const OnboardingPage: React.FC = () => {
                     onChange={(e) => setForm({ ...form, key_hackerone: e.target.value })}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <TextField
                     fullWidth
                     label="Shodan Key"
@@ -372,7 +372,7 @@ export const OnboardingPage: React.FC = () => {
                     onChange={(e) => setForm({ ...form, key_shodan: e.target.value })}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <TextField
                     fullWidth
                     label="Censys ID"
@@ -380,7 +380,7 @@ export const OnboardingPage: React.FC = () => {
                     onChange={(e) => setForm({ ...form, key_censys_id: e.target.value })}
                   />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <TextField
                     fullWidth
                     label="Censys Secret"

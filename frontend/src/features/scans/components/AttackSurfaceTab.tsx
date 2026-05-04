@@ -295,7 +295,7 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
                   { label: 'IP Address', color: '#f59e0b' },
                   { label: 'Vulnerability', color: '#ef4444' }
                 ].map(item => (
-                  <Stack key={item.label} direction="row" alignItems="center" spacing={1}>
+                  <Stack key={item.label} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                     <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: item.color }} />
                     <Typography sx={{ fontSize: '0.7rem', color: '#e2e8f0', fontWeight: 600 }}>{item.label}</Typography>
                   </Stack>

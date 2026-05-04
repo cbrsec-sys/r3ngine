@@ -113,7 +113,7 @@ export const AdminSettingsPage: React.FC = () => {
 
   if (isLoading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" height="400px">
+      <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "400px" }}>
         <CircularProgress sx={{ color: '#00f3ff' }} />
       </Box>
     );
@@ -231,13 +231,15 @@ export const AdminSettingsPage: React.FC = () => {
       <Dialog
         open={isModalOpen}
         onClose={handleCloseModal}
-        paperprops={{
-          sx: {
-            background: 'rgba(10, 25, 41, 0.95)',
-            backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(0, 243, 255, 0.3)',
-            color: '#fff',
-            minWidth: '400px'
+        slotProps={{
+          paper: {
+            sx: {
+              background: 'rgba(10, 25, 41, 0.95)',
+              backdropFilter: 'blur(20px)',
+              border: '1px solid rgba(0, 243, 255, 0.3)',
+              color: '#fff',
+              minWidth: '400px'
+            }
           }
         }}
       >

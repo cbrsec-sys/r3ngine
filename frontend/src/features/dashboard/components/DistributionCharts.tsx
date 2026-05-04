@@ -64,8 +64,8 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
   const theme = useTheme();
 
   const donutOptions: any = {
-    chart: { type: 'donut', background: 'transparent' },
-    theme: { mode: 'dark' },
+    chart: { type: 'donut' as any, background: 'transparent' },
+    theme: { mode: 'dark' as any },
     stroke: { show: true, width: 2, colors: ['#05050f'] },
     dataLabels: { enabled: false },
     legend: { position: 'bottom', labels: { colors: theme.palette.text.secondary }, fontSize: '10px' },
@@ -86,7 +86,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
   };
 
   const getBarOptions = (categories: string[], color = '#00f3ff') => ({
-    chart: { type: 'bar', toolbar: { show: false }, background: 'transparent' },
+    chart: { type: 'bar' as any, toolbar: { show: false }, background: 'transparent' },
     plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '60%' } },
     dataLabels: { enabled: false },
     xaxis: { 
@@ -96,13 +96,13 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
     yaxis: { labels: { style: { colors: theme.palette.text.secondary, fontSize: '9px' } } },
     colors: [color],
     grid: { borderColor: 'rgba(255, 255, 255, 0.05)', strokeDashArray: 4 },
-    theme: { mode: 'dark' }
+    theme: { mode: 'dark' as any }
   });
 
   return (
     <Box>
       {/* Row 1: High Level Risk & Most Vulnerable Targets */}
-      <Grid container spacing={3} sx={{ mb: 3 }} alignItems="stretch">
+      <Grid container spacing={3} sx={{ mb: 3, alignItems: 'stretch' }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Vulnerability Severity">
             <Chart 
@@ -172,7 +172,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
       </Grid>
 
       {/* Row 2: Technologies & Most Common Vulnerabilities */}
-      <Grid container spacing={3} sx={{ mb: 3 }} alignItems="stretch">
+      <Grid container spacing={3} sx={{ mb: 3, alignItems: 'stretch' }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Most Used Technologies">
             <Chart 

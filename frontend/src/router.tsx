@@ -406,6 +406,11 @@ const bountyHubRoute = createRoute({
 const searchRoute = createRoute({
   getParentRoute: () => projectRoute,
   path: "search",
+  validateSearch: (search: Record<string, unknown>) => {
+    return {
+      query: (search.query as string) || undefined,
+    }
+  },
   component: SearchPage,
 });
 
@@ -453,19 +458,17 @@ const routeTree = rootRoute.addChildren([
     todoRoute,
     organizationsRoute,
     vulnsRoute,
-    settingsRoute.addChildren([
-      profileSettingsRoute,
-      proxySettingsRoute,
-      opsecSettingsRoute,
-      toolSettingsRoute,
-      toolArsenalRoute,
-      apiVaultSettingsRoute,
-      llmToolkitSettingsRoute,
-      reportSettingsRoute,
-      rengineSettingsRoute,
-      notificationSettingsRoute,
-      adminSettingsRoute,
-    ]),
+    profileSettingsRoute,
+    proxySettingsRoute,
+    opsecSettingsRoute,
+    toolSettingsRoute,
+    toolArsenalRoute,
+    apiVaultSettingsRoute,
+    llmToolkitSettingsRoute,
+    reportSettingsRoute,
+    rengineSettingsRoute,
+    notificationSettingsRoute,
+    adminSettingsRoute,
     bountyHubRoute,
     searchRoute,
   ]),

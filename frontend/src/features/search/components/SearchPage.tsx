@@ -66,7 +66,7 @@ export const SearchPage: React.FC = () => {
   const handleSearch = (e?: React.FormEvent) => {
     e?.preventDefault();
     if (query.trim()) {
-      navigate({ search: { query } });
+      navigate({ search: { query } as any });
     }
   };
 
@@ -107,19 +107,21 @@ export const SearchPage: React.FC = () => {
             placeholder="Type target, subdomain, or vulnerability..."
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={24} style={{ color: '#00f3ff', marginRight: 8 }} />
-                </InputAdornment>
-              ),
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton onClick={() => handleSearch()} sx={{ color: '#00f3ff' }}>
-                    <ChevronRight size={24} />
-                  </IconButton>
-                </InputAdornment>
-              )
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search size={24} style={{ color: '#00f3ff', marginRight: 8 }} />
+                  </InputAdornment>
+                ),
+                endAdornment: (
+                  <InputAdornment position="end">
+                    <IconButton onClick={() => handleSearch()} sx={{ color: '#00f3ff' }}>
+                      <ChevronRight size={24} />
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }
             }}
             sx={{
               '& .MuiOutlinedInput-root': {
@@ -154,7 +156,7 @@ export const SearchPage: React.FC = () => {
                 label={item.query}
                 onClick={() => {
                   setQuery(item.query);
-                  navigate({ search: { query: item.query } });
+                  navigate({ search: { query: item.query } as any });
                 }}
                 sx={{ 
                   bgcolor: 'rgba(255,255,255,0.05)', 
@@ -200,7 +202,7 @@ export const SearchPage: React.FC = () => {
                     searchResults.results.subdomains.map((s, idx) => (
                       <Card key={idx} sx={{ bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Stack direction="row" spacing={3} alignItems="center">
+                          <Stack direction="row" spacing={3} sx={{ alignItems: "center" }}>
                             <Box sx={{ color: '#00f3ff' }}><Globe size={20} /></Box>
                             <Box>
                               <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 600 }}>
@@ -243,7 +245,7 @@ export const SearchPage: React.FC = () => {
                     searchResults.results.endpoints.map((e, idx) => (
                       <Card key={idx} sx={{ bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Stack direction="row" spacing={3} alignItems="center">
+                          <Stack direction="row" spacing={3} sx={{ alignItems: "center" }}>
                             <Box sx={{ color: '#ffd600' }}><LinkIcon size={20} /></Box>
                             <Box>
                               <Typography variant="body2" sx={{ color: '#fff', wordBreak: 'break-all' }}>
@@ -273,7 +275,7 @@ export const SearchPage: React.FC = () => {
                     searchResults.results.vulnerabilities.map((v, idx) => (
                       <Card key={idx} sx={{ bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                         <CardContent>
-                          <Stack direction="row" spacing={3} alignItems="flex-start">
+                          <Stack direction="row" spacing={3} sx={{ alignItems: "flex-start" }}>
                             <Box sx={{ color: SEVERITY_COLORS[v.severity] || '#fff', mt: 0.5 }}><ShieldAlert size={20} /></Box>
                             <Box sx={{ flexGrow: 1 }}>
                               <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 600 }}>

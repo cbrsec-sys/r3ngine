@@ -32,7 +32,7 @@ def index(request, slug):
         'scan_engine_nav_active': 'active',
         'engine_type': engine_type,
     }
-    return render(request, 'scanEngine/index.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -51,7 +51,7 @@ def add_engine(request, slug):
         'scan_engine_nav_active': 'active',
         'form': form
     }
-    return render(request, 'scanEngine/add_engine.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -94,7 +94,7 @@ def update_engine(request, slug, id):
         'scan_engine_nav_active': 'active',
         'form': form
     }
-    return render(request, 'scanEngine/update_engine.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_WORDLISTS, redirect_url=FOUR_OH_FOUR_URL)
@@ -104,7 +104,7 @@ def wordlist_list(request, slug):
             'scan_engine_nav_active': 'active',
             'wordlist_li': 'active',
             'wordlists': wordlists}
-    return render(request, 'scanEngine/wordlist/index.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_WORDLISTS, redirect_url=FOUR_OH_FOUR_URL)
@@ -133,7 +133,7 @@ def add_wordlist(request, slug):
                     ' added successfully')
                 return http.HttpResponseRedirect(reverse('wordlist_list', kwargs={'slug': slug}))
     context['form'] = form
-    return render(request, 'scanEngine/wordlist/add.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_WORDLISTS, redirect_url=FOUR_OH_FOUR_URL)
@@ -193,7 +193,7 @@ def interesting_lookup(request, slug):
         context['interesting_lookup_found'] = True
     context['form'] = form
     context['default_lookup'] = InterestingLookupModel.objects.filter(id=1)
-    return render(request, 'scanEngine/lookup.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -312,7 +312,7 @@ def tool_specific_settings(request, slug):
     context['settings_ul_show'] = 'show'
     context['nuclei_templates'] = nuclei_custom_pattern
     context['gf_patterns'] = sorted([p for p in gf_list if p])
-    return render(request, 'scanEngine/settings/tool.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -331,7 +331,7 @@ def rengine_settings(request, slug):
     context['rengine_settings_li'] = 'active'
     context['settings_ul_show'] = 'show'
 
-    return render(request, 'scanEngine/settings/rengine.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -368,7 +368,7 @@ def notification_settings(request, slug):
     context['settings_ul_show'] = 'show'
     context['form'] = form
 
-    return render(request, 'scanEngine/settings/notification.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -413,7 +413,7 @@ def proxy_settings(request, slug):
     context['proxy_settings_li'] = 'active'
     context['settings_ul_show'] = 'show'
 
-    return render(request, 'scanEngine/settings/proxy.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -469,7 +469,7 @@ def opsec_settings(request, slug):
     context['opsec_settings_li'] = 'active'
     context['settings_ul_show'] = 'show'
 
-    return render(request, 'scanEngine/settings/opsec.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -520,7 +520,7 @@ def hackerone_settings(request, slug):
     context['hackerone_settings_li'] = 'active'
     context['settings_ul_show'] = 'show'
 
-    return render(request, 'scanEngine/settings/hackerone.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_REPORT, redirect_url=FOUR_OH_FOUR_URL)
@@ -561,7 +561,7 @@ def report_settings(request, slug):
     context['settings_ul_show'] = 'show'
     context['primary_color'] = primary_color
     context['secondary_color'] = secondary_color
-    return render(request, 'scanEngine/settings/report.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -620,7 +620,7 @@ def tool_arsenal_section(request, slug):
 
     context = {}
     context['installed_tools'] = tools
-    return render(request, 'scanEngine/settings/tool_arsenal.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -662,7 +662,7 @@ def llm_toolkit_section(request, slug):
             'active_provider': context['active_provider']
         })
 
-    return render(request, 'scanEngine/settings/llm_toolkit.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -843,7 +843,7 @@ def api_vault(request, slug):
             'hackerone_key': hackerone_key or "",
         })
 
-    return render(request, 'scanEngine/settings/api.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -885,7 +885,7 @@ def add_tool(request, slug):
             'settings_nav_active': 'active',
             'form': form
         }
-    return render(request, 'scanEngine/settings/add_tool.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -911,4 +911,4 @@ def modify_tool_in_arsenal(request, slug, id):
     context = {
             'scan_engine_nav_active':
             'active', 'form': form}
-    return render(request, 'scanEngine/settings/update_tool.html', context)
+    return render(request, 'dashboard/v3_index.html', context)

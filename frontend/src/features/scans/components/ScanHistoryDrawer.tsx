@@ -75,7 +75,7 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
     {/* Decorative line */}
     <Box sx={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 3, bgcolor: getStatusColor(scan.scan_status) }} />
 
-    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
+    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
       <Box>
         <Typography sx={{
           fontFamily: 'Orbitron',
@@ -85,7 +85,7 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
           textTransform: 'uppercase',
           letterSpacing: 1
         }}>
-          {scan.engine_name || scan.scan_type?.engine_name || 'GENERAL SCAN'} ON {scan.domain_name || 'UNKNOWN'}
+          {scan.scan_type?.engine_name || 'GENERAL SCAN'} ON {scan.domain?.name || 'UNKNOWN'}
         </Typography>
         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>
           {scan.scan_status === 1 ? 'Running Since ' : 'Scan Completed '} {scan.completed_ago || 'just now'}
@@ -106,7 +106,7 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
       />
     </Stack>
 
-    <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
       <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(0, 243, 255, 0.1)', borderRadius: 1, border: '1px solid rgba(0, 243, 255, 0.2)' }}>
         <Typography sx={{ fontSize: '0.7rem', fontWeight: 900, color: '#00f3ff' }}>{scan.subdomain_count || 0}</Typography>
       </Box>
@@ -118,7 +118,7 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
       </Box>
     </Stack>
 
-    <Stack direction="row" spacing={1} justifyContent="flex-end">
+    <Stack direction="row" spacing={1} sx={{ justifyContent: 'flex-end' }}>
       {scan.scan_status === 1 && (
         <Button
           size="small"
@@ -155,7 +155,7 @@ const TaskItem = ({ task, onStop }: { task: any, onStop?: (id: number) => void }
       transform: 'translateX(-4px)'
     }
   }}>
-    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
+    <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
       <Box>
         <Typography sx={{
           fontFamily: 'Orbitron',
@@ -237,14 +237,16 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
       anchor="right"
       open={open}
       onClose={onClose}
-      paperprops={{
-        sx: {
-          width: 450,
-          bgcolor: 'rgba(5, 5, 10, 0.98)',
-          backdropFilter: 'blur(25px)',
-          borderLeft: '1px solid rgba(0, 243, 255, 0.2)',
-          color: '#fff',
-          boxShadow: '-10px 0 40px rgba(0,0,0,0.9)'
+      slotProps={{
+        paper: {
+          sx: {
+            width: 450,
+            bgcolor: 'rgba(5, 5, 10, 0.98)',
+            backdropFilter: 'blur(25px)',
+            borderLeft: '1px solid rgba(0, 243, 255, 0.2)',
+            color: '#fff',
+            boxShadow: '-10px 0 40px rgba(0,0,0,0.9)'
+          }
         }
       }}
     >

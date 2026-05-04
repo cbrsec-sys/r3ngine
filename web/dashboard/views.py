@@ -201,7 +201,7 @@ def index(request, slug, *args, **kwargs):
 
     context['asset_countries'] = CountryISO.objects.filter(ipaddress__in=ip_addresses).annotate(count=Count('ipaddress')).order_by('-count')
 
-    return render(request, 'dashboard/index.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def profile(request, slug):
@@ -218,7 +218,7 @@ def profile(request, slug):
             messages.error(request, 'Please correct the error below.')
     else:
         form = PasswordChangeForm(request.user)
-    return render(request, 'dashboard/profile.html', {
+    return render(request, 'dashboard/v3_index.html', {
         'form': form
     })
 
@@ -229,7 +229,7 @@ def admin_interface(request, slug):
     users = UserModel.objects.all().order_by('date_joined')
     return render(
         request,
-        'dashboard/admin.html',
+        'dashboard/v3_index.html',
         {
             'users': users
         }
@@ -319,7 +319,7 @@ def search(request, slug):
 
 def four_oh_four(request):
     try:
-        return render(request, '404.html')
+        return render(request, 'dashboard/v3_index.html') # Or a specific 404 page if SPA handles it
     except Exception as e:
         logger.error(f"Error in 404 handler: {str(e)}")
         import traceback
@@ -331,7 +331,7 @@ def four_oh_four(request):
 def projects(request, slug):
     context = {}
     context['projects'] = Project.objects.all()
-    return render(request, 'dashboard/projects.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
@@ -528,7 +528,7 @@ def monitoring_dashboard(request, slug):
         'login_discoveries': login_discoveries,
     }
     
-    return render(request, 'dashboard/monitoring.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def attack_surface(request, slug, scan_id):
@@ -539,7 +539,7 @@ def attack_surface(request, slug, scan_id):
         'scan': scan,
         'attack_surface_active': 'active'
     }
-    return render(request, 'dashboard/attack_surface.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def get_graph_data(request, slug, scan_id):

@@ -7,7 +7,7 @@ import {
   Link,
   Stack
 } from '@mui/material';
-import { LogIn, Github, ExternalLink, Heart } from 'lucide-react';
+import { LogIn, Globe, ExternalLink, Heart } from 'lucide-react';
 import { useNavigate } from '@tanstack/react-router';
 
 export const LogoutPage: React.FC = () => {
@@ -98,7 +98,7 @@ export const LogoutPage: React.FC = () => {
           <Button
             fullWidth
             variant="outlined"
-            startIcon={<Github size={18} />}
+            startIcon={<Globe size={18} />}
             component={Link}
             href="https://github.com/whiterabb17/rengine/issues"
             target="_blank"

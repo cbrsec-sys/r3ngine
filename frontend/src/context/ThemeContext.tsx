@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { ThemeProvider } from '@mui/material/styles';
 import { hackerTheme, cleanTheme, scriptKiddieTheme } from '../theme';
 import type { Theme } from '@mui/material/styles';

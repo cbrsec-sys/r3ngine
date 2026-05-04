@@ -204,12 +204,14 @@ export const SubScansPage: React.FC = () => {
               '&:before, &:after': { borderBottomColor: 'rgba(188, 19, 254, 0.3)' }
             }
           }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <Search size={18} color="#bc13fe" />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <Search size={18} color="#bc13fe" />
+                </InputAdornment>
+              ),
+            }
           }}
         />
       </Box>

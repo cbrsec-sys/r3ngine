@@ -45,7 +45,7 @@ export const ProjectsPage: React.FC = () => {
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
           <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', letterSpacing: 2 }}>
-            ALL PROJECTS
+            PROJECTS
           </Typography>
           <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontFamily: 'Orbitron', letterSpacing: 1 }}>
             Central Control / Project Management

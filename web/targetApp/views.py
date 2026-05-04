@@ -77,7 +77,7 @@ def manage_monitoring_task(domain):
 
 def index(request):
     # TODO bring default target page
-    return render(request, 'target/index.html')
+    return render(request, 'dashboard/v3_index.html')
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
@@ -380,7 +380,7 @@ def add_target(request, slug):
         'form': form,
         'scan_engines': EngineType.objects.all()
     }
-    return render(request, 'target/add.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def list_target(request, slug):
@@ -389,7 +389,7 @@ def list_target(request, slug):
         'target_data_active': 'active',
         'slug': slug
     }
-    return render(request, 'target/list.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
@@ -457,7 +457,7 @@ def update_target(request, slug, id):
         "domain": domain,
         "form": form
     }
-    return render(request, 'target/update.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 def target_summary(request, slug, id):
     """Summary of a target (domain). Contains aggregated information on all
@@ -598,7 +598,7 @@ def target_summary(request, slug, id):
         .order_by('-discovered_at')
     )
 
-    return render(request, 'target/summary.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
@@ -625,7 +625,7 @@ def add_organization(request, slug):
         "organization_active": "active",
         "form": form
     }
-    return render(request, 'organization/add.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 def list_organization(request, slug):
     organizations = Organization.objects.filter(project__slug=slug).order_by('-insert_date')
@@ -633,7 +633,7 @@ def list_organization(request, slug):
         'organization_active': 'active',
         'organizations': organizations
     }
-    return render(request, 'organization/list.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
@@ -693,5 +693,5 @@ def update_organization(request, slug, id):
         "domain_list": mark_safe(domain_list),
         "form": form
     }
-    return render(request, 'organization/update.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 

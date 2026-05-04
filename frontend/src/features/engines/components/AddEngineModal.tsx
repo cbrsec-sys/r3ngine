@@ -41,13 +41,15 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
       onClose={onClose}
       maxWidth="md"
       fullWidth
-      paperprops={{
-        sx: {
-          bgcolor: '#0a0a0c',
-          border: '1px solid rgba(0, 243, 255, 0.2)',
-          boxShadow: '0 0 30px rgba(0, 243, 255, 0.1)',
-          backgroundImage: 'linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px)',
-          backgroundSize: '20px 20px',
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: '#0a0a0c',
+            border: '1px solid rgba(0, 243, 255, 0.2)',
+            boxShadow: '0 0 30px rgba(0, 243, 255, 0.1)',
+            backgroundImage: 'linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+          }
         }
       }}
     >

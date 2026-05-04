@@ -94,7 +94,7 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
                     </Typography>
                   </TableCell>
                   <TableCell>
-                    <Stack direction="row" alignItems="center" spacing={1}>
+                    <Stack direction="row" sx={{ alignItems: 'center' }} spacing={1}>
                       <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {leak.source_url}
                       </Typography>

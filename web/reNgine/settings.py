@@ -117,8 +117,10 @@ TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
-            os.path.join(BASE_DIR, 'templates'),
-            os.path.join(BASE_DIR, '..', 'frontend', 'templates'),
+            path for path in [
+                os.path.join(env('RENGINE_HOME', default='/usr/src/app'), 'frontend', 'templates'),
+                '/usr/src/frontend/templates',
+            ] if os.path.exists(path)
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -192,6 +194,11 @@ STATIC_URL = '/staticfiles/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, "static"),
+] + [
+    path for path in [
+        os.path.join(env('RENGINE_HOME', default='/usr/src/app'), "frontend", "dist"),
+        '/usr/src/frontend/dist',
+    ] if os.path.exists(path)
 ]
 
 FIXTURE_DIRS = [

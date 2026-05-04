@@ -51,7 +51,7 @@ import {
 } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
 import { useBountyPrograms, useProgramDetails, useImportPrograms } from '../api';
-import { HackerOneProgram } from '../types';
+//import { HackerOneProgram } from '../types';
 
 const PROGRAM_CARD_STYLE = {
   bgcolor: 'rgba(255, 255, 255, 0.02)',
@@ -84,10 +84,10 @@ export const BountyHubPage: React.FC = () => {
   const [detailHandle, setDetailHandle] = useState<string | null>(null);
 
   const [sortKey, sortOrder] = sortBy.split('-');
-  const { data: programs, isLoading, error } = useBountyPrograms({ 
-    sort_by: sortKey, 
+  const { data: programs, isLoading, error } = useBountyPrograms({
+    sort_by: sortKey,
     sort_order: sortOrder,
-    bookmarked: showBookmarked 
+    bookmarked: showBookmarked
   });
 
   const { data: details, isLoading: isLoadingDetails } = useProgramDetails(detailHandle);
@@ -96,14 +96,14 @@ export const BountyHubPage: React.FC = () => {
   const filteredPrograms = useMemo(() => {
     if (!programs) return [];
     return programs.filter(p => {
-      const matchesSearch = p.attributes.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                           p.attributes.handle.toLowerCase().includes(searchTerm.toLowerCase());
-      
-      const matchesFilter = filterType === 'All' || 
-                           (filterType === 'Bounty Eligible' && p.attributes.offers_bounties) ||
-                           (filterType === 'VDP' && !p.attributes.offers_bounties) ||
-                           (filterType === 'Private Programs' && p.attributes.state === 'private_mode');
-      
+      const matchesSearch = p.attributes.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.attributes.handle.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const matchesFilter = filterType === 'All' ||
+        (filterType === 'Bounty Eligible' && p.attributes.offers_bounties) ||
+        (filterType === 'VDP' && !p.attributes.offers_bounties) ||
+        (filterType === 'Private Programs' && p.attributes.state === 'private_mode');
+
       const matchesClosed = showClosed || p.attributes.submission_state === 'open';
 
       return matchesSearch && matchesFilter && matchesClosed;
@@ -111,7 +111,7 @@ export const BountyHubPage: React.FC = () => {
   }, [programs, searchTerm, filterType, showClosed]);
 
   const toggleSelection = (handle: string) => {
-    setSelectedHandles(prev => 
+    setSelectedHandles(prev =>
       prev.includes(handle) ? prev.filter(h => h !== handle) : [...prev, handle]
     );
   };
@@ -130,14 +130,14 @@ export const BountyHubPage: React.FC = () => {
   return (
     <Box sx={{ p: 4, bgcolor: '#0a0a0a', minHeight: '100vh' }}>
       {/* Header */}
-      <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
+      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 4 }}>
         <Box>
-          <Typography variant="h4" sx={{ 
-            fontFamily: 'Orbitron', 
-            fontWeight: 900, 
+          <Typography variant="h4" sx={{
+            fontFamily: 'Orbitron',
+            fontWeight: 900,
             color: '#fff',
             textShadow: '0 0 15px rgba(0, 243, 255, 0.3)',
-            mb: 1 
+            mb: 1
           }}>
             BOUNTY_HUB
           </Typography>
@@ -175,27 +175,29 @@ export const BountyHubPage: React.FC = () => {
       </Stack>
 
       {/* Filters Bar */}
-      <Box sx={{ 
-        p: 2, 
-        bgcolor: 'rgba(255,255,255,0.02)', 
+      <Box sx={{
+        p: 2,
+        bgcolor: 'rgba(255,255,255,0.02)',
         border: '1px solid rgba(255,255,255,0.05)',
         borderRadius: 2,
         mb: 4
       }}>
-        <Grid container spacing={2} alignItems="center">
-          <Grid item xs={12} md={4}>
+        <Grid container spacing={2} sx={{ alignItems: 'center' }}>
+          <Grid size={{ xs: 12, md: 4 }}>
             <TextField
               fullWidth
               placeholder="Search programs..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: <Search size={18} style={{ color: 'rgba(255,255,255,0.3)', marginRight: 8 }} />
+              slotProps={{
+                input: {
+                  startAdornment: <Search size={18} style={{ color: 'rgba(255,255,255,0.3)', marginRight: 8 }} />
+                }
               }}
               sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(255,255,255,0.01)' } }}
             />
           </Grid>
-          <Grid item xs={12} md={2}>
+          <Grid size={{ xs: 12, md: 2 }}>
             <FormControl fullWidth size="small">
               <Select
                 value={filterType}
@@ -209,7 +211,7 @@ export const BountyHubPage: React.FC = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={2}>
+          <Grid size={{ xs: 12, md: 2 }}>
             <FormControl fullWidth size="small">
               <Select
                 value={sortBy}
@@ -224,8 +226,8 @@ export const BountyHubPage: React.FC = () => {
               </Select>
             </FormControl>
           </Grid>
-          <Grid item xs={12} md={4}>
-            <Stack direction="row" spacing={2} justifyContent="flex-end">
+          <Grid size={{ xs: 12, md: 4 }}>
+            <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end" }}>
               <FormControlLabel
                 control={<Checkbox checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />}
                 label={<Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Show Closed</Typography>}
@@ -251,16 +253,16 @@ export const BountyHubPage: React.FC = () => {
       ) : (
         <Grid container spacing={3}>
           {filteredPrograms.map((p) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={p.id}>
-              <Card 
+            <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={p.id}>
+              <Card
                 className={selectedHandles.includes(p.attributes.handle) ? 'selected' : ''}
                 sx={PROGRAM_CARD_STYLE}
                 onClick={() => toggleSelection(p.attributes.handle)}
               >
                 <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
                   <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-                    <Avatar 
-                      src={p.attributes.profile_picture} 
+                    <Avatar
+                      src={p.attributes.profile_picture}
                       variant="rounded"
                       sx={{ width: 48, height: 48, border: '1px solid rgba(255,255,255,0.1)' }}
                     />
@@ -277,20 +279,20 @@ export const BountyHubPage: React.FC = () => {
                   </Stack>
 
                   <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', gap: 0.5 }}>
-                    <Chip 
-                      label={p.attributes.submission_state === 'open' ? 'OPEN' : 'CLOSED'} 
+                    <Chip
+                      label={p.attributes.submission_state === 'open' ? 'OPEN' : 'CLOSED'}
                       size="small"
-                      sx={{ 
+                      sx={{
                         height: 18, fontSize: '0.65rem', fontWeight: 900,
                         bgcolor: p.attributes.submission_state === 'open' ? 'rgba(0, 255, 0, 0.1)' : 'rgba(255, 0, 0, 0.1)',
                         color: p.attributes.submission_state === 'open' ? '#00ff00' : '#ff5252',
                         border: `1px solid ${p.attributes.submission_state === 'open' ? 'rgba(0, 255, 0, 0.2)' : 'rgba(255, 0, 0, 0.2)'}`
-                      }} 
+                      }}
                     />
-                    <Chip 
-                      label={p.attributes.state === 'public_mode' ? 'PUBLIC' : 'PRIVATE'} 
+                    <Chip
+                      label={p.attributes.state === 'public_mode' ? 'PUBLIC' : 'PRIVATE'}
                       size="small"
-                      sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)' }} 
+                      sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)' }}
                     />
                     {p.attributes.offers_bounties ? (
                       <Chip label="BOUNTY" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff' }} />
@@ -300,16 +302,16 @@ export const BountyHubPage: React.FC = () => {
                   </Stack>
 
                   <Grid container spacing={1} sx={{ mb: 2 }}>
-                    <Grid item xs={6}>
-                      <Stack direction="row" spacing={1} alignItems="center">
+                    <Grid size={{ xs: 6 }}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                         <Flag size={12} color="rgba(255,255,255,0.4)" />
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
                           Reports: {p.attributes.number_of_reports_for_user}
                         </Typography>
                       </Stack>
                     </Grid>
-                    <Grid item xs={6}>
-                      <Stack direction="row" spacing={1} alignItems="center">
+                    <Grid size={{ xs: 6 }}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                         <DollarSign size={12} color="rgba(255,255,255,0.4)" />
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
                           Earnings: ${p.attributes.bounty_earned_for_user.toFixed(0)}
@@ -340,13 +342,15 @@ export const BountyHubPage: React.FC = () => {
       )}
 
       {/* Details Dialog */}
-      <Dialog 
-        open={!!detailHandle} 
+      <Dialog
+        open={!!detailHandle}
         onClose={() => setDetailHandle(null)}
         maxWidth="md"
         fullWidth
-        PaperProps={{
-          sx: { bgcolor: '#0d0d0d', border: '1px solid rgba(255,255,255,0.1)', backgroundImage: 'none' }
+        slotProps={{
+          paper: {
+            sx: { bgcolor: '#0d0d0d', border: '1px solid rgba(255,255,255,0.1)', backgroundImage: 'none' }
+          }
         }}
       >
         {isLoadingDetails ? (
@@ -354,7 +358,7 @@ export const BountyHubPage: React.FC = () => {
         ) : details && (
           <>
             <DialogTitle sx={{ p: 3, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-              <Stack direction="row" spacing={2} alignItems="center">
+              <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
                 <Avatar src={details.attributes.profile_picture} sx={{ width: 40, height: 40 }} />
                 <Box>
                   <Typography variant="h6" sx={{ color: '#fff', fontFamily: 'Orbitron' }}>{details.attributes.name}</Typography>
@@ -364,21 +368,21 @@ export const BountyHubPage: React.FC = () => {
             </DialogTitle>
             <DialogContent sx={{ p: 3 }}>
               <Grid container spacing={4}>
-                <Grid item xs={12} md={7}>
+                <Grid size={{ xs: 12, md: 7 }}>
                   <Typography variant="subtitle2" sx={{ color: 'rgba(0, 243, 255, 0.7)', mb: 2, letterSpacing: 1 }}>ASSETS_ON_SCOPE</Typography>
                   <Stack spacing={2}>
                     {details.relationships.structured_scopes.data.length > 0 ? (
                       details.relationships.structured_scopes.data.map((scope) => (
-                        <Box key={scope.id} sx={{ 
-                          p: 1.5, 
-                          bgcolor: 'rgba(255,255,255,0.02)', 
+                        <Box key={scope.id} sx={{
+                          p: 1.5,
+                          bgcolor: 'rgba(255,255,255,0.02)',
                           border: '1px solid rgba(255,255,255,0.05)',
                           borderRadius: 1,
                           display: 'flex',
                           justifyContent: 'space-between',
                           alignItems: 'center'
                         }}>
-                          <Stack direction="row" spacing={1.5} alignItems="center">
+                          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
                             <Box sx={{ color: 'rgba(255,255,255,0.3)' }}>
                               {scope.attributes.asset_type === 'DOMAIN' ? <Globe size={16} /> : <PlusCircle size={16} />}
                             </Box>
@@ -397,18 +401,18 @@ export const BountyHubPage: React.FC = () => {
                     )}
                   </Stack>
                 </Grid>
-                <Grid item xs={12} md={5}>
+                <Grid size={{ xs: 12, md: 5 }}>
                   <Stack spacing={3}>
                     <Box>
                       <Typography variant="subtitle2" sx={{ color: 'rgba(0, 243, 255, 0.7)', mb: 1.5, letterSpacing: 1 }}>STATS</Typography>
                       <Grid container spacing={2}>
-                        <Grid item xs={6}>
+                        <Grid size={{ xs: 6 }}>
                           <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1, textAlign: 'center' }}>
                             <Typography variant="h5" sx={{ color: '#fff', fontWeight: 900 }}>{details.attributes.number_of_reports_for_user || 0}</Typography>
                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>REPORTS</Typography>
                           </Box>
                         </Grid>
-                        <Grid item xs={6}>
+                        <Grid size={{ xs: 6 }}>
                           <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1, textAlign: 'center' }}>
                             <Typography variant="h5" sx={{ color: '#fff', fontWeight: 900 }}>${(details.attributes.bounty_earned_for_user || 0).toFixed(0)}</Typography>
                             <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>EARNED</Typography>
@@ -433,8 +437,8 @@ export const BountyHubPage: React.FC = () => {
             </DialogContent>
             <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
               <Button onClick={() => setDetailHandle(null)} sx={{ color: 'rgba(255,255,255,0.6)' }}>CLOSE</Button>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 startIcon={<DownloadCloud size={16} />}
                 onClick={() => {
                   toggleSelection(details.attributes.handle);

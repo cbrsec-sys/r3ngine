@@ -96,7 +96,7 @@ export const NotificationSettingsPage: React.FC = () => {
   }
 
   const sectionHeader = (icon: React.ReactNode, title: string) => (
-    <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
+    <Stack direction="row" spacing={2} sx={{ alignItems: "center", mb: 3 }}>
       <Box sx={{ 
         p: 1, 
         borderRadius: '8px', 
@@ -172,8 +172,8 @@ export const NotificationSettingsPage: React.FC = () => {
             <Stack spacing={4} sx={{ p: 2 }}>
               {/* Slack */}
               <Box>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
+                <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                  <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
                     <Hash size={20} color="#E01E5A" />
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Slack Integration</Typography>
                   </Stack>
@@ -209,8 +209,8 @@ export const NotificationSettingsPage: React.FC = () => {
 
               {/* Discord */}
               <Box>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
+                <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                  <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
                     <ShieldAlert size={20} color="#5865F2" />
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Discord Integration</Typography>
                   </Stack>
@@ -246,8 +246,8 @@ export const NotificationSettingsPage: React.FC = () => {
 
               {/* Telegram */}
               <Box>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
+                <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                  <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
                     <Zap size={20} color="#0088cc" />
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Telegram Integration</Typography>
                   </Stack>
@@ -304,8 +304,8 @@ export const NotificationSettingsPage: React.FC = () => {
 
               {/* Lark */}
               <Box>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
-                  <Stack direction="row" spacing={2} alignItems="center">
+                <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 2 }}>
+                  <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
                     <Typography sx={{ fontSize: '20px' }}>🐦</Typography>
                     <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>Lark Integration</Typography>
                   </Stack>
@@ -364,7 +364,7 @@ export const NotificationSettingsPage: React.FC = () => {
                       />
                     }
                     label={
-                      <Stack direction="row" spacing={1} alignItems="center">
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                         <Box sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex' }}>{trigger.icon}</Box>
                         <Typography variant="body2">{trigger.label}</Typography>
                       </Stack>
@@ -397,7 +397,7 @@ export const NotificationSettingsPage: React.FC = () => {
                     />
                   }
                   label={
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                       <Box sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex' }}><FileText size={18} /></Box>
                       <Box>
                         <Typography variant="body2">Upload Scan Output Files</Typography>
@@ -430,7 +430,7 @@ export const NotificationSettingsPage: React.FC = () => {
                     />
                   }
                   label={
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                       <Box sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex' }}><AlertTriangle size={18} /></Box>
                       <Box>
                         <Typography variant="body2">Send Task Tracebacks</Typography>

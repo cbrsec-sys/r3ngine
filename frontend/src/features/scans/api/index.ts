@@ -177,7 +177,7 @@ export const useBulkDeleteSubScans = (projectSlug: string) => {
 };
 
 export const useScansHistory = (project: string) => {
-  return useQuery<Scan[]>({
+  return useQuery<ScanHistory[]>({
     queryKey: ['scans-history', project],
     queryFn: async () => {
       const response = await fetch(`/api/listScans/?project=${project}`, {
