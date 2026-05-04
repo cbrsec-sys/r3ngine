@@ -727,6 +727,8 @@ def api_vault(request, slug):
         key_shodan = request.POST.get('key_shodan')
         key_censys_id = request.POST.get('key_censys_id')
         key_censys_secret = request.POST.get('key_censys_secret')
+        key_acunetix_url = request.POST.get('key_acunetix_url')
+        key_acunetix_key = request.POST.get('key_acunetix_key')
 
 
         if key_openai:
@@ -802,6 +804,15 @@ def api_vault(request, slug):
                 defaults={'key_value': spiderfoot_key}
             )
 
+        if key_acunetix_url and key_acunetix_key:
+            AcunetixAPIKey.objects.update_or_create(
+                id=1,
+                defaults={
+                    'server_url': key_acunetix_url,
+                    'api_key': key_acunetix_key
+                }
+            )
+
         delete_sf_key = request.POST.get('delete_sf_key')
         if delete_sf_key:
             SpiderfootAPIKey.objects.filter(id=delete_sf_key).delete()
@@ -829,6 +840,7 @@ def api_vault(request, slug):
     context['shodan_key'] = shodan_key
     context['censys_key'] = censys_key
     context['leaklookup_key'] = LeakLookupAPIKey.objects.first()
+    context['acunetix_key'] = AcunetixAPIKey.objects.first()
     context['spiderfoot_keys'] = SpiderfootAPIKey.objects.all()
     
     if request.headers.get('Accept') == 'application/json':
@@ -841,6 +853,8 @@ def api_vault(request, slug):
             'leaklookup_key': context['leaklookup_key'].key if context['leaklookup_key'] else "",
             'hackerone_username': hackerone_username or "",
             'hackerone_key': hackerone_key or "",
+            'acunetix_url': context['acunetix_key'].server_url if context['acunetix_key'] else "",
+            'acunetix_key': context['acunetix_key'].api_key if context['acunetix_key'] else "",
         })
 
     return render(request, 'dashboard/v3_index.html', context)

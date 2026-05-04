@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import { 
-  Box, 
-  Typography, 
-  Grid, 
-  Button, 
-  Tabs, 
-  Tab, 
-  Paper, 
-  IconButton, 
+import {
+  Box,
+  Typography,
+  Grid,
+  Button,
+  Tabs,
+  Tab,
+  Paper,
+  IconButton,
   Tooltip,
   CircularProgress,
   List,
@@ -21,13 +21,13 @@ import {
   Alert,
   Snackbar
 } from '@mui/material';
-import { 
-  Settings, 
-  Upload, 
-  Save, 
-  FileText, 
-  Zap, 
-  Shield, 
+import {
+  Settings,
+  Upload,
+  Save,
+  FileText,
+  Zap,
+  Shield,
   Code,
   CheckCircle,
   AlertTriangle,
@@ -38,11 +38,11 @@ import {
   ChevronRight
 } from 'lucide-react';
 import { TacticalPanel } from '../../../components/TacticalPanel';
-import { 
-  useToolSettings, 
-  useFileContent, 
-  useUpdateToolConfig, 
-  useUploadToolFiles 
+import {
+  useToolSettings,
+  useFileContent,
+  useUpdateToolConfig,
+  useUploadToolFiles
 } from '../api';
 import { useParams } from '@tanstack/react-router';
 
@@ -130,7 +130,7 @@ export const ToolSettingsPage: React.FC = () => {
 
   const handleSaveConfig = () => {
     if (!editingFile) return;
-    
+
     // Map the key back to the form field name expected by the backend
     let postKey = '';
     if (editingFile.key === 'nuclei_config') postKey = 'nuclei_config_text_area';
@@ -139,7 +139,7 @@ export const ToolSettingsPage: React.FC = () => {
     else if (editingFile.key === 'amass_config') postKey = 'amass_config_text_area';
     else if (editingFile.key === 'theharvester_config') postKey = 'theharvester_config_text_area';
     else if (editingFile.key === 'spiderfoot_config') postKey = 'spiderfoot_config_text_area';
-    
+
     if (postKey) {
       updateConfig.mutate({ key: postKey, content: fileContent }, {
         onSuccess: (data) => {
@@ -188,7 +188,7 @@ export const ToolSettingsPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4 }}>
         <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', mb: 1 }}>
-          TOOL_SETTINGS
+          TOOL SETTINGS
         </Typography>
         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
           Manage configuration files, GF patterns, and Nuclei templates.
@@ -197,12 +197,12 @@ export const ToolSettingsPage: React.FC = () => {
 
       <TacticalPanel title="CONFIGURATION_PANEL" sx={{ width: '100%' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
-          <Tabs 
-            value={tabValue} 
+          <Tabs
+            value={tabValue}
             onChange={handleTabChange}
             sx={{
               '& .MuiTabs-indicator': { bgcolor: '#00f3ff' },
-              '& .MuiTab-root': { 
+              '& .MuiTab-root': {
                 color: 'rgba(255,255,255,0.5)',
                 fontFamily: 'Orbitron',
                 fontSize: '12px',
@@ -218,7 +218,7 @@ export const ToolSettingsPage: React.FC = () => {
 
         <TabPanel value={tabValue} index={0}>
           <Grid container spacing={2}>
-            <Grid size={{xs: 12, md: 3}} >
+            <Grid size={{ xs: 12, md: 3 }} >
               <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.1)', width: '100%' }}>
                 <Typography variant="h6" sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '14px', mb: 2 }}>
                   UPLOAD GF PATTERNS
@@ -237,8 +237,8 @@ export const ToolSettingsPage: React.FC = () => {
                     component="span"
                     fullWidth
                     startIcon={<Upload size={18} />}
-                    sx={{ 
-                      borderColor: '#00f3ff', 
+                    sx={{
+                      borderColor: '#00f3ff',
                       color: '#00f3ff',
                       '&:hover': { bgcolor: 'rgba(0,243,255,0.1)', borderColor: '#00f3ff' }
                     }}
@@ -255,30 +255,30 @@ export const ToolSettingsPage: React.FC = () => {
                 <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
                   INSTALLED PATTERNS ({toolSettings?.gf_patterns.length})
                 </Typography>
-                <Paper sx={{ 
-                  bgcolor: 'rgba(0,0,0,0.2)', 
-                  maxHeight: '400px', 
+                <Paper sx={{
+                  bgcolor: 'rgba(0,0,0,0.2)',
+                  maxHeight: '400px',
                   overflow: 'auto',
                   border: '1px solid rgba(255,255,255,0.05)',
                   width: '100%'
                 }}>
                   <List dense>
                     {toolSettings?.gf_patterns.map((pattern) => (
-                      <ListItem 
+                      <ListItem
                         key={pattern}
                         disablePadding
-                        sx={{ 
+                        sx={{
                           borderBottom: '1px solid rgba(255,255,255,0.05)'
                         }}
                       >
                         <ListItemButton
                           onClick={() => handleEditGF(pattern)}
-                          sx={{ 
+                          sx={{
                             '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' },
                           }}
                         >
-                          <ListItemText 
-                            primary={pattern} 
+                          <ListItemText
+                            primary={pattern}
                             slotProps={{
                               primary: { sx: { color: 'rgba(255,255,255,0.8)', fontSize: '13px' } }
                             }}
@@ -292,17 +292,17 @@ export const ToolSettingsPage: React.FC = () => {
               </Box>
             </Grid>
 
-            <Grid size={{xs: 12, md: 9}} >
+            <Grid size={{ xs: 12, md: 9 }} >
               {editingFile && editingFile.key === 'gf_pattern' ? (
                 <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.2)', width: '100%' }}>
-                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '14px' }}>
                       EDITING: {editingFile.name}
                     </Typography>
                     <Box>
-                       <Button 
-                        size="small" 
-                        variant="contained" 
+                      <Button
+                        size="small"
+                        variant="contained"
                         startIcon={<Save size={16} />}
                         onClick={handleSaveConfig}
                         disabled={updateConfig.isPending}
@@ -310,8 +310,8 @@ export const ToolSettingsPage: React.FC = () => {
                       >
                         SAVE
                       </Button>
-                      <Button 
-                        size="small" 
+                      <Button
+                        size="small"
                         sx={{ color: 'rgba(255,255,255,0.5)', ml: 1 }}
                         onClick={() => setEditingFile(null)}
                       >
@@ -329,10 +329,10 @@ export const ToolSettingsPage: React.FC = () => {
                     slotProps={{
                       input: {
                         disableUnderline: true,
-                        sx: { 
-                          fontFamily: 'monospace', 
-                          color: '#a9b7c6', 
-                          bgcolor: '#1e1e1e', 
+                        sx: {
+                          fontFamily: 'monospace',
+                          color: '#a9b7c6',
+                          bgcolor: '#1e1e1e',
                           p: 2,
                           fontSize: '13px',
                           border: '1px solid rgba(0,243,255,0.1)'
@@ -345,11 +345,11 @@ export const ToolSettingsPage: React.FC = () => {
                   </Alert>
                 </Paper>
               ) : (
-                <Box sx={{ 
-                  height: '100%', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
+                <Box sx={{
+                  height: '100%',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
                   justifyContent: 'center',
                   bgcolor: 'rgba(0,0,0,0.1)',
                   borderRadius: 1,
@@ -387,8 +387,8 @@ export const ToolSettingsPage: React.FC = () => {
                     component="span"
                     fullWidth
                     startIcon={<Upload size={18} />}
-                    sx={{ 
-                      borderColor: '#00f3ff', 
+                    sx={{
+                      borderColor: '#00f3ff',
                       color: '#00f3ff',
                       '&:hover': { bgcolor: 'rgba(0,243,255,0.1)', borderColor: '#00f3ff' }
                     }}
@@ -401,26 +401,26 @@ export const ToolSettingsPage: React.FC = () => {
               <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontFamily: 'Orbitron', fontSize: '11px' }}>
                 CUSTOM TEMPLATES ({toolSettings?.nuclei_templates?.length || 0})
               </Typography>
-              <Paper sx={{ 
-                bgcolor: 'rgba(0,0,0,0.2)', 
-                maxHeight: '500px', 
+              <Paper sx={{
+                bgcolor: 'rgba(0,0,0,0.2)',
+                maxHeight: '500px',
                 overflow: 'auto',
                 border: '1px solid rgba(255,255,255,0.05)',
                 width: '100%'
               }}>
                 <List dense>
                   {toolSettings?.nuclei_templates?.map((template) => (
-                    <ListItem 
+                    <ListItem
                       key={template}
                       disablePadding
-                      sx={{ 
+                      sx={{
                         borderBottom: '1px solid rgba(255,255,255,0.05)',
                       }}
                     >
                       <ListItemButton
                         selected={editingFile?.key === 'nuclei_template' && editingFile?.name === template}
                         onClick={() => handleViewNucleiTemplate(template)}
-                        sx={{ 
+                        sx={{
                           '&.Mui-selected': {
                             bgcolor: 'rgba(0,243,255,0.1)',
                             borderLeft: '3px solid #00f3ff'
@@ -428,14 +428,14 @@ export const ToolSettingsPage: React.FC = () => {
                           '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' }
                         }}
                       >
-                        <ListItemText 
-                          primary={template} 
+                        <ListItemText
+                          primary={template}
                           slotProps={{
-                            primary: { 
-                              sx: { 
-                                color: (editingFile?.key === 'nuclei_template' && editingFile?.name === template) ? '#00f3ff' : 'rgba(255,255,255,0.8)', 
-                                fontSize: '12px' 
-                              } 
+                            primary: {
+                              sx: {
+                                color: (editingFile?.key === 'nuclei_template' && editingFile?.name === template) ? '#00f3ff' : 'rgba(255,255,255,0.8)',
+                                fontSize: '12px'
+                              }
                             }
                           }}
                         />
@@ -470,10 +470,10 @@ export const ToolSettingsPage: React.FC = () => {
                       input: {
                         readOnly: true,
                         disableUnderline: true,
-                        sx: { 
-                          fontFamily: 'monospace', 
-                          color: '#a9b7c6', 
-                          bgcolor: '#1e1e1e', 
+                        sx: {
+                          fontFamily: 'monospace',
+                          color: '#a9b7c6',
+                          bgcolor: '#1e1e1e',
                           p: 2,
                           fontSize: '13px',
                           border: '1px solid rgba(0,243,255,0.1)'
@@ -483,11 +483,11 @@ export const ToolSettingsPage: React.FC = () => {
                   />
                 </Paper>
               ) : (
-                <Box sx={{ 
-                  height: '600px', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
+                <Box sx={{
+                  height: '600px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
                   justifyContent: 'center',
                   bgcolor: 'rgba(0,0,0,0.1)',
                   borderRadius: 1,
@@ -496,7 +496,7 @@ export const ToolSettingsPage: React.FC = () => {
                 }}>
                   <Shield size={48} color="rgba(0,243,255,0.2)" />
                   <Typography sx={{ color: 'rgba(255,255,255,0.3)', mt: 2, fontFamily: 'Orbitron', fontSize: '12px', textAlign: 'center' }}>
-                    SELECT A NUCLEI TEMPLATE TO VIEW CONTENT<br/>
+                    SELECT A NUCLEI TEMPLATE TO VIEW CONTENT<br />
                     UPLOAD NEW ONES USING THE PANEL ON THE LEFT
                   </Typography>
                 </Box>
@@ -510,7 +510,7 @@ export const ToolSettingsPage: React.FC = () => {
             <Box sx={{ width: '250px', flexShrink: 0 }}>
               <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1 }}>
                 {configFiles.map((file) => (
-                  <ListItem 
+                  <ListItem
                     key={file.key}
                     disablePadding
                   >
@@ -528,17 +528,17 @@ export const ToolSettingsPage: React.FC = () => {
                       <Box sx={{ mr: 2, color: editingFile?.key === file.key ? '#00f3ff' : 'rgba(255,255,255,0.5)' }}>
                         {file.icon}
                       </Box>
-                      <ListItemText 
-                        primary={file.name} 
+                      <ListItemText
+                        primary={file.name}
                         slotProps={{
-                          primary: { 
-                            sx: { 
+                          primary: {
+                            sx: {
                               color: editingFile?.key === file.key ? '#00f3ff' : 'rgba(255,255,255,0.7)',
                               fontSize: '13px',
                               fontFamily: 'Orbitron'
-                            } 
+                            }
                           }
-                        }} 
+                        }}
                       />
                     </ListItemButton>
                   </ListItem>
@@ -553,9 +553,9 @@ export const ToolSettingsPage: React.FC = () => {
                     <Typography sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '14px' }}>
                       {editingFile.name}
                     </Typography>
-                    <Button 
-                      size="small" 
-                      variant="contained" 
+                    <Button
+                      size="small"
+                      variant="contained"
                       startIcon={<Save size={16} />}
                       onClick={handleSaveConfig}
                       disabled={updateConfig.isPending}
@@ -574,10 +574,10 @@ export const ToolSettingsPage: React.FC = () => {
                     slotProps={{
                       input: {
                         disableUnderline: true,
-                        sx: { 
-                          fontFamily: 'monospace', 
-                          color: '#a9b7c6', 
-                          bgcolor: '#1e1e1e', 
+                        sx: {
+                          fontFamily: 'monospace',
+                          color: '#a9b7c6',
+                          bgcolor: '#1e1e1e',
                           p: 2,
                           fontSize: '13px',
                           border: '1px solid rgba(0,243,255,0.1)'
@@ -587,11 +587,11 @@ export const ToolSettingsPage: React.FC = () => {
                   />
                 </Paper>
               ) : (
-                <Box sx={{ 
-                  height: '400px', 
-                  display: 'flex', 
-                  flexDirection: 'column', 
-                  alignItems: 'center', 
+                <Box sx={{
+                  height: '400px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
                   justifyContent: 'center',
                   bgcolor: 'rgba(0,0,0,0.1)',
                   borderRadius: 1,
@@ -614,8 +614,8 @@ export const ToolSettingsPage: React.FC = () => {
         autoHideDuration={6000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
       >
-        <Alert 
-          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity}
           sx={{ width: '100%', bgcolor: snackbar.severity === 'success' ? '#1b5e20' : '#d32f2f', color: '#fff' }}
         >

@@ -130,7 +130,8 @@ RUN printf "\
     github.com/projectdiscovery/katana/cmd/katana@latest\n\
     github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest\n\
     github.com/sa7mon/s3scanner@latest\n\
-    github.com/zricethezav/gitleaks/v8@latest\n" | \
+    github.com/zricethezav/gitleaks/v8@latest\n\
+    github.com/xalgord/reconx@latest\n" | \
     xargs -L1 go install -ldflags="-s -w" -v && \
     rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
 
@@ -174,6 +175,12 @@ RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarves
 RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
     cd /usr/src/github/ctfr && pip3 install -r requirements.txt
 
+RUN git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python && \
+    cd /usr/src/github/acunetix-python && pip3 install .
+
+RUN git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-scan && \
+    cd /usr/src/github/awvs14-scan && pip3 install -r requirements.txt
+
 RUN ARCH=$(dpkg --print-architecture) \
     && wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
     tar -xvf kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
@@ -183,11 +190,11 @@ RUN ARCH=$(dpkg --print-architecture) \
 # Install Trivy with checksum verification
 RUN ARCH=$(dpkg --print-architecture) \
     && if [ "${ARCH}" = "arm64" ]; then TRIVY_ARCH="ARM64"; else TRIVY_ARCH="64bit"; fi \
-    && TRIVY_VERSION="0.59.1" \
-    && wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz \
+    && TRIVY_VERSION="0.70.0" \
+    && wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-32bit.tar.gz \
     && wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_checksums.txt \
-    && grep "trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz" trivy_${TRIVY_VERSION}_checksums.txt | sha256sum -c - \
-    && tar -xvf trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz \
+    && grep "trivy_${TRIVY_VERSION}_Linux-32bit.tar.gz" trivy_${TRIVY_VERSION}_checksums.txt | sha256sum -c - \
+    && tar -xvf trivy_${TRIVY_VERSION}_Linux-32bit.tar.gz \
     && mv trivy /usr/local/bin/ \
     && rm -rf trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz trivy_${TRIVY_VERSION}_checksums.txt
 
@@ -207,9 +214,8 @@ WORKDIR /usr/src/github/spiderfoot
 RUN pip3 install -r requirements.txt
 WORKDIR /usr/src/app
 
-# Install Chromium and Retire.js
-RUN apt install chromium-driver -y && \
-    npm install -g retire
+# Install Retire.js (NOTE! geckodriver is installed, chromium is causing conflicts)
+RUN apt install -y npm && npm install -g retire
 
 # Setup Eyewitness
 RUN git clone https://github.com/RedSiege/EyeWitness /usr/src/github/EyeWitness && \

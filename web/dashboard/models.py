@@ -151,3 +151,12 @@ class LeakLookupAPIKey(models.Model):
 
 	def __str__(self):
 		return self.key
+
+
+class AcunetixAPIKey(models.Model):
+	id = models.AutoField(primary_key=True)
+	server_url = models.CharField(max_length=500)
+	api_key = models.CharField(max_length=500)
+
+	def __str__(self):
+		return self.server_url

@@ -115,7 +115,55 @@ def monitor_target_task(domain_id):
 							scan_history=scan_history
 						)
 
-		# 4. Attack Surface Intelligence (SpiderFoot)
+		# 4. ReconX Discovery
+		reconx_results = f"{results_dir}/reconx_findings"
+		os.makedirs(reconx_results, exist_ok=True)
+		
+		# Create a temporary targets file for reconx
+		reconx_targets = f"{results_dir}/reconx_targets.txt"
+		with open(reconx_targets, 'w') as f:
+			f.write(domain.name)
+		
+		# Run reconx
+		# reconx run uses targets from config, but we can override or use a specific config
+		# For simplicity, we'll use a direct command if supported, or create a minimal config
+		reconx_cmd = f"reconx run --targets {reconx_targets} --output {reconx_results}"
+		os.system(reconx_cmd)
+		
+		# Parse reconx findings (JSONL format in findings directory)
+		# Findings are usually in ~/.local/share/reconx/findings/ but we try to direct output if possible
+		# If not, we'll check the default location
+		reconx_default_findings = os.path.expanduser("~/.local/share/reconx/findings/")
+		if os.path.exists(reconx_default_findings):
+			for file in os.listdir(reconx_default_findings):
+				if file.endswith(".jsonl"):
+					try:
+						with open(os.path.join(reconx_default_findings, file), 'r') as f:
+							for line in f:
+								finding = json.loads(line)
+								# ReconX findings can be subdomains or vulnerabilities
+								if finding.get('type') == 'subdomain':
+									sub_name = finding.get('data', {}).get('subdomain')
+									if sub_name and sub_name.endswith(domain.name) and sub_name not in existing_subs:
+										from reNgine.tasks import save_subdomain
+										sub_obj, created = save_subdomain(sub_name, ctx=ctx)
+										if created:
+											new_discoveries.append(f"Subdomain (ReconX): {sub_name}")
+											existing_subs.add(sub_name)
+											MonitoringDiscovery.objects.create(
+												domain=domain,
+												discovery_type='subdomain',
+												content={'name': sub_name, 'source': 'ReconX'},
+												scan_history=scan_history
+											)
+								elif finding.get('type') == 'vulnerability':
+									# If reconx found a vulnerability, we can also log it
+									vuln_info = finding.get('data', {})
+									new_discoveries.append(f"Vulnerability (ReconX): {vuln_info.get('template-id')}")
+					except Exception as e:
+						logger.error(f"Error parsing ReconX findings: {str(e)}")
+
+		# 5. Attack Surface Intelligence (SpiderFoot)
 		sf_output = f"{results_dir}/spiderfoot_monitor.json"
 		sf_config_path = "/root/.config/spiderfoot.cfg"
 		if not os.path.exists(sf_config_path):

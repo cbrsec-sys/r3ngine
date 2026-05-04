@@ -45,7 +45,9 @@ export const ApiVaultPage: React.FC = () => {
     censys_secret: '',
     leaklookup_key: '',
     hackerone_username: '',
-    hackerone_key: ''
+    hackerone_key: '',
+    acunetix_url: '',
+    acunetix_key: ''
   });
 
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -60,7 +62,9 @@ export const ApiVaultPage: React.FC = () => {
         censys_secret: settings.censys_secret || '',
         leaklookup_key: settings.leaklookup_key || '',
         hackerone_username: settings.hackerone_username || '',
-        hackerone_key: settings.hackerone_key || ''
+        hackerone_key: settings.hackerone_key || '',
+        acunetix_url: settings.acunetix_url || '',
+        acunetix_key: settings.acunetix_key || ''
       });
     }
   }, [settings]);
@@ -344,6 +348,64 @@ export const ApiVaultPage: React.FC = () => {
                       GENERATE TOKEN
                     </Button>
                   </Box>
+                </Box>
+              </TacticalPanel>
+
+              <TacticalPanel title="ACUNETIX (AWVS)" icon={<Shield size={20} />}>
+                <Box sx={{ p: 1 }}>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 3, display: 'block' }}>
+                    Connect your Acunetix instance for automated vulnerability scanning.
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid size={{xs: 12}} >
+                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>SERVER URL</Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        value={form.acunetix_url}
+                        onChange={(e) => setForm({ ...form, acunetix_url: e.target.value })}
+                        placeholder="https://acunetix.example.com:3443"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            color: '#fff',
+                            bgcolor: 'rgba(255,255,255,0.02)',
+                            fontFamily: 'monospace',
+                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                          }
+                        }}
+                      />
+                    </Grid>
+                    <Grid size={{xs: 12}} >
+                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API KEY</Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type={showKeys.acunetix_key ? 'text' : 'password'}
+                        value={form.acunetix_key}
+                        onChange={(e) => setForm({ ...form, acunetix_key: e.target.value })}
+                        placeholder="Enter Acunetix API Key"
+                        slotProps={{
+                          input: {
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton onClick={() => toggleVisibility('acunetix_key')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                                  {showKeys.acunetix_key ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            color: '#fff',
+                            bgcolor: 'rgba(255,255,255,0.02)',
+                            fontFamily: 'monospace',
+                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                          }
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
                 </Box>
               </TacticalPanel>
             </Stack>

@@ -21,10 +21,11 @@ interface VisualizationNode {
 
 interface VisualizationTabProps {
   projectSlug: string;
-  scanId: number;
+  scanId?: number;
+  targetId?: number;
 }
 
-const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId }) => {
+const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId, targetId }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [loading, setLoading] = useState(true);
@@ -34,12 +35,18 @@ const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId
 
   useEffect(() => {
     fetchData();
-  }, [scanId]);
+  }, [scanId, targetId]);
 
   const fetchData = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`/api/queryAllScanResultVisualise/?scan_id=${scanId}&format=json`);
+      let url = `/api/queryAllScanResultVisualise/?format=json`;
+      if (scanId) {
+        url += `&scan_id=${scanId}`;
+      } else if (targetId) {
+        url += `&target_id=${targetId}`;
+      }
+      const response = await axios.get(url);
       if (response.data && response.data.length > 0) {
         setData(response.data[0]);
       } else {

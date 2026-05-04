@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { getCsrfToken } from '../../settings/api';
+import { getCsrfToken } from '../../../api/axiosConfig';
 import type { LoginResponse } from '../types';
 
 export const useLogin = () => {

@@ -2333,12 +2333,16 @@ class VisualiseData(APIView):
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
+		target_id = req.query_params.get('target_id')
 		if scan_id:
 			mitch_data = ScanHistory.objects.filter(id=scan_id)
-			serializer = VisualiseDataSerializer(mitch_data, many=True)
-			return Response(serializer.data)
+		elif target_id:
+			mitch_data = ScanHistory.objects.filter(domain__id=target_id).order_by('-start_scan_date')[:1]
 		else:
-			return Response()
+			return Response([])
+
+		serializer = VisualiseDataSerializer(mitch_data, many=True)
+		return Response(serializer.data)
 
 
 class ListTechnology(APIView):

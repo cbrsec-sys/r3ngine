@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import { getCsrfToken } from '../../../api/axiosConfig';
 
 export interface NotificationSettings {
 	send_to_slack: boolean;
@@ -85,6 +86,8 @@ export interface ApiVaultSettings {
   leaklookup_key: string;
   hackerone_username: string;
   hackerone_key: string;
+  acunetix_url: string;
+  acunetix_key: string;
 }
 
 export interface ReportSettings {
@@ -143,11 +146,7 @@ export interface FileContentResponse {
   message?: string;
 }
 
-export const getCsrfToken = () => {
-  return document.cookie.split('; ')
-    .find(row => row.startsWith('csrftoken='))
-    ?.split('=')[1];
-};
+
 
 export const useProxySettings = (slug: string) => {
   return useQuery<ProxySettings>({

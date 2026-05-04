@@ -34,6 +34,7 @@ import {
   AlertTriangle
 } from 'lucide-react';
 import { useSearch, useSearchHistory } from '../api';
+import { escapeRegExp } from '../../../utils/securityUtils';
 import { useParams, useNavigate, useSearch as useUrlSearch } from '@tanstack/react-router';
 
 const SEVERITY_COLORS: Record<number, string> = {
@@ -72,7 +73,9 @@ export const SearchPage: React.FC = () => {
 
   const highlightText = (text: string, highlight: string) => {
     if (!highlight.trim()) return text;
-    const parts = text.split(new RegExp(`(${highlight})`, 'gi'));
+    // Escape special characters to prevent ReDoS using centralized utility
+    const escapedHighlight = escapeRegExp(highlight);
+    const parts = text.split(new RegExp(`(${escapedHighlight})`, 'gi'));
     return (
       <span>
         {parts.map((part, i) => 

@@ -60,7 +60,9 @@ Centralized AI management for smarter reconnaissance and automated reporting.
 *   **AI-Assisted Recon**: Automated generation of vulnerability descriptions, remediation strategies, and attack surface assessments.
 *   **Vulnerability Impact Intelligence**: Interactive tactical dashboard featuring AI-generated impact narratives and Cytoscape.js-powered attack path visualizations.
 *   **PII Gate**: Integrated privacy protection to anonymize sensitive scan data (IPs, emails, hostnames) before LLM processing, ensuring secure data handling in AI-assisted analysis.
-*   **Vulnerability Correlation Engine**: Advanced multi-tool unification pipeline that correlates findings from **Nuclei (DAST)**, **Semgrep (SAST)**, and **Trivy/Retire.js (SCA)** into a prioritized threat landscape with automated **Potential Attack Chain** generation.
+
+
+*   **Vulnerability Correlation Engine**: Advanced multi-tool unification pipeline that correlates findings from **Nuclei (DAST)**, **Semgrep (SAST)**, **Trivy (SCA)**, **Gitleaks (Secrets)**, **Acunetix (DAST)**, and **Retire.js** into a prioritized threat landscape with automated **Potential Attack Chain** generation.
 
 ### 🕵️ SpiderFoot Integration 2.0
 The SpiderFoot discovery engine has been completely re-engineered for v3.
@@ -80,6 +82,25 @@ The SpiderFoot discovery engine has been completely re-engineered for v3.
 *   **Task Management**: Enhanced task monitoring with granular status tracking and detailed logs.
 *   **Reporting Views**: New analytics dashboards providing a 360-degree view of your attack surface and vulnerability trends.
 
+### 🛡️ Frontend Security & Resilience
+A robust, unified security layer ensuring data integrity and access control.
+*   **Centralized Authentication**: Unified `AuthContext` architecture with automated protected route guards via TanStack Router.
+*   **Proactive XSS Prevention**: Global `DOMPurify` sanitization for all user-provided and reconnaissance data.
+*   **Client-Side SQLi Shield**: Integrated Axios interceptors that scan and block suspicious payload patterns before they reach the server.
+*   **CSRF Enforcement**: Automated token synchronization and injection for all mutation requests (POST/PUT/DELETE).
+*   **Dependency Hardening**: Surgical remediation of high-severity vulnerabilities in visualization libraries.
+*   **Regex Safety**: Secure regex handling across search and filtering modules to prevent Denial of Service (ReDoS) attacks.
+*   **Vulnerability Dashboard Refinements**: Native support for externally synchronized findings with verified metadata.
+
+### 🔬 External Tool Orchestration (Acunetix & ReconX)
+Version 3.0 introduces deep integration with high-impact external security tools, allowing reNgine to act as a centralized controller.
+*   **Acunetix (AWVS) Integration**:
+    *   **Automated Provisioning**: Automatically add targets and initiate scans on your managed Acunetix instances.
+    *   **Finding Ingestion**: Native transformer to map Acunetix vulnerabilities into reNgine's enterprise reports.
+    *   **API Vault Sync**: Securely manage multiple Acunetix API keys and server URLs from a single interface.
+*   **ReconX Auxiliary Discovery**:
+    *   **Continuous Monitoring**: Integration into the periodic monitoring pipeline for proactive asset discovery.
+    *   **Consolidated Reporting**: Findings from ReconX are merged with native reNgine discoveries for a unified attack surface view.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -151,6 +172,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
   * Screenshot Gathering
   * Vulnerability Scan
     * Nuclei
+    * **Acunetix (AWVS)**: Automated vulnerability scanning with native ingestion.
     * Dalfox XSS Scanner
     * CRLFuzzer
     * Misconfigured S3 Scanner
@@ -163,6 +185,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
   * Email Address gathering
   * Google Dorking for sensitive info and urls
   * **Spiderfoot Integration**: Full intensity control and profile-based OSINT.
+  * **ReconX**: Integrated asset discovery and continuous monitoring.
 * Projects, create distinct project spaces, each tailored to a specific purpose.
 * Perform Advanced Query lookup using natural language alike operations
 * Highly configurable YAML-based Scan Engines

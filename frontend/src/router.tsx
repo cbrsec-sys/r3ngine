@@ -1,4 +1,4 @@
-import { createRootRoute, createRoute, createRouter, Outlet, Link } from "@tanstack/react-router";
+import { createRootRouteWithContext, createRoute, createRouter, Outlet, Link, redirect } from "@tanstack/react-router";
 import { Shell } from "./components/Shell";
 import { DashboardPage } from "./features/dashboard";
 import { TargetList, TargetSummary } from "./features/targets";
@@ -34,8 +34,30 @@ import { Box, Typography, Button } from "@mui/material";
 import { AlertCircle, Home, RefreshCw } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 
+interface RouterContext {
+  auth: {
+    isAuthenticated: boolean;
+    isLoading: boolean;
+    user: any;
+  };
+}
+
 // Root Route
-const rootRoute = createRootRoute({
+const rootRoute = createRootRouteWithContext<RouterContext>()({
+  beforeLoad: ({ context, location }) => {
+    const isAuthPage = location.pathname.startsWith('/login') ||
+      location.pathname.startsWith('/logout') ||
+      location.pathname.startsWith('/onboarding');
+
+    if (!context.auth.isAuthenticated && !isAuthPage && !context.auth.isLoading) {
+      throw redirect({
+        to: '/login',
+        search: {
+          redirect: location.href,
+        },
+      });
+    }
+  },
   component: () => {
     const routerState = useRouterState();
     const isAuthPage = routerState.location.pathname.startsWith('/login') ||
@@ -442,6 +464,7 @@ const onboardingRoute = createRoute({
 
 // Route Tree
 const routeTree = rootRoute.addChildren([
+  rootRedirectRoute,
   projectRoute.addChildren([
     projectsRoute,
     dashboardRoute,
@@ -480,6 +503,9 @@ const routeTree = rootRoute.addChildren([
 // Router Instance
 export const router = createRouter({
   routeTree,
+  context: {
+    auth: undefined!, // This will be provided by the AuthProvider
+  },
   defaultNotFoundComponent: () => <NotFound />,
 });
 

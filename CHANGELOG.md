@@ -39,14 +39,26 @@
   - **Vulnerability Impact Intelligence**: Integrated AI-driven impact assessment and graph-based attack path visualization:
     - **AI-Driven Impact Assessment**: Automated generation of potential impact narratives and remediation priorities using LLMs (OpenAI, Anthropic, Gemini, Ollama).
     - **Attack Path Visualization**: Interactive Cytoscape.js-powered graph showing the full exploit chain from root domain to vulnerability.
-    - **Impact Explorer**: A tactical UI component for real-time monitoring of impact generation tasks and interactive graph exploration.
+    - **Impact Explorer**: A tactical React component for real-time monitoring of impact generation tasks and interactive graph exploration.
     - **PII Gate**: Implemented a privacy-preserving "gate" that anonymizes sensitive reconnaissance data (IPs, emails, hostnames) before sending it to external LLMs and deanonymizes the returned results.
     - **Persistence & Polling**: Impact findings are persisted in PostgreSQL and synchronized with React Query using smart polling for asynchronous background tasks.
   - **Advanced Vulnerability Correlation Engine**: 
-    - Integrated **Trivy** for automated Software Composition Analysis (SCA) on discovered dependency files.
+    - Integrated **Trivy** for automated Software Composition Analysis (SCA) and **Gitleaks** for secret discovery.
     - Added **Retire.js** integration to identify vulnerable client-side JavaScript libraries.
-    - Implemented a weighted correlation algorithm that unifies results from Nuclei (DAST), Semgrep (SAST), Trivy (SCA), and Retire.js.
+    - Implemented a weighted correlation algorithm that unifies results from Nuclei (DAST), Semgrep (SAST), Trivy (SCA), Gitleaks, and Retire.js.
     - Introduced **Potential Attack Chain** generation to visualize sequential exploitation steps (Initial Access -> Lateral Movement -> Impact).
+    - Added automated unit tests to ensure correlation logic accuracy across all security tools.
+- **Acunetix & ReconX Integration**: 
+    - **Acunetix (AWVS)**: Fully integrated Acunetix into the vulnerability scanning pipeline. Users can now manage their own instances via the API Vault and trigger automated scans with native result ingestion.
+    - **ReconX**: Integrated ReconX as an auxiliary discovery tool in the continuous monitoring pipeline for enhanced asset identification.
+- **Frontend Security & Resilience**: 
+    - **Centralized Auth Architecture**: Implemented a robust `AuthContext` and `AuthProvider` to manage user sessions and state globally.
+    - **Protected Route Guards**: Integrated TanStack Router `beforeLoad` hooks to enforce authentication across all sensitive application routes.
+    - **Robust CSRF Protection**: Centralized CSRF token retrieval and automated injection into all mutation requests via Axios interceptors.
+    - **Automatic SQLi Prevention**: Implemented a client-side request interceptor that blocks outgoing requests containing suspicious SQL injection patterns in the payload.
+    - **DOM Sanitization**: Integrated `DOMPurify` for secure rendering of potentially unsafe content, preventing XSS in future features.
+    - **Dependency Hardening**: Remediated high-severity ReDoS vulnerabilities in the `d3` ecosystem via `package.json` overrides.
+    - **Regex Security**: Optimized search highlighting logic with centralized regex escaping to prevent ReDoS attacks from user inputs.
 
 ### Bug Fixes
 - **Automated Infrastructure Stability**: Integrated `custom_engines` directory creation into the Docker build and entrypoint processes to prevent runtime `FileNotFoundError` during engine initialization.

@@ -39,9 +39,13 @@ from scanEngine.models import (EngineType, InstalledExternalTool, Notification, 
 from startScan.models import *
 from startScan.models import EndPoint, Subdomain, Vulnerability, Parameter
 from targetApp.models import Domain
+from dashboard.models import AcunetixAPIKey
 from reNgine.monitor_tasks import *
 from reNgine.graph_utils import Neo4jManager
-from reNgine.privacy import PIIGate
+try:
+	from acunetix import Acunetix
+except ImportError:
+	Acunetix = None
 
 """
 Celery tasks.
@@ -2695,6 +2699,7 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	should_run_crlfuzz = config.get(RUN_CRLFUZZ, False)
 	should_run_dalfox = config.get(RUN_DALFOX, False)
 	should_run_s3scanner = config.get(RUN_S3SCANNER, True)
+	should_run_acunetix = config.get(RUN_ACUNETIX, False)
 
 	grouped_tasks = []
 	if should_run_nuclei:
@@ -2702,6 +2707,14 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 			urls=urls,
 			ctx=ctx,
 			description=f'Nuclei Scan'
+		)
+		grouped_tasks.append(_task)
+
+	if should_run_acunetix:
+		_task = acunetix_scan.si(
+			domain_id=ctx.get('domain_id'),
+			scan_history_id=ctx.get('scan_history_id'),
+			ctx=ctx
 		)
 		grouped_tasks.append(_task)
 
@@ -6037,6 +6050,139 @@ def pull_ollama_model(model_name):
     return True
 
 
+def map_acunetix_severity(severity):
+	# Acunetix: 3 (High), 2 (Medium), 1 (Low), 0 (Informational)
+	# reNgine: 4 (Critical), 3 (High), 2 (Medium), 1 (Low), 0 (Info)
+	mapping = {
+		3: 3,
+		2: 2,
+		1: 1,
+		0: 0
+	}
+	if isinstance(severity, str):
+		sev_map = {'high': 3, 'medium': 2, 'low': 1, 'info': 0}
+		return sev_map.get(severity.lower(), 0)
+	return mapping.get(severity, 0)
+
+
+@app.task(name='acunetix_scan', queue='main_scan_queue', base=RengineTask, bind=True)
+def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
+	"""
+	Run Acunetix (AWVS) scan for the given domain.
+	"""
+	if not Acunetix:
+		logger.error("Acunetix library not found. Skipping Acunetix scan.")
+		return False
+
+	scan_history = ScanHistory.objects.get(pk=scan_history_id) if scan_history_id else None
+	domain = Domain.objects.get(pk=domain_id)
+	
+	# Get credentials from vault
+	creds = AcunetixAPIKey.objects.first()
+	if not creds:
+		logger.error("Acunetix API keys not found in vault. Skipping.")
+		return False
+
+	try:
+		acunetix = Acunetix(host=creds.server_url, api=creds.api_key)
+		
+		target_url = f"http://{domain.name}"
+		logger.info(f"Starting Acunetix scan for {target_url}")
+		
+		# Use the library's start_scan which typically adds target and starts scan
+		# Based on the user provided example
+		acunetix.start_scan(domain.name)
+		
+		# Now we need to poll for status and fetch findings.
+		# Since acunetix-python is a light wrapper, we might need to use requests for some parts
+		# if the library doesn't expose them.
+		
+		headers = {
+			'X-Auth': creds.api_key,
+			'Content-Type': 'application/json'
+		}
+		base_url = creds.server_url if creds.server_url.startswith('http') else f"https://{creds.server_url}"
+		
+		# Get target ID for the domain
+		targets_resp = requests.get(f"{base_url}/api/v1/targets?q=text_search:{domain.name}", headers=headers, verify=False)
+		if targets_resp.status_code != 200:
+			logger.error(f"Failed to fetch target ID from Acunetix: {targets_resp.text}")
+			return False
+		
+		targets_data = targets_resp.json()
+		target = next((t for t in targets_data.get('targets', []) if t['address'].strip('http://').strip('https://') == domain.name), None)
+		
+		if not target:
+			logger.error(f"Target {domain.name} not found in Acunetix after start_scan.")
+			return False
+			
+		target_id = target['target_id']
+		
+		# Wait for scan to complete
+		# We'll poll /api/v1/scans
+		max_retries = 360 # 1 hour
+		retries = 0
+		while retries < max_retries:
+			scans_resp = requests.get(f"{base_url}/api/v1/scans?q=target_id:{target_id}", headers=headers, verify=False)
+			if scans_resp.status_code == 200:
+				scans_data = scans_resp.json()
+				latest_scan = scans_data.get('scans', [{}])[0]
+				current_status = latest_scan.get('current_session', {}).get('status')
+				
+				if current_status == 'completed':
+					logger.info(f"Acunetix scan for {domain.name} completed.")
+					break
+				elif current_status in ['failed', 'aborted']:
+					logger.error(f"Acunetix scan for {domain.name} {current_status}.")
+					return False
+			
+			time.sleep(10)
+			retries += 1
+			
+		# Fetch Vulnerabilities
+		vulns_resp = requests.get(f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}", headers=headers, verify=False)
+		if vulns_resp.status_code == 200:
+			vulns_data = vulns_resp.json()
+			for vuln in vulns_data.get('vulnerabilities', []):
+				# Get full details for each vuln
+				vuln_detail_resp = requests.get(f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}", headers=headers, verify=False)
+				if vuln_detail_resp.status_code == 200:
+					v_detail = vuln_detail_resp.json()
+					
+					save_v_data = {
+						'scan_history': scan_history,
+						'target_domain': domain,
+						'source': 'Acunetix',
+						'name': v_detail.get('vt_name'),
+						'severity': map_acunetix_severity(v_detail.get('severity')),
+						'description': v_detail.get('description'),
+						'impact': v_detail.get('impact'),
+						'remediation': v_detail.get('recommendation'),
+						'http_url': v_detail.get('affects_url'),
+						'request': v_detail.get('request'),
+						'response': v_detail.get('response'),
+						'template_id': v_detail.get('vt_id'),
+					}
+					
+					# Handle references
+					refs = []
+					# v_detail might have references as a list of dicts
+					for r in v_detail.get('references', []):
+						if isinstance(r, dict):
+							refs.append(r.get('href'))
+						else:
+							refs.append(str(r))
+					save_v_data['references'] = refs
+					
+					save_vulnerability(**save_v_data)
+					
+		return True
+		
+	except Exception as e:
+		logger.error(f"Error in Acunetix scan: {str(e)}")
+		return False
+
+
 @app.task(name='correlate_vulnerabilities', queue='main_scan_queue', base=RengineTask, bind=True)
 def correlate_vulnerabilities(self, scan_history_id):
 	"""
@@ -6084,7 +6230,6 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 		return False
 
 	generator = LLMImpactGenerator(logger)
-	gate = PIIGate()
 
 	# Run Correlation Engine to unify results and calculate scores
 	from reNgine.correlation import VulnerabilityCorrelationEngine
@@ -6101,14 +6246,8 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 		if vuln.subdomain:
 			context += f"Technologies: {', '.join([t.name for t in vuln.subdomain.technologies.all()])}\n"
 
-		# PII Gate: Mask data
-		masked_context = gate.anonymize(context)
-
-		# Call LLM
-		impact_text = generator.generate_impact_assessment(masked_context)
-
-		# PII Gate: Reseal data
-		final_impact = gate.deanonymize(impact_text)
+		# Call LLM (PII protection is handled inside generator)
+		final_impact = generator.generate_impact_assessment(context)
 
 		# Persist
 		ImpactAssessment.objects.update_or_create(

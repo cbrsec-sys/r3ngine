@@ -1,27 +1,27 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { 
-  Box, 
-  Typography, 
-  CircularProgress, 
-  Stack, 
-  Button, 
+import {
+  Box,
+  Typography,
+  CircularProgress,
+  Stack,
+  Button,
   Divider,
   Chip,
   IconButton,
   Tooltip
 } from '@mui/material';
-import { 
-  Maximize, 
-  RefreshCw, 
-  Download, 
-  ShieldAlert, 
+import {
+  Maximize,
+  RefreshCw,
+  Download,
+  ShieldAlert,
   Target,
   Activity,
   Bot
 } from 'lucide-react';
 import cytoscape from 'cytoscape';
 import { TacticalPanel } from '../../../components/TacticalPanel';
-import { useImpactGraphData, useImpactAssessment } from '../api';
+import { useImpactGraphData, useImpactAssessment, useGenerateImpact } from '../api';
 
 interface ImpactExplorerProps {
   projectSlug: string;
@@ -33,7 +33,7 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   const [graphLoading, setGraphLoading] = useState(true);
-  
+
   const { data: graphData, isLoading: isGraphDataLoading } = useImpactGraphData(projectSlug, vulnId);
   const { data: assessment, isLoading: isAssessmentLoading } = useImpactAssessment(projectSlug, vulnId);
 
@@ -62,13 +62,13 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
               'font-size': '10px',
               'font-family': 'Inter, sans-serif',
               'text-valign': 'bottom',
-              'text-margin-y': '5px',
+              'text-margin-y': 5,
               'width': 35,
               'height': 35,
               'border-width': 2,
               'border-color': '#00f3ff',
               'border-opacity': 0.5,
-              'overlay-padding': '6px',
+              'overlay-padding': 6,
             }
           },
           {
@@ -149,7 +149,7 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
     }
   };
 
-  const resetZoom = () => cyRef.current?.fit(null, 50);
+  const resetZoom = () => cyRef.current?.fit(undefined, 50);
   const exportPNG = () => {
     if (!cyRef.current) return;
     const pngContent = cyRef.current.png({ full: true, bg: '#0f172a' });
@@ -162,11 +162,11 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
   return (
     <Box sx={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 3 }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 350px' }, gap: 3 }}>
-        
+
         {/* Left: Graph Visualization */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TacticalPanel 
-            title="ATTACK PATH VISUALIZATION" 
+          <TacticalPanel
+            title="ATTACK PATH VISUALIZATION"
             icon={<Target size={14} />}
             headerAction={
               <Stack direction="row" spacing={1}>
@@ -190,15 +190,15 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
                 </Box>
               )}
               <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-              
+
               {/* Graph Legend Overlay */}
-              <Box sx={{ 
-                position: 'absolute', 
-                bottom: 15, 
-                left: 15, 
-                bgcolor: 'rgba(30, 41, 59, 0.9)', 
-                p: 1.5, 
-                borderRadius: 1, 
+              <Box sx={{
+                position: 'absolute',
+                bottom: 15,
+                left: 15,
+                bgcolor: 'rgba(30, 41, 59, 0.9)',
+                p: 1.5,
+                borderRadius: 1,
                 border: '1px solid rgba(255,255,255,0.1)',
                 backdropFilter: 'blur(4px)'
               }}>
@@ -216,15 +216,15 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
 
         {/* Right: AI Impact Intelligence */}
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          <TacticalPanel 
-            title="IMPACT INTELLIGENCE" 
+          <TacticalPanel
+            title="IMPACT INTELLIGENCE"
             icon={<Bot size={14} />}
             headerAction={
               assessment?.status && (
                 <Tooltip title="Regenerate Assessment">
-                  <IconButton 
-                    size="small" 
-                    onClick={handleTriggerAiImpact} 
+                  <IconButton
+                    size="small"
+                    onClick={handleTriggerAiImpact}
                     disabled={generateImpactMutation.isPending}
                     sx={{ color: '#00f3ff' }}
                   >
@@ -257,13 +257,13 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
                     <Typography sx={{ fontSize: '0.65rem', color: '#00f3ff', fontWeight: 900, fontFamily: 'Orbitron' }}>
                       REMEDIATION PRIORITY
                     </Typography>
-                    <Chip 
+                    <Chip
                       label={getPriorityLabel(assessment.remediation_priority)}
                       size="small"
-                      sx={{ 
-                        height: 20, 
-                        fontSize: '0.6rem', 
-                        fontWeight: 900, 
+                      sx={{
+                        height: 20,
+                        fontSize: '0.6rem',
+                        fontWeight: 900,
                         bgcolor: getPriorityColor(assessment.remediation_priority),
                         color: '#fff',
                         fontFamily: 'Orbitron'
@@ -282,23 +282,23 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
                         {assessment.potential_attack_chain.steps?.map((step: any, idx: number) => (
                           <Box key={idx} sx={{ position: 'relative', pl: 3 }}>
                             {idx < assessment.potential_attack_chain.steps.length - 1 && (
-                              <Box sx={{ 
-                                position: 'absolute', 
-                                left: 7, 
-                                top: 15, 
-                                bottom: -10, 
-                                width: '2px', 
+                              <Box sx={{
+                                position: 'absolute',
+                                left: 7,
+                                top: 15,
+                                bottom: -10,
+                                width: '2px',
                                 bgcolor: 'rgba(0, 243, 255, 0.2)',
                                 zIndex: 0
                               }} />
                             )}
-                            <Box sx={{ 
-                              position: 'absolute', 
-                              left: 0, 
-                              top: 0, 
-                              width: 16, 
-                              height: 16, 
-                              borderRadius: '50%', 
+                            <Box sx={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 0,
+                              width: 16,
+                              height: 16,
+                              borderRadius: '50%',
                               bgcolor: '#0f172a',
                               border: '2px solid #00f3ff',
                               display: 'flex',
@@ -328,14 +328,14 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
                   )}
 
                   <Box sx={{ mt: 'auto', pt: 2 }}>
-                    <Stack direction="row" spacing={1} alignItems="center">
+                    <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                       <Activity size={12} color="rgba(255,255,255,0.4)" />
                       <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
                         Generated at: {new Date(assessment.created_at).toLocaleString()}
                       </Typography>
                     </Stack>
                     {assessment.is_ai_generated && (
-                      <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                      <Stack direction="row" spacing={1} sx={{ alignItems: "center", mt: 0.5 }}>
                         <Bot size={12} color="#00ffaa" />
                         <Typography sx={{ fontSize: '0.6rem', color: '#00ffaa', fontWeight: 700 }}>
                           AI-DRIVEN ASSESSMENT
@@ -350,14 +350,14 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
                   <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
                     No impact assessment found for this vulnerability.
                   </Typography>
-                  <Button 
-                    variant="outlined" 
-                    size="small" 
+                  <Button
+                    variant="outlined"
+                    size="small"
                     onClick={handleTriggerAiImpact}
                     disabled={generateImpactMutation.isPending}
                     startIcon={generateImpactMutation.isPending ? <CircularProgress size={14} /> : <RefreshCw size={14} />}
-                    sx={{ 
-                      borderColor: 'rgba(0, 243, 255, 0.3)', 
+                    sx={{
+                      borderColor: 'rgba(0, 243, 255, 0.3)',
                       color: '#00f3ff',
                       fontSize: '0.65rem',
                       fontWeight: 900,
@@ -377,7 +377,7 @@ export const ImpactExplorer: React.FC<ImpactExplorerProps> = ({ projectSlug, vul
 };
 
 const LegendItem = ({ color, label }: { color: string, label: string }) => (
-  <Stack direction="row" spacing={1} alignItems="center">
+  <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
     <Box sx={{ width: 8, height: 8, borderRadius: 0.5, bgcolor: color }} />
     <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.7)', fontWeight: 600 }}>{label}</Typography>
   </Stack>
