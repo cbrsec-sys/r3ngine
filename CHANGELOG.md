@@ -42,15 +42,22 @@
     - **Impact Explorer**: A tactical React component for real-time monitoring of impact generation tasks and interactive graph exploration.
     - **PII Gate**: Implemented a privacy-preserving "gate" that anonymizes sensitive reconnaissance data (IPs, emails, hostnames) before sending it to external LLMs and deanonymizes the returned results.
     - **Persistence & Polling**: Impact findings are persisted in PostgreSQL and synchronized with React Query using smart polling for asynchronous background tasks.
+  - **Real-Time Interactive Scan Timeline**: Overhauled the scan timeline to support live task monitoring and detailed command execution logs:
+    - **Live Command Streaming**: Integrated real-time polling to capture and display command stdout/stderr as tools execute.
+    - **Interactive Task Overlay**: Users can click on timeline events to open a terminal-style overlay showing all executed commands and their outputs.
+    - **Enhanced Task Metadata**: Backend updated to track command-level lifecycle and log availability per scan activity.
+    - **Smart Polling**: Implemented intelligent React Query polling that automatically adjusts based on scan status.
   - **Advanced Vulnerability Correlation Engine**: 
     - Integrated **Trivy** for automated Software Composition Analysis (SCA) and **Gitleaks** for secret discovery.
     - Added **Retire.js** integration to identify vulnerable client-side JavaScript libraries.
     - Implemented a weighted correlation algorithm that unifies results from Nuclei (DAST), Semgrep (SAST), Trivy (SCA), Gitleaks, and Retire.js.
     - Introduced **Potential Attack Chain** generation to visualize sequential exploitation steps (Initial Access -> Lateral Movement -> Impact).
     - Added automated unit tests to ensure correlation logic accuracy across all security tools.
-- **Acunetix & ReconX Integration**: 
-    - **Acunetix (AWVS)**: Fully integrated Acunetix into the vulnerability scanning pipeline. Users can now manage their own instances via the API Vault and trigger automated scans with native result ingestion.
-    - **ReconX**: Integrated ReconX as an auxiliary discovery tool in the continuous monitoring pipeline for enhanced asset identification.
+- **Acunetix & ReconX Orchestration**: 
+    - **Acunetix (AWVS) Pipeline**: Integrated automated vulnerability scanning via Acunetix API. Supports secure storage of server URLs and API keys in the reNgine Vault, automated target provisioning, and native ingestion of scan findings into the core `Vulnerability` database.
+    - **ReconX Auxiliary Discovery**: Integrated ReconX into the `monitor_tasks.py` pipeline to complement existing subdomain discovery and OSINT tools. ReconX findings are automatically parsed and mapped to `MonitoringDiscovery` nodes for consolidated asset tracking.
+- **Build & Infrastructure**:
+    - **ReconX Installation Fix**: Corrected the Go installation path for ReconX in `web/Dockerfile` (appended `/cmd/reconx`) to resolve module package errors.
 - **Frontend Security & Resilience**: 
     - **Centralized Auth Architecture**: Implemented a robust `AuthContext` and `AuthProvider` to manage user sessions and state globally.
     - **Protected Route Guards**: Integrated TanStack Router `beforeLoad` hooks to enforce authentication across all sensitive application routes.

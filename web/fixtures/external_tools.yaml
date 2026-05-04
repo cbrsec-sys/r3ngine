@@ -533,3 +533,38 @@
     is_github_cloned: false
     github_clone_path: null
     subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 31
+  fields:
+    logo_url: https://raw.githubusercontent.com/WazeHell/acunetix-python/master/static/logo.png
+    name: Acunetix (AWVS)
+    description: Acunetix is an automated web application security testing tool that audits your web applications by checking for vulnerabilities like SQL Injection, Cross-site Scripting, and other exploitable vulnerabilities.
+    github_url: https://github.com/WazeHell/acunetix-python
+    license_url: https://github.com/WazeHell/acunetix-python/blob/master/LICENSE
+    version_lookup_command: pip3 show acunetix-python
+    update_command: pip3 install acunetix-python --upgrade
+    install_command: pip3 install acunetix-python
+    version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+
+- model: scanEngine.installedexternaltool
+  pk: 32
+  fields:
+    logo_url: null
+    name: ReconX
+    description: 24x7 automated security reconnaissance & vulnerability scanning.
+    github_url: https://github.com/xalgord/reconx
+    license_url: https://github.com/xalgord/reconx/blob/main/README.md
+    version_lookup_command: reconx version
+    update_command: go install -v github.com/xalgord/reconx/cmd/reconx@latest
+    install_command: go install -v github.com/xalgord/reconx/cmd/reconx@latest
+    version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: true
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null

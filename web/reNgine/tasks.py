@@ -2711,12 +2711,17 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 		grouped_tasks.append(_task)
 
 	if should_run_acunetix:
-		_task = acunetix_scan.si(
-			domain_id=ctx.get('domain_id'),
-			scan_history_id=ctx.get('scan_history_id'),
-			ctx=ctx
-		)
-		grouped_tasks.append(_task)
+		# Double check if acunetix is configured
+		creds = AcunetixAPIKey.objects.first()
+		if creds and creds.server_url and creds.api_key:
+			_task = acunetix_scan.si(
+				domain_id=ctx.get('domain_id'),
+				scan_history_id=ctx.get('scan_history_id'),
+				ctx=ctx
+			)
+			grouped_tasks.append(_task)
+		else:
+			logger.warning("Acunetix is enabled in engine but not configured in vault. Skipping.")
 
 	if should_run_crlfuzz:
 		_task = crlfuzz_scan.si(
@@ -6079,8 +6084,8 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 	
 	# Get credentials from vault
 	creds = AcunetixAPIKey.objects.first()
-	if not creds:
-		logger.error("Acunetix API keys not found in vault. Skipping.")
+	if not (creds and creds.server_url and creds.api_key):
+		logger.error("Acunetix API keys not fully configured in vault. Skipping.")
 		return False
 
 	try:

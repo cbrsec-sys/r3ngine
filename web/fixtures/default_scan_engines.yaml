@@ -2,7 +2,7 @@
     default_engine: true
     engine_name: Full Scan
     yaml_configuration: "subdomain_discovery: {\n  'uses_tools': ['subfinder', 'chaos',\
-      \ 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas'],\n  'enable_http_crawl':\
+      \ 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'reconx'],\n  'enable_http_crawl':\
       \ true,\n  'threads': 30,\n  'timeout': 5,\n}\nhttp_crawl: {}\nport_scan: {\n\
       \  'enable_http_crawl': true,\n  'timeout': 5,\n  'ports': ['top-100'],\n  'rate_limit':\
       \ 150,\n  'threads': 30,\n  'passive': false\n}\nosint: {\n  'discover': ['emails',\
@@ -21,7 +21,7 @@
       \ 'interestingsubs', 'lfi', 'rce', 'redirect', 'sqli', 'ssrf', 'ssti', 'xss'],\n\
       \  'ignore_file_extensions': ['png', 'jpg', 'jpeg', 'gif', 'mp4', 'mpeg', 'mp3'],\n\
       \  'threads': 30\n}\nvulnerability_scan: {\n  'run_nuclei': true,\n  'run_dalfox':\
-      \ true,\n  'run_crlfuzz': true,\n  'enable_http_crawl': true,\n  'concurrency':\
+      \ true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'enable_http_crawl': true,\n  'concurrency':\
       \ 50,\n  'intensity': 'normal',\n  'rate_limit': 150,\n  'retries': 1,\n  'timeout':\
       \ 5,\n  'fetch_gpt_report': false,\n  'nuclei': {\n    'use_nuclei_config':\
       \ false,\n    'severities': ['unknown', 'info', 'low', 'medium', 'high', 'critical']\n\
@@ -39,7 +39,7 @@
     engine_name: Subdomain Scan
     yaml_configuration: "subdomain_discovery: {\n  'uses_tools': [\n    'subfinder',\
       \ \n    'ctfr', \n    'sublist3r', \n    'tlsx', \n    'oneforall',\
-      \ \n    'netlas', \n    'chaos'\n  ],\n  'enable_http_crawl': true,
+      \ \n    'netlas', \n    'chaos',\n    'reconx'\n  ],\n  'enable_http_crawl': true,
       \n  'threads': 30,\n  'timeout': 5,\n}\nhttp_crawl: {}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
   model: scanEngine.enginetype
   pk: 2
@@ -60,7 +60,7 @@
     default_engine: true
     engine_name: Vulnerability Scan
     yaml_configuration: "subdomain_discovery: {\n  'uses_tools': ['subfinder', 'chaos',\
-      \ 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas'],\n  'enable_http_crawl':\
+      \ 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'reconx'],\n  'enable_http_crawl':\
       \ true,\n  'threads': 30,\n  'timeout': 5,\n}\nhttp_crawl: {}\nosint:\
       \ {\n  'discover': [\n      'emails',\n      'metainfo',\n      'employees'
       \n    ],\n  'dorks': [\n    'login_pages',\n    'admin_panels',\n  \
@@ -69,7 +69,7 @@
       \  'jenkins',\n    'wordpress_files',\n    'php_error',\n    'exposed_documents',
       \n    'db_files',\n    'git_exposed'\n  ],\n  'intensity': 'normal',
       \n  'documents_limit': 50\n}\nvulnerability_scan: {\n  'run_nuclei': true,
-      \n  'run_dalfox': true,\n  'run_crlfuzz': true,\n  'enable_http_crawl':\
+      \n  'run_dalfox': true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'enable_http_crawl':\
       \ true,\n  'concurrency': 50,\n  'intensity': 'normal',\n  'rate_limit':\
       \ 150,\n  'retries': 1,\n  'timeout': 5,\n  'fetch_gpt_report': false,
       \n  'nuclei': {\n    'use_nuclei_config': false,\n    'severities': ['unknown',\
@@ -91,13 +91,13 @@
     default_engine: true
     engine_name: reNgine Recommended
     yaml_configuration: "subdomain_discovery: {\n  'uses_tools': ['subfinder', 'chaos',\
-      \ 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas'],\n  'enable_http_crawl':\
+      \ 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'reconx'],\n  'enable_http_crawl':\
       \ true,\n  'threads': 30,\n  'timeout': 5,\n}\nhttp_crawl: {}\nosint:\
       \ {\n  'discover': [\n      'emails',\n      'metainfo'\n    ],\n\
       \  'dorks': [\n    'login_pages',\n    'admin_panels',\n    'dashboard_pages',
       \n    'config_files',\n    'exposed_documents',\n  ],\n  'intensity':\
       \ 'normal',\n  'documents_limit': 50\n}\nvulnerability_scan: {\n  'run_nuclei':\
-      \ true,\n  'run_dalfox': true,\n  'run_crlfuzz': true,\n  'enable_http_crawl':\
+      \ true,\n  'run_dalfox': true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'enable_http_crawl':\
       \ false,\n  'concurrency': 50,\n  'intensity': 'normal',\n  'rate_limit':\
       \ 150,\n  'retries': 1,\n  'timeout': 5,\n  'fetch_gpt_report': false,
       \n  'nuclei': {\n    'use_nuclei_config': false,\n    'severities': ['low',\
@@ -131,6 +131,6 @@
 - fields:
     default_engine: true
     engine_name: Web App & API Discovery
-    yaml_configuration: "web_api_discovery: {\n  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'inql', 'aquatone', 'semgrep'],\n  'scan_only_active': true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite'\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
+    yaml_configuration: "web_api_discovery: {\n  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'inql', 'aquatone', 'semgrep'],\n  'scan_only_active': true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite'\n}\nvulnerability_scan: {\n  'run_acunetix': true\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
   model: scanEngine.enginetype
   pk: 8

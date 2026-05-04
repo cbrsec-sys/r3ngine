@@ -131,7 +131,7 @@ RUN printf "\
     github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest\n\
     github.com/sa7mon/s3scanner@latest\n\
     github.com/zricethezav/gitleaks/v8@latest\n\
-    github.com/xalgord/reconx@latest\n" | \
+    github.com/xalgord/reconx/cmd/reconx@latest\n" | \
     xargs -L1 go install -ldflags="-s -w" -v && \
     rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
 
@@ -178,8 +178,7 @@ RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
 RUN git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python && \
     cd /usr/src/github/acunetix-python && pip3 install .
 
-RUN git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-scan && \
-    cd /usr/src/github/awvs14-scan && pip3 install -r requirements.txt
+RUN git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-scan
 
 RUN ARCH=$(dpkg --print-architecture) \
     && wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz && \

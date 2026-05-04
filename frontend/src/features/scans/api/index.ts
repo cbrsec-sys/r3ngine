@@ -265,6 +265,11 @@ export const useScanSummary = (projectSlug: string, scanId: number) => {
       return response.json();
     },
     enabled: !!projectSlug && !!scanId,
+    refetchInterval: (query: any) => {
+      const data = query.state.data;
+      if (data && data.scan_info && data.scan_info.scan_status === 2) return false;
+      return 5000;
+    }
   });
 };
 
@@ -342,5 +347,23 @@ export const useDeleteScanAction = (projectSlug: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
     }
+  });
+};
+
+export const useActivityLogs = (activityId: number | null) => {
+  return useQuery({
+    queryKey: ['activity-logs', activityId],
+    queryFn: async () => {
+      const response = await fetch(`/api/listActivityLogs/?activity_id=${activityId}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data : data.results || [];
+    },
+    enabled: !!activityId,
+    refetchInterval: 5000, // Poll every 5 seconds for real-time logs
   });
 };
