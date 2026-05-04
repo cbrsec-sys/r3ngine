@@ -139,19 +139,21 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
               anchorEl={anchorEl}
               open={Boolean(anchorEl)}
               onClose={handleMenuClose}
-              paperprops={{
-                sx: {
-                  bgcolor: '#0a0a0f',
-                  border: '1px solid rgba(0, 243, 255, 0.2)',
-                  boxShadow: '0 0 30px rgba(0,0,0,0.5)',
-                  mt: 1,
-                  '& .MuiMenuItem-root': {
-                    fontSize: '0.75rem',
-                    fontWeight: 700,
-                    color: 'rgba(255,255,255,0.7)',
-                    px: 3,
-                    py: 1,
-                    '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff' }
+              slotProps={{
+                paper: {
+                  sx: {
+                    bgcolor: '#0a0a0f',
+                    border: '1px solid rgba(0, 243, 255, 0.2)',
+                    boxShadow: '0 0 30px rgba(0,0,0,0.5)',
+                    mt: 1,
+                    '& .MuiMenuItem-root': {
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: 'rgba(255,255,255,0.7)',
+                      px: 3,
+                      py: 1,
+                      '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff' }
+                    }
                   }
                 }
               }}

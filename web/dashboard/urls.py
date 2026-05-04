@@ -158,4 +158,12 @@ urlpatterns = [
         '<slug:slug>/api/graph/scan/<int:scan_id>/data/',
         views.get_graph_data,
         name='get_graph_data'),
+    path(
+        '<slug:slug>/api/graph/target/<int:target_id>/data/',
+        views.get_target_graph_data,
+        name='get_target_graph_data'),
+    path(
+        '<slug:slug>/target/<int:target_id>/attack-surface/',
+        views.target_attack_surface,
+        name='target_attack_surface_v3'),
 ]

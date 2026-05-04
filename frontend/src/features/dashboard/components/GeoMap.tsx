@@ -124,8 +124,8 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
           </defs>
           <ZoomableGroup zoom={1} maxZoom={3}>
             <Geographies geography={geoUrl}>
-              {({ geographies }) =>
-                geographies.map((geo) => {
+              {({ geographies }: { geographies: any[] }) =>
+                geographies.map((geo: any) => {
                   const country = findCountry(geo);
                   return (
                     <g key={geo.rsmKey}>

@@ -8,6 +8,16 @@ export default defineConfig({
     react(),
     basicSsl()
   ],
+  base: '/staticfiles/',
+  build: {
+    rollupOptions: {
+      output: {
+        entryFileNames: `assets/[name].js`,
+        chunkFileNames: `assets/[name].js`,
+        assetFileNames: `assets/[name].[ext]`
+      }
+    }
+  },
   server: {
     host: true,
     port: 5173,

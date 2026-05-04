@@ -245,21 +245,23 @@ export const LlmToolkitPage: React.FC = () => {
                   value={form.api_key}
                   onChange={(e) => setForm({ ...form, api_key: e.target.value })}
                   placeholder={selectedProvider === 'ollama' ? 'http://ollama:11434' : 'sk-...'}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Box sx={{ color: 'rgba(0, 243, 255, 0.5)' }}>
-                          {selectedProvider === 'ollama' ? <Globe size={18} /> : <Eye size={18} />}
-                        </Box>
-                      </InputAdornment>
-                    ),
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton onClick={() => setShowKey(!showKey)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                          {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
-                        </IconButton>
-                      </InputAdornment>
-                    )
+                  slotProps={{
+                    input: {
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Box sx={{ color: 'rgba(0, 243, 255, 0.5)' }}>
+                            {selectedProvider === 'ollama' ? <Globe size={18} /> : <Eye size={18} />}
+                          </Box>
+                        </InputAdornment>
+                      ),
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton onClick={() => setShowKey(!showKey)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                            {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
+                          </IconButton>
+                        </InputAdornment>
+                      )
+                    }
                   }}
                   sx={{
                     '& .MuiOutlinedInput-root': {

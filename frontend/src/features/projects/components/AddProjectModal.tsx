@@ -46,15 +46,17 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ open, onClose 
     <Dialog
       open={open}
       onClose={handleClose}
-      paperprops={{
-        sx: {
-          bgcolor: 'rgba(10, 10, 20, 0.95)',
-          backdropFilter: 'blur(20px)',
-          border: '1px solid rgba(0, 243, 255, 0.2)',
-          borderRadius: 4,
-          backgroundImage: 'radial-gradient(circle at top right, rgba(0, 243, 255, 0.05), transparent)',
-          maxWidth: 450,
-          width: '100%'
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: 'rgba(10, 10, 20, 0.95)',
+            backdropFilter: 'blur(20px)',
+            border: '1px solid rgba(0, 243, 255, 0.2)',
+            borderRadius: 4,
+            backgroundImage: 'radial-gradient(circle at top right, rgba(0, 243, 255, 0.05), transparent)',
+            maxWidth: 450,
+            width: '100%'
+          }
         }
       }}
     >
@@ -114,7 +116,9 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ open, onClose 
               placeholder="e.g. Cybersec_Audit_2024"
               sx={fieldStyles}
               helperText="A slug will be automatically generated from the project name."
-              FormHelperTextProps={{ sx: { color: 'rgba(255,255,255,0.3)' } }}
+              slotProps={{
+                formHelperText: { sx: { color: 'rgba(255,255,255,0.3)' } }
+              }}
             />
           </Box>
         </DialogContent>

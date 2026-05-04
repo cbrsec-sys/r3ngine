@@ -39,6 +39,7 @@ class DashboardGeoSerializer(serializers.Serializer):
 
 class DashboardDataSerializer(serializers.Serializer):
     project_info = serializers.DictField()
+    rengine_version = serializers.CharField(required=False)
     kpis = DashboardKPISerializer()
     trends = DashboardTrendsSerializer()
     most_used_port = DashboardDistributionItemSerializer(many=True)

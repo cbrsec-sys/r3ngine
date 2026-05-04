@@ -10,7 +10,7 @@ export const ThemeSwitcher: React.FC = () => {
   const themes = [
     { id: 'hacker', label: 'V3 Hacker', color: '#00f3ff' },
     { id: 'clean', label: 'V3 Clean', color: '#00d2ff' },
-    { id: 'scriptKiddie', label: 'V3 Script Kiddie', color: '#ff00ff' },
+    { id: 'script_kiddie', label: 'V3 Script Kiddie', color: '#ff00ff' },
   ] as const;
 
   return (

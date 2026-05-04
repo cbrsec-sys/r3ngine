@@ -147,6 +147,7 @@ class VulnerabilityReportSetting(models.Model):
     enable_llm_report_generation = models.BooleanField(default=False)
     show_footer = models.BooleanField(default=False)
     footer_text = models.CharField(max_length=200, null=True, blank=True)
+    include_attack_surface_map = models.BooleanField(default=False)
 
 
 class InstalledExternalTool(models.Model):

@@ -629,6 +629,15 @@ Avoid using markdown headers like # or ##. Use bold text for emphasis if needed.
 CRITICAL: Do NOT include any sign-offs, signatures, or placeholders like 'Sincerely', '[Your Name]', or '[Company Name]' at the end.
 """
 
+LLM_ATTACK_SCENARIO_SYSTEM_PROMPT = """
+You are an expert penetration tester. You are provided with a vulnerability that has a known exploit.
+Your task is to describe a realistic attack scenario where an attacker leverages this vulnerability to compromise the system or achieve a specific impact.
+Explain the steps an attacker might take, the tools they might use, and the potential outcome (e.g., data theft, system takeover, etc.).
+Ensure the tone is technical, professional, and objective.
+Avoid using markdown headers like # or ##. Use bold text for emphasis if needed.
+CRITICAL: Do NOT include any sign-offs, signatures, or placeholders.
+"""
+
 
 # OSINT GooFuzz Path
 GOFUZZ_EXEC_PATH = '/usr/src/github/goofuzz/GooFuzz'

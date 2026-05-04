@@ -98,12 +98,14 @@ export const ScanList: React.FC = () => {
                 '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
               }
             }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                  </InputAdornment>
+                ),
+              }
             }}
           />
         </Box>
@@ -124,7 +126,7 @@ export const ScanList: React.FC = () => {
                 <TableRow key={scan.id} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }, transition: 'all 0.2s' }}>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: '#fff' }}>{scan.domain?.name || 'N/A'}</Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontWeight: 600 }}>{scan.engine_name || scan.scan_type?.engine_name || 'Standard'}</Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontWeight: 600 }}>{scan.scan_type?.engine_name || 'Standard'}</Typography>
                   </TableCell>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', minWidth: 150 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>

@@ -1,8 +1,8 @@
 import React from 'react';
-import { 
-  Box, 
-  Card, 
-  Typography, 
+import {
+  Box,
+  Card,
+  Typography,
   IconButton,
   Button,
   LinearProgress,
@@ -12,11 +12,11 @@ import {
   Divider,
   Paper
 } from '@mui/material';
-import { 
-  Search, 
-  Plus, 
-  FileText, 
-  Trash2, 
+import {
+  Search,
+  Plus,
+  FileText,
+  Trash2,
   Eye,
   List,
   ChevronRight,
@@ -42,9 +42,9 @@ export const WordlistList: React.FC = () => {
     <Box>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
         {wordlists?.map((wordlist) => (
-          <Card key={wordlist.id} sx={{ 
-            bgcolor: 'rgba(10, 10, 20, 0.4)', 
-            backdropFilter: 'blur(10px)', 
+          <Card key={wordlist.id} sx={{
+            bgcolor: 'rgba(10, 10, 20, 0.4)',
+            backdropFilter: 'blur(10px)',
             border: '1px solid rgba(255, 255, 255, 0.05)',
             borderRadius: 1,
             transition: 'all 0.2s ease',
@@ -55,29 +55,29 @@ export const WordlistList: React.FC = () => {
               '& .action-btns': { opacity: 1 }
             }
           }}>
-            <Box sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              minHeight: 64, 
-              p: { xs: 2, md: 1.5 }, 
+            <Box sx={{
+              display: 'flex',
+              alignItems: 'center',
+              minHeight: 64,
+              p: { xs: 2, md: 1.5 },
               pr: 2,
               flexWrap: { xs: 'wrap', md: 'nowrap' },
               gap: { xs: 2, md: 0 }
             }}>
               {/* Left: Identity */}
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: { xs: '100%', md: 300 }, pl: 1, flexShrink: 0 }}>
-                <Paper sx={{ 
-                  p: 0.8, 
-                  bgcolor: 'rgba(255, 0, 255, 0.05)', 
+                <Paper sx={{
+                  p: 0.8,
+                  bgcolor: 'rgba(255, 0, 255, 0.05)',
                   borderRadius: 1,
                   border: '1px solid rgba(255, 0, 255, 0.1)'
                 }}>
                   <FileText size={16} style={{ color: '#ff00ff' }} />
                 </Paper>
                 <Box sx={{ overflow: 'hidden' }}>
-                  <Typography variant="body2" sx={{ 
-                    fontFamily: 'Orbitron', 
-                    fontWeight: 800, 
+                  <Typography variant="body2" sx={{
+                    fontFamily: 'Orbitron',
+                    fontWeight: 800,
                     color: '#fff',
                     fontSize: '0.8rem',
                     whiteSpace: 'nowrap',
@@ -109,18 +109,18 @@ export const WordlistList: React.FC = () => {
               <Divider orientation="vertical" flexItem sx={{ mx: 3, display: { xs: 'none', md: 'block' }, borderColor: 'rgba(255,255,255,0.05)' }} />
 
               {/* Right: Actions */}
-              <Box className="action-btns" sx={{ 
-                display: 'flex', 
-                gap: 1, 
-                opacity: { xs: 1, md: 0.4 }, 
+              <Box className="action-btns" sx={{
+                display: 'flex',
+                gap: 1,
+                opacity: { xs: 1, md: 0.4 },
                 transition: 'opacity 0.2s',
                 width: { xs: '100%', md: 150 },
                 justifyContent: { xs: 'center', md: 'flex-end' },
                 flexShrink: 0
               }}>
                 <Tooltip title="View Content">
-                  <IconButton 
-                    size="small" 
+                  <IconButton
+                    size="small"
                     onClick={() => handleView(wordlist.id)}
                     sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#ff00ff', bgcolor: 'rgba(255,0,255,0.1)' } }}
                   >
@@ -128,8 +128,8 @@ export const WordlistList: React.FC = () => {
                   </IconButton>
                 </Tooltip>
                 <Tooltip title="Purge Payload">
-                  <IconButton 
-                    size="small" 
+                  <IconButton
+                    size="small"
                     disabled={deleteWordlist.isPending}
                     onClick={() => {
                       if (window.confirm(`Purge wordlist "${wordlist.name}"?`)) {
@@ -141,8 +141,8 @@ export const WordlistList: React.FC = () => {
                     <Trash2 size={16} />
                   </IconButton>
                 </Tooltip>
-                <IconButton 
-                  size="small" 
+                <IconButton
+                  size="small"
                   sx={{ color: 'rgba(255,255,255,0.3)' }}
                   onClick={() => handleView(wordlist.id)}
                 >
@@ -155,15 +155,15 @@ export const WordlistList: React.FC = () => {
         {(!wordlists || wordlists.length === 0) && (
           <Box sx={{ py: 8, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 2, border: '1px dashed rgba(255,255,255,0.05)' }}>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron' }}>
-              VAULT_EMPTY_NO_PAYLOADS_DETECTED
+              VAULT EMPTY NO CUSTOM WORDLISTS DETECTED
             </Typography>
           </Box>
         )}
       </Box>
 
-      <ViewWordlistModal 
-        open={viewModalOpen} 
-        onClose={() => setViewModalOpen(false)} 
+      <ViewWordlistModal
+        open={viewModalOpen}
+        onClose={() => setViewModalOpen(false)}
         wordlistId={selectedWordlistId}
       />
     </Box>

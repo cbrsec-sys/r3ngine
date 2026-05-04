@@ -70,18 +70,20 @@ export const OrganizationPage: React.FC = () => {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               fullWidth
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search size={18} color="rgba(255, 255, 255, 0.5)" />
-                  </InputAdornment>
-                ),
-                sx: { 
-                  backgroundColor: 'rgba(255, 255, 255, 0.03)',
-                  color: '#fff',
-                  '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a2e' },
-                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' },
-                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' }
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Search size={18} color="rgba(255, 255, 255, 0.5)" />
+                    </InputAdornment>
+                  ),
+                  sx: { 
+                    backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                    color: '#fff',
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: '#1a1a2e' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' },
+                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' }
+                  }
                 }
               }}
             />

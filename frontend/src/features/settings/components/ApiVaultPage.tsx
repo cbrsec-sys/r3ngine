@@ -106,14 +106,16 @@ export const ApiVaultPage: React.FC = () => {
         value={(form as any)[field]}
         onChange={(e) => setForm({ ...form, [field]: e.target.value })}
         placeholder={placeholder}
-        InputProps={{
-          endAdornment: (
-            <InputAdornment position="end">
-              <IconButton onClick={() => toggleVisibility(field)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                {showKeys[field] ? <EyeOff size={18} /> : <Eye size={18} />}
-              </IconButton>
-            </InputAdornment>
-          ),
+        slotProps={{
+          input: {
+            endAdornment: (
+              <InputAdornment position="end">
+                <IconButton onClick={() => toggleVisibility(field)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                  {showKeys[field] ? <EyeOff size={18} /> : <Eye size={18} />}
+                </IconButton>
+              </InputAdornment>
+            ),
+          }
         }}
         sx={{
           '& .MuiOutlinedInput-root': {
@@ -242,14 +244,16 @@ export const ApiVaultPage: React.FC = () => {
                         value={form.censys_secret}
                         onChange={(e) => setForm({ ...form, censys_secret: e.target.value })}
                         placeholder="Enter Censys Secret"
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton onClick={() => toggleVisibility('censys_secret')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                                {showKeys.censys_secret ? <EyeOff size={16} /> : <Eye size={16} />}
-                              </IconButton>
-                            </InputAdornment>
-                          ),
+                        slotProps={{
+                          input: {
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton onClick={() => toggleVisibility('censys_secret')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                                  {showKeys.censys_secret ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }
                         }}
                         sx={{
                           '& .MuiOutlinedInput-root': {
@@ -307,14 +311,16 @@ export const ApiVaultPage: React.FC = () => {
                         value={form.hackerone_key}
                         onChange={(e) => setForm({ ...form, hackerone_key: e.target.value })}
                         placeholder="Enter Hackerone Token"
-                        InputProps={{
-                          endAdornment: (
-                            <InputAdornment position="end">
-                              <IconButton onClick={() => toggleVisibility('hackerone_key')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                                {showKeys.hackerone_key ? <EyeOff size={16} /> : <Eye size={16} />}
-                              </IconButton>
-                            </InputAdornment>
-                          ),
+                        slotProps={{
+                          input: {
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton onClick={() => toggleVisibility('hackerone_key')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                                  {showKeys.hackerone_key ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }
                         }}
                         sx={{
                           '& .MuiOutlinedInput-root': {

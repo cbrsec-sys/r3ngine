@@ -1,7 +1,7 @@
 import React from 'react';
 import { Grid, Card, CardContent, Typography, Box } from '@mui/material';
 import { Monitor, Globe, Link, Lock } from 'lucide-react';
-import type { MonitoringStats as StatsType } from '../api';
+import type { MonitoringStats as StatsType } from '../types';
 
 const StatCard: React.FC<{
   title: string;
@@ -23,7 +23,7 @@ const StatCard: React.FC<{
       opacity: 0.1, 
       transform: 'rotate(-15deg)' 
     }}>
-      {React.cloneElement(icon as React.ReactElement, { size: 80, color })}
+      {React.cloneElement(icon as React.ReactElement<any>, { size: 80, color })}
     </Box>
     <CardContent>
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
@@ -37,7 +37,7 @@ const StatCard: React.FC<{
           justifyContent: 'center',
           boxShadow: `0 0 15px ${color}33`
         }}>
-          {React.cloneElement(icon as React.ReactElement, { size: 20 })}
+          {React.cloneElement(icon as React.ReactElement<any>, { size: 20 })}
         </Box>
         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 600, letterSpacing: 1 }}>
           {title.toUpperCase()}
@@ -58,7 +58,7 @@ const StatCard: React.FC<{
 export const MonitoringStats: React.FC<{ stats: StatsType }> = ({ stats }) => {
   return (
     <Grid container spacing={3}>
-      <Grid xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard 
           title="Total Discoveries" 
           value={stats.total_discoveries} 
@@ -66,7 +66,7 @@ export const MonitoringStats: React.FC<{ stats: StatsType }> = ({ stats }) => {
           color="#00f3ff" 
         />
       </Grid>
-      <Grid xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard 
           title="New Subdomains" 
           value={stats.subdomain_discoveries} 
@@ -74,7 +74,7 @@ export const MonitoringStats: React.FC<{ stats: StatsType }> = ({ stats }) => {
           color="#00ff62" 
         />
       </Grid>
-      <Grid xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard 
           title="New Directories" 
           value={stats.endpoint_discoveries} 
@@ -82,7 +82,7 @@ export const MonitoringStats: React.FC<{ stats: StatsType }> = ({ stats }) => {
           color="#7000ff" 
         />
       </Grid>
-      <Grid xs={12} sm={6} md={3}>
+      <Grid size={{ xs: 12, sm: 6, md: 3 }}>
         <StatCard 
           title="Login Pages" 
           value={stats.login_discoveries} 

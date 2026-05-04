@@ -47,19 +47,19 @@ export const EnginesPage: React.FC = () => {
   return (
     <Box>
       <Grid container spacing={2} sx={{ mb: 4 }}>
-        <Grid xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Card sx={{ bgcolor: 'rgba(112, 0, 255, 0.05)', border: '1px solid rgba(112, 0, 255, 0.2)', p: 2, borderRadius: 2 }}>
             <Typography variant="caption" sx={{ color: '#7000ff', fontWeight: 800, letterSpacing: 1 }}>TOTAL_ENGINES</Typography>
             <Typography variant="h4" sx={{ color: '#fff', fontFamily: 'Orbitron', fontWeight: 900 }}>{engines?.length || 0}</Typography>
           </Card>
         </Grid>
-        <Grid xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Card sx={{ bgcolor: 'rgba(255, 0, 255, 0.05)', border: '1px solid rgba(255, 0, 255, 0.2)', p: 2, borderRadius: 2 }}>
             <Typography variant="caption" sx={{ color: '#ff00ff', fontWeight: 800, letterSpacing: 1 }}>WORDLIST_COUNT</Typography>
             <Typography variant="h4" sx={{ color: '#fff', fontFamily: 'Orbitron', fontWeight: 900 }}>{wordlists?.length || 0}</Typography>
           </Card>
         </Grid>
-        <Grid xs={12} sm={4}>
+        <Grid size={{ xs: 12, sm: 4 }}>
           <Card sx={{ bgcolor: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.2)', p: 2, borderRadius: 2 }}>
             <Typography variant="caption" sx={{ color: '#00f3ff', fontWeight: 800, letterSpacing: 1 }}>DEFAULT_ENGINE</Typography>
             <Typography variant="h6" sx={{ color: '#fff', fontFamily: 'Orbitron', fontWeight: 800, mt: 1 }}>

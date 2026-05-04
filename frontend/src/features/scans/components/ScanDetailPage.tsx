@@ -1,16 +1,16 @@
 import React, { useState } from 'react';
 import { useParams, Link as RouterLink } from '@tanstack/react-router';
-import { 
-  Box, 
-  Grid, 
-  Typography, 
-  Card, 
-  CardContent, 
-  Button, 
-  IconButton, 
-  Stack, 
-  Chip, 
-  Tab, 
+import {
+  Box,
+  Grid,
+  Typography,
+  Card,
+  CardContent,
+  Button,
+  IconButton,
+  Stack,
+  Chip,
+  Tab,
   Tabs,
   Paper,
   Divider,
@@ -32,14 +32,14 @@ import {
   FormControlLabel,
   Checkbox
 } from '@mui/material';
-import { 
-  Activity, 
-  Globe, 
-  Shield, 
-  Server, 
-  Zap, 
-  Terminal, 
-  AlertTriangle, 
+import {
+  Activity,
+  Globe,
+  Shield,
+  Server,
+  Zap,
+  Terminal,
+  AlertTriangle,
   Target,
   Map as MapIcon,
   ChevronRight,
@@ -94,12 +94,12 @@ const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   };
   const config = configs[severity] || configs[-1];
   return (
-    <Box sx={{ 
-      display: 'inline-flex', 
-      px: 1, 
-      py: 0.2, 
-      borderRadius: 0.5, 
-      bgcolor: `${config.color}20`, 
+    <Box sx={{
+      display: 'inline-flex',
+      px: 1,
+      py: 0.2,
+      borderRadius: 0.5,
+      bgcolor: `${config.color}20`,
       border: `1px solid ${config.color}50`,
       color: config.color,
       fontSize: '0.6rem',
@@ -120,16 +120,16 @@ const StatusBadge: React.FC<{ status: number }> = ({ status }) => {
   };
   const config = configs[status] || { label: 'UNKNOWN', color: '#fff', icon: Info };
   const Icon = config.icon;
-  
+
   return (
-    <Box sx={{ 
-      display: 'inline-flex', 
+    <Box sx={{
+      display: 'inline-flex',
       alignItems: 'center',
       gap: 1,
-      px: 3, 
-      py: 1, 
-      borderRadius: '20px', 
-      bgcolor: 'transparent', 
+      px: 3,
+      py: 1,
+      borderRadius: '20px',
+      bgcolor: 'transparent',
       border: `1px solid ${config.color}40`,
       color: config.color,
       fontSize: '0.9rem',
@@ -152,7 +152,7 @@ const formatTimeAgo = (date: string) => {
   const diffHrs = Math.floor(diffMs / (1000 * 60 * 60));
   const days = Math.floor(diffHrs / 24);
   const hrs = diffHrs % 24;
-  
+
   if (days > 0) return `${days} days, ${hrs} hours ago`;
   return `${hrs} hours ago`;
 };
@@ -170,24 +170,24 @@ const TimelineItem: React.FC<{ activity: any }> = ({ activity }) => {
   return (
     <Box sx={{ position: 'relative', pl: 5, pb: 4, '&:last-child': { pb: 0 } }}>
       {/* Vertical Line */}
-      <Box sx={{ 
-        position: 'absolute', 
-        left: 6, 
-        top: 10, 
-        bottom: -4, 
-        width: 2, 
+      <Box sx={{
+        position: 'absolute',
+        left: 6,
+        top: 10,
+        bottom: -4,
+        width: 2,
         bgcolor: 'rgba(255,255,255,0.05)',
         zIndex: 1
       }} />
-      
+
       {/* Dot - Ring Style */}
-      <Box sx={{ 
-        position: 'absolute', 
-        left: 0, 
-        top: 4, 
-        width: 14, 
-        height: 14, 
-        borderRadius: '50%', 
+      <Box sx={{
+        position: 'absolute',
+        left: 0,
+        top: 4,
+        width: 14,
+        height: 14,
+        borderRadius: '50%',
         border: `2px solid ${config.color}`,
         bgcolor: 'transparent',
         boxShadow: activity.status === 'RUNNING' ? `0 0 10px ${config.color}` : 'none',
@@ -197,26 +197,26 @@ const TimelineItem: React.FC<{ activity: any }> = ({ activity }) => {
         justifyContent: 'center'
       }}>
         {activity.status === 'RUNNING' && (
-          <Box sx={{ 
-            width: 4, 
-            height: 4, 
-            borderRadius: '50%', 
+          <Box sx={{
+            width: 4,
+            height: 4,
+            borderRadius: '50%',
             bgcolor: config.color,
-            animation: 'pulse 1.5s infinite' 
+            animation: 'pulse 1.5s infinite'
           }} />
         )}
       </Box>
 
       <Stack spacing={0.5}>
-        <Stack direction="row" alignItems="center" spacing={1}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
             {activity.title}
           </Typography>
-          <Box sx={{ 
-            px: 1, 
-            py: 0.1, 
-            borderRadius: 1, 
-            bgcolor: 'rgba(0,255,98,0.1)', 
+          <Box sx={{
+            px: 1,
+            py: 0.1,
+            borderRadius: 1,
+            bgcolor: 'rgba(0,255,98,0.1)',
             border: '1px solid rgba(0,255,98,0.2)',
             color: '#00ff62',
             fontSize: '0.6rem',
@@ -246,18 +246,18 @@ const SubScanWidget: React.FC<{ subscans: any[], targetName: string }> = ({ subs
       </Typography>
       {subscans?.map((sub: any) => (
         <Box key={sub.id} sx={{ p: 1.5, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
-           <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, bgcolor: sub.status === 2 ? '#00ff62' : '#ffc107' }} />
-           <Stack spacing={1}>
-              <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#00f3ff', textTransform: 'uppercase' }}>
-                {sub.engine} ON {sub.subdomain_name}
-              </Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                 <StatusBadge status={sub.status} />
-              </Stack>
-              <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
-                 {sub.completed_ago} Took {sub.time_taken}
-              </Typography>
-           </Stack>
+          <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, bgcolor: sub.status === 2 ? '#00ff62' : '#ffc107' }} />
+          <Stack spacing={1}>
+            <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#00f3ff', textTransform: 'uppercase' }}>
+              {sub.engine} ON {sub.subdomain_name}
+            </Typography>
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <StatusBadge status={sub.status} />
+            </Stack>
+            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
+              {sub.completed_ago} Took {sub.time_taken}
+            </Typography>
+          </Stack>
         </Box>
       ))}
       {(!subscans || subscans.length === 0) && (
@@ -274,51 +274,51 @@ const VulnerabilityBreakdown: React.FC<{ counts: any, exploitable: number }> = (
 
   return (
     <TacticalPanel title="Vulnerability Breakdown" icon={<Bug size={14} />} sx={{ height: '100%', '& .MuiCardContent-root': { pb: '10px !important' } }}>
-       <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, textAlign: 'center', width: '100%', px: 1 }}>
-            {labels.map((l, i) => (
-               <Box key={l} sx={{ flex: 1 }}>
-                  <Typography sx={{ fontSize: '0.6rem', color: colors[i], fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>{l.substring(0, 4)}</Typography>
-                  <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: colors[i] }}>{series[i] || 0}</Typography>
-               </Box>
-            ))}
-         </Box>
-         <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-           <Chart 
-              options={{
-                chart: { type: 'donut', background: 'transparent' },
-                theme: { mode: 'dark' },
-                stroke: { show: false },
-                labels: labels,
-                dataLabels: { enabled: false },
-                legend: { show: true, position: 'bottom', fontSize: '10px', labels: { colors: 'rgba(255,255,255,0.7)' } },
-                colors: colors,
-                plotOptions: {
-                  pie: {
-                    donut: {
-                      size: '65%',
-                      labels: {
+      <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, textAlign: 'center', width: '100%', px: 1 }}>
+          {labels.map((l, i) => (
+            <Box key={l} sx={{ flex: 1 }}>
+              <Typography sx={{ fontSize: '0.6rem', color: colors[i], fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1 }}>{l.substring(0, 4)}</Typography>
+              <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: colors[i] }}>{series[i] || 0}</Typography>
+            </Box>
+          ))}
+        </Box>
+        <Box sx={{ flexGrow: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <Chart
+            options={{
+              chart: { type: 'donut', background: 'transparent' },
+              theme: { mode: 'dark' as any },
+              stroke: { show: false },
+              labels: labels,
+              dataLabels: { enabled: false },
+              legend: { show: true, position: 'bottom', fontSize: '10px', labels: { colors: 'rgba(255,255,255,0.7)' } },
+              colors: colors,
+              plotOptions: {
+                pie: {
+                  donut: {
+                    size: '65%',
+                    labels: {
+                      show: true,
+                      total: {
                         show: true,
-                        total: {
-                          show: true,
-                          label: 'Total',
-                          color: 'rgba(255,255,255,0.4)',
-                          fontSize: '12px',
-                          formatter: () => counts.total.toString()
-                        },
-                        value: { color: '#fff', fontSize: '20px', fontWeight: 900 }
-                      }
+                        label: 'Total',
+                        color: 'rgba(255,255,255,0.4)',
+                        fontSize: '12px',
+                        formatter: () => counts.total.toString()
+                      },
+                      value: { color: '#fff', fontSize: '20px', fontWeight: 900 }
                     }
                   }
                 }
-              }} 
-              series={series} 
-              type="donut" 
-              width="100%"
-              height={260} 
-           />
-         </Box>
-       </Box>
+              }
+            }}
+            series={series}
+            type="donut"
+            width="100%"
+            height={260}
+          />
+        </Box>
+      </Box>
     </TacticalPanel>
   );
 };
@@ -339,13 +339,13 @@ const VulnHighlights: React.FC<{ highlights: any[] }> = ({ highlights }) => (
           {(highlights || []).map((v: any, idx: number) => (
             <TableRow key={idx} sx={{ '& td': { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 2 } }}>
               <TableCell>
-                <Box sx={{ 
-                  bgcolor: 'rgba(33,150,243,0.1)', 
-                  color: '#2196f3', 
-                  fontSize: '0.6rem', 
-                  fontWeight: 900, 
-                  px: 1, 
-                  py: 0.5, 
+                <Box sx={{
+                  bgcolor: 'rgba(33,150,243,0.1)',
+                  color: '#2196f3',
+                  fontSize: '0.6rem',
+                  fontWeight: 900,
+                  px: 1,
+                  py: 0.5,
                   borderRadius: 0.5,
                   display: 'inline-block',
                   textTransform: 'lowercase'
@@ -363,9 +363,9 @@ const VulnHighlights: React.FC<{ highlights: any[] }> = ({ highlights }) => (
                 <SeverityBadge severity={v.severity} />
               </TableCell>
               <TableCell>
-                <Typography sx={{ 
-                  fontSize: '0.7rem', 
-                  color: '#ff003c', 
+                <Typography sx={{
+                  fontSize: '0.7rem',
+                  color: '#ff003c',
                   fontWeight: 600,
                   wordBreak: 'break-all'
                 }}>
@@ -387,21 +387,21 @@ const VulnHighlights: React.FC<{ highlights: any[] }> = ({ highlights }) => (
 
 const MostVulnerableSubdomain: React.FC<{ vulnerabilities: any[], sx?: any }> = ({ vulnerabilities, sx = {} }) => {
   const [ignoreInfo, setIgnoreInfo] = useState(false);
-  
+
   const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => v.severity > 0) : vulnerabilities;
-  
-  const subdomainCounts = filteredVulns.reduce((acc: any, v: any) => {
+
+  const subdomainCounts = filteredVulns.reduce((acc: Record<string, number>, v: any) => {
     const host = new URL(v.http_url).hostname;
     acc[host] = (acc[host] || 0) + 1;
     return acc;
   }, {});
-  
+
   const sorted = Object.entries(subdomainCounts).sort((a: any, b: any) => b[1] - a[1]);
   const mostVulnerable = sorted[0];
 
   return (
-    <TacticalPanel 
-      title="MOST VULNERABLE SUBDOMAIN" 
+    <TacticalPanel
+      title="MOST VULNERABLE SUBDOMAIN"
       icon={<ShieldAlert size={14} color="#ff003c" />}
       sx={{ height: '100%', ...sx }}
       headerAction={
@@ -415,7 +415,7 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: any[], sx?: any }> = 
         {mostVulnerable ? (
           <Box sx={{ bgcolor: 'rgba(255,0,60,0.05)', border: '1px solid rgba(255,0,60,0.1)', p: 2, borderRadius: 1 }}>
             <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#ff003c', mb: 1 }}>{mostVulnerable[0]}</Typography>
-            <Typography sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>Total Vulnerabilities: <Box component="span" sx={{ color: '#ff003c', fontWeight: 900 }}>{mostVulnerable[1]}</Box></Typography>
+            <Typography sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>Total Vulnerabilities: <Box component="span" sx={{ color: '#ff003c', fontWeight: 900 }}>{String(mostVulnerable[1])}</Box></Typography>
           </Box>
         ) : (
           <Box sx={{ bgcolor: 'rgba(255,252,0,0.1)', border: '1px solid rgba(255,252,0,0.2)', p: 2, borderRadius: 1 }}>
@@ -431,19 +431,19 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: any[], sx?: any }> = 
 const MostCommonVulnsWidget: React.FC<{ vulnerabilities: any[], sx?: any }> = ({ vulnerabilities = [], sx = {} }) => {
   const [ignoreInfo, setIgnoreInfo] = useState(false);
   const filtered = ignoreInfo ? vulnerabilities.filter(v => v.severity !== 0 && v.severity !== 'Info') : vulnerabilities;
-  
+
   // Calculate common vulns from the full vulnerabilities list to ensure Info vulns are included
   const commonMap = filtered.reduce((acc: any, v: any) => {
     acc[v.name] = acc[v.name] || { name: v.name, count: 0, severity: v.severity };
     acc[v.name].count += 1;
     return acc;
   }, {});
-  
+
   const data = Object.values(commonMap).sort((a: any, b: any) => b.count - a.count).slice(0, 10);
 
   return (
-    <TacticalPanel 
-      title="MOST COMMON VULNERABILITIES" 
+    <TacticalPanel
+      title="MOST COMMON VULNERABILITIES"
       icon={<Bug size={14} color="#ff003c" />}
       sx={{ height: '100%', ...sx }}
       headerAction={
@@ -472,7 +472,7 @@ const MostCommonVulnsWidget: React.FC<{ vulnerabilities: any[], sx?: any }> = ({
                   </Box>
                 </TableCell>
                 <TableCell align="right">
-                   <SeverityBadge severity={typeof v.severity === 'string' ? (v.severity === 'Critical' ? 4 : v.severity === 'High' ? 3 : v.severity === 'Medium' ? 2 : v.severity === 'Low' ? 1 : 0) : v.severity} />
+                  <SeverityBadge severity={typeof v.severity === 'string' ? (v.severity === 'Critical' ? 4 : v.severity === 'High' ? 3 : v.severity === 'Medium' ? 2 : v.severity === 'Low' ? 1 : 0) : v.severity} />
                 </TableCell>
               </TableRow>
             ))}
@@ -507,8 +507,8 @@ const ImportantSubdomainsWidget: React.FC<{ subdomains: any[], sx?: any }> = ({ 
 );
 
 const ReconNotesWidget: React.FC<{ notes: any[], sx?: any }> = ({ notes = [], sx = {} }) => (
-  <TacticalPanel 
-    title="RECON NOTE/TODO" 
+  <TacticalPanel
+    title="RECON NOTE/TODO"
     icon={<Box sx={{ width: 14, height: 14, bgcolor: '#2196f3', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notes.length}</Box>}
     headerAction={<Plus size={14} color="#00f3ff" style={{ cursor: 'pointer' }} />}
     sx={{ height: '100%', ...sx }}
@@ -617,128 +617,128 @@ export const ScanDetailPage = () => {
   const renderSidebar = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
       <TacticalPanel title="Scan Status" icon={<Activity size={14} />}>
-         <Box sx={{ p: 2 }}>
-           <Stack spacing={4}>
-             <Box sx={{ textAlign: 'center' }}>
-               <StatusBadge status={data.scan_info.scan_status} />
-             </Box>
-             
-             <Box>
-               <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', mb: 1.5, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Current Progress</Typography>
-               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                 <Box sx={{ flexGrow: 1, position: 'relative' }}>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={data.scan_info.scan_status === 2 ? 100 : data.scan_info.progress} 
-                      sx={{ 
-                        height: 6, 
-                        borderRadius: 3, 
-                        bgcolor: 'rgba(255,255,255,0.05)', 
-                        '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff', boxShadow: '0 0 15px #00f3ff' } 
-                      }} 
-                    />
-                 </Box>
-                 <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#00f3ff', fontFamily: 'Orbitron' }}>
-                    {data.scan_info.scan_status === 2 ? '100' : data.scan_info.progress}%
-                 </Typography>
-               </Box>
-             </Box>
-             
-             <Box sx={{ height: '1px', bgcolor: 'rgba(255,255,255,0.05)', mx: -2 }} />
+        <Box sx={{ p: 2 }}>
+          <Stack spacing={4}>
+            <Box sx={{ textAlign: 'center' }}>
+              <StatusBadge status={data.scan_info.scan_status} />
+            </Box>
 
-             <Grid container spacing={3}>
-                <Grid size={{ xs: 6 }}>
-                   <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', mb: 1, fontWeight: 700 }}>ENGINE</Typography>
-                   <Stack direction="row" spacing={1} alignItems="center">
-                      <Cpu size={16} color="#00f3ff" />
-                      <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>{data.scan_info.engine_name}</Typography>
-                   </Stack>
-                </Grid>
-                <Grid size={{ xs: 6 }}>
-                   <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', mb: 1, fontWeight: 700 }}>DURATION</Typography>
-                   <Stack direction="row" spacing={1} alignItems="center">
-                      <Timer size={16} color="#fffc00" />
-                      <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>{Math.floor(data.scan_info.duration / 60)}m {data.scan_info.duration % 60}s</Typography>
-                   </Stack>
-                </Grid>
-             </Grid>
-           </Stack>
-         </Box>
+            <Box>
+              <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', mb: 1.5, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Current Progress</Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ flexGrow: 1, position: 'relative' }}>
+                  <LinearProgress
+                    variant="determinate"
+                    value={data.scan_info.scan_status === 2 ? 100 : data.scan_info.progress}
+                    sx={{
+                      height: 6,
+                      borderRadius: 3,
+                      bgcolor: 'rgba(255,255,255,0.05)',
+                      '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff', boxShadow: '0 0 15px #00f3ff' }
+                    }}
+                  />
+                </Box>
+                <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#00f3ff', fontFamily: 'Orbitron' }}>
+                  {data.scan_info.scan_status === 2 ? '100' : data.scan_info.progress}%
+                </Typography>
+              </Box>
+            </Box>
+
+            <Box sx={{ height: '1px', bgcolor: 'rgba(255,255,255,0.05)', mx: -2 }} />
+
+            <Grid container spacing={3}>
+              <Grid size={{ xs: 6 }}>
+                <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', mb: 1, fontWeight: 700 }}>ENGINE</Typography>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                  <Cpu size={16} color="#00f3ff" />
+                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>{data.scan_info.engine_name}</Typography>
+                </Stack>
+              </Grid>
+              <Grid size={{ xs: 6 }}>
+                <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', mb: 1, fontWeight: 700 }}>DURATION</Typography>
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                  <Timer size={16} color="#fffc00" />
+                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>{Math.floor(data.scan_info.duration / 60)}m {data.scan_info.duration % 60}s</Typography>
+                </Stack>
+              </Grid>
+            </Grid>
+          </Stack>
+        </Box>
       </TacticalPanel>
 
       <TacticalPanel title="Configurations" icon={<Settings size={14} />}>
-         <Box sx={{ p: 1 }}>
-           <Stack spacing={1.5}>
-             <Box>
-               <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mb: 0.5 }}>STARTING PATH</Typography>
-               <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, wordBreak: 'break-all', color: '#fff' }}>{data.scan_info.cfg_starting_point_path || '/'}</Typography>
-             </Box>
-             <Box>
-               <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mb: 0.5 }}>IMPORTED SUBDOMAINS</Typography>
-               {data.scan_info.cfg_imported_subdomains?.length > 0 ? (
-                 <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                   {data.scan_info.cfg_imported_subdomains.map((s: string) => <Chip key={s} label={s} size="small" sx={{ height: 18, fontSize: '0.6rem', bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff', mb: 0.5 }} />)}
-                 </Stack>
-               ) : <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.2)' }}>None</Typography>}
-             </Box>
-             <Box>
-               <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mb: 0.5 }}>OUT OF SCOPE</Typography>
-               {data.scan_info.cfg_out_of_scope_subdomains?.length > 0 ? (
-                 <Stack direction="row" spacing={0.5} flexWrap="wrap">
-                   {data.scan_info.cfg_out_of_scope_subdomains.map((s: string) => <Chip key={s} label={s} size="small" sx={{ height: 18, fontSize: '0.6rem', bgcolor: 'rgba(255,0,60,0.1)', color: '#ff003c', mb: 0.5 }} />)}
-                 </Stack>
-               ) : <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.2)' }}>None</Typography>}
-             </Box>
-           </Stack>
-         </Box>
+        <Box sx={{ p: 1 }}>
+          <Stack spacing={1.5}>
+            <Box>
+              <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mb: 0.5 }}>STARTING PATH</Typography>
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, wordBreak: 'break-all', color: '#fff' }}>{data.scan_info.cfg_starting_point_path || '/'}</Typography>
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mb: 0.5 }}>IMPORTED SUBDOMAINS</Typography>
+              {data.scan_info.cfg_imported_subdomains?.length > 0 ? (
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                  {data.scan_info.cfg_imported_subdomains.map((s: string) => <Chip key={s} label={s} size="small" sx={{ height: 18, fontSize: '0.6rem', bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff', mb: 0.5 }} />)}
+                </Stack>
+              ) : <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.2)' }}>None</Typography>}
+            </Box>
+            <Box>
+              <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mb: 0.5 }}>OUT OF SCOPE</Typography>
+              {data.scan_info.cfg_out_of_scope_subdomains?.length > 0 ? (
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
+                  {data.scan_info.cfg_out_of_scope_subdomains.map((s: string) => <Chip key={s} label={s} size="small" sx={{ height: 18, fontSize: '0.6rem', bgcolor: 'rgba(255,0,60,0.1)', color: '#ff003c', mb: 0.5 }} />)}
+                </Stack>
+              ) : <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.2)' }}>None</Typography>}
+            </Box>
+          </Stack>
+        </Box>
       </TacticalPanel>
 
       <TacticalPanel title="Timeline" icon={<History size={14} />}>
-         <Box sx={{ p: 1, maxHeight: 400, overflow: 'auto' }}>
-           <Stack>
-             {data.timeline?.map((activity: any, idx: number) => (
-               <TimelineItem key={idx} activity={activity} />
-             ))}
-             {(!data.timeline || data.timeline.length === 0) && (
-               <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center', py: 4 }}>NO ACTIVITY LOGS</Typography>
-             )}
-           </Stack>
-         </Box>
+        <Box sx={{ p: 1, maxHeight: 400, overflow: 'auto' }}>
+          <Stack>
+            {data.timeline?.map((activity: any, idx: number) => (
+              <TimelineItem key={idx} activity={activity} />
+            ))}
+            {(!data.timeline || data.timeline.length === 0) && (
+              <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center', py: 4 }}>NO ACTIVITY LOGS</Typography>
+            )}
+          </Stack>
+        </Box>
       </TacticalPanel>
 
       <TacticalPanel title="Recent Scans" icon={<Activity size={14} />}>
-         <Box sx={{ p: 1 }}>
-           <Stack spacing={1}>
-             {data.recent_scans?.map((scan: any) => (
-               <Box 
-                 key={scan.id} 
-                 component={RouterLink}
-                 to={`/${projectSlug}/scans/detail/${scan.id}`}
-                 sx={{ 
-                   p: 1.5, 
-                   borderRadius: 1, 
-                   bgcolor: scan.id === parseInt(scanId || '0') ? 'rgba(0, 243, 255, 0.05)' : 'transparent',
-                   border: `1px solid ${scan.id === parseInt(scanId || '0') ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255,255,255,0.05)'}`,
-                   textDecoration: 'none',
-                   transition: 'all 0.2s',
-                   '&:hover': { bgcolor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.1)' }
-                 }}
-               >
-                 <Stack direction="row" justifyContent="space-between" alignItems="center">
-                   <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff' }}>{scan.engine_name}</Typography>
-                   <SeverityBadge severity={scan.highest_severity === 'critical' ? 4 : scan.highest_severity === 'high' ? 3 : 0} />
-                 </Stack>
-                 <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>{scan.completed_ago}</Typography>
-               </Box>
-             ))}
-           </Stack>
-         </Box>
+        <Box sx={{ p: 1 }}>
+          <Stack spacing={1}>
+            {data.recent_scans?.map((scan: any) => (
+              <Box
+                key={scan.id}
+                component={RouterLink}
+                to={`/${projectSlug}/scans/detail/${scan.id}`}
+                sx={{
+                  p: 1.5,
+                  borderRadius: 1,
+                  bgcolor: scan.id === parseInt(scanId || '0') ? 'rgba(0, 243, 255, 0.05)' : 'transparent',
+                  border: `1px solid ${scan.id === parseInt(scanId || '0') ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255,255,255,0.05)'}`,
+                  textDecoration: 'none',
+                  transition: 'all 0.2s',
+                  '&:hover': { bgcolor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.1)' }
+                }}
+              >
+                <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff' }}>{scan.engine_name}</Typography>
+                  <SeverityBadge severity={scan.highest_severity === 'critical' ? 4 : scan.highest_severity === 'high' ? 3 : 0} />
+                </Stack>
+                <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>{scan.completed_ago}</Typography>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
       </TacticalPanel>
 
       <TacticalPanel title="Sub Scan History" icon={<Activity size={14} />}>
-         <Box sx={{ p: 1 }}>
-            <SubScanWidget subscans={data.subscans} targetName={data.target_info.name} />
-         </Box>
+        <Box sx={{ p: 1 }}>
+          <SubScanWidget subscans={data.subscans} targetName={data.target_info.name} />
+        </Box>
       </TacticalPanel>
     </Box>
   );
@@ -746,109 +746,109 @@ export const ScanDetailPage = () => {
   const renderHomeContent = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%' }}>
       {/* Row 1: Target Information and HTTP Status Charts (MOVED UP) */}
-      <Grid container spacing={2} alignItems="stretch" sx={{ width: '100%', m: 0 }}>
+      <Grid container spacing={2} sx={{ alignItems: 'stretch', width: '100%', m: 0 }}>
         <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex' }}>
           <TacticalPanel title="Target Information" icon={<Activity size={14} />} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-             <Box sx={{ p: 2, flex: 1 }}>
-               <Tabs value={infoTab} onChange={(_, v) => setInfoTab(v)} sx={{ mb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: 32 }}>
-                 {['Domain Info', 'Whois', 'DNS Records', 'Nameservers', 'History'].map((l) => (
-                   <Tab key={l} label={l} sx={{ fontSize: '0.65rem', fontWeight: 900, minHeight: 32, p: 1, color: 'rgba(255,255,255,0.4)', '&.Mui-selected': { color: '#00f3ff' } }} />
-                 ))}
-               </Tabs>
-               
-               {infoTab === 0 && (
-                 <Grid container spacing={3}>
-                   {/* Column 1: ID & Origin */}
-                   <Grid size={{ xs: 6 }}>
-                     <Stack spacing={2.5}>
-                       <Box>
-                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Domain</Typography>
-                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: '#ff003c', fontFamily: 'Orbitron', wordBreak: 'break-all' }}>{data.target_info.name}</Typography>
-                       </Box>
-                       <Box>
-                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Dnssec</Typography>
-                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>{data.domain_info?.dnssec || 'N/A'}</Typography>
-                       </Box>
-                       <Box>
-                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Geolocation</Typography>
-                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography>
-                       </Box>
-                       <Box>
-                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Created</Typography>
-                         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.created?.split('T')[0] || 'N/A'}</Typography>
-                       </Box>
-                     </Stack>
-                   </Grid>
+            <Box sx={{ p: 2, flex: 1 }}>
+              <Tabs value={infoTab} onChange={(_, v) => setInfoTab(v)} sx={{ mb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: 32 }}>
+                {['Domain Info', 'Whois', 'DNS Records', 'Nameservers', 'History'].map((l) => (
+                  <Tab key={l} label={l} sx={{ fontSize: '0.65rem', fontWeight: 900, minHeight: 32, p: 1, color: 'rgba(255,255,255,0.4)', '&.Mui-selected': { color: '#00f3ff' } }} />
+                ))}
+              </Tabs>
 
-                   {/* Column 2: Maintenance & Registrar */}
-                   <Grid size={{ xs: 6 }}>
-                     <Stack spacing={2.5}>
-                       <Box>
-                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Updated</Typography>
-                         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.updated?.split('T')[0] || 'N/A'}</Typography>
-                       </Box>
-                       <Box>
-                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Expires</Typography>
-                         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.expires?.split('T')[0] || 'N/A'}</Typography>
-                       </Box>
-                       <Box>
-                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Registrar</Typography>
-                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f3ff' }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography>
-                       </Box>
-                     </Stack>
-                   </Grid>
-                 </Grid>
-               )}
-               {infoTab === 1 && (
-                 <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                   <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                     {data.domain_info?.whois_data || 'No WHOIS data available.'}
-                   </Typography>
-                 </Box>
-               )}
-               {infoTab === 2 && (
-                 <Stack spacing={1}>
-                   {data.domain_info?.dns_records?.map((r: any, idx: number) => (
-                     <Stack key={idx} direction="row" spacing={1} alignItems="center">
-                       <Chip label={r.type.toUpperCase()} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} />
-                       <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{r.name} {"->"} {r.value}</Typography>
-                     </Stack>
-                   ))}
-                 </Stack>
-               )}
-               {infoTab === 3 && (
-                 <Stack spacing={1}>
-                   {data.domain_info?.nameservers?.map((ns: string, idx: number) => (
-                     <Stack key={idx} direction="row" spacing={1} alignItems="center">
-                       <Globe size={14} color="#00f3ff" />
-                       <Typography sx={{ fontSize: '0.7rem', color: '#fff' }}>{ns}</Typography>
-                     </Stack>
-                   ))}
-                 </Stack>
-               )}
-             </Box>
+              {infoTab === 0 && (
+                <Grid container spacing={3}>
+                  {/* Column 1: ID & Origin */}
+                  <Grid size={{ xs: 6 }}>
+                    <Stack spacing={2.5}>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Domain</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: '#ff003c', fontFamily: 'Orbitron', wordBreak: 'break-all' }}>{data.target_info.name}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Dnssec</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>{data.domain_info?.dnssec || 'N/A'}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Geolocation</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Created</Typography>
+                        <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.created?.split('T')[0] || 'N/A'}</Typography>
+                      </Box>
+                    </Stack>
+                  </Grid>
+
+                  {/* Column 2: Maintenance & Registrar */}
+                  <Grid size={{ xs: 6 }}>
+                    <Stack spacing={2.5}>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Updated</Typography>
+                        <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.updated?.split('T')[0] || 'N/A'}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Expires</Typography>
+                        <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.expires?.split('T')[0] || 'N/A'}</Typography>
+                      </Box>
+                      <Box>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Registrar</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f3ff' }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography>
+                      </Box>
+                    </Stack>
+                  </Grid>
+                </Grid>
+              )}
+              {infoTab === 1 && (
+                <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
+                  <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                    {data.domain_info?.whois_data || 'No WHOIS data available.'}
+                  </Typography>
+                </Box>
+              )}
+              {infoTab === 2 && (
+                <Stack spacing={1}>
+                  {data.domain_info?.dns_records?.map((r: any, idx: number) => (
+                    <Stack key={idx} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                      <Chip label={r.type.toUpperCase()} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} />
+                      <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{r.name} {"->"} {r.value}</Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+              {infoTab === 3 && (
+                <Stack spacing={1}>
+                  {data.domain_info?.nameservers?.map((ns: string, idx: number) => (
+                    <Stack key={idx} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+                      <Globe size={14} color="#00f3ff" />
+                      <Typography sx={{ fontSize: '0.7rem', color: '#fff' }}>{ns}</Typography>
+                    </Stack>
+                  ))}
+                </Stack>
+              )}
+            </Box>
           </TacticalPanel>
         </Grid>
         <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex' }}>
-           <TacticalPanel title="HTTP Status Breakdown" icon={<Activity size={14} />} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-             <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
-               <Chart 
-                 options={{
-                   chart: { type: 'donut', background: 'transparent' },
-                   theme: { mode: 'dark' },
-                   stroke: { show: false },
-                   labels: data.http_status_breakdown.map((s: any) => `HTTP ${s.http_status}`),
-                   dataLabels: { enabled: false },
-                   legend: { position: 'bottom', fontSize: '10px', labels: { colors: 'rgba(255,255,255,0.7)' } },
-                   colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00']
-                 }} 
-                 series={data.http_status_breakdown.map((s: any) => s.count)} 
-                 type="donut" 
-                 width="100%"
-                 height={300} 
-               />
-             </Box>
-           </TacticalPanel>
+          <TacticalPanel title="HTTP Status Breakdown" icon={<Activity size={14} />} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+              <Chart
+                options={{
+                  chart: { type: 'donut', background: 'transparent' },
+                  theme: { mode: 'dark' as any },
+                  stroke: { show: false },
+                  labels: data.http_status_breakdown.map((s: any) => `HTTP ${s.http_status}`),
+                  dataLabels: { enabled: false },
+                  legend: { position: 'bottom', fontSize: '10px', labels: { colors: 'rgba(255,255,255,0.7)' } },
+                  colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00']
+                }}
+                series={data.http_status_breakdown.map((s: any) => s.count)}
+                type="donut"
+                width="100%"
+                height={300}
+              />
+            </Box>
+          </TacticalPanel>
         </Grid>
       </Grid>
 
@@ -861,133 +861,133 @@ export const ScanDetailPage = () => {
 
       {/* Row 3: Vulnerability Distribution & Highlights */}
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '1fr 1fr' }, gap: 2, mb: 2, width: '100%' }}>
-         <VulnerabilityBreakdown 
-           counts={{
-             critical: data.critical_count,
-             high: data.high_count,
-             medium: data.medium_count,
-             low: data.low_count,
-             info: data.info_count,
-             unknown: data.unknown_count,
-             total: data.vulnerability_count
-           }} 
-           exploitable={data.exploitable_count}
-         />
-         <VulnHighlights highlights={data.vulnerability_highlights} />
+        <VulnerabilityBreakdown
+          counts={{
+            critical: data.critical_count,
+            high: data.high_count,
+            medium: data.medium_count,
+            low: data.low_count,
+            info: data.info_count,
+            unknown: data.unknown_count,
+            total: data.vulnerability_count
+          }}
+          exploitable={data.exploitable_count}
+        />
+        <VulnHighlights highlights={data.vulnerability_highlights} />
       </Box>
 
       {/* Row 4: Vulnerability Deep Dive */}
       <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>
         <Grid size={{ xs: 12, md: 4 }}>
-           <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
+          <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
         </Grid>
         <Grid size={{ xs: 12, md: 8 }}>
-           <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
+          <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
         </Grid>
       </Grid>
 
       {/* Row 5: Contextual Assets */}
       <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>
         <Grid size={{ xs: 12, md: 6 }}>
-           <ImportantSubdomainsWidget subdomains={data.important_subdomains} sx={{ height: '100%' }} />
+          <ImportantSubdomainsWidget subdomains={data.important_subdomains} sx={{ height: '100%' }} />
         </Grid>
         <Grid size={{ xs: 12, md: 6 }}>
-           <ReconNotesWidget notes={data.todo_notes} sx={{ height: '100%' }} />
+          <ReconNotesWidget notes={data.todo_notes} sx={{ height: '100%' }} />
         </Grid>
       </Grid>
 
       {/* Row 6: Infrastructure & Fingerprinting */}
       <Grid container spacing={2} sx={{ width: '100%', m: 0 }}>
         <Grid size={{ xs: 12, md: 4 }}>
-           <IpAddressesWidget subdomains={data.subdomains} sx={{ height: '100%' }} />
+          <IpAddressesWidget subdomains={data.subdomains} sx={{ height: '100%' }} />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
-           <DiscoveredPortsWidget ports={data.discovered_ports} sx={{ height: '100%' }} />
+          <DiscoveredPortsWidget ports={data.discovered_ports} sx={{ height: '100%' }} />
         </Grid>
         <Grid size={{ xs: 12, md: 4 }}>
-           <DiscoveredTechWidget techs={data.discovered_technologies} sx={{ height: '100%' }} />
+          <DiscoveredTechWidget techs={data.discovered_technologies} sx={{ height: '100%' }} />
         </Grid>
       </Grid>
     </Box>
   );
   const renderBuckets = () => (
     <TacticalPanel title="S3 Buckets Discovered" icon={<Database size={14} />}>
-       <TableContainer>
-         <Table size="small">
-           <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-             <TableRow>
-               <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>BUCKET NAME</TableCell>
-               <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>PUBLIC READ</TableCell>
-               <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>PUBLIC WRITE</TableCell>
-             </TableRow>
-           </TableHead>
-           <TableBody>
-             {(data.buckets || []).map((b: any, idx: number) => (
-               <TableRow key={idx}>
-                 <TableCell sx={{ color: '#fff', fontWeight: 700 }}>{b.name}</TableCell>
-                 <TableCell>
-                    <Chip label={b.public_read ? 'YES' : 'NO'} size="small" color={b.public_read ? 'error' : 'default'} />
-                 </TableCell>
-                 <TableCell>
-                    <Chip label={b.public_write ? 'YES' : 'NO'} size="small" color={b.public_write ? 'error' : 'default'} />
-                 </TableCell>
-               </TableRow>
-             ))}
-             {(!data.buckets || data.buckets.length === 0) && (
-               <TableRow>
-                 <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO BUCKETS FOUND</TableCell>
-               </TableRow>
-             )}
-           </TableBody>
-         </Table>
-       </TableContainer>
+      <TableContainer>
+        <Table size="small">
+          <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
+            <TableRow>
+              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>BUCKET NAME</TableCell>
+              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>PUBLIC READ</TableCell>
+              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>PUBLIC WRITE</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {(data.buckets || []).map((b: any, idx: number) => (
+              <TableRow key={idx}>
+                <TableCell sx={{ color: '#fff', fontWeight: 700 }}>{b.name}</TableCell>
+                <TableCell>
+                  <Chip label={b.public_read ? 'YES' : 'NO'} size="small" color={b.public_read ? 'error' : 'default'} />
+                </TableCell>
+                <TableCell>
+                  <Chip label={b.public_write ? 'YES' : 'NO'} size="small" color={b.public_write ? 'error' : 'default'} />
+                </TableCell>
+              </TableRow>
+            ))}
+            {(!data.buckets || data.buckets.length === 0) && (
+              <TableRow>
+                <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO BUCKETS FOUND</TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
     </TacticalPanel>
   );
 
   const renderOSINT = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%' }}>
       <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, width: '100%' }}>
-         <TacticalPanel title="Employees/People Found" icon={<Users size={14} />}>
-            <TableContainer>
-              <Table size="small">
-                <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-                  <TableRow>
-                    <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>NAME</TableCell>
-                    <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>DESIGNATION</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                   {/* This would be populated from data.employees if available */}
-                   <TableRow>
-                     <TableCell colSpan={2} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO EMPLOYEE DATA FOUND</TableCell>
-                   </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-         </TacticalPanel>
-         <TacticalPanel title="Discovered Email Addresses" icon={<Mail size={14} />}>
-            <TableContainer>
-              <Table size="small">
-                <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-                  <TableRow>
-                    <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>EMAIL</TableCell>
-                    <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>EXPOSED</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                   {/* This would be populated from data.emails if available */}
-                   <TableRow>
-                     <TableCell colSpan={2} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO EMAIL DATA FOUND</TableCell>
-                   </TableRow>
-                </TableBody>
-              </Table>
-            </TableContainer>
-         </TacticalPanel>
+        <TacticalPanel title="Employees/People Found" icon={<Users size={14} />}>
+          <TableContainer>
+            <Table size="small">
+              <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
+                <TableRow>
+                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>NAME</TableCell>
+                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>DESIGNATION</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {/* This would be populated from data.employees if available */}
+                <TableRow>
+                  <TableCell colSpan={2} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO EMPLOYEE DATA FOUND</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </TacticalPanel>
+        <TacticalPanel title="Discovered Email Addresses" icon={<Mail size={14} />}>
+          <TableContainer>
+            <Table size="small">
+              <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
+                <TableRow>
+                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>EMAIL</TableCell>
+                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>EXPOSED</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {/* This would be populated from data.emails if available */}
+                <TableRow>
+                  <TableCell colSpan={2} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO EMAIL DATA FOUND</TableCell>
+                </TableRow>
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </TacticalPanel>
       </Box>
       <TacticalPanel title="Dorking Results" icon={<Search size={14} />}>
-         <Box sx={{ p: 4, textAlign: 'center' }}>
-            <Typography sx={{ color: 'rgba(255,255,255,0.2)' }}>OSINT MODULE DATA COMING SOON</Typography>
-         </Box>
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Typography sx={{ color: 'rgba(255,255,255,0.2)' }}>OSINT MODULE DATA COMING SOON</Typography>
+        </Box>
       </TacticalPanel>
     </Box>
   );
@@ -1006,22 +1006,22 @@ export const ScanDetailPage = () => {
 
   const renderExploits = () => (
     <TacticalPanel title="Potential Exploits & Payloads" icon={<Zap size={14} />}>
-       <TableContainer>
-         <Table size="small">
-           <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-             <TableRow>
-               <TableCell sx={{ color: '#fffc00', fontWeight: 900 }}>TARGET</TableCell>
-               <TableCell sx={{ color: '#fffc00', fontWeight: 900 }}>EXPLOIT TYPE</TableCell>
-               <TableCell sx={{ color: '#fffc00', fontWeight: 900 }}>PAYLOAD</TableCell>
-             </TableRow>
-           </TableHead>
-           <TableBody>
-              <TableRow>
-                 <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO POTENTIAL EXPLOITS IDENTIFIED</TableCell>
-              </TableRow>
-           </TableBody>
-         </Table>
-       </TableContainer>
+      <TableContainer>
+        <Table size="small">
+          <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
+            <TableRow>
+              <TableCell sx={{ color: '#fffc00', fontWeight: 900 }}>TARGET</TableCell>
+              <TableCell sx={{ color: '#fffc00', fontWeight: 900 }}>EXPLOIT TYPE</TableCell>
+              <TableCell sx={{ color: '#fffc00', fontWeight: 900 }}>PAYLOAD</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            <TableRow>
+              <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO POTENTIAL EXPLOITS IDENTIFIED</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </TableContainer>
     </TacticalPanel>
   );
 
@@ -1044,12 +1044,12 @@ export const ScanDetailPage = () => {
     <Box sx={{ p: 2 }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
+        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN_DETAIL</Typography>
             <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info.name}</Typography>
           </Box>
-          <Stack direction="row" spacing={2} alignItems="center">
+          <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
             <Button
               variant="contained"
               startIcon={<FileText size={16} />}
@@ -1076,64 +1076,64 @@ export const ScanDetailPage = () => {
 
       {/* Tab Bar Integration - Now spanning full width at the top */}
       <Box sx={{ mb: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', position: 'sticky', top: 0, bgcolor: 'rgba(10,10,15,0.9)', zIndex: 10, backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px' }}>
-        <Tabs 
-          value={activeTab} 
-          onChange={(_, v) => setActiveTab(v)} 
+        <Tabs
+          value={activeTab}
+          onChange={(_, v) => setActiveTab(v)}
           variant="scrollable"
           scrollButtons="auto"
-          sx={{ 
-            minHeight: 50, 
+          sx={{
+            minHeight: 50,
             '& .MuiTabs-indicator': { bgcolor: '#00f3ff', height: 3, boxShadow: '0 0 15px #00f3ff' },
             '& .MuiTabs-scrollButtons': { color: '#00f3ff' }
           }}
         >
           {tabs.map((tab, idx) => (
-            <Tab 
-              key={idx} 
+            <Tab
+              key={idx}
               label={
-                <Stack direction="row" spacing={1} alignItems="center">
+                <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                   <tab.icon size={14} />
                   <span>{tab.label}</span>
                 </Stack>
-              } 
-              sx={{ 
-                fontSize: '0.65rem', 
-                fontWeight: 900, 
-                minHeight: 50, 
-                color: 'rgba(255,255,255,0.4)', 
-                letterSpacing: 1.5, 
+              }
+              sx={{
+                fontSize: '0.65rem',
+                fontWeight: 900,
+                minHeight: 50,
+                color: 'rgba(255,255,255,0.4)',
+                letterSpacing: 1.5,
                 fontFamily: 'Orbitron',
                 px: 3,
-                '&.Mui-selected': { color: '#00f3ff' } 
-              }} 
+                '&.Mui-selected': { color: '#00f3ff' }
+              }}
             />
           ))}
         </Tabs>
       </Box>
 
       {/* MAIN TWO-COLUMN LAYOUT (Sidebar Left, Content Right) */}
-      <Box sx={{ 
-        display: 'grid', 
-        gridTemplateColumns: tabs[activeTab]?.label === 'HOME' 
-          ? { xs: '1fr', lg: '320px 1fr' } 
+      <Box sx={{
+        display: 'grid',
+        gridTemplateColumns: tabs[activeTab]?.label === 'HOME'
+          ? { xs: '1fr', lg: '320px 1fr' }
           : '1fr',
-        gap: 3, 
-        alignItems: 'start', 
-        width: '100%', 
-        minWidth: 0 
+        gap: 3,
+        alignItems: 'start',
+        width: '100%',
+        minWidth: 0
       }}>
-        
+
         {/* LEFT COLUMN: Scan Metadata & Timeline (Only on HOME tab) */}
         {tabs[activeTab]?.label === 'HOME' && (
-          <Box sx={{ 
-            position: { lg: 'sticky' }, 
+          <Box sx={{
+            position: { lg: 'sticky' },
             top: 70,
             transition: 'all 0.3s ease',
             minWidth: 0
           }}>
-             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-               {renderSidebar()}
-             </Box>
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {renderSidebar()}
+            </Box>
           </Box>
         )}
 
@@ -1143,49 +1143,49 @@ export const ScanDetailPage = () => {
           <Box sx={{ minHeight: '60vh' }}>
             {tabs[activeTab]?.label === 'HOME' ? (
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                
+
                 {/* Top Row: Discovery Metrics (The 4 KPIs) - Compact Squares */}
-                <Box sx={{ 
-                  display: 'grid', 
-                  gridTemplateColumns: { 
-                    xs: 'repeat(2, 1fr)', 
-                    md: 'repeat(4, 1fr)' 
-                  }, 
+                <Box sx={{
+                  display: 'grid',
+                  gridTemplateColumns: {
+                    xs: 'repeat(2, 1fr)',
+                    md: 'repeat(4, 1fr)'
+                  },
                   gap: 2,
                   width: '100%'
                 }}>
-                   <KpiCard 
-                     title="SUBDOMAINS" 
-                     value={data.subdomain_count} 
-                     subtitle={`${data.alive_count} ACTIVE`} 
-                     color="#7000ff"
-                     icon={Layers}
-                     sx={{ aspectRatio: '1/1', height: '100%' }}
-                   />
-                   <KpiCard 
-                     title="ENDPOINTS" 
-                     value={data.endpoint_count} 
-                     subtitle={`${data.endpoint_alive_count} ALIVE`} 
-                     color="#ff00f7"
-                     icon={Target}
-                     sx={{ aspectRatio: '1/1', height: '100%' }}
-                   />
-                   <KpiCard 
-                     title="VULNS" 
-                     value={data.vulnerability_count} 
-                     subtitle={`${data.critical_count} CRITICAL`} 
-                     color="#ff003c"
-                     icon={Bug}
-                     sx={{ aspectRatio: '1/1', height: '100%' }}
-                   />
-                   <KpiCard 
-                     title="OSINT" 
-                     value={data.secret_leaks_count} 
-                     subtitle="SENSITIVE DATA" 
-                     color="#fffc00"
-                     icon={Key}
-                     sx={{ aspectRatio: '1/1', height: '100%' }}
-                   />
+                  <KpiCard
+                    title="SUBDOMAINS"
+                    value={data.subdomain_count}
+                    subtitle={`${data.alive_count} ACTIVE`}
+                    color="#7000ff"
+                    icon={Layers}
+                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                  />
+                  <KpiCard
+                    title="ENDPOINTS"
+                    value={data.endpoint_count}
+                    subtitle={`${data.endpoint_alive_count} ALIVE`}
+                    color="#ff00f7"
+                    icon={Target}
+                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                  />
+                  <KpiCard
+                    title="VULNS"
+                    value={data.vulnerability_count}
+                    subtitle={`${data.critical_count} CRITICAL`}
+                    color="#ff003c"
+                    icon={Bug}
+                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                  />
+                  <KpiCard
+                    title="OSINT"
+                    value={data.secret_leaks_count}
+                    subtitle="SENSITIVE DATA"
+                    color="#fffc00"
+                    icon={Key}
+                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                  />
                 </Box>
 
                 {/* Discovery Modules (Target Info, etc.) */}
@@ -1205,7 +1205,7 @@ export const ScanDetailPage = () => {
                 {tabs[activeTab]?.label === 'VISUALIZATION' && renderVisualization()}
                 {tabs[activeTab]?.label === 'RECON NOTES' && <ReconNotesWidget notes={data.todo_notes} />}
                 {tabs[activeTab]?.label === 'EXPLOITS' && renderExploits()}
-                
+
                 {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION'].includes(tabs[activeTab]?.label) && (
                   <Box sx={{ p: 4, textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 2 }}>
                     <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE_STAGING_AREA: {tabs[activeTab]?.label}</Typography>
@@ -1217,10 +1217,10 @@ export const ScanDetailPage = () => {
           </Box>
         </Box>
       </Box>
-      <ScanReportModal 
-        open={reportModalOpen} 
-        onClose={() => setReportModalOpen(false)} 
-        scanId={parseInt(scanId)} 
+      <ScanReportModal
+        open={reportModalOpen}
+        onClose={() => setReportModalOpen(false)}
+        scanId={parseInt(scanId)}
       />
     </Box>
   );

@@ -200,12 +200,14 @@ export const ScanHistoryPage: React.FC = () => {
                 '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
               }
             }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search size={16} style={{ color: '#00f3ff' }} />
-                </InputAdornment>
-              ),
+            slotProps={{
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search size={16} style={{ color: '#00f3ff' }} />
+                  </InputAdornment>
+                ),
+              }
             }}
           />
         </Box>
@@ -388,22 +390,24 @@ export const ScanHistoryPage: React.FC = () => {
         anchorEl={anchorEl}
         open={Boolean(anchorEl)}
         onClose={handleMenuClose}
-        paperprops={{
-          sx: {
-            bgcolor: '#0d0c14',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
-            borderRadius: 0,
-            boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
-            minWidth: 200,
-            '& .MuiMenuItem-root': {
-              fontFamily: 'Orbitron',
-              fontSize: '0.7rem',
-              fontWeight: 700,
-              color: 'rgba(255,255,255,0.8)',
-              gap: 1.5,
-              py: 1.2,
-              '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)', color: '#00f3ff' },
-              '& svg': { color: 'rgba(0, 243, 255, 0.5)' }
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#0d0c14',
+              border: '1px solid rgba(0, 243, 255, 0.2)',
+              borderRadius: 0,
+              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+              minWidth: 200,
+              '& .MuiMenuItem-root': {
+                fontFamily: 'Orbitron',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                color: 'rgba(255,255,255,0.8)',
+                gap: 1.5,
+                py: 1.2,
+                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)', color: '#00f3ff' },
+                '& svg': { color: 'rgba(0, 243, 255, 0.5)' }
+              }
             }
           }
         }}

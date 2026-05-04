@@ -192,3 +192,87 @@ def get_color_by_http_status(http_status):
         return generate_color(colors[500], status - 500)
     else:
         return "#c9cbcf"
+
+
+def generate_attack_surface_map(graph_data):
+    """
+    Generates a static network graph using plotly from Cytoscape JSON data.
+    Args:
+        graph_data: Dictionary with 'nodes' and 'edges' (Cytoscape format).
+    Returns:
+        Image as base64 encoded string.
+    """
+    import math
+    nodes = graph_data.get('nodes', [])
+    edges = graph_data.get('edges', [])
+    
+    if not nodes:
+        return None
+
+    # Compute positions (Circular Layout for simplicity and no dependencies)
+    n = len(nodes)
+    pos = {}
+    for i, node in enumerate(nodes):
+        angle = 2 * math.pi * i / n if n > 0 else 0
+        # Radius can be varied for a bit more spread if needed
+        pos[node['data']['id']] = (math.cos(angle), math.sin(angle))
+        
+    edge_x = []
+    edge_y = []
+    for edge in edges:
+        source = edge['data'].get('source')
+        target = edge['data'].get('target')
+        if source in pos and target in pos:
+            x0, y0 = pos[source]
+            x1, y1 = pos[target]
+            edge_x.extend([x0, x1, None])
+            edge_y.extend([y0, y1, None])
+
+    edge_trace = go.Scatter(
+        x=edge_x, y=edge_y,
+        line=dict(width=0.5, color='rgba(148, 163, 184, 0.3)'),
+        hoverinfo='none',
+        mode='lines')
+
+    node_x = []
+    node_y = []
+    node_color = []
+    node_text = []
+    for node in nodes:
+        x, y = pos[node['data']['id']]
+        node_x.append(x)
+        node_y.append(y)
+        node_color.append(node['data'].get('color', '#94a3b8'))
+        node_text.append(node['data'].get('label', ''))
+
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers',
+        text=node_text,
+        hoverinfo='text',
+        marker=dict(
+            showscale=False,
+            color=node_color,
+            size=12,
+            line=dict(width=1, color='white')))
+
+    fig = go.Figure(data=[edge_trace, node_trace],
+                 layout=go.Layout(
+                    paper_bgcolor='#0f172a',
+                    plot_bgcolor='#0f172a',
+                    showlegend=False,
+                    hovermode='closest',
+                    margin=dict(b=20, l=5, r=5, t=40),
+                    xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                    yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                    width=1000,
+                    height=800
+                ))
+    
+    try:
+        img_bytes = to_image(fig, format="png")
+        img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+        return img_base64
+    except Exception as e:
+        print(f"Error generating graph image: {e}")
+        return None
