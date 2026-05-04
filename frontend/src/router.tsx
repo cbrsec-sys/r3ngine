@@ -24,6 +24,7 @@ import {
   AdminSettingsPage,
 } from "./features/settings";
 import { LoginPage } from "./features/auth/components/LoginPage";
+import { LogoutPage } from "./features/auth/components/LogoutPage";
 
 
 import { Box, Typography, Button } from "@mui/material";
@@ -34,9 +35,10 @@ import { useRouterState } from "@tanstack/react-router";
 const rootRoute = createRootRoute({
   component: () => {
     const routerState = useRouterState();
-    const isLoginPage = routerState.location.pathname.startsWith('/login');
+    const isAuthPage = routerState.location.pathname.startsWith('/login') || 
+                       routerState.location.pathname.startsWith('/logout');
     
-    if (isLoginPage) {
+    if (isAuthPage) {
       return <Outlet />;
     }
     
@@ -405,40 +407,46 @@ const loginRoute = createRoute({
   component: LoginPage,
 });
 
+const logoutRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "logout",
+  component: LogoutPage,
+});
+
 // Route Tree
 const routeTree = rootRoute.addChildren([
-  loginRoute,
-  rootRedirectRoute,
   projectRoute.addChildren([
     projectsRoute,
     dashboardRoute,
-
     targetListRoute,
     targetSummaryRoute,
     monitoringRoute,
     enginesRoute,
-    scansRoute,
-    subScansRoute,
-    scanDetailRoute,
     scheduledScansRoute,
-    subdomainsRoute,
+    subScansRoute,
+    scansRoute,
+    scanDetailRoute,
     endpointsRoute,
+    subdomainsRoute,
     todoRoute,
     organizationsRoute,
-    proxySettingsRoute,
-    opsecSettingsRoute,
-    toolSettingsRoute,
-    toolArsenalRoute,
-    apiVaultSettingsRoute,
-    llmToolkitSettingsRoute,
-    reportSettingsRoute,
-    rengineSettingsRoute,
-    notificationSettingsRoute,
-    profileSettingsRoute,
-    adminSettingsRoute,
     vulnsRoute,
-
+    settingsRoute.addChildren([
+      profileSettingsRoute,
+      proxySettingsRoute,
+      opsecSettingsRoute,
+      toolSettingsRoute,
+      toolArsenalRoute,
+      apiVaultSettingsRoute,
+      llmToolkitSettingsRoute,
+      reportSettingsRoute,
+      rengineSettingsRoute,
+      notificationSettingsRoute,
+      adminSettingsRoute,
+    ]),
   ]),
+  loginRoute,
+  logoutRoute,
 ]);
 
 // Router Instance

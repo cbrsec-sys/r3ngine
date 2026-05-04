@@ -19,7 +19,7 @@ from django.urls import reverse
 from rolepermissions.roles import assign_role, clear_roles
 from rolepermissions.decorators import has_permission_decorator
 from django.template.defaultfilters import slugify
-from django.contrib.auth import authenticate, login
+from django.contrib.auth import authenticate, login, logout
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.conf import settings
 
@@ -592,4 +592,12 @@ def login_v3(request):
     return render(request, 'dashboard/v3_index.html', {
         'debug': settings.DEBUG,
         'project': {'name': 'reNgine'} # Fallback for title
+    })
+
+
+def logout_v3(request):
+    logout(request)
+    return render(request, 'dashboard/v3_index.html', {
+        'debug': settings.DEBUG,
+        'project': {'name': 'reNgine'}
     })
