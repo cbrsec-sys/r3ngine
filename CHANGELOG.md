@@ -36,6 +36,17 @@
   - Resolved "node bleeding" where global graph data would pollute individual scan maps.
   - Included a `sync_all_scans` migration utility to retroactively anchor historical data.
   - Added a `reset_graph` Django management command to clear and re-populate the Neo4j database in case of data corruption or schema changes.
+  - **Vulnerability Impact Intelligence**: Integrated AI-driven impact assessment and graph-based attack path visualization:
+    - **AI-Driven Impact Assessment**: Automated generation of potential impact narratives and remediation priorities using LLMs (OpenAI, Anthropic, Gemini, Ollama).
+    - **Attack Path Visualization**: Interactive Cytoscape.js-powered graph showing the full exploit chain from root domain to vulnerability.
+    - **Impact Explorer**: A tactical UI component for real-time monitoring of impact generation tasks and interactive graph exploration.
+    - **PII Gate**: Implemented a privacy-preserving "gate" that anonymizes sensitive reconnaissance data (IPs, emails, hostnames) before sending it to external LLMs and deanonymizes the returned results.
+    - **Persistence & Polling**: Impact findings are persisted in PostgreSQL and synchronized with React Query using smart polling for asynchronous background tasks.
+  - **Advanced Vulnerability Correlation Engine**: 
+    - Integrated **Trivy** for automated Software Composition Analysis (SCA) on discovered dependency files.
+    - Added **Retire.js** integration to identify vulnerable client-side JavaScript libraries.
+    - Implemented a weighted correlation algorithm that unifies results from Nuclei (DAST), Semgrep (SAST), Trivy (SCA), and Retire.js.
+    - Introduced **Potential Attack Chain** generation to visualize sequential exploitation steps (Initial Access -> Lateral Movement -> Impact).
 
 ### Bug Fixes
 - **Automated Infrastructure Stability**: Integrated `custom_engines` directory creation into the Docker build and entrypoint processes to prevent runtime `FileNotFoundError` during engine initialization.

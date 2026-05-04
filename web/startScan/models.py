@@ -232,6 +232,8 @@ class Subdomain(models.Model):
 	waf = models.ManyToManyField('Waf', related_name='waf', blank=True)
 	origin_ip = models.CharField(max_length=45, null=True, blank=True)
 	attack_surface = models.TextField(null=True, blank=True)
+	criticality_level = models.IntegerField(default=1, null=True, blank=True)
+	criticality_reason = models.TextField(null=True, blank=True)
 
 
 	def __str__(self):
@@ -522,6 +524,8 @@ class Vulnerability(models.Model):
 		('patched', 'Patched'),
 	)
 	validation_status = models.CharField(max_length=20, choices=VULNERABILITY_STATUS_CHOICES, default='unverified')
+	correlation_score = models.FloatField(null=True, blank=True, default=0.0)
+	is_suppressed = models.BooleanField(default=False)
 
 	def __str__(self):
 		cve_str = ', '.join(f'`{cve.name}`' for cve in self.cve_ids.all())
@@ -545,6 +549,50 @@ class Vulnerability(models.Model):
 
 	def get_path(self):
 		return urlparse(self.http_url).path
+
+
+class ImpactAssessment(models.Model):
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, null=True, blank=True)
+	subdomain = models.ForeignKey(Subdomain, on_delete=models.CASCADE, null=True, blank=True)
+	vulnerability = models.ForeignKey(Vulnerability, on_delete=models.CASCADE, null=True, blank=True)
+
+	simulated_path = models.JSONField(null=True, blank=True)
+	potential_attack_chain = models.JSONField(null=True, blank=True)
+	potential_impact = models.TextField(null=True, blank=True)
+	remediation_priority = models.IntegerField(default=1)
+	is_ai_generated = models.BooleanField(default=False)
+
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	def __str__(self):
+		return f"Impact Assessment for {self.vulnerability.name if self.vulnerability else 'General'}"
+
+
+class FalsePositiveRule(models.Model):
+	id = models.AutoField(primary_key=True)
+	target_domain = models.ForeignKey(Domain, on_delete=models.CASCADE)
+	template_id = models.CharField(max_length=200) # Nuclei template ID or vuln name
+	regex_pattern = models.CharField(max_length=500, null=True, blank=True) # Optional regex for URL
+	is_active = models.BooleanField(default=True)
+	reason = models.TextField(null=True, blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	def matches(self, vuln_name, url):
+		if self.template_id and self.template_id.lower() not in vuln_name.lower():
+			return False
+		if self.regex_pattern:
+			import re
+			try:
+				if not re.search(self.regex_pattern, url):
+					return False
+			except:
+				return False
+		return True
+
+	def __str__(self):
+		return f"FP Rule: {self.template_id} on {self.target_domain.name}"
 
 
 class ScanActivity(models.Model):

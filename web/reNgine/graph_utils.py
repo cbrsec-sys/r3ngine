@@ -60,6 +60,24 @@ class Neo4jManager:
                 for param in parameters:
                     session.execute_write(self._merge_parameters, endpoint.http_url, param.name, param.type, scan_history_id)
 
+            # Sync Technologies
+            subdomains = Subdomain.objects.filter(scan_history_id=scan_history_id)
+            for sub in subdomains:
+                for tech in sub.technologies.all():
+                    session.execute_write(self._merge_technologies, sub.name, tech.name, scan_history_id)
+
+            # Sync Vulnerabilities
+            from startScan.models import Vulnerability
+            vulns = Vulnerability.objects.filter(scan_history_id=scan_history_id)
+            for vuln in vulns:
+                asset_name = vuln.subdomain.name if vuln.subdomain else (vuln.endpoint.http_url if vuln.endpoint else None)
+                asset_type = 'Subdomain' if vuln.subdomain else ('Endpoint' if vuln.endpoint else None)
+                if asset_name:
+                    session.execute_write(self._merge_vulnerabilities, asset_name, asset_type, vuln.name, vuln.severity, vuln.correlation_score, scan_history_id, vuln.id)
+                    # Sync CVEs linked to this vulnerability
+                    for cve in vuln.cve_ids.all():
+                        session.execute_write(self._merge_cves, vuln.name, cve.name, scan_history_id)
+
     @staticmethod
     def _initialize_scan_context(tx, project_id, project_name, scan_id, target_name, scan_date):
         # Create Project
@@ -122,6 +140,37 @@ class Neo4jManager:
             MERGE (sc)-[:FOUND]->(p)
         """, name=param_name, type=param_type, url=endpoint_url, scan_id=scan_id)
 
+    @staticmethod
+    def _merge_technologies(tx, subdomain_name, tech_name, scan_id):
+        tx.run("""
+            MERGE (t:Technology {name: $tech_name})
+            WITH t
+            MATCH (s:Subdomain {name: $sub_name}), (sc:Scan {id: $scan_id})
+            MERGE (s)-[:USES_TECH]->(t)
+            MERGE (sc)-[:FOUND]->(t)
+        """, tech_name=tech_name, sub_name=subdomain_name, scan_id=scan_id)
+
+    @staticmethod
+    def _merge_vulnerabilities(tx, asset_name, asset_type, vuln_name, severity, correlation_score, scan_id, vuln_id):
+        tx.run(f"""
+            MERGE (v:Vulnerability {{id: $vuln_id}})
+            SET v.name = $vuln_name, v.severity = $severity, v.correlation_score = $score
+            WITH v
+            MATCH (a:{asset_type} {{name: $asset_name}}), (sc:Scan {{id: $scan_id}})
+            MERGE (a)-[:HAS_VULNERABILITY]->(v)
+            MERGE (sc)-[:FOUND]->(v)
+        """, vuln_id=vuln_id, vuln_name=vuln_name, severity=severity, score=correlation_score, asset_name=asset_name, scan_id=scan_id)
+
+    @staticmethod
+    def _merge_cves(tx, vuln_name, cve_name, scan_id):
+        tx.run("""
+            MERGE (c:CVE {name: $cve_name})
+            WITH c
+            MATCH (v:Vulnerability {name: $vuln_name}), (sc:Scan {id: $scan_id})
+            MERGE (v)-[:LINKED_TO_CVE]->(c)
+            MERGE (sc)-[:FOUND]->(c)
+        """, cve_name=cve_name, vuln_name=vuln_name, scan_id=scan_id)
+
     def sync_all_scans(self):
         """Syncs all scan results from PostgreSQL to Neo4j."""
         from startScan.models import ScanHistory
@@ -161,6 +210,18 @@ class Neo4jManager:
         """
         return self._fetch_graph_data(query, {"target_name": target_name})
 
+    def get_impact_path(self, vuln_id):
+        """Returns a subgraph showing the attack path from the domain to a specific vulnerability."""
+        query = """
+            MATCH (v:Vulnerability {id: $vuln_id})
+            MATCH p = (d:Domain)-[*..4]->(v)
+            WITH p, v
+            UNWIND nodes(p) as n
+            UNWIND relationships(p) as r
+            RETURN DISTINCT n, r, endNode(r) as m
+        """
+        return self._fetch_graph_data(query, {"vuln_id": int(vuln_id)})
+
     def _fetch_graph_data(self, query, params):
         if not self.driver:
             return {"nodes": [], "edges": []}
@@ -173,7 +234,9 @@ class Neo4jManager:
             'IPAddress': '#f59e0b',
             'Vulnerability': '#ef4444',
             'Endpoint': '#8b5cf6',
-            'Parameter': '#ec4899'
+            'Parameter': '#ec4899',
+            'Technology': '#facc15',
+            'CVE': '#7c3aed'
         }
 
         with self.driver.session() as session:

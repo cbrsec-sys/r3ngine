@@ -109,3 +109,57 @@ export const useToggleVulnerabilityStatus = () => {
     }
   });
 };
+
+export const useGenerateImpact = (projectSlug: string) => {
+  return useMutation({
+    mutationFn: async (vulnId: number) => {
+      const response = await fetch(`/${projectSlug}/api/impact/vulnerability/${vulnId}/generate/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || ''
+        },
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to trigger impact generation');
+      }
+      return response.json();
+    }
+  });
+};
+
+export const useImpactGraphData = (projectSlug: string, vulnId: number | null) => {
+  return useQuery({
+    queryKey: ['impact-graph', projectSlug, vulnId],
+    queryFn: async () => {
+      const response = await fetch(`/${projectSlug}/api/impact/vulnerability/${vulnId}/data/`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch impact graph data');
+      }
+      return response.json();
+    },
+    enabled: !!projectSlug && !!vulnId,
+  });
+};
+export const useImpactAssessment = (projectSlug: string, vulnId: number | null) => {
+  return useQuery({
+    queryKey: ['impact-assessment', projectSlug, vulnId],
+    queryFn: async () => {
+      const response = await fetch(`/${projectSlug}/api/impact/vulnerability/${vulnId}/details/`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch impact assessment');
+      }
+      return response.json();
+    },
+    enabled: !!projectSlug && !!vulnId,
+    refetchInterval: (data) => {
+      // If AI generation is in progress (no assessment yet or marked as generated recently), poll
+      if (!data || (data as any).status === false) return 5000;
+      return false;
+    }
+  });
+};

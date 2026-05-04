@@ -568,6 +568,37 @@ def get_target_graph_data(request, slug, target_id):
     return JsonResponse(data)
 
 
+def get_impact_graph_data(request, slug, vuln_id):
+    graph = Neo4jManager()
+    data = graph.get_impact_path(vuln_id)
+    graph.close()
+    return JsonResponse(data)
+
+
+def trigger_ai_impact(request, slug, vuln_id):
+    if request.method == 'POST':
+        from reNgine.tasks import generate_impact_assessment
+        generate_impact_assessment.delay(vulnerability_id=vuln_id)
+        return JsonResponse({'status': True, 'message': 'AI Impact Generation started...'})
+    return JsonResponse({'status': False})
+
+
+def get_impact_assessment_details(request, slug, vuln_id):
+    from startScan.models import ImpactAssessment
+    assessment = ImpactAssessment.objects.filter(vulnerability_id=vuln_id).order_by('-created_at').first()
+    if assessment:
+        return JsonResponse({
+            'status': True,
+            'id': assessment.id,
+            'potential_impact': assessment.potential_impact,
+            'remediation_priority': assessment.remediation_priority,
+            'potential_attack_chain': assessment.potential_attack_chain,
+            'is_ai_generated': assessment.is_ai_generated,
+            'created_at': assessment.created_at.isoformat(),
+        })
+    return JsonResponse({'status': False, 'message': 'No assessment found.'})
+
+
 @ensure_csrf_cookie
 def login_v3(request):
     if request.method == 'POST':

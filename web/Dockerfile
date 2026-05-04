@@ -180,6 +180,17 @@ RUN ARCH=$(dpkg --print-architecture) \
     mv kr /usr/local/bin/ && \
     rm -rf kiterunner_1.0.2_linux_${ARCH}.tar.gz
 
+# Install Trivy with checksum verification
+RUN ARCH=$(dpkg --print-architecture) \
+    && if [ "${ARCH}" = "arm64" ]; then TRIVY_ARCH="ARM64"; else TRIVY_ARCH="64bit"; fi \
+    && TRIVY_VERSION="0.59.1" \
+    && wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz \
+    && wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_checksums.txt \
+    && grep "trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz" trivy_${TRIVY_VERSION}_checksums.txt | sha256sum -c - \
+    && tar -xvf trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz \
+    && mv trivy /usr/local/bin/ \
+    && rm -rf trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz trivy_${TRIVY_VERSION}_checksums.txt
+
 # Download Kiterunner Wordlist
 RUN mkdir -p /usr/src/wordlist/kr && \
     cd /usr/src/wordlist/kr && \
@@ -196,8 +207,9 @@ WORKDIR /usr/src/github/spiderfoot
 RUN pip3 install -r requirements.txt
 WORKDIR /usr/src/app
 
-# Install Chromium
-RUN apt install chromium-driver -y
+# Install Chromium and Retire.js
+RUN apt install chromium-driver -y && \
+    npm install -g retire
 
 # Setup Eyewitness
 RUN git clone https://github.com/RedSiege/EyeWitness /usr/src/github/EyeWitness && \

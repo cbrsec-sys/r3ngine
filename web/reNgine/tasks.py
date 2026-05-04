@@ -41,6 +41,7 @@ from startScan.models import EndPoint, Subdomain, Vulnerability, Parameter
 from targetApp.models import Domain
 from reNgine.monitor_tasks import *
 from reNgine.graph_utils import Neo4jManager
+from reNgine.privacy import PIIGate
 
 """
 Celery tasks.
@@ -256,8 +257,13 @@ def initiate_scan(
 					waf_bypass.si(ctx=ctx, description='WAF bypass')
 				),
 				firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan')
-			)
+			),
+			correlate_vulnerabilities.si(scan_history_id=scan_history_id),
+			calculate_risk_scores.si(scan_history_id=scan_history_id)
 		)
+
+		if config.get('enable_ai_impact_analysis'):
+			workflow = chain(workflow, generate_impact_assessment.si(scan_history_id=scan_history_id))
 
 		# Build callback
 		callback = report.si(ctx=ctx).set(link_error=[report.si(ctx=ctx)])
@@ -2609,6 +2615,49 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		semgrep_output = f"{results_dir}/semgrep_results.json"
 		cmd = f"semgrep scan --config auto --json --output {semgrep_output} {results_dir}"
 		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+		# Parse Semgrep results
+		if os.path.exists(semgrep_output):
+			with open(semgrep_output, 'r') as f:
+				data = json.load(f)
+				for match in data.get('results', []):
+					vuln_data = parse_semgrep_result(match)
+					save_vulnerability(vuln_data, self.scan, self.domain)
+
+	# Trivy - SCA for discovered dependency files
+	if 'trivy' in uses_tools:
+		logger.info(f'Running Trivy SCA on discovery results')
+		trivy_output = f"{results_dir}/trivy_results.json"
+		cmd = f"trivy fs --format json --output {trivy_output} {results_dir}"
+		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+		# Parse Trivy results
+		if os.path.exists(trivy_output):
+			with open(trivy_output, 'r') as f:
+				data = json.load(f)
+				for result in data.get('Results', []):
+					for vuln in result.get('Vulnerabilities', []):
+						vuln_data = parse_trivy_result(vuln)
+						save_vulnerability(vuln_data, self.scan, self.domain)
+
+	# Retire.js - JS Library vulnerability scan
+	if 'retire' in uses_tools:
+		logger.info(f'Running Retire.js on discovery results')
+		retire_output = f"{results_dir}/retire_results.json"
+		cmd = f"retire --path {results_dir} --outputformat json --outputpath {retire_output}"
+		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+		# Parse Retire.js results
+		if os.path.exists(retire_output):
+			with open(retire_output, 'r') as f:
+				data = json.load(f)
+				for result in data:
+					for component in result.get('results', []):
+						for vuln in component.get('vulnerabilities', []):
+							vuln_data = parse_retire_result({
+								'component': component.get('component'),
+								'version': component.get('version'),
+								'info': vuln.get('info'),
+								'file': result.get('file')
+							})
+							save_vulnerability(vuln_data, self.scan, self.domain)
 
 	# Aquatone - Visual discovery
 	if 'aquatone' in uses_tools:
@@ -5208,6 +5257,21 @@ def save_vulnerability(**vuln_data):
 	# remove nulls
 	vuln_data = replace_nulls(vuln_data)
 
+	# Check for False Positive rules
+	is_suppressed = False
+	try:
+		from startScan.models import FalsePositiveRule
+		rules = FalsePositiveRule.objects.filter(target_domain=target_domain, is_active=True)
+		for rule in rules:
+			if rule.matches(vuln_data.get('name', ''), http_url):
+				is_suppressed = True
+				break
+	except Exception as e:
+		logger.error(f"Error checking FP rules: {e}")
+
+	if is_suppressed:
+		vuln_data['is_suppressed'] = True
+
 	# Create vulnerability
 	vuln, created = Vulnerability.objects.get_or_create(**vuln_data)
 	if created:
@@ -5971,3 +6035,88 @@ def pull_ollama_model(model_name):
         return False
     
     return True
+
+
+@app.task(name='correlate_vulnerabilities', queue='main_scan_queue', base=RengineTask, bind=True)
+def correlate_vulnerabilities(self, scan_history_id):
+	"""
+	Correlates discovered technologies with known CVEs and updates the graph.
+	"""
+	nm = Neo4jManager()
+	try:
+		# In a real scenario, this would query a CVE DB. 
+		# For now, we sync the graph which now includes Tech and CVE links from Vulnerability models.
+		nm.sync_scan_results(scan_history_id)
+	except Exception as e:
+		logger.error(f"Error in correlate_vulnerabilities: {str(e)}")
+	finally:
+		nm.close()
+
+
+@app.task(name='calculate_risk_scores', queue='main_scan_queue', base=RengineTask, bind=True)
+def calculate_risk_scores(self, scan_history_id):
+	"""
+	Calculates a weighted risk score for vulnerabilities.
+	Score = (Severity * 0.4) + (AssetCriticality * 0.3) + (Exploitability * 0.2) + (Exposure * 0.1)
+	"""
+	from reNgine.correlation import VulnerabilityCorrelationEngine
+	scan_history = ScanHistory.objects.get(id=scan_history_id)
+	correlator = VulnerabilityCorrelationEngine(scan_history=scan_history)
+	correlator.correlate_findings()
+
+
+@app.task(name='generate_impact_assessment', queue='main_scan_queue', base=RengineTask, bind=True)
+def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None):
+	"""
+	Generates an AI-powered impact assessment for vulnerabilities.
+	"""
+	from reNgine.llm import LLMImpactGenerator
+	from reNgine.privacy import PIIGate
+
+	if vulnerability_id:
+		vulns = Vulnerability.objects.filter(id=vulnerability_id)
+		if not scan_history_id and vulns.exists():
+			scan_history_id = vulns.first().scan_history_id
+	elif scan_history_id:
+		vulns = Vulnerability.objects.filter(scan_history_id=scan_history_id)
+	else:
+		logger.error("Neither scan_history_id nor vulnerability_id provided for impact assessment.")
+		return False
+
+	generator = LLMImpactGenerator(logger)
+	gate = PIIGate()
+
+	# Run Correlation Engine to unify results and calculate scores
+	from reNgine.correlation import VulnerabilityCorrelationEngine
+	correlator = VulnerabilityCorrelationEngine(scan_history=ScanHistory.objects.get(id=scan_history_id))
+	correlator.correlate_findings()
+
+	for vuln in vulns:
+		if vuln.is_suppressed:
+			continue
+
+		context = f"Vulnerability: {vuln.name}\n"
+		context += f"Description: {vuln.description}\n"
+		context += f"Asset: {vuln.subdomain.name if vuln.subdomain else (vuln.endpoint.http_url if vuln.endpoint else 'Unknown')}\n"
+		if vuln.subdomain:
+			context += f"Technologies: {', '.join([t.name for t in vuln.subdomain.technologies.all()])}\n"
+
+		# PII Gate: Mask data
+		masked_context = gate.anonymize(context)
+
+		# Call LLM
+		impact_text = generator.generate_impact_assessment(masked_context)
+
+		# PII Gate: Reseal data
+		final_impact = gate.deanonymize(impact_text)
+
+		# Persist
+		ImpactAssessment.objects.update_or_create(
+			vulnerability=vuln,
+			defaults={
+				'scan_history_id': scan_history_id,
+				'subdomain': vuln.subdomain,
+				'potential_impact': final_impact,
+				'is_ai_generated': True
+			}
+		)

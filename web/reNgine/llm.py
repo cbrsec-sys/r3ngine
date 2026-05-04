@@ -155,4 +155,15 @@ class LLMReportGenerator(LLMBaseGenerator):
     def generate_attack_scenario(self, vulnerability_context):
         from reNgine.definitions import LLM_ATTACK_SCENARIO_SYSTEM_PROMPT
         return self._generate_section(LLM_ATTACK_SCENARIO_SYSTEM_PROMPT, vulnerability_context)
+
+
+class LLMImpactGenerator(LLMBaseGenerator):
+    def generate_impact_assessment(self, vulnerability_context):
+        # Fallback system prompt if not defined in definitions.py
+        try:
+            from reNgine.definitions import LLM_IMPACT_ASSESSMENT_SYSTEM_PROMPT
+        except ImportError:
+            LLM_IMPACT_ASSESSMENT_SYSTEM_PROMPT = "You are a senior security architect. Given the following attack path and findings, describe the potential business impact and suggest a remediation priority. Focus on real-world risk."
+        
+        return self._call_llm(LLM_IMPACT_ASSESSMENT_SYSTEM_PROMPT, vulnerability_context)
 		
