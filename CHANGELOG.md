@@ -1,6 +1,7 @@
 # Changelog
 
 ## v3.0.0
+**Official Repo location:** https://github.com/whiterabb17/r3ngine
  
 ### New Features
  **Advanced Web App & API Discovery Pipeline**: Introduced a dedicated reconnaissance engine for deep API discovery, featuring:
@@ -26,12 +27,22 @@
 - **Dynamic Model Fetching**: Implemented real-time model discovery for all supported providers, including hardware requirements and expertise insights for local models.
 - **On-Demand Model Loading**: Optimized the AI Hub by fetching available models only when the dropdown is clicked, reducing initial page load overhead.
 - **Legacy API Vault Sync**: Automatically migrates existing OpenAI keys from the legacy API Vault to the new AI Hub configuration.
+- **404 Page Enhancement**: Added an Interdimensional Rabbit Hole background image for the 404 page.
+- **Scoped Attack Surface Visualization**: Refactored the Neo4j ingestion and retrieval pipeline to support scan-specific and target-specific scoping:
+  - Introduced `Scan` nodes in Neo4j to anchor assets to specific execution contexts.
+  - Implemented target-level graph aggregation with color-coded scan distinction in the UI.
+  - Added backend API support for segmented graph data fetching (`/api/graph/target/<target_id>/data/`).
+  - Added new "Attack Surface" and "Visualization" tabs to the Target Summary view.
+  - Resolved "node bleeding" where global graph data would pollute individual scan maps.
+  - Included a `sync_all_scans` migration utility to retroactively anchor historical data.
+  - Added a `reset_graph` Django management command to clear and re-populate the Neo4j database in case of data corruption or schema changes.
 
 ### Bug Fixes
-- **Scan Engine Task Mapping**: Fixed a critical bug in the "Full Scan" engine where malformed YAML configuration prevented modules from being correctly identified and displayed.
-- **Firewall/VPN Module Restoration**: Restored the missing Firewall/VPN module to the default Full Scan engine configuration.
-- **AI Hub UI Refinements**: Fixed layout issues in the AI Hub, including responsive grid adjustments for non-Ollama providers and improved vertical spacing of navigation elements.
-- **Notification Fixes**: Replaced the missing `toastr` library with reNgine's native SweetAlert2 to resolve console errors during LLM configuration saves.
+- **Automated Infrastructure Stability**: Integrated `custom_engines` directory creation into the Docker build and entrypoint processes to prevent runtime `FileNotFoundError` during engine initialization.
+- **LLM Report Generation Dependency**: Fixed a `TypeError` in `create_report` where the `LLMReportGenerator` was missing its required `logger` dependency.
+- **Version Badge Persistence**: Resolved a UI bug where the version badge would disappear shortly after page load by adding `rengine_version` to the dashboard API serializer and implementing defensive state updates.
+- **Report Layout Refinements**: Fixed an issue in the Modern PDF report where the Table of Contents list would jump to a new page, leaving the title orphaned. Refactored TOC styles to use a more stable layout and added page-break avoidance rules.
+- **Django System Check Cleanup**: Resolved the `(fields.W340)` warning by removing redundant `null=True` parameters from `ManyToManyField` definitions in `EndPoint` models.
 
 
 ## v2.5.2

@@ -49,7 +49,7 @@ export const LogoutPage: React.FC = () => {
         boxShadow: '0 0 40px rgba(0, 243, 255, 0.15)'
       }}>
         <Box sx={{ mb: 4 }}>
-          <img src="/staticfiles/img/logo-lg.png" alt="reNgine Logo" style={{ height: 80, marginBottom: 24 }} />
+          <img src="/img/r3ngine_logo.png" alt="reNgine Logo" style={{ height: 80, marginBottom: 24 }} />
           
           <Typography variant="h4" sx={{ 
             fontFamily: 'Orbitron', 

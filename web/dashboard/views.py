@@ -542,9 +542,28 @@ def attack_surface(request, slug, scan_id):
     return render(request, 'dashboard/v3_index.html', context)
 
 
+def target_attack_surface(request, slug, target_id):
+    project = get_object_or_404(Project, slug=slug)
+    target = get_object_or_404(Domain, id=target_id)
+    context = {
+        'project': project,
+        'target': target,
+        'attack_surface_active': 'active'
+    }
+    return render(request, 'dashboard/v3_index.html', context)
+
+
 def get_graph_data(request, slug, scan_id):
     graph = Neo4jManager()
     data = graph.get_cytoscape_json(scan_id)
+    graph.close()
+    return JsonResponse(data)
+
+
+def get_target_graph_data(request, slug, target_id):
+    target = get_object_or_404(Domain, id=target_id)
+    graph = Neo4jManager()
+    data = graph.get_target_graph_data(target.name)
     graph.close()
     return JsonResponse(data)
 

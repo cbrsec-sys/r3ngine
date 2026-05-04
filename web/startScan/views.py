@@ -1,5 +1,6 @@
 import markdown
 import requests
+import logging
 
 from celery import group
 from weasyprint import HTML, CSS
@@ -23,6 +24,9 @@ from reNgine.tasks import create_scan_activity, initiate_scan, run_command
 from scanEngine.models import EngineType
 from startScan.models import *
 from targetApp.models import *
+from reNgine.graph_utils import Neo4jManager
+
+logger = logging.getLogger(__name__)
 
 
 def scan_history(request, slug):
@@ -1165,6 +1169,20 @@ def create_report(request, id):
         .filter(ip_addresses__in=subdomains)
         .distinct()
     )
+
+    # Attack Surface Map (Optional for Enterprise)
+    include_attack_surface_map = request.GET.get('include_attack_surface_map', 'False') == 'True'
+    attack_surface_map_image = None
+    if report_template == 'enterprise' and include_attack_surface_map:
+        try:
+            neo4j_manager = Neo4jManager()
+            graph_data = neo4j_manager.get_cytoscape_json(id)
+            if graph_data and graph_data.get('nodes'):
+                attack_surface_map_image = generate_attack_surface_map(graph_data)
+            neo4j_manager.close()
+        except Exception as e:
+            logger.error(f"Error generating Attack Surface Map for report: {e}")
+
     data = {
         'scan_object': scan,
         'unique_vulnerabilities': unique_vulns,
@@ -1178,6 +1196,7 @@ def create_report(request, id):
         'show_vuln': show_vuln,
         'report_name': report_name,
         'is_ignore_info_vuln': is_ignore_info_vuln,
+        'attack_surface_map_image': attack_surface_map_image,
     }
 
     # Get report related config
@@ -1215,7 +1234,7 @@ def create_report(request, id):
         # LLM Generated Sections
         if report.enable_llm_report_generation:
             from reNgine.llm import LLMReportGenerator
-            llm_gen = LLMReportGenerator()
+            llm_gen = LLMReportGenerator(logger=logger)
             
             # Prepare context for LLM
             llm_context = f"Target: {scan.domain.name}\n"
@@ -1241,6 +1260,14 @@ def create_report(request, id):
             data['llm_conclusion'] = markdown.markdown(llm_gen.generate_conclusion(llm_context))
             data['enable_llm_report_generation'] = True
 
+            # Generate attack scenarios for exploitable vulnerabilities
+            exploitable_vulns = vulns.exclude(exploit_url__isnull=True).exclude(exploit_url__exact='')
+            for v in exploitable_vulns:
+                vuln_context = f"Vulnerability: {v.name}\n"
+                vuln_context += f"Description: {v.description}\n"
+                vuln_context += f"Exploit URL: {v.exploit_url}\n"
+                v.attack_scenario = markdown.markdown(llm_gen.generate_attack_scenario(vuln_context))
+
         primary_color = report.primary_color
         secondary_color = report.secondary_color
 
@@ -1250,7 +1277,9 @@ def create_report(request, id):
     data['subdomain_http_status_chart'] = generate_subdomain_chart_by_http_status(subdomains)
     data['vulns_severity_chart'] = generate_vulnerability_chart_by_severity(vulns) if vulns else ''
 
-    if report_template == 'modern':
+    if report_template == 'enterprise':
+        template = get_template('report/enterprise.html')
+    elif report_template == 'modern':
         template = get_template('report/modern.html')
     else:
         template = get_template('report/default.html')
@@ -1259,9 +1288,17 @@ def create_report(request, id):
     pdf = HTML(string=html).write_pdf()
     # pdf = HTML(string=html).write_pdf(stylesheets=[CSS(string='@page { size: A4; margin: 0; }')])
 
-    if 'download' in request.GET:
+    should_download = request.GET.get('download', 'false').lower() == 'true'
+    
+    target_name = scan.domain.name
+    date_str = datetime.now().strftime('%Y-%m-%d')
+    filename = f"{target_name} Report {date_str}.pdf"
+
+    if should_download:
         response = HttpResponse(pdf, content_type='application/octet-stream')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
     else:
         response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
 
     return response

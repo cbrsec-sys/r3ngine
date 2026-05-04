@@ -81,7 +81,7 @@ export const LoginPage: React.FC = () => {
         boxShadow: '0 0 40px rgba(0, 243, 255, 0.2)'
       }}>
         <Box sx={{ mb: 3, textAlign: 'center' }}>
-          <img src="/staticfiles/img/logo-lg.png" alt="reNgine Logo" style={{ height: 80, marginBottom: 16 }} />
+          <img src="/img/r3ngine_logo.png" alt="reNgine Logo" style={{ height: 80, marginBottom: 16 }} />
           <Typography variant="h5" sx={{ 
             fontFamily: 'Orbitron', 
             fontWeight: 900, 

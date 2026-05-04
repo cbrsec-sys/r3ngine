@@ -1,16 +1,16 @@
 import React from 'react';
-import { 
-  Box, 
-  Card, 
-  CardContent, 
-  Typography, 
-  Grid, 
-  useTheme, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
+import {
+  Box,
+  Card,
+  CardContent,
+  Typography,
+  Grid,
+  useTheme,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
   TableRow,
   Chip
 } from '@mui/material';
@@ -43,19 +43,19 @@ const SeverityBadge: React.FC<{ severity: number | string; label?: string }> = (
 
   const info = getSeverityInfo(severity);
   return (
-    <Chip 
-      label={info.label} 
-      size="small" 
-      sx={{ 
-        height: 18, 
-        fontSize: '0.6rem', 
-        fontWeight: 900, 
-        bgcolor: `${info.color}15`, 
+    <Chip
+      label={info.label}
+      size="small"
+      sx={{
+        height: 18,
+        fontSize: '0.6rem',
+        fontWeight: 900,
+        bgcolor: `${info.color}15`,
         color: info.color,
         borderRadius: 0.5,
         fontFamily: 'Inter',
         border: `1px solid ${info.color}33`,
-      }} 
+      }}
     />
   );
 };
@@ -89,7 +89,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
     chart: { type: 'bar' as any, toolbar: { show: false }, background: 'transparent' },
     plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '60%' } },
     dataLabels: { enabled: false },
-    xaxis: { 
+    xaxis: {
       categories,
       labels: { style: { colors: theme.palette.text.secondary, fontSize: '9px' } }
     },
@@ -105,12 +105,12 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
       <Grid container spacing={3} sx={{ mb: 3, alignItems: 'stretch' }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Vulnerability Severity">
-            <Chart 
+            <Chart
               options={{
                 ...donutOptions,
                 labels: ['Critical', 'High', 'Medium', 'Low', 'Info', 'Unknown'],
                 colors: ['#ff003c', '#ff9f00', '#fffc00', '#00ff62', '#00f3ff', '#7000ff']
-              }} 
+              }}
               series={[
                 data.kpis.critical_count,
                 data.kpis.high_count,
@@ -118,13 +118,13 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                 data.kpis.low_count,
                 data.kpis.info_count,
                 data.kpis.unknown_count
-              ]} 
-              type="donut" 
-              height={300} 
+              ]}
+              type="donut"
+              height={300}
             />
           </ChartCard>
         </Grid>
-        
+
         <Grid size={{ xs: 12, md: 8 }}>
           <ChartCard title="Most Vulnerable Targets">
             <TableContainer sx={{ maxHeight: 300 }}>
@@ -143,7 +143,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                   {data.most_vulnerable_targets.map((target, index) => (
                     <TableRow key={index} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
                       <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', py: 1 }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: 'primary.main' }}>{target.name}</Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#c7c7c7ff' }}>{target.name}</Typography>
                       </TableCell>
                       <TableCell align="center" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.critical_count > 0 ? '#ff003c' : 'rgba(255,255,255,0.1)' }}>{target.critical_count}</Typography>
@@ -175,15 +175,15 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
       <Grid container spacing={3} sx={{ mb: 3, alignItems: 'stretch' }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Most Used Technologies">
-            <Chart 
-              options={getBarOptions(data.most_used_tech.slice(0, 8).map(t => t.name))} 
-              series={[{ name: 'Usage', data: data.most_used_tech.slice(0, 8).map(t => t.count) }]} 
-              type="bar" 
-              height={240} 
+            <Chart
+              options={getBarOptions(data.most_used_tech.slice(0, 8).map(t => t.name))}
+              series={[{ name: 'Usage', data: data.most_used_tech.slice(0, 8).map(t => t.count) }]}
+              type="bar"
+              height={240}
             />
           </ChartCard>
         </Grid>
-        
+
         <Grid size={{ xs: 12, md: 8 }}>
           <ChartCard title="Most Common Vulnerabilities">
             <TableContainer sx={{ maxHeight: 300 }}>
@@ -220,36 +220,36 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Open Ports Distribution">
-            <Chart 
+            <Chart
               options={{
                 ...donutOptions,
                 labels: data.most_used_port.slice(0, 5).map(p => `${p.number}/${p.service_name}`)
-              }} 
-              series={data.most_used_port.slice(0, 5).map(p => p.count)} 
-              type="donut" 
-              height={240} 
+              }}
+              series={data.most_used_port.slice(0, 5).map(p => p.count)}
+              type="donut"
+              height={240}
             />
           </ChartCard>
         </Grid>
 
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Most Common CWE">
-            <Chart 
-              options={getBarOptions(data.most_common_cwe.slice(0, 8).map(c => c.name), '#7000ff')} 
-              series={[{ name: 'Occurrences', data: data.most_common_cwe.slice(0, 8).map(c => c.count) }]} 
-              type="bar" 
-              height={240} 
+            <Chart
+              options={getBarOptions(data.most_common_cwe.slice(0, 8).map(c => c.name), '#7000ff')}
+              series={[{ name: 'Occurrences', data: data.most_common_cwe.slice(0, 8).map(c => c.count) }]}
+              type="bar"
+              height={240}
             />
           </ChartCard>
         </Grid>
 
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Top IP Addresses">
-            <Chart 
-              options={getBarOptions(data.most_used_ip.slice(0, 8).map(ip => ip.address || 'Unknown'), '#00ff62')} 
-              series={[{ name: 'Usage', data: data.most_used_ip.slice(0, 8).map(ip => ip.count) }]} 
-              type="bar" 
-              height={240} 
+            <Chart
+              options={getBarOptions(data.most_used_ip.slice(0, 8).map(ip => ip.address || 'Unknown'), '#00ff62')}
+              series={[{ name: 'Usage', data: data.most_used_ip.slice(0, 8).map(ip => ip.count) }]}
+              type="bar"
+              height={240}
             />
           </ChartCard>
         </Grid>

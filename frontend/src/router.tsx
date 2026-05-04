@@ -536,12 +536,11 @@ function NotFound() {
         letterSpacing: 2,
         fontWeight: 700
       }}>
-        UNAUTHORIZED ACCESS
+        NOT FOUND
       </Typography>
 
       <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.6)', maxWidth: 500, mb: 6, lineHeight: 1.8 }}>
-        The tactical coordinates you provided do not match any known sectors in the reNgine perimeter.
-        Return to base or verify the target parameters.
+        This page has not yet been migrated to the new interface.
       </Typography>
 
       <Box sx={{ display: 'flex', gap: 3 }}>

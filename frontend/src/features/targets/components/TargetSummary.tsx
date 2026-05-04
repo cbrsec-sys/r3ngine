@@ -69,6 +69,8 @@ import { SubdomainsTab } from '../../scans/components/SubdomainsTab';
 import { EndpointsTab } from '../../scans/components/EndpointsTab';
 import { DirectoriesTab } from '../../scans/components/DirectoriesTab';
 import { VulnerabilityTable } from '../../vulnerabilities/components/VulnerabilityTable';
+import VisualizationTab from '../../scans/components/VisualizationTab';
+import { AttackSurfaceTab } from '../../scans/components/AttackSurfaceTab';
 
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
@@ -130,7 +132,9 @@ export const TargetSummary = () => {
     { label: 'DIRECTORIES', icon: Folder },
     { label: 'URLS', icon: LinkIcon },
     { label: 'VULNERABILITIES', icon: ShieldAlert },
+    { label: 'ATTACK SURFACE', icon: MapIcon },
     { label: 'MONITORING', icon: Eye },
+    { label: 'VISUALIZATION', icon: BarChart2 },
   ];
 
   const renderHome = () => (
@@ -595,7 +599,9 @@ export const TargetSummary = () => {
         {tabs[activeTab]?.label === 'DIRECTORIES' && <DirectoriesTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
         {tabs[activeTab]?.label === 'URLS' && <EndpointsTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
         {tabs[activeTab]?.label === 'VULNERABILITIES' && <VulnerabilityTable projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
+        {tabs[activeTab]?.label === 'ATTACK SURFACE' && <AttackSurfaceTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
         {tabs[activeTab]?.label === 'MONITORING' && renderMonitoring()}
+        {tabs[activeTab]?.label === 'VISUALIZATION' && <VisualizationTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
       </Box>
     </Box>
   );

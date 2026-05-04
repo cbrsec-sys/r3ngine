@@ -392,8 +392,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 fontWeight: 900,
                 fontFamily: 'Orbitron',
                 letterSpacing: 2,
-                color: '#ff00ff',
-                textShadow: '0 0 12px rgba(255, 0, 115, 0.8)',
+                color: "rgb(255, 0, 241)",
+                textShadow: "rgb(255, 0, 0) 0px 0px 21px",
                 fontSize: '1.4rem',
                 mr: 1.5,
                 ml: 12,
@@ -419,7 +419,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             <Box sx={{ flexGrow: 1 }} />
 
             {/* Action Group */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, backgroundColor: "transparent" }}>
               {/* Universal Search */}
               <Box sx={{
                 display: 'flex',
