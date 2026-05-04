@@ -10,10 +10,10 @@ import { EndpointsPage } from "./features/endpoints";
 import { SubdomainsPage } from "./features/subdomains";
 import { TodoPage } from "./features/todos";
 import { OrganizationPage } from "./features/organizations";
-import { 
-  ProxySettingsPage, 
-  OpSecSettingsPage, 
-  ToolSettingsPage, 
+import {
+  ProxySettingsPage,
+  OpSecSettingsPage,
+  ToolSettingsPage,
   ToolArsenalPage,
   ApiVaultPage,
   LlmToolkitPage,
@@ -23,8 +23,11 @@ import {
   ProfileSettingsPage,
   AdminSettingsPage,
 } from "./features/settings";
+import { BountyHubPage } from "./features/bounty/components/BountyHubPage";
+import { SearchPage } from "./features/search/components/SearchPage";
 import { LoginPage } from "./features/auth/components/LoginPage";
 import { LogoutPage } from "./features/auth/components/LogoutPage";
+import { OnboardingPage } from "./features/auth/components/OnboardingPage";
 
 
 import { Box, Typography, Button } from "@mui/material";
@@ -35,13 +38,14 @@ import { useRouterState } from "@tanstack/react-router";
 const rootRoute = createRootRoute({
   component: () => {
     const routerState = useRouterState();
-    const isAuthPage = routerState.location.pathname.startsWith('/login') || 
-                       routerState.location.pathname.startsWith('/logout');
-    
+    const isAuthPage = routerState.location.pathname.startsWith('/login') ||
+      routerState.location.pathname.startsWith('/logout') ||
+      routerState.location.pathname.startsWith('/onboarding');
+
     if (isAuthPage) {
       return <Outlet />;
     }
-    
+
     return (
       <Shell>
         <Outlet />
@@ -133,11 +137,11 @@ const subScansRoute = createRoute({
     return { projectSlug };
   },
   pendingComponent: () => (
-    <Box sx={{ 
-      height: '80vh', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
+    <Box sx={{
+      height: '80vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
       justifyContent: 'center',
       gap: 3
     }}>
@@ -146,15 +150,15 @@ const subScansRoute = createRoute({
         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
       </Box>
-      <Typography sx={{ 
-        fontFamily: 'Orbitron', 
-        fontWeight: 900, 
-        letterSpacing: 2, 
+      <Typography sx={{
+        fontFamily: 'Orbitron',
+        fontWeight: 900,
+        letterSpacing: 2,
         fontSize: '14px',
         color: '#00f3ff',
         textAlign: 'center'
       }}>
-        ACCESSING TACTICAL REGISTRY... <br/>
+        ACCESSING TACTICAL REGISTRY... <br />
         <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>RETRIEVING SUB SCANS... PLEASE WAIT</span>
       </Typography>
       <style>
@@ -178,11 +182,11 @@ const scheduledScansRoute = createRoute({
     return { projectSlug };
   },
   pendingComponent: () => (
-    <Box sx={{ 
-      height: '80vh', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
+    <Box sx={{
+      height: '80vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
       justifyContent: 'center',
       gap: 3
     }}>
@@ -191,15 +195,15 @@ const scheduledScansRoute = createRoute({
         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
       </Box>
-      <Typography sx={{ 
-        fontFamily: 'Orbitron', 
-        fontWeight: 900, 
-        letterSpacing: 2, 
+      <Typography sx={{
+        fontFamily: 'Orbitron',
+        fontWeight: 900,
+        letterSpacing: 2,
         fontSize: '14px',
         color: '#00f3ff',
         textAlign: 'center'
       }}>
-        ACCESSING TACTICAL REGISTRY... <br/>
+        ACCESSING TACTICAL REGISTRY... <br />
         <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>RETRIEVING SCHEDULED OPERATIONS... PLEASE WAIT</span>
       </Typography>
       <style>
@@ -226,11 +230,11 @@ const subdomainsRoute = createRoute({
     return { projectSlug };
   },
   pendingComponent: () => (
-    <Box sx={{ 
-      height: '80vh', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
+    <Box sx={{
+      height: '80vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
       justifyContent: 'center',
       gap: 3
     }}>
@@ -239,15 +243,15 @@ const subdomainsRoute = createRoute({
         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
       </Box>
-      <Typography sx={{ 
-        fontFamily: 'Orbitron', 
-        fontWeight: 900, 
-        letterSpacing: 2, 
+      <Typography sx={{
+        fontFamily: 'Orbitron',
+        fontWeight: 900,
+        letterSpacing: 2,
         fontSize: '14px',
         color: '#00f3ff',
         textAlign: 'center'
       }}>
-        INITIALIZING TACTICAL DATA... <br/>
+        INITIALIZING TACTICAL DATA... <br />
         <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>FETCHING SUBDOMAINS... PLEASE WAIT</span>
       </Typography>
       <style>
@@ -357,11 +361,11 @@ const vulnsRoute = createRoute({
     return { projectSlug };
   },
   pendingComponent: () => (
-    <Box sx={{ 
-      height: '80vh', 
-      display: 'flex', 
-      flexDirection: 'column', 
-      alignItems: 'center', 
+    <Box sx={{
+      height: '80vh',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
       justifyContent: 'center',
       gap: 3
     }}>
@@ -370,15 +374,15 @@ const vulnsRoute = createRoute({
         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
       </Box>
-      <Typography sx={{ 
-        fontFamily: 'Orbitron', 
-        fontWeight: 900, 
-        letterSpacing: 2, 
+      <Typography sx={{
+        fontFamily: 'Orbitron',
+        fontWeight: 900,
+        letterSpacing: 2,
         fontSize: '14px',
         color: '#00f3ff',
         textAlign: 'center'
       }}>
-        INITIALIZING TACTICAL DATA... <br/>
+        INITIALIZING TACTICAL DATA... <br />
         <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>FETCHING VULNERABILITIES... PLEASE WAIT</span>
       </Typography>
       <style>
@@ -391,6 +395,18 @@ const vulnsRoute = createRoute({
       </style>
     </Box>
   )
+});
+
+const bountyHubRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "bountyhub",
+  component: BountyHubPage,
+});
+
+const searchRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "search",
+  component: SearchPage,
 });
 
 // Scan History Detail Route
@@ -411,6 +427,12 @@ const logoutRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "logout",
   component: LogoutPage,
+});
+
+const onboardingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "onboarding",
+  component: OnboardingPage,
 });
 
 // Route Tree
@@ -444,13 +466,16 @@ const routeTree = rootRoute.addChildren([
       notificationSettingsRoute,
       adminSettingsRoute,
     ]),
+    bountyHubRoute,
+    searchRoute,
   ]),
   loginRoute,
   logoutRoute,
+  onboardingRoute,
 ]);
 
 // Router Instance
-export const router = createRouter({ 
+export const router = createRouter({
   routeTree,
   defaultNotFoundComponent: () => <NotFound />,
 });
@@ -478,51 +503,51 @@ function NotFound() {
     >
       <Box sx={{ position: 'relative', mb: 4 }}>
         <AlertCircle size={120} color="#ff003c" style={{ opacity: 0.8 }} />
-        <Box sx={{ 
-          position: 'absolute', 
-          top: 0, 
-          left: 0, 
-          right: 0, 
-          bottom: 0, 
+        <Box sx={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
           boxShadow: '0 0 50px rgba(255, 0, 60, 0.3)',
           borderRadius: '50%'
         }} />
       </Box>
-      
-      <Typography variant="h1" sx={{ 
-        fontFamily: 'Orbitron', 
-        fontWeight: 900, 
+
+      <Typography variant="h1" sx={{
+        fontFamily: 'Orbitron',
+        fontWeight: 900,
         fontSize: { xs: '3rem', md: '5rem' },
         letterSpacing: 8,
         mb: 2,
         color: '#fff',
         textShadow: '0 0 20px rgba(255, 0, 60, 0.5)'
       }}>
-        SIGNAL_LOST
+        SIGNAL LOST
       </Typography>
-      
-      <Typography variant="h5" sx={{ 
+
+      <Typography variant="h5" sx={{
         fontFamily: 'Orbitron',
         color: '#ff003c',
         mb: 4,
         letterSpacing: 2,
         fontWeight: 700
       }}>
-        UNAUTHORIZED_SECTOR_ACCESS
+        UNAUTHORIZED ACCESS
       </Typography>
-      
+
       <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.6)', maxWidth: 500, mb: 6, lineHeight: 1.8 }}>
-        The tactical coordinates you provided do not match any known sectors in the reNgine perimeter. 
+        The tactical coordinates you provided do not match any known sectors in the reNgine perimeter.
         Return to base or verify the target parameters.
       </Typography>
-      
+
       <Box sx={{ display: 'flex', gap: 3 }}>
-        <Button 
+        <Button
           component={Link}
           to="/"
-          variant="outlined" 
+          variant="outlined"
           startIcon={<Home size={18} />}
-          sx={{ 
+          sx={{
             borderColor: 'rgba(255, 255, 255, 0.2)',
             color: '#fff',
             px: 4,
@@ -532,11 +557,11 @@ function NotFound() {
         >
           RETURN TO DASHBOARD
         </Button>
-        <Button 
+        <Button
           onClick={() => window.location.reload()}
-          variant="outlined" 
+          variant="outlined"
           startIcon={<RefreshCw size={18} />}
-          sx={{ 
+          sx={{
             borderColor: '#ff003c',
             color: '#ff003c',
             px: 4,
@@ -567,11 +592,11 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
       <AlertCircle size={80} color="#ff003c" style={{ marginBottom: 20 }} />
       <Typography variant="h3" sx={{ fontFamily: 'Orbitron', mb: 2, color: '#fff' }}>SYSTEM_CRASH</Typography>
       <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.7)', mb: 4, maxWidth: 600 }}>
-        An unexpected error occurred in the tactical interface. 
+        An unexpected error occurred in the tactical interface.
         Error: {error.message}
       </Typography>
-      <Button 
-        variant="contained" 
+      <Button
+        variant="contained"
         onClick={reset}
         sx={{ bgcolor: '#ff003c', '&:hover': { bgcolor: '#cc0030' } }}
       >

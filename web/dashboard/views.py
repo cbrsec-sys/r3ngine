@@ -314,7 +314,7 @@ def on_user_logged_in(sender, request, **kwargs):
 
 def search(request, slug):
     # Verified edit
-    return render(request, 'dashboard/search.html')
+    return render(request, 'dashboard/v3_index.html')
 
 
 def four_oh_four(request):
@@ -487,7 +487,7 @@ def onboarding(request):
         user=request.user
     )
 
-    return render(request, 'dashboard/onboarding.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 
@@ -497,7 +497,7 @@ def list_bountyhub_programs(request, slug):
     platform = request.GET.get('platform') or 'hackerone'
     context['platform'] = platform.capitalize()
     
-    return render(request, 'dashboard/bountyhub_programs.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
     
 
 def monitoring_dashboard(request, slug):
