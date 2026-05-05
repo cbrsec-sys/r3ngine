@@ -1921,6 +1921,7 @@ class ScanStatus(APIView):
 	def get(self, request):
 		req = self.request
 		slug = self.request.GET.get('project', None)
+
 		# main tasks
 		recently_completed_scans = (
 			ScanHistory.objects
@@ -1970,6 +1971,7 @@ class ScanStatus(APIView):
 				'completed': SubScanSerializer(recently_completed_tasks, many=True).data
 			}
 		}
+		
 		return Response(response)
 
 

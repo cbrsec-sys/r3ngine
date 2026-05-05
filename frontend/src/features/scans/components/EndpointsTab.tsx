@@ -317,7 +317,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
               {(!isLoading && data?.results.length === 0) && (
                 <tr>
                   <td colSpan={5} style={{ padding: '60px', textAlign: 'center' }}>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>ZERO_ENDPOINTS_DETECTED</Typography>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>ZERO ENDPOINTS DETECTED</Typography>
                   </td>
                 </tr>
               )}

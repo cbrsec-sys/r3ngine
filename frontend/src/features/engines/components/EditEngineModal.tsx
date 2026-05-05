@@ -91,7 +91,7 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Cpu size={20} style={{ color: '#00f3ff' }} />
           <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: '#fff', letterSpacing: 1 }}>
-            MODIFY_ENGINE_CONFIG
+            MODIFY ENGINE CONFIG
           </Typography>
         </Box>
         <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -107,7 +107,7 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <TextField
-              label="ENGINE_IDENTITY"
+              label="ENGINE IDENTITY"
               fullWidth
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -255,7 +255,7 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
             '&.Mui-disabled': { bgcolor: 'rgba(0,243,255,0.1)', color: 'rgba(255,255,255,0.2)' }
           }}
         >
-          {updateEngine.isPending ? 'SYNCHRONIZING...' : 'COMMIT_CHANGES'}
+          {updateEngine.isPending ? 'SYNCHRONIZING...' : 'COMMIT CHANGES'}
         </Button>
       </DialogActions>
     </Dialog>

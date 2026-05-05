@@ -5,7 +5,7 @@ import { TargetList, TargetSummary } from "./features/targets";
 import { MonitoringPage } from "./features/monitoring";
 import { EnginesPage } from "./features/engines";
 import { ProjectsPage } from "./features/projects";
-import { ScheduledScansPage, SubScansPage, ScanHistoryPage, ScanDetailPage } from "./features/scans";
+import { ScheduledScansPage, SubScansPage, ScanHistoryPage, ScanDetailPage, AttackSurfacePage } from "./features/scans";
 import { EndpointsPage } from "./features/endpoints";
 import { SubdomainsPage } from "./features/subdomains";
 import { TodoPage } from "./features/todos";
@@ -443,6 +443,13 @@ const scanDetailRoute = createRoute({
   component: ScanDetailPage,
 });
 
+// Attack Surface Route
+const attackSurfaceRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "attack_surface/$scanId",
+  component: AttackSurfacePage,
+});
+
 // Login Route
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -476,6 +483,7 @@ const routeTree = rootRoute.addChildren([
     subScansRoute,
     scansRoute,
     scanDetailRoute,
+    attackSurfaceRoute,
     endpointsRoute,
     subdomainsRoute,
     todoRoute,
@@ -507,6 +515,7 @@ export const router = createRouter({
     auth: undefined!, // This will be provided by the AuthProvider
   },
   defaultNotFoundComponent: () => <NotFound />,
+  trailingSlash: 'never',
 });
 
 // Type safety

@@ -77,6 +77,31 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
     ? `${domainNames.length} SELECTED TARGETS`
     : domainNames[0]?.toUpperCase() || 'N/A';
 
+  
+  React.useEffect(() => {
+    if (!open) return;
+    fetch('http://127.0.0.1:7744/ingest/42e8b300-a2ff-4d3c-940b-8fe098d0aaa3', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '55a681' },
+      body: JSON.stringify({
+        sessionId: '55a681',
+        runId: 'initial',
+        hypothesisId: 'H3',
+        location: 'frontend/src/features/scans/components/StartScanModal.tsx:OPEN_EFFECT',
+        message: 'StartScanModal received open=true, domainNames=' + domainNames.join(', '),
+        data: {
+          domainIdsLen: domainIds?.length || 0,
+          domainNamesLen: domainNames?.length || 0,
+          firstDomainNameLen: domainNames?.[0]?.length || 0,
+          loadingEngines
+        },
+        timestamp: Date.now()
+      })
+    }).catch(() => {});
+  }, [open, domainIds, domainNames, loadingEngines]);
+
+
+
   return (
     <Dialog
       open={open}

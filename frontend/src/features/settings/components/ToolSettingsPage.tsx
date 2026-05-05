@@ -195,7 +195,7 @@ export const ToolSettingsPage: React.FC = () => {
         </Typography>
       </Box>
 
-      <TacticalPanel title="CONFIGURATION_PANEL" sx={{ width: '100%' }}>
+      <TacticalPanel title="CONFIGURATION PANEL" sx={{ width: '100%' }}>
         <Box sx={{ borderBottom: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
           <Tabs
             value={tabValue}

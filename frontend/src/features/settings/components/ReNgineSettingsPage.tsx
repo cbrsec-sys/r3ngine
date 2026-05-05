@@ -163,14 +163,14 @@ export const ReNgineSettingsPage: React.FC = () => {
       <Stack spacing={3}>
         <Box>
           <Typography variant="h4" sx={{ color: '#fff', fontFamily: 'Orbitron', fontWeight: 900, mb: 1 }}>
-            RENGINE_SYSTEM_CONFIG
+            RENGINE SYSTEM CONFIG
           </Typography>
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
             Monitor system resources and perform global maintenance actions.
           </Typography>
         </Box>
 
-        <TacticalPanel title="STORAGE_METRICS">
+        <TacticalPanel title="STORAGE METRICS">
           <Box sx={{ 
             display: 'flex', 
             flexDirection: { xs: 'column', md: 'row' }, 
@@ -194,7 +194,7 @@ export const ReNgineSettingsPage: React.FC = () => {
                   letterSpacing: 2,
                   textTransform: 'uppercase'
                 }}>
-                  {isDanger ? 'CRITICAL_LEVEL' : (isWarning ? 'WARNING_LEVEL' : 'STABLE_LEVEL')}
+                  {isDanger ? 'CRITICAL LEVEL' : (isWarning ? 'WARNING LEVEL' : 'STABLE LEVEL')}
                 </Typography>
               </Box>
             </Box>
@@ -203,14 +203,14 @@ export const ReNgineSettingsPage: React.FC = () => {
               <Grid container spacing={3}>
                 <Grid size={{xs: 12, sm: 4}} >
                   <MetricCard 
-                    label="TOTAL_STORAGE" 
+                    label="TOTAL STORAGE" 
                     value={`${systemInfo?.total || 0} GB`} 
                     icon={<Database size={20} color="#ffd600" />} 
                   />
                 </Grid>
                 <Grid size={{xs: 12, sm: 4}} >
                   <MetricCard 
-                    label="USED_SPACE" 
+                    label="USED SPACE" 
                     value={`${systemInfo?.used || 0} GB`} 
                     icon={<HardDrive size={20} color={gaugeColor} />} 
                     statusColor={gaugeColor}
@@ -218,7 +218,7 @@ export const ReNgineSettingsPage: React.FC = () => {
                 </Grid>
                 <Grid size={{xs: 12, sm: 4}} >
                   <MetricCard 
-                    label="FREE_SPACE" 
+                    label="FREE SPACE" 
                     value={`${systemInfo?.free || 0} GB`} 
                     icon={<Database size={20} color="#00ff9d" />} 
                     statusColor="#00ff9d"
@@ -229,21 +229,21 @@ export const ReNgineSettingsPage: React.FC = () => {
           </Box>
         </TacticalPanel>
 
-        <TacticalPanel title="DANGER_ZONE" borderColor="rgba(255, 0, 85, 0.3)">
+        <TacticalPanel title="DANGER ZONE" borderColor="rgba(255, 0, 85, 0.3)">
           <Stack spacing={0} divider={<Divider sx={{ borderColor: 'rgba(255,0,85,0.1)' }} />}>
             <MaintenanceRow 
               title="Delete all scan results"
               description="Permanently remove all scan history, findings, and logs across all projects. This action is irreversible."
               onAction={handleDeleteScanResults}
               isLoading={deleteScanResults.isPending}
-              buttonLabel="PURGE_ALL_SCANS"
+              buttonLabel="PURGE ALL SCANS"
             />
             <MaintenanceRow 
               title="Delete all screenshots"
               description="Remove all captured website screenshots to free up disk space. Scan reports will no longer show visual evidence."
               onAction={handleDeleteScreenshots}
               isLoading={deleteScreenshots.isPending}
-              buttonLabel="PURGE_SCREENSHOTS"
+              buttonLabel="PURGE SCREENSHOTS"
             />
           </Stack>
         </TacticalPanel>

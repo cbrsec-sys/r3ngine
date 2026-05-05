@@ -1483,7 +1483,7 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 
 	# Spiderfoot CLI usage
 	# -s target, -m modules, -f (output format json), -o (output file), -q (quiet)
-	cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {host} {profile_cmd} -max-threads {threads} -q -f -o json -c {sf_config_path} > {output_file}"
+	cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {host} {profile_cmd} -max-threads {threads} -q -o json > {output_file}"
 	if proxy:
 		cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 	
@@ -1839,6 +1839,8 @@ def nmap(
 		description (str, optional): Task description shown in UI.
 	"""
 	notif = Notification.objects.first()
+	# Deduplicate ports
+	ports = list(dict.fromkeys(ports))
 	ports_str = ','.join(str(port) for port in ports)
 	self.filename = self.filename.replace('.txt', '.xml')
 	filename_vulns = self.filename.replace('.xml', '_vulns.json')
@@ -2487,7 +2489,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	"""Advanced Web App & API Discovery using Kiterunner, Arjun, LinkFinder, etc."""
 	logger.info('Running Web API Discovery Task')
 	config = self.yaml_configuration.get(WEB_API_DISCOVERY) or {}
-	uses_tools = ctx.get('api_discovery_tools') or config.get(USES_TOOLS, ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'inql', 'aquatone', 'semgrep'])
+	uses_tools = ctx.get('api_discovery_tools') or config.get(USES_TOOLS, ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'])
 	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
@@ -2519,8 +2521,8 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running Arjun on {url}')
 			arjun_output = f"{results_dir}/arjun_{subdomain_name}.json"
 			cmd = f"arjun -u {url} --passive -oJ {arjun_output}"
-			if proxy:
-				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
+			#if proxy:
+			# 	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(arjun_output):
 				try:
@@ -2541,7 +2543,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running Kiterunner on {url}')
 			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
 			# kr scan -w wordlist.kite -o json
-			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} --progress -o json > {kr_output}"
+			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j 5 -o json >> {kr_output}"
 			if proxy:
 				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
@@ -2563,9 +2565,11 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if 'paramspider' in uses_tools:
 			logger.info(f'Running ParamSpider on {subdomain_name}')
 			ps_output = f"{results_dir}/ps_{subdomain_name}.txt"
-			cmd = f"python3 -m paramspider --domain {subdomain_name} --output {ps_output}"
+			cmd = f"paramspider --domain {subdomain_name}"
 			if proxy:
 				cmd += f" --proxy {proxy}"
+			cmd += f" > {ps_output}"
+			print(cmd)
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(ps_output):
 				try:
@@ -2646,7 +2650,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	if 'retire' in uses_tools:
 		logger.info(f'Running Retire.js on discovery results')
 		retire_output = f"{results_dir}/retire_results.json"
-		cmd = f"retire --path {results_dir} --outputformat json --outputpath {retire_output}"
+		cmd = f"npx -y retire --path {results_dir} --outputformat json --outputpath {retire_output}"
 		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 		# Parse Retire.js results
 		if os.path.exists(retire_output):
@@ -2670,7 +2674,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		os.makedirs(aquatone_dir, exist_ok=True)
 		urls_file = f"{results_dir}/all_discovery_urls.txt"
 		# Get all endpoints discovered so far for this scan
-		all_endpoints = Endpoint.objects.filter(subdomain__scan_history=self.scan)
+		all_endpoints = EndPoint.objects.filter(subdomain__scan_history=self.scan)
 		with open(urls_file, 'w') as f:
 			for ep in all_endpoints:
 				f.write(f"{ep.http_url}\n")

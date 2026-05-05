@@ -101,7 +101,7 @@ export const WordlistList: React.FC = () => {
                     {wordlist.count.toLocaleString()}
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', letterSpacing: 1 }}>
-                    ENTRIES_DETECTED
+                    ENTRIES DETECTED
                   </Typography>
                 </Box>
               </Box>

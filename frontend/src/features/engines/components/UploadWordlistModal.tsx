@@ -78,7 +78,7 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <FileUp size={20} style={{ color: '#ff00ff' }} />
           <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: '#fff', letterSpacing: 1 }}>
-            UPLOAD_WORDLIST_PAYLOAD
+            UPLOAD WORDLIST PAYLOAD
           </Typography>
         </Box>
         <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -89,7 +89,7 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
       <DialogContent sx={{ mt: 2 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <TextField
-            label="WORDLIST_NAME"
+            label="WORDLIST NAME"
             placeholder="e.g. Awesome Wordlist"
             fullWidth
             value={name}
@@ -108,7 +108,7 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
           />
 
           <TextField
-            label="SHORT_IDENTIFIER"
+            label="SHORT IDENTIFIER"
             placeholder="e.g. awesome_wordlist"
             fullWidth
             value={shortName}
@@ -128,7 +128,7 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
 
           <Box>
             <Typography variant="caption" sx={{ color: 'rgba(255, 0, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem', mb: 1, display: 'block' }}>
-              SELECT_PAYLOAD_FILE (.TXT)
+              SELECT PAYLOAD FILE (.TXT)
             </Typography>
             <input
               type="file"
@@ -155,7 +155,7 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
               }}>
                 <Upload size={24} style={{ color: file ? '#ff00ff' : 'rgba(255,255,255,0.3)' }} />
                 <Typography sx={{ color: file ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
-                  {file ? file.name : 'CLICK_TO_SCAN_FILESYSTEM'}
+                  {file ? file.name : 'CLICK TO SCAN FILESYSTEM'}
                 </Typography>
               </Paper>
             </label>
@@ -185,7 +185,7 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
             '&.Mui-disabled': { bgcolor: 'rgba(255,0,255,0.1)', color: 'rgba(255,255,255,0.2)' }
           }}
         >
-          {uploadWordlist.isPending ? 'UPLOADING...' : 'COMMIT_PAYLOAD'}
+          {uploadWordlist.isPending ? 'UPLOADING...' : 'COMMIT PAYLOAD'}
         </Button>
       </DialogActions>
     </Dialog>

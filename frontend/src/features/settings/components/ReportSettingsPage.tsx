@@ -145,7 +145,7 @@ export const ReportSettingsPage: React.FC = () => {
           textShadow: '0 0 20px rgba(0, 243, 255, 0.5)',
           mb: 1
         }}>
-          REPORT_CALIBRATION
+          REPORT CALIBRATION
         </Typography>
         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
           CUSTOMIZE VULNERABILITY REPORT AESTHETICS & BRANDING
@@ -158,11 +158,11 @@ export const ReportSettingsPage: React.FC = () => {
           <Stack spacing={4}>
             <Box>
               <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
-                THEME_COLORS
+                THEME COLORS
               </Typography>
               <Grid container spacing={3}>
                 <Grid size={{xs: 12, sm: 6}} >
-                  <Typography variant="caption" sx={{ color: '#00f3ff', mb: 1, display: 'block', fontWeight: 600 }}>PRIMARY_COLOR</Typography>
+                  <Typography variant="caption" sx={{ color: '#00f3ff', mb: 1, display: 'block', fontWeight: 600 }}>PRIMARY COLOR</Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for Main Title, Footer Background, and Page Counters.
                   </Typography>
@@ -189,7 +189,7 @@ export const ReportSettingsPage: React.FC = () => {
                   </Box>
                 </Grid>
                 <Grid size={{xs: 12, sm: 6}} >
-                  <Typography variant="caption" sx={{ color: '#ffd600', mb: 1, display: 'block', fontWeight: 600 }}>SECONDARY_COLOR</Typography>
+                  <Typography variant="caption" sx={{ color: '#ffd600', mb: 1, display: 'block', fontWeight: 600 }}>SECONDARY COLOR</Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for the report cover background.
                   </Typography>
@@ -222,7 +222,7 @@ export const ReportSettingsPage: React.FC = () => {
 
             <Box sx={{ width: '100%' }}>
               <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
-                COMPANY_IDENTITY
+                COMPANY IDENTITY
               </Typography>
               <Stack spacing={3} sx={{ width: '100%' }}>
                 <Stack direction="row" spacing={2} sx={{ width: '100%' }}>
@@ -314,11 +314,11 @@ export const ReportSettingsPage: React.FC = () => {
         </TacticalPanel>
 
         {/* Report Content */}
-        <TacticalPanel title="REPORT_COMPONENTS" icon={<Layout size={18} />} sx={{ width: '100%' }}>
+        <TacticalPanel title="REPORT COMPONENTS" icon={<Layout size={18} />} sx={{ width: '100%' }}>
           <Stack spacing={4}>
             <Box>
               <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
-                LAYOUT_TOGGLES
+                LAYOUT TOGGLES
               </Typography>
               <Stack 
                 direction="row" 
@@ -391,12 +391,12 @@ export const ReportSettingsPage: React.FC = () => {
 
             <Box>
               <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
-                EXECUTIVE_SUMMARY_TEMPLATE
+                EXECUTIVE SUMMARY TEMPLATE
               </Typography>
 
               <Box sx={{ mb: 2, p: 2, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <Typography variant="caption" sx={{ color: '#00f3ff', fontWeight: 600, display: 'block', mb: 2, fontFamily: 'Orbitron' }}>
-                  AVAILABLE_SYNTAX (Curly braces are mandatory)
+                  AVAILABLE SYNTAX (Curly braces are mandatory)
                 </Typography>
                 <Stack spacing={1}>
                   {[
@@ -576,7 +576,7 @@ export const ReportSettingsPage: React.FC = () => {
               '&:hover': { bgcolor: '#00d8e4' }
             }}
           >
-            {updateSettings.isPending ? 'SYNCHRONIZING...' : 'UPDATE_CONFIG'}
+            {updateSettings.isPending ? 'SYNCHRONIZING...' : 'UPDATE CONFIG'}
           </Button>
         </Paper>
       </Stack>

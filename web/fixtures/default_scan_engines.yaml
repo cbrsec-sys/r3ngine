@@ -31,7 +31,7 @@
       \ ['top_default_usernames.txt', 'most_common_usernames.txt'],\n  'pass_wordlist':\
       \ ['top_default_passwords.txt', 'most_common_passwords.txt'],\n  'service':\
       \ 'http',\n  'stop_on_success': true\n}\nfirewall_vpn_scan: {\n  'run_ike_scan':\
-      \ true,\n  'threads': 20\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}\nweb_api_discovery: {\n  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'inql', 'aquatone', 'semgrep'],\n  'scan_only_active': true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite'\n}"
+      \ true,\n  'threads': 20\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}\nweb_api_discovery: {\n  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'],\n  'scan_only_active': true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite'\n}"
   model: scanEngine.enginetype
   pk: 1
 - fields:
@@ -83,8 +83,8 @@
       \ true,\n  'timeout': 5,\n  # 'exclude_ports': [],\n  # 'exclude_subdomains':\
       \ [],\n  'ports': ['top-100'],\n  'rate_limit': 150,\n  'threads': 30,
       \n  'passive': false,\n  # 'use_naabu_config': false,\n  # 'enable_nmap':\
-      \ true,\n  # 'nmap_cmd': '',\n  # 'nmap_script': '',\n  # 'nmap_script_args':\
-      \ ''\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
+      \ true,\n  # 'nmap_cmd': 'nmap -vv -Pn ',\n  # 'nmap_script': '/usr/share/nmap/scripts/vulners.nse',\n  # 'nmap_script_args':\
+      \ ''\n}"
   model: scanEngine.enginetype
   pk: 5
 - fields:
@@ -131,6 +131,6 @@
 - fields:
     default_engine: true
     engine_name: Web App & API Discovery
-    yaml_configuration: "web_api_discovery: {\n  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'inql', 'aquatone', 'semgrep'],\n  'scan_only_active': true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite'\n}\nvulnerability_scan: {\n  'run_acunetix': true\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
+    yaml_configuration: "web_api_discovery: {\n  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'],\n  'scan_only_active': true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite'\n}\nvulnerability_scan: {\n  'run_acunetix': true\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
   model: scanEngine.enginetype
   pk: 8

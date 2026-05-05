@@ -943,6 +943,12 @@ def get_nmap_cmd(
 	if not cmd:
 		cmd = 'nmap'
 
+	if ports:
+		if isinstance(ports, list):
+			ports = ','.join(list(dict.fromkeys([str(p) for p in ports])))
+		elif isinstance(ports, str):
+			ports = ','.join(list(dict.fromkeys([p.strip() for p in ports.split(',')])))
+
 	options = {
 		"-sV": service_detection,
 		"-p": ports,

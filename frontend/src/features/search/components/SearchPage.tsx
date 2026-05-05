@@ -101,7 +101,7 @@ export const SearchPage: React.FC = () => {
           mb: 4,
           textShadow: '0 0 20px rgba(0, 243, 255, 0.3)'
         }}>
-          UNIVERSAL_SEARCH
+          UNIVERSAL SEARCH
         </Typography>
 
         <form onSubmit={handleSearch}>

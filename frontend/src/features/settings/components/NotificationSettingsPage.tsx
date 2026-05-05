@@ -119,7 +119,7 @@ export const NotificationSettingsPage: React.FC = () => {
         <Grid size={{xs: 12, md: 7}} sx={{ mb: 2 }}>
           <Box>
             <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', mb: 1, letterSpacing: 2 }}>
-              NOTIFICATION_LINKS
+              NOTIFICATION LINKS
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter', maxWidth: 600 }}>
               Configure tactical relays for real-time operation updates across your infrastructure.
@@ -143,7 +143,7 @@ export const NotificationSettingsPage: React.FC = () => {
                 '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)', borderColor: '#00f3ff' }
               }}
             >
-              TEST_SIGNAL
+              TEST SIGNAL
             </Button>
             <Button
               variant="contained"
@@ -161,14 +161,14 @@ export const NotificationSettingsPage: React.FC = () => {
                 '&:hover': { bgcolor: '#00c8d4' }
               }}
             >
-              {updateSettings.isPending ? <CircularProgress size={16} color="inherit" /> : 'SAVE_CONFIG'}
+              {updateSettings.isPending ? <CircularProgress size={16} color="inherit" /> : 'SAVE CONFIG'}
             </Button>
           </Stack>
         </Grid>
 
         {/* Notification Channels */}
         <Grid size={{xs: 12, md: 7}} >
-          <TacticalPanel title="CHANNEL_CONFIG">
+          <TacticalPanel title="CHANNEL CONFIG">
             <Stack spacing={4} sx={{ p: 2 }}>
               {/* Slack */}
               <Box>
@@ -343,7 +343,7 @@ export const NotificationSettingsPage: React.FC = () => {
         {/* Triggers and Advanced */}
         <Grid size={{xs: 12, md: 5}} >
           <Stack spacing={4}>
-            <TacticalPanel title="TRIGGER_EVENTS">
+            <TacticalPanel title="TRIGGER EVENTS">
               <Stack spacing={2} sx={{ p: 2 }}>
                 {[
                   { id: 'send_scan_status_notif', label: 'Scan Status Updates', icon: <Activity size={18} /> },
@@ -383,7 +383,7 @@ export const NotificationSettingsPage: React.FC = () => {
               </Stack>
             </TacticalPanel>
 
-            <TacticalPanel title="ADVANCED_OPTIONS">
+            <TacticalPanel title="ADVANCED OPTIONS">
               <Stack spacing={2} sx={{ p: 2 }}>
                 <FormControlLabel
                   control={

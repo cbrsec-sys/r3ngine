@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Card, 
-  CardContent, 
-  TextField, 
-  Button, 
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  TextField,
+  Button,
   LinearProgress,
   Alert,
   Stack,
@@ -15,11 +15,11 @@ import {
   Divider,
   Snackbar
 } from '@mui/material';
-import { 
-  Settings, 
-  Shield, 
-  Save, 
-  Eye, 
+import {
+  Settings,
+  Shield,
+  Save,
+  Eye,
   EyeOff,
   ExternalLink,
   Zap,
@@ -116,10 +116,10 @@ export const ApiVaultPage: React.FC = () => {
           </Typography>
         </Box>
         {url && (
-          <Button 
-            href={url} 
-            target="_blank" 
-            size="small" 
+          <Button
+            href={url}
+            target="_blank"
+            size="small"
             endIcon={<ExternalLink size={12} />}
             sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', '&:hover': { color: '#00f3ff' } }}
           >
@@ -135,7 +135,7 @@ export const ApiVaultPage: React.FC = () => {
         variant="outlined"
         type={showKeys[field] ? 'text' : 'password'}
         value={(form as any)[field]}
-        onChange={(e) => setForm({ ...form, [field]: e.target.value })}
+        onChange={(e) => setForm((prev) => ({ ...prev, [field]: e.target.value }))}
         placeholder={placeholder}
         slotProps={{
           input: {
@@ -166,10 +166,10 @@ export const ApiVaultPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <Typography variant="h4" sx={{ 
-            fontFamily: 'Orbitron', 
-            fontWeight: 900, 
-            letterSpacing: 2, 
+          <Typography variant="h4" sx={{
+            fontFamily: 'Orbitron',
+            fontWeight: 900,
+            letterSpacing: 2,
             color: '#fff',
             textShadow: '0 0 20px rgba(0, 243, 255, 0.5)',
             mb: 1
@@ -186,52 +186,52 @@ export const ApiVaultPage: React.FC = () => {
       </Box>
 
       <Stack spacing={3}>
-        <Alert 
-          severity="info" 
+        <Alert
+          severity="info"
           icon={<Lock size={20} />}
-          sx={{ 
-            bgcolor: 'rgba(0, 243, 255, 0.05)', 
+          sx={{
+            bgcolor: 'rgba(0, 243, 255, 0.05)',
             color: '#00f3ff',
             border: '1px solid rgba(0, 243, 255, 0.2)',
             '& .MuiAlert-icon': { color: '#00f3ff' }
           }}
         >
-          API keys are stored securely and used across various discovery and OSINT modules. 
+          API keys are stored securely and used across various discovery and OSINT modules.
           Unleash the full power of reNgine by connecting external data sources.
         </Alert>
 
         <Grid container spacing={3}>
-          <Grid size={{xs: 12, md: 6}} >
+          <Grid size={{ xs: 12, md: 6 }} >
             <TacticalPanel title="OSINT & DISCOVERY" icon={<Globe size={20} />}>
               <Box sx={{ p: 1 }}>
-                <KeyField 
-                  label="NETLAS" 
-                  description="Used for WHOIS information and historical OSINT data." 
-                  field="netlas_key" 
+                <KeyField
+                  label="NETLAS"
+                  description="Used for WHOIS information and historical OSINT data."
+                  field="netlas_key"
                   placeholder="Enter Netlas Key"
                   icon={Search}
                   url="https://netlas.io"
                 />
-                <KeyField 
-                  label="CHAOS" 
-                  description="Used for subdomain enumeration and recon data from Project Discovery." 
-                  field="chaos_key" 
+                <KeyField
+                  label="CHAOS"
+                  description="Used for subdomain enumeration and recon data from Project Discovery."
+                  field="chaos_key"
                   placeholder="Enter Chaos Key"
                   icon={Zap}
                   url="https://cloud.projectdiscovery.io"
                 />
-                <KeyField 
-                  label="SHODAN" 
-                  description="Used for origin discovery and historical IP lookups." 
-                  field="shodan_key" 
+                <KeyField
+                  label="SHODAN"
+                  description="Used for origin discovery and historical IP lookups."
+                  field="shodan_key"
                   placeholder="Enter Shodan Key"
                   icon={Database}
                   url="https://shodan.io"
                 />
-                <KeyField 
-                  label="LEAKLOOKUP" 
-                  description="Used to search for leaked credentials and data breaches." 
-                  field="leaklookup_key" 
+                <KeyField
+                  label="LEAKLOOKUP"
+                  description="Used to search for leaked credentials and data breaches."
+                  field="leaklookup_key"
                   placeholder="Enter LeakLookup Key"
                   icon={Shield}
                   url="https://leak-lookup.com"
@@ -240,7 +240,7 @@ export const ApiVaultPage: React.FC = () => {
             </TacticalPanel>
           </Grid>
 
-          <Grid size={{xs: 12, md: 6}} >
+          <Grid size={{ xs: 12, md: 6 }} >
             <Stack spacing={3}>
               <TacticalPanel title="CENSYS CONFIGURATION" icon={<Search size={20} />}>
                 <Box sx={{ p: 1 }}>
@@ -248,14 +248,14 @@ export const ApiVaultPage: React.FC = () => {
                     Censys keys are used for origin discovery and SSL serial matching.
                   </Typography>
                   <Grid container spacing={2}>
-                    <Grid size={{xs: 12}} >
+                    <Grid size={{ xs: 12 }} >
                       <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API KEY</Typography>
                       <TextField
                         fullWidth
                         size="small"
                         type={showKeys.censys_key ? 'text' : 'password'}
                         value={form.censys_key}
-                        onChange={(e) => setForm({ ...form, censys_key: e.target.value })}
+                        onChange={(e) => setForm((prev) => ({ ...prev, censys_key: e.target.value }))}
                         placeholder="Enter Censys Platform API Key"
                         slotProps={{
                           input: {
@@ -279,10 +279,10 @@ export const ApiVaultPage: React.FC = () => {
                       />
                     </Grid>
                   </Grid>
-                  <Button 
-                    href="https://search.censys.io/account/api" 
-                    target="_blank" 
-                    size="small" 
+                  <Button
+                    href="https://search.censys.io/account/api"
+                    target="_blank"
+                    size="small"
                     startIcon={<ExternalLink size={12} />}
                     sx={{ mt: 2, color: '#00f3ff', fontSize: '10px' }}
                   >
@@ -297,13 +297,13 @@ export const ApiVaultPage: React.FC = () => {
                     Used to import targets, bookmarked programs, and submit automated reports.
                   </Typography>
                   <Grid container spacing={2}>
-                    <Grid size={{xs: 12}} >
+                    <Grid size={{ xs: 12 }} >
                       <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>USERNAME (NOT EMAIL)</Typography>
                       <TextField
                         fullWidth
                         size="small"
                         value={form.hackerone_username}
-                        onChange={(e) => setForm({ ...form, hackerone_username: e.target.value })}
+                        onChange={(e) => setForm((prev) => ({ ...prev, hackerone_username: e.target.value }))}
                         placeholder="Enter Hackerone Username"
                         sx={{
                           '& .MuiOutlinedInput-root': {
@@ -315,14 +315,14 @@ export const ApiVaultPage: React.FC = () => {
                         }}
                       />
                     </Grid>
-                    <Grid size={{xs: 12}} >
+                    <Grid size={{ xs: 12 }} >
                       <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API TOKEN</Typography>
                       <TextField
                         fullWidth
                         size="small"
                         type={showKeys.hackerone_key ? 'text' : 'password'}
                         value={form.hackerone_key}
-                        onChange={(e) => setForm({ ...form, hackerone_key: e.target.value })}
+                        onChange={(e) => setForm((prev) => ({ ...prev, hackerone_key: e.target.value }))}
                         placeholder="Enter Hackerone Token"
                         slotProps={{
                           input: {
@@ -347,10 +347,10 @@ export const ApiVaultPage: React.FC = () => {
                     </Grid>
                   </Grid>
                   <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                    <Button 
-                      href="https://hackerone.com/settings/api_token/edit" 
-                      target="_blank" 
-                      size="small" 
+                    <Button
+                      href="https://hackerone.com/settings/api_token/edit"
+                      target="_blank"
+                      size="small"
                       startIcon={<ExternalLink size={12} />}
                       sx={{ color: '#00f3ff', fontSize: '10px' }}
                     >
@@ -366,13 +366,13 @@ export const ApiVaultPage: React.FC = () => {
                     Connect your Acunetix instance for automated vulnerability scanning.
                   </Typography>
                   <Grid container spacing={2}>
-                    <Grid size={{xs: 12}} >
+                    <Grid size={{ xs: 12 }} >
                       <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>SERVER URL</Typography>
                       <TextField
                         fullWidth
                         size="small"
                         value={form.acunetix_url}
-                        onChange={(e) => setForm({ ...form, acunetix_url: e.target.value })}
+                        onChange={(e) => setForm((prev) => ({ ...prev, acunetix_url: e.target.value }))}
                         placeholder="https://acunetix.example.com:3443"
                         sx={{
                           '& .MuiOutlinedInput-root': {
@@ -384,14 +384,14 @@ export const ApiVaultPage: React.FC = () => {
                         }}
                       />
                     </Grid>
-                    <Grid size={{xs: 12}} >
+                    <Grid size={{ xs: 12 }} >
                       <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API KEY</Typography>
                       <TextField
                         fullWidth
                         size="small"
                         type={showKeys.acunetix_key ? 'text' : 'password'}
                         value={form.acunetix_key}
-                        onChange={(e) => setForm({ ...form, acunetix_key: e.target.value })}
+                        onChange={(e) => setForm((prev) => ({ ...prev, acunetix_key: e.target.value }))}
                         placeholder="Enter Acunetix API Key"
                         slotProps={{
                           input: {
@@ -443,18 +443,18 @@ export const ApiVaultPage: React.FC = () => {
         </Box>
       </Stack>
 
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
           variant="filled"
-          sx={{ 
-            fontFamily: 'Orbitron', 
+          sx={{
+            fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
             bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',

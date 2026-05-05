@@ -11,7 +11,8 @@ import {
   LinearProgress,
   Alert,
   Stack,
-  Snackbar
+  Snackbar,
+  CircularProgress
 } from '@mui/material';
 import { 
   Settings, 
@@ -98,9 +99,26 @@ export const ProxySettingsPage: React.FC = () => {
 
   const handleFetch = () => {
     if (window.confirm('This will fetch new proxies and update the list. Existing list will be replaced if you save. Continue?')) {
+      setSnackbar({
+        open: true,
+        message: 'Initiating proxy fetch task...',
+        severity: 'success'
+      });
       fetchProxies.mutate(undefined, {
         onSuccess: (data) => {
           setCurrentTaskId(data.task_id);
+          setSnackbar({
+            open: true,
+            message: 'Proxy fetch task started. Monitoring progress...',
+            severity: 'success'
+          });
+        },
+        onError: (error: any) => {
+          setSnackbar({
+            open: true,
+            message: `Failed to start proxy fetch: ${error?.response?.data?.error || error?.response?.data?.message || error.message || 'Unknown error'}`,
+            severity: 'error'
+          });
         }
       });
     }
@@ -195,26 +213,45 @@ export const ProxySettingsPage: React.FC = () => {
               }}
             />
 
-            {currentTaskId && taskStatus && (
-              <Box sx={{ mt: 3 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="caption" sx={{ color: '#00f3ff', fontWeight: 800 }}>
-                    {taskStatus.message || 'Processing...'}
+            {currentTaskId && (
+              <Box sx={{ mb: 4, p: 2, bgcolor: 'rgba(255, 255, 255, 0.02)', borderRadius: 1, border: '1px solid rgba(0, 243, 255, 0.1)' }}>
+                <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
+                  {(!taskStatus || taskStatus.status === 'PROGRESS' || taskStatus.status === 'PENDING') ? (
+                    <CircularProgress size={20} sx={{ color: '#00f3ff' }} />
+                  ) : taskStatus.status === 'SUCCESS' ? (
+                    <CheckCircle2 size={20} color="#00ff00" />
+                  ) : (
+                    <AlertCircle size={20} color="#ff0055" />
+                  )}
+                  <Box sx={{ flexGrow: 1 }}>
+                    <Typography variant="subtitle2" sx={{ color: '#fff', fontFamily: 'Orbitron', mb: 0.5 }}>
+                      {taskStatus?.message || 'Initializing task...'}
+                    </Typography>
+                    <LinearProgress 
+                      variant="determinate" 
+                      value={taskStatus?.progress || 0} 
+                      sx={{ 
+                        height: 6, 
+                        borderRadius: 3,
+                        bgcolor: 'rgba(255, 255, 255, 0.05)',
+                        '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' }
+                      }} 
+                    />
+                  </Box>
+                  <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)', fontFamily: 'Orbitron' }}>
+                    {taskStatus?.progress || 0}%
                   </Typography>
-                  <Typography variant="caption" sx={{ color: '#fff' }}>
-                    {taskStatus.progress || 0}%
-                  </Typography>
-                </Box>
-                <LinearProgress 
-                  variant="determinate" 
-                  value={taskStatus.progress || 0} 
-                  sx={{ 
-                    height: 6, 
-                    borderRadius: 3,
-                    bgcolor: 'rgba(255,255,255,0.05)',
-                    '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' }
-                  }} 
-                />
+                </Stack>
+                {taskStatus?.status === 'SUCCESS' && (
+                  <Alert severity="success" sx={{ bgcolor: 'rgba(0, 255, 0, 0.05)', color: '#00ff00', border: '1px solid rgba(0, 255, 0, 0.2)' }}>
+                    Proxies fetched and verified. Review the list below and click SAVE to apply changes.
+                  </Alert>
+                )}
+                {taskStatus?.status === 'FAILURE' && (
+                  <Alert severity="error" sx={{ bgcolor: 'rgba(255, 0, 0, 0.05)', color: '#ff0055', border: '1px solid rgba(255, 0, 0, 0.2)' }}>
+                    Task failed: {taskStatus.result || 'Unknown error during verification'}
+                  </Alert>
+                )}
               </Box>
             )}
 

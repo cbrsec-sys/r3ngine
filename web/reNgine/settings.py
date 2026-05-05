@@ -259,7 +259,9 @@ LOGGING = {
         'file': {
             'level': 'ERROR',
             'class': 'logging.FileHandler',
-            'filename': 'errors.log',
+            # In containers, the working directory may not be writable.
+            # Use a universally writable path to avoid boot-time logging failures.
+            'filename': '/tmp/errors.log',
         },
         'null': {
             'class': 'logging.NullHandler'

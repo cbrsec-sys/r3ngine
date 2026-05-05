@@ -120,11 +120,11 @@ export const OnboardingPage: React.FC = () => {
               color: '#fff',
               textShadow: '0 0 20px rgba(0, 243, 255, 0.5)'
             }}>
-              INITIAL_SETUP
+              INITIAL SETUP
             </Typography>
           </Stack>
           <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.6)', letterSpacing: 1 }}>
-            INITIALIZING_RENGINE_ENVIRONMENT_V3
+            INITIALIZING R3NGINE ENVIRONMENT V3
           </Typography>
         </Box>
 
@@ -199,7 +199,7 @@ export const OnboardingPage: React.FC = () => {
               }
             }}>
               <Typography sx={SECTION_TITLE_STYLE}>
-                <UserPlus size={18} /> OPERATOR_PROVISIONING
+                <UserPlus size={18} /> OPERATOR PROVISIONING
               </Typography>
               <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mb: 3 }}>
                 Create an additional system operator with specific access privileges.
@@ -276,12 +276,12 @@ export const OnboardingPage: React.FC = () => {
               }
             }}>
               <Typography sx={SECTION_TITLE_STYLE}>
-                <Shield size={18} /> OPERATIONAL_MODE
+                <Shield size={18} /> OPERATIONAL MODE
               </Typography>
               <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
                 <Box>
                   <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 600 }}>
-                    BUG_BOUNTY_MODE
+                    BUG BOUNTY MODE
                   </Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
                     Enables HackerOne integration and specialized target importing.
@@ -321,7 +321,7 @@ export const OnboardingPage: React.FC = () => {
               }
             }}>
               <Typography sx={SECTION_TITLE_STYLE}>
-                <Key size={18} /> API_VAULT_SYNCHRONIZATION
+                <Key size={18} /> API VAULT SYNCHRONIZATION
               </Typography>
               <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mb: 3 }}>
                 Configure external service keys to enhance reconnaissance and reporting.
@@ -405,7 +405,7 @@ export const OnboardingPage: React.FC = () => {
                   }
                 }}
               >
-                {onboardingMutation.isPending ? 'SYNCHRONIZING...' : 'INITIALIZE_SYSTEM'}
+                {onboardingMutation.isPending ? 'SYNCHRONIZING...' : 'INITIALIZE SYSTEM'}
               </Button>
             </Box>
           </Stack>
@@ -414,7 +414,7 @@ export const OnboardingPage: React.FC = () => {
         {/* Footer info */}
         <Box sx={{ mt: 8, mb: 4, textAlign: 'center', opacity: 0.5 }}>
           <Typography variant="caption" sx={{ letterSpacing: 1, color: '#fff' }}>
-            RENGINE_V3 // SECURE_INITIALIZATION_PROTOCOL_ACTIVE
+            R3NGINE V3 // SECURE INITIALIZATION PROTOCOL ACTIVE
           </Typography>
         </Box>
       </Box>

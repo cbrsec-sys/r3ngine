@@ -83,6 +83,16 @@
   - **Scan Detail Header Action**: Added a primary "RESCAN" button to the Scan Detail header, allowing users to quickly restart discovery from the summary view.
   - **UI/UX Stability**: Resolved critical state race conditions where menu actions would fail due to premature cleanup of active identifiers.
   - **Modular Scan Initiation**: Correctly linked all Rescan triggers to the `StartScanModal` and `useInitiateScan` orchestration layer, ensuring full parity with standard manual scan initiation.
+- **Integrated Attack Surface Map Navigation**: 
+  - Properly integrated the Attack Surface Map feature into the Scan History page.
+  - Replaced the broken `window.open` placeholder with a dedicated, SPA-managed `AttackSurfacePage`.
+  - Implemented a new route `/$projectSlug/attack_surface/$scanId` to host the cytoscape-based visualization.
+  - Enhanced the UI with navigation breadcrumbs and scan-specific metadata for better context.
+- **Proxy & Vault Persistence Stability**:
+  - Resolved missing `CircularProgress` import in `ProxySettingsPage.tsx` that caused frontend build failures.
+  - Fixed Acunetix (AWVS) configuration persistence bug by correctly mapping `acunetix_url` and `acunetix_key` in the `useUpdateApiVault` mutation.
+  - Synchronized frontend `FormData` keys with backend expectations (`key_acunetix_url`, `key_acunetix_key`).
+  - Improved UI responsiveness for rescan actions and proxy fetching with immediate Snackbar feedback.
 
 ### Bug Fixes
 - **Login/Logout Stability**: Resolved a critical "white page" crash by optimizing Vite development script loading in `v3_index.html` and expanding the `vite.config.ts` proxy to correctly handle authentication endpoints.
@@ -91,6 +101,8 @@
 - **LLM Report Generation Dependency**: Fixed a `TypeError` in `create_report` where the `LLMReportGenerator` was missing its required `logger` dependency.
 - **Version Badge Persistence**: Resolved a UI bug where the version badge would disappear shortly after page load by adding `rengine_version` to the dashboard API serializer and implementing defensive state updates.
 - **Report Layout Refinements**: Fixed an issue in the Modern PDF report where the Table of Contents list would jump to a new page, leaving the title orphaned. Refactored TOC styles to use a more stable layout and added page-break avoidance rules.
+- **Celery Task Resilience**: Resolved a `TypeError` in `RengineTask.write_results` caused by tasks returning boolean values. Implemented safe type checking and string casting for all task results.
+- **Dockerfile Architecture Stability**: Fixed a bug in the Trivy installation logic where it hardcoded 32-bit binaries instead of using the detected system architecture.
 - **Django System Check Cleanup**: Resolved the `(fields.W340)` warning by removing redundant `null=True` parameters from `ManyToManyField` definitions in `EndPoint` models.
 
 

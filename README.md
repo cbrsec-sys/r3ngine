@@ -92,8 +92,10 @@ A robust, unified security layer ensuring data integrity and access control.
 *   **Regex Safety**: Secure regex handling across search and filtering modules to prevent Denial of Service (ReDoS) attacks.
 *   **Vulnerability Dashboard Refinements**: Native support for externally synchronized findings with verified metadata.
 
+- **Multi-Architecture Build Optimization**: Resolved critical architecture conflicts in the Docker build process, ensuring correct tool installation (e.g., Trivy) across both 64-bit and ARM64 systems.
 ### 🔬 External Tool Orchestration (Acunetix & ReconX)
 Version 3.0 introduces deep integration with high-impact external security tools, allowing reNgine to act as a centralized controller.
+- **Celery Task Resilience Engine**: Hardened the core task execution wrapper to handle non-standard tool outputs and boolean results, preventing pipeline crashes during massive scan orchestrations.
 *   **Acunetix (AWVS) Integration**:
     *   **Automated Provisioning**: Automatically add targets and initiate scans on your managed Acunetix instances.
     *   **Finding Ingestion**: Native transformer to map Acunetix vulnerabilities into reNgine's enterprise reports.
@@ -210,6 +212,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 * Add external tools from GitHub/Go
 * Interoperable with other tools, Import/Export Subdomains/Endpoints
 * **Intelligent Rescan Orchestration**: Unified rescan capabilities across Scan History, Scan Detail, and Target Management views, with pre-populated configuration logic.
+* **Integrated Attack Surface Map Navigation**: Dedicated SPA page for high-fidelity infrastructure visualization directly from scan history.
 * Report Generation
 * Toolbox: cms detector, CVE lookup, dork generator, etc.
 * **LLM Toolkit**: Dedicated settings for AI models and automated analysis.

@@ -197,7 +197,7 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
               {data.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={2} align="center" sx={{ py: 4, border: 'none', opacity: 0.5 }}>
-                    <Typography variant="caption" sx={{ letterSpacing: 1 }}>NO_NODES_DETECTED</Typography>
+                    <Typography variant="caption" sx={{ letterSpacing: 1 }}>NO NODES DETECTED</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
