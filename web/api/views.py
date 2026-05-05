@@ -52,6 +52,7 @@ logger = logging.getLogger(__name__)
 
 
 class ToggleBugBountyModeView(APIView):
+	permission_classes = [IsAuthenticated]
 	"""
 		This class manages the user bug bounty mode
 	"""
@@ -65,6 +66,7 @@ class ToggleBugBountyModeView(APIView):
 
 
 class UpdateThemeView(APIView):
+	permission_classes = [IsAuthenticated]
 	"""
 		This class manages the user theme and intensity
 	"""
@@ -85,6 +87,7 @@ class UpdateThemeView(APIView):
 
 
 class HackerOneProgramViewSet(viewsets.ViewSet):
+	permission_classes = [IsPenetrationTester]
 	"""
 		This class manages the HackerOne Program model, 
 		provides basic fetching of programs and caching
@@ -299,6 +302,7 @@ class HackerOneProgramViewSet(viewsets.ViewSet):
 			return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 class InAppNotificationManagerViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsAuthenticated]
 	"""
 		This class manages the notification model, provided CRUD operation on notif model
 		such as read notif, clear all, fetch all notifications etc
@@ -443,6 +447,7 @@ class OllamaManager(APIView):
 
 
 class GPTAttackSuggestion(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		subdomain_id = req.query_params.get('subdomain_id')
@@ -494,6 +499,7 @@ class GPTAttackSuggestion(APIView):
 
 
 class LLMVulnerabilityReportGenerator(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		vulnerability_id = req.query_params.get('id')
@@ -558,6 +564,7 @@ class CreateProjectApi(APIView):
 
 
 class QueryInterestingSubdomains(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -576,6 +583,7 @@ class QueryInterestingSubdomains(APIView):
 
 
 class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	queryset = Domain.objects.all()
 	serializer_class = DomainSerializer
 
@@ -616,6 +624,7 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 
 
 class MonitoringDiscoveryViewSet(viewsets.ModelViewSet):
+    permission_classes = [IsPenetrationTester]
     queryset = MonitoringDiscovery.objects.all()
     serializer_class = MonitoringDiscoverySerializer
 
@@ -645,6 +654,7 @@ class MonitoringDiscoveryViewSet(viewsets.ModelViewSet):
 
 
 class WafDetector(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		url= req.query_params.get('url')
@@ -670,6 +680,7 @@ class WafDetector(APIView):
 
 
 class SearchHistoryView(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 
@@ -686,6 +697,7 @@ class SearchHistoryView(APIView):
 
 
 class UniversalSearch(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		query = req.query_params.get('query')
@@ -739,6 +751,7 @@ class UniversalSearch(APIView):
 
 
 class FetchMostCommonVulnerability(APIView):
+	permission_classes = [IsPenetrationTester]
 	def post(self, request):
 		req = self.request
 		data = req.data
@@ -824,6 +837,7 @@ class FetchMostCommonVulnerability(APIView):
 
 
 class FetchMostVulnerable(APIView):
+	permission_classes = [IsPenetrationTester]
 	def post(self, request):
 		req = self.request
 		data = req.data
@@ -927,6 +941,7 @@ class FetchMostVulnerable(APIView):
 
 
 class CVEDetails(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 
@@ -947,6 +962,7 @@ class CVEDetails(APIView):
 
 
 class AddReconNote(APIView):
+	permission_classes = [IsPenetrationTester]
 	def post(self, request):
 		req = self.request
 		data = req.data
@@ -982,6 +998,7 @@ class AddReconNote(APIView):
 
 
 class ToggleSubdomainImportantStatus(APIView):
+	permission_classes = [IsPenetrationTester]
 	def post(self, request):
 		req = self.request
 		data = req.data
@@ -1045,6 +1062,7 @@ class AddTarget(APIView):
 
 
 class FetchSubscanResults(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		# data = req.data
@@ -1091,6 +1109,7 @@ class FetchSubscanResults(APIView):
 
 
 class ListSubScans(APIView):
+	permission_classes = [IsAuditor]
 	def post(self, request):
 		req = self.request
 		data = req.data
@@ -1573,6 +1592,7 @@ class DeleteVulnerability(APIView):
 
 
 class ListInterestingKeywords(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request, format=None):
 		req = self.request
 		keywords = get_lookup_keywords()
@@ -1580,6 +1600,7 @@ class ListInterestingKeywords(APIView):
 
 
 class RengineUpdateCheck(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		github_api = \
@@ -1896,6 +1917,7 @@ class GithubToolCheckGetLatestRelease(APIView):
 
 
 class ScanStatus(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		slug = self.request.GET.get('project', None)
@@ -1952,6 +1974,7 @@ class ScanStatus(APIView):
 
 
 class Whois(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		target = req.query_params.get('target')
@@ -1968,6 +1991,7 @@ class Whois(APIView):
 
 
 class ReverseWhois(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		lookup_keyword = req.query_params.get('lookup_keyword')
@@ -1977,6 +2001,7 @@ class ReverseWhois(APIView):
 
 
 class DomainIPHistory(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		domain = req.query_params.get('domain')
@@ -1986,6 +2011,7 @@ class DomainIPHistory(APIView):
 
 
 class CMSDetector(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		url = req.query_params.get('url')
@@ -2042,6 +2068,7 @@ class CMSDetector(APIView):
 
 
 class IPToDomain(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		ip_address = req.query_params.get('ip_address')
@@ -2081,6 +2108,7 @@ class IPToDomain(APIView):
 
 
 class VulnerabilityReport(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request):
 		req = self.request
 		vulnerability_id = req.query_params.get('vulnerability_id')
@@ -2088,6 +2116,7 @@ class VulnerabilityReport(APIView):
 
 
 class GetFileContents(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request, format=None):
 		req = self.request
 		name = req.query_params.get('name')
@@ -2186,6 +2215,7 @@ class GetFileContents(APIView):
 
 
 class ListTodoNotes(APIView):
+	permission_classes = [IsPenetrationTester]
 	def get(self, request, format=None):
 		req = self.request
 		notes = TodoNote.objects.all().order_by('-id')
@@ -2209,6 +2239,7 @@ class ListTodoNotes(APIView):
 
 
 class ListScanHistory(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_history = ScanHistory.objects.all().order_by('-start_scan_date')
@@ -2220,6 +2251,7 @@ class ListScanHistory(APIView):
 
 
 class ListEngines(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		engines = EngineType.objects.order_by('engine_name').all()
@@ -2228,6 +2260,7 @@ class ListEngines(APIView):
 
 
 class ListOrganizations(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		organizations = Organization.objects.all()
@@ -2297,6 +2330,7 @@ class UpdateOrganization(APIView):
 
 
 class ListWordlists(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		wordlists = Wordlist.objects.all()
 		wordlist_serializer = WordlistSerializer(wordlists, many=True)
@@ -2304,6 +2338,7 @@ class ListWordlists(APIView):
 
 
 class ListConfigurations(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		configurations = Configuration.objects.all()
 		configuration_serializer = ConfigurationSerializer(configurations, many=True)
@@ -2311,6 +2346,7 @@ class ListConfigurations(APIView):
 
 
 class ListTargetsInOrganization(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		organization_id = req.query_params.get('organization_id')
@@ -2322,6 +2358,7 @@ class ListTargetsInOrganization(APIView):
 
 
 class ListTargetsWithoutOrganization(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		targets = Domain.objects.exclude(domains__in=Organization.objects.all())
@@ -2330,6 +2367,7 @@ class ListTargetsWithoutOrganization(APIView):
 
 
 class VisualiseData(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -2346,6 +2384,7 @@ class VisualiseData(APIView):
 
 
 class ListTechnology(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -2374,6 +2413,7 @@ class ListTechnology(APIView):
 
 
 class ListDorkTypes(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -2392,6 +2432,7 @@ class ListDorkTypes(APIView):
 
 
 class ListEmails(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -2403,6 +2444,7 @@ class ListEmails(APIView):
 
 
 class ListDorks(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -2426,6 +2468,7 @@ class ListDorks(APIView):
 
 
 class ListEmployees(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -2437,6 +2480,7 @@ class ListEmployees(APIView):
 
 
 class ListPorts(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -2466,6 +2510,7 @@ class ListPorts(APIView):
 
 
 class ListSubdomains(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -2525,6 +2570,7 @@ class ListSubdomains(APIView):
 
 
 class ListOsintUsers(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -2535,6 +2581,7 @@ class ListOsintUsers(APIView):
 
 
 class ListMetadata(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -2545,6 +2592,7 @@ class ListMetadata(APIView):
 
 
 class ListIPs(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -2575,6 +2623,7 @@ class ListIPs(APIView):
 
 
 class IpAddressViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	queryset = Subdomain.objects.none()
 	serializer_class = IpSubdomainSerializer
 
@@ -2599,6 +2648,7 @@ class IpAddressViewSet(viewsets.ModelViewSet):
 
 
 class SubdomainsViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	queryset = Subdomain.objects.none()
 	serializer_class = SubdomainSerializer
 
@@ -2621,6 +2671,7 @@ class SubdomainsViewSet(viewsets.ModelViewSet):
 
 
 class SubdomainChangesViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	'''
 		This viewset will return the Subdomain changes
 		To get the new subdomains, we will look for ScanHistory with
@@ -2703,6 +2754,7 @@ class SubdomainChangesViewSet(viewsets.ModelViewSet):
 
 
 class EndPointChangesViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	'''
 		This viewset will return the EndPoint changes
 	'''
@@ -2774,6 +2826,7 @@ class EndPointChangesViewSet(viewsets.ModelViewSet):
 
 
 class InterestingSubdomainViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	queryset = Subdomain.objects.none()
 	serializer_class = SubdomainSerializer
 
@@ -2828,6 +2881,7 @@ class InterestingSubdomainViewSet(viewsets.ModelViewSet):
 
 
 class InterestingEndpointViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	queryset = EndPoint.objects.none()
 	serializer_class = EndpointSerializer
 
@@ -2852,6 +2906,7 @@ class InterestingEndpointViewSet(viewsets.ModelViewSet):
 
 
 class SubdomainDatatableViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	queryset = Subdomain.objects.none()
 	serializer_class = SubdomainSerializer
 
@@ -3109,6 +3164,7 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 
 
 class ListActivityLogsViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	serializer_class = CommandSerializer
 	queryset = Command.objects.none()
 	def get_queryset(self):
@@ -3119,6 +3175,7 @@ class ListActivityLogsViewSet(viewsets.ModelViewSet):
 
 
 class ListScanLogsViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	serializer_class = CommandSerializer
 	queryset = Command.objects.none()
 	def get_queryset(self):
@@ -3129,6 +3186,7 @@ class ListScanLogsViewSet(viewsets.ModelViewSet):
 
 
 class ListEndpoints(APIView):
+	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 
@@ -3167,6 +3225,7 @@ class ListEndpoints(APIView):
 
 
 class EndPointViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	queryset = EndPoint.objects.none()
 	serializer_class = EndpointSerializer
 
@@ -3416,6 +3475,7 @@ class EndPointViewSet(viewsets.ModelViewSet):
 
 
 class DirectoryViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	queryset = DirectoryFile.objects.none()
 	serializer_class = DirectoryFileSerializer
 
@@ -3444,6 +3504,7 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 
 
 class VulnerabilityViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
 	queryset = Vulnerability.objects.none()
 	serializer_class = VulnerabilitySerializer
 

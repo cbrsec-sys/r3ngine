@@ -209,6 +209,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 * Edit tool-related configuration files (Nuclei, Subfinder, Naabu, amass, SpiderFoot)
 * Add external tools from GitHub/Go
 * Interoperable with other tools, Import/Export Subdomains/Endpoints
+* **Intelligent Rescan Orchestration**: Unified rescan capabilities across Scan History, Scan Detail, and Target Management views, with pre-populated configuration logic.
 * Report Generation
 * Toolbox: cms detector, CVE lookup, dork generator, etc.
 * **LLM Toolkit**: Dedicated settings for AI models and automated analysis.

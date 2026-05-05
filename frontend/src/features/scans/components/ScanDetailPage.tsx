@@ -74,7 +74,8 @@ import {
   Users,
   Key,
   X,
-  Copy
+  Copy,
+  RefreshCw
 } from 'lucide-react';
 import { useScanSummary, useActivityLogs } from '../api';
 import Chart from 'react-apexcharts';
@@ -89,6 +90,7 @@ import { SecretLeaksTab } from './SecretLeaksTab';
 import { AttackSurfaceTab } from './AttackSurfaceTab';
 import VisualizationTab from './VisualizationTab';
 import { ScanReportModal } from './ScanReportModal';
+import { StartScanModal } from './StartScanModal';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   const configs: any = {
@@ -746,6 +748,7 @@ export const ScanDetailPage = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [startScanTargets, setStartScanTargets] = useState<{ ids: number[]; names: string[] } | null>(null);
   const [taskOverlayOpen, setTaskOverlayOpen] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<{ id: number; title: string } | null>(null);
 
@@ -1222,6 +1225,23 @@ export const ScanDetailPage = () => {
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
             <Button
               variant="contained"
+              startIcon={<RefreshCw size={16} />}
+              onClick={() => setStartScanTargets({ ids: [data.target_info.id], names: [data.target_info.name] })}
+              sx={{
+                bgcolor: 'rgba(0, 255, 98, 0.1)',
+                color: '#00ff62',
+                border: '1px solid rgba(0, 255, 98, 0.3)',
+                fontFamily: 'Orbitron',
+                fontSize: '0.65rem',
+                fontWeight: 900,
+                px: 2,
+                '&:hover': { bgcolor: 'rgba(0, 255, 98, 0.2)' }
+              }}
+            >
+              RESCAN
+            </Button>
+            <Button
+              variant="contained"
               startIcon={<FileText size={16} />}
               onClick={() => setReportModalOpen(true)}
               sx={{
@@ -1399,6 +1419,16 @@ export const ScanDetailPage = () => {
         activityId={selectedActivity?.id || null}
         activityTitle={selectedActivity?.title || ''}
       />
+
+      {startScanTargets && (
+        <StartScanModal 
+          open={!!startScanTargets}
+          onClose={() => setStartScanTargets(null)}
+          domainIds={startScanTargets.ids}
+          domainNames={startScanTargets.names}
+          projectSlug={projectSlug}
+        />
+      )}
     </Box>
   );
 };

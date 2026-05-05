@@ -55,6 +55,7 @@ import {
 } from '../api';
 import { useParams, Link as RouterLink } from '@tanstack/react-router';
 import { ScanReportModal } from './ScanReportModal';
+import { StartScanModal } from './StartScanModal';
 
 export const ScanHistoryPage: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
@@ -71,6 +72,7 @@ export const ScanHistoryPage: React.FC = () => {
   const [activeScanId, setActiveScanId] = React.useState<number | null>(null);
   const [reportScanId, setReportScanId] = React.useState<number | null>(null);
   const [reportModalOpen, setReportModalOpen] = React.useState(false);
+  const [rescanTarget, setRescanTarget] = React.useState<{ ids: number[]; names: string[] } | null>(null);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, id: number) => {
     setAnchorEl(event.currentTarget);
@@ -148,9 +150,7 @@ export const ScanHistoryPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', mb: 1, letterSpacing: '0.1rem', textShadow: '0 0 15px rgba(0, 243, 255, 0.3)' }}>
-            SCAN HISTORY
-          </Typography>
+          <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN_HISTORY [DEBUG]</Typography>
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
             MANAGE AND AUDIT PAST SECURITY OPERATIONS
           </Typography>
@@ -416,14 +416,27 @@ export const ScanHistoryPage: React.FC = () => {
           <Settings size={14} /> SHOW CONFIGS
         </MenuItem>
         <MenuItem onClick={() => {
-          handleMenuClose();
           window.open(`/${projectSlug}/attack_surface/${activeScanId}/`, '_blank');
+          handleMenuClose();
         }}>
           <Share2 size={14} /> ATTACK SURFACE
         </MenuItem>
         <MenuItem onClick={() => {
+          console.log('RESCAN clicked, activeScanId:', activeScanId);
+          if (activeScanId) {
+            const scan = scans?.find(s => s.id === activeScanId);
+            console.log('Found scan:', scan);
+            if (scan && scan.domain) {
+              console.log('Setting rescanTarget for domain:', scan.domain);
+              setRescanTarget({
+                ids: [scan.domain.id],
+                names: [scan.domain.name]
+              });
+            } else {
+              console.warn('Scan or domain not found for rescan');
+            }
+          }
           handleMenuClose();
-          // Logic for rescan
         }}>
           <RefreshCw size={14} /> RESCAN
         </MenuItem>
@@ -462,6 +475,16 @@ export const ScanHistoryPage: React.FC = () => {
             setReportScanId(null);
           }}
           scanId={reportScanId}
+        />
+      )}
+
+      {rescanTarget && (
+        <StartScanModal 
+          open={!!rescanTarget}
+          onClose={() => setRescanTarget(null)}
+          domainIds={rescanTarget.ids}
+          domainNames={rescanTarget.names}
+          projectSlug={projectSlug}
         />
       )}
     </Box>

@@ -213,8 +213,10 @@ WORKDIR /usr/src/github/spiderfoot
 RUN pip3 install -r requirements.txt
 WORKDIR /usr/src/app
 
-# Install Retire.js (NOTE! geckodriver is installed, chromium is causing conflicts)
-RUN apt install -y npm && npm install -g retire
+# Install Node.js 20 and Retire.js
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt install -y nodejs && \
+    npm install -g retire
 
 # Setup Eyewitness
 RUN git clone https://github.com/RedSiege/EyeWitness /usr/src/github/EyeWitness && \
@@ -252,6 +254,13 @@ RUN pip3 install --no-cache-dir fuzzywuzzy \
     python-Levenshtein \
     pyvirtualdisplay \
     netaddr
+
+# Install Frontend Dependencies (for Dev mode)
+RUN mkdir -p /usr/src/app/frontend
+WORKDIR /usr/src/app/frontend
+COPY frontend/package*.json ./
+RUN npm install --legacy-peer-deps
+WORKDIR /usr/src/app
 
 # Copy source code
 COPY web/ /usr/src/app/

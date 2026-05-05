@@ -2520,7 +2520,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			arjun_output = f"{results_dir}/arjun_{subdomain_name}.json"
 			cmd = f"arjun -u {url} --passive -oJ {arjun_output}"
 			if proxy:
-				cmd += f" --proxy {proxy}"
+				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(arjun_output):
 				try:
@@ -2541,7 +2541,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running Kiterunner on {url}')
 			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
 			# kr scan -w wordlist.kite -o json
-			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} --concurrency {threads} -o json > {kr_output}"
+			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} --progress -o json > {kr_output}"
 			if proxy:
 				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
@@ -2563,7 +2563,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if 'paramspider' in uses_tools:
 			logger.info(f'Running ParamSpider on {subdomain_name}')
 			ps_output = f"{results_dir}/ps_{subdomain_name}.txt"
-			cmd = f"python3 /usr/src/github/ParamSpider/paramspider.py --domain {subdomain_name} --output {ps_output}"
+			cmd = f"python3 -m paramspider --domain {subdomain_name} --output {ps_output}"
 			if proxy:
 				cmd += f" --proxy {proxy}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)

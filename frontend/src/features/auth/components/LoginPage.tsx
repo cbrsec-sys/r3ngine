@@ -72,16 +72,21 @@ export const LoginPage: React.FC = () => {
         maxWidth: 400,
         bgcolor: 'rgba(10, 10, 15, 0.9)',
         backdropFilter: 'blur(20px)',
-        border: '1px solid rgba(0, 243, 255, 0.3)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: 4,
         p: 4,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        boxShadow: '0 0 40px rgba(0, 243, 255, 0.2)'
+        boxShadow: '0 0 40px rgba(0, 0, 0, 0.4)',
+        transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
+        '&:hover': {
+          borderColor: 'rgba(0, 243, 255, 0.3)',
+          boxShadow: '0 0 50px rgba(0, 243, 255, 0.1)'
+        }
       }}>
         <Box sx={{ mb: 3, textAlign: 'center' }}>
-          <img src="/img/r3ngine_logo.png" alt="reNgine Logo" style={{ height: 80, marginBottom: 16 }} />
+          <img src="/staticfiles/img/r3ngine_logo.png" alt="reNgine Logo" style={{ height: 80, marginBottom: 16 }} />
           <Typography variant="h5" sx={{ 
             fontFamily: 'Orbitron', 
             fontWeight: 900, 
@@ -99,9 +104,10 @@ export const LoginPage: React.FC = () => {
         <Alert severity="info" sx={{ 
           width: '100%', 
           mb: 3, 
-          bgcolor: 'rgba(0, 243, 255, 0.1)', 
+          bgcolor: 'rgba(0, 243, 255, 0.05)', 
           color: '#00f3ff',
-          border: '1px solid rgba(0, 243, 255, 0.2)',
+          border: '1px solid rgba(0, 243, 255, 0.15)',
+          borderRadius: 2,
           '& .MuiAlert-icon': { color: '#00f3ff' }
         }}>
           <Link href="https://rengine.wiki" target="_blank" sx={{ color: 'inherit', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none' }}>
@@ -134,10 +140,11 @@ export const LoginPage: React.FC = () => {
                     </InputAdornment>
                   ),
                   sx: {
-                    bgcolor: 'rgba(255, 255, 255, 0.05)',
+                    bgcolor: 'rgba(255, 255, 255, 0.03)',
                     color: '#fff',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.5)' },
+                    borderRadius: 2,
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.08)' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.3)' },
                     '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' }
                   }
                 }
@@ -171,10 +178,11 @@ export const LoginPage: React.FC = () => {
                     </InputAdornment>
                   ),
                   sx: {
-                    bgcolor: 'rgba(255, 255, 255, 0.05)',
+                    bgcolor: 'rgba(255, 255, 255, 0.03)',
                     color: '#fff',
-                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.1)' },
-                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.5)' },
+                    borderRadius: 2,
+                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.08)' },
+                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.3)' },
                     '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' }
                   }
                 }
@@ -189,13 +197,23 @@ export const LoginPage: React.FC = () => {
             disabled={loginMutation.isPending}
             sx={{ 
               py: 1.5,
-              bgcolor: '#00f3ff',
-              color: '#000',
+              background: 'linear-gradient(135deg, #00f3ff 0%, #7000ff 100%)',
+              color: '#fff',
               fontFamily: 'Orbitron',
               fontWeight: 900,
-              letterSpacing: 1,
-              '&:hover': { bgcolor: '#00d4df' },
-              '&.Mui-disabled': { bgcolor: 'rgba(0, 243, 255, 0.3)', color: 'rgba(0, 0, 0, 0.5)' }
+              letterSpacing: 2,
+              clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)',
+              transition: 'all 0.3s ease',
+              '&:hover': { 
+                background: 'linear-gradient(135deg, #00f3ff 20%, #7000ff 80%)',
+                filter: 'drop-shadow(0 0 10px rgba(0, 243, 255, 0.5))',
+                transform: 'translateY(-2px)'
+              },
+              '&.Mui-disabled': { 
+                background: 'rgba(0, 243, 255, 0.1)', 
+                color: 'rgba(255, 255, 255, 0.3)',
+                clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)'
+              }
             }}
           >
             {loginMutation.isPending ? 'AUTHENTICATING...' : 'LOG IN'}

@@ -16,7 +16,9 @@ import {
   Tooltip,
   TextField,
   InputAdornment,
-  Button
+  Button,
+  Menu,
+  MenuItem
 } from '@mui/material';
 import { 
   Search, 
@@ -39,6 +41,19 @@ export const ScanList: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: scans, isLoading } = useScans(projectSlug);
   const [isStartScanModalOpen, setIsStartScanModalOpen] = React.useState(false);
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [activeScanId, setActiveScanId] = React.useState<number | null>(null);
+  const [rescanTarget, setRescanTarget] = React.useState<{ ids: number[]; names: string[] } | null>(null);
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, id: number) => {
+    setAnchorEl(event.currentTarget);
+    setActiveScanId(id);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setActiveScanId(null);
+  };
 
   const getStatusChip = (status: number) => {
     switch (status) {
@@ -199,7 +214,11 @@ export const ScanList: React.FC = () => {
                           </IconButton>
                         </Tooltip>
                       )}
-                      <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                      <IconButton 
+                        size="small" 
+                        onClick={(e) => handleMenuOpen(e, scan.id)}
+                        sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                      >
                         <MoreVertical size={16} />
                       </IconButton>
                     </Box>
@@ -210,6 +229,68 @@ export const ScanList: React.FC = () => {
           </Table>
         </TableContainer>
       </Card>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#0d0c14',
+              border: '1px solid rgba(0, 243, 255, 0.2)',
+              borderRadius: 0,
+              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+              minWidth: 200,
+              '& .MuiMenuItem-root': {
+                fontFamily: 'Orbitron',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                color: 'rgba(255,255,255,0.8)',
+                gap: 1.5,
+                py: 1.2,
+                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)', color: '#00f3ff' },
+                '& svg': { color: 'rgba(0, 243, 255, 0.5)' }
+              }
+            }
+          }
+        }}
+      >
+        <MenuItem onClick={() => {
+          console.log('RESCAN clicked (ScanList), activeScanId:', activeScanId);
+          if (activeScanId) {
+            const scan = scans?.find(s => s.id === activeScanId);
+            console.log('Found scan (ScanList):', scan);
+            if (scan && scan.domain) {
+              setRescanTarget({
+                ids: [scan.domain.id],
+                names: [scan.domain.name]
+              });
+            }
+          }
+          handleMenuClose();
+        }}>
+          <RefreshCw size={14} /> RESCAN
+        </MenuItem>
+        <MenuItem onClick={() => {
+          if (activeScanId) {
+            // handle stop scan if needed
+          }
+          handleMenuClose();
+        }}>
+          <StopCircle size={14} /> STOP SCAN
+        </MenuItem>
+      </Menu>
+
+      {rescanTarget && (
+        <StartScanModal 
+          open={!!rescanTarget}
+          onClose={() => setRescanTarget(null)}
+          domainIds={rescanTarget.ids}
+          domainNames={rescanTarget.names}
+          projectSlug={projectSlug}
+        />
+      )}
     </Box>
   );
 };

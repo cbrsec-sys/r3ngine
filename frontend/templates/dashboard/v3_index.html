@@ -11,16 +11,17 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     
-    {% if debug %}
+    {% if debug and VITE_ENABLED %}
     <script type="module">
-      import RefreshRuntime from 'https://localhost:5173/@react-refresh'
+      // Vite React HMR Preamble
+      import RefreshRuntime from '{{ VITE_DEV_SERVER_URL }}/@react-refresh'
       RefreshRuntime.injectIntoGlobalHook(window)
       window.$RefreshReg$ = () => {}
       window.$RefreshSig$ = () => (type) => type
       window.__vite_plugin_react_preamble_installed__ = true
     </script>
-    <script type="module" src="https://localhost:5173/@vite/client"></script>
-    <script type="module" src="https://localhost:5173/src/main.tsx"></script>
+    <script type="module" src="{{ VITE_DEV_SERVER_URL }}/@vite/client"></script>
+    <script type="module" src="{{ VITE_DEV_SERVER_URL }}/src/main.tsx"></script>
     {% else %}
     <link rel="stylesheet" href="{% static 'assets/index.css' %}">
     <script type="module" src="{% static 'assets/index.js' %}"></script>
