@@ -7,7 +7,7 @@
   <h3 align="center">Official v3 Rebirth: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
 </p>
 
-<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.1-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
+<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=Xk_YH83IQgg" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--Asia-2023-blue.svg?logo=none" alt="" /></a>&nbsp;
@@ -27,9 +27,9 @@
 <a href="https://opensourcesecurityindex.io/" target="_blank" rel="noopener">
 <img style="width: 282px; height: 56px" src="https://opensourcesecurityindex.io/badge.svg" alt="Open Source Security Index - Fastest Growing Open Source Security Projects" width="282" height="56" /> </a>
 </p>
-<h4>r3ngine 3.0.1 is released!</h4>
+<h4>r3ngine 3.0.0 is released!</h4>
 <p>
-  r3ngine 3.0.1 marks the official branding transition and production stabilization. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Interactive KPI Reports</b> with internal navigation, and <b>Scoped Attack Surface Visualization</b>. Built on the massive v3.0 core, it includes the <b>Advanced Web App & API Discovery Pipeline</b>, full <b>Spiderfoot OSINT Integration</b>, and a dedicated <b>LLM Toolkit</b> for AI-assisted vulnerability analysis.
+  r3ngine 3.0.0 marks the official rebirth and production stabilization. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Interactive KPI Reports</b> with internal navigation, and <b>Scoped Attack Surface Visualization</b>. Built on the massive v3.0 core, it includes the <b>Advanced Web App & API Discovery Pipeline</b>, full <b>Spiderfoot OSINT Integration</b>, and a dedicated <b>LLM Toolkit</b> for AI-assisted vulnerability analysis.
 </p>
 
 <h4>What is r3ngine?</h4>
