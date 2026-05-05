@@ -11,7 +11,9 @@ import {
   CircularProgress,
   Divider,
   Paper,
-  InputAdornment
+  InputAdornment,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import {
   FileText,
@@ -66,14 +68,43 @@ export const ReportSettingsPage: React.FC = () => {
     footer_text: ''
   });
 
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+
   useEffect(() => {
     if (settings) {
       setForm(settings);
     }
   }, [settings]);
 
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
   const handleSave = () => {
-    updateSettings.mutate(form);
+    updateSettings.mutate(form, {
+      onSuccess: () => {
+        setSnackbar({
+          open: true,
+          message: 'Report settings updated successfully.',
+          severity: 'success',
+        });
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: `Failed to update report settings: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          severity: 'error',
+        });
+      },
+    });
   };
 
   const handleFormat = (prefix: string, suffix: string = '') => {
@@ -549,6 +580,29 @@ export const ReportSettingsPage: React.FC = () => {
           </Button>
         </Paper>
       </Stack>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

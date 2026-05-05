@@ -15,7 +15,8 @@ import {
   InputAdornment,
   Divider,
   Paper,
-  Tooltip
+  Tooltip,
+  Snackbar
 } from '@mui/material';
 import { 
   Cpu, 
@@ -60,6 +61,15 @@ export const LlmToolkitPage: React.FC = () => {
     is_active: false
   });
   const [pullingModel, setPullingModel] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
   
   const { data: models, isLoading: isModelsLoading } = useLlmModels(
     projectSlug, 
@@ -106,10 +116,26 @@ export const LlmToolkitPage: React.FC = () => {
 
   // Handle pull completion
   useEffect(() => {
-    if (pullStatus?.status === 'success' || pullStatus?.status === 'failed') {
+    if (pullStatus?.status === 'success') {
+      setSnackbar({
+        open: true,
+        message: `Model ${pullingModel} downloaded successfully.`,
+        severity: 'success',
+      });
+      setTimeout(() => setPullingModel(null), 5000);
+    } else if (pullStatus?.status === 'failed') {
+      setSnackbar({
+        open: true,
+        message: `Failed to download model ${pullingModel}.`,
+        severity: 'error',
+      });
       setTimeout(() => setPullingModel(null), 5000);
     }
   }, [pullStatus?.status]);
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
 
   const handleProviderChange = (provider: string) => {
     setSelectedProvider(provider);
@@ -127,8 +153,26 @@ export const LlmToolkitPage: React.FC = () => {
       onSuccess: (data) => {
         if (data.status === 'pulling') {
           setPullingModel(form.selected_model);
+          setSnackbar({
+            open: true,
+            message: `Initiating download for ${form.selected_model}...`,
+            severity: 'info',
+          });
+        } else {
+          setSnackbar({
+            open: true,
+            message: `${selectedProvider.toUpperCase()} configuration saved successfully.`,
+            severity: 'success',
+          });
         }
-      }
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: `Failed to update LLM settings: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          severity: 'error',
+        });
+      },
     });
   };
 
@@ -490,6 +534,29 @@ export const LlmToolkitPage: React.FC = () => {
           </Grid>
         )}
       </Grid>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : snackbar.severity === 'info' ? 'rgba(0, 243, 255, 0.7)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

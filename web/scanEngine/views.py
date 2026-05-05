@@ -725,8 +725,7 @@ def api_vault(request, slug):
         key_hackerone = request.POST.get('key_hackerone')
         username_hackerone = request.POST.get('username_hackerone')
         key_shodan = request.POST.get('key_shodan')
-        key_censys_id = request.POST.get('key_censys_id')
-        key_censys_secret = request.POST.get('key_censys_secret')
+        key_censys = request.POST.get('key_censys')
         key_acunetix_url = request.POST.get('key_acunetix_url')
         key_acunetix_key = request.POST.get('key_acunetix_key')
 
@@ -775,16 +774,14 @@ def api_vault(request, slug):
             else:
                 ShodanAPIKey.objects.create(key=key_shodan)
 
-        if key_censys_id and key_censys_secret:
+        if key_censys:
             censys_api_key = CensysAPIKey.objects.first()
             if censys_api_key:
-                censys_api_key.api_id = key_censys_id
-                censys_api_key.api_secret = key_censys_secret
+                censys_api_key.api_key = key_censys
                 censys_api_key.save()
             else:
                 CensysAPIKey.objects.create(
-                    api_id=key_censys_id,
-                    api_secret=key_censys_secret
+                    api_key=key_censys
                 )
 
         key_leaklookup = request.POST.get('key_leaklookup')
@@ -848,8 +845,7 @@ def api_vault(request, slug):
             'netlas_key': netlas_key.key if netlas_key else "",
             'chaos_key': chaos_key.key if chaos_key else "",
             'shodan_key': shodan_key.key if shodan_key else "",
-            'censys_id': censys_key.api_id if censys_key else "",
-            'censys_secret': censys_key.api_secret if censys_key else "",
+            'censys_key': censys_key.api_key if censys_key else "",
             'leaklookup_key': context['leaklookup_key'].key if context['leaklookup_key'] else "",
             'hackerone_username': hackerone_username or "",
             'hackerone_key': hackerone_key or "",

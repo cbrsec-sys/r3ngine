@@ -213,6 +213,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 * Toolbox: cms detector, CVE lookup, dork generator, etc.
 * **LLM Toolkit**: Dedicated settings for AI models and automated analysis.
 * **Cyberpunk V3 UI**: Glassmorphic Neon dashboard with improved readability.
+* **Standardized Notification System**: Tactical MUI Snackbar-driven feedback for all administrative and configuration actions.
 * **Advanced Web App & API Discovery Pipeline**: Integrated Arjun, Kiterunner, ParamSpider, LinkFinder, InQL.
 * **Semgrep-Powered Analysis**: Automated static analysis for JS and GraphQL.
 * **OpSec Settings**: UA rotation, stealth presets, and WAF bypass.

@@ -66,8 +66,7 @@ export const OnboardingPage: React.FC = () => {
     key_hackerone: '',
     username_hackerone: '',
     key_shodan: '',
-    key_censys_id: '',
-    key_censys_secret: '',
+    key_censys: '',
     bug_bounty_mode: false,
   });
 
@@ -364,7 +363,7 @@ export const OnboardingPage: React.FC = () => {
                     onChange={(e) => setForm({ ...form, key_hackerone: e.target.value })}
                   />
                 </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <TextField
                     fullWidth
                     label="Shodan Key"
@@ -372,21 +371,14 @@ export const OnboardingPage: React.FC = () => {
                     onChange={(e) => setForm({ ...form, key_shodan: e.target.value })}
                   />
                 </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <TextField
                     fullWidth
-                    label="Censys ID"
-                    value={form.key_censys_id}
-                    onChange={(e) => setForm({ ...form, key_censys_id: e.target.value })}
-                  />
-                </Grid>
-                <Grid size={{ xs: 12, md: 4 }}>
-                  <TextField
-                    fullWidth
-                    label="Censys Secret"
+                    label="Censys Platform API Key"
                     type="password"
-                    value={form.key_censys_secret}
-                    onChange={(e) => setForm({ ...form, key_censys_secret: e.target.value })}
+                    value={form.key_censys}
+                    onChange={(e) => setForm({ ...form, key_censys: e.target.value })}
+                    helperText="Required for origin discovery and enhanced reconnaissance."
                   />
                 </Grid>
               </Grid>

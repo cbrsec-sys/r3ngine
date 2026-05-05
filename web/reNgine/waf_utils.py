@@ -17,18 +17,16 @@ class OriginDiscoveryManager:
         self.subdomain = subdomain_obj
         self.domain = subdomain_obj.name
         self.shodan_key = self._get_shodan_key()
-        self.censys_id, self.censys_secret = self._get_censys_credentials()
+        self.censys_key = self._get_censys_key()
         self.opsec = OpSecManager()
 
     def _get_shodan_key(self):
         key_obj = ShodanAPIKey.objects.first()
         return key_obj.key if key_obj else None
 
-    def _get_censys_credentials(self):
+    def _get_censys_key(self):
         key_obj = CensysAPIKey.objects.first()
-        if key_obj:
-            return key_obj.api_id, key_obj.api_secret
-        return None, None
+        return key_obj.api_key if key_obj else None
 
     def find_origin(self, use_shodan=True, use_censys=True, use_heuristics=True):
         results = set()
@@ -36,7 +34,7 @@ class OriginDiscoveryManager:
         if use_shodan and self.shodan_key:
             results.update(self._query_shodan())
             
-        if use_censys and self.censys_id:
+        if use_censys and self.censys_key:
             results.update(self._query_censys())
             
         if use_heuristics:
@@ -73,15 +71,16 @@ class OriginDiscoveryManager:
     def _query_censys(self):
         ips = []
         try:
-            # Query by domain
-            url = "https://search.censys.io/api/v2/hosts/search"
+            from censys.platform import CensysPlatform
+            # Initialize Censys Platform client with the single API key
+            cp = CensysPlatform(api_key=self.censys_key)
             query = f"services.tls.certificates.leaf_data.names: {self.domain}"
-            auth = (self.censys_id, self.censys_secret)
-            response = requests.get(url, params={'q': query}, auth=auth, timeout=10)
-            if response.status_code == 200:
-                data = response.json()
-                for result in data.get('result', {}).get('hits', []):
-                    ips.append(result.get('ip'))
+            
+            # The new Platform API uses search.hosts and returns an iterator of results
+            # We take the first page of results (usually enough for origin discovery)
+            results = cp.search.hosts(query)
+            for hit in results.view(pages=1):
+                ips.append(hit.get('ip'))
         except Exception as e:
             logger.error(f"Censys query failed for {self.domain}: {str(e)}")
         return ips
@@ -107,17 +106,28 @@ class OriginDiscoveryManager:
         return ips
 
     def _get_ssl_serial(self):
+        """
+        Retrieves the SSL certificate serial number for the target domain.
+        Used for origin discovery via Shodan.
+        """
         try:
+            from cryptography import x509
+            from cryptography.hazmat.backends import default_backend
+            
             hostname = self.domain
             ctx = ssl.create_default_context()
+            # Disable verification as we only need the serial metadata
+            # Origin IPs often have self-signed or expired certificates
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
+            
             with socket.create_connection((hostname, 443), timeout=5) as sock:
                 with ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
-                    cert = ssock.getpeercert(True)
-                    cert_dict = ssl.DER_cert_to_PEM_cert(cert)
-                    # We need the serial number. ssl module doesn't provide it easily from DER.
-                    # This is a simplification. In production, we'd use 'cryptography' library.
-                    return None 
-        except:
+                    cert_der = ssock.getpeercert(binary_form=True)
+                    cert = x509.load_der_x509_certificate(cert_der, default_backend())
+                    return cert.serial_number
+        except Exception as e:
+            logger.debug(f"SSL serial retrieval failed for {self.domain}: {str(e)}")
             return None
 
 class WafBypassOrchestrator:

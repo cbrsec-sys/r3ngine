@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -8,7 +8,8 @@ import {
   Divider,
   Alert,
   CircularProgress,
-  Grid
+  Grid,
+  Snackbar
 } from '@mui/material';
 import { 
   Trash2, 
@@ -29,14 +30,35 @@ export const ReNgineSettingsPage: React.FC = () => {
   const { data: systemInfo, isLoading } = useRengineSystemSettings();
   const deleteScanResults = useDeleteAllScanResults();
   const deleteScreenshots = useDeleteAllScreenshots();
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
 
   const handleDeleteScanResults = async () => {
     if (window.confirm('CRITICAL: This will permanently delete all scan history and results. This action cannot be undone. Proceed?')) {
       try {
         await deleteScanResults.mutateAsync();
-        alert('All scan results have been deleted.');
+        setSnackbar({
+          open: true,
+          message: 'All scan results have been deleted.',
+          severity: 'success',
+        });
       } catch (err) {
-        alert('Failed to initiate deletion.');
+        setSnackbar({
+          open: true,
+          message: 'Failed to initiate deletion of scan results.',
+          severity: 'error',
+        });
       }
     }
   };
@@ -45,9 +67,17 @@ export const ReNgineSettingsPage: React.FC = () => {
     if (window.confirm('WARNING: This will permanently delete all screenshots. Proceed?')) {
       try {
         await deleteScreenshots.mutateAsync();
-        alert('All screenshots have been deleted.');
+        setSnackbar({
+          open: true,
+          message: 'All screenshots have been deleted.',
+          severity: 'success',
+        });
       } catch (err) {
-        alert('Failed to initiate deletion.');
+        setSnackbar({
+          open: true,
+          message: 'Failed to initiate deletion of screenshots.',
+          severity: 'error',
+        });
       }
     }
   };
@@ -231,6 +261,29 @@ export const ReNgineSettingsPage: React.FC = () => {
           System maintenance actions affect all projects globally. Ensure you have backups before performing purge operations.
         </Alert>
       </Stack>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -10,7 +10,8 @@ import {
   Button, 
   LinearProgress,
   Alert,
-  Stack
+  Stack,
+  Snackbar
 } from '@mui/material';
 import { 
   Settings, 
@@ -33,6 +34,15 @@ export const ProxySettingsPage: React.FC = () => {
   const [useProxy, setUseProxy] = useState(false);
   const [proxyList, setProxyList] = useState('');
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   const { data: taskStatus } = useProxyTaskStatus(projectSlug, currentTaskId);
 
@@ -47,11 +57,43 @@ export const ProxySettingsPage: React.FC = () => {
     if (taskStatus?.status === 'SUCCESS' && taskStatus.result) {
       setProxyList(taskStatus.result);
       setUseProxy(true);
+      setSnackbar({
+        open: true,
+        message: 'Proxy list updated from fetch task.',
+        severity: 'success',
+      });
+      setCurrentTaskId(null);
+    } else if (taskStatus?.status === 'FAILURE') {
+      setSnackbar({
+        open: true,
+        message: 'Failed to fetch proxies automatically.',
+        severity: 'error',
+      });
+      setCurrentTaskId(null);
     }
   }, [taskStatus]);
 
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
   const handleSave = () => {
-    updateSettings.mutate({ use_proxy: useProxy, proxies: proxyList });
+    updateSettings.mutate({ use_proxy: useProxy, proxies: proxyList }, {
+      onSuccess: () => {
+        setSnackbar({
+          open: true,
+          message: 'Proxy settings saved successfully.',
+          severity: 'success',
+        });
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: `Failed to save proxy settings: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          severity: 'error',
+        });
+      },
+    });
   };
 
   const handleFetch = () => {
@@ -213,6 +255,29 @@ export const ProxySettingsPage: React.FC = () => {
           </Box>
         </TacticalPanel>
       </Stack>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

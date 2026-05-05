@@ -12,7 +12,8 @@ import {
   Grid,
   InputAdornment,
   IconButton,
-  Divider
+  Divider,
+  Snackbar
 } from '@mui/material';
 import { 
   Settings, 
@@ -41,8 +42,7 @@ export const ApiVaultPage: React.FC = () => {
     netlas_key: '',
     chaos_key: '',
     shodan_key: '',
-    censys_id: '',
-    censys_secret: '',
+    censys_key: '',
     leaklookup_key: '',
     hackerone_username: '',
     hackerone_key: '',
@@ -51,6 +51,15 @@ export const ApiVaultPage: React.FC = () => {
   });
 
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   useEffect(() => {
     if (settings) {
@@ -58,8 +67,7 @@ export const ApiVaultPage: React.FC = () => {
         netlas_key: settings.netlas_key || '',
         chaos_key: settings.chaos_key || '',
         shodan_key: settings.shodan_key || '',
-        censys_id: settings.censys_id || '',
-        censys_secret: settings.censys_secret || '',
+        censys_key: settings.censys_key || '',
         leaklookup_key: settings.leaklookup_key || '',
         hackerone_username: settings.hackerone_username || '',
         hackerone_key: settings.hackerone_key || '',
@@ -73,8 +81,27 @@ export const ApiVaultPage: React.FC = () => {
     setShowKeys(prev => ({ ...prev, [field]: !prev[field] }));
   };
 
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
   const handleSave = () => {
-    updateSettings.mutate(form);
+    updateSettings.mutate(form, {
+      onSuccess: () => {
+        setSnackbar({
+          open: true,
+          message: 'API Vault updated successfully.',
+          severity: 'success',
+        });
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: `Failed to update API Vault: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          severity: 'error',
+        });
+      },
+    });
   };
 
   if (isLoading) return <LinearProgress sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />;
@@ -222,38 +249,20 @@ export const ApiVaultPage: React.FC = () => {
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid size={{xs: 12}} >
-                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API ID</Typography>
+                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API KEY</Typography>
                       <TextField
                         fullWidth
                         size="small"
-                        value={form.censys_id}
-                        onChange={(e) => setForm({ ...form, censys_id: e.target.value })}
-                        placeholder="Enter Censys API ID"
-                        sx={{
-                          '& .MuiOutlinedInput-root': {
-                            color: '#fff',
-                            bgcolor: 'rgba(255,255,255,0.02)',
-                            fontFamily: 'monospace',
-                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                          }
-                        }}
-                      />
-                    </Grid>
-                    <Grid size={{xs: 12}} >
-                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API SECRET</Typography>
-                      <TextField
-                        fullWidth
-                        size="small"
-                        type={showKeys.censys_secret ? 'text' : 'password'}
-                        value={form.censys_secret}
-                        onChange={(e) => setForm({ ...form, censys_secret: e.target.value })}
-                        placeholder="Enter Censys Secret"
+                        type={showKeys.censys_key ? 'text' : 'password'}
+                        value={form.censys_key}
+                        onChange={(e) => setForm({ ...form, censys_key: e.target.value })}
+                        placeholder="Enter Censys Platform API Key"
                         slotProps={{
                           input: {
                             endAdornment: (
                               <InputAdornment position="end">
-                                <IconButton onClick={() => toggleVisibility('censys_secret')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                                  {showKeys.censys_secret ? <EyeOff size={16} /> : <Eye size={16} />}
+                                <IconButton onClick={() => toggleVisibility('censys_key')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                                  {showKeys.censys_key ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </IconButton>
                               </InputAdornment>
                             ),
@@ -277,7 +286,7 @@ export const ApiVaultPage: React.FC = () => {
                     startIcon={<ExternalLink size={12} />}
                     sx={{ mt: 2, color: '#00f3ff', fontSize: '10px' }}
                   >
-                    GET CENSYS KEYS
+                    GET CENSYS KEY
                   </Button>
                 </Box>
               </TacticalPanel>
@@ -433,6 +442,29 @@ export const ApiVaultPage: React.FC = () => {
           </Button>
         </Box>
       </Stack>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -16,7 +16,8 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
-  InputAdornment
+  InputAdornment,
+  Snackbar
 } from '@mui/material';
 import { 
   Settings, 
@@ -43,6 +44,15 @@ export const OpSecSettingsPage: React.FC = () => {
   
   const [formData, setFormData] = useState<OpSecSettings | null>(null);
   const [activePreset, setActivePreset] = useState<string | null>(localStorage.getItem('rengine-opsec-preset'));
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   useEffect(() => {
     if (settings) {
@@ -112,9 +122,28 @@ export const OpSecSettingsPage: React.FC = () => {
     localStorage.setItem('rengine-opsec-preset', preset);
   };
 
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
   const handleSave = () => {
     if (formData) {
-      updateSettings.mutate(formData);
+      updateSettings.mutate(formData, {
+        onSuccess: () => {
+          setSnackbar({
+            open: true,
+            message: 'OpSec settings updated successfully.',
+            severity: 'success',
+          });
+        },
+        onError: (error: any) => {
+          setSnackbar({
+            open: true,
+            message: `Failed to update OpSec settings: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+            severity: 'error',
+          });
+        },
+      });
     }
   };
 
@@ -383,6 +412,29 @@ export const OpSecSettingsPage: React.FC = () => {
           </Button>
         </Box>
       </Stack>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

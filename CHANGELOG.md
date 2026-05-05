@@ -28,6 +28,17 @@
 - **On-Demand Model Loading**: Optimized the AI Hub by fetching available models only when the dropdown is clicked, reducing initial page load overhead.
 - **Legacy API Vault Sync**: Automatically migrates existing OpenAI keys from the legacy API Vault to the new AI Hub configuration.
 - **404 Page Enhancement**: Added an Interdimensional Rabbit Hole background image for the 404 page.
+- **Production-Ready SSL Serial Retrieval**: Implemented a robust `_get_ssl_serial` function in `waf_utils.py` using the `cryptography` library for reliable origin discovery via Shodan.
+  - **Standardized Notification System (Snackbar)**: 
+    - Replaced legacy `alert()` dialogs with consistent, non-intrusive MUI `Snackbar` and `Alert` components across all settings modules.
+    - Implemented state-driven feedback for critical actions in `ApiVault`, `ProxySettings`, `ReportSettings`, `OpSecSettings`, `LlmToolkit`, `SystemSettings`, and `AdminSettings`.
+    - Enhanced error handling with detailed feedback from backend mutation responses.
+    - Unified notification visuals with the "Cyberpunk" design language (Orbitron font, filled severity backgrounds).
+- **Modernized Censys Platform Integration**: 
+  - Migrated from legacy Search v2 (Basic Auth) to the latest **Censys Platform API (2026 standards)** using Personal Access Tokens (Bearer authentication).
+  - Updated the `CensysAPIKey` database model to support a single-key schema.
+  - Refactored `OriginDiscoveryManager` to utilize the `censys-platform` SDK for more reliable host lookups and origin discovery.
+  - Streamlined the API Vault and Onboarding UI for single-key configuration.
 - **Scoped Attack Surface Visualization**: Refactored the Neo4j ingestion and retrieval pipeline to support scan-specific and target-specific scoping:
   - Introduced `Scan` nodes in Neo4j to anchor assets to specific execution contexts.
   - Implemented target-level graph aggregation with color-coded scan distinction in the UI.

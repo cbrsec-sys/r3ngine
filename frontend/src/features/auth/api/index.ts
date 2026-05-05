@@ -29,8 +29,7 @@ export interface OnboardingData {
   key_hackerone?: string;
   username_hackerone?: string;
   key_shodan?: string;
-  key_censys_id?: string;
-  key_censys_secret?: string;
+  key_censys?: string;
   bug_bounty_mode: boolean;
 }
 

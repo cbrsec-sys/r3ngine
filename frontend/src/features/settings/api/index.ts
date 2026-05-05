@@ -81,8 +81,7 @@ export interface ApiVaultSettings {
   netlas_key: string;
   chaos_key: string;
   shodan_key: string;
-  censys_id: string;
-  censys_secret: string;
+  censys_key: string;
   leaklookup_key: string;
   hackerone_username: string;
   hackerone_key: string;
@@ -436,8 +435,7 @@ export const useUpdateApiVault = (slug: string) => {
       formData.append('key_netlas', data.netlas_key);
       formData.append('key_chaos', data.chaos_key);
       formData.append('key_shodan', data.shodan_key);
-      formData.append('key_censys_id', data.censys_id);
-      formData.append('key_censys_secret', data.censys_secret);
+      formData.append('key_censys', data.censys_key);
       formData.append('key_leaklookup', data.leaklookup_key);
       formData.append('username_hackerone', data.hackerone_username);
       formData.append('key_hackerone', data.hackerone_key);
