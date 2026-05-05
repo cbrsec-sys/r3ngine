@@ -1,5 +1,6 @@
 import markdown
 import requests
+import logging
 
 from celery import group
 from weasyprint import HTML, CSS
@@ -23,18 +24,21 @@ from reNgine.tasks import create_scan_activity, initiate_scan, run_command
 from scanEngine.models import EngineType
 from startScan.models import *
 from targetApp.models import *
+from reNgine.graph_utils import Neo4jManager
+
+logger = logging.getLogger(__name__)
 
 
 def scan_history(request, slug):
     host = ScanHistory.objects.filter(domain__project__slug=slug).order_by('-start_scan_date')
     context = {'scan_history_active': 'active', "scan_history": host}
-    return render(request, 'startScan/history.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def subscan_history(request, slug):
     subscans = SubScan.objects.filter(scan_history__domain__project__slug=slug).order_by('-start_scan_date')
     context = {'scan_history_active': 'active', "subscans": subscans}
-    return render(request, 'startScan/subscan_history.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def detail_scan(request, id, slug):
@@ -222,7 +226,7 @@ def detail_scan(request, id, slug):
         last_scan = last_scans.order_by('-start_scan_date')[1]
         ctx['last_scan'] = last_scan
 
-    return render(request, 'startScan/detail_scan.html', ctx)
+    return render(request, 'dashboard/v3_index.html', ctx)
 
 
 def all_subdomains(request, slug):
@@ -237,14 +241,15 @@ def all_subdomains(request, slug):
         .count()
     )
     context = {
-        'scan_history_id': id,
+        'current_project': get_object_or_404(Project, slug=slug),
+        'scan_history_id': '',
         'scan_history_active': 'active',
         'scan_engines': scan_engines,
         'subdomain_count': subdomains.values('name').distinct().count(),
         'alive_count': alive_subdomains.values('name').distinct().count(),
         'important_count': important_subdomains
     }
-    return render(request, 'startScan/subdomains.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 def detail_vuln_scan(request, slug, id=None):
     if id:
@@ -253,14 +258,14 @@ def detail_vuln_scan(request, slug, id=None):
         context = {'scan_history_id': id, 'history': history}
     else:
         context = {'vuln_scan_active': 'true'}
-    return render(request, 'startScan/vulnerabilities.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def all_endpoints(request, slug):
     context = {
         'scan_history_active': 'active'
     }
-    return render(request, 'startScan/endpoints.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 @has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
 def start_scan_ui(request, slug, domain_id):
@@ -365,7 +370,7 @@ def start_scan_ui(request, slug, domain_id):
         'starting_point_path': starting_point_path,
         'selected_engine_id': selected_engine_id,
     }
-    return render(request, 'startScan/start_scan_ui.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
@@ -454,7 +459,7 @@ def start_multiple_scan(request, slug):
         'custom_engine_count': custom_engine_count,
         'excluded_paths': excluded_paths
     }
-    return render(request, 'startScan/start_multiple_scan_ui.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 def export_subdomains(request, scan_id):
     subdomain_list = Subdomain.objects.filter(scan_history__id=scan_id)
@@ -507,7 +512,7 @@ def delete_scan(request, id):
     obj = get_object_or_404(ScanHistory, id=id)
     if request.method == "POST":
         delete_dir = obj.results_dir
-        run_command('rm -rf ' + delete_dir)
+        run_command.run('rm -rf ' + delete_dir, shell=True)
         obj.delete()
         messageData = {'status': 'true'}
         messages.add_message(
@@ -706,7 +711,7 @@ def schedule_scan(request, host_id, slug):
         'custom_engine_count': custom_engine_count,
         'excluded_paths': excluded_paths
     }
-    return render(request, 'startScan/schedule_scan_ui.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def scheduled_scan_view(request, slug):
@@ -719,7 +724,7 @@ def scheduled_scan_view(request, slug):
         'scheduled_scan_active': 'active',
         'scheduled_tasks': scheduled_tasks,
     }
-    return render(request, 'startScan/schedule_scan_list.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_RESULTS, redirect_url=FOUR_OH_FOUR_URL)
@@ -831,7 +836,7 @@ def delete_all_scan_results(request):
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def delete_all_screenshots(request):
     if request.method == 'POST':
-        run_command('rm -rf /usr/src/scan_results/*')
+        run_command.run('rm -rf /usr/src/scan_results/*', shell=True)
         messageData = {'status': 'true'}
         messages.add_message(
             request,
@@ -846,7 +851,7 @@ def visualise(request, id):
         'scan_id': id,
         'scan_history': scan,
     }
-    return render(request, 'startScan/visualise.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
@@ -913,7 +918,7 @@ def start_organization_scan(request, id, slug):
         'custom_engine_count': custom_engine_count,
         'excluded_paths': excluded_paths
     }
-    return render(request, 'organization/start_scan.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
@@ -1024,7 +1029,7 @@ def schedule_organization_scan(request, slug, id):
         'custom_engine_count': custom_engine_count,
         'excluded_paths': excluded_paths
     }
-    return render(request, 'organization/schedule_scan_ui.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_RESULTS, redirect_url=FOUR_OH_FOUR_URL)
@@ -1035,7 +1040,7 @@ def delete_scans(request, slug):
                 continue
             scan = get_object_or_404(ScanHistory, id=value)
             delete_dir = scan.results_dir
-            run_command('rm -rf ' + delete_dir)
+            run_command.run('rm -rf ' + delete_dir, shell=True)
             scan.delete()
         messages.add_message(
             request,
@@ -1051,7 +1056,7 @@ def customize_report(request, id):
         'scan_id': id,
         'scan_history': scan,
     }
-    return render(request, 'startScan/customize_report.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_REPORT, redirect_url=FOUR_OH_FOUR_URL)
@@ -1164,6 +1169,20 @@ def create_report(request, id):
         .filter(ip_addresses__in=subdomains)
         .distinct()
     )
+
+    # Attack Surface Map (Optional for Enterprise)
+    include_attack_surface_map = request.GET.get('include_attack_surface_map', 'False') == 'True'
+    attack_surface_map_image = None
+    if report_template == 'enterprise' and include_attack_surface_map:
+        try:
+            neo4j_manager = Neo4jManager()
+            graph_data = neo4j_manager.get_cytoscape_json(id)
+            if graph_data and graph_data.get('nodes'):
+                attack_surface_map_image = generate_attack_surface_map(graph_data)
+            neo4j_manager.close()
+        except Exception as e:
+            logger.error(f"Error generating Attack Surface Map for report: {e}")
+
     data = {
         'scan_object': scan,
         'unique_vulnerabilities': unique_vulns,
@@ -1177,6 +1196,7 @@ def create_report(request, id):
         'show_vuln': show_vuln,
         'report_name': report_name,
         'is_ignore_info_vuln': is_ignore_info_vuln,
+        'attack_surface_map_image': attack_surface_map_image,
     }
 
     # Get report related config
@@ -1214,7 +1234,7 @@ def create_report(request, id):
         # LLM Generated Sections
         if report.enable_llm_report_generation:
             from reNgine.llm import LLMReportGenerator
-            llm_gen = LLMReportGenerator()
+            llm_gen = LLMReportGenerator(logger=logger)
             
             # Prepare context for LLM
             llm_context = f"Target: {scan.domain.name}\n"
@@ -1240,6 +1260,14 @@ def create_report(request, id):
             data['llm_conclusion'] = markdown.markdown(llm_gen.generate_conclusion(llm_context))
             data['enable_llm_report_generation'] = True
 
+            # Generate attack scenarios for exploitable vulnerabilities
+            exploitable_vulns = vulns.exclude(exploit_url__isnull=True).exclude(exploit_url__exact='')
+            for v in exploitable_vulns:
+                vuln_context = f"Vulnerability: {v.name}\n"
+                vuln_context += f"Description: {v.description}\n"
+                vuln_context += f"Exploit URL: {v.exploit_url}\n"
+                v.attack_scenario = markdown.markdown(llm_gen.generate_attack_scenario(vuln_context))
+
         primary_color = report.primary_color
         secondary_color = report.secondary_color
 
@@ -1249,7 +1277,9 @@ def create_report(request, id):
     data['subdomain_http_status_chart'] = generate_subdomain_chart_by_http_status(subdomains)
     data['vulns_severity_chart'] = generate_vulnerability_chart_by_severity(vulns) if vulns else ''
 
-    if report_template == 'modern':
+    if report_template == 'enterprise':
+        template = get_template('report/enterprise.html')
+    elif report_template == 'modern':
         template = get_template('report/modern.html')
     else:
         template = get_template('report/default.html')
@@ -1258,9 +1288,17 @@ def create_report(request, id):
     pdf = HTML(string=html).write_pdf()
     # pdf = HTML(string=html).write_pdf(stylesheets=[CSS(string='@page { size: A4; margin: 0; }')])
 
-    if 'download' in request.GET:
+    should_download = request.GET.get('download', 'false').lower() == 'true'
+    
+    target_name = scan.domain.name
+    date_str = datetime.now().strftime('%Y-%m-%d')
+    filename = f"{target_name} Report {date_str}.pdf"
+
+    if should_download:
         response = HttpResponse(pdf, content_type='application/octet-stream')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
     else:
         response = HttpResponse(pdf, content_type='application/pdf')
+        response['Content-Disposition'] = f'inline; filename="{filename}"'
 
     return response

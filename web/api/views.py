@@ -14,6 +14,10 @@ from datetime import datetime
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.renderers import JSONRenderer
+
+
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_204_NO_CONTENT, HTTP_202_ACCEPTED
 from rest_framework.decorators import action
 from django.core.exceptions import ObjectDoesNotExist
@@ -24,7 +28,14 @@ from recon_note.models import *
 from reNgine.celery import app
 from reNgine.common_func import *
 from reNgine.database_utils import *
-from reNgine.definitions import ABORTED_TASK
+from reNgine.definitions import (
+	ABORTED_TASK,
+	PERM_MODIFY_TARGETS,
+	PERM_MODIFY_SCAN_CONFIGURATIONS,
+	PERM_MODIFY_WORDLISTS,
+	PERM_INITATE_SCANS_SUBSCANS,
+	PERM_MODIFY_SCAN_REPORT
+)
 from reNgine.tasks import *
 from reNgine.llm import *
 from reNgine.utilities import is_safe_path
@@ -496,9 +507,29 @@ class LLMVulnerabilityReportGenerator(APIView):
 		return Response(response)
 
 
+
+class ProjectViewSet(viewsets.ModelViewSet):
+	queryset = Project.objects.all().order_by('-insert_date')
+	serializer_class = ProjectSerializer
+	permission_classes = [IsAuthenticated]
+	renderer_classes = [JSONRenderer]
+
+
+	@action(detail=True, methods=['post'])
+	def delete_project(self, request, pk=None):
+		if not request.user.has_perm('dashboard.modify_targets'):
+			return Response({'status': False, 'message': 'Permission Denied'}, status=403)
+		project = self.get_object()
+		project.delete()
+		return Response({'status': True})
+
+
 class CreateProjectApi(APIView):
+
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_TARGETS
+	renderer_classes = [JSONRenderer]
+
 
 	def get(self, request):
 		req = self.request
@@ -549,13 +580,13 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 	serializer_class = DomainSerializer
 
 	def get_queryset(self):
+		queryset = Domain.objects.all()
 		slug = self.request.GET.get('slug', None)
 		if slug:
-			self.queryset = self.queryset.filter(project__slug=slug)
-		return self.queryset
+			queryset = queryset.filter(project__slug=slug)
+		return queryset
 
 	def filter_queryset(self, qs):
-		qs = self.queryset.filter()
 		search_value = self.request.GET.get(u'search[value]', None)
 		_order_col = self.request.GET.get(u'order[0][column]', None)
 		_order_direction = self.request.GET.get(u'order[0][dir]', None)
@@ -575,14 +606,41 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 			if _order_direction == 'desc':
 				order_col = f'-{order_col}'
 
-			qs = self.queryset.filter(
+			qs = qs.filter(
 				Q(name__icontains=search_value) |
 				Q(description__icontains=search_value) |
 				Q(domains__name__icontains=search_value)
 			)
 			return qs.order_by(order_col)
+		return qs
 
-		return qs.order_by('-id')
+
+class MonitoringDiscoveryViewSet(viewsets.ModelViewSet):
+    queryset = MonitoringDiscovery.objects.all()
+    serializer_class = MonitoringDiscoverySerializer
+
+    def get_queryset(self):
+        slug = self.request.query_params.get('slug')
+        if slug:
+            return self.queryset.filter(domain__project__slug=slug).order_by('-discovered_at')
+        return self.queryset.order_by('-discovered_at')
+
+    @action(detail=False, methods=['get'])
+    def statistics(self, request):
+        slug = self.request.query_params.get('slug')
+        if not slug:
+            return Response({'error': 'Slug is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        project = get_object_or_404(Project, slug=slug)
+        discoveries = MonitoringDiscovery.objects.filter(domain__project=project)
+        
+        stats = {
+            'total_discoveries': discoveries.count(),
+            'subdomain_discoveries': discoveries.filter(discovery_type='subdomain').count(),
+            'endpoint_discoveries': discoveries.filter(discovery_type='directory').count(),
+            'login_discoveries': discoveries.filter(discovery_type='login').count(),
+        }
+        return Response(stats)
 
 
 
@@ -599,7 +657,7 @@ class WafDetector(APIView):
 			return Response(response)
 		
 		wafw00f_command = f'wafw00f {url}'
-		_, output = run_command(wafw00f_command, remove_ansi_sequence=True)
+		_, output = run_command.run(wafw00f_command, shell=True, remove_ansi_sequence=True)
 		regex = r"behind (.*?) WAF"
 		group = re.search(regex, output)
 		if group:
@@ -1094,11 +1152,189 @@ class DeleteMultipleRows(APIView):
 			elif data['type'] == 'organization':
 				for row in data['rows']:
 					Organization.objects.get(id=row).delete()
+			elif data['type'] == 'scan_engine':
+				for row in data['rows']:
+					EngineType.objects.get(id=row).delete()
+			elif data['type'] == 'wordlist':
+				for row in data['rows']:
+					Wordlist.objects.get(id=row).delete()
+			elif data['type'] == 'target':
+				for row in data['rows']:
+					Domain.objects.get(id=row).delete()
+			elif data['type'] == 'scan_history':
+				for row in data['rows']:
+					ScanHistory.objects.get(id=row).delete()
 			response = True
 		except Exception as e:
 			response = False
 
 		return Response({'status': response})
+
+
+class CreateEngine(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def post(self, request):
+		data = request.data
+		name = data.get('engine_name')
+		yaml_configuration = data.get('yaml_configuration')
+
+		if not name or not yaml_configuration:
+			return Response({
+				'status': False,
+				'message': 'Name and YAML configuration are required'
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			EngineType.objects.create(
+				engine_name=name,
+				yaml_configuration=yaml_configuration
+			)
+			return Response({
+				'status': True,
+				'message': 'Engine created successfully'
+			})
+		except Exception as e:
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UploadWordlist(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_WORDLISTS
+
+	def post(self, request):
+		data = request.data
+		name = data.get('name')
+		short_name = data.get('short_name')
+		upload_file = request.FILES.get('upload_file')
+
+		if not name or not short_name or not upload_file:
+			return Response({
+				'status': False,
+				'message': 'Name, short name and file are required'
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			wordlist_content = upload_file.read().decode('UTF-8', "ignore")
+			wordlist_dir = '/usr/src/wordlist/'
+			if not os.path.exists(wordlist_dir):
+				os.makedirs(wordlist_dir)
+
+			file_path = os.path.join(wordlist_dir, f"{short_name}.txt")
+			with open(file_path, 'w') as f:
+				f.write(wordlist_content)
+
+			Wordlist.objects.create(
+				name=name,
+				short_name=short_name,
+				count=wordlist_content.count('\n')
+			)
+			return Response({
+				'status': True,
+				'message': 'Wordlist uploaded successfully'
+			})
+		except Exception as e:
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GetWordlistContent(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_WORDLISTS
+
+	def get(self, request):
+		wordlist_id = request.query_params.get('wordlist_id')
+		if not wordlist_id:
+			return Response({
+				'status': False,
+				'message': 'Wordlist ID is required'
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			wordlist = Wordlist.objects.get(id=wordlist_id)
+			file_path = f'/usr/src/wordlist/{wordlist.short_name}.txt'
+			if os.path.exists(file_path):
+				with open(file_path, 'r', encoding='utf-8', errors='ignore') as f:
+					# Read first 1000 lines or something to avoid huge responses
+					content = "".join([next(f) for _ in range(1000)])
+					return Response({
+						'status': True,
+						'content': content,
+						'name': wordlist.name
+					})
+			return Response({
+				'status': False,
+				'message': 'File not found'
+			}, status=status.HTTP_404_NOT_FOUND)
+		except Exception as e:
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class GetEngineDetails(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def get(self, request):
+		engine_id = request.query_params.get('engine_id')
+		if not engine_id:
+			return Response({
+				'status': False,
+				'message': 'Engine ID is required'
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			engine = EngineType.objects.get(id=engine_id)
+			return Response({
+				'status': True,
+				'engine_name': engine.engine_name,
+				'yaml_configuration': engine.yaml_configuration
+			})
+		except Exception as e:
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UpdateEngine(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def post(self, request):
+		data = request.data
+		engine_id = data.get('engine_id')
+		name = data.get('engine_name')
+		yaml_configuration = data.get('yaml_configuration')
+
+		if not engine_id or not name or not yaml_configuration:
+			return Response({
+				'status': False,
+				'message': 'Engine ID, name and YAML configuration are required'
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+		try:
+			engine = EngineType.objects.get(id=engine_id)
+			engine.engine_name = name
+			engine.yaml_configuration = yaml_configuration
+			engine.save()
+			return Response({
+				'status': True,
+				'message': 'Engine updated successfully'
+			})
+		except Exception as e:
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
 
 
 class StopScan(APIView):
@@ -1201,7 +1437,98 @@ class StopScan(APIView):
 		return Response(response)
 
 
+class InitiateScan(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+	def post(self, request):
+		data = request.data
+		domain_ids = data.get('domain_id')
+		engine_id = data.get('engine_id')
+		
+		try:
+			# Convert single ID to list for uniform processing
+			if not isinstance(domain_ids, list):
+				domain_ids = [domain_ids]
+
+			results = []
+			errors = []
+
+			for domain_id in domain_ids:
+				try:
+					domain = Domain.objects.get(pk=domain_id)
+					
+					# Extract optional scan parameters
+					subdomains_in = data.get('importSubdomainTextArea', [])
+					subdomains_out = data.get('outOfScopeSubdomainTextarea', [])
+					starting_point_path = data.get('startingPointPath', '').strip()
+					excluded_paths = data.get('excludedPaths', [])
+					if isinstance(excluded_paths, str):
+						excluded_paths = [path.strip() for path in excluded_paths.split(',')]
+					
+					custom_dorks = data.get('customDorkTextarea', '').strip() if data.get('customDorkSwitch') else None
+					api_discovery_tools = data.get('api_discovery_tools', [])
+					kr_wordlist = data.get('kr_wordlist', 'routes-large.kite')
+					spiderfoot_scan = data.get('spiderfoot_scan', False)
+
+					# Create ScanHistory object
+					scan_history_id = create_scan_object(
+						host_id=domain_id,
+						engine_id=engine_id,
+						initiated_by_id=request.user.id
+					)
+					scan = ScanHistory.objects.get(pk=scan_history_id)
+					if custom_dorks:
+						scan.cfg_custom_dorks = custom_dorks
+						scan.save()
+
+					# Start the celery task
+					kwargs = {
+						'scan_history_id': scan.id,
+						'domain_id': domain.id,
+						'engine_id': engine_id,
+						'scan_type': LIVE_SCAN,
+						'results_dir': '/usr/src/scan_results',
+						'imported_subdomains': subdomains_in,
+						'out_of_scope_subdomains': subdomains_out,
+						'starting_point_path': starting_point_path,
+						'excluded_paths': excluded_paths,
+						'custom_dorks': custom_dorks,
+						'api_discovery_tools': api_discovery_tools,
+						'kr_wordlist': kr_wordlist,
+						'enable_spiderfoot_scan': spiderfoot_scan,
+						'initiated_by_id': request.user.id
+					}
+					initiate_scan.apply_async(kwargs=kwargs)
+					results.append({'domain': domain.name, 'scan_id': scan.id})
+					
+				except Exception as e:
+					logger.error(f"Error initiating scan for domain {domain_id}: {str(e)}")
+					errors.append({'domain_id': domain_id, 'error': str(e)})
+
+			if not results:
+				return Response({
+					'status': False,
+					'message': 'Failed to initiate any scans',
+					'errors': errors
+				}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+			return Response({
+				'status': True,
+				'message': f'Successfully initiated {len(results)} scan(s)',
+				'results': results,
+				'errors': errors if errors else None
+			})
+		except Exception as e:
+			logger.error(e)
+			return Response({
+				'status': False,
+				'message': str(e)
+			}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class InitiateSubTask(APIView):
+
 	permission_classes = [HasPermission]
 	permission_required = PERM_INITATE_SCANS_SUBSCANS
 
@@ -1314,6 +1641,26 @@ class RengineUpdateCheck(APIView):
 		return Response(return_response)
 
 
+class RengineSystemSettingsAPIView(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
+
+	def get(self, request):
+		import shutil
+		total, used, _ = shutil.disk_usage("/")
+		total_gb = total // (2**30)
+		used_gb = used // (2**30)
+		free_gb = total_gb - used_gb
+		consumed_percent = int(100 * float(used_gb) / float(total_gb)) if total_gb > 0 else 0
+
+		return Response({
+			'total': total_gb,
+			'used': used_gb,
+			'free': free_gb,
+			'consumed_percent': consumed_percent
+		})
+
+
 class UninstallTool(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
@@ -1347,8 +1694,8 @@ class UninstallTool(APIView):
 		else:
 			return Response({'status': False, 'message': 'Cannot uninstall tool!'})
 
-		run_command(uninstall_command)
-		run_command.apply_async(args=(uninstall_command,))
+		run_command.run(uninstall_command, shell=True)
+		run_command.apply_async(args=(uninstall_command,), kwargs={'shell': True})
 
 		tool.delete()
 
@@ -1383,9 +1730,42 @@ class UpdateTool(APIView):
 
 		
 		try:
-			run_command(update_command, shell=True)
-			run_command.apply_async(args=[update_command], kwargs={'shell': True})
-			return Response({'status': True, 'message': tool.name + ' updated successfully.'})
+			# Execute via Celery and wait for result to ensure success
+			task = run_command.delay(update_command, shell=True)
+			res = task.get(timeout=300) # Updates can take time
+			return_code, output = res[0], res[1]
+			
+			if return_code == 0:
+				return Response({'status': True, 'message': tool.name + ' updated successfully.'})
+			else:
+				# Log the failure output for debugging
+				logger.error(f"Update failed for {tool.name}: {output}")
+				return Response({'status': False, 'message': f'Update failed: {output[:200]}...'})
+		except Exception as e:
+			logger.error(str(e))
+			return Response({'status': False, 'message': str(e)})
+
+class UninstallTool(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
+
+	def get(self, request):
+		req = self.request
+		tool_id = req.query_params.get('tool_id')
+		if not InstalledExternalTool.objects.filter(id=tool_id).exists():
+			return Response({'status': False, 'message': 'Tool Not found'})
+		tool = InstalledExternalTool.objects.get(id=tool_id)
+		
+		try:
+			task = run_command.delay(tool.uninstall_command, shell=True)
+			res = task.get(timeout=60)
+			return_code, output = res[0], res[1]
+			
+			if return_code == 0:
+				tool.delete()
+				return Response({'status': True, 'message': tool.name + ' uninstalled successfully.'})
+			else:
+				return Response({'status': False, 'message': f'Uninstall failed: {output[:200]}'})
 		except Exception as e:
 			logger.error(str(e))
 			return Response({'status': False, 'message': str(e)})
@@ -1416,16 +1796,38 @@ class GetExternalToolCurrentVersion(APIView):
 			return Response({'status': False, 'message': 'Version Lookup command not provided.'})
 
 		version_number = None
-		_, stdout = run_command(tool.version_lookup_command)
+		try:
+			# Execute via Celery to ensure we are in the same environment as the workers
+			task = run_command.delay(tool.version_lookup_command, shell=True)
+			res = task.get(timeout=60)
+			return_code, stdout = res[0], res[1]
+			
+			if return_code != 0:
+				logger.warning(f"Version lookup failed for {tool.name} with code {return_code}: {stdout}")
+				return Response({'status': False, 'message': 'Tool not found or check failed.'})
+		except Exception as e:
+			logger.error(f"Error running version lookup command via Celery: {str(e)}")
+			return Response({'status': False, 'message': f'Error running version lookup command: {str(e)}'})
+
 		if tool.version_match_regex:
 			version_number = re.search(re.compile(tool.version_match_regex), str(stdout))
 		else:
-			version_match_regex = r'(?i:v)?(\d+(?:\.\d+){2,})'
+			# Improved regex: must look like a version and NOT be part of a path
+			# Looks for version at start of line or preceded by space, and not followed by /
+			version_match_regex = r'(?:^|\s)(?i:v)?(\d+\.\d+(?:\.\d+)*)(?!\/)'
 			version_number = re.search(version_match_regex, str(stdout))
+		
 		if not version_number:
-			return Response({'status': False, 'message': 'Invalid version lookup command.'})
+			return Response({'status': False, 'message': 'Tool installed but version could not be parsed.'})
 
-		return Response({'status': True, 'version_number': version_number.group(0), 'tool_name': tool.name})
+		# Use group(1) to get the captured version number without the leading space
+		version = version_number.group(1) if version_number.groups() else version_number.group(0)
+		
+		# Final check: if version is just a single digit, it's probably wrong (unless it matches a strict regex)
+		if not tool.version_match_regex and len(version.strip()) < 3 and '.' not in version:
+			return Response({'status': False, 'message': 'Invalid version parsed.'})
+
+		return Response({'status': True, 'version_number': version.strip(), 'tool_name': tool.name})
 
 
 
@@ -1454,24 +1856,41 @@ class GithubToolCheckGetLatestRelease(APIView):
 		tool_github_url = tool.github_url.replace('http://github.com/', '').replace('https://github.com/', '')
 		tool_github_url = remove_lead_and_trail_slash(tool_github_url)
 		github_api = f'https://api.github.com/repos/{tool_github_url}/releases'
-		response = requests.get(github_api).json()
+		try:
+			res = requests.get(github_api, timeout=10)
+			if res.status_code == 403:
+				return Response({'status': False, 'message': 'GitHub Rate Limit Exceeded'})
+			response = res.json()
+		except requests.exceptions.Timeout:
+			return Response({'status': False, 'message': 'GitHub API Timeout'})
+		except Exception as e:
+			return Response({'status': False, 'message': f'Error fetching from GitHub: {str(e)}'})
+
 		# check if api rate limit exceeded
-		if 'message' in response and response['message'] == 'RateLimited':
-			return Response({'status': False, 'message': 'RateLimited'})
-		elif 'message' in response and response['message'] == 'Not Found':
-			return Response({'status': False, 'message': 'Not Found'})
-		elif not response:
-			return Response({'status': False, 'message': 'Not Found'})
+		if isinstance(response, dict) and 'message' in response:
+			if 'rate limit' in response['message'].lower():
+				return Response({'status': False, 'message': 'RateLimited'})
+			elif 'Not Found' in response['message']:
+				return Response({'status': False, 'message': 'Repository Not Found'})
+		
+		if not response or not isinstance(response, list):
+			return Response({'status': False, 'message': 'No releases found'})
 
 		# only send latest release
 		response = response[0]
 
+		# Try to find a version string in tag_name or name
+		latest_version = response.get('tag_name') or response.get('name') or 'Unknown'
+		# If tag_name was used, use name as a secondary identifier
+		release_name = response.get('name') or response.get('tag_name') or 'Unknown'
+
 		api_response = {
 			'status': True,
-			'url': response['url'],
-			'id': response['id'],
-			'name': response['name'],
-			'changelog': response['body'],
+			'url': response.get('html_url'),
+			'id': response.get('id'),
+			'name': release_name,
+			'version_number': latest_version,
+			'changelog': response.get('body'),
 		}
 		return Response(api_response)
 
@@ -1584,7 +2003,7 @@ class CMSDetector(APIView):
 			cms_detector_command += ' --random-agent --batch --follow-redirect'
 			cms_detector_command += f' -u {url}'
 
-			_, output = run_command(cms_detector_command, remove_ansi_sequence=True)
+			_, output = run_command.run(cms_detector_command, shell=True, remove_ansi_sequence=True)
 
 			response['message'] = 'Could not detect CMS!'
 
@@ -1679,7 +2098,7 @@ class GetFileContents(APIView):
 		if 'nuclei_config' in req.query_params:
 			path = "/root/.config/nuclei/config.yaml"
 			if not os.path.exists(path):
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -1689,7 +2108,7 @@ class GetFileContents(APIView):
 		if 'subfinder_config' in req.query_params:
 			path = "/root/.config/subfinder/config.yaml"
 			if not os.path.exists(path):
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -1699,7 +2118,7 @@ class GetFileContents(APIView):
 		if 'naabu_config' in req.query_params:
 			path = "/root/.config/naabu/config.yaml"
 			if not os.path.exists(path):
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -1709,7 +2128,7 @@ class GetFileContents(APIView):
 		if 'theharvester_config' in req.query_params:
 			path = "/usr/src/github/theHarvester/api-keys.yaml"
 			if not os.path.exists(path):
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -1720,7 +2139,7 @@ class GetFileContents(APIView):
 			path = "/root/.config/spiderfoot.cfg"
 			if not os.path.exists(path):
 				# Create a default config or just touch
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -1730,7 +2149,7 @@ class GetFileContents(APIView):
 		if 'amass_config' in req.query_params:
 			path = "/root/.config/amass.ini"
 			if not os.path.exists(path):
-				run_command(f'touch {path}')
+				run_command.run(f'touch {path}', shell=True)
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -1814,6 +2233,81 @@ class ListOrganizations(APIView):
 		organizations = Organization.objects.all()
 		organization_serializer = OrganizationSerializer(organizations, many=True)
 		return Response({'organizations': organization_serializer.data})
+
+
+class CreateOrganization(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		data = request.data
+		name = data.get('name')
+		description = data.get('description', '')
+		domains = data.get('domains', [])
+		slug = data.get('slug')
+
+		if not name or not slug:
+			return Response({'status': False, 'message': 'Name and project slug are required'}, status=400)
+
+		try:
+			project = Project.objects.get(slug=slug)
+			organization = Organization.objects.create(
+				name=name,
+				description=description,
+				project=project,
+				insert_date=timezone.now()
+			)
+			for domain_id in domains:
+				domain = Domain.objects.get(id=domain_id)
+				organization.domains.add(domain)
+			return Response({'status': True, 'message': 'Organization created successfully', 'id': organization.id})
+		except Exception as e:
+			return Response({'status': False, 'message': str(e)}, status=400)
+
+
+class UpdateOrganization(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		data = request.data
+		org_id = data.get('id')
+		name = data.get('name')
+		description = data.get('description', '')
+		domains = data.get('domains', [])
+
+		if not org_id or not name:
+			return Response({'status': False, 'message': 'ID and Name are required'}, status=400)
+
+		try:
+			organization = Organization.objects.get(id=org_id)
+			organization.name = name
+			organization.description = description
+			organization.save()
+			
+			# Update domains
+			organization.domains.clear()
+			for domain_id in domains:
+				domain = Domain.objects.get(id=domain_id)
+				organization.domains.add(domain)
+				
+			return Response({'status': True, 'message': 'Organization updated successfully'})
+		except Exception as e:
+			return Response({'status': False, 'message': str(e)}, status=400)
+
+
+class ListWordlists(APIView):
+	def get(self, request, format=None):
+		wordlists = Wordlist.objects.all()
+		wordlist_serializer = WordlistSerializer(wordlists, many=True)
+		return Response({'wordlists': wordlist_serializer.data})
+
+
+class ListConfigurations(APIView):
+	def get(self, request, format=None):
+		configurations = Configuration.objects.all()
+		configuration_serializer = ConfigurationSerializer(configurations, many=True)
+		return Response({'configurations': configuration_serializer.data})
 
 
 class ListTargetsInOrganization(APIView):
@@ -3235,3 +3729,49 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 					print(e)
 
 		return qs
+
+class ReportSettingsAPIView(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_REPORT
+
+	def get(self, request):
+		report_setting = VulnerabilityReportSetting.objects.first()
+		if not report_setting:
+			# Create default settings if not exists
+			report_setting = VulnerabilityReportSetting.objects.create()
+		serializer = VulnerabilityReportSettingSerializer(report_setting)
+		return Response(serializer.data)
+
+	def post(self, request):
+		report_setting = VulnerabilityReportSetting.objects.first()
+		if not report_setting:
+			report_setting = VulnerabilityReportSetting.objects.create()
+		serializer = VulnerabilityReportSettingSerializer(report_setting, data=request.data, partial=True)
+		if serializer.is_valid():
+			serializer.save()
+			return Response(serializer.data)
+		return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+class NotificationSettingsAPIView(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def get(self, request):
+		notification = Notification.objects.first()
+		if not notification:
+			notification = Notification.objects.create()
+		serializer = NotificationSettingsSerializer(notification)
+		return Response(serializer.data)
+
+	def post(self, request):
+		notification = Notification.objects.first()
+		serializer = NotificationSettingsSerializer(notification, data=request.data, partial=True)
+		if serializer.is_valid():
+			serializer.save()
+			# Send test messages if requested or on every save (to match legacy)
+			if request.data.get('send_test', True):
+				send_slack_message('*reNgine*\nCongratulations! your notification services are working.')
+				send_lark_message('*reNgine*\nCongratulations! your notification services are working.')
+				send_telegram_message('*reNgine*\nCongratulations! your notification services are working.')
+				send_discord_message('**reNgine**\nCongratulations! your notification services are working.')
+			return Response({'status': True, 'message': 'Notification settings updated and test message sent.'})
+		return Response(serializer.errors, status=400)

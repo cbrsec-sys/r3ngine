@@ -90,38 +90,7 @@ fi
 echo "Copying Auth Wordlists"
 cp -r /usr/src/app/wordlist/auth/* /usr/src/wordlist/auth/
 
-# clone Sublist3r
-if [ ! -d "/usr/src/github/Sublist3r" ]
-then
-  echo "Cloning Sublist3r"
-  git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r
-fi
-python3 -m pip install -r /usr/src/github/Sublist3r/requirements.txt
-
-# clone OneForAll
-if [ ! -d "/usr/src/github/OneForAll" ]
-then
-  echo "Cloning OneForAll"
-  git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll
-fi
-python3 -m pip install -r /usr/src/github/OneForAll/requirements.txt
-
-# clone eyewitness
-if [ ! -d "/usr/src/github/EyeWitness" ]
-then
-  echo "Cloning EyeWitness"
-  git clone https://github.com/FortyNorthSecurity/EyeWitness /usr/src/github/EyeWitness
-  # pip install -r /usr/src/github/Eyewitness/requirements.txt
-fi
-
-# clone theHarvester
-if [ ! -d "/usr/src/github/theHarvester" ]
-then
-  echo "Cloning theHarvester"
-  git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester
-fi
-
-# clone vulscan
+# vulscan is a special case (nmap script)
 if [ ! -d "/usr/src/github/scipag_vulscan" ]
 then
   echo "Cloning Nmap Vulscan script"
@@ -177,12 +146,7 @@ then
   pip install -r /usr/src/github/CMSeeK/requirements.txt
 fi
 
-# clone ctfr
-if [ ! -d "/usr/src/github/ctfr" ]
-then
-  echo "Cloning CTFR"
-  git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr
-fi
+# clone ctfr is now in Dockerfile
 
 # clone gooFuzz
 if [ ! -d "/usr/src/github/goofuzz" ]

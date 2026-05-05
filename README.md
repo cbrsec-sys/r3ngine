@@ -1,12 +1,13 @@
 <p align="center">
-<a href="https://rengine.wiki"><img src=".github/screenshots/banner.gif" alt=""/></a>
+<a href="https://rengine.wiki"><img src="frontend/public/img/r3ngine_logo.png" height="520px" width="520px" alt=""/></a>
 </p>
 
 <p align="center">
-  <h3>Unofficial Fork of reNgine: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
+  <h4 align="center"><strong>Phoenix: Fire from the Ashes even Stronger</strong></h4> 
+  <h3 align="center">Official v3 Rebirth: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
 </p>
 
-<p align="center"><a href="https://github.com/whiterabb17/rengine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="reNgine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
+<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.1-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=Xk_YH83IQgg" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--Asia-2023-blue.svg?logo=none" alt="" /></a>&nbsp;
@@ -19,20 +20,20 @@
 </p>
 
 <p align="center">
-<a href="https://github.com/whiterabb17/rengine/actions/workflows/codeql-analysis.yml" target="_blank"><img src="https://github.com/whiterabb17/rengine/actions/workflows/codeql-analysis.yml/badge.svg" alt="" /></a>&nbsp;<a href="https://github.com/whiterabb17/rengine/actions/workflows/build.yml" target="_blank"><img src="https://github.com/whiterabb17/rengine/actions/workflows/build.yml/badge.svg" alt="" /></a>&nbsp;
+<a href="https://github.com/whiterabb17/r3ngine/actions/workflows/codeql-analysis.yml" target="_blank"><img src="https://github.com/whiterabb17/r3ngine/actions/workflows/codeql-analysis.yml/badge.svg" alt="" /></a>&nbsp;<a href="https://github.com/whiterabb17/r3ngine/actions/workflows/build.yml" target="_blank"><img src="https://github.com/whiterabb17/r3ngine/actions/workflows/build.yml/badge.svg" alt="" /></a>&nbsp;
 </p>
 
 <p align="center">
 <a href="https://opensourcesecurityindex.io/" target="_blank" rel="noopener">
 <img style="width: 282px; height: 56px" src="https://opensourcesecurityindex.io/badge.svg" alt="Open Source Security Index - Fastest Growing Open Source Security Projects" width="282" height="56" /> </a>
 </p>
-<h4>reNgine 3.0.0 is released!</h4>
+<h4>r3ngine 3.0.1 is released!</h4>
 <p>
-  reNgine 3.0.0 is a massive leap forward in automated reconnaissance, introducing the <b>Advanced Web App & API Discovery Pipeline</b>, full <b>Spiderfoot OSINT Integration</b>, and the stunning <b>Cyberpunk V3 Hacker Dashboard</b>. This version features a dedicated <b>LLM Toolkit</b> for AI-assisted vulnerability analysis, deep API reconnaissance powered by <b>Kiterunner, Arjun, ParamSpider, InQL, and Aquatone</b>, along with automated <b>Semgrep</b>-powered static analysis. With enhanced <b>OpSec controls</b>, <b>Stealth Brute-Force</b> engines, and <b>Dashboard Analytics</b>, v3 is built to handle the most complex modern attack surfaces.
+  r3ngine 3.0.1 marks the official branding transition and production stabilization. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Interactive KPI Reports</b> with internal navigation, and <b>Scoped Attack Surface Visualization</b>. Built on the massive v3.0 core, it includes the <b>Advanced Web App & API Discovery Pipeline</b>, full <b>Spiderfoot OSINT Integration</b>, and a dedicated <b>LLM Toolkit</b> for AI-assisted vulnerability analysis.
 </p>
 
-<h4>What is reNgine?</h4>
-reNgine is your ultimate web application reconnaissance suite, designed to supercharge the recon process for security pros, pentesters, and bug bounty hunters. It is a highly configurable engine that simplifies and streamlines reconnaissance through data correlation, continuous monitoring, and an intuitive user interface. Whether you're a solo bug hunter or an enterprise security team, reNgine redefines how you gather critical information about your targets.
+<h4>What is r3ngine?</h4>
+r3ngine v3 is your ultimate web application reconnaissance suite, designed to supercharge the recon process for security pros, pentesters, and bug bounty hunters. It is a highly configurable engine that simplifies and streamlines reconnaissance through data correlation, continuous monitoring, and an intuitive user interface. Whether you're a solo bug hunter or an enterprise security team, r3ngine redefines how you gather critical information about your targets.
 
 Traditional reconnaissance tools often fall short in terms of configurability and efficiency. reNgine addresses these shortcomings, emerging as a powerful alternative that surpasses many commercial offerings by providing end-to-end automation and deep tactical insights.
 
@@ -40,7 +41,7 @@ Traditional reconnaissance tools often fall short in terms of configurability an
 
 ## 🚀 Version 3.0: The Recon Revolution
 
-Version 3.0 represents a complete overhaul of reNgine, focusing on AI-driven intelligence, aesthetic excellence, and surgical discovery precision. Below are the core pillars of the v3 release:
+Version 3.0 represents a complete overhaul of r3ngine, focusing on AI-driven intelligence, aesthetic excellence, and surgical discovery precision. Below are the core pillars of the v3 release:
 
 ### 🎨 Cyberpunk V3 Hacker Dashboard
 A completely reimagined, glassmorphic UI designed for high-impact data visualization and aesthetic excellence.
@@ -76,18 +77,13 @@ The SpiderFoot discovery engine has been completely re-engineered for v3.
 *   **Task Management**: Enhanced task monitoring with granular status tracking and detailed logs.
 *   **Reporting Views**: New analytics dashboards providing a 360-degree view of your attack surface and vulnerability trends.
 
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Documentation
-
-Detailed documentation available at [https://rengine.wiki](https://rengine.wiki) 
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
 
 ## Table of Contents
 
-* [About reNgine](#about-rengine)
+* [About r3ngine](#about-r3ngine)
 * [Workflow](#workflow)
 * [Features](#features)
 * [Enterprise Support](#enterprise-support)
@@ -97,7 +93,7 @@ Detailed documentation available at [https://rengine.wiki](https://rengine.wiki)
 * [Screenshots](#screenshots)
 * [What's new in reNgine](https://github.com/whiterabb17/rengine/releases)
 * [Contributing](#contributing)
-* [reNgine Support](#rengine-support)
+* [r3ngine Support](#r3ngine-support)
 * [Support and Sponsoring](#support-and-sponsoring)
 * [Reporting Security Vulnerabilities](#reporting-security-vulnerabilities)
 * [License](#license)

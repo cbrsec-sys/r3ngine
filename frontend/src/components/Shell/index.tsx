@@ -1,0 +1,803 @@
+import React, { useState } from 'react';
+import {
+  Box,
+  Drawer,
+  AppBar,
+  Toolbar,
+  List,
+  Typography,
+  Divider,
+  IconButton,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Avatar,
+  Menu,
+  MenuItem,
+  Tooltip,
+  InputBase,
+  Collapse,
+  Button,
+  Chip,
+  Grid,
+  Badge
+} from '@mui/material';
+
+import {
+  Home,
+  Folder,
+  Target,
+  Monitor,
+  Activity,
+  ShieldAlert,
+  CheckSquare,
+  Briefcase,
+  Cpu,
+  Command,
+  Settings,
+  Bell,
+  Search,
+  ChevronRight,
+  ChevronDown,
+  LayoutGrid,
+  Sliders,
+  Clock,
+  Globe,
+  Plus,
+  RefreshCw,
+  LogOut,
+  User as UserIcon,
+  Wrench,
+  List as ListIcon,
+  Bug
+} from 'lucide-react';
+import { useTheme } from '@mui/material/styles';
+import { Link, useRouterState, useParams } from '@tanstack/react-router';
+import { useAppContext } from '../../context/AppContext';
+import {
+  WhoisModal,
+  CMSDetectorModal,
+  CVELookupModal,
+  WAFDetectorModal
+} from '../../features/tools/components/ToolboxModals';
+import { NotificationsDropdown } from '../../features/notifications/components/NotificationsDropdown';
+import { useUnreadCount } from '../../features/notifications/api';
+import { ScanHistoryDrawer } from '../../features/scans/components/ScanHistoryDrawer';
+import { CheckForUpdateModal } from '../../features/settings/components/CheckForUpdateModal';
+import { useRengineUpdateCheck } from '../../features/settings/api';
+
+const drawerWidth = 260;
+const collapsedWidth = 72;
+
+interface NavItem {
+  title: string;
+  icon: React.ReactNode;
+  path: string;
+  color?: string;
+  children?: { title: string; path: string }[];
+}
+
+export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const theme = useTheme();
+  const { version, projectName } = useAppContext();
+  const [isHovered, setIsHovered] = useState(false);
+  const [openItems, setOpenItems] = useState<string[]>([]);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [quickAddAnchorEl, setQuickAddAnchorEl] = useState<null | HTMLElement>(null);
+  const [toolboxAnchorEl, setToolboxAnchorEl] = useState<null | HTMLElement>(null);
+  const [openTool, setOpenTool] = useState<string | null>(null);
+  const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
+  const [scanHistoryOpen, setScanHistoryOpen] = useState(false);
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { data: unreadData } = useUnreadCount(projectSlug);
+
+  const navItems: NavItem[] = [
+    { title: 'Dashboard', icon: <Home size={20} />, path: `/${projectSlug}/dashboard`, color: '#7000ff' },
+    { title: 'Projects', icon: <Folder size={20} />, path: `/${projectSlug}/projects`, color: '#00f3ff' },
+
+
+    { title: 'Targets', icon: <Target size={20} />, path: `/${projectSlug}/targets`, color: '#00f3ff' },
+    { title: 'Monitoring', icon: <Monitor size={20} />, path: `/${projectSlug}/monitoring`, color: '#00f3ff' },
+    {
+      title: 'Scan History',
+      icon: <Activity size={20} />,
+      path: `/${projectSlug}/scans`,
+      color: '#00f3ff',
+      children: [
+        { title: 'Scan History', path: `/${projectSlug}/scans` },
+        { title: 'Sub Scan History', path: `/${projectSlug}/scans/sub` },
+        { title: 'Scheduled Scan', path: `/${projectSlug}/scans/scheduled` },
+        { title: 'All Subdomains', path: `/${projectSlug}/subdomains` },
+        { title: 'All Endpoints', path: `/${projectSlug}/endpoints` },
+      ]
+    },
+    { title: 'Vulnerabilities', icon: <ShieldAlert size={20} />, path: `/${projectSlug}/vulns`, color: '#00f3ff' },
+    { title: 'Todo', icon: <CheckSquare size={20} />, path: `/${projectSlug}/todo`, color: '#00f3ff' },
+    { title: 'Organization', icon: <Briefcase size={20} />, path: `/${projectSlug}/org`, color: '#00f3ff' },
+    { title: 'Scan Engine', icon: <Cpu size={20} />, path: `/${projectSlug}/engines`, color: '#00f3ff' },
+    { title: 'Bounty Hub', icon: <Command size={20} />, path: `/${projectSlug}/bounty`, color: '#00f3ff' },
+    {
+      title: 'Settings',
+      icon: <Settings size={20} />,
+      path: `/${projectSlug}/settings`,
+      color: '#00f3ff',
+      children: [
+        { title: 'Proxies', path: `/${projectSlug}/settings/proxies` },
+        { title: 'OpSec Settings', path: `/${projectSlug}/settings/opsec` },
+        { title: 'Tool Settings', path: `/${projectSlug}/settings/tool-settings` },
+        { title: 'API Vault', path: `/${projectSlug}/settings/api-vault` },
+        { title: 'LLM Toolkit', path: `/${projectSlug}/settings/llm-toolkit` },
+        { title: 'Tool Arsenal', path: `/${projectSlug}/settings/tools-arsenal` },
+        { title: 'Report Settings', path: `/${projectSlug}/settings/report-settings` },
+        { title: 'reNgine Settings', path: `/${projectSlug}/settings/rengine-settings` },
+        { title: 'Notification Settings', path: `/${projectSlug}/settings/notifications` },
+      ]
+    },
+  ];
+
+  const handleToggle = (title: string) => {
+    setOpenItems(prev =>
+      prev.includes(title) ? prev.filter(i => i !== title) : [...prev, title]
+    );
+  };
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => setAnchorEl(event.currentTarget);
+  const handleMenuClose = () => setAnchorEl(null);
+
+  const handleQuickAddOpen = (event: React.MouseEvent<HTMLElement>) => setQuickAddAnchorEl(event.currentTarget);
+  const handleQuickAddClose = () => setQuickAddAnchorEl(null);
+
+  const handleToolboxOpen = (event: React.MouseEvent<HTMLElement>) => setToolboxAnchorEl(event.currentTarget);
+  const handleToolboxClose = () => setToolboxAnchorEl(null);
+
+  const handleToolClick = (tool: string) => {
+    setOpenTool(tool);
+    handleToolboxClose();
+  };
+
+  const handleNotificationOpen = (event: React.MouseEvent<HTMLElement>) => setNotificationAnchorEl(event.currentTarget);
+  const handleNotificationClose = () => setNotificationAnchorEl(null);
+
+  const routerState = useRouterState();
+  const activePath = routerState.location.pathname;
+
+  const updateCheck = useRengineUpdateCheck();
+
+  React.useEffect(() => {
+    const lastCheck = localStorage.getItem('last_update_checked');
+    const today = new Date().toLocaleDateString();
+
+    if (lastCheck !== today) {
+      updateCheck.mutateAsync().then(data => {
+        if (data.update_available) {
+          setUpdateAvailable(true);
+          localStorage.setItem('update_available', 'true');
+        } else {
+          setUpdateAvailable(false);
+          localStorage.setItem('update_available', 'false');
+        }
+        localStorage.setItem('last_update_checked', today);
+      }).catch(err => console.error('Auto update check failed', err));
+    } else {
+      // Check if update_available is in localStorage from a previous session
+      const wasUpdateAvailable = localStorage.getItem('update_available') === 'true';
+      if (wasUpdateAvailable) {
+        setUpdateAvailable(true);
+      }
+    }
+  }, []);
+
+  const handleUpdateCheckClick = () => {
+    setUpdateModalOpen(true);
+    handleMenuClose();
+  };
+
+  const quickAddItems = [
+    { title: 'Target', icon: <Target size={16} />, path: `/${projectSlug}/targets` },
+    { title: 'Organization', icon: <Briefcase size={16} />, path: `/${projectSlug}/org` },
+    { title: 'Scan Engine', icon: <Cpu size={16} />, path: `/${projectSlug}/engines` },
+    { title: 'External Tool', icon: <Wrench size={16} />, path: `/${projectSlug}/settings/tools-arsenal` },
+    { title: 'Wordlist', icon: <ListIcon size={16} />, path: `/${projectSlug}/engines` },
+  ];
+
+  const toolboxItems = [
+    { id: 'whois', title: 'Whois', icon: <Globe size={28} />, color: '#00f3ff' },
+    { id: 'cms', title: 'CMS Detector', icon: <Search size={28} />, color: '#00f3ff' },
+    { id: 'cve', title: 'CVE Lookup', icon: <Bug size={28} />, color: '#ff00ff' },
+    { id: 'waf', title: 'WAF Detector', icon: <ShieldAlert size={28} />, color: '#ff9800' },
+  ];
+
+  return (
+    <Box sx={{
+      display: 'flex',
+      minHeight: '100vh',
+      bgcolor: 'transparent'
+    }}>
+      {/* Sidebar - Mini Drawer Style */}
+      <Drawer
+        variant="permanent"
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        sx={{
+          width: isHovered ? drawerWidth : collapsedWidth,
+          flexShrink: 0,
+          whiteSpace: 'nowrap',
+          transition: theme.transitions.create('width', {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.enteringScreen,
+          }),
+          '& .MuiDrawer-paper': {
+            width: isHovered ? drawerWidth : collapsedWidth,
+            transition: theme.transitions.create('width', {
+              easing: theme.transitions.easing.sharp,
+              duration: theme.transitions.duration.enteringScreen,
+            }),
+            overflowX: 'hidden',
+            overflowY: 'auto',
+            boxSizing: 'border-box',
+            borderRight: 'none',
+            bgcolor: 'rgba(10, 10, 20, 0.8)',
+            backdropFilter: 'blur(10px)',
+            backgroundImage: 'none',
+            borderRadius: '0 30px 30px 0',
+            height: 'fit-content',
+            maxHeight: 'calc(100vh - 40px)',
+            top: '50%',
+            transform: 'translateY(-50%)',
+            border: '1px solid rgba(0, 243, 255, 0.1)',
+            boxShadow: '0 0 30px rgba(0,0,0,0.5)',
+            py: 2,
+            /* Custom Scrollbar */
+            '&::-webkit-scrollbar': {
+              width: '4px',
+            },
+            '&::-webkit-scrollbar-track': {
+              background: 'transparent',
+            },
+            '&::-webkit-scrollbar-thumb': {
+              background: 'rgba(0, 243, 255, 0.2)',
+              borderRadius: '10px',
+              '&:hover': {
+                background: 'rgba(0, 243, 255, 0.4)',
+              },
+            },
+          },
+        }}
+      >
+        <List sx={{ px: 1, mt: 2 }}>
+          {navItems.map((item) => {
+            const hasChildren = item.children && item.children.length > 0;
+            const isOpen = openItems.includes(item.title);
+            const isActive = activePath.startsWith(item.path);
+            const itemColor = isActive ? '#7000ff' : '#00f3ff';
+
+            return (
+              <React.Fragment key={item.title}>
+                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                  <ListItemButton
+                    {...(hasChildren ? {
+                      onClick: () => handleToggle(item.title)
+                    } : {
+                      component: Link,
+                      to: item.path
+                    })}
+                    sx={{
+                      borderRadius: 2,
+                      minHeight: 48,
+                      justifyContent: isHovered ? 'initial' : 'center',
+                      px: 2.5,
+                      bgcolor: isActive ? 'rgba(112, 0, 255, 0.15)' : 'transparent',
+                      '&:hover': {
+                        bgcolor: isActive ? 'rgba(112, 0, 255, 0.2)' : 'rgba(0, 243, 255, 0.05)',
+                      }
+                    }}
+                  >
+                    <ListItemIcon sx={{
+                      minWidth: 0,
+                      mr: isHovered ? 2 : 'auto',
+                      justifyContent: 'center',
+                      color: itemColor,
+                      filter: `drop-shadow(0 0 5px ${itemColor}aa)`
+                    }}>
+                      {item.icon}
+                    </ListItemIcon>
+
+                    {isHovered && (
+                      <>
+                        <ListItemText
+                          primary={
+                            <Typography variant="body2" sx={{
+                              fontWeight: 600,
+                              color: isActive ? '#7000ff' : 'rgba(255,255,255,0.6)',
+                              fontSize: '0.85rem'
+                            }}>
+                              {item.title}
+                            </Typography>
+                          }
+                        />
+                        {hasChildren && (
+                          isOpen ? <ChevronDown size={14} style={{ opacity: 0.5 }} /> : <ChevronRight size={14} style={{ opacity: 0.5 }} />
+                        )}
+                      </>
+                    )}
+                  </ListItemButton>
+                </ListItem>
+
+                {hasChildren && isHovered && (
+                  <Collapse in={isOpen} timeout="auto" unmountOnExit>
+                    <List component="div" disablePadding sx={{ ml: 2 }}>
+                      {item.children?.map((child) => {
+                        const isChildActive = activePath === child.path;
+                        return (
+                          <ListItemButton
+                            key={child.title}
+                            component={Link}
+                            to={child.path}
+                            sx={{
+                              py: 0.5,
+                              borderRadius: 1,
+                              mb: 0.2,
+                              bgcolor: isChildActive ? 'rgba(112, 0, 255, 0.1)' : 'transparent',
+                              '&:hover': {
+                                bgcolor: 'rgba(0, 243, 255, 0.05)',
+                              }
+                            }}
+                          >
+                            <ListItemText
+                              primary={
+                                <Typography variant="caption" sx={{
+                                  fontWeight: isChildActive ? 700 : 500,
+                                  color: isChildActive ? '#7000ff' : 'rgba(255,255,255,0.4)',
+                                  fontSize: '0.75rem',
+                                  letterSpacing: 0.5
+                                }}>
+                                  {child.title}
+                                </Typography>
+                              }
+                            />
+                          </ListItemButton>
+                        );
+                      })}
+                    </List>
+                  </Collapse>
+                )}
+              </React.Fragment>
+            );
+          })}
+        </List>
+      </Drawer>
+
+      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+        {/* Floating Topbar */}
+        <AppBar position="fixed" sx={{
+          bgcolor: 'rgba(10, 10, 15, 0.95)',
+          backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255, 255, 255, 0.05)',
+          borderRadius: 4,
+          mt: 1.5,
+          mx: 2,
+          width: 'calc(100% - 32px)',
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          backgroundImage: 'none',
+          zIndex: theme.zIndex.drawer + 1
+        }}>
+          <Toolbar sx={{ px: '16px !important', minHeight: '64px !important' }}>
+            {/* Logo Section */}
+            <Box sx={{ display: 'flex', alignItems: 'center', mr: 4 }}>
+              <Typography variant="h6" sx={{
+                fontWeight: 900,
+                fontFamily: 'Orbitron',
+                letterSpacing: 2,
+                color: "rgb(255, 0, 241)",
+                textShadow: "rgb(255, 0, 0) 0px 0px 21px",
+                fontSize: '1.4rem',
+                mr: 1.5,
+                ml: 12,
+                textTransform: 'lowercase'
+              }}>
+                r3ngine
+              </Typography>
+              <Chip
+                label={version}
+                size="small"
+                sx={{
+                  height: 18,
+                  fontSize: '0.6rem',
+                  fontWeight: 800,
+                  bgcolor: 'transparent',
+                  border: '1px solid #ff00ff',
+                  color: '#ff00ff',
+                  borderRadius: 1
+                }}
+              />
+            </Box>
+
+            <Box sx={{ flexGrow: 1 }} />
+
+            {/* Action Group */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, backgroundColor: "transparent" }}>
+              {/* Universal Search */}
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                bgcolor: 'rgba(255, 255, 255, 0.03)',
+                px: 2,
+                py: 0.5,
+                borderRadius: 10,
+                width: 240,
+                border: '1px solid rgba(255,255,255,0.05)',
+                '&:hover': { borderColor: 'rgba(0, 243, 255, 0.3)' }
+              }}>
+                <InputBase
+                  placeholder="Universal Search..."
+                  sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', flex: 1, ml: 1 }}
+                />
+                <Search size={14} style={{ color: '#ff00ff', opacity: 0.8 }} />
+              </Box>
+              <Box
+                component={Link}
+                to={`/${projectSlug}/projects`}
+                sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5, textDecoration: 'none' }}
+              >
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Projects</Typography>
+                <ChevronDown size={14} style={{ opacity: 0.5, color: 'rgba(255,255,255,0.6)' }} />
+              </Box>
+
+
+              <Box
+                onClick={handleQuickAddOpen}
+                sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5 }}
+              >
+                <Plus size={14} style={{ opacity: 0.6 }} />
+                <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Quick Add</Typography>
+                <ChevronDown size={14} style={{ opacity: 0.5 }} />
+              </Box>
+
+              <Box sx={{ display: 'flex', gap: 1, mx: 2 }}>
+                <IconButton
+                  onClick={handleToolboxOpen}
+                  size="small"
+                  sx={{
+                    color: toolboxAnchorEl ? '#00f3ff' : 'rgba(255,255,255,0.5)',
+                    bgcolor: toolboxAnchorEl ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
+                    boxShadow: toolboxAnchorEl ? '0 0 15px rgba(0, 243, 255, 0.3)' : 'none',
+                    '&:hover': {
+                      color: '#00f3ff',
+                      bgcolor: 'rgba(0, 243, 255, 0.05)',
+                    }
+                  }}
+                >
+                  <LayoutGrid size={18} />
+                </IconButton>
+                <IconButton
+                  onClick={handleNotificationOpen}
+                  size="small"
+                  sx={{
+                    color: notificationAnchorEl ? '#00f3ff' : 'rgba(255,255,255,0.5)',
+                    bgcolor: notificationAnchorEl ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
+                    '&:hover': {
+                      color: '#00f3ff',
+                      bgcolor: 'rgba(0, 243, 255, 0.05)',
+                    }
+                  }}
+                >
+                  <Badge badgeContent={unreadData?.count} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
+                    <Bell size={18} />
+                  </Badge>
+                </IconButton>
+                {/* Removed extra icon */}
+              </Box>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }} onClick={handleMenuOpen}>
+                <Avatar
+                  src="https://api.dicebear.com/7.x/bottts-neutral/svg?seed=hacker&backgroundColor=transparent"
+                  sx={{
+                    width: 32,
+                    height: 32,
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(0, 243, 255, 0.3)',
+                    p: 0.2
+                  }}
+                />
+                <Box sx={{ ml: 1, display: 'flex', alignItems: 'center' }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>root</Typography>
+                  <ChevronDown size={14} style={{ opacity: 0.4, marginLeft: 4 }} />
+                </Box>
+              </Box>
+            </Box>
+
+            <Menu
+              anchorEl={quickAddAnchorEl}
+              open={Boolean(quickAddAnchorEl)}
+              onClose={handleQuickAddClose}
+              slotProps={{
+                paper: {
+                  sx: {
+                    bgcolor: 'rgba(10, 10, 15, 0.95)',
+                    backdropFilter: 'blur(12px)',
+                    border: '1px solid rgba(0, 243, 255, 0.2)',
+                    borderRadius: 2,
+                    minWidth: 200,
+                    mt: 1.5,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+                    '& .MuiMenuItem-root': {
+                      py: 1.5,
+                      px: 2.5,
+                      gap: 2,
+                      color: 'rgba(255,255,255,0.7)',
+                      fontFamily: 'Orbitron',
+                      fontSize: '0.75rem',
+                      letterSpacing: '1px',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 243, 255, 0.1)',
+                        color: '#00f3ff',
+                      }
+                    }
+                  }
+                }
+              }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              {quickAddItems.map((item) => (
+                <MenuItem
+                  key={item.title}
+                  component={Link}
+                  to={item.path}
+                  onClick={handleQuickAddClose}
+                  sx={{ textDecoration: 'none' }}
+                >
+                  <Box sx={{ display: 'flex', color: 'inherit' }}>{item.icon}</Box>
+                  <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>
+                    {item.title}
+                  </Typography>
+                </MenuItem>
+              ))}
+            </Menu>
+
+            <Menu
+              anchorEl={toolboxAnchorEl}
+              open={Boolean(toolboxAnchorEl)}
+              onClose={handleToolboxClose}
+              slotProps={{
+                paper: {
+                  sx: {
+                    bgcolor: 'rgba(10, 10, 15, 0.98)',
+                    backdropFilter: 'blur(15px)',
+                    border: '1px solid rgba(0, 243, 255, 0.2)',
+                    borderRadius: 3,
+                    p: 2.5,
+                    width: 320,
+                    mt: 1.5,
+                    boxShadow: '0 10px 40px rgba(0,0,0,0.9)',
+                    overflow: 'hidden',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '2px',
+                      background: 'linear-gradient(90deg, #00f3ff, #ff00ff)',
+                      zIndex: 1
+                    }
+                  }
+                }
+              }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <Box sx={{ px: 2, py: 1, mb: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Typography sx={{
+                  color: '#ff00ff',
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.75rem',
+                  fontWeight: 900,
+                  letterSpacing: '3px',
+                  textShadow: '0 0 10px rgba(255, 0, 255, 0.5)'
+                }}>
+                  TOOLBOX
+                </Typography>
+                <Box sx={{ width: 40, height: 1, bgcolor: 'rgba(255,0,255,0.2)' }} />
+              </Box>
+              <Grid container spacing={2}>
+                {toolboxItems.map((item) => (
+                  <Grid size={{ xs: 6 }} key={item.title}>
+                    <Box
+                      onClick={() => handleToolClick(item.id)}
+                      sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        p: 2.5,
+                        borderRadius: 2,
+                        cursor: 'pointer',
+                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                        border: '1px solid transparent',
+                        '&:hover': {
+                          bgcolor: 'rgba(255, 255, 255, 0.03)',
+                          borderColor: 'rgba(255, 255, 255, 0.05)',
+                          transform: 'translateY(-4px)',
+                          boxShadow: `0 4px 20px ${item.color}15`,
+                          '& .icon-box': {
+                            color: item.color,
+                            filter: `drop-shadow(0 0 12px ${item.color}cc)`
+                          },
+                          '& .item-text': {
+                            color: '#fff',
+                            textShadow: `0 0 8px ${item.color}aa`
+                          }
+                        }
+                      }}
+                    >
+                      <Box
+                        className="icon-box"
+                        sx={{
+                          mb: 2,
+                          color: 'rgba(255,255,255,0.3)',
+                          transition: 'all 0.3s',
+                          display: 'flex',
+                          transform: 'scale(1)',
+                          '& svg': {
+                            filter: 'drop-shadow(0 0 2px rgba(255,255,255,0.1))'
+                          }
+                        }}
+                      >
+                        {item.icon}
+                      </Box>
+                      <Typography className="item-text" sx={{
+                        fontSize: '0.7rem',
+                        color: 'rgba(255,255,255,0.4)',
+                        fontFamily: 'Orbitron',
+                        textAlign: 'center',
+                        fontWeight: 700,
+                        letterSpacing: '1.2px',
+                        transition: 'all 0.3s',
+                        textTransform: 'uppercase'
+                      }}>
+                        {item.title}
+                      </Typography>
+                    </Box>
+                  </Grid>
+                ))}
+              </Grid>
+            </Menu>
+
+            <WhoisModal open={openTool === 'whois'} onClose={() => setOpenTool(null)} />
+            <CMSDetectorModal open={openTool === 'cms'} onClose={() => setOpenTool(null)} />
+            <CVELookupModal open={openTool === 'cve'} onClose={() => setOpenTool(null)} />
+            <WAFDetectorModal open={openTool === 'waf'} onClose={() => setOpenTool(null)} />
+
+            <NotificationsDropdown
+              anchorEl={notificationAnchorEl}
+              onClose={handleNotificationClose}
+              projectSlug={projectSlug}
+            />
+
+            <ScanHistoryDrawer
+              open={scanHistoryOpen}
+              onClose={() => setScanHistoryOpen(false)}
+              projectSlug={projectSlug}
+            />
+
+            <CheckForUpdateModal
+              open={updateModalOpen}
+              onClose={() => setUpdateModalOpen(false)}
+              onUpdateFound={setUpdateAvailable}
+            />
+
+            <Menu
+              anchorEl={anchorEl}
+              open={Boolean(anchorEl)}
+              onClose={handleMenuClose}
+              slotProps={{
+                paper: {
+                  sx: {
+                    bgcolor: 'rgba(10, 10, 15, 0.98)',
+                    backdropFilter: 'blur(15px)',
+                    border: '1px solid rgba(0, 243, 255, 0.2)',
+                    borderRadius: 2,
+                    minWidth: 240,
+                    mt: 1.5,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+                    overflow: 'hidden',
+                    '& .MuiMenuItem-root': {
+                      py: 1.5,
+                      px: 2.5,
+                      gap: 2,
+                      color: 'rgba(255,255,255,0.7)',
+                      fontFamily: 'Orbitron',
+                      fontSize: '0.75rem',
+                      letterSpacing: '1px',
+                      transition: 'all 0.2s',
+                      '&:hover': {
+                        bgcolor: 'rgba(0, 243, 255, 0.1)',
+                        color: '#00f3ff',
+                        '& .menu-icon': {
+                          color: '#00f3ff',
+                          filter: 'drop-shadow(0 0 5px #00f3ffaa)'
+                        }
+                      }
+                    }
+                  }
+                }
+              }}
+              transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+              anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+            >
+              <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.05)', mb: 1 }}>
+                <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: 0.5 }}>
+                  Welcome root!
+                </Typography>
+              </Box>
+
+              <MenuItem onClick={handleMenuClose} component={Link} to={`/${projectSlug}/settings/profile`}>
+                <UserIcon size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
+                <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>My Account</Typography>
+              </MenuItem>
+
+              <MenuItem onClick={handleMenuClose}>
+                <Target size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
+                <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Disable Bug Bounty Mode</Typography>
+              </MenuItem>
+
+              <MenuItem onClick={handleMenuClose} component={Link} to={`/${projectSlug}/settings/admin`}>
+                <Settings size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
+                <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Admin Settings</Typography>
+              </MenuItem>
+
+              <Divider sx={{ bgcolor: 'rgba(255,255,255,0.05)', my: 1 }} />
+
+              <MenuItem onClick={handleUpdateCheckClick}>
+                <RefreshCw size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
+                <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                  <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Check reNgine Update</Typography>
+                  {updateAvailable && (
+                    <Typography sx={{ fontSize: '0.6rem', color: '#ff0055', fontWeight: 800 }}>Update Available!</Typography>
+                  )}
+                </Box>
+              </MenuItem>
+
+              <Divider sx={{ bgcolor: 'rgba(255,255,255,0.05)', my: 1 }} />
+
+              <MenuItem
+                onClick={handleMenuClose}
+                component="a"
+                href="/logout"
+                sx={{ '&:hover': { color: '#ff003c !important', bgcolor: 'rgba(255, 0, 60, 0.1) !important' } }}
+              >
+                <LogOut size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
+                <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Logout</Typography>
+              </MenuItem>
+            </Menu>
+          </Toolbar>
+        </AppBar>
+
+        {/* Page Content */}
+        <Box
+          component="main"
+          sx={{
+            flexGrow: 1,
+            pt: 12,
+            px: { xs: 1, md: 3 },
+            pb: 4,
+            overflowX: 'hidden',
+            overflowY: 'auto',
+            position: 'relative',
+            width: '100%',
+            minWidth: 0
+          }}
+        >
+          <Box sx={{ position: 'relative', zIndex: 1, width: '100%', minWidth: 0 }}>
+            {children}
+          </Box>
+        </Box>
+      </Box>
+    </Box>
+  );
+};

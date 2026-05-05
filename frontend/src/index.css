@@ -1,0 +1,99 @@
+:root {
+  --primary: #00f3ff;
+  --secondary: #ff00ff;
+  --bg-dark: #05050a;
+  --glass: rgba(10, 10, 15, 0.7);
+  --heading: 'Orbitron', sans-serif;
+  --body: 'Inter', sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-color: #05050a;
+}
+
+body {
+  font-family: var(--body);
+  color: #fff;
+  line-height: 1.6;
+}
+
+/* Grain Effect Layer */
+body::after {
+  content: "" !important;
+  display: block !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E") !important;
+  background-size: 100px 100px !important;
+  background-repeat: repeat !important;
+  opacity: 0.35 !important;
+  z-index: 99999 !important;
+  pointer-events: none !important;
+  mix-blend-mode: overlay !important;
+  filter: contrast(150%) brightness(100%) !important;
+  animation: scanline-move 5s linear infinite !important;
+}
+
+@keyframes scanline-move {
+  0% {
+    background-position: 0 0;
+  }
+
+  100% {
+    background-position: 0 100%;
+  }
+}
+
+h1,
+h2 {
+  font-family: var(--heading);
+  text-transform: uppercase;
+  letter-spacing: 2px;
+}
+
+.neon-text {
+  color: var(--primary);
+  text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+}
+
+.MuiBox-root {
+  background-color: #0000002b;
+}
+
+.glass-panel {
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #05050a;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1a1a25;
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}

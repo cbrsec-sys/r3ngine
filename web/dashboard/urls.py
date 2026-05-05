@@ -14,8 +14,9 @@ urlpatterns = [
         name='dashboardIndex'),
     path(
         '<slug:slug>/monitoring/',
-        views.monitoring_dashboard,
+        views.index,
         name='monitoring_dashboard'),
+
     path(
         '<slug:slug>/profile/',
         views.profile,
@@ -38,8 +39,9 @@ urlpatterns = [
         name='four_oh_four'),
     path(
         '<slug:slug>/projects/',
-        views.projects,
+        views.index,
         name='list_projects'),
+
     path(
         'delete/project/<int:id>',
         views.delete_project,
@@ -53,7 +55,115 @@ urlpatterns = [
         views.attack_surface,
         name='attack_surface'),
     path(
+        '<slug:slug>/targets/',
+        views.index,
+        name='targets_v3'),
+    path(
+        '<slug:slug>/target/<int:id>/summary',
+        views.index,
+        name='target_summary_v3'),
+    path(
+        '<slug:slug>/scans/',
+        views.index,
+        name='scans_v3'),
+    path(
+        '<slug:slug>/scan/detail/<int:id>',
+        views.index,
+        name='scan_detail_v3'),
+    path(
+        '<slug:slug>/scans/scheduled',
+        views.index,
+        name='scheduled_scans_v3'),
+    path(
+        '<slug:slug>/scans/sub',
+        views.index,
+        name='subscans_history_v3'),
+    path(
+        '<slug:slug>/vulns/',
+        views.index,
+        name='vulnerabilities_v3'),
+    path(
+        '<slug:slug>/engines/',
+        views.index,
+        name='engines_v3'),
+    path(
+        '<slug:slug>/wordlists/',
+        views.index,
+        name='wordlists_v3'),
+    path(
+        '<slug:slug>/subdomains/',
+        views.index,
+        name='subdomains_v3'),
+    path(
+        '<slug:slug>/endpoints/',
+        views.index,
+        name='endpoints_v3'),
+    path(
+        '<slug:slug>/todo/',
+        views.index,
+        name='todo_v3'),
+    path(
+        '<slug:slug>/org/',
+        views.index,
+        name='organizations_v3'),
+    path(
+        '<slug:slug>/settings/proxies',
+        views.index,
+        name='proxy_settings_v3'),
+    path(
+        '<slug:slug>/settings/opsec',
+        views.index,
+        name='opsec_settings_v3'),
+    path(
+        '<slug:slug>/settings/tool-settings',
+        views.index,
+        name='tool_settings_v3'),
+    path(
+        '<slug:slug>/settings/tools-arsenal',
+        views.index,
+        name='tool_arsenal_v3'),
+    path(
+        '<slug:slug>/settings/api-vault',
+        views.index,
+        name='api_vault_v3'),
+    path(
+        '<slug:slug>/settings/llm-toolkit',
+        views.index,
+        name='llm_toolkit_v3'),
+    path(
+        '<slug:slug>/settings/report-settings',
+        views.index,
+        name='report_settings_v3'),
+    path(
+        '<slug:slug>/settings/notifications',
+        views.index,
+        name='notifications_v3'),
+    path(
+        '<slug:slug>/settings/rengine-settings',
+        views.index,
+        name='rengine_settings_v3'),
+    path(
+        '<slug:slug>/settings/profile',
+        views.index,
+        name='profile_v3'),
+    path(
+        '<slug:slug>/settings/admin',
+        views.index,
+        name='admin_v3'),
+    path(
+        '<slug:slug>/bounty',
+        views.index,
+        name='bounty_v3'),
+    path(
         '<slug:slug>/api/graph/scan/<int:scan_id>/data/',
         views.get_graph_data,
         name='get_graph_data'),
+    path(
+        '<slug:slug>/api/graph/target/<int:target_id>/data/',
+        views.get_target_graph_data,
+        name='get_target_graph_data'),
+    path(
+        '<slug:slug>/target/<int:target_id>/attack-surface/',
+        views.target_attack_surface,
+        name='target_attack_surface_v3'),
 ]

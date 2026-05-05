@@ -3,6 +3,15 @@ from django.urls import path
 from rest_framework import routers
 
 from .views import *
+from .dashboard_views import DashboardAPIView
+from .target_summary_views import TargetSummaryAPIView
+from .scan_summary_views import ScanSummaryAPIView
+
+from .scheduled_scans import ScheduledScanViewSet
+from .subscans import SubScanViewSet
+from .scan_history import ScanHistoryViewSet
+from .users import UserManageViewSet
+
 
 app_name = 'api'
 router = routers.DefaultRouter()
@@ -21,6 +30,13 @@ router.register(r'listActivityLogs', ListActivityLogsViewSet)
 router.register(r'listScanLogs', ListScanLogsViewSet)
 router.register(r'notifications', InAppNotificationManagerViewSet, basename='notification')
 router.register(r'hackerone-programs', HackerOneProgramViewSet, basename='hackerone_program')
+router.register(r'monitoring', MonitoringDiscoveryViewSet, basename='monitoring')
+router.register(r'projects', ProjectViewSet, basename='projects')
+router.register(r'scheduledScans', ScheduledScanViewSet, basename='scheduled-scans')
+router.register(r'subscans', SubScanViewSet, basename='subscans')
+router.register(r'listScans', ScanHistoryViewSet, basename='list-scans')
+router.register(r'users', UserManageViewSet, basename='users')
+
 
 urlpatterns = [
     url('^', include(router.urls)),
@@ -101,9 +117,25 @@ urlpatterns = [
         ListOrganizations.as_view(),
         name='listOrganizations'),
     path(
+        'createOrganization/',
+        CreateOrganization.as_view(),
+        name='createOrganization'),
+    path(
+        'updateOrganization/',
+        UpdateOrganization.as_view(),
+        name='updateOrganization'),
+    path(
         'listEngines/',
         ListEngines.as_view(),
         name='listEngines'),
+    path(
+        'listWordlists/',
+        ListWordlists.as_view(),
+        name='listWordlists'),
+    path(
+        'listConfigurations/',
+        ListConfigurations.as_view(),
+        name='listConfigurations'),
     path(
         'listSubScans/',
         ListSubScans.as_view(),
@@ -189,6 +221,10 @@ urlpatterns = [
         RengineUpdateCheck.as_view(),
         name='check_rengine_update'),
     path(
+        'rengine/system-settings/',
+        RengineSystemSettingsAPIView.as_view(),
+        name='rengine_system_settings'),
+    path(
         'action/subdomain/delete/',
         DeleteSubdomain.as_view(),
         name='delete_subdomain'),
@@ -201,6 +237,26 @@ urlpatterns = [
         DeleteMultipleRows.as_view(),
         name='delete_rows'),
     path(
+        'action/engine/create/',
+        CreateEngine.as_view(),
+        name='create_engine'),
+    path(
+        'action/wordlist/upload/',
+        UploadWordlist.as_view(),
+        name='upload_wordlist'),
+    path(
+        'action/wordlist/read/',
+        GetWordlistContent.as_view(),
+        name='read_wordlist'),
+    path(
+        'action/engine/get/',
+        GetEngineDetails.as_view(),
+        name='get_engine_details'),
+    path(
+        'action/engine/update/',
+        UpdateEngine.as_view(),
+        name='update_engine'),
+    path(
         'toggle/subdomain/important/',
         ToggleSubdomainImportantStatus.as_view(),
         name='toggle_subdomain'),
@@ -208,6 +264,10 @@ urlpatterns = [
         'action/initiate/subtask/',
         InitiateSubTask.as_view(),
         name='initiate_subscan'),
+    path(
+        'action/initiate/scan/',
+        InitiateScan.as_view(),
+        name='initiate_scan'),
     path(
         'action/stop/scan/',
         StopScan.as_view(),
@@ -251,6 +311,32 @@ urlpatterns = [
         UpdateThemeView.as_view(),
         name='update_theme'
     ),
+    path(
+        'report-settings/',
+        ReportSettingsAPIView.as_view(),
+        name='report_settings'
+    ),
+    path(
+        'dashboard/<slug:slug>/',
+        DashboardAPIView.as_view(),
+        name='dashboard_api'
+    ),
+    path(
+        'target-summary/<slug:slug>/<int:id>/',
+        TargetSummaryAPIView.as_view(),
+        name='target_summary_api'
+    ),
+    path(
+        'scan-summary/<slug:slug>/<int:id>/',
+        ScanSummaryAPIView.as_view(),
+        name='scan_summary_api'
+    ),
+    path(
+        'notification-settings/',
+        NotificationSettingsAPIView.as_view(),
+        name='notification_settings_api'
+    ),
 ]
+
 
 urlpatterns += router.urls

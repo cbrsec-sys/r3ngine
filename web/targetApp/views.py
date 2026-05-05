@@ -77,7 +77,7 @@ def manage_monitoring_task(domain):
 
 def index(request):
     # TODO bring default target page
-    return render(request, 'target/index.html')
+    return render(request, 'dashboard/v3_index.html')
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
@@ -380,7 +380,7 @@ def add_target(request, slug):
         'form': form,
         'scan_engines': EngineType.objects.all()
     }
-    return render(request, 'target/add.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def list_target(request, slug):
@@ -389,14 +389,14 @@ def list_target(request, slug):
         'target_data_active': 'active',
         'slug': slug
     }
-    return render(request, 'target/list.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
 def delete_target(request, id):
     obj = get_object_or_404(Domain, id=id)
     if request.method == "POST":
-        run_command(f'rm -rf {settings.TOOL_LOCATION} scan_results/{obj.name}*')
+        run_command.run(f'rm -rf {settings.TOOL_LOCATION} scan_results/{obj.name}*', shell=True)
         obj.delete()
         responseData = {'status': 'true'}
         messages.add_message(
@@ -457,7 +457,7 @@ def update_target(request, slug, id):
         "domain": domain,
         "form": form
     }
-    return render(request, 'target/update.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 def target_summary(request, slug, id):
     """Summary of a target (domain). Contains aggregated information on all
@@ -489,24 +489,14 @@ def target_summary(request, slug, id):
     context['scan_engines'] = EngineType.objects.order_by('engine_name').all()
 
     # Subdomains
-    subdomains = (
-        Subdomain.objects
-        .filter(target_domain__id=id)
-        .values('name')
-        .distinct()
-    )
-    context['subdomain_count'] = subdomains.count()
-    context['alive_count'] = subdomains.filter(http_status__exact=200).count()
+    subdomain_qs = Subdomain.objects.filter(target_domain__id=id)
+    context['subdomain_count'] = subdomain_qs.values('name').distinct().count()
+    context['alive_count'] = subdomain_qs.filter(http_status__exact=200).count()
 
     # Endpoints
-    endpoints = (
-        EndPoint.objects
-        .filter(target_domain__id=id)
-        .values('http_url')
-        .distinct()
-    )
-    context['endpoint_count'] = endpoints.count()
-    context['endpoint_alive_count'] = endpoints.filter(http_status__exact=200).count()
+    endpoint_qs = EndPoint.objects.filter(target_domain__id=id)
+    context['endpoint_count'] = endpoint_qs.values('http_url').distinct().count()
+    context['endpoint_alive_count'] = endpoint_qs.filter(http_status__exact=200).count()
 
     # Vulnerabilities
     vulnerabilities = Vulnerability.objects.filter(target_domain__id=id)
@@ -565,10 +555,10 @@ def target_summary(request, slug, id):
 
     # HTTP Statuses
     context['http_status_breakdown'] = (
-        subdomains
+        subdomain_qs
         .exclude(http_status=0)
         .values('http_status')
-        .annotate(Count('http_status'))
+        .annotate(count=Count('http_status'))
     )
 
     # CVEs
@@ -590,14 +580,14 @@ def target_summary(request, slug, id):
     )
 
     # Country ISOs
-    subdomains = Subdomain.objects.filter(target_domain__id=id)
-    ip_addresses = IpAddress.objects.filter(ip_addresses__in=subdomains)
+    ip_addresses = IpAddress.objects.filter(ip_addresses__in=subdomain_qs)
     context['asset_countries'] = (
         CountryISO.objects
         .filter(ipaddress__in=ip_addresses)
         .annotate(count=Count('iso'))
         .order_by('-count')
     )
+
 
     context['slug'] = slug
     
@@ -608,7 +598,7 @@ def target_summary(request, slug, id):
         .order_by('-discovered_at')
     )
 
-    return render(request, 'target/summary.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
@@ -635,7 +625,7 @@ def add_organization(request, slug):
         "organization_active": "active",
         "form": form
     }
-    return render(request, 'organization/add.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 def list_organization(request, slug):
     organizations = Organization.objects.filter(project__slug=slug).order_by('-insert_date')
@@ -643,7 +633,7 @@ def list_organization(request, slug):
         'organization_active': 'active',
         'organizations': organizations
     }
-    return render(request, 'organization/list.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
@@ -703,5 +693,5 @@ def update_organization(request, slug, id):
         "domain_list": mark_safe(domain_list),
         "form": form
     }
-    return render(request, 'organization/update.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 

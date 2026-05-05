@@ -10,7 +10,7 @@ from startScan.models import *
 def list_note(request, slug):
     context = {}
     context['recon_note_active'] = 'active'
-    return render(request, 'note/index.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 def flip_todo_status(request):
     if request.method == "POST":

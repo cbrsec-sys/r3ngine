@@ -4891,21 +4891,33 @@ def run_command(
 		activity_id=activity_id)
 
 	# Run the command using subprocess
-	popen = subprocess.Popen(
-		cmd if shell else cmd.split(),
-		shell=shell,
-		stdout=subprocess.PIPE,
-		stderr=subprocess.STDOUT,
-		cwd=cwd,
-		universal_newlines=True)
-	output = ''
-	for stdout_line in iter(popen.stdout.readline, ""):
-		item = stdout_line.strip()
-		output += '\n' + item
-		logger.debug(item)
-	popen.stdout.close()
-	popen.wait()
-	return_code = popen.returncode
+	try:
+		popen = subprocess.Popen(
+			cmd if shell else cmd.split(),
+			shell=shell,
+			stdout=subprocess.PIPE,
+			stderr=subprocess.STDOUT,
+			cwd=cwd,
+			universal_newlines=True)
+		output = ''
+		for stdout_line in iter(popen.stdout.readline, ""):
+			item = stdout_line.strip()
+			output += '\n' + item
+			logger.debug(item)
+		popen.stdout.close()
+		try:
+			popen.wait(timeout=30)
+		except subprocess.TimeoutExpired:
+			popen.kill()
+			return_code = 124 # Timeout
+			output += "\nCommand timed out after 30 seconds."
+		else:
+			return_code = popen.returncode
+	except Exception as e:
+		logger.error(f"Error executing command {cmd}: {str(e)}")
+		output = f"Error executing command: {str(e)}"
+		return_code = 127 # Command not found / error
+
 	command_obj.output = output
 	command_obj.return_code = return_code
 	command_obj.save()

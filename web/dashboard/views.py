@@ -19,6 +19,9 @@ from django.urls import reverse
 from rolepermissions.roles import assign_role, clear_roles
 from rolepermissions.decorators import has_permission_decorator
 from django.template.defaultfilters import slugify
+from django.contrib.auth import authenticate, login, logout
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.conf import settings
 
 
 from startScan.models import *
@@ -30,14 +33,24 @@ from reNgine.graph_utils import Neo4jManager
 
 logger = logging.getLogger(__name__)
 
-def index(request, slug):
+def index(request, slug, *args, **kwargs):
     try:
         project = Project.objects.get(slug=slug)
     except Exception as e:
         # if project not found redirect to 404
         return HttpResponseRedirect(reverse('four_oh_four'))
 
+    try:
+        user_preferences = UserPreferences.objects.get(user=request.user)
+        if user_preferences.ui_version == 'v3':
+            return render(request, 'dashboard/v3_index.html', {'project': project})
+    except Exception as e:
+        # Fallback to legacy dashboard
+        pass
+
+
     domains = Domain.objects.filter(project=project)
+
     subdomains = Subdomain.objects.filter(scan_history__domain__project__slug=project)
     endpoints = EndPoint.objects.filter(scan_history__domain__project__slug=project)
     scan_histories = ScanHistory.objects.filter(domain__project=project)
@@ -188,7 +201,7 @@ def index(request, slug):
 
     context['asset_countries'] = CountryISO.objects.filter(ipaddress__in=ip_addresses).annotate(count=Count('ipaddress')).order_by('-count')
 
-    return render(request, 'dashboard/index.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def profile(request, slug):
@@ -205,7 +218,7 @@ def profile(request, slug):
             messages.error(request, 'Please correct the error below.')
     else:
         form = PasswordChangeForm(request.user)
-    return render(request, 'dashboard/profile.html', {
+    return render(request, 'dashboard/v3_index.html', {
         'form': form
     })
 
@@ -216,7 +229,7 @@ def admin_interface(request, slug):
     users = UserModel.objects.all().order_by('date_joined')
     return render(
         request,
-        'dashboard/admin.html',
+        'dashboard/v3_index.html',
         {
             'users': users
         }
@@ -300,17 +313,25 @@ def on_user_logged_in(sender, request, **kwargs):
 
 
 def search(request, slug):
-    return render(request, 'dashboard/search.html')
+    # Verified edit
+    return render(request, 'dashboard/v3_index.html')
 
 
 def four_oh_four(request):
-    return render(request, '404.html')
+    try:
+        return render(request, 'dashboard/v3_index.html') # Or a specific 404 page if SPA handles it
+    except Exception as e:
+        logger.error(f"Error in 404 handler: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        from django.http import HttpResponse
+        return HttpResponse("404 Not Found (and 404 handler crashed)", status=404)
 
 
 def projects(request, slug):
     context = {}
     context['projects'] = Project.objects.all()
-    return render(request, 'dashboard/projects.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_TARGETS, redirect_url=FOUR_OH_FOUR_URL)
@@ -454,8 +475,6 @@ def onboarding(request):
                 )
 
     context['error'] = error
-    
-
     context['openai_key'] = OpenAiAPIKey.objects.first()
     context['netlas_key'] = NetlasAPIKey.objects.first()
     context['chaos_key'] = ChaosAPIKey.objects.first()
@@ -468,7 +487,7 @@ def onboarding(request):
         user=request.user
     )
 
-    return render(request, 'dashboard/onboarding.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 
@@ -478,7 +497,7 @@ def list_bountyhub_programs(request, slug):
     platform = request.GET.get('platform') or 'hackerone'
     context['platform'] = platform.capitalize()
     
-    return render(request, 'dashboard/bountyhub_programs.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
     
 
 def monitoring_dashboard(request, slug):
@@ -509,7 +528,7 @@ def monitoring_dashboard(request, slug):
         'login_discoveries': login_discoveries,
     }
     
-    return render(request, 'dashboard/monitoring.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def attack_surface(request, slug, scan_id):
@@ -520,7 +539,18 @@ def attack_surface(request, slug, scan_id):
         'scan': scan,
         'attack_surface_active': 'active'
     }
-    return render(request, 'dashboard/attack_surface.html', context)
+    return render(request, 'dashboard/v3_index.html', context)
+
+
+def target_attack_surface(request, slug, target_id):
+    project = get_object_or_404(Project, slug=slug)
+    target = get_object_or_404(Domain, id=target_id)
+    context = {
+        'project': project,
+        'target': target,
+        'attack_surface_active': 'active'
+    }
+    return render(request, 'dashboard/v3_index.html', context)
 
 
 def get_graph_data(request, slug, scan_id):
@@ -528,3 +558,65 @@ def get_graph_data(request, slug, scan_id):
     data = graph.get_cytoscape_json(scan_id)
     graph.close()
     return JsonResponse(data)
+
+
+def get_target_graph_data(request, slug, target_id):
+    target = get_object_or_404(Domain, id=target_id)
+    graph = Neo4jManager()
+    data = graph.get_target_graph_data(target.name)
+    graph.close()
+    return JsonResponse(data)
+
+
+@ensure_csrf_cookie
+def login_v3(request):
+    if request.method == 'POST':
+        try:
+            # Check if it's a multipart form or JSON
+            if 'application/json' in (request.content_type or ''):
+                data = json.loads(request.body)
+                username = data.get('username')
+                password = data.get('password')
+            else:
+                username = request.POST.get('username')
+                password = request.POST.get('password')
+                
+            user = authenticate(request, username=username, password=password)
+            if user is not None:
+                login(request, user)
+                # Check if there is any project, if so redirect to dashboard of first project
+                project = Project.objects.first()
+                redirect_url = reverse('dashboardIndex', kwargs={'slug': project.slug}) if project else reverse('onboarding')
+                return JsonResponse({
+                    'status': True,
+                    'redirect_url': redirect_url
+                })
+            else:
+                return JsonResponse({
+                    'status': False,
+                    'message': 'Invalid username or password.'
+                })
+        except Exception as e:
+            return JsonResponse({
+                'status': False,
+                'message': str(e)
+            })
+            
+    if request.user.is_authenticated:
+        project = Project.objects.first()
+        if project:
+            return redirect('dashboardIndex', slug=project.slug)
+        return redirect('onboarding')
+        
+    return render(request, 'dashboard/v3_index.html', {
+        'debug': settings.DEBUG,
+        'project': {'name': 'reNgine'} # Fallback for title
+    })
+
+
+def logout_v3(request):
+    logout(request)
+    return render(request, 'dashboard/v3_index.html', {
+        'debug': settings.DEBUG,
+        'project': {'name': 'reNgine'}
+    })
