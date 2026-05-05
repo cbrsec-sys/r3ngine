@@ -151,4 +151,8 @@ class LLMReportGenerator(LLMBaseGenerator):
     def generate_conclusion(self, context):
         from reNgine.definitions import LLM_REPORT_CONCLUSION_SYSTEM_PROMPT
         return self._generate_section(LLM_REPORT_CONCLUSION_SYSTEM_PROMPT, context)
+
+    def generate_attack_scenario(self, vulnerability_context):
+        from reNgine.definitions import LLM_ATTACK_SCENARIO_SYSTEM_PROMPT
+        return self._generate_section(LLM_ATTACK_SCENARIO_SYSTEM_PROMPT, vulnerability_context)
 		

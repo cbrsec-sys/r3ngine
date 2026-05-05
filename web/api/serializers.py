@@ -11,7 +11,22 @@ from targetApp.models import *
 from dashboard.models import InAppNotification
 
 
+
+class ProjectSerializer(serializers.ModelSerializer):
+	insert_date_humanized = serializers.SerializerMethodField()
+
+	class Meta:
+		model = Project
+		fields = '__all__'
+
+	def get_insert_date_humanized(self, obj):
+		if obj.insert_date:
+			return naturaltime(obj.insert_date).title()
+
+
 class HackerOneProgramAttributesSerializer(serializers.Serializer):
+
+
 	"""
 		Serializer for HackerOne Program
 		IMP: THIS is not a model serializer, programs will not be stored in db
@@ -98,10 +113,12 @@ class DomainSerializer(serializers.ModelSerializer):
 		return obj.get_recent_scan_id()
 
 	def get_insert_date(self, obj):
-		return naturalday(obj.insert_date).title()
+		if obj.insert_date:
+			return naturalday(obj.insert_date).title()
 
 	def get_insert_date_humanized(self, obj):
-		return naturaltime(obj.insert_date).title()
+		if obj.insert_date:
+			return naturaltime(obj.insert_date).title()
 
 	def get_start_scan_date(self, obj):
 		if obj.start_scan_date:
@@ -224,6 +241,47 @@ class MinimalUserSerializer(serializers.ModelSerializer):
 		fields = ['username']
 
 
+class UserSerializer(serializers.ModelSerializer):
+	full_name = serializers.SerializerMethodField('get_full_name')
+	role = serializers.SerializerMethodField('get_role')
+	last_login_humanized = serializers.SerializerMethodField('get_last_login_humanized')
+	date_joined_humanized = serializers.SerializerMethodField('get_date_joined_humanized')
+
+	class Meta:
+		model = User
+		fields = [
+			'id', 
+			'username', 
+			'full_name', 
+			'email', 
+			'role', 
+			'is_active', 
+			'is_staff',
+			'date_joined',
+			'date_joined_humanized',
+			'last_login',
+			'last_login_humanized'
+		]
+
+	def get_full_name(self, obj):
+		return obj.get_full_name() or obj.username
+
+	def get_role(self, obj):
+		from rolepermissions.roles import get_user_roles
+		roles = get_user_roles(obj)
+		if roles:
+			return roles[0].role_name
+		return 'penetration_tester'
+
+	def get_last_login_humanized(self, obj):
+		from django.contrib.humanize.templatetags.humanize import naturaltime
+		return naturaltime(obj.last_login) if obj.last_login else 'Never'
+
+	def get_date_joined_humanized(self, obj):
+		from django.contrib.humanize.templatetags.humanize import naturaltime
+		return naturaltime(obj.date_joined)
+
+
 class ScanHistorySerializer(serializers.ModelSerializer):
 
 	subdomain_count = serializers.SerializerMethodField('get_subdomain_count')
@@ -235,6 +293,8 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 	completed_ago = serializers.SerializerMethodField('get_completed_ago')
 	organizations = serializers.SerializerMethodField('get_organizations')
 	initiated_by = MinimalUserSerializer(read_only=True)
+	max_severity = serializers.SerializerMethodField('get_max_severity')
+	engine_name = serializers.SerializerMethodField('get_engine_name')
 
 	class Meta:
 		model = ScanHistory
@@ -257,9 +317,32 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			'error_message',
 			'domain',
 			'scan_type',
-			'initiated_by'
+			'initiated_by',
+			'max_severity',
+			'engine_name',
+			'cfg_starting_point_path'
 		]
 		depth = 1
+
+	def get_max_severity(self, scan_history):
+		from startScan.models import Vulnerability
+		max_vuln = Vulnerability.objects.filter(scan_history=scan_history).order_by('-severity').first()
+		if max_vuln:
+			severity_map = {
+				4: 'critical',
+				3: 'high',
+				2: 'medium',
+				1: 'low',
+				0: 'info',
+				-1: 'unknown'
+			}
+			return severity_map.get(max_vuln.severity, 'unknown')
+		return 'none'
+
+	def get_engine_name(self, scan_history):
+		if scan_history.scan_type:
+			return scan_history.scan_type.engine_name
+		return 'Standard'
 
 	def get_subdomain_count(self, scan_history):
 		if scan_history.get_subdomain_count:
@@ -319,7 +402,8 @@ class OrganizationTargetsSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = Domain
 		fields = [
-			'name'
+			'name',
+			'id'
 		]
 
 
@@ -1005,13 +1089,70 @@ class VulnerabilitySerializer(serializers.ModelSerializer):
 		scan_history_dict = {}
 		scan_history = vulnerability.scan_history
 		if scan_history:
-			# convert model to dict then use MinimalSerializer to get only username
 			scan_history_dict = model_to_dict(scan_history)
+			scan_history_dict['domain'] = {
+				'name': scan_history.domain.name,
+			}
 			scan_history_dict['initiated_by'] = MinimalUserSerializer(scan_history.initiated_by).data if scan_history.initiated_by else None
 			scan_history_dict['aborted_by'] = MinimalUserSerializer(scan_history.aborted_by).data if scan_history.aborted_by else None
+			scan_history_dict['completed_ago'] = scan_history.get_completed_ago()
 		return scan_history_dict
 
 	class Meta:
 		model = Vulnerability
 		fields = '__all__'
 		depth = 2
+
+
+class MonitoringDiscoverySerializer(serializers.ModelSerializer):
+    domain_name = serializers.CharField(source='domain.name', read_only=True)
+    scan_history_id = serializers.IntegerField(source='scan_history.id', read_only=True, allow_null=True)
+
+    class Meta:
+        model = MonitoringDiscovery
+        fields = ['id', 'domain', 'domain_name', 'discovery_type', 'content', 'discovered_at', 'scan_history_id']
+
+
+class ScanActivitySerializer(serializers.ModelSerializer):
+	domain = serializers.SerializerMethodField('get_domain_name')
+	completed_ago = serializers.SerializerMethodField('get_completed_ago')
+
+	class Meta:
+		model = ScanActivity
+		fields = ['id', 'title', 'name', 'time', 'status', 'domain', 'completed_ago']
+
+	def get_domain_name(self, activity):
+		if activity.scan_of:
+			return activity.scan_of.domain.name
+		return ''
+
+	def get_completed_ago(self, activity):
+		return naturaltime(activity.time).title()
+
+
+class WordlistSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Wordlist
+		fields = '__all__'
+
+
+class ConfigurationSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Configuration
+		fields = '__all__'
+
+
+class SecretLeakSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = SecretLeak
+		fields = '__all__'
+
+
+class VulnerabilityReportSettingSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = VulnerabilityReportSetting
+		fields = '__all__'
+class NotificationSettingsSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Notification
+		fields = '__all__'

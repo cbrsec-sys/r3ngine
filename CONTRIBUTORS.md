@@ -1,5 +1,8 @@
 ## Contributors
 
+Version 3 reboot continued by 
+* [MistrHyd3](https://github.com/whiterabb17)
+
 Thanks to these individuals for making reNgine awesome by fixing bugs, resolving issues and by creating PR!
 
 * [Aju100](https://github.com/Aju100)
