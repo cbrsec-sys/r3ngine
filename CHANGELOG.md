@@ -20,6 +20,12 @@
  - Dynamic module configuration via YAML scan engines.
  - Automatic ingestion of discovered subdomains and URLs into the reNgine database.
 - Full Neo4j graph synchronization for OSINT assets.
+- **Multi-Tier Theme System (Hacker, Hybrid, Enterprise)**: Implemented a 3-tier, switchable aesthetic architecture for the React v3 frontend.
+  - **Hacker Theme (Default)**: Optimized the signature cyberpunk look with custom scanline logic and Orbitron-driven typography.
+  - **Hybrid (Modern) Theme**: Introduced a "clean" dark mode that preserves brand-essential neon accents but removes high-intensity background effects.
+  - **Enterprise (Professional) Theme**: Added a new, professional "Slate & Blue" interface using Inter typography and a flat, high-density layout for corporate use cases.
+  - **Functional Token Architecture**: Centralized all theme logic in `tokens.ts`, enabling dynamic injection of CSS variables for fonts, colors, and motion.
+  - **Persistent Selection**: Integrated a `HeaderThemeSwitcher` with `localStorage` persistence and automatic theme propagation via `ThemeContext`.
 - **Cyberpunk V3 "Neon" Dashboard**: Reimagined the entire UI with a premium glassmorphic theme, featuring:
  - Unified dark/neon color palette for enhanced data visualization.
  - Improved sorting and filtering UI for large subdomain datasets.

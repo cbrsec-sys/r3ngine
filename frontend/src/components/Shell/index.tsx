@@ -21,7 +21,8 @@ import {
   Button,
   Chip,
   Grid,
-  Badge
+  Badge,
+  alpha
 } from '@mui/material';
 
 import {
@@ -66,6 +67,7 @@ import { useUnreadCount } from '../../features/notifications/api';
 import { ScanHistoryDrawer } from '../../features/scans/components/ScanHistoryDrawer';
 import { CheckForUpdateModal } from '../../features/settings/components/CheckForUpdateModal';
 import { useRengineUpdateCheck } from '../../features/settings/api';
+import { HeaderThemeSwitcher } from './HeaderThemeSwitcher';
 
 const drawerWidth = 260;
 const collapsedWidth = 72;
@@ -96,17 +98,17 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const { data: unreadData } = useUnreadCount(projectSlug);
 
   const navItems: NavItem[] = [
-    { title: 'Dashboard', icon: <Home size={20} />, path: `/${projectSlug}/dashboard`, color: '#7000ff' },
-    { title: 'Projects', icon: <Folder size={20} />, path: `/${projectSlug}/projects`, color: '#00f3ff' },
+    { title: 'Dashboard', icon: <Home size={20} />, path: `/${projectSlug}/dashboard`, color: theme.palette.primary.main },
+    { title: 'Projects', icon: <Folder size={20} />, path: `/${projectSlug}/projects`, color: theme.palette.primary.main },
 
 
-    { title: 'Targets', icon: <Target size={20} />, path: `/${projectSlug}/targets`, color: '#00f3ff' },
-    { title: 'Monitoring', icon: <Monitor size={20} />, path: `/${projectSlug}/monitoring`, color: '#00f3ff' },
+    { title: 'Targets', icon: <Target size={20} />, path: `/${projectSlug}/targets`, color: theme.palette.primary.main },
+    { title: 'Monitoring', icon: <Monitor size={20} />, path: `/${projectSlug}/monitoring`, color: theme.palette.primary.main },
     {
       title: 'Scan History',
       icon: <Activity size={20} />,
       path: `/${projectSlug}/scans`,
-      color: '#00f3ff',
+      color: theme.palette.primary.main,
       children: [
         { title: 'Scan History', path: `/${projectSlug}/scans` },
         { title: 'Sub Scan History', path: `/${projectSlug}/scans/sub` },
@@ -115,16 +117,16 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
         { title: 'All Endpoints', path: `/${projectSlug}/endpoints` },
       ]
     },
-    { title: 'Vulnerabilities', icon: <ShieldAlert size={20} />, path: `/${projectSlug}/vulns`, color: '#00f3ff' },
-    { title: 'Todo', icon: <CheckSquare size={20} />, path: `/${projectSlug}/todo`, color: '#00f3ff' },
-    { title: 'Organization', icon: <Briefcase size={20} />, path: `/${projectSlug}/org`, color: '#00f3ff' },
-    { title: 'Scan Engine', icon: <Cpu size={20} />, path: `/${projectSlug}/engines`, color: '#00f3ff' },
-    { title: 'Bounty Hub', icon: <Command size={20} />, path: `/${projectSlug}/bounty`, color: '#00f3ff' },
+    { title: 'Vulnerabilities', icon: <ShieldAlert size={20} />, path: `/${projectSlug}/vulns`, color: theme.palette.primary.main },
+    { title: 'Todo', icon: <CheckSquare size={20} />, path: `/${projectSlug}/todo`, color: theme.palette.primary.main },
+    { title: 'Organization', icon: <Briefcase size={20} />, path: `/${projectSlug}/org`, color: theme.palette.primary.main },
+    { title: 'Scan Engine', icon: <Cpu size={20} />, path: `/${projectSlug}/engines`, color: theme.palette.primary.main },
+    { title: 'Bounty Hub', icon: <Command size={20} />, path: `/${projectSlug}/bounty`, color: theme.palette.primary.main },
     {
       title: 'Settings',
       icon: <Settings size={20} />,
       path: `/${projectSlug}/settings`,
-      color: '#00f3ff',
+      color: theme.palette.primary.main,
       children: [
         { title: 'Proxies', path: `/${projectSlug}/settings/proxies` },
         { title: 'OpSec Settings', path: `/${projectSlug}/settings/opsec` },
@@ -240,7 +242,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             overflowY: 'auto',
             boxSizing: 'border-box',
             borderRight: 'none',
-            bgcolor: 'rgba(10, 10, 20, 0.8)',
+            bgcolor: alpha(theme.palette.background.paper, 0.8),
             backdropFilter: 'blur(10px)',
             backgroundImage: 'none',
             borderRadius: '0 30px 30px 0',
@@ -248,8 +250,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             maxHeight: 'calc(100vh - 40px)',
             top: '50%',
             transform: 'translateY(-50%)',
-            border: '1px solid rgba(0, 243, 255, 0.1)',
-            boxShadow: '0 0 30px rgba(0,0,0,0.5)',
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+            boxShadow: theme.shadows[10],
             py: 2,
             /* Custom Scrollbar */
             '&::-webkit-scrollbar': {
@@ -259,10 +261,10 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               background: 'transparent',
             },
             '&::-webkit-scrollbar-thumb': {
-              background: 'rgba(0, 243, 255, 0.2)',
+              background: alpha(theme.palette.primary.main, 0.2),
               borderRadius: '10px',
               '&:hover': {
-                background: 'rgba(0, 243, 255, 0.4)',
+                background: alpha(theme.palette.primary.main, 0.4),
               },
             },
           },
@@ -290,9 +292,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       minHeight: 48,
                       justifyContent: isHovered ? 'initial' : 'center',
                       px: 2.5,
-                      bgcolor: isActive ? 'rgba(112, 0, 255, 0.15)' : 'transparent',
+                      bgcolor: isActive ? alpha(theme.palette.primary.main, 0.15) : 'transparent',
                       '&:hover': {
-                        bgcolor: isActive ? 'rgba(112, 0, 255, 0.2)' : 'rgba(0, 243, 255, 0.05)',
+                        bgcolor: isActive ? alpha(theme.palette.primary.main, 0.2) : alpha(theme.palette.primary.main, 0.05),
                       }
                     }}
                   >
@@ -301,7 +303,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       mr: isHovered ? 2 : 'auto',
                       justifyContent: 'center',
                       color: itemColor,
-                      filter: `drop-shadow(0 0 5px ${itemColor}aa)`
+                      filter: `drop-shadow(0 0 5px ${itemColor}66)`
                     }}>
                       {item.icon}
                     </ListItemIcon>
@@ -312,7 +314,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                           primary={
                             <Typography variant="body2" sx={{
                               fontWeight: 600,
-                              color: isActive ? '#7000ff' : 'rgba(255,255,255,0.6)',
+                              color: isActive ? theme.palette.primary.main : alpha(theme.palette.text.primary, 0.6),
                               fontSize: '0.85rem'
                             }}>
                               {item.title}
@@ -374,14 +376,14 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* Floating Topbar */}
         <AppBar position="fixed" sx={{
-          bgcolor: 'rgba(10, 10, 15, 0.95)',
+          bgcolor: alpha(theme.palette.background.paper, 0.95),
           backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255, 255, 255, 0.05)',
+          border: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
           borderRadius: 4,
           mt: 1.5,
           mx: 2,
           width: 'calc(100% - 32px)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+          boxShadow: theme.shadows[8],
           backgroundImage: 'none',
           zIndex: theme.zIndex.drawer + 1
         }}>
@@ -390,10 +392,10 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             <Box sx={{ display: 'flex', alignItems: 'center', mr: 4 }}>
               <Typography variant="h6" sx={{
                 fontWeight: 900,
-                fontFamily: 'Orbitron',
+                fontFamily: 'var(--r3-heading-font)',
                 letterSpacing: 2,
-                color: "rgb(255, 0, 241)",
-                textShadow: "rgb(255, 0, 0) 0px 0px 21px",
+                color: theme.palette.primary.main,
+                textShadow: theme.palette.mode === 'dark' ? `${alpha(theme.palette.primary.main, 0.5)} 0px 0px 15px` : 'none',
                 fontSize: '1.4rem',
                 mr: 1.5,
                 ml: 12,
@@ -409,8 +411,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                   fontSize: '0.6rem',
                   fontWeight: 800,
                   bgcolor: 'transparent',
-                  border: '1px solid #ff00ff',
-                  color: '#ff00ff',
+                  border: `1px solid ${theme.palette.primary.main}`,
+                  color: theme.palette.primary.main,
                   borderRadius: 1
                 }}
               />
@@ -458,16 +460,17 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               </Box>
 
               <Box sx={{ display: 'flex', gap: 1, mx: 2 }}>
+                <HeaderThemeSwitcher />
                 <IconButton
                   onClick={handleToolboxOpen}
                   size="small"
                   sx={{
-                    color: toolboxAnchorEl ? '#00f3ff' : 'rgba(255,255,255,0.5)',
-                    bgcolor: toolboxAnchorEl ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
-                    boxShadow: toolboxAnchorEl ? '0 0 15px rgba(0, 243, 255, 0.3)' : 'none',
+                    color: toolboxAnchorEl ? theme.palette.primary.main : alpha(theme.palette.text.secondary, 0.5),
+                    bgcolor: toolboxAnchorEl ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                    boxShadow: toolboxAnchorEl && theme.palette.mode === 'dark' ? `0 0 15px ${alpha(theme.palette.primary.main, 0.3)}` : 'none',
                     '&:hover': {
-                      color: '#00f3ff',
-                      bgcolor: 'rgba(0, 243, 255, 0.05)',
+                      color: theme.palette.primary.main,
+                      bgcolor: alpha(theme.palette.primary.main, 0.05),
                     }
                   }}
                 >
@@ -477,11 +480,11 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                   onClick={handleNotificationOpen}
                   size="small"
                   sx={{
-                    color: notificationAnchorEl ? '#00f3ff' : 'rgba(255,255,255,0.5)',
-                    bgcolor: notificationAnchorEl ? 'rgba(0, 243, 255, 0.1)' : 'transparent',
+                    color: notificationAnchorEl ? theme.palette.primary.main : alpha(theme.palette.text.secondary, 0.5),
+                    bgcolor: notificationAnchorEl ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
                     '&:hover': {
-                      color: '#00f3ff',
-                      bgcolor: 'rgba(0, 243, 255, 0.05)',
+                      color: theme.palette.primary.main,
+                      bgcolor: alpha(theme.palette.primary.main, 0.05),
                     }
                   }}
                 >
@@ -489,7 +492,6 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                     <Bell size={18} />
                   </Badge>
                 </IconButton>
-                {/* Removed extra icon */}
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }} onClick={handleMenuOpen}>
@@ -498,8 +500,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                   sx={{
                     width: 32,
                     height: 32,
-                    bgcolor: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(0, 243, 255, 0.3)',
+                    bgcolor: alpha(theme.palette.text.primary, 0.05),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`,
                     p: 0.2
                   }}
                 />

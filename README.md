@@ -43,14 +43,14 @@ Traditional reconnaissance tools often fall short in terms of configurability an
 
 Version 3.0 represents a complete overhaul of r3ngine, focusing on AI-driven intelligence, aesthetic excellence, and surgical discovery precision. Below are the core pillars of the v3 release:
 
-### 🎨 Cyberpunk V3 Hacker Dashboard
-A completely reimagined, glassmorphic UI designed for high-impact data visualization and aesthetic excellence.
-*   **Neon Aesthetic**: High-contrast, vibrant interface with neon accents for better visibility in dark environments.
-*   **Unified Tables**: Structurally optimized headers (including IP, Ports, and Status) for a seamless, professional look.
-*   **Interactive Analytics**: Dynamic reporting views with actionable insights and trend analysis.
+### 🎨 Multi-Tier V3 Visual Experience
+reNgine v3 now features a sophisticated, switchable theme system designed to adapt to your operational environment.
+*   **Hacker (Default)**: The full cyberpunk experience. High-intensity neons, glassmorphism, Orbitron typography, and animated scanlines for a tactical "mission control" feel.
+*   **Hybrid (Modern)**: A refined, clean version of the brand. Removes high-intensity background noise and scanlines while retaining the signature neon accents and Orbitron headings.
+*   **Enterprise (Professional)**: A premium, corporate-grade interface. Built for performance and stability with a Slate/Blue palette, Inter (Sans-Serif) typography, and a flat, high-density layout.
 *   **Theme Management**:
-    *   **How to Switch**: Toggle the intensity (Neon/Glassmorphic) via the top navigation bar or select "Hacker" in your **User Profile Settings**.
-    *   **How to Revert**: To return to the classic look, simply visit your **User Profile Settings** and switch back to the "Default" or "Classic" theme.
+    *   **How to Switch**: Click the **Palette Icon** in the top navigation bar (Topbar) to choose between Hacker, Hybrid, and Enterprise modes instantly.
+    *   **Persistence**: Your theme preference is automatically saved to `localStorage` and will persist across all browser sessions.
 
 ### 🤖 Dedicated LLM Toolkit
 Centralized AI management for smarter reconnaissance and automated reporting.
@@ -260,7 +260,7 @@ You can also find the deep dive video on how to use and install reNgine from her
 1. Clone the repository
 
     ```bash
-    git clone https://github.com/whiterabb17/rengine && cd rengine
+    git clone https://github.com/whiterabb17/r3ngine && cd r3ngine
     ```
 
 1. Configure the environment
@@ -337,7 +337,7 @@ Please note: This is community-curated content and is not owned by reNgine. The 
 1. To update reNgine, run:
 
     ```bash
-    cd rengine &&  sudo ./update.sh
+    cd r3ngine &&  sudo ./update.sh
     ```
 
     If `update.sh` lacks execution permissions, use:
