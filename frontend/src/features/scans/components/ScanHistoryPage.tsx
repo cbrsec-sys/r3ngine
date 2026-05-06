@@ -371,8 +371,7 @@ export const ScanHistoryPage: React.FC = () => {
                         </Button>
                         <IconButton
                           size="small"
-                          onClick={(e) => {
-                            e.stopPropagation();
+                          onClick={() => {
                             const match = domains?.find(d => d.id === scan.domain.id);
                             if (!match) return;
                             setStartScanTargets({

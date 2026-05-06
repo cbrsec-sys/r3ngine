@@ -92,6 +92,7 @@ import VisualizationTab from './VisualizationTab';
 import { ScreenshotsTab } from './ScreenshotsTab';
 import { ScanReportModal } from './ScanReportModal';
 import { StartScanModal } from './StartScanModal';
+import { OsintTab } from './OsintTab';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   const configs: any = {
@@ -357,7 +358,7 @@ const TimelineItem: React.FC<{ activity: any, onClick?: () => void }> = ({ activ
             height: 4,
             borderRadius: '50%',
             bgcolor: config.color,
-            animation: 'pulse 1.5s infinite'
+            opacity: 0.8
           }} />
         )}
       </Box>
@@ -1119,51 +1120,7 @@ export const ScanDetailPage = () => {
   );
 
   const renderOSINT = () => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%' }}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, width: '100%' }}>
-        <TacticalPanel title="Employees/People Found" icon={<Users size={14} />}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-                <TableRow>
-                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>NAME</TableCell>
-                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>DESIGNATION</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {/* This would be populated from data.employees if available */}
-                <TableRow>
-                  <TableCell colSpan={2} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO EMPLOYEE DATA FOUND</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </TacticalPanel>
-        <TacticalPanel title="Discovered Email Addresses" icon={<Mail size={14} />}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-                <TableRow>
-                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>EMAIL</TableCell>
-                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>EXPOSED</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {/* This would be populated from data.emails if available */}
-                <TableRow>
-                  <TableCell colSpan={2} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO EMAIL DATA FOUND</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </TacticalPanel>
-      </Box>
-      <TacticalPanel title="Dorking Results" icon={<Search size={14} />}>
-        <Box sx={{ p: 4, textAlign: 'center' }}>
-          <Typography sx={{ color: 'rgba(255,255,255,0.2)' }}>OSINT MODULE DATA COMING SOON</Typography>
-        </Box>
-      </TacticalPanel>
-    </Box>
+    <OsintTab data={data} />
   );
 
   const renderLeaks = () => (

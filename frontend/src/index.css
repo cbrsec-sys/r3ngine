@@ -44,7 +44,7 @@ body::after {
   pointer-events: none !important;
   mix-blend-mode: overlay !important;
   filter: contrast(150%) brightness(100%) !important;
-  animation: scanline-move 5s linear infinite !important;
+  /* animation: scanline-move 5s linear infinite !important; */
 }
 
 @keyframes scanline-move {

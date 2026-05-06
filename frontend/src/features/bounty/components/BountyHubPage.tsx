@@ -26,6 +26,7 @@ import {
   AccordionDetails,
   CircularProgress,
   Tooltip,
+  Snackbar,
   Divider,
   Alert
 } from '@mui/material';
@@ -51,6 +52,8 @@ import {
 } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
 import { useBountyPrograms, useProgramDetails, useImportPrograms } from '../api';
+import { useAddTarget } from '../../targets/api';
+import { formatDistanceToNow, subMonths } from 'date-fns';
 //import { HackerOneProgram } from '../types';
 
 const PROGRAM_CARD_STYLE = {
@@ -82,6 +85,13 @@ export const BountyHubPage: React.FC = () => {
   const [sortBy, setSortBy] = useState('age-desc');
   const [selectedHandles, setSelectedHandles] = useState<string[]>([]);
   const [detailHandle, setDetailHandle] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
+  const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
 
   const [sortKey, sortOrder] = sortBy.split('-');
   const { data: programs, isLoading, error } = useBountyPrograms({
@@ -92,6 +102,20 @@ export const BountyHubPage: React.FC = () => {
 
   const { data: details, isLoading: isLoadingDetails } = useProgramDetails(detailHandle);
   const importMutation = useImportPrograms();
+  const addTargetMutation = useAddTarget(projectSlug || 'default');
+
+  const groupedAssets = useMemo(() => {
+    if (!details) return {};
+    const grouped: Record<string, any[]> = {};
+    details.relationships.structured_scopes.data.forEach(scope => {
+      if (scope.attributes.eligible_for_submission) {
+        const type = scope.attributes.asset_type;
+        if (!grouped[type]) grouped[type] = [];
+        grouped[type].push(scope);
+      }
+    });
+    return grouped;
+  }, [details]);
 
   const filteredPrograms = useMemo(() => {
     if (!programs) return [];
@@ -121,9 +145,38 @@ export const BountyHubPage: React.FC = () => {
     try {
       await importMutation.mutateAsync({ handles: selectedHandles, projectSlug });
       setSelectedHandles([]);
-      // Success alert logic here (e.g. using a global toast system)
-    } catch (err) {
-      console.error(err);
+      setSnackbar({
+        open: true,
+        message: `Import process started for ${selectedHandles.length} programs.`,
+        severity: 'success'
+      });
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        message: err.message || 'Import initiation failed.',
+        severity: 'error'
+      });
+    }
+  };
+
+  const handleAddTarget = async (asset: string, programName: string) => {
+    if (!projectSlug) return;
+    try {
+      await addTargetMutation.mutateAsync({
+        domain_name: asset,
+        project_slug: projectSlug,
+      });
+      setSnackbar({
+        open: true,
+        message: `Added target: ${asset}`,
+        severity: 'success'
+      });
+    } catch (err: any) {
+      setSnackbar({
+        open: true,
+        message: err.message || 'Failed to add target.',
+        severity: 'error'
+      });
     }
   };
 
@@ -147,30 +200,10 @@ export const BountyHubPage: React.FC = () => {
         </Box>
 
         <Stack direction="row" spacing={2}>
-          {selectedHandles.length > 0 && (
-            <Button
-              variant="outlined"
-              onClick={() => setSelectedHandles([])}
-              sx={{ color: 'rgba(255,255,255,0.6)', borderColor: 'rgba(255,255,255,0.2)' }}
-            >
-              CLEAR SELECTIONS ({selectedHandles.length})
-            </Button>
-          )}
-          <Button
-            variant="contained"
-            disabled={selectedHandles.length === 0 || importMutation.isPending}
-            onClick={handleImport}
-            startIcon={<DownloadCloud size={18} />}
-            sx={{
-              bgcolor: '#00f3ff',
-              color: '#000',
-              fontFamily: 'Orbitron',
-              fontWeight: 900,
-              '&:hover': { bgcolor: '#00d8e4', boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)' }
-            }}
-          >
-            {importMutation.isPending ? 'IMPORTING...' : `IMPORT PROGRAMS`}
-          </Button>
+          {/* Action buttons removed from header to match legacy floating container if selected */}
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', alignSelf: 'center', fontFamily: 'Orbitron' }}>
+            {programs?.length || 0} PROGRAMS SYNCED
+          </Typography>
         </Stack>
       </Stack>
 
@@ -218,11 +251,12 @@ export const BountyHubPage: React.FC = () => {
                 onChange={(e) => setSortBy(e.target.value)}
                 sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.01)' }}
               >
-                <MenuItem value="age-desc">Newest First</MenuItem>
-                <MenuItem value="age-asc">Oldest First</MenuItem>
+                <MenuItem value="age-desc">Most Recent</MenuItem>
+                <MenuItem value="age-asc">Least Recent</MenuItem>
                 <MenuItem value="name-asc">Name (A-Z)</MenuItem>
                 <MenuItem value="name-desc">Name (Z-A)</MenuItem>
                 <MenuItem value="reports-desc">Most Reports</MenuItem>
+                <MenuItem value="reports-asc">Least Reports</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -299,6 +333,12 @@ export const BountyHubPage: React.FC = () => {
                     ) : (
                       <Chip label="VDP" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'rgba(255, 152, 0, 0.1)', color: '#ff9800' }} />
                     )}
+                    {p.attributes.open_scope && (
+                      <Chip label="OPEN SCOPE" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'rgba(76, 175, 80, 0.1)', color: '#4caf50' }} />
+                    )}
+                    {new Date(p.attributes.started_accepting_at) > subMonths(new Date(), 3) && (
+                      <Chip icon={<Zap size={10} />} label="NEW" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', '& .MuiChip-icon': { color: '#00f3ff' } }} />
+                    )}
                   </Stack>
 
                   <Grid container spacing={1} sx={{ mb: 2 }}>
@@ -322,6 +362,15 @@ export const BountyHubPage: React.FC = () => {
 
                   <Divider sx={{ mb: 1.5, borderColor: 'rgba(255,255,255,0.05)' }} />
 
+                  <Stack direction="row" sx={{ justifyContent: "space-between", color: 'rgba(255,255,255,0.4)', mb: 1.5 }}>
+                    <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      Since {new Date(p.attributes.started_accepting_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                    </Typography>
+                    <Typography variant="caption" sx={{ fontWeight: 900 }}>
+                      {p.attributes.currency.toUpperCase()}
+                    </Typography>
+                  </Stack>
+
                   <Button
                     fullWidth
                     size="small"
@@ -339,6 +388,49 @@ export const BountyHubPage: React.FC = () => {
             </Grid>
           ))}
         </Grid>
+      )}
+
+      {/* Floating Action Container */}
+      {selectedHandles.length > 0 && (
+        <Box sx={{
+          position: 'fixed',
+          bottom: 32,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          zIndex: 1000,
+          bgcolor: 'rgba(13, 12, 20, 0.95)',
+          border: '1px solid #00f3ff',
+          p: 1.5,
+          borderRadius: 2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 3,
+          boxShadow: '0 0 30px rgba(0, 243, 255, 0.2)',
+          backdropFilter: 'blur(10px)'
+        }}>
+          <Button
+            variant="contained"
+            onClick={handleImport}
+            disabled={importMutation.isPending}
+            startIcon={importMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <DownloadCloud size={18} />}
+            sx={{
+              bgcolor: '#00f3ff',
+              color: '#000',
+              fontFamily: 'Orbitron',
+              fontWeight: 900,
+              '&:hover': { bgcolor: '#00d8e4' }
+            }}
+          >
+            {importMutation.isPending ? 'IMPORTING...' : `IMPORT ${selectedHandles.length} PROGRAM${selectedHandles.length !== 1 ? 'S' : ''}`}
+          </Button>
+          <Button
+            variant="text"
+            onClick={() => setSelectedHandles([])}
+            sx={{ color: 'rgba(255,255,255,0.6)', fontFamily: 'Orbitron', fontSize: '0.7rem', fontWeight: 800 }}
+          >
+            CLEAR ALL <XCircle size={14} style={{ marginLeft: 8 }} />
+          </Button>
+        </Box>
       )}
 
       {/* Details Dialog */}
@@ -370,36 +462,61 @@ export const BountyHubPage: React.FC = () => {
               <Grid container spacing={4}>
                 <Grid size={{ xs: 12, md: 7 }}>
                   <Typography variant="subtitle2" sx={{ color: 'rgba(0, 243, 255, 0.7)', mb: 2, letterSpacing: 1 }}>ASSETS ON SCOPE</Typography>
-                  <Stack spacing={2}>
-                    {details.relationships.structured_scopes.data.length > 0 ? (
-                      details.relationships.structured_scopes.data.map((scope) => (
-                        <Box key={scope.id} sx={{
-                          p: 1.5,
-                          bgcolor: 'rgba(255,255,255,0.02)',
+                  <Box sx={{ maxHeight: 400, overflowY: 'auto', pr: 1 }}>
+                    {Object.keys(groupedAssets).length > 0 ? (
+                      Object.entries(groupedAssets).map(([type, assets]) => (
+                        <Accordion key={type} sx={{
+                          bgcolor: 'transparent',
+                          backgroundImage: 'none',
                           border: '1px solid rgba(255,255,255,0.05)',
-                          borderRadius: 1,
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center'
+                          mb: 1,
+                          '&:before': { display: 'none' }
                         }}>
-                          <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                            <Box sx={{ color: 'rgba(255,255,255,0.3)' }}>
-                              {scope.attributes.asset_type === 'DOMAIN' ? <Globe size={16} /> : <PlusCircle size={16} />}
-                            </Box>
-                            <Box>
-                              <Typography variant="body2" sx={{ color: '#fff', fontWeight: 600 }}>{scope.attributes.asset_identifier}</Typography>
-                              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>{scope.attributes.asset_type}</Typography>
-                            </Box>
-                          </Stack>
-                          <Button size="small" variant="text" startIcon={<PlusCircle size={14} />} sx={{ color: '#00f3ff' }}>
-                            ADD
-                          </Button>
-                        </Box>
+                          <AccordionSummary expandIcon={<ChevronDown color="rgba(255,255,255,0.3)" size={18} />}>
+                            <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
+                              <Folder size={16} color="#00f3ff" />
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#fff', fontFamily: 'Orbitron' }}>
+                                {type}S <Typography component="span" variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.5)', ml: 1 }}>({assets.length})</Typography>
+                              </Typography>
+                            </Stack>
+                          </AccordionSummary>
+                          <AccordionDetails sx={{ pt: 0 }}>
+                            <Stack spacing={1}>
+                              {assets.map((scope: any) => (
+                                <Box key={scope.id} sx={{
+                                  p: 1.5,
+                                  bgcolor: 'rgba(255,255,255,0.02)',
+                                  border: '1px solid rgba(255,255,255,0.05)',
+                                  borderRadius: 1,
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  '&:hover': { bgcolor: 'rgba(255,255,255,0.04)' }
+                                }}>
+                                  <Box sx={{ minWidth: 0, flexGrow: 1, mr: 2 }}>
+                                    <Typography variant="body2" noWrap sx={{ color: '#fff', fontWeight: 600 }}>{scope.attributes.asset_identifier}</Typography>
+                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>{scope.attributes.asset_type}</Typography>
+                                  </Box>
+                                  <Button
+                                    size="small"
+                                    variant="text"
+                                    startIcon={<PlusCircle size={14} />}
+                                    onClick={() => handleAddTarget(scope.attributes.asset_identifier, details.attributes.name)}
+                                    disabled={addTargetMutation.isPending}
+                                    sx={{ color: '#00f3ff', minWidth: 'auto', '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                                  >
+                                    ADD
+                                  </Button>
+                                </Box>
+                              ))}
+                            </Stack>
+                          </AccordionDetails>
+                        </Accordion>
                       ))
                     ) : (
                       <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.4)' }}>No structured scope found.</Typography>
                     )}
-                  </Stack>
+                  </Box>
                 </Grid>
                 <Grid size={{ xs: 12, md: 5 }}>
                   <Stack spacing={3}>
@@ -452,6 +569,31 @@ export const BountyHubPage: React.FC = () => {
           </>
         )}
       </Dialog>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{
+            fontFamily: 'Orbitron',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' :
+              snackbar.severity === 'error' ? 'rgba(255, 0, 85, 0.9)' : 'rgba(0, 243, 255, 0.5)',
+            color: '#000',
+            border: '1px solid rgba(255,255,255,0.1)',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

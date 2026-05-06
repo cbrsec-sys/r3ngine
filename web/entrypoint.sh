@@ -19,9 +19,9 @@ python3 manage.py loaddata fixtures/external_tools.yaml
 python3 manage.py loaddata fixtures/default_keywords.yaml
 
 # Load custom engines if any
-echo "Loading custom engines..."
-mkdir -p /usr/src/app/custom_engines
-python3 manage.py loadcustomengines
+#echo "Loading custom engines..."
+#mkdir -p /usr/src/app/custom_engines
+#python3 manage.py loadcustomengines
 
 # Start Vite development server if DEBUG is enabled
 if [ "$DEBUG" = "1" ]; then

@@ -38,13 +38,13 @@ const PulsingDot = styled('div')(({ color }: { color: string }) => ({
         bottom: -4,
         borderRadius: '50%',
         border: `2px solid ${color}`,
-        animation: 'pulse 2s infinite',
+        // animation: 'mapMarkerPulse 2s infinite',
         opacity: 0
     },
-    '@keyframes pulse': {
-        '0%': { transform: 'scale(0.5)', opacity: 0.8 },
-        '100%': { transform: 'scale(2.5)', opacity: 0 }
-    }
+    // '@keyframes mapMarkerPulse': {
+    //     '0%': { transform: 'scale(0.5)', opacity: 0.8 },
+    //     '100%': { transform: 'scale(2.5)', opacity: 0 }
+    // }
 }));
 
 // Basic Centroid Mapping for Tactical Markers
@@ -216,16 +216,16 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
                             <Marker
                                 key={country.iso}
                                 position={coords}
-                                icon={L.divIcon({
-                                    html: `<div style="display: flex; justify-content: center; align-items: center; width: 100%; height: 100%;"><div style="width: 8px; height: 8px; background-color: #00f3ff; border-radius: 50%; box-shadow: 0 0 10px #00f3ff; position: relative;"><style>@keyframes pulse { 0% { box-shadow: 0 0 10px #00f3ff, 0 0 0px 2px #00f3ff; } 100% { box-shadow: 0 0 10px #00f3ff, 0 0 15px 8px rgba(0,243,255,0); } } div { animation: pulse 2s infinite; }</style></div></div>`,
-                                    iconSize: [20, 20],
-                                    iconAnchor: [10, 10],
-                                    popupAnchor: [0, -10],
-                                    className: 'custom-marker'
-                                })}
                             >
                                 <Tooltip title={`${country.name}: ${country.count} Assets`} arrow>
-                                    <span />
+                                    <g>
+                                        <circle r={4} fill="rgba(0, 243, 255, 0.2)" />
+                                        <foreignObject x="-10" y="-10" width="20" height="20">
+                                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}>
+                                                <PulsingDot color="#00f3ff" />
+                                            </div>
+                                        </foreignObject>
+                                    </g>
                                 </Tooltip>
                             </Marker>
                         );

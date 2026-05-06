@@ -2,6 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Box, Typography, CircularProgress, Stack, Button, InputBase } from '@mui/material';
 import { Map as MapIcon, Maximize, RefreshCw, Download, Search } from 'lucide-react';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { useGraphStore } from '../../../store/useGraphStore';
+import { GraphNodeDetailPanel } from './GraphNodeDetailPanel';
+import { GraphBlastRadiusPanel } from './GraphBlastRadiusPanel';
+import { GraphControlPanel } from './GraphControlPanel';
 
 interface AttackSurfaceTabProps {
   projectSlug: string;
@@ -27,6 +31,7 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [scanColorMap, setScanColorMap] = useState<Record<number, string>>({});
+  const { setSelectedNode, activePanel } = useGraphStore();
 
   useEffect(() => {
     // Load Cytoscape from CDN if not already loaded
@@ -82,13 +87,23 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
                         'text-valign': 'bottom',
                         'text-margin-y': '5px',
                         'text-opacity': 0,
-                        'width': 30,
-                        'height': 30,
+                        'width': (ele: any) => {
+                            const deg = ele.data('degree_centrality') || 0;
+                            return Math.min(80, 30 + deg * 5);
+                        },
+                        'height': (ele: any) => {
+                            const deg = ele.data('degree_centrality') || 0;
+                            return Math.min(80, 30 + deg * 5);
+                        },
                         'border-width': (ele: any) => {
+                            const criticals = ele.data('criticalVulnCount') || 0;
+                            if (criticals > 0) return 4;
                             const scanIds = ele.data('scan_ids') || [];
                             return scanIds.length > 0 ? 3 : 1;
                         },
                         'border-color': (ele: any) => {
+                            const criticals = ele.data('criticalVulnCount') || 0;
+                            if (criticals > 0) return '#ef4444'; // Red border for critical
                             const scanIds = ele.data('scan_ids') || [];
                             if (scanIds.length > 0) {
                                 return colorMap[scanIds[0]] || '#00f3ff';
@@ -219,6 +234,17 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
               cyRef.current.elements().removeClass('faded highlighted hover');
           });
 
+          cyRef.current.on('tap', 'node', function(e: any) {
+              const node = e.target;
+              setSelectedNode(node.id(), node.data());
+          });
+
+          cyRef.current.on('tap', function(e: any) {
+              if (e.target === cyRef.current) {
+                  setSelectedNode(null);
+              }
+          });
+
           setIsLoading(false);
         }
       } catch (error) {
@@ -300,28 +326,13 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
       </Box>
 
       <TacticalPanel title="GRAPH CONTROLS" icon={<MapIcon size={14} />}>
-        <Box sx={{ p: 2, display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'center', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-           <Box sx={{ 
-              display: 'flex', 
-              bgcolor: 'rgba(255,255,255,0.03)', 
-              borderRadius: 1, 
-              border: '1px solid rgba(0, 243, 255, 0.1)',
-              width: '300px'
-           }}>
-              <Box sx={{ p: 1, color: 'rgba(255,255,255,0.3)' }}><Search size={16} /></Box>
-              <InputBase 
-                placeholder="Search assets..." 
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-                sx={{ flex: 1, color: '#fff', fontSize: '0.8rem' }} 
-              />
-           </Box>
-           <Stack direction="row" spacing={1}>
-              <Button size="small" startIcon={<Maximize size={14} />} onClick={resetZoom} sx={{ bgcolor: 'rgba(33,150,243,0.1)', color: '#2196f3', fontSize: '0.7rem', fontWeight: 800 }}>RESET ZOOM</Button>
-              <Button size="small" startIcon={<RefreshCw size={14} />} onClick={refreshLayout} sx={{ bgcolor: 'rgba(112,0,255,0.1)', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800 }}>RELAYOUT</Button>
-              <Button size="small" startIcon={<Download size={14} />} onClick={exportPNG} sx={{ bgcolor: 'rgba(0,255,170,0.1)', color: '#00ffaa', fontSize: '0.7rem', fontWeight: 800 }}>EXPORT PNG</Button>
-           </Stack>
-        </Box>
+        <GraphControlPanel 
+            searchQuery={searchQuery}
+            onSearch={handleSearch}
+            onResetZoom={resetZoom}
+            onRefreshLayout={refreshLayout}
+            onExport={exportPNG}
+        />
 
         <Box sx={{ position: 'relative', bgcolor: '#0f172a', height: '600px' }}>
           {isLoading && (
@@ -358,7 +369,7 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
                       </Stack>
                     ))}
                 </Stack>
-                {Object.keys(scanColorMap).length > 0 && (
+                 {Object.keys(scanColorMap).length > 0 && (
                     <Stack spacing={0.5} sx={{ mt: 1, pt: 1, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                         <Typography sx={{ fontSize: '0.55rem', color: 'rgba(0,243,255,0.6)', fontWeight: 800 }}>SCAN IDENTIFIERS</Typography>
                         {Object.entries(scanColorMap).map(([id, color]) => (
@@ -370,6 +381,11 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
                     </Stack>
                 )}
              </Stack>
+          </Box>
+          
+          <Box sx={{ position: 'absolute', top: 0, right: 0, bottom: 0, zIndex: 3, display: 'flex' }}>
+            <GraphNodeDetailPanel projectSlug={projectSlug} />
+            <GraphBlastRadiusPanel projectSlug={projectSlug} />
           </Box>
         </Box>
       </TacticalPanel>

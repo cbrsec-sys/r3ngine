@@ -21,6 +21,7 @@ import { X, Play, Zap, Shield, Search, Terminal, Globe } from 'lucide-react';
 import { useEngines } from '../../engines/api';
 import { useInitiateScan } from '../api';
 import { useNavigate } from '@tanstack/react-router';
+import { generateDorks } from '../utils/dorkUtils';
 
 interface StartScanModalProps {
   open: boolean;
@@ -209,17 +210,43 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
                 />
 
                 {formData.customDorkSwitch && (
-                  <TextField
-                    label="Github Dorks"
-                    fullWidth
-                    multiline
-                    rows={4}
-                    value={formData.customDorkTextarea}
-                    onChange={(e) => setFormData({ ...formData, customDorkTextarea: e.target.value })}
-                    placeholder="Enter custom dorks, one per line..."
-                    sx={fieldStyles}
-                  />
+                  <>
+                    <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 1 }}>
+                      <Button
+                        size="small"
+                        onClick={() => setFormData({ 
+                          ...formData, 
+                          customDorkTextarea: generateDorks(domainNames) 
+                        })}
+                        startIcon={<Terminal size={14} />}
+                        sx={{
+                          color: '#00ff62',
+                          fontFamily: 'Orbitron',
+                          fontSize: '0.65rem',
+                          fontWeight: 800,
+                          border: '1px solid rgba(0, 255, 98, 0.2)',
+                          '&:hover': {
+                            bgcolor: 'rgba(0, 255, 98, 0.05)',
+                            border: '1px solid #00ff62',
+                          }
+                        }}
+                      >
+                        AUTOGENERATE DORKS
+                      </Button>
+                    </Box>
+                    <TextField
+                      label="Github Dorks"
+                      fullWidth
+                      multiline
+                      rows={4}
+                      value={formData.customDorkTextarea}
+                      onChange={(e) => setFormData({ ...formData, customDorkTextarea: e.target.value })}
+                      placeholder="Enter custom dorks, one per line..."
+                      sx={fieldStyles}
+                    />
+                  </>
                 )}
+
               </Box>
             </Grid>
 

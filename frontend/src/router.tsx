@@ -1,39 +1,49 @@
-import { createRootRouteWithContext, createRoute, createRouter, Outlet, Link, redirect } from "@tanstack/react-router";
+import { createRootRouteWithContext, createRoute, createRouter, Outlet, Link, redirect, lazyRouteComponent } from "@tanstack/react-router";
 import { Shell } from "./components/Shell";
-import { DashboardPage } from "./features/dashboard";
-import { TargetList, TargetSummary } from "./features/targets";
-import { MonitoringPage } from "./features/monitoring";
-import { EnginesPage } from "./features/engines";
-import { ProjectsPage } from "./features/projects";
-import { ScheduledScansPage, SubScansPage, ScanHistoryPage, ScanDetailPage, AttackSurfacePage } from "./features/scans";
-import { StressTestingPage } from "./pages/StressTestingPage";
-import { EndpointsPage } from "./features/endpoints";
-import { SubdomainsPage } from "./features/subdomains";
-import { TodoPage } from "./features/todos";
-import { OrganizationPage } from "./features/organizations";
-import {
-  ProxySettingsPage,
-  OpSecSettingsPage,
-  ToolSettingsPage,
-  ToolArsenalPage,
-  ApiVaultPage,
-  LlmToolkitPage,
-  ReportSettingsPage,
-  ReNgineSettingsPage,
-  NotificationSettingsPage,
-  ProfileSettingsPage,
-  AdminSettingsPage,
-} from "./features/settings";
-import { BountyHubPage } from "./features/bounty/components/BountyHubPage";
-import { SearchPage } from "./features/search/components/SearchPage";
-import { LoginPage } from "./features/auth/components/LoginPage";
-import { LogoutPage } from "./features/auth/components/LogoutPage";
-import { OnboardingPage } from "./features/auth/components/OnboardingPage";
-
+// Lazy loaded components below
 
 import { Box, Typography, Button } from "@mui/material";
 import { AlertCircle, Home, RefreshCw } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
+import { LoginPage } from "./features/auth/components/LoginPage";
+import { LogoutPage } from "./features/auth/components/LogoutPage";
+import { OnboardingPage } from "./features/auth/components/OnboardingPage";
+
+// Lazy Routes
+const DashboardPage = lazyRouteComponent(() => import("./features/dashboard").then(m => ({ default: m.DashboardPage })));
+const ProjectsPage = lazyRouteComponent(() => import("./features/projects").then(m => ({ default: m.ProjectsPage })));
+const MonitoringPage = lazyRouteComponent(() => import("./features/monitoring").then(m => ({ default: m.MonitoringPage })));
+const EnginesPage = lazyRouteComponent(() => import("./features/engines").then(m => ({ default: m.EnginesPage })));
+const OrganizationPage = lazyRouteComponent(() => import("./features/organizations").then(m => ({ default: m.OrganizationPage })));
+const TargetList = lazyRouteComponent(() => import("./features/targets").then(m => ({ default: m.TargetList })));
+const TargetSummary = lazyRouteComponent(() => import("./features/targets").then(m => ({ default: m.TargetSummary })));
+const EndpointsPage = lazyRouteComponent(() => import("./features/endpoints").then(m => ({ default: m.EndpointsPage })));
+const SubdomainsPage = lazyRouteComponent(() => import("./features/subdomains").then(m => ({ default: m.SubdomainsPage })));
+const TodoPage = lazyRouteComponent(() => import("./features/todos").then(m => ({ default: m.TodoPage })));
+const VulnerabilityList = lazyRouteComponent(() => import("./features/vulnerabilities").then(m => ({ default: m.VulnerabilityList })));
+const BountyHubPage = lazyRouteComponent(() => import("./features/bounty/components/BountyHubPage").then(m => ({ default: m.BountyHubPage })));
+const SearchPage = lazyRouteComponent(() => import("./features/search/components/SearchPage").then(m => ({ default: m.SearchPage })));
+
+// Scan Feature Lazy Routes
+const ScheduledScansPage = lazyRouteComponent(() => import("./features/scans/components/ScheduledScansPage").then(m => ({ default: m.ScheduledScansPage })));
+const SubScansPage = lazyRouteComponent(() => import("./features/scans/components/SubScansPage").then(m => ({ default: m.SubScansPage })));
+const ScanHistoryPage = lazyRouteComponent(() => import("./features/scans/components/ScanHistoryPage").then(m => ({ default: m.ScanHistoryPage })));
+const ScanDetailPage = lazyRouteComponent(() => import("./features/scans/components/ScanDetailPage").then(m => ({ default: m.ScanDetailPage })));
+const AttackSurfacePage = lazyRouteComponent(() => import("./features/scans/components/AttackSurfacePage").then(m => ({ default: m.AttackSurfacePage })));
+
+// Settings Feature Lazy Routes
+const ProxySettingsPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.ProxySettingsPage })));
+const OpSecSettingsPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.OpSecSettingsPage })));
+const ToolSettingsPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.ToolSettingsPage })));
+const ToolArsenalPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.ToolArsenalPage })));
+const ApiVaultPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.ApiVaultPage })));
+const LlmToolkitPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.LlmToolkitPage })));
+const ReportSettingsPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.ReportSettingsPage })));
+const ReNgineSettingsPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.ReNgineSettingsPage })));
+const NotificationSettingsPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.NotificationSettingsPage })));
+const ProfileSettingsPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.ProfileSettingsPage })));
+const AdminSettingsPage = lazyRouteComponent(() => import("./features/settings").then(m => ({ default: m.AdminSettingsPage })));
+const StressTestingPage = lazyRouteComponent(() => import("./pages/StressTestingPage").then(m => ({ default: m.StressTestingPage })));
 
 interface RouterContext {
   auth: {
@@ -169,9 +179,9 @@ const subScansRoute = createRoute({
       gap: 3
     }}>
       <Box sx={{ display: 'flex', gap: 1 }}>
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out' }} />
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff' }} />
       </Box>
       <Typography sx={{
         fontFamily: 'Orbitron',
@@ -214,9 +224,9 @@ const scheduledScansRoute = createRoute({
       gap: 3
     }}>
       <Box sx={{ display: 'flex', gap: 1 }}>
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out' }} />
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff' }} />
       </Box>
       <Typography sx={{
         fontFamily: 'Orbitron',
@@ -229,14 +239,14 @@ const scheduledScansRoute = createRoute({
         ACCESSING TACTICAL REGISTRY... <br />
         <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>RETRIEVING SCHEDULED OPERATIONS... PLEASE WAIT</span>
       </Typography>
-      <style>
+      {/* <style>
         {`
           @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 0.5; }
             50% { transform: scale(1.5); opacity: 1; }
           }
         `}
-      </style>
+      </style> */}
     </Box>
   )
 });
@@ -262,9 +272,9 @@ const subdomainsRoute = createRoute({
       gap: 3
     }}>
       <Box sx={{ display: 'flex', gap: 1 }}>
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out' }} />
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', opacity: 0.7 }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', opacity: 0.4 }} />
       </Box>
       <Typography sx={{
         fontFamily: 'Orbitron',
@@ -277,14 +287,14 @@ const subdomainsRoute = createRoute({
         INITIALIZING TACTICAL DATA... <br />
         <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>FETCHING SUBDOMAINS... PLEASE WAIT</span>
       </Typography>
-      <style>
+      {/* <style>
         {`
           @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 0.5; }
             50% { transform: scale(1.5); opacity: 1; }
           }
         `}
-      </style>
+      </style> */}
     </Box>
   )
 });
@@ -371,7 +381,7 @@ const adminSettingsRoute = createRoute({
 });
 
 
-import { VulnerabilityList } from "./features/vulnerabilities";
+
 
 // Vulnerabilities Route
 const vulnsRoute = createRoute({
@@ -393,9 +403,9 @@ const vulnsRoute = createRoute({
       gap: 3
     }}>
       <Box sx={{ display: 'flex', gap: 1 }}>
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out' }} />
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.2s' }} />
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', animation: 'pulse 1.5s infinite ease-in-out 0.4s' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', opacity: 0.7 }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', opacity: 0.4 }} />
       </Box>
       <Typography sx={{
         fontFamily: 'Orbitron',
@@ -408,14 +418,14 @@ const vulnsRoute = createRoute({
         INITIALIZING TACTICAL DATA... <br />
         <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>FETCHING VULNERABILITIES... PLEASE WAIT</span>
       </Typography>
-      <style>
+      {/* <style>
         {`
           @keyframes pulse {
             0%, 100% { transform: scale(1); opacity: 0.5; }
             50% { transform: scale(1.5); opacity: 1; }
           }
         `}
-      </style>
+      </style> */}
     </Box>
   )
 });

@@ -14,11 +14,11 @@ export interface KpiCardProps {
 
 export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, color, subtitle, sx }) => {
   return (
-    <Card 
-      sx={{ 
+    <Card
+      sx={{
         height: '100%',
-        bgcolor: 'rgba(5, 5, 15, 0.4)', 
-        backdropFilter: 'blur(12px)', 
+        bgcolor: 'rgba(5, 5, 15, 0.4)',
+        backdropFilter: 'blur(12px)',
         border: '1px solid rgba(255, 255, 255, 0.05)',
         position: 'relative',
         overflow: 'hidden',
@@ -35,12 +35,12 @@ export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, colo
     >
       <CardContent sx={{ p: 3 }}>
         {/* Watermark Icon */}
-        <Box 
+        <Box
           className="kpi-icon-bg"
-          sx={{ 
-            position: 'absolute', 
-            right: -15, 
-            top: -15, 
+          sx={{
+            position: 'absolute',
+            right: -15,
+            top: -15,
             opacity: 0.08,
             transition: 'all 0.3s ease',
             color: color
@@ -48,13 +48,13 @@ export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, colo
         >
           <Icon size={100} />
         </Box>
-        
+
         {/* Header Row */}
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2.5 }}>
-          <Box sx={{ 
-            p: 1.2, 
-            borderRadius: 2, 
-            bgcolor: `${color}15`, 
+          <Box sx={{
+            p: 1.2,
+            borderRadius: 2,
+            bgcolor: `${color}15`,
             color: color,
             display: 'flex',
             mr: 1.5,
@@ -63,9 +63,9 @@ export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, colo
           }}>
             <Icon size={22} />
           </Box>
-          <Typography variant="overline" sx={{ 
-            fontWeight: 800, 
-            letterSpacing: 2, 
+          <Typography variant="overline" sx={{
+            fontWeight: 800,
+            letterSpacing: 2,
             color: 'rgba(255,255,255,0.5)',
             fontFamily: 'Orbitron',
             lineHeight: 1
@@ -75,32 +75,31 @@ export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, colo
         </Box>
 
         {/* Value Row */}
-        <Typography variant="h3" sx={{ 
-          fontWeight: 900, 
-          mb: 0.5, 
+        <Typography variant="h3" sx={{
+          fontWeight: 900,
+          mb: 0.5,
           fontFamily: 'Orbitron',
           letterSpacing: -1,
           color: '#fff'
         }}>
           {value.toLocaleString()}
         </Typography>
-        
+
         {/* Footer Row */}
         {subtitle && (
           <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Box 
-              sx={{ 
-                width: 6, 
-                height: 6, 
-                borderRadius: '50%', 
-                bgcolor: color, 
+            <Box
+              sx={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                bgcolor: color,
                 mr: 1,
-                boxShadow: `0 0 8px ${color}`,
-                animation: 'kpiPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
-              }} 
+                boxShadow: `0 0 8px ${color}`
+              }}
             />
-            <Typography variant="caption" sx={{ 
-              color: 'rgba(255,255,255,0.4)', 
+            <Typography variant="caption" sx={{
+              color: 'rgba(255,255,255,0.4)',
               fontWeight: 800,
               fontSize: '0.65rem',
               letterSpacing: 1
@@ -110,12 +109,6 @@ export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, colo
           </Box>
         )}
       </CardContent>
-      <style>{`
-        @keyframes kpiPulse {
-          0%, 100% { opacity: 1; }
-          50% { opacity: 0.3; }
-        }
-      `}</style>
     </Card>
   );
 };

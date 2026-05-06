@@ -419,7 +419,7 @@ class Neo4jManager:
         if not self.driver:
             return {"nodes": [], "edges": []}
 
-        nodes = []
+        nodes_dict = {}
         edges = []
         color_map = {
             "Domain": "#3b82f6",
@@ -436,7 +436,6 @@ class Neo4jManager:
         with self.driver.session() as session:
             result = session.run(query, **params)
 
-            seen_nodes = set()
             for record in result:
                 scan_ids = record.get("scan_ids") or []
                 if record.get("scan_id"):
@@ -447,35 +446,87 @@ class Neo4jManager:
                     if not node:
                         continue
                     node_id = str(node.id)
-                    if node_id not in seen_nodes:
-                        label = node.get("name") or node.get("address") or node_id
+                    if node_id not in nodes_dict:
+                        label = node.get("name") or node.get("address") or node.get("url") or node_id
                         node_type = list(node.labels)[0] if node.labels else "Unknown"
-                        nodes.append(
-                            {
-                                "data": {
-                                    "id": node_id,
-                                    "label": label,
-                                    "type": node_type,
-                                    "color": color_map.get(node_type, "#94a3b8"),
-                                    "scan_ids": scan_ids,
-                                }
+                        nodes_dict[node_id] = {
+                            "data": {
+                                "id": node_id,
+                                "label": label,
+                                "type": node_type,
+                                "color": color_map.get(node_type, "#94a3b8"),
+                                "scan_ids": scan_ids,
+                                "degree_centrality": 0,
+                                "criticalVulnCount": 0,
+                                "highVulnCount": 0,
+                                "severity": node.get("severity", -1),
                             }
-                        )
-                        seen_nodes.add(node_id)
+                        }
 
                 if record["r"]:
+                    src = str(record["n"].id)
+                    tgt = str(record["m"].id)
+                    r_type = record["r"].type
                     edges.append(
                         {
                             "data": {
-                                "source": str(record["n"].id),
-                                "target": str(record["m"].id),
-                                "label": record["r"].type,
+                                "source": src,
+                                "target": tgt,
+                                "label": r_type,
                                 "scan_ids": scan_ids,
                             }
                         }
                     )
+                    
+                    # Compute degree centrality
+                    if src in nodes_dict:
+                        nodes_dict[src]["data"]["degree_centrality"] += 1
+                    if tgt in nodes_dict:
+                        nodes_dict[tgt]["data"]["degree_centrality"] += 1
+                        
+                    # Compute vulnerability counts
+                    if r_type == "HAS_VULNERABILITY":
+                        vuln_node = nodes_dict.get(tgt)
+                        if vuln_node and vuln_node["data"]["type"] == "Vulnerability":
+                            severity = vuln_node["data"].get("severity", -1)
+                            if severity == 4:
+                                nodes_dict[src]["data"]["criticalVulnCount"] += 1
+                            elif severity == 3:
+                                nodes_dict[src]["data"]["highVulnCount"] += 1
 
-        return {"nodes": nodes, "edges": edges}
+        return {"nodes": list(nodes_dict.values()), "edges": edges}
+
+    def get_blast_radius(self, node_id):
+        """Calculates the blast radius of a compromised node using APOC."""
+        query = """
+            MATCH (startNode) WHERE startNode.id = $node_id OR toString(id(startNode)) = $node_id
+            CALL apoc.path.subgraphAll(startNode, {maxLevel: 3}) YIELD relationships
+            UNWIND relationships as r
+            RETURN startNode(r) as n, r, endNode(r) as m
+        """
+        return self._fetch_graph_data(query, {"node_id": str(node_id)})
+
+    def get_node_details(self, node_id):
+        """Fetches detailed properties for a single node."""
+        if not self.driver:
+            return {}
+
+        query = """
+            MATCH (n) WHERE toString(id(n)) = $node_id OR n.id = $node_id
+            RETURN n, labels(n) as labels
+        """
+        with self.driver.session() as session:
+            result = session.run(query, node_id=str(node_id))
+            record = result.single()
+            if record:
+                node = record["n"]
+                labels = record["labels"]
+                return {
+                    "id": str(node.id),
+                    "labels": labels,
+                    "properties": dict(node)
+                }
+        return {}
 
     def reset_database(self):
         """Deletes all nodes and relationships from the Neo4j database."""

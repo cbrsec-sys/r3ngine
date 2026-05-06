@@ -29,7 +29,7 @@
 </p>
 <h4>r3ngine 3.0.0 is released!</h4>
 <p>
-  r3ngine 3.0.0 marks the official branding transition and production stabilization. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Interactive KPI Reports</b> with internal navigation, and <b>Scoped Attack Surface Visualization</b>. Built on the massive v3.0 core, it includes the <b>Advanced Web App & API Discovery Pipeline</b>, full <b>Spiderfoot OSINT Integration</b>, and a dedicated <b>LLM Toolkit</b> for AI-assisted vulnerability analysis.
+  r3ngine 3.0.0 marks the official branding transition and production stabilization. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Interactive KPI Reports</b> with internal navigation, <b>Scoped Attack Surface Visualization</b>, and a comprehensive <b>OSINT Intelligence Dashboard</b>. Built on the massive v3.0 core, it includes the <b>Advanced Web App & API Discovery Pipeline</b>, full <b>Spiderfoot OSINT Integration</b>, and a dedicated <b>LLM Toolkit</b> for AI-assisted vulnerability analysis.
 </p>
 
 <h4>What is r3ngine?</h4>
@@ -73,7 +73,7 @@ The SpiderFoot discovery engine has been completely re-engineered for v3.
 ### 🛡️ Advanced OpSec & Stealth
 *   **WAF Bypass Engine**: Sophisticated modules designed to identify and bypass Web Application Firewalls (WAFs) for deeper scan penetration.
 *   **Automated Proxy Management**: A new, fully automated pipeline to gather, validate, and rotate high-quality proxies, ensuring continuous scanning without rate-limiting or IP blocking.
-*   **API Discovery Pipeline**: Integrated **Arjun**, **Kiterunner**, and **ParamSpider** for deep hidden endpoint discovery.
+*   **API Discovery Pipeline**: Integrated **Arjun**, **Kiterunner**, and **ParamSpider** for deep hidden endpoint discovery with configurable HTTP methods and thread management.
 *   **Stealth Auth Brute-Force**: **Medusa** + **Proxychains4** integration with automated portal detection.
 *   **Custom Dorking**: A new **Dork Generator** to build complex queries for sensitive data discovery.
 *   **OpSec Presets**: User-agent rotation, rate limiting, and metadata stripping modules for stealthier operations.
@@ -93,6 +93,8 @@ A robust, unified security layer ensuring data integrity and access control.
 *   **Vulnerability Dashboard Refinements**: Native support for externally synchronized findings with verified metadata.
 
 - **Multi-Architecture Build Optimization**: Resolved critical architecture conflicts in the Docker build process, ensuring correct tool installation (e.g., Trivy) across both 64-bit and ARM64 systems.
+- **Proxy Resolution Fix**: Aligned Docker Compose network aliases with Nginx configuration and modernized HTTP/2 directives to ensure proxy container stability.
+- **Frontend Asset Stabilization**: Fixed 404 errors by standardizing Vite output filenames for main entry points, ensuring seamless integration with Django's static file system.
 ### 🔬 External Tool Orchestration (Acunetix & ReconX)
 Version 3.0 introduces deep integration with high-impact external security tools, allowing reNgine to act as a centralized controller.
 - **Celery Task Resilience Engine**: Hardened the core task execution wrapper to handle non-standard tool outputs and boolean results, preventing pipeline crashes during massive scan orchestrations.
@@ -171,7 +173,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
   * IP and Open Ports Identification
   * Endpoints Discovery
   * Directory/Files fuzzing
-  * Screenshot Gathering
+  * **Screenshot Gathering**: Restored visual evidence pipeline with tactical gallery and secure lightbox inspection.
   * Vulnerability Scan
     * Nuclei
     * **Acunetix (AWVS)**: Automated vulnerability scanning with native ingestion.
@@ -225,6 +227,8 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 * **Advanced Web App & API Discovery Pipeline**: Integrated Arjun, Kiterunner, ParamSpider, LinkFinder, InQL.
 * **Semgrep-Powered Analysis**: Automated static analysis for JS and GraphQL.
 * **OpSec Settings**: UA rotation, stealth presets, and WAF bypass.
+* **Bounty Hub**: Centralized platform for managing and importing HackerOne bug bounty programs with tactical asset browsing and direct target orchestration.
+* performance-optimizer
 * integrated tools: Chaos, TLSX, CTFR, Netlas, Katana, Medusa.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)

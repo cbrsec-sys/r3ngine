@@ -49,7 +49,8 @@ RUN apt update -y && \
 
 
 # Install essential packages
-RUN apt install -y --no-install-recommends \
+RUN apt update -y && \
+    apt install -y --no-install-recommends \
     build-essential \
     cmake \
     geoip-bin \
@@ -82,7 +83,7 @@ RUN apt install -y --no-install-recommends \
     jq \
     wrk \
     hping3 \
-    unzip
+    unzip --fix-missing -y
 
 RUN add-apt-repository ppa:mozillateam/ppa
 
@@ -259,14 +260,14 @@ RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
 # Copy requirements
 COPY web/requirements.txt /tmp/requirements.txt
 RUN pip3 install --upgrade pip setuptools wheel
-RUN pip3 install -r /tmp/requirements.txt --no-cache-dir
+RUN pip3 install -r /tmp/requirements.txt --no-cache-dir --ignore-installed blinker
 
 # install eyewitness
-RUN pip3 install --no-cache-dir fuzzywuzzy \
-    selenium==4.15 \
-    python-Levenshtein \
-    pyvirtualdisplay \
-    netaddr
+# RUN pip3 install --no-cache-dir fuzzywuzzy \
+#     selenium==4.15 \
+#     python-Levenshtein \
+#     pyvirtualdisplay \
+#     netaddr
 
 # Install Frontend Dependencies (for Dev mode)
 RUN mkdir -p /usr/src/app/frontend
@@ -277,7 +278,7 @@ WORKDIR /usr/src/app
 
 # Copy source code
 COPY web/ /usr/src/app/
-RUN mkdir -p /usr/src/app/custom_engines
+#RUN mkdir -p /usr/src/app/custom_engines
 
 # Copy built frontend
 COPY --from=frontend-builder /app/frontend/dist /usr/src/frontend/dist

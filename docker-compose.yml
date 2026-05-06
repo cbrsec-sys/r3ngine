@@ -168,6 +168,7 @@ services:
       - "127.0.0.1:7687:7687"
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
+      - NEO4J_PLUGINS=["apoc"]
     volumes:
       - neo4j_data:/data
     networks:
@@ -178,15 +179,35 @@ networks:
 
 volumes:
   tool_config:
+    name: rengine_tool_config
+    external: true
   postgres_data:
+    name: rengine_postgres_data
+    external: true
   gf_patterns:
+    name: rengine_gf_patterns
+    external: true
   nuclei_templates:
+    name: rengine_nuclei_templates
+    external: true
   github_repos:
+    name: rengine_github_repos
+    external: true
   wordlist:
+    name: rengine_wordlist
+    external: true
   scan_results:
+    name: rengine_scan_results
+    external: true
   static_volume:
+    name: rengine_static_volume
+    external: true
   ollama_data:
+    name: rengine_ollama_data
+    external: true
   neo4j_data:
+    name: rengine_neo4j_data
+    external: true
 
 secrets:
   proxy.ca:

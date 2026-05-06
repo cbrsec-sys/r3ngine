@@ -79,7 +79,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({ note, onToggleStatus, onTogg
         <Stack direction="row" spacing={1}>
           {note.is_important && (
             <Tooltip title="Important">
-              <Box sx={{ color: '#ff003c', animation: 'pulse 2s infinite' }}>
+              <Box sx={{ color: '#ff003c' }}>
                 <AlertOctagon size={18} />
               </Box>
             </Tooltip>

@@ -2501,6 +2501,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
+	arjun_methods = config.get(ARJUN_METHODS, ARJUN_DEFAULT_METHODS)
 
 	# Get targets
 	if not urls:
@@ -2528,7 +2529,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if 'arjun' in uses_tools:
 			logger.info(f'Running Arjun on {url}')
 			arjun_output = f"{results_dir}/arjun_{subdomain_name}.json"
-			cmd = f"arjun -u {url} --passive -oJ {arjun_output}"
+			cmd = f"arjun -u {url} --passive -m {arjun_methods} -t {threads} --stable -oJ {arjun_output}"
 			#if proxy:
 			# 	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
@@ -2540,8 +2541,13 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 							endpoint, _ = save_endpoint(target_url, ctx=ctx, subdomain=subdomain)
 							if endpoint:
 								params = details.get('params', {})
-								for method, param_list in params.items():
-									for p in param_list:
+								if isinstance(params, dict):
+									for method, param_list in params.items():
+										for p in param_list:
+											save_parameter(endpoint, p, param_type=method)
+								elif isinstance(params, list):
+									method = details.get('method', 'unknown')
+									for p in params:
 										save_parameter(endpoint, p, param_type=method)
 				except Exception as e:
 					logger.error(f"Error parsing Arjun output for {url}: {e}")
@@ -2551,7 +2557,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running Kiterunner on {url}')
 			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
 			# kr scan -w wordlist.kite -o json
-			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j 5 -o json >> {kr_output}"
+			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json >> {kr_output}"
 			if proxy:
 				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
@@ -6276,3 +6282,23 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 				'is_ai_generated': True
 			}
 		)
+
+
+@app.task(name='sync_cisa_kev_catalog', queue='main_scan_queue', bind=False)
+def sync_cisa_kev_catalog():
+	"""
+	Syncs CISA KEV catalog and updates CVE records.
+	"""
+	import requests
+	from startScan.models import CveId
+	url = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+	try:
+		response = requests.get(url, timeout=30)
+		if response.status_code == 200:
+			data = response.json()
+			cve_list = [v.get("cveID") for v in data.get("vulnerabilities", [])]
+			if cve_list:
+				CveId.objects.filter(name__in=cve_list).update(is_cisa_kev=True)
+				logger.info(f"Successfully synced CISA KEV catalog. Updated {len(cve_list)} records.")
+	except Exception as e:
+		logger.error(f"Error syncing CISA KEV catalog: {e}")
