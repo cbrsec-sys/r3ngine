@@ -526,6 +526,7 @@ class Vulnerability(models.Model):
 		('patched', 'Patched'),
 	)
 	validation_status = models.CharField(max_length=20, choices=VULNERABILITY_STATUS_CHOICES, default='unverified')
+	validation_confidence = models.FloatField(null=True, blank=True, default=0.0)
 	correlation_score = models.FloatField(null=True, blank=True, default=0.0)
 	is_suppressed = models.BooleanField(default=False)
 
@@ -533,6 +534,21 @@ class Vulnerability(models.Model):
 		cve_str = ', '.join(f'`{cve.name}`' for cve in self.cve_ids.all())
 		severity = NUCLEI_REVERSE_SEVERITY_MAP[self.severity]
 		return f'{self.http_url} | `{severity.upper()}` | `{self.name}` | `{cve_str}`'
+
+
+class ValidationResult(models.Model):
+	id = models.AutoField(primary_key=True)
+	vulnerability = models.ForeignKey(Vulnerability, on_delete=models.CASCADE, related_name='validation_results')
+	tool = models.CharField(max_length=100)
+	validated = models.BooleanField(default=False)
+	confidence = models.FloatField(default=0.0)
+	payload = models.TextField(null=True, blank=True)
+	request_evidence = models.TextField(null=True, blank=True)
+	response_evidence = models.TextField(null=True, blank=True)
+	timestamp = models.DateTimeField(auto_now_add=True)
+
+	def __str__(self):
+		return f"Validation for {self.vulnerability.name} by {self.tool}"
 
 	def get_severity(self):
 		return self.severity

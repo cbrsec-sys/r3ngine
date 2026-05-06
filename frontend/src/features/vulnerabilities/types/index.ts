@@ -17,6 +17,17 @@ export interface Vulnerability {
   response: string | null;
   open_status: boolean;
   validation_status: 'unverified' | 'verified' | 'not_working' | 'patched';
+  validation_confidence: number | null;
+  validation_results: {
+    id: number;
+    validated_at: string;
+    tool_name: string;
+    is_safe: boolean;
+    evidence: any;
+    payload: string | null;
+    request_dump: string | null;
+    response_dump: string | null;
+  }[];
   tags: { id: number; name: string }[];
   cve_ids: { id: number; name: string }[];
   cwe_ids: { id: number; name: string }[];

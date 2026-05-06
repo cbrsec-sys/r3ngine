@@ -640,3 +640,21 @@
     is_github_cloned: false
     github_clone_path: null
     subdomain_gathering_command: null
+
+- model: scanEngine.installedexternaltool
+  pk: 37
+  fields:
+    logo_url: null
+    name: ERL (Exploitation Readiness Layer)
+    description: Safe, modular, and production-grade exploitation validation layer for reNgine. Converts potential findings into validated vulnerabilities via non-destructive validation.
+    github_url: https://github.com/whiterabb17/r3ngine
+    license_url: https://github.com/whiterabb17/r3ngine/blob/master/LICENSE
+    version_lookup_command: null
+    update_command: null
+    install_command: null
+    version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null

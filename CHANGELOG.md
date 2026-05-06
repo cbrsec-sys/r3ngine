@@ -9,6 +9,14 @@
   - **Safety Guardrails**: Integrated a Redis-based kill-switch mechanisms for safe testing and instant termination to protect target infrastructure.
   - **Telemetry Ingestion**: Real-time aggregation of latency, throughput, and error rate metrics directly into Neo4j for topological node analysis.
   - **Visualization Dashboard**: Created a new React-based interactive UI utilizing Apache ECharts and Nivo to visually represent endpoint resilience, saturation points, and errors across the network.
+- **Exploitation Readiness Layer (ERL)**: Implemented a safe, modular, and production-grade validation layer for vulnerabilities.
+  - **Vulnerability Validation**: Automatically converts potential findings into "Verified" status using non-destructive, containerized validation tools (e.g., safe SQLmap profiles).
+  - **Confidence Scoring**: Integrated a Bayesian confidence engine that aggregates tool results, asset metadata, and tool reliability into a unified confidence score.
+  - **Containerized Sandboxing**: Orchestrated on-demand, ephemeral Docker sandboxes for validation execution to maintain strict isolation.
+  - **Policy-Driven Safety**: Implemented a Policy Engine that enforces safety boundaries, preventing validation on sensitive assets (e.g., .gov, production) or during restricted hours.
+  - **Normalizer & Adapters**: Standardized validation evidence (request/response dumps, payloads) into a unified schema for consistent UI rendering.
+  - **Global Configuration**: Added a global toggle `RENGINE_ERL_ENABLED` and updated all default scan engines to include ERL by default.
+  - **Interactive Evidence Viewer**: Added a new "Validation" column and expandable evidence section in the vulnerability dashboard to display cryptographic-grade proof of findings.
  - **Advanced Web App & API Discovery Pipeline**: Introduced a dedicated reconnaissance engine for deep API discovery, featuring:
  - **Kiterunner**: High-performance API endpoint brute-forcing with custom `.kite` wordlists (`routes-large.kite` by default).
  - **Arjun**: Automated HTTP parameter discovery for identifying hidden API inputs.

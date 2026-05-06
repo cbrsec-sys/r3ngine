@@ -264,7 +264,8 @@ def initiate_scan(
 				firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan')
 			),
 			correlate_vulnerabilities.si(scan_history_id=scan_history_id),
-			calculate_risk_scores.si(scan_history_id=scan_history_id)
+			calculate_risk_scores.si(scan_history_id=scan_history_id),
+			run_erl.si(scan_history_id=scan_history_id)
 		)
 
 		if config.get('enable_ai_impact_analysis'):
@@ -6302,3 +6303,17 @@ def sync_cisa_kev_catalog():
 				logger.info(f"Successfully synced CISA KEV catalog. Updated {len(cve_list)} records.")
 	except Exception as e:
 		logger.error(f"Error syncing CISA KEV catalog: {e}")
+
+
+@app.task(name='run_erl', queue='main_scan_queue', base=RengineTask, bind=True)
+def run_erl(self, scan_history_id):
+	"""
+	Runs the Exploitation Readiness Layer (ERL) validation.
+	"""
+	if not RENGINE_ERL_ENABLED:
+		logger.info("ERL is disabled in settings. Skipping.")
+		return
+
+	from erl.core.orchestrator import Orchestrator
+	orchestrator = Orchestrator()
+	orchestrator.process_scan(scan_history_id)

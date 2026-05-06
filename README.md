@@ -60,6 +60,14 @@ Centralized AI management for smarter reconnaissance and automated reporting.
 *   **AI-Assisted Recon**: Automated generation of vulnerability descriptions, remediation strategies, and attack surface assessments.
 *   **Vulnerability Impact Intelligence**: Interactive tactical dashboard featuring AI-generated impact narratives and Cytoscape.js-powered attack path visualizations.
 *   **PII Gate**: Integrated privacy protection to anonymize sensitive scan data (IPs, emails, hostnames) before LLM processing, ensuring secure data handling in AI-assisted analysis.
+ 
+### 🛡️ Exploitation Readiness Layer (ERL)
+A safe, modular, and production-grade validation layer for vulnerabilities.
+*   **Vulnerability Validation**: Automatically converts potential findings into "Verified" status using non-destructive, containerized validation tools (e.g., safe SQLmap profiles).
+*   **Confidence Scoring**: Integrated a Bayesian confidence engine that aggregates tool results, asset metadata, and tool reliability into a unified confidence score.
+*   **Containerized Sandboxing**: Orchestrated on-demand, ephemeral Docker sandboxes for validation execution to maintain strict isolation.
+*   **Policy-Driven Safety**: Implemented a Policy Engine that enforces safety boundaries, preventing validation on sensitive assets (e.g., .gov, production) or during restricted hours.
+*   **Interactive Evidence Viewer**: New "Validation" column and expandable evidence section in the vulnerability dashboard providing cryptographic-grade proof of findings.
 
 
 *   **Vulnerability Correlation Engine**: Advanced multi-tool unification pipeline that correlates findings from **Nuclei (DAST)**, **Semgrep (SAST)**, **Trivy (SCA)**, **Gitleaks (Secrets)**, **Acunetix (DAST)**, and **Retire.js** into a prioritized threat landscape with automated **Potential Attack Chain** generation.

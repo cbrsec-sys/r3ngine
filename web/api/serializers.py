@@ -1073,11 +1073,18 @@ class EndpointOnlyURLsSerializer(serializers.ModelSerializer):
 		fields = ['http_url']
 
 
+class ValidationResultSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = ValidationResult
+		fields = '__all__'
+
+
 class VulnerabilitySerializer(serializers.ModelSerializer):
 
 	discovered_date = serializers.SerializerMethodField()
 	severity = serializers.SerializerMethodField()
 	scan_history = serializers.SerializerMethodField()
+	validation_results = ValidationResultSerializer(many=True, read_only=True)
 
 	def get_discovered_date(self, Vulnerability):
 		return Vulnerability.discovered_date.strftime("%b %d, %Y %H:%M")
