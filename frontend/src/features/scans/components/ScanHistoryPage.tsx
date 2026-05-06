@@ -54,11 +54,14 @@ import {
   useScansHistory,
   useStopScan,
   useDeleteScan,
-  useBulkScanAction
+  useBulkScanAction,
+  useDomains
 } from '../api';
 import { useParams, Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import { ScanReportModal } from './ScanReportModal';
 import { StartScanModal } from './StartScanModal';
+
+import { timeout } from 'd3';
 
 export const ScanHistoryPage: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
@@ -67,6 +70,7 @@ export const ScanHistoryPage: React.FC = () => {
   const stopScanMutation = useStopScan(projectSlug);
   const deleteScanMutation = useDeleteScan(projectSlug);
   const bulkActionMutation = useBulkScanAction(projectSlug);
+  const { data: domains } = useDomains(projectSlug);
 
   const [searchQuery, setSearchQuery] = React.useState('');
   const [page, setPage] = React.useState(0);
@@ -86,37 +90,13 @@ export const ScanHistoryPage: React.FC = () => {
 
   const [activeTarget, setActiveTarget] = React.useState<{ id: number; name: string } | null>(null);
   const [startScanTargets, setStartScanTargets] = React.useState<{ ids: number[]; names: string[] } | null>(null);
-  
+
   const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
 
-  // #region agent log
-  React.useEffect(() => {
-    if (!startScanTargets) return;
-    fetch('http://127.0.0.1:7744/ingest/42e8b300-a2ff-4d3c-940b-8fe098d0aaa3', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '55a681' },
-      body: JSON.stringify({
-        sessionId: '55a681',
-        runId: 'initial',
-        hypothesisId: 'H3',
-        location: 'frontend/src/features/scans/components/ScanHistoryPage.tsx:RESCAN STATE EFFECT',
-        message: 'rescan state after click',
-        data: {
-          startScanTargetsExists: !!startScanTargets,
-          domainIdsLen: startScanTargets?.ids?.length || 0,
-          domainNamesLen: startScanTargets?.names?.length || 0,
-        },
-        timestamp: Date.now()
-      })
-    }).catch(() => {});
-  }, [startScanTargets]);
-  // #endregion
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, id: number) => {
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, _id: number, domainName: string) => {
     setAnchorEl(event.currentTarget);
-    setActiveScanId(id);
-    const scan = scans?.find(s => s.id === id);
-    setActiveTarget(scan?.domain ? { id: scan.domain.id, name: scan.domain.name } : null);
+    setActiveScanId(_id);
+    setActiveTarget({ id: _id, name: domainName });
   };
 
   const handleMenuClose = () => {
@@ -190,7 +170,7 @@ export const ScanHistoryPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN HISTORY [DEBUG]</Typography>
+          <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN HISTORY</Typography>
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
             MANAGE AND AUDIT PAST SECURITY OPERATIONS
           </Typography>
@@ -393,7 +373,22 @@ export const ScanHistoryPage: React.FC = () => {
                           size="small"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleMenuOpen(e, scan.id);
+                            const match = domains?.find(d => d.id === scan.domain.id);
+                            if (!match) return;
+                            setStartScanTargets({
+                              ids: [match.id],
+                              names: [match.name],
+                            });
+                          }}
+                          sx={{ color: 'rgba(112, 206, 35, 0.63)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                        >
+                          <RefreshCw size={16} />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMenuOpen(e, scan.id, scan.domain?.name);
                           }}
                           sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
                         >
@@ -461,98 +456,33 @@ export const ScanHistoryPage: React.FC = () => {
         }}>
           <Share2 size={14} /> ATTACK SURFACE
         </MenuItem>
-        <MenuItem onClick={() => {
-          // #region agent log
-          fetch('http://127.0.0.1:7744/ingest/42e8b300-a2ff-4d3c-940b-8fe098d0aaa3', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '55a681' },
-            body: JSON.stringify({
-              sessionId: '55a681',
-              runId: 'initial',
-              hypothesisId: 'H2',
-              location: 'frontend/src/features/scans/components/ScanHistoryPage.tsx:RESCAN_MENUITEM_ENTRY',
-              message: 'rescan menu item clicked',
-              data: {
-                activeScanId,
-                activeScanIdIsTruthy: !!activeScanId,
-                scansCount: scans?.length || 0,
-                selectedCount: selected.length,
-              },
-              timestamp: Date.now()
-            })
-          }).catch(() => {});
-          // #endregion
-
-          // console.log('RESCAN clicked, activeScanId:', activeScanId);
-          // console.log('Scans:', scans);
-          // if (activeScanId) {
-          //   const scan = scans?.find(s => s.id === activeScanId);
-          //   console.log('Found scan:', scan);
-          //   // #region agent log
-          //   fetch('http://127.0.0.1:7744/ingest/42e8b300-a2ff-4d3c-940b-8fe098d0aaa3', {
-          //     method: 'POST',
-          //     headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '55a681' },
-          //     body: JSON.stringify({
-          //       sessionId: '55a681',
-          //       runId: 'initial',
-          //       hypothesisId: 'H1',
-          //       location: 'frontend/src/features/scans/components/ScanHistoryPage.tsx:RESCAN_SCAN_DOMAIN_CHECK',
-          //       message: 'rescan scan/domain presence',
-          //       data: {
-          //         scanFound: !!scan,
-          //         hasDomain: !!scan?.domain,
-          //         domainId: scan?.domain?.id ?? null,
-          //         domainNameLen: scan?.domain?.name?.length ?? 0,
-          //       },
-          //       timestamp: Date.now()
-          //     })
-          //   }).catch(() => {});
-          //   // #endregion
-
-          //   if (scan && scan.domain) {
-          //     console.log('Setting rescanTarget for domain:', scan.domain);
-          //     setRescanTarget({
-          //       ids: [scan.domain.id],
-          //       names: [scan.domain.name]
-          //     });
-          //     setRescanModalOpen(true);
-          //     setSnackbar({
-          //       open: true,
-          //       message: `Initializing rescan for ${scan.domain.name}...`,
-          //       severity: 'info'
-          //     });
-          //   } else {
-          //     setSnackbar({
-          //       open: true,
-          //       message: 'Failed to identify target for rescan.',
-          //       severity: 'error'
-          //     });
-          //   }
-          // } else {
-          //   console.log("activeScanId is not set")
-          // }
-          const scan = scans?.find(s => s.id === activeScanId);
-          const domainId = scan?.domain?.id ?? activeTarget?.id ?? null;
-          const domainName = scan?.domain?.name ?? activeTarget?.name ?? '';
-
-          if (!domainId) {
+        {/* <MenuItem onClick={() => {
+          if (!activeTarget) {
             setSnackbar({
               open: true,
               message: 'Failed to identify target for rescan.',
               severity: 'error'
             });
-            handleMenuClose();
+
+            setTimeout(() => {
+              setSnackbar({ open: false, message: '', severity: 'info' });
+              handleMenuClose();
+            }, 3000);
+
             return;
           }
 
           setStartScanTargets({
-            ids: [domainId],
-            names: [domainName].filter(Boolean),
+            ids: [activeScanId || 0],
+            names: [activeTarget?.name],
           });
-          handleMenuClose();
+          setTimeout(() => {
+            handleMenuClose();
+          }, 3000);
+          //handleMenuClose();
         }}>
           <RefreshCw size={14} /> RESCAN
-        </MenuItem>
+        </MenuItem> */}
         <MenuItem onClick={() => {
           if (activeScanId) {
             stopScanMutation.mutate(activeScanId);
@@ -592,7 +522,7 @@ export const ScanHistoryPage: React.FC = () => {
       )}
 
       {startScanTargets && (
-        <StartScanModal 
+        <StartScanModal
           open={!!startScanTargets}
           onClose={() => setStartScanTargets(null)}
           domainIds={startScanTargets.ids}

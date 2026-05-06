@@ -134,3 +134,9 @@
     yaml_configuration: "web_api_discovery: {\n  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'],\n  'scan_only_active': true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite'\n}\nvulnerability_scan: {\n  'run_acunetix': true\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
   model: scanEngine.enginetype
   pk: 8
+- fields:
+    default_engine: true
+    engine_name: Adaptive Stress & Resilience Engine
+    yaml_configuration: "stress_test: {\n  'uses_tools': ['k6', 'wrk', 'hping3', 'locust'],\n  'concurrency': 100,\n  'duration': '30s',\n  'rate_limit': 150,\n  'kill_switch': true,\n  'intensity': 'normal'\n}"
+  model: scanEngine.enginetype
+  pk: 9

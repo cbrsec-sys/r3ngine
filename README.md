@@ -181,6 +181,10 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
     * NMap Vulners (Improved Parsing)
   * WHOIS Identification
   * WAF Detection
+* **Adaptive Stress & Resilience Engine (ASRE)**
+  * Full-scale endpoint stress testing with `k6`, `wrk`, `hping3`, and `Locust`
+  * Real-time metrics visualization with React, ECharts, and Nivo
+  * Redis-based kill-switch for safe testing
 * OSINT Capabilities
   * Meta info Gathering
   * Employees Gathering

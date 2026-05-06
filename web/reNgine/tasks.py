@@ -42,6 +42,7 @@ from targetApp.models import Domain
 from dashboard.models import AcunetixAPIKey
 from reNgine.monitor_tasks import *
 from reNgine.graph_utils import Neo4jManager
+from reNgine.stress_testing_tasks import run_stress_testing
 try:
 	from acunetix import Acunetix
 except ImportError:
@@ -268,6 +269,13 @@ def initiate_scan(
 
 		if config.get('enable_ai_impact_analysis'):
 			workflow = chain(workflow, generate_impact_assessment.si(scan_history_id=scan_history_id))
+
+		if 'stress_test' in tasks:
+			workflow = chain(workflow, run_stress_testing.si(
+				scan_history_id=scan_history_id, 
+				target_domain_name=domain.name, 
+				yaml_config=config
+			))
 
 		# Build callback
 		callback = report.si(ctx=ctx).set(link_error=[report.si(ctx=ctx)])

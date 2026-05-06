@@ -1257,6 +1257,24 @@ export const ScanDetailPage = () => {
             >
               GENERATE REPORT
             </Button>
+            <Button
+              variant="contained"
+              component={RouterLink}
+              to={`/${projectSlug}/stress_testing/${scanId}`}
+              startIcon={<Zap size={16} />}
+              sx={{
+                bgcolor: 'rgba(255, 0, 255, 0.1)',
+                color: '#ff00ff',
+                border: '1px solid rgba(255, 0, 255, 0.3)',
+                fontFamily: 'Orbitron',
+                fontSize: '0.65rem',
+                fontWeight: 900,
+                px: 2,
+                '&:hover': { bgcolor: 'rgba(255, 0, 255, 0.2)' }
+              }}
+            >
+              STRESS TEST
+            </Button>
             <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
               <span>SCANS</span> / <span>DETAIL</span> / <span style={{ color: '#00f3ff' }}>{data.target_info.name}</span>
             </Stack>

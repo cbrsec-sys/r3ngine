@@ -6,6 +6,7 @@ import { MonitoringPage } from "./features/monitoring";
 import { EnginesPage } from "./features/engines";
 import { ProjectsPage } from "./features/projects";
 import { ScheduledScansPage, SubScansPage, ScanHistoryPage, ScanDetailPage, AttackSurfacePage } from "./features/scans";
+import { StressTestingPage } from "./pages/StressTestingPage";
 import { EndpointsPage } from "./features/endpoints";
 import { SubdomainsPage } from "./features/subdomains";
 import { TodoPage } from "./features/todos";
@@ -450,6 +451,13 @@ const attackSurfaceRoute = createRoute({
   component: AttackSurfacePage,
 });
 
+// Stress Testing Route
+const stressTestingRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "stress_testing/$scanId",
+  component: StressTestingPage,
+});
+
 // Login Route
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -484,6 +492,7 @@ const routeTree = rootRoute.addChildren([
     scansRoute,
     scanDetailRoute,
     attackSurfaceRoute,
+    stressTestingRoute,
     endpointsRoute,
     subdomainsRoute,
     todoRoute,

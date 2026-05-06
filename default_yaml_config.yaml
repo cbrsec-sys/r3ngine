@@ -148,3 +148,14 @@ web_api_discovery: {
   'timeout': 5,
   'kiterunner_wordlist': 'routes-large.kite'
 }
+stress_test: {
+  'uses_tools': ['k6', 'wrk', 'hping3', 'locust'],
+  'concurrency': 100,
+  'duration': '30s',
+  'rate_limit': 150,
+  'kill_switch': true,
+  'intensity': 'normal',
+  # 'custom_scenarios': false,
+  # 'allow_l7': true,
+  # 'allow_l4': false
+}

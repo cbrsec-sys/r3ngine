@@ -568,3 +568,75 @@
     is_github_cloned: false
     github_clone_path: null
     subdomain_gathering_command: null
+
+- model: scanEngine.installedexternaltool
+  pk: 33
+  fields:
+    logo_url: https://raw.githubusercontent.com/grafana/k6/master/assets/logo.png
+    name: k6
+    description: Grafana k6 is an open-source load testing tool that makes performance testing easy and productive for engineering teams.
+    github_url: https://github.com/grafana/k6
+    license_url: https://github.com/grafana/k6/blob/master/LICENSE.md
+    version_lookup_command: k6 version
+    update_command: ''
+    install_command: ''
+    version_match_regex: k6 v(?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+
+- model: scanEngine.installedexternaltool
+  pk: 34
+  fields:
+    logo_url: null
+    name: wrk
+    description: wrk is a modern HTTP benchmarking tool capable of generating significant load when run on a single multi-core CPU.
+    github_url: https://github.com/wg/wrk
+    license_url: https://github.com/wg/wrk/blob/master/LICENSE
+    version_lookup_command: wrk -v
+    update_command: apt install wrk --upgrade
+    install_command: apt install wrk
+    version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+
+- model: scanEngine.installedexternaltool
+  pk: 35
+  fields:
+    logo_url: null
+    name: hping3
+    description: hping is a command-line oriented TCP/IP packet assembler/analyzer.
+    github_url: https://github.com/antirez/hping
+    license_url: null
+    version_lookup_command: hping3 -v
+    update_command: apt install hping3 --upgrade
+    install_command: apt install hping3
+    version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+
+- model: scanEngine.installedexternaltool
+  pk: 36
+  fields:
+    logo_url: https://locust.io/static/img/logo.png
+    name: locust
+    description: Locust is an easy to use, scriptable and scalable performance testing tool.
+    github_url: https://github.com/locustio/locust
+    license_url: https://github.com/locustio/locust/blob/master/LICENSE
+    version_lookup_command: locust -V
+    update_command: pip3 install locust --upgrade
+    install_command: pip3 install locust
+    version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null

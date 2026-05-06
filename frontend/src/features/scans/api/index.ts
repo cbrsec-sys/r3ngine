@@ -1,5 +1,26 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ScanHistory, ScheduledScan, SubScan } from '../types';
+import type { Domain } from '../../targets/types';
+
+export const useDomains = (projectSlug: string) => {
+  return useQuery<Domain[]>({
+    queryKey: ['domains', projectSlug],
+    queryFn: async () => {
+      const response = await fetch(`/api/listTargets/?slug=${projectSlug}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      if (Array.isArray(data)) return data;
+      if (data.results && Array.isArray(data.results)) return data.results;
+      if (data.data && Array.isArray(data.data)) return data.data;
+      return [];
+    },
+    enabled: !!projectSlug,
+  });
+};
 
 export const useScans = (projectSlug: string) => {
   return useQuery<ScanHistory[]>({
@@ -23,7 +44,7 @@ export const useScans = (projectSlug: string) => {
 
 export const useInitiateScan = (projectSlug: string) => {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (params: {
       domain_id: number | number[];
@@ -365,5 +386,24 @@ export const useActivityLogs = (activityId: number | null) => {
     },
     enabled: !!activityId,
     refetchInterval: 5000, // Poll every 5 seconds for real-time logs
+  });
+};
+
+export const useStressTelemetry = (scanId: number | string | undefined) => {
+  return useQuery({
+    queryKey: ['stress-telemetry', scanId],
+    queryFn: async () => {
+      if (!scanId) return [];
+      const response = await fetch(`/api/stress-testing/${scanId}/`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      return Array.isArray(data.results) ? data.results : [];
+    },
+    enabled: !!scanId,
+    refetchInterval: 15000, // Refresh every 15s during test runs
   });
 };

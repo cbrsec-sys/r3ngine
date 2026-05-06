@@ -11,6 +11,7 @@ from .scheduled_scans import ScheduledScanViewSet
 from .subscans import SubScanViewSet
 from .scan_history import ScanHistoryViewSet
 from .users import UserManageViewSet
+from .stress_testing_views import StressTestingAPIView
 
 
 app_name = 'api'
@@ -335,6 +336,11 @@ urlpatterns = [
         'notification-settings/',
         NotificationSettingsAPIView.as_view(),
         name='notification_settings_api'
+    ),
+    path(
+        'stress-testing/<int:id>/',
+        StressTestingAPIView.as_view(),
+        name='stress_testing_api'
     ),
 ]
 

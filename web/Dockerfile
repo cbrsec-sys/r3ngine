@@ -80,6 +80,8 @@ RUN apt install -y --no-install-recommends \
     medusa \
     proxychains4 \
     jq \
+    wrk \
+    hping3 \
     unzip
 
 RUN add-apt-repository ppa:mozillateam/ppa
@@ -142,6 +144,15 @@ RUN ARCH=$(dpkg --print-architecture) \
     && tar -xvf trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH}.tar.gz \
     && mv trufflehog /usr/local/bin/ \
     && rm -rf trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH}.tar.gz
+
+# Install k6
+RUN ARCH=$(dpkg --print-architecture) \
+    && K6_VERSION="0.50.0" \
+    && if [ "${ARCH}" = "arm64" ]; then K6_ARCH="arm64"; else K6_ARCH="amd64"; fi \
+    && wget https://github.com/grafana/k6/releases/download/v${K6_VERSION}/k6-v${K6_VERSION}-linux-${K6_ARCH}.tar.gz \
+    && tar -xvf k6-v${K6_VERSION}-linux-${K6_ARCH}.tar.gz \
+    && mv k6-v${K6_VERSION}-linux-${K6_ARCH}/k6 /usr/local/bin/ \
+    && rm -rf k6-v${K6_VERSION}-linux-${K6_ARCH}*
 
 # Install Aquatone
 RUN ARCH=$(dpkg --print-architecture) \
@@ -252,7 +263,7 @@ RUN pip3 install -r /tmp/requirements.txt --no-cache-dir
 
 # install eyewitness
 RUN pip3 install --no-cache-dir fuzzywuzzy \
-    selenium==4.9.1 \
+    selenium==4.15 \
     python-Levenshtein \
     pyvirtualdisplay \
     netaddr
