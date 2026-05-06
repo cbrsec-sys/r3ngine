@@ -139,10 +139,10 @@ export const BountyHubPage: React.FC = () => {
             textShadow: '0 0 15px rgba(0, 243, 255, 0.3)',
             mb: 1
           }}>
-            BOUNTY_HUB
+            BOUNTY HUB
           </Typography>
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
-            INTEGRATED_VULNERABILITY_RESOURCES_V3
+            INTEGRATED VULNERABILITY RESOURCES V3
           </Typography>
         </Box>
 
@@ -153,7 +153,7 @@ export const BountyHubPage: React.FC = () => {
               onClick={() => setSelectedHandles([])}
               sx={{ color: 'rgba(255,255,255,0.6)', borderColor: 'rgba(255,255,255,0.2)' }}
             >
-              CLEAR_SELECTIONS ({selectedHandles.length})
+              CLEAR SELECTIONS ({selectedHandles.length})
             </Button>
           )}
           <Button
@@ -169,7 +169,7 @@ export const BountyHubPage: React.FC = () => {
               '&:hover': { bgcolor: '#00d8e4', boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)' }
             }}
           >
-            {importMutation.isPending ? 'IMPORTING...' : `IMPORT_PROGRAMS`}
+            {importMutation.isPending ? 'IMPORTING...' : `IMPORT PROGRAMS`}
           </Button>
         </Stack>
       </Stack>
@@ -332,7 +332,7 @@ export const BountyHubPage: React.FC = () => {
                     }}
                     sx={{ color: 'rgba(255,255,255,0.6)', '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' } }}
                   >
-                    SEE_DETAILS
+                    SEE DETAILS
                   </Button>
                 </CardContent>
               </Card>
@@ -369,7 +369,7 @@ export const BountyHubPage: React.FC = () => {
             <DialogContent sx={{ p: 3 }}>
               <Grid container spacing={4}>
                 <Grid size={{ xs: 12, md: 7 }}>
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 243, 255, 0.7)', mb: 2, letterSpacing: 1 }}>ASSETS_ON_SCOPE</Typography>
+                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 243, 255, 0.7)', mb: 2, letterSpacing: 1 }}>ASSETS ON SCOPE</Typography>
                   <Stack spacing={2}>
                     {details.relationships.structured_scopes.data.length > 0 ? (
                       details.relationships.structured_scopes.data.map((scope) => (
@@ -421,7 +421,7 @@ export const BountyHubPage: React.FC = () => {
                       </Grid>
                     </Box>
                     <Box>
-                      <Typography variant="subtitle2" sx={{ color: 'rgba(0, 243, 255, 0.7)', mb: 1.5, letterSpacing: 1 }}>PROGRAM_INFO</Typography>
+                      <Typography variant="subtitle2" sx={{ color: 'rgba(0, 243, 255, 0.7)', mb: 1.5, letterSpacing: 1 }}>PROGRAM INFO</Typography>
                       <Stack spacing={1}>
                         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 1 }}>
                           <CheckCircle2 size={14} color="#00ff00" /> Active since {new Date(details.attributes.started_accepting_at).toLocaleDateString()}
@@ -446,7 +446,7 @@ export const BountyHubPage: React.FC = () => {
                 }}
                 sx={{ bgcolor: '#00f3ff', color: '#000', fontWeight: 900, fontFamily: 'Orbitron' }}
               >
-                SELECT_FOR_IMPORT
+                SELECT FOR IMPORT
               </Button>
             </DialogActions>
           </>

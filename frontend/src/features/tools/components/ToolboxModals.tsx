@@ -65,7 +65,7 @@ export const WhoisModal: React.FC<ToolModalProps> = ({ open, onClose }) => {
   const { data, refetch, isFetching } = useWhois(target);
 
   return (
-    <ToolDialog open={open} onClose={onClose} title="WHOIS_LOOKUP" icon={<Globe size={20} />} color="#00f3ff">
+    <ToolDialog open={open} onClose={onClose} title="WHOIS LOOKUP" icon={<Globe size={20} />} color="#00f3ff">
       <Stack spacing={3}>
         <Stack direction="row" spacing={2}>
           <TextField
@@ -109,7 +109,7 @@ export const CMSDetectorModal: React.FC<ToolModalProps> = ({ open, onClose }) =>
   const { data, refetch, isFetching } = useCMSDetector(url);
 
   return (
-    <ToolDialog open={open} onClose={onClose} title="CMS_DETECTOR" icon={<Search size={20} />} color="#00f3ff">
+    <ToolDialog open={open} onClose={onClose} title="CMS DETECTOR" icon={<Search size={20} />} color="#00f3ff">
       <Stack spacing={3}>
         <Stack direction="row" spacing={2}>
           <TextField
@@ -138,7 +138,7 @@ export const CMSDetectorModal: React.FC<ToolModalProps> = ({ open, onClose }) =>
         {data && (
           <Paper sx={{ p: 3, bgcolor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
             <Typography sx={{ color: '#00f3ff', fontFamily: 'Orbitron', mb: 2, fontSize: '0.8rem' }}>
-              DETECTION_RESULTS:
+              DETECTION RESULTS:
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
               {data.status ? JSON.stringify(data, null, 2) : data.message || 'No CMS detected.'}
@@ -155,7 +155,7 @@ export const CVELookupModal: React.FC<ToolModalProps> = ({ open, onClose }) => {
   const { data, refetch, isFetching } = useCVEDetails(cveId);
 
   return (
-    <ToolDialog open={open} onClose={onClose} title="CVE_LOOKUP" icon={<Bug size={20} />} color="#ff00ff">
+    <ToolDialog open={open} onClose={onClose} title="CVE LOOKUP" icon={<Bug size={20} />} color="#ff00ff">
       <Stack spacing={3}>
         <Stack direction="row" spacing={2}>
           <TextField
@@ -208,7 +208,7 @@ export const WAFDetectorModal: React.FC<ToolModalProps> = ({ open, onClose }) =>
   const { data, refetch, isFetching } = useWafDetector(url);
 
   return (
-    <ToolDialog open={open} onClose={onClose} title="WAF_DETECTOR" icon={<ShieldAlert size={20} />} color="#ff9800">
+    <ToolDialog open={open} onClose={onClose} title="WAF DETECTOR" icon={<ShieldAlert size={20} />} color="#ff9800">
       <Stack spacing={3}>
         <Stack direction="row" spacing={2}>
           <TextField
@@ -237,7 +237,7 @@ export const WAFDetectorModal: React.FC<ToolModalProps> = ({ open, onClose }) =>
         {data && (
           <Paper sx={{ p: 3, bgcolor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
             <Typography sx={{ color: '#ff9800', fontFamily: 'Orbitron', mb: 2, fontSize: '0.8rem' }}>
-              WAF_STATUS:
+              WAF STATUS:
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
               {data.status ? JSON.stringify(data, null, 2) : data.message || 'No WAF detected or error occurred.'}

@@ -11,7 +11,9 @@ import {
   CircularProgress,
   Divider,
   Paper,
-  InputAdornment
+  InputAdornment,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import {
   FileText,
@@ -66,14 +68,43 @@ export const ReportSettingsPage: React.FC = () => {
     footer_text: ''
   });
 
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+
   useEffect(() => {
     if (settings) {
       setForm(settings);
     }
   }, [settings]);
 
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
   const handleSave = () => {
-    updateSettings.mutate(form);
+    updateSettings.mutate(form, {
+      onSuccess: () => {
+        setSnackbar({
+          open: true,
+          message: 'Report settings updated successfully.',
+          severity: 'success',
+        });
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: `Failed to update report settings: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          severity: 'error',
+        });
+      },
+    });
   };
 
   const handleFormat = (prefix: string, suffix: string = '') => {
@@ -114,7 +145,7 @@ export const ReportSettingsPage: React.FC = () => {
           textShadow: '0 0 20px rgba(0, 243, 255, 0.5)',
           mb: 1
         }}>
-          REPORT_CALIBRATION
+          REPORT CALIBRATION
         </Typography>
         <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
           CUSTOMIZE VULNERABILITY REPORT AESTHETICS & BRANDING
@@ -127,11 +158,11 @@ export const ReportSettingsPage: React.FC = () => {
           <Stack spacing={4}>
             <Box>
               <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
-                THEME_COLORS
+                THEME COLORS
               </Typography>
               <Grid container spacing={3}>
                 <Grid size={{xs: 12, sm: 6}} >
-                  <Typography variant="caption" sx={{ color: '#00f3ff', mb: 1, display: 'block', fontWeight: 600 }}>PRIMARY_COLOR</Typography>
+                  <Typography variant="caption" sx={{ color: '#00f3ff', mb: 1, display: 'block', fontWeight: 600 }}>PRIMARY COLOR</Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for Main Title, Footer Background, and Page Counters.
                   </Typography>
@@ -158,7 +189,7 @@ export const ReportSettingsPage: React.FC = () => {
                   </Box>
                 </Grid>
                 <Grid size={{xs: 12, sm: 6}} >
-                  <Typography variant="caption" sx={{ color: '#ffd600', mb: 1, display: 'block', fontWeight: 600 }}>SECONDARY_COLOR</Typography>
+                  <Typography variant="caption" sx={{ color: '#ffd600', mb: 1, display: 'block', fontWeight: 600 }}>SECONDARY COLOR</Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for the report cover background.
                   </Typography>
@@ -191,7 +222,7 @@ export const ReportSettingsPage: React.FC = () => {
 
             <Box sx={{ width: '100%' }}>
               <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
-                COMPANY_IDENTITY
+                COMPANY IDENTITY
               </Typography>
               <Stack spacing={3} sx={{ width: '100%' }}>
                 <Stack direction="row" spacing={2} sx={{ width: '100%' }}>
@@ -283,11 +314,11 @@ export const ReportSettingsPage: React.FC = () => {
         </TacticalPanel>
 
         {/* Report Content */}
-        <TacticalPanel title="REPORT_COMPONENTS" icon={<Layout size={18} />} sx={{ width: '100%' }}>
+        <TacticalPanel title="REPORT COMPONENTS" icon={<Layout size={18} />} sx={{ width: '100%' }}>
           <Stack spacing={4}>
             <Box>
               <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
-                LAYOUT_TOGGLES
+                LAYOUT TOGGLES
               </Typography>
               <Stack 
                 direction="row" 
@@ -360,12 +391,12 @@ export const ReportSettingsPage: React.FC = () => {
 
             <Box>
               <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
-                EXECUTIVE_SUMMARY_TEMPLATE
+                EXECUTIVE SUMMARY TEMPLATE
               </Typography>
 
               <Box sx={{ mb: 2, p: 2, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
                 <Typography variant="caption" sx={{ color: '#00f3ff', fontWeight: 600, display: 'block', mb: 2, fontFamily: 'Orbitron' }}>
-                  AVAILABLE_SYNTAX (Curly braces are mandatory)
+                  AVAILABLE SYNTAX (Curly braces are mandatory)
                 </Typography>
                 <Stack spacing={1}>
                   {[
@@ -545,10 +576,33 @@ export const ReportSettingsPage: React.FC = () => {
               '&:hover': { bgcolor: '#00d8e4' }
             }}
           >
-            {updateSettings.isPending ? 'SYNCHRONIZING...' : 'UPDATE_CONFIG'}
+            {updateSettings.isPending ? 'SYNCHRONIZING...' : 'UPDATE CONFIG'}
           </Button>
         </Paper>
       </Stack>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Grid, 
-  Button, 
+import {
+  Box,
+  Typography,
+  Grid,
+  Button,
   Card,
   CardContent,
   CardActions,
@@ -20,13 +20,13 @@ import {
   Snackbar,
   LinearProgress
 } from '@mui/material';
-import { 
-  MoreVertical, 
-  RefreshCw, 
-  Download, 
-  Trash2, 
-  ExternalLink, 
-  Hammer, 
+import {
+  MoreVertical,
+  RefreshCw,
+  Download,
+  Trash2,
+  ExternalLink,
+  Hammer,
   Wrench,
   Shield,
   Zap,
@@ -36,10 +36,10 @@ import {
   RefreshCcw
 } from 'lucide-react';
 import { TacticalPanel } from '../../../components/TacticalPanel';
-import { 
-  useToolArsenal, 
-  useToolVersion, 
-  useUpdateTool, 
+import {
+  useToolArsenal,
+  useToolVersion,
+  useUpdateTool,
   useUninstallTool,
   useAddTool,
   useModifyTool
@@ -91,7 +91,7 @@ export const ToolArsenalPage: React.FC = () => {
   const handleFetchVersion = (toolId: number, type: 'current' | 'latest' = 'latest') => {
     setLoadingTools(prev => ({ ...prev, [toolId]: true }));
     setVersionError(prev => ({ ...prev, [toolId]: '' }));
-    
+
     // Safety timeout to prevent infinite spinning
     const timeoutId = setTimeout(() => {
       setLoadingTools(prev => {
@@ -200,7 +200,7 @@ export const ToolArsenalPage: React.FC = () => {
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <Box>
           <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', mb: 1, letterSpacing: '2px' }}>
-            TOOL_ARSENAL
+            TOOL ARSENAL
           </Typography>
           <Typography variant="body2" sx={{ color: 'rgba(0,243,255,0.6)', fontFamily: 'monospace' }}>
             {`// Manage external security components and update routines`}
@@ -209,10 +209,10 @@ export const ToolArsenalPage: React.FC = () => {
         <Box sx={{ display: 'flex', gap: 2 }}>
           <ButtonGroup variant="outlined" size="small">
             {(['all', 'default', 'custom'] as const).map((f) => (
-              <Button 
+              <Button
                 key={f}
                 onClick={() => setFilter(f)}
-                sx={{ 
+                sx={{
                   bgcolor: filter === f ? 'rgba(0,243,255,0.1)' : 'transparent',
                   color: filter === f ? '#00f3ff' : 'rgba(255,255,255,0.5)',
                   borderColor: filter === f ? '#00f3ff' : 'rgba(0,243,255,0.3)',
@@ -233,22 +233,22 @@ export const ToolArsenalPage: React.FC = () => {
             variant="contained"
             startIcon={<Plus size={18} />}
             onClick={() => setModal({ open: true })}
-            sx={{ 
-              bgcolor: '#00f3ff', 
-              color: '#000', 
-              fontWeight: 'bold', 
+            sx={{
+              bgcolor: '#00f3ff',
+              color: '#000',
+              fontWeight: 'bold',
               fontFamily: 'Orbitron',
               fontSize: '11px',
               '&:hover': { bgcolor: '#00d8e4' },
               boxShadow: '0 0 15px rgba(0,243,255,0.3)'
             }}
           >
-            ADD_TOOL
+            ADD TOOL
           </Button>
         </Box>
       </Box>
 
-      <Box sx={{ 
+      <Box sx={{
         display: 'grid',
         gridTemplateColumns: {
           xs: '1fr',
@@ -262,8 +262,8 @@ export const ToolArsenalPage: React.FC = () => {
       }}>
         {filteredTools.map((tool) => (
           <Box key={tool.id} sx={{ height: '100%' }}>
-            <Card sx={{ 
-              bgcolor: 'rgba(10, 10, 15, 0.85)', 
+            <Card sx={{
+              bgcolor: 'rgba(10, 10, 15, 0.85)',
               border: `1px solid ${tool.is_default ? 'rgba(0, 243, 255, 0.15)' : 'rgba(255, 0, 255, 0.15)'}`,
               height: '580px',
               width: '100%',
@@ -280,10 +280,10 @@ export const ToolArsenalPage: React.FC = () => {
               }
             }}>
               {/* Top Badge */}
-              <Box sx={{ 
-                position: 'absolute', 
-                top: 0, 
-                left: 0, 
+              <Box sx={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
                 bgcolor: tool.is_default ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255, 0, 255, 0.2)',
                 color: tool.is_default ? '#00f3ff' : '#ff00ff',
                 px: 1,
@@ -304,8 +304,8 @@ export const ToolArsenalPage: React.FC = () => {
 
               {/* Action Menu */}
               <Box sx={{ position: 'absolute', top: 5, right: 5, zIndex: 2 }}>
-                <IconButton 
-                  size="small" 
+                <IconButton
+                  size="small"
                   onClick={(e) => handleMenuOpen(tool.id, e)}
                   sx={{ color: 'rgba(255,255,255,0.4)', '&:hover': { color: '#00f3ff' } }}
                 >
@@ -317,9 +317,9 @@ export const ToolArsenalPage: React.FC = () => {
                   onClose={() => handleMenuClose(tool.id)}
                   slotProps={{
                     paper: {
-                      sx: { 
-                        bgcolor: '#0a0a0a', 
-                        color: '#fff', 
+                      sx: {
+                        bgcolor: '#0a0a0a',
+                        color: '#fff',
                         border: '1px solid rgba(0,243,255,0.2)',
                         '& .MuiMenuItem-root': { fontSize: '11px', fontFamily: 'Orbitron' },
                         '& .MuiMenuItem-root:hover': { bgcolor: 'rgba(0,243,255,0.1)' }
@@ -343,12 +343,12 @@ export const ToolArsenalPage: React.FC = () => {
 
               <CardContent sx={{ p: 3, pt: 6, display: 'flex', flexDirection: 'column', alignItems: 'center', flexGrow: 1, overflow: 'hidden' }}>
                 {/* Logo/Icon */}
-                <Avatar 
+                <Avatar
                   src={tool.logo_url || undefined}
-                  sx={{ 
-                    width: 60, 
-                    height: 60, 
-                    mb: 2, 
+                  sx={{
+                    width: 60,
+                    height: 60,
+                    mb: 2,
                     bgcolor: 'rgba(255,255,255,0.03)',
                     border: '1px solid rgba(255,255,255,0.1)'
                   }}
@@ -357,12 +357,12 @@ export const ToolArsenalPage: React.FC = () => {
                 </Avatar>
 
                 <Box sx={{ height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
-                  <Typography variant="h6" sx={{ 
-                    fontFamily: 'Orbitron', 
-                    fontWeight: 'bold', 
-                    color: '#fff', 
-                    textAlign: 'center', 
-                    fontSize: '18px', 
+                  <Typography variant="h6" sx={{
+                    fontFamily: 'Orbitron',
+                    fontWeight: 'bold',
+                    color: '#fff',
+                    textAlign: 'center',
+                    fontSize: '18px',
                     letterSpacing: '1px',
                     display: '-webkit-box',
                     WebkitLineClamp: 2,
@@ -387,95 +387,95 @@ export const ToolArsenalPage: React.FC = () => {
                 {/* Divider */}
                 <Box sx={{ width: '40px', height: '2px', bgcolor: tool.is_default ? '#00f3ff' : '#ff00ff', mb: 3, opacity: 0.5 }} />
 
-                 {/* Version Section */}
-                 <Box sx={{ textAlign: 'center', mb: 3 }}>
-                   <Typography sx={{ color: '#ff00ff', fontSize: '9px', fontFamily: 'Orbitron', fontWeight: 'bold', letterSpacing: '1px', mb: 1 }}>
-                     INSTALLED VERSION
-                   </Typography>
-                   <Box sx={{ 
-                     bgcolor: 'rgba(0,0,0,0.3)', 
-                     px: 2, 
-                     py: 0.5, 
-                     borderRadius: '4px',
-                     border: versionError[tool.id] ? '1px solid rgba(255, 23, 68, 0.3)' : '1px solid rgba(255,255,255,0.05)',
-                     display: 'inline-block',
-                     minWidth: '80px'
-                   }}>
-                     <Typography sx={{ 
-                       color: versionError[tool.id] ? '#ff1744' : (currentVersions[tool.id] ? '#00f3ff' : 'rgba(255,255,255,0.2)'), 
-                       fontSize: versionError[tool.id] ? '9px' : '13px', 
-                       fontFamily: 'monospace', 
-                       fontWeight: 'bold' 
-                     }}>
-                       {versionError[tool.id] 
-                         ? versionError[tool.id].toUpperCase() 
-                         : (currentVersions[tool.id] || 'NOT DETECTED')}
-                     </Typography>
-                   </Box>
-                   
-                   {latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] && (
-                     <Box sx={{ mt: 1 }}>
-                       <Typography sx={{ color: '#00e676', fontSize: '9px', fontFamily: 'Orbitron', fontWeight: 'bold' }}>
-                         NEW VERSION AVAILABLE: {latestVersions[tool.id]}
-                       </Typography>
-                     </Box>
-                   )}
-                 </Box>
- 
-                 {/* Description Area - Grows but fits in fixed height card */}
-                 <Box sx={{ 
-                   flexGrow: 1, 
-                   width: '100%', 
-                   overflowY: 'auto', 
-                   mb: 2,
-                   px: 1,
-                   display: 'flex',
-                   flexDirection: 'column',
-                   '&::-webkit-scrollbar': { width: '4px' },
-                   '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,243,255,0.1)', borderRadius: '10px' }
-                 }}>
-                   <Typography variant="body2" sx={{ 
-                     color: 'rgba(255,255,255,0.5)', 
-                     textAlign: 'center', 
-                     fontSize: '11px', 
-                     lineHeight: 1.6,
-                   }}>
-                     {tool.description}
-                   </Typography>
-                 </Box>
- 
-                 <Box sx={{ mt: 'auto', width: '100%', pt: 2 }}>
-                   <Button 
-                     fullWidth
-                     variant={latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? "contained" : "outlined"} 
-                     startIcon={loadingTools[tool.id] ? <CircularProgress size={14} color="inherit" /> : (latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? <Download size={14} /> : <RefreshCcw size={14} />)}
-                     onClick={() => {
-                       if (latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id]) {
-                         handleAction('update', tool.id, tool.name);
-                       } else {
-                         handleFetchVersion(tool.id, 'latest');
-                       }
-                     }}
-                     disabled={loadingTools[tool.id]}
-                     sx={{ 
-                       borderColor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00e676' : 'rgba(0,243,255,0.2)', 
-                       bgcolor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00e676' : 'transparent',
-                       color: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#000' : '#00f3ff',
-                       fontSize: '10px',
-                       fontWeight: 'bold',
-                       fontFamily: 'Orbitron',
-                       py: 1,
-                       '&:hover': { 
-                         bgcolor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00c853' : 'rgba(0,243,255,0.1)', 
-                         borderColor: '#00f3ff' 
-                       }
-                     }}
-                   >
-                     {loadingTools[tool.id] 
-                       ? 'PROCESSING...' 
-                       : (latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? 'INSTALL UPDATE' : 'CHECK UPDATE')}
-                   </Button>
-                 </Box>
+                {/* Version Section */}
+                <Box sx={{ textAlign: 'center', mb: 3 }}>
+                  <Typography sx={{ color: '#ff00ff', fontSize: '9px', fontFamily: 'Orbitron', fontWeight: 'bold', letterSpacing: '1px', mb: 1 }}>
+                    INSTALLED VERSION
+                  </Typography>
+                  <Box sx={{
+                    bgcolor: 'rgba(0,0,0,0.3)',
+                    px: 2,
+                    py: 0.5,
+                    borderRadius: '4px',
+                    border: versionError[tool.id] ? '1px solid rgba(255, 23, 68, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+                    display: 'inline-block',
+                    minWidth: '80px'
+                  }}>
+                    <Typography sx={{
+                      color: versionError[tool.id] ? '#ff1744' : (currentVersions[tool.id] ? '#00f3ff' : 'rgba(255,255,255,0.2)'),
+                      fontSize: versionError[tool.id] ? '9px' : '13px',
+                      fontFamily: 'monospace',
+                      fontWeight: 'bold'
+                    }}>
+                      {versionError[tool.id]
+                        ? versionError[tool.id].toUpperCase()
+                        : (currentVersions[tool.id] || 'NOT DETECTED')}
+                    </Typography>
+                  </Box>
+
+                  {latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] && (
+                    <Box sx={{ mt: 1 }}>
+                      <Typography sx={{ color: '#00e676', fontSize: '9px', fontFamily: 'Orbitron', fontWeight: 'bold' }}>
+                        NEW VERSION AVAILABLE: {latestVersions[tool.id]}
+                      </Typography>
+                    </Box>
+                  )}
+                </Box>
+
+                {/* Description Area - Grows but fits in fixed height card */}
+                <Box sx={{
+                  flexGrow: 1,
+                  width: '100%',
+                  overflowY: 'auto',
+                  mb: 2,
+                  px: 1,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  '&::-webkit-scrollbar': { width: '4px' },
+                  '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,243,255,0.1)', borderRadius: '10px' }
+                }}>
+                  <Typography variant="body2" sx={{
+                    color: 'rgba(255,255,255,0.5)',
+                    textAlign: 'center',
+                    fontSize: '11px',
+                    lineHeight: 1.6,
+                  }}>
+                    {tool.description}
+                  </Typography>
+                </Box>
+
+                <Box sx={{ mt: 'auto', width: '100%', pt: 2 }}>
+                  <Button
+                    fullWidth
+                    variant={latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? "contained" : "outlined"}
+                    startIcon={loadingTools[tool.id] ? <CircularProgress size={14} color="inherit" /> : (latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? <Download size={14} /> : <RefreshCcw size={14} />)}
+                    onClick={() => {
+                      if (latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id]) {
+                        handleAction('update', tool.id, tool.name);
+                      } else {
+                        handleFetchVersion(tool.id, 'latest');
+                      }
+                    }}
+                    disabled={loadingTools[tool.id]}
+                    sx={{
+                      borderColor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00e676' : 'rgba(0,243,255,0.2)',
+                      bgcolor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00e676' : 'transparent',
+                      color: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#000' : '#00f3ff',
+                      fontSize: '10px',
+                      fontWeight: 'bold',
+                      fontFamily: 'Orbitron',
+                      py: 1,
+                      '&:hover': {
+                        bgcolor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00c853' : 'rgba(0,243,255,0.1)',
+                        borderColor: '#00f3ff'
+                      }
+                    }}
+                  >
+                    {loadingTools[tool.id]
+                      ? 'PROCESSING...'
+                      : (latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? 'INSTALL UPDATE' : 'CHECK UPDATE')}
+                  </Button>
+                </Box>
               </CardContent>
               {loadingTools[tool.id] && <LinearProgress sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, bgcolor: 'transparent', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />}
             </Card>
@@ -495,12 +495,12 @@ export const ToolArsenalPage: React.FC = () => {
         autoHideDuration={6000}
         onClose={() => setSnackbar({ ...snackbar, open: false })}
       >
-        <Alert 
-          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
           severity={snackbar.severity as any}
-          sx={{ 
-            width: '100%', 
-            bgcolor: snackbar.severity === 'success' ? '#00c853' : snackbar.severity === 'error' ? '#ff1744' : '#2979ff', 
+          sx={{
+            width: '100%',
+            bgcolor: snackbar.severity === 'success' ? '#00c853' : snackbar.severity === 'error' ? '#ff1744' : '#2979ff',
             color: '#000',
             fontWeight: 'bold',
             fontFamily: 'Orbitron',

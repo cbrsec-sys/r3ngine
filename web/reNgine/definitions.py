@@ -24,6 +24,7 @@ CUSTOM_HEADERS = 'custom_headers'
 CUSTOM_HEADER = 'custom_header'
 FETCH_GPT_REPORT = 'fetch_gpt_report'
 RUN_NUCLEI = 'run_nuclei'
+RUN_ACUNETIX = 'run_acunetix'
 RUN_CRLFUZZ = 'run_crlfuzz'
 RUN_DALFOX = 'run_dalfox'
 RUN_S3SCANNER = 'run_s3scanner'
@@ -160,6 +161,22 @@ NUCLEI_SEVERITY_MAP = {
 }
 NUCLEI_REVERSE_SEVERITY_MAP = {v: k for k, v in NUCLEI_SEVERITY_MAP.items()}
 NUCLEI_DEFAULT_SEVERITIES = list(NUCLEI_SEVERITY_MAP.keys())
+
+# semgrep
+SEMGREP_SEVERITY_MAP = {
+    'INFO': 0,
+    'WARNING': 2,
+    'ERROR': 3,
+}
+
+# trivy
+TRIVY_SEVERITY_MAP = {
+    'UNKNOWN': 0,
+    'LOW': 1,
+    'MEDIUM': 2,
+    'HIGH': 3,
+    'CRITICAL': 4,
+}
 
 # s3scanner
 S3SCANNER_DEFAULT_PROVIDERS = ['gcp', 'aws', 'digitalocean', 'dreamhost', 'linode']
@@ -636,6 +653,14 @@ Explain the steps an attacker might take, the tools they might use, and the pote
 Ensure the tone is technical, professional, and objective.
 Avoid using markdown headers like # or ##. Use bold text for emphasis if needed.
 CRITICAL: Do NOT include any sign-offs, signatures, or placeholders.
+"""
+
+LLM_IMPACT_ASSESSMENT_SYSTEM_PROMPT = """
+You are an expert Cyber Risk Strategist. Your task is to analyze a security finding and describe its potential business impact.
+Instead of focusing on specific threat actors, focus on the **Potential Attack Chain** (the sequence of technical steps an attacker would likely take to pivot or escalate) and the **Business Impact**.
+Describe how this vulnerability fits into a broader attack path (e.g., Initial Access -> Lateral Movement -> Data Exfiltration).
+Provide a prioritized list of business consequences.
+Format the response clearly with sections for 'Potential Attack Chain' and 'Impact Summary'.
 """
 
 

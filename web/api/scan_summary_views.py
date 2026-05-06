@@ -11,7 +11,7 @@ from startScan.models import (
     Subdomain, EndPoint, Vulnerability, 
     VulnerabilityTags, IpAddress, Port, Technology, 
     MonitoringDiscovery, CountryISO, CveId, CweId,
-    Email, Employee, ScanHistory, SubScan, ScanActivity, SecretLeak
+    Email, Employee, ScanHistory, SubScan, ScanActivity, SecretLeak, Command
 )
 from recon_note.models import TodoNote
 
@@ -134,11 +134,13 @@ class ScanSummaryAPIView(APIView):
                 -1: 'PENDING'
             }
             timeline_data.append({
+                'id': activity.id,
                 'title': activity.title,
                 'time': activity.time,
                 'status': status_map.get(activity.status, 'UNKNOWN'),
                 'name': activity.name,
-                'error_message': activity.error_message if hasattr(activity, 'error_message') else None
+                'error_message': activity.error_message if hasattr(activity, 'error_message') else None,
+                'has_commands': Command.objects.filter(activity=activity).exists()
             })
 
         # Extra counts

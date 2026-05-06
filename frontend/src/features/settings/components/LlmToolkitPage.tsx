@@ -15,7 +15,8 @@ import {
   InputAdornment,
   Divider,
   Paper,
-  Tooltip
+  Tooltip,
+  Snackbar
 } from '@mui/material';
 import { 
   Cpu, 
@@ -60,6 +61,15 @@ export const LlmToolkitPage: React.FC = () => {
     is_active: false
   });
   const [pullingModel, setPullingModel] = useState<string | null>(null);
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
   
   const { data: models, isLoading: isModelsLoading } = useLlmModels(
     projectSlug, 
@@ -106,10 +116,26 @@ export const LlmToolkitPage: React.FC = () => {
 
   // Handle pull completion
   useEffect(() => {
-    if (pullStatus?.status === 'success' || pullStatus?.status === 'failed') {
+    if (pullStatus?.status === 'success') {
+      setSnackbar({
+        open: true,
+        message: `Model ${pullingModel} downloaded successfully.`,
+        severity: 'success',
+      });
+      setTimeout(() => setPullingModel(null), 5000);
+    } else if (pullStatus?.status === 'failed') {
+      setSnackbar({
+        open: true,
+        message: `Failed to download model ${pullingModel}.`,
+        severity: 'error',
+      });
       setTimeout(() => setPullingModel(null), 5000);
     }
   }, [pullStatus?.status]);
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
 
   const handleProviderChange = (provider: string) => {
     setSelectedProvider(provider);
@@ -127,8 +153,26 @@ export const LlmToolkitPage: React.FC = () => {
       onSuccess: (data) => {
         if (data.status === 'pulling') {
           setPullingModel(form.selected_model);
+          setSnackbar({
+            open: true,
+            message: `Initiating download for ${form.selected_model}...`,
+            severity: 'info',
+          });
+        } else {
+          setSnackbar({
+            open: true,
+            message: `${selectedProvider.toUpperCase()} configuration saved successfully.`,
+            severity: 'success',
+          });
         }
-      }
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: `Failed to update LLM settings: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          severity: 'error',
+        });
+      },
     });
   };
 
@@ -168,7 +212,7 @@ export const LlmToolkitPage: React.FC = () => {
       <Grid container spacing={3}>
         {/* Provider Sidebar */}
         <Grid size={{xs: 12, lg: 3}} >
-          <TacticalPanel title="LLM_PROVIDERS" icon={<Brain size={18} />}>
+          <TacticalPanel title="LLM PROVIDERS" icon={<Brain size={18} />}>
             <Stack spacing={1}>
               {providers.map((p) => (
                 <Button
@@ -212,7 +256,7 @@ export const LlmToolkitPage: React.FC = () => {
         {/* Main Config Area */}
         <Grid size={{xs: 12, lg: selectedProvider === 'ollama' ? 6 : 9}} >
           <TacticalPanel 
-            title={`${selectedProvider.toUpperCase()}_CONFIGURATION`}
+            title={`${selectedProvider.toUpperCase()} CONFIGURATION`}
             icon={<Settings size={18} />}
             headerAction={
               <Box sx={{ 
@@ -228,7 +272,7 @@ export const LlmToolkitPage: React.FC = () => {
                   color: form.is_active ? '#00f3ff' : 'rgba(255,255,255,0.4)',
                   fontWeight: 700
                 }}>
-                  {form.is_active ? 'ACTIVE_DEFAULT' : 'INACTIVE'}
+                  {form.is_active ? 'ACTIVE DEFAULT' : 'INACTIVE'}
                 </Typography>
               </Box>
             }
@@ -284,7 +328,7 @@ export const LlmToolkitPage: React.FC = () => {
               {/* Model Selection */}
               <Box>
                 <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 1, fontFamily: 'Orbitron' }}>
-                  SELECT_MODEL
+                  SELECT MODEL
                 </Typography>
                 <TextField
                   select
@@ -340,7 +384,7 @@ export const LlmToolkitPage: React.FC = () => {
                 }
                 label={
                   <Typography sx={{ color: '#fff', fontSize: '0.85rem', fontFamily: 'Orbitron' }}>
-                    SET_AS_DEFAULT_LLM
+                    SET AS DEFAULT LLM
                   </Typography>
                 }
               />
@@ -405,7 +449,7 @@ export const LlmToolkitPage: React.FC = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <TerminalIcon size={14} color="#00f3ff" />
                         <Typography sx={{ color: '#fff', fontSize: '10px', fontFamily: 'monospace' }}>
-                          OLLAMA_PULL: {pullingModel}
+                          OLLAMA PULL: {pullingModel}
                         </Typography>
                       </Box>
                       <Typography sx={{ 
@@ -442,7 +486,7 @@ export const LlmToolkitPage: React.FC = () => {
         {/* Model Info Sidebar (Ollama only) */}
         {selectedProvider === 'ollama' && (
           <Grid size={{xs: 12, lg: 3}} >
-            <TacticalPanel title="MODEL_INSIGHTS" icon={<Info size={18} />}>
+            <TacticalPanel title="MODEL INSIGHTS" icon={<Info size={18} />}>
               {!currentModel ? (
                 <Box sx={{ textAlign: 'center', py: 4 }}>
                   <Ghost size={40} color="rgba(255,255,255,0.1)" />
@@ -462,12 +506,12 @@ export const LlmToolkitPage: React.FC = () => {
                   </Box>
 
                   <Box>
-                    <Typography sx={{ color: 'rgba(0, 243, 255, 0.5)', fontSize: '10px', fontFamily: 'Orbitron', mb: 0.5 }}>DISK_FOOTPRINT</Typography>
+                    <Typography sx={{ color: 'rgba(0, 243, 255, 0.5)', fontSize: '10px', fontFamily: 'Orbitron', mb: 0.5 }}>DISK FOOTPRINT</Typography>
                     <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600 }}>{currentModel.size || 'N/A'}</Typography>
                   </Box>
 
                   <Box>
-                    <Typography sx={{ color: 'rgba(0, 243, 255, 0.5)', fontSize: '10px', fontFamily: 'Orbitron', mb: 0.5 }}>SUGGESTED_RAM</Typography>
+                    <Typography sx={{ color: 'rgba(0, 243, 255, 0.5)', fontSize: '10px', fontFamily: 'Orbitron', mb: 0.5 }}>SUGGESTED RAM</Typography>
                     <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600 }}>{currentModel.suggested_ram || 'N/A'}</Typography>
                   </Box>
 
@@ -490,6 +534,29 @@ export const LlmToolkitPage: React.FC = () => {
           </Grid>
         )}
       </Grid>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : snackbar.severity === 'info' ? 'rgba(0, 243, 255, 0.7)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

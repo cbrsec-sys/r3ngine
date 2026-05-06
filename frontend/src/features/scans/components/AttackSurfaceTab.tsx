@@ -295,7 +295,7 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
           Attack Surface Map {targetId ? `(Target Coverage)` : `(Scan #${scanId})`}
         </Typography>
         <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
-          V3.0 INFRASTRUCTURE_GRAPH_VISUALIZATION
+          V3.0 INFRASTRUCTURE GRAPH VISUALIZATION
         </Typography>
       </Box>
 

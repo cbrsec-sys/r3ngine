@@ -56,7 +56,7 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
           Leaks & Secrets
         </Typography>
         <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
-          V3.0 CREDENTIAL_INTELLIGENCE_REPORT
+          V3.0 CREDENTIAL INTELLIGENCE REPORT
         </Typography>
       </Box>
 

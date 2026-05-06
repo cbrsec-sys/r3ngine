@@ -566,12 +566,18 @@ def report_settings(request, slug):
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def fetch_proxies(request, slug):
+    logger.info(f"fetch_proxies view hit! Method: {request.method}, Slug: {slug}, User: {request.user}")
     if request.method == "POST":
         logger.info("Initiating fetch_proxies_task...")
-        task = fetch_proxies_task.delay()
-        logger.info(f"Task initiated with ID: {task.id}")
-        return http.JsonResponse({'task_id': task.id})
-    return http.JsonResponse({'error': 'Invalid request'}, status=400)
+        try:
+            task = fetch_proxies_task.delay()
+            logger.info(f"Task successfully queued with ID: {task.id}")
+            return http.JsonResponse({'task_id': task.id})
+        except Exception as e:
+            logger.error(f"Failed to queue fetch_proxies_task: {str(e)}")
+            return http.JsonResponse({'error': f"Celery error: {str(e)}"}, status=500)
+    logger.warning(f"Invalid request method to fetch_proxies: {request.method}")
+    return http.JsonResponse({'error': 'Invalid request method. POST required.'}, status=405)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
@@ -719,17 +725,42 @@ def get_ollama_pull_status(request, slug):
 def api_vault(request, slug):
     context = {}
     if request.method == "POST":
+        
+        # Support both legacy FormData keys (key_netlas, key_acunetix_url, ...)
+        # and JSON payload keys (netlas_key, acunetix_url, ...).
+        json_payload = None
+        try:
+            content_type = (request.META.get("CONTENT_TYPE") or "").lower()
+            if "application/json" in content_type:
+                import json as _json
+                raw = (request.body or b"").decode("utf-8", errors="ignore").strip()
+                if raw:
+                    json_payload = _json.loads(raw)
+        except Exception:
+            json_payload = None
+
+        def _pick(*names):
+            for n in names:
+                if json_payload is not None and isinstance(json_payload, dict) and n in json_payload:
+                    return json_payload.get(n)
+                if n in request.POST:
+                    return request.POST.get(n)
+            return None
+
         key_openai = request.POST.get('key_openai')
-        key_netlas = request.POST.get('key_netlas')
-        key_chaos = request.POST.get('key_chaos')
-        key_hackerone = request.POST.get('key_hackerone')
-        username_hackerone = request.POST.get('username_hackerone')
-        key_shodan = request.POST.get('key_shodan')
-        key_censys_id = request.POST.get('key_censys_id')
-        key_censys_secret = request.POST.get('key_censys_secret')
+        key_netlas = _pick('key_netlas', 'netlas_key')
+        key_chaos = _pick('key_chaos', 'chaos_key')
+        key_hackerone = _pick('key_hackerone', 'hackerone_key')
+        username_hackerone = _pick('username_hackerone', 'hackerone_username')
+        key_shodan = _pick('key_shodan', 'shodan_key')
+        key_censys = _pick('key_censys', 'censys_key')
+        key_acunetix_url = _pick('key_acunetix_url', 'acunetix_url')
+        key_acunetix_key = _pick('key_acunetix_key', 'acunetix_key')
+        print(f"key_acunetix_url: {key_acunetix_url}")
+        print(f"key_acunetix_key: {key_acunetix_key}")
 
-
-        if key_openai:
+        # Treat empty strings as "clear value" (fixes: unsetting defaults to last value).
+        if key_openai is not None:
             openai_api_key = OpenAiAPIKey.objects.first()
             if openai_api_key:
                 openai_api_key.key = key_openai
@@ -737,7 +768,7 @@ def api_vault(request, slug):
             else:
                 OpenAiAPIKey.objects.create(key=key_openai)
 
-        if key_netlas:
+        if key_netlas is not None:
             netlas_api_key = NetlasAPIKey.objects.first()
             if netlas_api_key:
                 netlas_api_key.key = key_netlas
@@ -745,7 +776,7 @@ def api_vault(request, slug):
             else:
                 NetlasAPIKey.objects.create(key=key_netlas)
 
-        if key_chaos:
+        if key_chaos is not None:
             chaos_api_key = ChaosAPIKey.objects.first()
             if chaos_api_key:
                 chaos_api_key.key = key_chaos
@@ -753,19 +784,21 @@ def api_vault(request, slug):
             else:
                 ChaosAPIKey.objects.create(key=key_chaos)
 
-        if key_hackerone and username_hackerone:
+        if (key_hackerone is not None) or (username_hackerone is not None):
             hackerone_api_key = HackerOneAPIKey.objects.first()
             if hackerone_api_key:
-                hackerone_api_key.username = username_hackerone
-                hackerone_api_key.key = key_hackerone
+                if username_hackerone is not None:
+                    hackerone_api_key.username = username_hackerone
+                if key_hackerone is not None:
+                    hackerone_api_key.key = key_hackerone
                 hackerone_api_key.save()
             else:
                 HackerOneAPIKey.objects.create(
-                    username=username_hackerone, 
-                    key=key_hackerone
+                    username=username_hackerone or "",
+                    key=key_hackerone or ""
                 )
 
-        if key_shodan:
+        if key_shodan is not None:
             shodan_api_key = ShodanAPIKey.objects.first()
             if shodan_api_key:
                 shodan_api_key.key = key_shodan
@@ -773,20 +806,18 @@ def api_vault(request, slug):
             else:
                 ShodanAPIKey.objects.create(key=key_shodan)
 
-        if key_censys_id and key_censys_secret:
+        if key_censys is not None:
             censys_api_key = CensysAPIKey.objects.first()
             if censys_api_key:
-                censys_api_key.api_id = key_censys_id
-                censys_api_key.api_secret = key_censys_secret
+                censys_api_key.api_key = key_censys
                 censys_api_key.save()
             else:
                 CensysAPIKey.objects.create(
-                    api_id=key_censys_id,
-                    api_secret=key_censys_secret
+                    api_key=key_censys
                 )
 
         key_leaklookup = request.POST.get('key_leaklookup')
-        if key_leaklookup:
+        if key_leaklookup is not None:
             leaklookup_key = LeakLookupAPIKey.objects.first()
             if leaklookup_key:
                 leaklookup_key.key = key_leaklookup
@@ -800,6 +831,16 @@ def api_vault(request, slug):
             SpiderfootAPIKey.objects.update_or_create(
                 module_name=spiderfoot_module,
                 defaults={'key_value': spiderfoot_key}
+            )
+
+        if (key_acunetix_url is not None) or (key_acunetix_key is not None):
+            # Update even when blank to allow clearing values.
+            AcunetixAPIKey.objects.update_or_create(
+                id=1,
+                defaults={
+                    'server_url': key_acunetix_url or "",
+                    'api_key': key_acunetix_key or ""
+                }
             )
 
         delete_sf_key = request.POST.get('delete_sf_key')
@@ -829,6 +870,7 @@ def api_vault(request, slug):
     context['shodan_key'] = shodan_key
     context['censys_key'] = censys_key
     context['leaklookup_key'] = LeakLookupAPIKey.objects.first()
+    context['acunetix_key'] = AcunetixAPIKey.objects.first()
     context['spiderfoot_keys'] = SpiderfootAPIKey.objects.all()
     
     if request.headers.get('Accept') == 'application/json':
@@ -836,11 +878,12 @@ def api_vault(request, slug):
             'netlas_key': netlas_key.key if netlas_key else "",
             'chaos_key': chaos_key.key if chaos_key else "",
             'shodan_key': shodan_key.key if shodan_key else "",
-            'censys_id': censys_key.api_id if censys_key else "",
-            'censys_secret': censys_key.api_secret if censys_key else "",
+            'censys_key': censys_key.api_key if censys_key else "",
             'leaklookup_key': context['leaklookup_key'].key if context['leaklookup_key'] else "",
             'hackerone_username': hackerone_username or "",
             'hackerone_key': hackerone_key or "",
+            'acunetix_url': context['acunetix_key'].server_url if context['acunetix_key'] else "",
+            'acunetix_key': context['acunetix_key'].api_key if context['acunetix_key'] else "",
         })
 
     return render(request, 'dashboard/v3_index.html', context)

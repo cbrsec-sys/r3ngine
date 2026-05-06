@@ -63,7 +63,7 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Cpu size={20} style={{ color: '#00f3ff' }} />
           <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: '#fff', letterSpacing: 1 }}>
-            PROVISION_NEW_ENGINE
+            PROVISION NEW ENGINE
           </Typography>
         </Box>
         <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -74,7 +74,7 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
       <DialogContent sx={{ mt: 2 }}>
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <TextField
-            label="ENGINE_IDENTITY"
+            label="ENGINE IDENTITY"
             placeholder="e.g. Full Recon Suite"
             fullWidth
             value={name}
@@ -93,7 +93,7 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
           />
 
           <TextField
-            label="YAML_CONFIGURATION_BLUEPRINT"
+            label="YAML CONFIGURATION BLUEPRINT"
             placeholder="# Enter your engine configuration here"
             fullWidth
             multiline
@@ -138,7 +138,7 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
             '&.Mui-disabled': { bgcolor: 'rgba(0,243,255,0.1)', color: 'rgba(255,255,255,0.2)' }
           }}
         >
-          {createEngine.isPending ? 'PROVISIONING...' : 'INITIALIZE_ENGINE'}
+          {createEngine.isPending ? 'PROVISIONING...' : 'INITIALIZE ENGINE'}
         </Button>
       </DialogActions>
     </Dialog>

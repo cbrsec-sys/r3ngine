@@ -57,7 +57,7 @@ export const NotFound: React.FC = () => {
           mb: 1,
           textShadow: '0 0 10px rgba(255, 0, 60, 0.8)'
         }}>
-          SIGNAL_LOST
+          SIGNAL LOST
         </Typography>
 
         <Typography variant="h6" sx={{ 
@@ -67,7 +67,7 @@ export const NotFound: React.FC = () => {
           mb: 4,
           opacity: 0.8
         }}>
-          UNAUTHORIZED_SECTOR_ACCESS
+          UNAUTHORIZED SECTOR ACCESS
         </Typography>
 
         <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.6)', maxWidth: 450, mb: 6, lineHeight: 1.6 }}>

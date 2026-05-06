@@ -378,8 +378,7 @@ def onboarding(request):
         key_hackerone = request.POST.get('key_hackerone')
         username_hackerone = request.POST.get('username_hackerone')
         key_shodan = request.POST.get('key_shodan')
-        key_censys_id = request.POST.get('key_censys_id')
-        key_censys_secret = request.POST.get('key_censys_secret')
+        key_censys = request.POST.get('key_censys')
         bug_bounty_mode = request.POST.get('bug_bounty_mode') == 'on'
 
         insert_date = timezone.now()
@@ -462,16 +461,14 @@ def onboarding(request):
             else:
                 ShodanAPIKey.objects.create(key=key_shodan)
 
-        if key_censys_id and key_censys_secret:
+        if key_censys:
             censys_api_key = CensysAPIKey.objects.first()
             if censys_api_key:
-                censys_api_key.api_id = key_censys_id
-                censys_api_key.api_secret = key_censys_secret
+                censys_api_key.api_key = key_censys
                 censys_api_key.save()
             else:
                 CensysAPIKey.objects.create(
-                    api_id=key_censys_id,
-                    api_secret=key_censys_secret
+                    api_key=key_censys
                 )
 
     context['error'] = error
@@ -566,6 +563,37 @@ def get_target_graph_data(request, slug, target_id):
     data = graph.get_target_graph_data(target.name)
     graph.close()
     return JsonResponse(data)
+
+
+def get_impact_graph_data(request, slug, vuln_id):
+    graph = Neo4jManager()
+    data = graph.get_impact_path(vuln_id)
+    graph.close()
+    return JsonResponse(data)
+
+
+def trigger_ai_impact(request, slug, vuln_id):
+    if request.method == 'POST':
+        from reNgine.tasks import generate_impact_assessment
+        generate_impact_assessment.delay(vulnerability_id=vuln_id)
+        return JsonResponse({'status': True, 'message': 'AI Impact Generation started...'})
+    return JsonResponse({'status': False})
+
+
+def get_impact_assessment_details(request, slug, vuln_id):
+    from startScan.models import ImpactAssessment
+    assessment = ImpactAssessment.objects.filter(vulnerability_id=vuln_id).order_by('-created_at').first()
+    if assessment:
+        return JsonResponse({
+            'status': True,
+            'id': assessment.id,
+            'potential_impact': assessment.potential_impact,
+            'remediation_priority': assessment.remediation_priority,
+            'potential_attack_chain': assessment.potential_attack_chain,
+            'is_ai_generated': assessment.is_ai_generated,
+            'created_at': assessment.created_at.isoformat(),
+        })
+    return JsonResponse({'status': False, 'message': 'No assessment found.'})
 
 
 @ensure_csrf_cookie

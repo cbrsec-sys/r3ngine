@@ -1,6 +1,7 @@
-from rest_framework.permissions import BasePermission
+from rest_framework.permissions import BasePermission, IsAuthenticated
 from rest_framework.exceptions import PermissionDenied
-from rolepermissions.checkers import has_permission
+from rolepermissions.checkers import has_permission, has_role
+from reNgine.definitions import *
 
 class HasPermission(BasePermission):
 	"""
@@ -19,3 +20,31 @@ class HasPermission(BasePermission):
 		if not has_permission(request.user, permission_code):
 			raise PermissionDenied(detail="This user does not have enough permissions")
 		return True
+
+class IsSysAdmin(BasePermission):
+	"""
+	Allows access only to SysAdmin users.
+	"""
+	def has_permission(self, request, view):
+		return request.user and request.user.is_authenticated and (
+			request.user.is_superuser or has_role(request.user, 'sys_admin')
+		)
+
+class IsPenetrationTester(BasePermission):
+	"""
+	Allows access to SysAdmin and PenetrationTester users.
+	"""
+	def has_permission(self, request, view):
+		if not request.user or not request.user.is_authenticated:
+			return False
+		return (
+			request.user.is_superuser or 
+			has_role(request.user, ['sys_admin', 'penetration_tester'])
+		)
+
+class IsAuditor(BasePermission):
+	"""
+	Allows access to all authenticated users (including Auditors).
+	"""
+	def has_permission(self, request, view):
+		return request.user and request.user.is_authenticated

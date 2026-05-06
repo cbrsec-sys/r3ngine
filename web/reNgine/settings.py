@@ -39,6 +39,8 @@ DEFAULT_HTTP_TIMEOUT = env.int('DEFAULT_HTTP_TIMEOUT', default=5) # seconds
 DEFAULT_RETRIES = env.int('DEFAULT_RETRIES', default=1)
 DEFAULT_THREADS = env.int('DEFAULT_THREADS', default=30)
 DEFAULT_GET_GPT_REPORT = env.bool('DEFAULT_GET_GPT_REPORT', default=True)
+VITE_DEV_SERVER_URL = env('VITE_DEV_SERVER_URL', default='https://localhost:5173')
+VITE_ENABLED = env.bool('VITE_ENABLED', default=DEBUG)
 
 # Neo4j Configurations
 NEO4J_URI = env('NEO4J_URI', default='bolt://neo4j:7687')
@@ -132,6 +134,7 @@ TEMPLATES = [
                 'reNgine.context_processors.projects',
                 'reNgine.context_processors.version_context',
                 'reNgine.context_processors.user_preferences',
+                'reNgine.context_processors.vite_settings',
             ],
     },
 }]
@@ -256,7 +259,9 @@ LOGGING = {
         'file': {
             'level': 'ERROR',
             'class': 'logging.FileHandler',
-            'filename': 'errors.log',
+            # In containers, the working directory may not be writable.
+            # Use a universally writable path to avoid boot-time logging failures.
+            'filename': '/tmp/errors.log',
         },
         'null': {
             'class': 'logging.NullHandler'

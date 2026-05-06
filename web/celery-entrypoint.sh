@@ -159,6 +159,60 @@ fi
 # httpx seems to have issue, use alias instead!!!
 echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
 
+if [ ! -d "/usr/src/github/ParamSpider" ]
+then
+  echo "Cloning ParamSpider"
+  git clone https://github.com/devanshbathwal/ParamSpider /usr/src/github/ParamSpider
+  DIR=$(pwd)
+  cd /usr/src/github/ParamSpider
+  pip3 install .
+  python3 setup.py install
+  cd $DIR
+fi
+
+if [ ! -d "/usr/src/github/semgrep" ]
+then
+  echo "Installing Semgrep"
+  git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep
+  DIR=$(pwd)
+  cd /usr/src/github/semgrep
+  pip3 install .
+  cd $DIR
+fi
+
+if [ ! -d "/usr/src/github/scipag_vulscan" ]
+then
+  echo "Installing VulScan"
+  git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan
+  ln -s /usr/src/github/scipag_vulscan /usr/share/nmap/scripts/vulscan
+fi
+
+if [ ! -d "/usr/src/github/spiderfoot" ]
+then
+  echo "Installing SpiderFoot"
+  git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
+  DIR=$(pwd)
+  cd /usr/src/github/spiderfoot
+  pip3 install -r requirements.txt
+  cd $DIR
+fi
+
+if [ ! -d "/usr/src/github/acunetix-python" ]
+then
+  echo "Cloning Acunetix Python"
+  git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python
+  DIR=$(pwd)
+  cd /usr/src/github/acunetix-python
+  pip3 install .
+  cd $DIR
+fi
+
+if [ ! -d "/usr/src/github/awvs14-scan" ]
+then
+  echo "Cloning AWVS 14 Scan"
+  git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-scan
+fi
+
 # TEMPORARY FIX, httpcore is causing issues with celery, removing it as temp fix
 #python3 -m pip uninstall -y httpcore
 

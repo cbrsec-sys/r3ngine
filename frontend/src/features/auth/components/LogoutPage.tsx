@@ -81,7 +81,7 @@ export const LogoutPage: React.FC = () => {
             fullWidth
             variant="contained"
             startIcon={<LogIn size={18} />}
-            onClick={() => window.location.href = '/login/'}
+            onClick={() => navigate({ to: '/login' })}
             sx={{ 
               py: 1.5,
               bgcolor: '#00f3ff',

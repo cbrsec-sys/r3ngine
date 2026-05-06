@@ -1,11 +1,12 @@
-import { createRootRoute, createRoute, createRouter, Outlet, Link } from "@tanstack/react-router";
+import { createRootRouteWithContext, createRoute, createRouter, Outlet, Link, redirect } from "@tanstack/react-router";
 import { Shell } from "./components/Shell";
 import { DashboardPage } from "./features/dashboard";
 import { TargetList, TargetSummary } from "./features/targets";
 import { MonitoringPage } from "./features/monitoring";
 import { EnginesPage } from "./features/engines";
 import { ProjectsPage } from "./features/projects";
-import { ScheduledScansPage, SubScansPage, ScanHistoryPage, ScanDetailPage } from "./features/scans";
+import { ScheduledScansPage, SubScansPage, ScanHistoryPage, ScanDetailPage, AttackSurfacePage } from "./features/scans";
+import { StressTestingPage } from "./pages/StressTestingPage";
 import { EndpointsPage } from "./features/endpoints";
 import { SubdomainsPage } from "./features/subdomains";
 import { TodoPage } from "./features/todos";
@@ -34,8 +35,30 @@ import { Box, Typography, Button } from "@mui/material";
 import { AlertCircle, Home, RefreshCw } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 
+interface RouterContext {
+  auth: {
+    isAuthenticated: boolean;
+    isLoading: boolean;
+    user: any;
+  };
+}
+
 // Root Route
-const rootRoute = createRootRoute({
+const rootRoute = createRootRouteWithContext<RouterContext>()({
+  beforeLoad: ({ context, location }) => {
+    const isAuthPage = location.pathname.startsWith('/login') ||
+      location.pathname.startsWith('/logout') ||
+      location.pathname.startsWith('/onboarding');
+
+    if (!context.auth.isAuthenticated && !isAuthPage && !context.auth.isLoading) {
+      throw redirect({
+        to: '/login',
+        search: {
+          redirect: location.href,
+        },
+      });
+    }
+  },
   component: () => {
     const routerState = useRouterState();
     const isAuthPage = routerState.location.pathname.startsWith('/login') ||
@@ -421,6 +444,20 @@ const scanDetailRoute = createRoute({
   component: ScanDetailPage,
 });
 
+// Attack Surface Route
+const attackSurfaceRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "attack_surface/$scanId",
+  component: AttackSurfacePage,
+});
+
+// Stress Testing Route
+const stressTestingRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "stress_testing/$scanId",
+  component: StressTestingPage,
+});
+
 // Login Route
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -442,6 +479,7 @@ const onboardingRoute = createRoute({
 
 // Route Tree
 const routeTree = rootRoute.addChildren([
+  rootRedirectRoute,
   projectRoute.addChildren([
     projectsRoute,
     dashboardRoute,
@@ -453,6 +491,8 @@ const routeTree = rootRoute.addChildren([
     subScansRoute,
     scansRoute,
     scanDetailRoute,
+    attackSurfaceRoute,
+    stressTestingRoute,
     endpointsRoute,
     subdomainsRoute,
     todoRoute,
@@ -480,7 +520,11 @@ const routeTree = rootRoute.addChildren([
 // Router Instance
 export const router = createRouter({
   routeTree,
+  context: {
+    auth: undefined!, // This will be provided by the AuthProvider
+  },
   defaultNotFoundComponent: () => <NotFound />,
+  trailingSlash: 'never',
 });
 
 // Type safety

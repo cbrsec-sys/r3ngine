@@ -20,6 +20,7 @@ import {
 import { X, Play, Zap, Shield, Search, Terminal, Globe } from 'lucide-react';
 import { useEngines } from '../../engines/api';
 import { useInitiateScan } from '../api';
+import { useNavigate } from '@tanstack/react-router';
 
 interface StartScanModalProps {
   open: boolean;
@@ -47,6 +48,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
 
   const { data: engines, isLoading: loadingEngines } = useEngines();
   const { mutate: initiateScan, isPending, error, reset } = useInitiateScan(projectSlug);
+  const navigate = useNavigate();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,6 +66,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
       onSuccess: () => {
         onClose();
         reset();
+        navigate({ to: `/${projectSlug}/scans` });
       },
     });
   };

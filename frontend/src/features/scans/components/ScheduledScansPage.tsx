@@ -141,7 +141,7 @@ export const ScheduledScansPage: React.FC = () => {
                 '&:hover': { bgcolor: 'rgba(255, 0, 60, 0.2)' }
               }}
             >
-              PURGE_{selectedIds.length}_TARGETS
+              PURGE {selectedIds.length} TARGETS
             </Button>
           )}
         </Box>
@@ -204,9 +204,9 @@ export const ScheduledScansPage: React.FC = () => {
               </th>
               <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>DESCRIPTION</th>
               <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>FREQUENCY</th>
-              <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>LAST_RUN</th>
+              <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>LAST RUN</th>
               <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>RUNS</th>
-              <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ONE_OFF</th>
+              <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ONE OFF</th>
               <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ENABLED</th>
               <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ACTION</th>
             </tr>
@@ -293,7 +293,7 @@ export const ScheduledScansPage: React.FC = () => {
                   </td>
                   <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
-                      <Tooltip title="RUN_NOW">
+                      <Tooltip title="RUN NOW">
                         <IconButton size="small" sx={{ color: '#00ff9d', '&:hover': { bgcolor: 'rgba(0, 255, 157, 0.1)' } }}>
                           <Play size={16} />
                         </IconButton>
@@ -338,18 +338,18 @@ export const ScheduledScansPage: React.FC = () => {
       {/* Footer Info */}
       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', px: 1 }}>
         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
-          TOTAL_RECORDS: {filteredData.length}
+          TOTAL RECORDS: {filteredData.length}
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#00ff9d' }} />
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>ACTIVE_TASKS</Typography>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>ACTIVE TASKS</Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.2)' }}>
               <Zap size={8} color="#fff" />
             </Box>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>ONE_OFF_OPS</Typography>
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>ONE OFF OPS</Typography>
           </Box>
         </Box>
       </Box>

@@ -164,7 +164,7 @@ class RengineTask(Task):
 		return self.result
 
 	def write_results(self):
-		if not self.result:
+		if not self.result or isinstance(self.result, bool):
 			return False
 		is_json_results = isinstance(self.result, dict) or isinstance(self.result, list)
 		if not self.output_path:
@@ -174,7 +174,7 @@ class RengineTask(Task):
 				if is_json_results:
 					json.dump(self.result, f, indent=4)
 				else:
-					f.write(self.result)
+					f.write(str(self.result))
 			logger.warning(f'Wrote {self.task_name} results to {self.output_path}')
 
 	def create_scan_activity(self):

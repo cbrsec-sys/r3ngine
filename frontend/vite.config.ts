@@ -3,12 +3,12 @@ import react from '@vitejs/plugin-react';
 import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // https://vitejs.dev/config/
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     basicSsl()
   ],
-  base: '/staticfiles/',
+  base: command === 'serve' ? '/' : '/staticfiles/',
   build: {
     rollupOptions: {
       output: {
@@ -23,15 +23,30 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'https://127.0.0.1',
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/login': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/logout': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/onboarding': {
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       },
       '/static': {
-        target: 'https://127.0.0.1',
+        target: 'http://127.0.0.1:8000',
         changeOrigin: true,
         secure: false,
       }
     }
   }
-});
+}));

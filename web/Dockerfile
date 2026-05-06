@@ -80,6 +80,8 @@ RUN apt install -y --no-install-recommends \
     medusa \
     proxychains4 \
     jq \
+    wrk \
+    hping3 \
     unzip
 
 RUN add-apt-repository ppa:mozillateam/ppa
@@ -130,7 +132,8 @@ RUN printf "\
     github.com/projectdiscovery/katana/cmd/katana@latest\n\
     github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest\n\
     github.com/sa7mon/s3scanner@latest\n\
-    github.com/zricethezav/gitleaks/v8@latest\n" | \
+    github.com/zricethezav/gitleaks/v8@latest\n\
+    github.com/xalgord/reconx/cmd/reconx@latest\n" | \
     xargs -L1 go install -ldflags="-s -w" -v && \
     rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
 
@@ -142,6 +145,15 @@ RUN ARCH=$(dpkg --print-architecture) \
     && mv trufflehog /usr/local/bin/ \
     && rm -rf trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH}.tar.gz
 
+# Install k6
+RUN ARCH=$(dpkg --print-architecture) \
+    && K6_VERSION="0.50.0" \
+    && if [ "${ARCH}" = "arm64" ]; then K6_ARCH="arm64"; else K6_ARCH="amd64"; fi \
+    && wget https://github.com/grafana/k6/releases/download/v${K6_VERSION}/k6-v${K6_VERSION}-linux-${K6_ARCH}.tar.gz \
+    && tar -xvf k6-v${K6_VERSION}-linux-${K6_ARCH}.tar.gz \
+    && mv k6-v${K6_VERSION}-linux-${K6_ARCH}/k6 /usr/local/bin/ \
+    && rm -rf k6-v${K6_VERSION}-linux-${K6_ARCH}*
+
 # Install Aquatone
 RUN ARCH=$(dpkg --print-architecture) \
     && wget https://github.com/michenriksen/aquatone/releases/download/v1.7.0/aquatone_linux_${ARCH}_1.7.0.zip \
@@ -151,6 +163,61 @@ RUN ARCH=$(dpkg --print-architecture) \
 
 # Install Arjun, InQL, Netlas
 RUN pip3 install arjun inql netlas
+
+RUN ARCH=$(dpkg --print-architecture) \
+    && wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
+    tar -xvf kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
+    mv kr /usr/local/bin/ && \
+    rm -rf kiterunner_1.0.2_linux_${ARCH}.tar.gz
+
+# Install Trivy with checksum verification
+RUN ARCH=$(dpkg --print-architecture) \
+    && if [ "${ARCH}" = "arm64" ]; then TRIVY_ARCH="ARM64"; else TRIVY_ARCH="64bit"; fi \
+    && TRIVY_VERSION="0.70.0" \
+    && wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-32bit.tar.gz \
+    && wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_checksums.txt \
+    && grep "trivy_${TRIVY_VERSION}_Linux-32bit.tar.gz" trivy_${TRIVY_VERSION}_checksums.txt | sha256sum -c - \
+    && tar -xvf trivy_${TRIVY_VERSION}_Linux-32bit.tar.gz \
+    && mv trivy /usr/local/bin/ \
+    && rm -rf trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz trivy_${TRIVY_VERSION}_checksums.txt
+
+# Install Node.js 20 and Retire.js
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt install -y nodejs && \
+    npm install -g retire
+
+# Setup Eyewitness
+RUN git clone https://github.com/RedSiege/EyeWitness /usr/src/github/EyeWitness && \
+    cd /usr/src/github/EyeWitness && \
+    bash setup/setup.sh
+
+# Update Nuclei and Nuclei-Templates
+RUN nuclei -update-templates
+
+# update chaos
+RUN chaos -update
+
+# Pre-download common wordlists
+RUN mkdir -p /usr/src/wordlist && \
+    wget https://raw.githubusercontent.com/maurosoria/dirsearch/master/db/dicc.txt -O /usr/src/wordlist/dicc.txt && \
+    wget https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/deepmagic.com-prefixes-top50000.txt -O /usr/src/wordlist/deepmagic.com-prefixes-top50000.txt
+
+# Download Kiterunner Wordlist
+RUN mkdir -p /usr/src/wordlist/kr && \
+    cd /usr/src/wordlist/kr && \
+    wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-large.kite.tar.gz -O routes-large.kite.tar.gz && \
+    tar -xvf routes-large.kite.tar.gz && \
+    rm -rf routes-large.kite.tar.gz && \
+    wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-small.kite.tar.gz -O routes-small.kite.tar.gz && \
+    tar -xvf routes-small.kite.tar.gz && \
+    rm -rf routes-small.kite.tar.gz
+
+# Pre-clone nmap scripts and other tools
+RUN mkdir -p /usr/src/github && \
+    git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan && \
+    ln -s /usr/src/github/scipag_vulscan /usr/share/nmap/scripts/vulscan && \
+    git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK && \
+    pip3 install -r /usr/src/github/CMSeeK/requirements.txt
 
 # Clone and install managed tools
 RUN git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder && \
@@ -174,55 +241,20 @@ RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarves
 RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
     cd /usr/src/github/ctfr && pip3 install -r requirements.txt
 
-RUN ARCH=$(dpkg --print-architecture) \
-    && wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
-    tar -xvf kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
-    mv kr /usr/local/bin/ && \
-    rm -rf kiterunner_1.0.2_linux_${ARCH}.tar.gz
+RUN git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python && \
+    cd /usr/src/github/acunetix-python && pip3 install .
 
-# Download Kiterunner Wordlist
-RUN mkdir -p /usr/src/wordlist/kr && \
-    cd /usr/src/wordlist/kr && \
-    wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-large.kite.tar.gz -O routes-large.kite.tar.gz && \
-    tar -xvf routes-large.kite.tar.gz && \
-    rm -rf routes-large.kite.tar.gz && \
-    wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-small.kite.tar.gz -O routes-small.kite.tar.gz && \
-    tar -xvf routes-small.kite.tar.gz && \
-    rm -rf routes-small.kite.tar.gz
+RUN git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-scan
 
-# Install SpiderFoot
-RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
-WORKDIR /usr/src/github/spiderfoot
-RUN pip3 install -r requirements.txt
-WORKDIR /usr/src/app
+RUN cd /usr/src/github && \
+    wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip && \
+    unzip GooFuzz.v.1.2.6.zip && \
+    rm GooFuzz.v.1.2.6.zip && \
+    mv GooFuzz.v.1.2.6 goofuzz && \
+    chmod +x goofuzz/GooFuzz
 
-# Install Chromium
-RUN apt install chromium-driver -y
-
-# Setup Eyewitness
-RUN git clone https://github.com/RedSiege/EyeWitness /usr/src/github/EyeWitness && \
-    cd /usr/src/github/EyeWitness && \
-    bash setup/setup.sh
-
-# Update Nuclei and Nuclei-Templates
-RUN nuclei -update-templates
-
-# update chaos
-RUN chaos -update
-
-# Pre-download common wordlists
-RUN mkdir -p /usr/src/wordlist && \
-    wget https://raw.githubusercontent.com/maurosoria/dirsearch/master/db/dicc.txt -O /usr/src/wordlist/dicc.txt && \
-    wget https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/deepmagic.com-prefixes-top50000.txt -O /usr/src/wordlist/deepmagic.com-prefixes-top50000.txt
-
-# Pre-clone nmap scripts and other tools
-RUN mkdir -p /usr/src/github && \
-    git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan && \
-    ln -s /usr/src/github/scipag_vulscan /usr/share/nmap/scripts/vulscan && \
-    git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK && \
-    pip3 install -r /usr/src/github/CMSeeK/requirements.txt && \
-    git clone https://github.com/m3n0sd0n4ld/GooFuzz.git /usr/src/github/goofuzz && \
-    chmod +x /usr/src/github/goofuzz/GooFuzz
+RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot && \
+    cd /usr/src/github/spiderfoot && pip3 install -r requirements.txt
 
 # Copy requirements
 COPY web/requirements.txt /tmp/requirements.txt
@@ -231,10 +263,17 @@ RUN pip3 install -r /tmp/requirements.txt --no-cache-dir
 
 # install eyewitness
 RUN pip3 install --no-cache-dir fuzzywuzzy \
-    selenium==4.9.1 \
+    selenium==4.15 \
     python-Levenshtein \
     pyvirtualdisplay \
     netaddr
+
+# Install Frontend Dependencies (for Dev mode)
+RUN mkdir -p /usr/src/app/frontend
+WORKDIR /usr/src/app/frontend
+COPY frontend/package*.json ./
+RUN npm install --legacy-peer-deps
+WORKDIR /usr/src/app
 
 # Copy source code
 COPY web/ /usr/src/app/

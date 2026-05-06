@@ -23,3 +23,9 @@ def user_preferences(request):
     if hasattr(request, 'user_preferences'):
         return {'user_preferences': request.user_preferences}
     return {}
+
+def vite_settings(request):
+    return {
+        'VITE_ENABLED': settings.VITE_ENABLED,
+        'VITE_DEV_SERVER_URL': settings.VITE_DEV_SERVER_URL,
+    }

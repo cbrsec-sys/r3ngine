@@ -943,6 +943,12 @@ def get_nmap_cmd(
 	if not cmd:
 		cmd = 'nmap'
 
+	if ports:
+		if isinstance(ports, list):
+			ports = ','.join(list(dict.fromkeys([str(p) for p in ports])))
+		elif isinstance(ports, str):
+			ports = ','.join(list(dict.fromkeys([p.strip() for p in ports.split(',')])))
+
 	options = {
 		"-sV": service_detection,
 		"-p": ports,
@@ -1722,3 +1728,38 @@ def is_valid_nmap_command(cmd):
 		return False
 		
 	return True
+
+
+#------------------------------#
+# Vulnerability Parsing Utils  #
+#------------------------------#
+
+def parse_semgrep_result(result):
+	"""Parses a single Semgrep match into reNgine vulnerability format."""
+	return {
+		'name': f"Semgrep: {result.get('check_id')}",
+		'description': result.get('extra', {}).get('message', ''),
+		'severity': SEMGREP_SEVERITY_MAP.get(result.get('extra', {}).get('severity', 'INFO'), 0),
+		'http_url': result.get('path', ''),
+		'type': 'SAST',
+	}
+
+def parse_trivy_result(result):
+	"""Parses a single Trivy vulnerability into reNgine vulnerability format."""
+	return {
+		'name': f"Trivy: {result.get('Title') or result.get('VulnerabilityID')}",
+		'description': result.get('Description', ''),
+		'severity': TRIVY_SEVERITY_MAP.get(result.get('Severity', 'UNKNOWN'), 0),
+		'http_url': result.get('PrimaryURL', ''),
+		'type': 'SCA',
+	}
+
+def parse_retire_result(result):
+	"""Parses a single Retire.js vulnerability into reNgine vulnerability format."""
+	return {
+		'name': f"Retire.js: {result.get('component')} ({result.get('version')})",
+		'description': result.get('info', ''),
+		'severity': 2, # Default medium for library vulnerabilities
+		'http_url': result.get('file', ''),
+		'type': 'SCA',
+	}

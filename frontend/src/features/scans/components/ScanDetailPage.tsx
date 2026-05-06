@@ -30,7 +30,12 @@ import {
   ListItemIcon,
   LinearProgress,
   FormControlLabel,
-  Checkbox
+  Checkbox,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  Slide,
+  Backdrop
 } from '@mui/material';
 import {
   Activity,
@@ -67,9 +72,12 @@ import {
   Eye,
   Mail,
   Users,
-  Key
+  Key,
+  X,
+  Copy,
+  RefreshCw
 } from 'lucide-react';
-import { useScanSummary } from '../api';
+import { useScanSummary, useActivityLogs } from '../api';
 import Chart from 'react-apexcharts';
 import { GeoMap } from '../../dashboard/components/GeoMap';
 import { KpiCard } from '../../../components/KpiCard';
@@ -82,6 +90,7 @@ import { SecretLeaksTab } from './SecretLeaksTab';
 import { AttackSurfaceTab } from './AttackSurfaceTab';
 import VisualizationTab from './VisualizationTab';
 import { ScanReportModal } from './ScanReportModal';
+import { StartScanModal } from './StartScanModal';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   const configs: any = {
@@ -157,7 +166,140 @@ const formatTimeAgo = (date: string) => {
   return `${hrs} hours ago`;
 };
 
-const TimelineItem: React.FC<{ activity: any }> = ({ activity }) => {
+const TaskOverlay: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  activityId: number | null;
+  activityTitle: string;
+}> = ({ open, onClose, activityId, activityTitle }) => {
+  const { data: logs, isLoading } = useActivityLogs(activityId);
+  const [selectedLog, setSelectedLog] = useState<any>(null);
+
+  // Set first log as selected when logs load
+  React.useEffect(() => {
+    if (logs && logs.length > 0 && !selectedLog) {
+      setSelectedLog(logs[0]);
+    }
+  }, [logs]);
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      fullWidth
+      maxWidth="lg"
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: '#0a0a0a',
+            backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+            border: '1px solid rgba(255,255,255,0.1)',
+            borderRadius: 2,
+            minHeight: '70vh'
+          }
+        }
+      }}
+    >
+      <DialogTitle sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <Stack direction="row" sx={{ spacing: 2, alignItems: "center" }}>
+          <Terminal size={20} color="#00f3ff" />
+          <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: '1rem', letterSpacing: 1 }}>
+            {activityTitle}
+          </Typography>
+        </Stack>
+        <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' } }}>
+          <X size={20} />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent sx={{ p: 0, overflow: 'hidden' }}>
+        <Grid container sx={{ height: '60vh' }}>
+          {/* Command List */}
+          <Grid size={{ xs: 4 }} sx={{ borderRight: '1px solid rgba(255,255,255,0.05)', height: '100%', overflowY: 'auto' }}>
+            {isLoading ? (
+              <Box sx={{ p: 4, textAlign: 'center' }}>
+                <CircularProgress size={24} sx={{ color: '#00f3ff' }} />
+              </Box>
+            ) : logs && logs.length > 0 ? (
+              <List sx={{ p: 0 }}>
+                {logs.map((log: any) => (
+                  <ListItem
+                    key={log.id}
+                    component="div"
+                    onClick={() => setSelectedLog(log)}
+                    sx={{
+                      cursor: 'pointer',
+                      borderBottom: '1px solid rgba(255,255,255,0.03)',
+                      py: 2,
+                      bgcolor: selectedLog?.id === log.id ? 'rgba(0,243,255,0.05)' : 'transparent',
+                      '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }
+                    }}
+                  >
+                    <ListItemText
+                      primary={
+                        <Typography sx={{ fontSize: '0.8rem', color: selectedLog?.id === log.id ? '#00f3ff' : '#fff', fontWeight: 700, mb: 0.5, fontFamily: 'monospace' }}>
+                          {log.command.split(' ')[0]}
+                        </Typography>
+                      }
+                      secondary={
+                        <Typography noWrap sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                          {log.command}
+                        </Typography>
+                      }
+                    />
+                    <ChevronRight size={14} color={selectedLog?.id === log.id ? '#00f3ff' : 'rgba(255,255,255,0.2)'} />
+                  </ListItem>
+                ))}
+              </List>
+            ) : (
+              <Box sx={{ p: 4, textAlign: 'center', opacity: 0.5 }}>
+                <Typography sx={{ fontSize: '0.8rem' }}>No commands logged yet.</Typography>
+              </Box>
+            )}
+          </Grid>
+          {/* Command Output */}
+          <Grid size={{ xs: 8 }} sx={{ height: '100%', overflowY: 'auto', bgcolor: '#050505' }}>
+            {selectedLog ? (
+              <Box sx={{ p: 2 }}>
+                <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography sx={{ fontSize: '0.7rem', color: '#00f3ff', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1 }}>Command Execution Output</Typography>
+                  <Button
+                    size="small"
+                    startIcon={<Copy size={12} />}
+                    onClick={() => navigator.clipboard.writeText(selectedLog.output)}
+                    sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: '#fff', border: '1px solid #00f3ff' } }}
+                  >
+                    Copy Output
+                  </Button>
+                </Stack>
+                <Box sx={{
+                  p: 2,
+                  bgcolor: 'rgba(0,0,0,0.5)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: 1,
+                  fontFamily: 'monospace',
+                  fontSize: '0.75rem',
+                  color: 'rgba(255,255,255,0.8)',
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-all'
+                }}>
+                  {selectedLog.output || "No output captured yet..."}
+                </Box>
+              </Box>
+            ) : (
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, opacity: 0.3 }}>
+                <Terminal size={48} />
+                <Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>Select a command to view output</Typography>
+              </Box>
+            )}
+          </Grid>
+        </Grid>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const TimelineItem: React.FC<{ activity: any, onClick?: () => void }> = ({ activity, onClick }) => {
   const statusConfig: any = {
     'SUCCESS': { color: '#00ff62', label: 'Completed' },
     'RUNNING': { color: '#00f3ff', label: 'In Progress' },
@@ -168,7 +310,19 @@ const TimelineItem: React.FC<{ activity: any }> = ({ activity }) => {
   const config = statusConfig[activity.status] || { color: '#fff', label: activity.status };
 
   return (
-    <Box sx={{ position: 'relative', pl: 5, pb: 4, '&:last-child': { pb: 0 } }}>
+    <Box
+      onClick={activity.has_commands ? onClick : undefined}
+      sx={{
+        position: 'relative',
+        pl: 5,
+        pb: 4,
+        '&:last-child': { pb: 0 },
+        cursor: activity.has_commands ? 'pointer' : 'default',
+        '&:hover': activity.has_commands ? {
+          '& .timeline-content': { bgcolor: 'rgba(255,255,255,0.03)' }
+        } : {}
+      }}
+    >
       {/* Vertical Line */}
       <Box sx={{
         position: 'absolute',
@@ -207,7 +361,7 @@ const TimelineItem: React.FC<{ activity: any }> = ({ activity }) => {
         )}
       </Box>
 
-      <Stack spacing={0.5}>
+      <Stack spacing={0.5} className="timeline-content" sx={{ p: 1, borderRadius: 1, transition: 'background-color 0.2s' }}>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
             {activity.title}
@@ -224,6 +378,11 @@ const TimelineItem: React.FC<{ activity: any }> = ({ activity }) => {
           }}>
             {config.label}
           </Box>
+          {activity.has_commands && (
+            <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+              • Click to view details <ChevronRight size={10} />
+            </Typography>
+          )}
         </Stack>
         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
           {new Date(activity.time).toLocaleString()}
@@ -589,6 +748,14 @@ export const ScanDetailPage = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [startScanTargets, setStartScanTargets] = useState<{ ids: number[]; names: string[] } | null>(null);
+  const [taskOverlayOpen, setTaskOverlayOpen] = useState(false);
+  const [selectedActivity, setSelectedActivity] = useState<{ id: number; title: string } | null>(null);
+
+  const handleTimelineItemClick = (activity: any) => {
+    setSelectedActivity({ id: activity.id, title: activity.title });
+    setTaskOverlayOpen(true);
+  };
 
   if (isLoading || !data) {
     return (
@@ -696,9 +863,15 @@ export const ScanDetailPage = () => {
       <TacticalPanel title="Timeline" icon={<History size={14} />}>
         <Box sx={{ p: 1, maxHeight: 400, overflow: 'auto' }}>
           <Stack>
-            {data.timeline?.map((activity: any, idx: number) => (
-              <TimelineItem key={idx} activity={activity} />
-            ))}
+            <Box sx={{ position: 'relative' }}>
+              {data.timeline?.map((activity: any, idx: number) => (
+                <TimelineItem
+                  key={idx}
+                  activity={activity}
+                  onClick={() => handleTimelineItemClick(activity)}
+                />
+              ))}
+            </Box>
             {(!data.timeline || data.timeline.length === 0) && (
               <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center', py: 4 }}>NO ACTIVITY LOGS</Typography>
             )}
@@ -1046,10 +1219,27 @@ export const ScanDetailPage = () => {
       <Box sx={{ mb: 3 }}>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN_DETAIL</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN DETAIL</Typography>
             <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info.name}</Typography>
           </Box>
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+            <Button
+              variant="contained"
+              startIcon={<RefreshCw size={16} />}
+              onClick={() => setStartScanTargets({ ids: [data.target_info.id], names: [data.target_info.name] })}
+              sx={{
+                bgcolor: 'rgba(0, 255, 98, 0.1)',
+                color: '#00ff62',
+                border: '1px solid rgba(0, 255, 98, 0.3)',
+                fontFamily: 'Orbitron',
+                fontSize: '0.65rem',
+                fontWeight: 900,
+                px: 2,
+                '&:hover': { bgcolor: 'rgba(0, 255, 98, 0.2)' }
+              }}
+            >
+              RESCAN
+            </Button>
             <Button
               variant="contained"
               startIcon={<FileText size={16} />}
@@ -1066,6 +1256,24 @@ export const ScanDetailPage = () => {
               }}
             >
               GENERATE REPORT
+            </Button>
+            <Button
+              variant="contained"
+              component={RouterLink}
+              to={`/${projectSlug}/stress_testing/${scanId}`}
+              startIcon={<Zap size={16} />}
+              sx={{
+                bgcolor: 'rgba(255, 0, 255, 0.1)',
+                color: '#ff00ff',
+                border: '1px solid rgba(255, 0, 255, 0.3)',
+                fontFamily: 'Orbitron',
+                fontSize: '0.65rem',
+                fontWeight: 900,
+                px: 2,
+                '&:hover': { bgcolor: 'rgba(255, 0, 255, 0.2)' }
+              }}
+            >
+              STRESS TEST
             </Button>
             <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
               <span>SCANS</span> / <span>DETAIL</span> / <span style={{ color: '#00f3ff' }}>{data.target_info.name}</span>
@@ -1208,7 +1416,7 @@ export const ScanDetailPage = () => {
 
                 {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION'].includes(tabs[activeTab]?.label) && (
                   <Box sx={{ p: 4, textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE_STAGING_AREA: {tabs[activeTab]?.label}</Typography>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE STAGING AREA: {tabs[activeTab]?.label}</Typography>
                     <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem', mt: 1 }}>SYNCHRONIZING DATA FROM LEGACY INTERFACE...</Typography>
                   </Box>
                 )}
@@ -1222,6 +1430,23 @@ export const ScanDetailPage = () => {
         onClose={() => setReportModalOpen(false)}
         scanId={parseInt(scanId)}
       />
+
+      <TaskOverlay
+        open={taskOverlayOpen}
+        onClose={() => setTaskOverlayOpen(false)}
+        activityId={selectedActivity?.id || null}
+        activityTitle={selectedActivity?.title || ''}
+      />
+
+      {startScanTargets && (
+        <StartScanModal 
+          open={!!startScanTargets}
+          onClose={() => setStartScanTargets(null)}
+          domainIds={startScanTargets.ids}
+          domainNames={startScanTargets.names}
+          projectSlug={projectSlug}
+        />
+      )}
     </Box>
   );
 };
