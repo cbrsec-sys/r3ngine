@@ -159,7 +159,7 @@ export const SubScansPage: React.FC = () => {
                   '&:hover': { bgcolor: 'rgba(255, 183, 77, 0.2)' }
                 }}
               >
-                STOP_{selectedIds.length}
+                STOP {selectedIds.length}
               </Button>
               <Button
                 variant="contained"
@@ -175,7 +175,7 @@ export const SubScansPage: React.FC = () => {
                   '&:hover': { bgcolor: 'rgba(255, 0, 60, 0.2)' }
                 }}
               >
-                DELETE_{selectedIds.length}
+                DELETE {selectedIds.length}
               </Button>
             </>
           )}
@@ -379,7 +379,7 @@ export const SubScansPage: React.FC = () => {
       {/* Footer Info */}
       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', px: 1 }}>
         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
-          TOTAL_RECORDS: {filteredData.length}
+          TOTAL RECORDS: {filteredData.length}
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>

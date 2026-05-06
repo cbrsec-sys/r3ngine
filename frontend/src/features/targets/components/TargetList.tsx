@@ -53,6 +53,18 @@ export const TargetList: React.FC = () => {
   const [startScanTargets, setStartScanTargets] = React.useState<{ ids: number[]; names: string[] } | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
   const [resultsPerPage, setResultsPerPage] = React.useState(20);
+  const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+  const [activeTarget, setActiveTarget] = React.useState<{ id: number; name: string } | null>(null);
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, target: { id: number; name: string }) => {
+    setAnchorEl(event.currentTarget);
+    setActiveTarget(target);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setActiveTarget(null);
+  };
 
   const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked && domains) {
@@ -366,8 +378,12 @@ export const TargetList: React.FC = () => {
                       >
                         Initiate Scan
                       </Button>
-                      <IconButton size="small" sx={{ color: 'rgba(0, 170, 255, 0.5)', bgcolor: 'rgba(0, 170, 255, 0.05)', borderRadius: 1 }}>
-                        <ChevronRight size={18} />
+                      <IconButton 
+                        size="small" 
+                        onClick={(e) => handleMenuOpen(e, { id: domain.id, name: domain.name })}
+                        sx={{ color: 'rgba(0, 170, 255, 0.5)', bgcolor: 'rgba(0, 170, 255, 0.05)', borderRadius: 1 }}
+                      >
+                        <MoreVertical size={18} />
                       </IconButton>
                     </Box>
                   </TableCell>
@@ -377,6 +393,52 @@ export const TargetList: React.FC = () => {
           </Table>
         </TableContainer>
       </Card>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#0d0c14',
+              border: '1px solid rgba(0, 170, 255, 0.2)',
+              borderRadius: 0,
+              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+              minWidth: 180,
+              '& .MuiMenuItem-root': {
+                fontFamily: 'Orbitron',
+                fontSize: '0.7rem',
+                fontWeight: 700,
+                color: 'rgba(255,255,255,0.8)',
+                gap: 1.5,
+                py: 1.2,
+                '&:hover': { bgcolor: 'rgba(0, 170, 255, 0.05)', color: '#00f3ff' },
+                '& svg': { color: 'rgba(0, 170, 255, 0.5)' }
+              }
+            }
+          }
+        }}
+      >
+        <MenuItem onClick={() => {
+          if (activeTarget) {
+            setStartScanTargets({ ids: [activeTarget.id], names: [activeTarget.name] });
+          }
+          handleMenuClose();
+        }}>
+          <Play size={14} /> INITIATE SCAN
+        </MenuItem>
+        <MenuItem onClick={() => {
+          if (activeTarget) {
+            if (window.confirm(`Are you sure you want to delete target ${activeTarget.name}?`)) {
+              deleteTargets([activeTarget.id]);
+            }
+          }
+          handleMenuClose();
+        }} sx={{ color: '#ff003c !important', '& svg': { color: '#ff003c !important' } }}>
+          <Trash2 size={14} /> DELETE TARGET
+        </MenuItem>
+      </Menu>
 
       <AddTargetModal 
         open={isAddModalOpen} 

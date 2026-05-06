@@ -90,7 +90,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
             Directory Fuzzing Results
           </Typography>
           <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
-            V3.0 SCAN_ASSETS_DIRECTORY_ENUM
+            V3.0 SCAN ASSETS DIRECTORY ENUM
           </Typography>
         </Box>
       </Box>

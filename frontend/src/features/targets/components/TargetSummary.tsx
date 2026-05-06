@@ -112,7 +112,7 @@ export const TargetSummary = () => {
       <Box sx={{ height: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
         <CircularProgress size={60} thickness={2} sx={{ color: '#00f3ff' }} />
         <Typography sx={{ color: '#00f3ff', fontFamily: 'Orbitron', letterSpacing: 4, fontSize: '0.8rem' }}>
-          BOOTING_SYSTEM_CORE...
+          BOOTING SYSTEM CORE...
         </Typography>
       </Box>
     );
@@ -121,7 +121,7 @@ export const TargetSummary = () => {
   if (error || !data) {
     return (
       <Box sx={{ height: '80vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <Typography color="error">ERROR: DATA_FETCH_FAILED</Typography>
+        <Typography color="error">ERROR: DATA FETCH FAILED</Typography>
       </Box>
     );
   }
@@ -546,7 +546,7 @@ export const TargetSummary = () => {
       <Box sx={{ mb: 3 }}>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>TARGET_SUMMARY</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>TARGET SUMMARY</Typography>
             <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {targetId} | TARGET: {data.target_info.name}</Typography>
           </Box>
           <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>

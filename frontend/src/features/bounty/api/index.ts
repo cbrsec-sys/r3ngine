@@ -1,6 +1,6 @@
 import { useQuery, useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { getCsrfToken } from '../../settings/api';
+import { getCsrfToken } from '../../../api/axiosConfig';
 import type { HackerOneProgram, ProgramDetails } from '../types';
 
 export const useBountyPrograms = (params: { sort_by?: string; sort_order?: string; bookmarked?: boolean }) => {

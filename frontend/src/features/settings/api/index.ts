@@ -1,22 +1,23 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+import { getCsrfToken } from '../../../api/axiosConfig';
 
 export interface NotificationSettings {
-	send_to_slack: boolean;
-	send_to_lark: boolean;
-	send_to_discord: boolean;
-	send_to_telegram: boolean;
-	slack_hook_url: string | null;
-	lark_hook_url: string | null;
-	discord_hook_url: string | null;
-	telegram_bot_token: string | null;
-	telegram_bot_chat_id: string | null;
-	send_scan_status_notif: boolean;
-	send_interesting_notif: boolean;
-	send_vuln_notif: boolean;
-	send_subdomain_changes_notif: boolean;
-	send_scan_output_file: boolean;
-	send_scan_tracebacks: boolean;
+  send_to_slack: boolean;
+  send_to_lark: boolean;
+  send_to_discord: boolean;
+  send_to_telegram: boolean;
+  slack_hook_url: string | null;
+  lark_hook_url: string | null;
+  discord_hook_url: string | null;
+  telegram_bot_token: string | null;
+  telegram_bot_chat_id: string | null;
+  send_scan_status_notif: boolean;
+  send_interesting_notif: boolean;
+  send_vuln_notif: boolean;
+  send_subdomain_changes_notif: boolean;
+  send_scan_output_file: boolean;
+  send_scan_tracebacks: boolean;
 }
 
 export interface LLMConfig {
@@ -80,11 +81,12 @@ export interface ApiVaultSettings {
   netlas_key: string;
   chaos_key: string;
   shodan_key: string;
-  censys_id: string;
-  censys_secret: string;
+  censys_key: string;
   leaklookup_key: string;
   hackerone_username: string;
   hackerone_key: string;
+  acunetix_url: string;
+  acunetix_key: string;
 }
 
 export interface ReportSettings {
@@ -143,11 +145,7 @@ export interface FileContentResponse {
   message?: string;
 }
 
-export const getCsrfToken = () => {
-  return document.cookie.split('; ')
-    .find(row => row.startsWith('csrftoken='))
-    ?.split('=')[1];
-};
+
 
 export const useProxySettings = (slug: string) => {
   return useQuery<ProxySettings>({
@@ -170,7 +168,7 @@ export const useUpdateProxySettings = (slug: string) => {
         formData.append('use_proxy', 'on');
       }
       formData.append('proxies', data.proxies);
-      
+
       const response = await axios.post(`/scanEngine/${slug}/proxy_settings`, formData, {
         headers: {
           'X-CSRFToken': getCsrfToken(),
@@ -246,7 +244,7 @@ export const useUpdateOpSecSettings = (slug: string) => {
       formData.append('http_protocol', data.http_protocol);
       formData.append('custom_dns_servers', data.custom_dns_servers);
       if (data.enable_metadata_stripping) formData.append('enable_metadata_stripping', 'on');
-      
+
       const response = await axios.post(`/scanEngine/${slug}/opsec_settings`, formData, {
         headers: {
           'X-CSRFToken': getCsrfToken(),
@@ -344,8 +342,8 @@ export const useToolArsenal = (slug: string) => {
 export const useToolVersion = () => {
   return useMutation({
     mutationFn: async ({ toolId, type }: { toolId: number; type: 'current' | 'latest' }) => {
-      const endpoint = type === 'current' 
-        ? `/api/external/tool/get_current_release/` 
+      const endpoint = type === 'current'
+        ? `/api/external/tool/get_current_release/`
         : `/api/github/tool/get_latest_releases/`;
       const { data } = await axios.get(endpoint, {
         params: { tool_id: toolId },
@@ -433,16 +431,18 @@ export const useUpdateApiVault = (slug: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (data: ApiVaultSettings) => {
+
       const formData = new FormData();
       formData.append('key_netlas', data.netlas_key);
       formData.append('key_chaos', data.chaos_key);
       formData.append('key_shodan', data.shodan_key);
-      formData.append('key_censys_id', data.censys_id);
-      formData.append('key_censys_secret', data.censys_secret);
+      formData.append('key_censys', data.censys_key);
       formData.append('key_leaklookup', data.leaklookup_key);
       formData.append('username_hackerone', data.hackerone_username);
       formData.append('key_hackerone', data.hackerone_key);
-      
+      formData.append('key_acunetix_url', data.acunetix_url);
+      formData.append('key_acunetix_key', data.acunetix_key);
+
       const response = await axios.post(`/scanEngine/${slug}/api_vault`, formData, {
         headers: {
           'X-CSRFToken': getCsrfToken(),
@@ -492,7 +492,7 @@ export const useUpdateLlmSettings = (slug: string) => {
       formData.append('selected_model', data.selected_model);
       formData.append('is_active', data.is_active ? 'true' : 'false');
       formData.append('action', data.action);
-      
+
       const response = await axios.post(`/scanEngine/${slug}/update_llm_settings`, formData, {
         headers: {
           'X-CSRFToken': getCsrfToken(),
@@ -609,33 +609,33 @@ export const useDeleteAllScreenshots = () => {
 };
 
 export const useNotificationSettings = () => {
-	return useQuery<NotificationSettings>({
-		queryKey: ['notification-settings'],
-		queryFn: async () => {
-			const response = await axios.get('/api/notification-settings/', {
-				headers: { 'Accept': 'application/json' }
-			});
-			return response.data;
-		},
-	});
+  return useQuery<NotificationSettings>({
+    queryKey: ['notification-settings'],
+    queryFn: async () => {
+      const response = await axios.get('/api/notification-settings/', {
+        headers: { 'Accept': 'application/json' }
+      });
+      return response.data;
+    },
+  });
 };
 
 export const useUpdateNotificationSettings = () => {
-	const queryClient = useQueryClient();
-	return useMutation({
-		mutationFn: async (data: Partial<NotificationSettings> & { send_test?: boolean }) => {
-			const response = await axios.post('/api/notification-settings/', data, {
-				headers: {
-					'X-CSRFToken': getCsrfToken(),
-					'Accept': 'application/json'
-				}
-			});
-			return response.data;
-		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ['notification-settings'] });
-		},
-	});
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (data: Partial<NotificationSettings> & { send_test?: boolean }) => {
+      const response = await axios.post('/api/notification-settings/', data, {
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'Accept': 'application/json'
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notification-settings'] });
+    },
+  });
 };
 
 export interface User {

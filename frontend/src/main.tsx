@@ -1,4 +1,5 @@
 import React from 'react';
+import './api/axiosConfig';
 import ReactDOM from 'react-dom/client';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

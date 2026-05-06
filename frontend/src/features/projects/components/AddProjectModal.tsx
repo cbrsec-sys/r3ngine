@@ -83,7 +83,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ open, onClose 
             letterSpacing: 1,
             color: '#fff'
           }}>
-            NEW_PROJECT_INITIALIZATION
+            NEW PROJECT INITIALIZATION
           </Typography>
         </Box>
         <IconButton onClick={handleClose} sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#ff003c' } }}>
@@ -107,7 +107,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ open, onClose 
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <TextField
-              label="PROJECT_NAME"
+              label="PROJECT NAME"
               fullWidth
               autoFocus
               required
@@ -156,7 +156,7 @@ export const AddProjectModal: React.FC<AddProjectModalProps> = ({ open, onClose 
               }
             }}
           >
-            {isPending ? <CircularProgress size={20} sx={{ color: '#000' }} /> : 'INITIALIZE_PROJECT'}
+            {isPending ? <CircularProgress size={20} sx={{ color: '#000' }} /> : 'INITIALIZE PROJECT'}
           </Button>
         </DialogActions>
       </form>

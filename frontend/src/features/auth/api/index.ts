@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import axios from 'axios';
-import { getCsrfToken } from '../../settings/api';
+import { getCsrfToken } from '../../../api/axiosConfig';
 import type { LoginResponse } from '../types';
 
 export const useLogin = () => {
@@ -29,8 +29,7 @@ export interface OnboardingData {
   key_hackerone?: string;
   username_hackerone?: string;
   key_shodan?: string;
-  key_censys_id?: string;
-  key_censys_secret?: string;
+  key_censys?: string;
   bug_bounty_mode: boolean;
 }
 

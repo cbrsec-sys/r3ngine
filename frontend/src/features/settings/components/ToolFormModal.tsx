@@ -125,7 +125,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Hammer size={20} />
-          {tool ? 'MODIFY_TOOL' : 'ADD_NEW_TOOL'}
+          {tool ? 'MODIFY TOOL' : 'ADD NEW TOOL'}
         </Box>
         <IconButton onClick={onClose} sx={{ color: 'rgba(255,255,255,0.5)' }}>
           <X size={20} />
@@ -259,7 +259,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
                       sx={{ color: '#00f3ff', '&.Mui-checked': { color: '#00f3ff' } }}
                     />
                   }
-                  label={<Typography sx={{ color: 'rgba(255,255,255,0.8)', fontFamily: 'Orbitron', fontSize: '12px' }}>USED_FOR_SUBDOMAIN_GATHERING</Typography>}
+                  label={<Typography sx={{ color: 'rgba(255,255,255,0.8)', fontFamily: 'Orbitron', fontSize: '12px' }}>USED FOR SUBDOMAIN GATHERING</Typography>}
                 />
                 {formData.is_subdomain_gathering && (
                   <TextField
@@ -293,7 +293,7 @@ export const ToolFormModal: React.FC<ToolFormModalProps> = ({
               '&:hover': { bgcolor: '#00d8e4' }
             }}
           >
-            {tool ? 'UPDATE_TOOL' : 'REGISTER_TOOL'}
+            {tool ? 'UPDATE TOOL' : 'REGISTER TOOL'}
           </Button>
         </DialogActions>
       </form>

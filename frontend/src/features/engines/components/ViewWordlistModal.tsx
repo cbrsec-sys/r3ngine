@@ -68,7 +68,7 @@ export const ViewWordlistModal: React.FC<ViewWordlistModalProps> = ({ open, onCl
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <FileText size={20} style={{ color: '#ff00ff' }} />
           <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: '#fff', letterSpacing: 1 }}>
-            {name ? `READ_PAYLOAD: ${name.toUpperCase()}` : 'READ_PAYLOAD'}
+            {name ? `READ PAYLOAD: ${name.toUpperCase()}` : 'READ PAYLOAD'}
           </Typography>
         </Box>
         <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -98,7 +98,7 @@ export const ViewWordlistModal: React.FC<ViewWordlistModalProps> = ({ open, onCl
               whiteSpace: 'pre-wrap'
             }}
           >
-            {content || 'PAYLOAD_EMPTY_OR_UNAVAILABLE'}
+            {content || 'PAYLOAD EMPTY OR UNAVAILABLE'}
           </Box>
         )}
         <Typography variant="caption" sx={{ mt: 1, color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron' }}>
@@ -111,7 +111,7 @@ export const ViewWordlistModal: React.FC<ViewWordlistModalProps> = ({ open, onCl
           onClick={onClose}
           sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}
         >
-          CLOSE_TERMINAL
+          CLOSE TERMINAL
         </Button>
       </DialogActions>
     </Dialog>

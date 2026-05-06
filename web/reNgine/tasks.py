@@ -39,8 +39,14 @@ from scanEngine.models import (EngineType, InstalledExternalTool, Notification, 
 from startScan.models import *
 from startScan.models import EndPoint, Subdomain, Vulnerability, Parameter
 from targetApp.models import Domain
+from dashboard.models import AcunetixAPIKey
 from reNgine.monitor_tasks import *
 from reNgine.graph_utils import Neo4jManager
+from reNgine.stress_testing_tasks import run_stress_testing
+try:
+	from acunetix import Acunetix
+except ImportError:
+	Acunetix = None
 
 """
 Celery tasks.
@@ -256,8 +262,20 @@ def initiate_scan(
 					waf_bypass.si(ctx=ctx, description='WAF bypass')
 				),
 				firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan')
-			)
+			),
+			correlate_vulnerabilities.si(scan_history_id=scan_history_id),
+			calculate_risk_scores.si(scan_history_id=scan_history_id)
 		)
+
+		if config.get('enable_ai_impact_analysis'):
+			workflow = chain(workflow, generate_impact_assessment.si(scan_history_id=scan_history_id))
+
+		if 'stress_test' in tasks:
+			workflow = chain(workflow, run_stress_testing.si(
+				scan_history_id=scan_history_id, 
+				target_domain_name=domain.name, 
+				yaml_config=config
+			))
 
 		# Build callback
 		callback = report.si(ctx=ctx).set(link_error=[report.si(ctx=ctx)])
@@ -1473,7 +1491,7 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 
 	# Spiderfoot CLI usage
 	# -s target, -m modules, -f (output format json), -o (output file), -q (quiet)
-	cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {host} {profile_cmd} -max-threads {threads} -q -f -o json -c {sf_config_path} > {output_file}"
+	cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {host} {profile_cmd} -max-threads {threads} -q -o json > {output_file}"
 	if proxy:
 		cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 	
@@ -1829,6 +1847,8 @@ def nmap(
 		description (str, optional): Task description shown in UI.
 	"""
 	notif = Notification.objects.first()
+	# Deduplicate ports
+	ports = list(dict.fromkeys(ports))
 	ports_str = ','.join(str(port) for port in ports)
 	self.filename = self.filename.replace('.txt', '.xml')
 	filename_vulns = self.filename.replace('.xml', '_vulns.json')
@@ -2477,7 +2497,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	"""Advanced Web App & API Discovery using Kiterunner, Arjun, LinkFinder, etc."""
 	logger.info('Running Web API Discovery Task')
 	config = self.yaml_configuration.get(WEB_API_DISCOVERY) or {}
-	uses_tools = ctx.get('api_discovery_tools') or config.get(USES_TOOLS, ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'inql', 'aquatone', 'semgrep'])
+	uses_tools = ctx.get('api_discovery_tools') or config.get(USES_TOOLS, ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'])
 	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
@@ -2509,8 +2529,8 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running Arjun on {url}')
 			arjun_output = f"{results_dir}/arjun_{subdomain_name}.json"
 			cmd = f"arjun -u {url} --passive -oJ {arjun_output}"
-			if proxy:
-				cmd += f" --proxy {proxy}"
+			#if proxy:
+			# 	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(arjun_output):
 				try:
@@ -2531,7 +2551,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running Kiterunner on {url}')
 			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
 			# kr scan -w wordlist.kite -o json
-			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} --concurrency {threads} -o json > {kr_output}"
+			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j 5 -o json >> {kr_output}"
 			if proxy:
 				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
@@ -2553,9 +2573,11 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if 'paramspider' in uses_tools:
 			logger.info(f'Running ParamSpider on {subdomain_name}')
 			ps_output = f"{results_dir}/ps_{subdomain_name}.txt"
-			cmd = f"python3 /usr/src/github/ParamSpider/paramspider.py --domain {subdomain_name} --output {ps_output}"
+			cmd = f"paramspider --domain {subdomain_name}"
 			if proxy:
 				cmd += f" --proxy {proxy}"
+			cmd += f" > {ps_output}"
+			print(cmd)
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(ps_output):
 				try:
@@ -2609,6 +2631,49 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		semgrep_output = f"{results_dir}/semgrep_results.json"
 		cmd = f"semgrep scan --config auto --json --output {semgrep_output} {results_dir}"
 		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+		# Parse Semgrep results
+		if os.path.exists(semgrep_output):
+			with open(semgrep_output, 'r') as f:
+				data = json.load(f)
+				for match in data.get('results', []):
+					vuln_data = parse_semgrep_result(match)
+					save_vulnerability(vuln_data, self.scan, self.domain)
+
+	# Trivy - SCA for discovered dependency files
+	if 'trivy' in uses_tools:
+		logger.info(f'Running Trivy SCA on discovery results')
+		trivy_output = f"{results_dir}/trivy_results.json"
+		cmd = f"trivy fs --format json --output {trivy_output} {results_dir}"
+		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+		# Parse Trivy results
+		if os.path.exists(trivy_output):
+			with open(trivy_output, 'r') as f:
+				data = json.load(f)
+				for result in data.get('Results', []):
+					for vuln in result.get('Vulnerabilities', []):
+						vuln_data = parse_trivy_result(vuln)
+						save_vulnerability(vuln_data, self.scan, self.domain)
+
+	# Retire.js - JS Library vulnerability scan
+	if 'retire' in uses_tools:
+		logger.info(f'Running Retire.js on discovery results')
+		retire_output = f"{results_dir}/retire_results.json"
+		cmd = f"npx -y retire --path {results_dir} --outputformat json --outputpath {retire_output}"
+		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+		# Parse Retire.js results
+		if os.path.exists(retire_output):
+			with open(retire_output, 'r') as f:
+				data = json.load(f)
+				for result in data:
+					for component in result.get('results', []):
+						for vuln in component.get('vulnerabilities', []):
+							vuln_data = parse_retire_result({
+								'component': component.get('component'),
+								'version': component.get('version'),
+								'info': vuln.get('info'),
+								'file': result.get('file')
+							})
+							save_vulnerability(vuln_data, self.scan, self.domain)
 
 	# Aquatone - Visual discovery
 	if 'aquatone' in uses_tools:
@@ -2617,7 +2682,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		os.makedirs(aquatone_dir, exist_ok=True)
 		urls_file = f"{results_dir}/all_discovery_urls.txt"
 		# Get all endpoints discovered so far for this scan
-		all_endpoints = Endpoint.objects.filter(subdomain__scan_history=self.scan)
+		all_endpoints = EndPoint.objects.filter(subdomain__scan_history=self.scan)
 		with open(urls_file, 'w') as f:
 			for ep in all_endpoints:
 				f.write(f"{ep.http_url}\n")
@@ -2646,6 +2711,7 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	should_run_crlfuzz = config.get(RUN_CRLFUZZ, False)
 	should_run_dalfox = config.get(RUN_DALFOX, False)
 	should_run_s3scanner = config.get(RUN_S3SCANNER, True)
+	should_run_acunetix = config.get(RUN_ACUNETIX, False)
 
 	grouped_tasks = []
 	if should_run_nuclei:
@@ -2655,6 +2721,19 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 			description=f'Nuclei Scan'
 		)
 		grouped_tasks.append(_task)
+
+	if should_run_acunetix:
+		# Double check if acunetix is configured
+		creds = AcunetixAPIKey.objects.first()
+		if creds and creds.server_url and creds.api_key:
+			_task = acunetix_scan.si(
+				domain_id=ctx.get('domain_id'),
+				scan_history_id=ctx.get('scan_history_id'),
+				ctx=ctx
+			)
+			grouped_tasks.append(_task)
+		else:
+			logger.warning("Acunetix is enabled in engine but not configured in vault. Skipping.")
 
 	if should_run_crlfuzz:
 		_task = crlfuzz_scan.si(
@@ -5208,6 +5287,21 @@ def save_vulnerability(**vuln_data):
 	# remove nulls
 	vuln_data = replace_nulls(vuln_data)
 
+	# Check for False Positive rules
+	is_suppressed = False
+	try:
+		from startScan.models import FalsePositiveRule
+		rules = FalsePositiveRule.objects.filter(target_domain=target_domain, is_active=True)
+		for rule in rules:
+			if rule.matches(vuln_data.get('name', ''), http_url):
+				is_suppressed = True
+				break
+	except Exception as e:
+		logger.error(f"Error checking FP rules: {e}")
+
+	if is_suppressed:
+		vuln_data['is_suppressed'] = True
+
 	# Create vulnerability
 	vuln, created = Vulnerability.objects.get_or_create(**vuln_data)
 	if created:
@@ -5971,3 +6065,214 @@ def pull_ollama_model(model_name):
         return False
     
     return True
+
+
+def map_acunetix_severity(severity):
+	# Acunetix: 3 (High), 2 (Medium), 1 (Low), 0 (Informational)
+	# reNgine: 4 (Critical), 3 (High), 2 (Medium), 1 (Low), 0 (Info)
+	mapping = {
+		3: 3,
+		2: 2,
+		1: 1,
+		0: 0
+	}
+	if isinstance(severity, str):
+		sev_map = {'high': 3, 'medium': 2, 'low': 1, 'info': 0}
+		return sev_map.get(severity.lower(), 0)
+	return mapping.get(severity, 0)
+
+
+@app.task(name='acunetix_scan', queue='main_scan_queue', base=RengineTask, bind=True)
+def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
+	"""
+	Run Acunetix (AWVS) scan for the given domain.
+	"""
+	if not Acunetix:
+		logger.error("Acunetix library not found. Skipping Acunetix scan.")
+		return False
+
+	scan_history = ScanHistory.objects.get(pk=scan_history_id) if scan_history_id else None
+	domain = Domain.objects.get(pk=domain_id)
+	
+	# Get credentials from vault
+	creds = AcunetixAPIKey.objects.first()
+	if not (creds and creds.server_url and creds.api_key):
+		logger.error("Acunetix API keys not fully configured in vault. Skipping.")
+		return False
+
+	try:
+		acunetix = Acunetix(host=creds.server_url, api=creds.api_key)
+		
+		target_url = f"http://{domain.name}"
+		logger.info(f"Starting Acunetix scan for {target_url}")
+		
+		# Use the library's start_scan which typically adds target and starts scan
+		# Based on the user provided example
+		acunetix.start_scan(domain.name)
+		
+		# Now we need to poll for status and fetch findings.
+		# Since acunetix-python is a light wrapper, we might need to use requests for some parts
+		# if the library doesn't expose them.
+		
+		headers = {
+			'X-Auth': creds.api_key,
+			'Content-Type': 'application/json'
+		}
+		base_url = creds.server_url if creds.server_url.startswith('http') else f"https://{creds.server_url}"
+		
+		# Get target ID for the domain
+		targets_resp = requests.get(f"{base_url}/api/v1/targets?q=text_search:{domain.name}", headers=headers, verify=False)
+		if targets_resp.status_code != 200:
+			logger.error(f"Failed to fetch target ID from Acunetix: {targets_resp.text}")
+			return False
+		
+		targets_data = targets_resp.json()
+		target = next((t for t in targets_data.get('targets', []) if t['address'].strip('http://').strip('https://') == domain.name), None)
+		
+		if not target:
+			logger.error(f"Target {domain.name} not found in Acunetix after start_scan.")
+			return False
+			
+		target_id = target['target_id']
+		
+		# Wait for scan to complete
+		# We'll poll /api/v1/scans
+		max_retries = 360 # 1 hour
+		retries = 0
+		while retries < max_retries:
+			scans_resp = requests.get(f"{base_url}/api/v1/scans?q=target_id:{target_id}", headers=headers, verify=False)
+			if scans_resp.status_code == 200:
+				scans_data = scans_resp.json()
+				latest_scan = scans_data.get('scans', [{}])[0]
+				current_status = latest_scan.get('current_session', {}).get('status')
+				
+				if current_status == 'completed':
+					logger.info(f"Acunetix scan for {domain.name} completed.")
+					break
+				elif current_status in ['failed', 'aborted']:
+					logger.error(f"Acunetix scan for {domain.name} {current_status}.")
+					return False
+			
+			time.sleep(10)
+			retries += 1
+			
+		# Fetch Vulnerabilities
+		vulns_resp = requests.get(f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}", headers=headers, verify=False)
+		if vulns_resp.status_code == 200:
+			vulns_data = vulns_resp.json()
+			for vuln in vulns_data.get('vulnerabilities', []):
+				# Get full details for each vuln
+				vuln_detail_resp = requests.get(f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}", headers=headers, verify=False)
+				if vuln_detail_resp.status_code == 200:
+					v_detail = vuln_detail_resp.json()
+					
+					save_v_data = {
+						'scan_history': scan_history,
+						'target_domain': domain,
+						'source': 'Acunetix',
+						'name': v_detail.get('vt_name'),
+						'severity': map_acunetix_severity(v_detail.get('severity')),
+						'description': v_detail.get('description'),
+						'impact': v_detail.get('impact'),
+						'remediation': v_detail.get('recommendation'),
+						'http_url': v_detail.get('affects_url'),
+						'request': v_detail.get('request'),
+						'response': v_detail.get('response'),
+						'template_id': v_detail.get('vt_id'),
+					}
+					
+					# Handle references
+					refs = []
+					# v_detail might have references as a list of dicts
+					for r in v_detail.get('references', []):
+						if isinstance(r, dict):
+							refs.append(r.get('href'))
+						else:
+							refs.append(str(r))
+					save_v_data['references'] = refs
+					
+					save_vulnerability(**save_v_data)
+					
+		return True
+		
+	except Exception as e:
+		logger.error(f"Error in Acunetix scan: {str(e)}")
+		return False
+
+
+@app.task(name='correlate_vulnerabilities', queue='main_scan_queue', base=RengineTask, bind=True)
+def correlate_vulnerabilities(self, scan_history_id):
+	"""
+	Correlates discovered technologies with known CVEs and updates the graph.
+	"""
+	nm = Neo4jManager()
+	try:
+		# In a real scenario, this would query a CVE DB. 
+		# For now, we sync the graph which now includes Tech and CVE links from Vulnerability models.
+		nm.sync_scan_results(scan_history_id)
+	except Exception as e:
+		logger.error(f"Error in correlate_vulnerabilities: {str(e)}")
+	finally:
+		nm.close()
+
+
+@app.task(name='calculate_risk_scores', queue='main_scan_queue', base=RengineTask, bind=True)
+def calculate_risk_scores(self, scan_history_id):
+	"""
+	Calculates a weighted risk score for vulnerabilities.
+	Score = (Severity * 0.4) + (AssetCriticality * 0.3) + (Exploitability * 0.2) + (Exposure * 0.1)
+	"""
+	from reNgine.correlation import VulnerabilityCorrelationEngine
+	scan_history = ScanHistory.objects.get(id=scan_history_id)
+	correlator = VulnerabilityCorrelationEngine(scan_history=scan_history)
+	correlator.correlate_findings()
+
+
+@app.task(name='generate_impact_assessment', queue='main_scan_queue', base=RengineTask, bind=True)
+def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None):
+	"""
+	Generates an AI-powered impact assessment for vulnerabilities.
+	"""
+	from reNgine.llm import LLMImpactGenerator
+	from reNgine.privacy import PIIGate
+
+	if vulnerability_id:
+		vulns = Vulnerability.objects.filter(id=vulnerability_id)
+		if not scan_history_id and vulns.exists():
+			scan_history_id = vulns.first().scan_history_id
+	elif scan_history_id:
+		vulns = Vulnerability.objects.filter(scan_history_id=scan_history_id)
+	else:
+		logger.error("Neither scan_history_id nor vulnerability_id provided for impact assessment.")
+		return False
+
+	generator = LLMImpactGenerator(logger)
+
+	# Run Correlation Engine to unify results and calculate scores
+	from reNgine.correlation import VulnerabilityCorrelationEngine
+	correlator = VulnerabilityCorrelationEngine(scan_history=ScanHistory.objects.get(id=scan_history_id))
+	correlator.correlate_findings()
+
+	for vuln in vulns:
+		if vuln.is_suppressed:
+			continue
+
+		context = f"Vulnerability: {vuln.name}\n"
+		context += f"Description: {vuln.description}\n"
+		context += f"Asset: {vuln.subdomain.name if vuln.subdomain else (vuln.endpoint.http_url if vuln.endpoint else 'Unknown')}\n"
+		if vuln.subdomain:
+			context += f"Technologies: {', '.join([t.name for t in vuln.subdomain.technologies.all()])}\n"
+
+		# Call LLM (PII protection is handled inside generator)
+		final_impact = generator.generate_impact_assessment(context)
+
+		# Persist
+		ImpactAssessment.objects.update_or_create(
+			vulnerability=vuln,
+			defaults={
+				'scan_history_id': scan_history_id,
+				'subdomain': vuln.subdomain,
+				'potential_impact': final_impact,
+				'is_ai_generated': True
+			}
+		)

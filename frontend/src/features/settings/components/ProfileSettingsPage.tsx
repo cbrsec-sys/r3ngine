@@ -352,7 +352,7 @@ export const ProfileSettingsPage: React.FC = () => {
           <Shield color="#ff003c" size={24} style={{ marginTop: 4 }} />
           <Box>
             <Typography variant="h6" sx={{ color: '#ff003c', fontFamily: 'Orbitron', fontSize: '0.9rem', mb: 1 }}>
-              SECURITY_PROTOCOL
+              SECURITY PROTOCOL
             </Typography>
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
               Ensure your password is at least 12 characters long and contains a mix of alphanumeric characters and special symbols. 

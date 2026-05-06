@@ -42,7 +42,7 @@ export const DiscoveryTable: React.FC<{ discoveries: MonitoringDiscovery[], proj
         <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', gap: 2 }}>
           <ShieldAlert size={20} color="#00f3ff" />
           <Typography variant="h6" sx={{ fontSize: '0.9rem', fontWeight: 900, fontFamily: 'Orbitron', letterSpacing: 1 }}>
-            RECENT_DISCOVERIES_LOG
+            RECENT DISCOVERIES LOG
           </Typography>
         </Box>
         <TableContainer>

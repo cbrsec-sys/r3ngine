@@ -20,6 +20,8 @@ import {
   MenuItem,
   CircularProgress,
   Tooltip,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import {
   Edit2 as EditIcon,
@@ -61,6 +63,15 @@ export const AdminSettingsPage: React.FC = () => {
     password: '',
     role: 'penetration_tester',
   });
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
 
   const handleOpenModal = (user: User | null = null) => {
     if (user) {
@@ -86,28 +97,64 @@ export const AdminSettingsPage: React.FC = () => {
     setEditingUser(null);
   };
 
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
   const handleSubmit = async () => {
-    if (editingUser) {
-      await updateUserMutation.mutateAsync({
-        userId: editingUser.id,
-        data: {
-          role: formData.role,
-          password: formData.password || undefined,
-        },
+    try {
+      if (editingUser) {
+        await updateUserMutation.mutateAsync({
+          userId: editingUser.id,
+          data: {
+            role: formData.role,
+            password: formData.password || undefined,
+          },
+        });
+        setSnackbar({ open: true, message: 'User updated successfully.', severity: 'success' });
+      } else {
+        await createUserMutation.mutateAsync(formData);
+        setSnackbar({ open: true, message: 'User created successfully.', severity: 'success' });
+      }
+      handleCloseModal();
+    } catch (error: any) {
+      setSnackbar({ 
+        open: true, 
+        message: `Error: ${error?.response?.data?.message || error.message || 'Action failed'}`, 
+        severity: 'error' 
       });
-    } else {
-      await createUserMutation.mutateAsync(formData);
     }
-    handleCloseModal();
   };
 
   const handleToggleStatus = (userId: number) => {
-    toggleStatusMutation.mutate(userId);
+    toggleStatusMutation.mutate(userId, {
+      onSuccess: () => {
+        setSnackbar({ open: true, message: 'User status toggled successfully.', severity: 'success' });
+      },
+      onError: (error: any) => {
+        setSnackbar({ 
+          open: true, 
+          message: `Failed to toggle status: ${error?.response?.data?.message || error.message}`, 
+          severity: 'error' 
+        });
+      }
+    });
   };
 
   const handleDeleteUser = (userId: number) => {
     if (window.confirm('Are you sure you want to delete this user?')) {
-      deleteUserMutation.mutate(userId);
+      deleteUserMutation.mutate(userId, {
+        onSuccess: () => {
+          setSnackbar({ open: true, message: 'User deleted successfully.', severity: 'success' });
+        },
+        onError: (error: any) => {
+          setSnackbar({ 
+            open: true, 
+            message: `Failed to delete user: ${error?.response?.data?.message || error.message}`, 
+            severity: 'error' 
+          });
+        }
+      });
     }
   };
 
@@ -297,6 +344,29 @@ export const AdminSettingsPage: React.FC = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

@@ -4,7 +4,12 @@
 **Official Repo location:** https://github.com/whiterabb17/r3ngine
  
 ### New Features
- **Advanced Web App & API Discovery Pipeline**: Introduced a dedicated reconnaissance engine for deep API discovery, featuring:
+- **Adaptive Stress & Resilience Engine (ASRE)**: Implemented full-scale endpoint stress testing directly within the reNgine workflow.
+  - **Tool Orchestration**: Seamlessly orchestrated backend stress tests via Celery, driving load testing tools such as `k6`, `wrk`, `hping3`, and `Locust`.
+  - **Safety Guardrails**: Integrated a Redis-based kill-switch mechanisms for safe testing and instant termination to protect target infrastructure.
+  - **Telemetry Ingestion**: Real-time aggregation of latency, throughput, and error rate metrics directly into Neo4j for topological node analysis.
+  - **Visualization Dashboard**: Created a new React-based interactive UI utilizing Apache ECharts and Nivo to visually represent endpoint resilience, saturation points, and errors across the network.
+ - **Advanced Web App & API Discovery Pipeline**: Introduced a dedicated reconnaissance engine for deep API discovery, featuring:
  - **Kiterunner**: High-performance API endpoint brute-forcing with custom `.kite` wordlists (`routes-large.kite` by default).
  - **Arjun**: Automated HTTP parameter discovery for identifying hidden API inputs.
  - **ParamSpider**: Advanced parameter extraction from web archives and live sources.
@@ -28,6 +33,17 @@
 - **On-Demand Model Loading**: Optimized the AI Hub by fetching available models only when the dropdown is clicked, reducing initial page load overhead.
 - **Legacy API Vault Sync**: Automatically migrates existing OpenAI keys from the legacy API Vault to the new AI Hub configuration.
 - **404 Page Enhancement**: Added an Interdimensional Rabbit Hole background image for the 404 page.
+- **Production-Ready SSL Serial Retrieval**: Implemented a robust `_get_ssl_serial` function in `waf_utils.py` using the `cryptography` library for reliable origin discovery via Shodan.
+  - **Standardized Notification System (Snackbar)**: 
+    - Replaced legacy `alert()` dialogs with consistent, non-intrusive MUI `Snackbar` and `Alert` components across all settings modules.
+    - Implemented state-driven feedback for critical actions in `ApiVault`, `ProxySettings`, `ReportSettings`, `OpSecSettings`, `LlmToolkit`, `SystemSettings`, and `AdminSettings`.
+    - Enhanced error handling with detailed feedback from backend mutation responses.
+    - Unified notification visuals with the "Cyberpunk" design language (Orbitron font, filled severity backgrounds).
+- **Modernized Censys Platform Integration**: 
+  - Migrated from legacy Search v2 (Basic Auth) to the latest **Censys Platform API (2026 standards)** using Personal Access Tokens (Bearer authentication).
+  - Updated the `CensysAPIKey` database model to support a single-key schema.
+  - Refactored `OriginDiscoveryManager` to utilize the `censys-platform` SDK for more reliable host lookups and origin discovery.
+  - Streamlined the API Vault and Onboarding UI for single-key configuration.
 - **Scoped Attack Surface Visualization**: Refactored the Neo4j ingestion and retrieval pipeline to support scan-specific and target-specific scoping:
   - Introduced `Scan` nodes in Neo4j to anchor assets to specific execution contexts.
   - Implemented target-level graph aggregation with color-coded scan distinction in the UI.
@@ -36,12 +52,62 @@
   - Resolved "node bleeding" where global graph data would pollute individual scan maps.
   - Included a `sync_all_scans` migration utility to retroactively anchor historical data.
   - Added a `reset_graph` Django management command to clear and re-populate the Neo4j database in case of data corruption or schema changes.
+  - **Vulnerability Impact Intelligence**: Integrated AI-driven impact assessment and graph-based attack path visualization:
+    - **AI-Driven Impact Assessment**: Automated generation of potential impact narratives and remediation priorities using LLMs (OpenAI, Anthropic, Gemini, Ollama).
+    - **Attack Path Visualization**: Interactive Cytoscape.js-powered graph showing the full exploit chain from root domain to vulnerability.
+    - **Impact Explorer**: A tactical React component for real-time monitoring of impact generation tasks and interactive graph exploration.
+    - **PII Gate**: Implemented a privacy-preserving "gate" that anonymizes sensitive reconnaissance data (IPs, emails, hostnames) before sending it to external LLMs and deanonymizes the returned results.
+    - **Persistence & Polling**: Impact findings are persisted in PostgreSQL and synchronized with React Query using smart polling for asynchronous background tasks.
+  - **Real-Time Interactive Scan Timeline**: Overhauled the scan timeline to support live task monitoring and detailed command execution logs:
+    - **Live Command Streaming**: Integrated real-time polling to capture and display command stdout/stderr as tools execute.
+    - **Interactive Task Overlay**: Users can click on timeline events to open a terminal-style overlay showing all executed commands and their outputs.
+    - **Enhanced Task Metadata**: Backend updated to track command-level lifecycle and log availability per scan activity.
+    - **Smart Polling**: Implemented intelligent React Query polling that automatically adjusts based on scan status.
+  - **Advanced Vulnerability Correlation Engine**: 
+    - Integrated **Trivy** for automated Software Composition Analysis (SCA) and **Gitleaks** for secret discovery.
+    - Added **Retire.js** integration to identify vulnerable client-side JavaScript libraries.
+    - Implemented a weighted correlation algorithm that unifies results from Nuclei (DAST), Semgrep (SAST), Trivy (SCA), Gitleaks, and Retire.js.
+    - Introduced **Potential Attack Chain** generation to visualize sequential exploitation steps (Initial Access -> Lateral Movement -> Impact).
+    - Added automated unit tests to ensure correlation logic accuracy across all security tools.
+- **Acunetix & ReconX Orchestration**: 
+    - **Acunetix (AWVS) Pipeline**: Integrated automated vulnerability scanning via Acunetix API. Supports secure storage of server URLs and API keys in the reNgine Vault, automated target provisioning, and native ingestion of scan findings into the core `Vulnerability` database.
+    - **ReconX Auxiliary Discovery**: Integrated ReconX into the `monitor_tasks.py` pipeline to complement existing subdomain discovery and OSINT tools. ReconX findings are automatically parsed and mapped to `MonitoringDiscovery` nodes for consolidated asset tracking.
+- **Build & Infrastructure**:
+    - **ReconX Installation Fix**: Corrected the Go installation path for ReconX in `web/Dockerfile` (appended `/cmd/reconx`) to resolve module package errors.
+- **Frontend Security & Resilience**: 
+    - **Centralized Auth Architecture**: Implemented a robust `AuthContext` and `AuthProvider` to manage user sessions and state globally.
+    - **Protected Route Guards**: Integrated TanStack Router `beforeLoad` hooks to enforce authentication across all sensitive application routes.
+    - **Robust CSRF Protection**: Centralized CSRF token retrieval and automated injection into all mutation requests via Axios interceptors.
+    - **Automatic SQLi Prevention**: Implemented a client-side request interceptor that blocks outgoing requests containing suspicious SQL injection patterns in the payload.
+    - **DOM Sanitization**: Integrated `DOMPurify` for secure rendering of potentially unsafe content, preventing XSS in future features.
+    - **Dependency Hardening**: Remediated high-severity ReDoS vulnerabilities in the `d3` ecosystem via `package.json` overrides.
+    - **Regex Security**: Optimized search highlighting logic with centralized regex escaping to prevent ReDoS attacks from user inputs.
+- **Scan History Rescan Orchestration**: Finalized the integration and wiring of the "Rescan" feature across the entire scan management lifecycle:
+  - **Scan History & Scan List Integration**: Wired the "RESCAN" menu item in both the Scan History page and the Dashboard Scan List, enabling immediate re-triggering of existing scans.
+  - **Target List Menu**: Enhanced the Targets list with a tactical row menu featuring an "INITIATE SCAN" (Rescan) action for better workflow consistency.
+  - **Scan Detail Header Action**: Added a primary "RESCAN" button to the Scan Detail header, allowing users to quickly restart discovery from the summary view.
+  - **UI/UX Stability**: Resolved critical state race conditions where menu actions would fail due to premature cleanup of active identifiers.
+  - **Modular Scan Initiation**: Correctly linked all Rescan triggers to the `StartScanModal` and `useInitiateScan` orchestration layer, ensuring full parity with standard manual scan initiation.
+- **Integrated Attack Surface Map Navigation**: 
+  - Properly integrated the Attack Surface Map feature into the Scan History page.
+  - Replaced the broken `window.open` placeholder with a dedicated, SPA-managed `AttackSurfacePage`.
+  - Implemented a new route `/$projectSlug/attack_surface/$scanId` to host the cytoscape-based visualization.
+  - Enhanced the UI with navigation breadcrumbs and scan-specific metadata for better context.
+- **Proxy & Vault Persistence Stability**:
+  - Resolved missing `CircularProgress` import in `ProxySettingsPage.tsx` that caused frontend build failures.
+  - Fixed Acunetix (AWVS) configuration persistence bug by correctly mapping `acunetix_url` and `acunetix_key` in the `useUpdateApiVault` mutation.
+  - Synchronized frontend `FormData` keys with backend expectations (`key_acunetix_url`, `key_acunetix_key`).
+  - Improved UI responsiveness for rescan actions and proxy fetching with immediate Snackbar feedback.
 
 ### Bug Fixes
+- **Login/Logout Stability**: Resolved a critical "white page" crash by optimizing Vite development script loading in `v3_index.html` and expanding the `vite.config.ts` proxy to correctly handle authentication endpoints.
+- **SPA Navigation Hardening**: Replaced legacy `window.location.href` redirects in `LogoutPage.tsx` with TanStack Router's `navigate` to maintain application state and prevent unnecessary full-page reloads.
 - **Automated Infrastructure Stability**: Integrated `custom_engines` directory creation into the Docker build and entrypoint processes to prevent runtime `FileNotFoundError` during engine initialization.
 - **LLM Report Generation Dependency**: Fixed a `TypeError` in `create_report` where the `LLMReportGenerator` was missing its required `logger` dependency.
 - **Version Badge Persistence**: Resolved a UI bug where the version badge would disappear shortly after page load by adding `rengine_version` to the dashboard API serializer and implementing defensive state updates.
 - **Report Layout Refinements**: Fixed an issue in the Modern PDF report where the Table of Contents list would jump to a new page, leaving the title orphaned. Refactored TOC styles to use a more stable layout and added page-break avoidance rules.
+- **Celery Task Resilience**: Resolved a `TypeError` in `RengineTask.write_results` caused by tasks returning boolean values. Implemented safe type checking and string casting for all task results.
+- **Dockerfile Architecture Stability**: Fixed a bug in the Trivy installation logic where it hardcoded 32-bit binaries instead of using the detected system architecture.
 - **Django System Check Cleanup**: Resolved the `(fields.W340)` warning by removing redundant `null=True` parameters from `ManyToManyField` definitions in `EndPoint` models.
 
 

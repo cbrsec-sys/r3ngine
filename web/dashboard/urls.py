@@ -166,4 +166,16 @@ urlpatterns = [
         '<slug:slug>/target/<int:target_id>/attack-surface/',
         views.target_attack_surface,
         name='target_attack_surface_v3'),
+    path(
+        '<slug:slug>/api/impact/vulnerability/<int:vuln_id>/data/',
+        views.get_impact_graph_data,
+        name='get_impact_graph_data'),
+    path(
+        '<slug:slug>/api/impact/vulnerability/<int:vuln_id>/generate/',
+        views.trigger_ai_impact,
+        name='trigger_ai_impact'),
+    path(
+        '<slug:slug>/api/impact/vulnerability/<int:vuln_id>/details/',
+        views.get_impact_assessment_details,
+        name='get_impact_assessment_details'),
 ]

@@ -10,10 +10,12 @@ from reNgine.definitions import (
 )
 from langchain_community.llms import Ollama
 from dashboard.models import LLMConfig
+from reNgine.privacy import PIIGate
 
 class LLMBaseGenerator:
     def __init__(self, logger):
         self.logger = logger
+        self.gate = PIIGate()
         self.config = LLMConfig.objects.filter(is_active=True).first()
         if not self.config:
             self.logger.warning("No active LLM configuration found. Defaulting to Ollama/llama3.")
@@ -27,16 +29,25 @@ class LLMBaseGenerator:
             self.api_key = self.config.api_key
 
     def _call_llm(self, system_message, user_message):
-        """Unified method to call the configured LLM provider."""
+        """Unified method to call the configured LLM provider with PII protection."""
+        # Anonymize inputs
+        masked_system = self.gate.anonymize(system_message)
+        masked_user = self.gate.anonymize(user_message)
+        
+        response = ""
         if self.provider == OLLAMA:
-            return self._call_ollama(system_message, user_message)
+            response = self._call_ollama(masked_system, masked_user)
         elif self.provider == OPENAI:
-            return self._call_openai(system_message, user_message)
+            response = self._call_openai(masked_system, masked_user)
         elif self.provider == ANTHROPIC:
-            return self._call_anthropic(system_message, user_message)
+            response = self._call_anthropic(masked_system, masked_user)
         elif self.provider == GEMINI:
-            return self._call_gemini(system_message, user_message)
-        return "Error: Unsupported LLM Provider"
+            response = self._call_gemini(masked_system, masked_user)
+        else:
+            return "Error: Unsupported LLM Provider"
+            
+        # Deanonymize response
+        return self.gate.deanonymize(response)
 
     def _call_ollama(self, system_message, user_message):
         try:
@@ -155,4 +166,15 @@ class LLMReportGenerator(LLMBaseGenerator):
     def generate_attack_scenario(self, vulnerability_context):
         from reNgine.definitions import LLM_ATTACK_SCENARIO_SYSTEM_PROMPT
         return self._generate_section(LLM_ATTACK_SCENARIO_SYSTEM_PROMPT, vulnerability_context)
+
+
+class LLMImpactGenerator(LLMBaseGenerator):
+    def generate_impact_assessment(self, vulnerability_context):
+        # Fallback system prompt if not defined in definitions.py
+        try:
+            from reNgine.definitions import LLM_IMPACT_ASSESSMENT_SYSTEM_PROMPT
+        except ImportError:
+            LLM_IMPACT_ASSESSMENT_SYSTEM_PROMPT = "You are a senior security architect. Given the following attack path and findings, describe the potential business impact and suggest a remediation priority. Focus on real-world risk."
+        
+        return self._call_llm(LLM_IMPACT_ASSESSMENT_SYSTEM_PROMPT, vulnerability_context)
 		

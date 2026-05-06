@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Typography,
@@ -8,7 +8,8 @@ import {
   Divider,
   Alert,
   CircularProgress,
-  Grid
+  Grid,
+  Snackbar
 } from '@mui/material';
 import { 
   Trash2, 
@@ -29,14 +30,35 @@ export const ReNgineSettingsPage: React.FC = () => {
   const { data: systemInfo, isLoading } = useRengineSystemSettings();
   const deleteScanResults = useDeleteAllScanResults();
   const deleteScreenshots = useDeleteAllScreenshots();
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
 
   const handleDeleteScanResults = async () => {
     if (window.confirm('CRITICAL: This will permanently delete all scan history and results. This action cannot be undone. Proceed?')) {
       try {
         await deleteScanResults.mutateAsync();
-        alert('All scan results have been deleted.');
+        setSnackbar({
+          open: true,
+          message: 'All scan results have been deleted.',
+          severity: 'success',
+        });
       } catch (err) {
-        alert('Failed to initiate deletion.');
+        setSnackbar({
+          open: true,
+          message: 'Failed to initiate deletion of scan results.',
+          severity: 'error',
+        });
       }
     }
   };
@@ -45,9 +67,17 @@ export const ReNgineSettingsPage: React.FC = () => {
     if (window.confirm('WARNING: This will permanently delete all screenshots. Proceed?')) {
       try {
         await deleteScreenshots.mutateAsync();
-        alert('All screenshots have been deleted.');
+        setSnackbar({
+          open: true,
+          message: 'All screenshots have been deleted.',
+          severity: 'success',
+        });
       } catch (err) {
-        alert('Failed to initiate deletion.');
+        setSnackbar({
+          open: true,
+          message: 'Failed to initiate deletion of screenshots.',
+          severity: 'error',
+        });
       }
     }
   };
@@ -133,14 +163,14 @@ export const ReNgineSettingsPage: React.FC = () => {
       <Stack spacing={3}>
         <Box>
           <Typography variant="h4" sx={{ color: '#fff', fontFamily: 'Orbitron', fontWeight: 900, mb: 1 }}>
-            RENGINE_SYSTEM_CONFIG
+            RENGINE SYSTEM CONFIG
           </Typography>
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
             Monitor system resources and perform global maintenance actions.
           </Typography>
         </Box>
 
-        <TacticalPanel title="STORAGE_METRICS">
+        <TacticalPanel title="STORAGE METRICS">
           <Box sx={{ 
             display: 'flex', 
             flexDirection: { xs: 'column', md: 'row' }, 
@@ -164,7 +194,7 @@ export const ReNgineSettingsPage: React.FC = () => {
                   letterSpacing: 2,
                   textTransform: 'uppercase'
                 }}>
-                  {isDanger ? 'CRITICAL_LEVEL' : (isWarning ? 'WARNING_LEVEL' : 'STABLE_LEVEL')}
+                  {isDanger ? 'CRITICAL LEVEL' : (isWarning ? 'WARNING LEVEL' : 'STABLE LEVEL')}
                 </Typography>
               </Box>
             </Box>
@@ -173,14 +203,14 @@ export const ReNgineSettingsPage: React.FC = () => {
               <Grid container spacing={3}>
                 <Grid size={{xs: 12, sm: 4}} >
                   <MetricCard 
-                    label="TOTAL_STORAGE" 
+                    label="TOTAL STORAGE" 
                     value={`${systemInfo?.total || 0} GB`} 
                     icon={<Database size={20} color="#ffd600" />} 
                   />
                 </Grid>
                 <Grid size={{xs: 12, sm: 4}} >
                   <MetricCard 
-                    label="USED_SPACE" 
+                    label="USED SPACE" 
                     value={`${systemInfo?.used || 0} GB`} 
                     icon={<HardDrive size={20} color={gaugeColor} />} 
                     statusColor={gaugeColor}
@@ -188,7 +218,7 @@ export const ReNgineSettingsPage: React.FC = () => {
                 </Grid>
                 <Grid size={{xs: 12, sm: 4}} >
                   <MetricCard 
-                    label="FREE_SPACE" 
+                    label="FREE SPACE" 
                     value={`${systemInfo?.free || 0} GB`} 
                     icon={<Database size={20} color="#00ff9d" />} 
                     statusColor="#00ff9d"
@@ -199,21 +229,21 @@ export const ReNgineSettingsPage: React.FC = () => {
           </Box>
         </TacticalPanel>
 
-        <TacticalPanel title="DANGER_ZONE" borderColor="rgba(255, 0, 85, 0.3)">
+        <TacticalPanel title="DANGER ZONE" borderColor="rgba(255, 0, 85, 0.3)">
           <Stack spacing={0} divider={<Divider sx={{ borderColor: 'rgba(255,0,85,0.1)' }} />}>
             <MaintenanceRow 
               title="Delete all scan results"
               description="Permanently remove all scan history, findings, and logs across all projects. This action is irreversible."
               onAction={handleDeleteScanResults}
               isLoading={deleteScanResults.isPending}
-              buttonLabel="PURGE_ALL_SCANS"
+              buttonLabel="PURGE ALL SCANS"
             />
             <MaintenanceRow 
               title="Delete all screenshots"
               description="Remove all captured website screenshots to free up disk space. Scan reports will no longer show visual evidence."
               onAction={handleDeleteScreenshots}
               isLoading={deleteScreenshots.isPending}
-              buttonLabel="PURGE_SCREENSHOTS"
+              buttonLabel="PURGE SCREENSHOTS"
             />
           </Stack>
         </TacticalPanel>
@@ -231,6 +261,29 @@ export const ReNgineSettingsPage: React.FC = () => {
           System maintenance actions affect all projects globally. Ensure you have backups before performing purge operations.
         </Alert>
       </Stack>
+
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={6000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

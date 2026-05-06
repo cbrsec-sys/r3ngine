@@ -21,7 +21,9 @@ import {
   Checkbox,
   TablePagination,
   Paper,
-  CircularProgress
+  CircularProgress,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import {
   Search,
@@ -45,23 +47,30 @@ import {
   Bug,
   Layers,
   ChevronRight,
-  Globe
+  Globe,
+  AlertCircle
 } from 'lucide-react';
 import {
   useScansHistory,
   useStopScan,
   useDeleteScan,
-  useBulkScanAction
+  useBulkScanAction,
+  useDomains
 } from '../api';
-import { useParams, Link as RouterLink } from '@tanstack/react-router';
+import { useParams, Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import { ScanReportModal } from './ScanReportModal';
+import { StartScanModal } from './StartScanModal';
+
+import { timeout } from 'd3';
 
 export const ScanHistoryPage: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const navigate = useNavigate();
   const { data: scans, isLoading } = useScansHistory(projectSlug);
   const stopScanMutation = useStopScan(projectSlug);
   const deleteScanMutation = useDeleteScan(projectSlug);
   const bulkActionMutation = useBulkScanAction(projectSlug);
+  const { data: domains } = useDomains(projectSlug);
 
   const [searchQuery, setSearchQuery] = React.useState('');
   const [page, setPage] = React.useState(0);
@@ -71,10 +80,23 @@ export const ScanHistoryPage: React.FC = () => {
   const [activeScanId, setActiveScanId] = React.useState<number | null>(null);
   const [reportScanId, setReportScanId] = React.useState<number | null>(null);
   const [reportModalOpen, setReportModalOpen] = React.useState(false);
+  //const [rescanModalOpen, setRescanModalOpen] = React.useState(false);
+  //const [rescanTarget, setRescanTarget] = React.useState<{ ids: number[]; names: string[] } | null>(null);
+  const [snackbar, setSnackbar] = React.useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, id: number) => {
+  const [activeTarget, setActiveTarget] = React.useState<{ id: number; name: string } | null>(null);
+  const [startScanTargets, setStartScanTargets] = React.useState<{ ids: number[]; names: string[] } | null>(null);
+
+  const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, _id: number, domainName: string) => {
     setAnchorEl(event.currentTarget);
-    setActiveScanId(id);
+    setActiveScanId(_id);
+    setActiveTarget({ id: _id, name: domainName });
   };
 
   const handleMenuClose = () => {
@@ -148,9 +170,7 @@ export const ScanHistoryPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', mb: 1, letterSpacing: '0.1rem', textShadow: '0 0 15px rgba(0, 243, 255, 0.3)' }}>
-            SCAN HISTORY
-          </Typography>
+          <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN HISTORY</Typography>
           <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
             MANAGE AND AUDIT PAST SECURITY OPERATIONS
           </Typography>
@@ -353,7 +373,22 @@ export const ScanHistoryPage: React.FC = () => {
                           size="small"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleMenuOpen(e, scan.id);
+                            const match = domains?.find(d => d.id === scan.domain.id);
+                            if (!match) return;
+                            setStartScanTargets({
+                              ids: [match.id],
+                              names: [match.name],
+                            });
+                          }}
+                          sx={{ color: 'rgba(112, 206, 35, 0.63)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                        >
+                          <RefreshCw size={16} />
+                        </IconButton>
+                        <IconButton
+                          size="small"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleMenuOpen(e, scan.id, scan.domain?.name);
                           }}
                           sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
                         >
@@ -416,17 +451,38 @@ export const ScanHistoryPage: React.FC = () => {
           <Settings size={14} /> SHOW CONFIGS
         </MenuItem>
         <MenuItem onClick={() => {
+          navigate({ to: `/${projectSlug}/attack_surface/${activeScanId}` });
           handleMenuClose();
-          window.open(`/${projectSlug}/attack_surface/${activeScanId}/`, '_blank');
         }}>
           <Share2 size={14} /> ATTACK SURFACE
         </MenuItem>
-        <MenuItem onClick={() => {
-          handleMenuClose();
-          // Logic for rescan
+        {/* <MenuItem onClick={() => {
+          if (!activeTarget) {
+            setSnackbar({
+              open: true,
+              message: 'Failed to identify target for rescan.',
+              severity: 'error'
+            });
+
+            setTimeout(() => {
+              setSnackbar({ open: false, message: '', severity: 'info' });
+              handleMenuClose();
+            }, 3000);
+
+            return;
+          }
+
+          setStartScanTargets({
+            ids: [activeScanId || 0],
+            names: [activeTarget?.name],
+          });
+          setTimeout(() => {
+            handleMenuClose();
+          }, 3000);
+          //handleMenuClose();
         }}>
           <RefreshCw size={14} /> RESCAN
-        </MenuItem>
+        </MenuItem> */}
         <MenuItem onClick={() => {
           if (activeScanId) {
             stopScanMutation.mutate(activeScanId);
@@ -464,6 +520,53 @@ export const ScanHistoryPage: React.FC = () => {
           scanId={reportScanId}
         />
       )}
+
+      {startScanTargets && (
+        <StartScanModal
+          open={!!startScanTargets}
+          onClose={() => setStartScanTargets(null)}
+          domainIds={startScanTargets.ids}
+          domainNames={startScanTargets.names}
+          projectSlug={projectSlug}
+        />
+      )}
+      {/* {rescanTarget && ( 
+        <StartScanModal
+          open={rescanModalOpen}
+          onClose={() => {
+            setRescanTarget(null)
+            setRescanModalOpen(false)
+          }}
+          domainIds={rescanTarget.ids}
+          domainNames={rescanTarget.names}
+          projectSlug={projectSlug}
+        />
+      )*/}
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{
+            fontFamily: 'Orbitron',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' :
+              snackbar.severity === 'error' ? 'rgba(255, 0, 85, 0.9)' : 'rgba(0, 243, 255, 0.5)',
+            color: '#000',
+            border: '1px solid rgba(255,255,255,0.1)',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

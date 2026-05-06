@@ -113,7 +113,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             Subdomain Inventory
           </Typography>
           <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
-            V3.0 SCAN_ASSETS_RECON_ACTIVE
+            V3.0 SCAN ASSETS RECON ACTIVE
           </Typography>
         </Box>
       </Box>

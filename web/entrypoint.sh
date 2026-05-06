@@ -23,6 +23,13 @@ echo "Loading custom engines..."
 mkdir -p /usr/src/app/custom_engines
 python3 manage.py loadcustomengines
 
+# Start Vite development server if DEBUG is enabled
+if [ "$DEBUG" = "1" ]; then
+    echo "Starting Vite development server..."
+    cd /usr/src/app/frontend && npm run dev -- --host 0.0.0.0 &
+    cd /usr/src/app
+fi
+
 # Start the server
 echo "Starting reNgine server..."
 python3 manage.py runserver 0.0.0.0:8000

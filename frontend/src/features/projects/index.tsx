@@ -137,7 +137,7 @@ export const ProjectsPage: React.FC = () => {
                           '&:hover': { borderColor: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)' }
                         }}
                       >
-                        OPEN_DASHBOARD
+                        OPEN DASHBOARD
                       </Button>
                       <IconButton
                         onClick={() => handleDelete(project.id, project.name)}
