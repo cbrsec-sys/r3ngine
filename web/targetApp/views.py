@@ -396,7 +396,14 @@ def list_target(request, slug):
 def delete_target(request, id):
     obj = get_object_or_404(Domain, id=id)
     if request.method == "POST":
-        run_command.run(f'rm -rf {settings.TOOL_LOCATION} scan_results/{obj.name}*', shell=True)
+        # Safely remove scan results using Python instead of shell commands
+        import shutil
+        scan_results_dir = settings.RENGINE_RESULTS
+        # Use the validated domain name from the DB object (not raw user input)
+        safe_name = os.path.basename(obj.name)
+        target_scan_dir = os.path.join(scan_results_dir, safe_name)
+        if os.path.isdir(target_scan_dir):
+            shutil.rmtree(target_scan_dir, ignore_errors=True)
         obj.delete()
         responseData = {'status': 'true'}
         messages.add_message(

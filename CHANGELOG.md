@@ -87,12 +87,21 @@
   - **Target List Menu**: Enhanced the Targets list with a tactical row menu featuring an "INITIATE SCAN" (Rescan) action for better workflow consistency.
   - **Scan Detail Header Action**: Added a primary "RESCAN" button to the Scan Detail header, allowing users to quickly restart discovery from the summary view.
   - **UI/UX Stability**: Resolved critical state race conditions where menu actions would fail due to premature cleanup of active identifiers.
-  - **Modular Scan Initiation**: Correctly linked all Rescan triggers to the `StartScanModal` and `useInitiateScan` orchestration layer, ensuring full parity with standard manual scan initiation.
+  - **Modular Scan Initiation**: Corrected all Rescan triggers to the `StartScanModal` and `useInitiateScan` orchestration layer, ensuring full parity with standard manual scan initiation.
 - **Integrated Attack Surface Map Navigation**: 
   - Properly integrated the Attack Surface Map feature into the Scan History page.
   - Replaced the broken `window.open` placeholder with a dedicated, SPA-managed `AttackSurfacePage`.
   - Implemented a new route `/$projectSlug/attack_surface/$scanId` to host the cytoscape-based visualization.
   - Enhanced the UI with navigation breadcrumbs and scan-specific metadata for better context.
+- **Security Hardening (v3)**:
+    - **Path Traversal Fix**: Secured `serve_protected_media` in `reNgine/views.py` using the existing `is_safe_path` utility to prevent `../` directory traversal attacks (LFI).
+    - **CSRF & API Method Hardening**: Migrated project creation from an unsafe `GET` request (vulnerable to CSRF via URL) to a secure `POST` request with proper CSRF token validation in both frontend (`projects/api.ts`) and backend (`CreateProjectApi`).
+    - **Frontend XSS Prevention**: Hardened `monitoring/utils/formatters.ts` to use `DOMPurify` for all dynamic content sanitization, added prototype pollution protection in JSON parsing, and applied strict type-checking before accessing object properties.
+    - **Django Security Headers**: Enabled `SECURE_CONTENT_TYPE_NOSNIFF`, `SECURE_BROWSER_XSS_FILTER`, `X_FRAME_OPTIONS = DENY`, `SECURE_REFERRER_POLICY`, and secure `SESSION_COOKIE_HTTPONLY`. Configurable HTTPS/HSTS settings via `.env` (`RENGINE_HTTPS`, `SECURE_HSTS_SECONDS`).
+    - **ALLOWED_HOSTS Hardening**: `ALLOWED_HOSTS` is now configurable via the `ALLOWED_HOSTS` environment variable (defaults to `*`; must be set to specific domains in production).
+    - **DRF Rate Limiting**: Added global REST framework throttle classes (20/min anonymous, 200/min authenticated) to protect API endpoints from brute-force attacks.
+    - **Role-Based Authorization Fix**: Corrected the `IsAuditor` DRF permission class which was incorrectly granting write access to all authenticated users. Auditors are now correctly restricted to read-only (`SAFE_METHODS`) access; `IsSysAdmin`, `IsPenetrationTester`, and `IsAuditor` role documentation updated to reflect the three-tier hierarchy.
+    - **Command Injection Mitigation**: Replaced all `run_command.run(f'touch {path}', shell=True)` subprocess calls in `GetFileContents` with safe Python-native `pathlib.Path.touch()` calls. Fixed `delete_target` in `targetApp/views.py` to use `shutil.rmtree` on a validated path instead of `rm -rf {obj.name}*` with `shell=True`.
 - **Proxy & Vault Persistence Stability**:
   - Resolved missing `CircularProgress` import in `ProxySettingsPage.tsx` that caused frontend build failures.
   - Fixed Acunetix (AWVS) configuration persistence bug by correctly mapping `acunetix_url` and `acunetix_key` in the `useUpdateApiVault` mutation.

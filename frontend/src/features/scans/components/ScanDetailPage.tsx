@@ -89,6 +89,7 @@ import { VulnerabilityTable } from '../../vulnerabilities/components/Vulnerabili
 import { SecretLeaksTab } from './SecretLeaksTab';
 import { AttackSurfaceTab } from './AttackSurfaceTab';
 import VisualizationTab from './VisualizationTab';
+import { ScreenshotsTab } from './ScreenshotsTab';
 import { ScanReportModal } from './ScanReportModal';
 import { StartScanModal } from './StartScanModal';
 
@@ -1407,6 +1408,7 @@ export const ScanDetailPage = () => {
                 {tabs[activeTab]?.label === 'URLS' && renderEndpoints()}
                 {tabs[activeTab]?.label === 'VULNERABILITIES' && renderVulnerabilities()}
                 {tabs[activeTab]?.label === 'BUCKETS' && renderBuckets()}
+                {tabs[activeTab]?.label === 'SCREENSHOTS' && <ScreenshotsTab projectSlug={projectSlug} scanId={parseInt(scanId)} />}
                 {tabs[activeTab]?.label === 'OSINT' && renderOSINT()}
                 {tabs[activeTab]?.label === 'LEAKS' && renderLeaks()}
                 {tabs[activeTab]?.label === 'ATTACK SURFACE' && renderAttackSurface()}
@@ -1414,7 +1416,7 @@ export const ScanDetailPage = () => {
                 {tabs[activeTab]?.label === 'RECON NOTES' && <ReconNotesWidget notes={data.todo_notes} />}
                 {tabs[activeTab]?.label === 'EXPLOITS' && renderExploits()}
 
-                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION'].includes(tabs[activeTab]?.label) && (
+                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'SCREENSHOTS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION'].includes(tabs[activeTab]?.label) && (
                   <Box sx={{ p: 4, textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 2 }}>
                     <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE STAGING AREA: {tabs[activeTab]?.label}</Typography>
                     <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem', mt: 1 }}>SYNCHRONIZING DATA FROM LEGACY INTERFACE...</Typography>

@@ -4,8 +4,13 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpResponse, Http404
 from django.conf import settings
 
+from reNgine.utilities import is_safe_path
+
 @login_required
 def serve_protected_media(request, path):
+    if not is_safe_path(settings.MEDIA_ROOT, path):
+        raise Http404("File not found")
+        
     file_path = os.path.join(settings.MEDIA_ROOT, path)
     if os.path.isdir(file_path):
         raise Http404("File not found")

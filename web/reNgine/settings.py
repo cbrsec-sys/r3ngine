@@ -48,7 +48,8 @@ NEO4J_USER = env('NEO4J_USER', default='neo4j')
 NEO4J_PASSWORD = env('NEO4J_PASSWORD', default='neo4jpassword')
 
 # Globals
-ALLOWED_HOSTS = ['*']
+# WARNING: Set ALLOWED_HOSTS to specific domains in production via environment variable
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
 SECRET_KEY = first_run(SECRET_FILE, BASE_DIR)
 
 # Rengine version
@@ -152,6 +153,14 @@ REST_FRAMEWORK = {
         'rest_framework_datatables.pagination.DatatablesPageNumberPagination'
     ),
     'PAGE_SIZE': 500,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '20/min',
+        'user': '200/min',
+    },
 }
 
 SWAGGER_SETTINGS = {
@@ -374,3 +383,36 @@ CACHES = {
         'TIMEOUT': 60 * 30,  # 30 minutes caching will be used
     }
 }
+
+'''
+    Security Settings
+    The application is served exclusively over HTTPS.
+    All secure cookie and HSTS settings are permanently enabled.
+'''
+
+# Session security
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_SECURE = True  # HTTPS only
+
+# CSRF hardening
+CSRF_COOKIE_HTTPONLY = False  # Must be False so JS can read the token for API calls
+CSRF_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SECURE = True  # HTTPS only
+
+# NOTE: Leave SECURE_SSL_REDIRECT=False — the upstream nginx reverse proxy handles
+# HTTP→HTTPS redirects. Enabling this in Django would cause a redirect loop.
+SECURE_SSL_REDIRECT = False
+
+# HSTS — tell browsers to always use HTTPS for this domain (1 year)
+SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=31536000)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=True)
+SECURE_HSTS_PRELOAD = env.bool('SECURE_HSTS_PRELOAD', default=False)  # opt-in for HSTS preload list
+
+# Security headers
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_BROWSER_XSS_FILTER = True
+X_FRAME_OPTIONS = 'DENY'
+
+# Referrer policy
+SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'

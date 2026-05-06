@@ -2,7 +2,7 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
@@ -272,7 +272,7 @@ RUN pip3 install --no-cache-dir fuzzywuzzy \
 RUN mkdir -p /usr/src/app/frontend
 WORKDIR /usr/src/app/frontend
 COPY frontend/package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install
 WORKDIR /usr/src/app
 
 # Copy source code
