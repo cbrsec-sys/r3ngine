@@ -10,11 +10,55 @@ export default defineConfig(({ command }) => ({
   ],
   base: command === 'serve' ? '/' : '/staticfiles/',
   build: {
+    chunkSizeWarningLimit: 1000, // raise slightly (optional, not a fix)
+
     rollupOptions: {
       output: {
-        entryFileNames: `assets/[name].js`,
-        chunkFileNames: `assets/[name].js`,
-        assetFileNames: `assets/[name].[ext]`
+        entryFileNames: `assets/[name]-[hash].js`,
+        chunkFileNames: `assets/[name]-[hash].js`,
+        assetFileNames: `assets/[name]-[hash].[ext]`,
+
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            // Core React stack
+            if (id.includes('react') || id.includes('react-dom')) {
+              return 'vendor-react';
+            }
+
+            // Routing
+            if (id.includes('react-router')) {
+              return 'vendor-router';
+            }
+
+            // Charts (VERY important for your use case)
+            if (
+              id.includes('recharts') ||
+              id.includes('echarts') ||
+              id.includes('chart.js') ||
+              id.includes('d3')
+            ) {
+              return 'vendor-charts';
+            }
+
+            // UI frameworks (if you're using any)
+            if (
+              id.includes('@mui') ||
+              id.includes('tailwind') ||
+              id.includes('react-markdown') ||
+              id.includes('lucide')
+            ) {
+              return 'vendor-ui';
+            }
+
+            // Utility libs
+            if (id.includes('lodash') || id.includes('axios') || id.includes('date-fns') || id.includes('react-markdown') || id.includes('lucide')) {
+              return 'vendor-utils';
+            }
+
+            // Everything else from node_modules
+            return 'vendor';
+          }
+        }
       }
     }
   },
