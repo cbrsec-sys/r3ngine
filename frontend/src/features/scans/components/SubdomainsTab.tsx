@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import {
   Box,
   Typography,
@@ -14,7 +15,24 @@ import {
   MenuItem,
   ListItemIcon,
   ListItemText,
-  Chip
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  FormControl,
+  FormControlLabel,
+  InputLabel,
+  Select,
+  Checkbox,
+  TextField,
+  List,
+  ListItem,
+  ListItemButton,
+  FormGroup,
+  Divider,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import {
   Search,
@@ -29,10 +47,19 @@ import {
   Trash2,
   Copy,
   FileText,
-  Shield
+  Shield,
+  X
 } from 'lucide-react';
 
-import { useSubdomains } from '../../subdomains/api';
+import { 
+  useSubdomains, 
+  useDeleteSubdomain, 
+  useToggleSubdomainImportant, 
+  useInitiateSubscan,
+  useGPTAttackSurface
+} from '../../subdomains/api';
+import { useEngines } from '../../engines/api';
+import { useCreateTodo } from '../../todos/api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 
 interface SubdomainsTabProps {
@@ -51,6 +78,51 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
 
   const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, false, targetId);
   const [isReady, setIsReady] = useState(false);
+  
+  // Modals state
+  const [subscanModalOpen, setSubscanModalOpen] = useState(false);
+  const [attackSurfaceModalOpen, setAttackSurfaceModalOpen] = useState(false);
+  const [todoModalOpen, setTodoModalOpen] = useState(false);
+  
+  // Selected subdomain for single actions
+  const [targetSubdomain, setTargetSubdomain] = useState<any>(null);
+  
+  // Subscan state
+  const [selectedEngineId, setSelectedEngineId] = useState<number | null>(null);
+  const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
+  
+  // TODO state
+  const [todoTitle, setTodoTitle] = useState('');
+  const [todoDescription, setTodoDescription] = useState('');
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({
+    open: false,
+    message: '',
+    severity: 'success',
+  });
+
+  const handleCloseSnackbar = () => {
+    setSnackbar({ ...snackbar, open: false });
+  };
+
+  const showNotification = (message: string, severity: 'success' | 'error' | 'info' | 'warning' = 'success') => {
+    setSnackbar({
+      open: true,
+      message,
+      severity,
+    });
+  };
+
+  // Mutations
+  const deleteMutation = useDeleteSubdomain(projectSlug);
+  const importantMutation = useToggleSubdomainImportant(projectSlug);
+  const subscanMutation = useInitiateSubscan();
+  const attackSurfaceMutation = useGPTAttackSurface();
+  const createTodoMutation = useCreateTodo();
+  const { data: enginesData } = useEngines();
 
   React.useEffect(() => {
     if (!isLoading && data) {
@@ -80,14 +152,117 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
     setActiveSearch(searchQuery);
   };
 
-  const handleActionClick = (event: React.MouseEvent<HTMLButtonElement>, id: number) => {
+  const handleActionClick = (event: React.MouseEvent<HTMLButtonElement>, sub: any) => {
     setAnchorEl(event.currentTarget);
-    setSelectedId(id);
+    setSelectedId(sub.id);
+    setTargetSubdomain(sub);
   };
 
   const handleActionClose = () => {
     setAnchorEl(null);
     setSelectedId(null);
+    // We keep targetSubdomain until a new one is selected or modal closes
+  };
+
+  const handleDelete = async (id: number) => {
+    if (window.confirm('Are you sure you want to delete this subdomain?')) {
+      try {
+        await deleteMutation.mutateAsync([id]);
+        showNotification('Subdomain deleted successfully');
+      } catch (error: any) {
+        showNotification(error.message || 'Failed to delete subdomain', 'error');
+      }
+    }
+    handleActionClose();
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedAssets.length === 0) return;
+    if (window.confirm(`Are you sure you want to delete ${selectedAssets.length} subdomains?`)) {
+      try {
+        await deleteMutation.mutateAsync(selectedAssets);
+        showNotification(`${selectedAssets.length} subdomains deleted`);
+        setSelectedAssets([]);
+      } catch (error: any) {
+        showNotification(error.message || 'Failed to delete subdomains', 'error');
+      }
+    }
+  };
+
+  const handleToggleImportant = async (id: number) => {
+    try {
+      await importantMutation.mutateAsync(id);
+      showNotification('Status updated');
+    } catch (error: any) {
+      showNotification(error.message || 'Failed to update status', 'error');
+    }
+    handleActionClose();
+  };
+
+  const handleInitiateSubscan = async () => {
+    if (!selectedEngineId) {
+      showNotification('Please select an engine', 'error');
+      return;
+    }
+    if (selectedTasks.length === 0) {
+      showNotification('Please select at least one task', 'error');
+      return;
+    }
+
+    const subdomain_ids = selectedAssets.length > 0 
+      ? selectedAssets 
+      : targetSubdomain ? [targetSubdomain.id] : [];
+
+    if (subdomain_ids.length === 0) {
+      showNotification('No subdomains selected', 'error');
+      return;
+    }
+
+    try {
+      await subscanMutation.mutateAsync({
+        engine_id: selectedEngineId,
+        tasks: selectedTasks,
+        subdomain_ids
+      });
+      showNotification('Subscan initiated successfully');
+      setSubscanModalOpen(false);
+      setSelectedEngineId(null);
+      setSelectedTasks([]);
+    } catch (error: any) {
+      showNotification(error.message || 'Failed to initiate subscan', 'error');
+    }
+  };
+
+  const selectedEngine = enginesData?.find(e => e.id === selectedEngineId);
+
+  const handleAddTodo = async () => {
+    if (!todoDescription) {
+      showNotification('Please enter a description', 'error');
+      return;
+    }
+    try {
+      await createTodoMutation.mutateAsync({
+        title: todoTitle || `TODO: ${targetSubdomain.name}`,
+        description: todoDescription,
+        subdomain_id: targetSubdomain.id,
+        project: projectSlug || ""
+      });
+      setTodoModalOpen(false);
+      setTodoDescription('');
+      showNotification('TODO note added successfully');
+    } catch (error: any) {
+      showNotification(error.message || 'Failed to add TODO note', 'error');
+    }
+  };
+
+  const handleShowAttackSurface = async (sub: any) => {
+    setTargetSubdomain(sub);
+    setAttackSurfaceModalOpen(true);
+    try {
+      await attackSurfaceMutation.mutateAsync(sub.id);
+    } catch (error: any) {
+      showNotification(error.message || 'Failed to fetch attack surface', 'error');
+    }
   };
 
   const getStatusColor = (status: number) => {
@@ -193,9 +368,38 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             {selectedAssets.length > 0 && (
-              <Button size="small" variant="contained" sx={{ bgcolor: '#ff003c', color: '#fff', fontSize: '10px', fontWeight: 800, '&:hover': { bgcolor: '#cc0030' } }}>
-                DELETE SELECTED ({selectedAssets.length})
-              </Button>
+              <Stack direction="row" spacing={1}>
+                <Button 
+                  size="small" 
+                  variant="contained" 
+                  onClick={() => setSubscanModalOpen(true)}
+                  sx={{ 
+                    bgcolor: 'rgba(0, 243, 255, 0.1)', 
+                    color: '#00f3ff', 
+                    fontSize: '10px', 
+                    fontWeight: 800, 
+                    border: '1px solid rgba(0, 243, 255, 0.2)',
+                    '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' } 
+                  }}
+                >
+                  SUBSCAN SELECTED ({selectedAssets.length})
+                </Button>
+                <Button 
+                  size="small" 
+                  variant="contained" 
+                  onClick={handleBulkDelete}
+                  sx={{ 
+                    bgcolor: 'rgba(255, 0, 60, 0.1)', 
+                    color: '#ff003c', 
+                    fontSize: '10px', 
+                    fontWeight: 800, 
+                    border: '1px solid rgba(255, 0, 60, 0.2)',
+                    '&:hover': { bgcolor: 'rgba(255, 0, 60, 0.2)' } 
+                  }}
+                >
+                  DELETE SELECTED ({selectedAssets.length})
+                </Button>
+              </Stack>
             )}
             <IconButton size="small" sx={{ color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.1)', borderRadius: 1 }}>
               <Download size={14} />
@@ -278,7 +482,15 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#fff', letterSpacing: 0.2 }}>{sub.name}</Typography>
-                        <IconButton size="small" sx={{ p: 0.2, color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff' } }}>
+                        {sub.is_important && <Shield size={12} color="#ffae00" style={{ filter: 'drop-shadow(0 0 5px #ffae00)' }} />}
+                        <IconButton 
+                          size="small" 
+                          onClick={() => {
+                            navigator.clipboard.writeText(sub.name);
+                            showNotification('Copied to clipboard');
+                          }}
+                          sx={{ p: 0.2, color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff' } }}
+                        >
                           <Copy size={12} />
                         </IconButton>
                       </Box>
@@ -400,21 +612,39 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   <td style={{ padding: '12px 16px' }}>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
                       <Tooltip title="Show Attack Surface">
-                        <IconButton size="small" sx={{ color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)', p: 0.5 }}>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => handleShowAttackSurface(sub)}
+                          sx={{ color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)', p: 0.5 }}
+                        >
                           <Eye size={14} />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Further Scan Subdomain">
-                        <IconButton size="small" sx={{ color: '#00ffaa', bgcolor: 'rgba(0, 255, 170, 0.05)', p: 0.5 }}>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => {
+                            setTargetSubdomain(sub);
+                            setSubscanModalOpen(true);
+                          }}
+                          sx={{ color: '#00ffaa', bgcolor: 'rgba(0, 255, 170, 0.05)', p: 0.5 }}
+                        >
                           <Zap size={14} />
                         </IconButton>
                       </Tooltip>
                       <Tooltip title="Add Recon TODO/Note">
-                        <IconButton size="small" sx={{ color: '#ffae00', bgcolor: 'rgba(255, 174, 0, 0.05)', p: 0.5 }}>
+                        <IconButton 
+                          size="small" 
+                          onClick={() => {
+                            setTargetSubdomain(sub);
+                            setTodoModalOpen(true);
+                          }}
+                          sx={{ color: '#ffae00', bgcolor: 'rgba(255, 174, 0, 0.05)', p: 0.5 }}
+                        >
                           <FileText size={14} />
                         </IconButton>
                       </Tooltip>
-                      <IconButton size="small" onClick={(e) => handleActionClick(e, sub.id)} sx={{ color: 'rgba(255,255,255,0.3)', p: 0.5 }}>
+                      <IconButton size="small" onClick={(e) => handleActionClick(e, sub)} sx={{ color: 'rgba(255,255,255,0.3)', p: 0.5 }}>
                         <MoreHorizontal size={14} />
                       </IconButton>
                     </Box>
@@ -472,27 +702,282 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           }
         }}
       >
-        <MenuItem onClick={handleActionClose}>
+        <MenuItem onClick={() => { handleActionClose(); setAttackSurfaceModalOpen(true); }}>
           <ListItemIcon><Eye size={16} color="#00f3ff" /></ListItemIcon>
           <ListItemText primary="ATTACK SURFACE" />
         </MenuItem>
-        <MenuItem onClick={handleActionClose}>
+        <MenuItem onClick={() => { handleActionClose(); setSubscanModalOpen(true); }}>
           <ListItemIcon><Zap size={16} color="#00f3ff" /></ListItemIcon>
           <ListItemText primary="INITIATE SCAN" />
         </MenuItem>
-        <MenuItem onClick={handleActionClose}>
+        <MenuItem onClick={() => { handleActionClose(); setTodoModalOpen(true); }}>
           <ListItemIcon><FilePlus size={16} color="#00f3ff" /></ListItemIcon>
           <ListItemText primary="ADD NOTE" />
         </MenuItem>
-        <MenuItem onClick={handleActionClose} sx={{ color: '#ffae00' }}>
+        <MenuItem onClick={() => handleToggleImportant(selectedId!)} sx={{ color: '#ffae00' }}>
           <ListItemIcon><Shield size={16} color="#ffae00" /></ListItemIcon>
-          <ListItemText primary="MARK IMPORTANT" />
+          <ListItemText primary={targetSubdomain?.is_important ? "UNMARK IMPORTANT" : "MARK IMPORTANT"} />
         </MenuItem>
-        <MenuItem onClick={handleActionClose} sx={{ color: '#ff003c' }}>
+        <MenuItem onClick={() => handleDelete(selectedId!)} sx={{ color: '#ff003c' }}>
           <ListItemIcon><Trash2 size={16} color="#ff003c" /></ListItemIcon>
           <ListItemText primary="DELETE ASSET" />
         </MenuItem>
       </Menu>
+
+      {/* Subscan Overlay */}
+      <Dialog
+        open={subscanModalOpen}
+        onClose={() => setSubscanModalOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#0a0a0a',
+              border: '1px solid rgba(0, 243, 255, 0.2)',
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2 }}>
+          CONFIGURE SUBSCAN: {selectedAssets.length > 0 ? `${selectedAssets.length} ASSETS` : targetSubdomain?.name}
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', mb: 2, fontFamily: 'monospace' }}>
+            SELECT ENGINE & ANALYTIC TASKS
+          </Typography>
+          
+          <FormControl fullWidth size="small" sx={{ mb: 3 }}>
+            <InputLabel id="engine-select-label" sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Scan Engine</InputLabel>
+            <Select
+              labelId="engine-select-label"
+              value={selectedEngineId || ''}
+              label="Scan Engine"
+              onChange={(e) => {
+                setSelectedEngineId(Number(e.target.value));
+                setSelectedTasks([]);
+              }}
+              sx={{
+                color: '#fff',
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.3)' },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' },
+              }}
+            >
+              {enginesData?.map(engine => (
+                <MenuItem key={engine.id} value={engine.id}>{engine.engine_name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {selectedEngine && (
+            <Box>
+              <Typography sx={{ color: 'rgba(0, 243, 255, 0.7)', fontSize: '0.65rem', mb: 1, fontWeight: 900, fontFamily: 'Orbitron' }}>
+                AVAILABLE TASKS
+              </Typography>
+              <FormGroup>
+                {selectedEngine.tasks.map((task: string) => (
+                  <FormControlLabel
+                    key={task}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={selectedTasks.includes(task)}
+                        onChange={(e) => {
+                          if (e.target.checked) setSelectedTasks(prev => [...prev, task]);
+                          else setSelectedTasks(prev => prev.filter(t => t !== task));
+                        }}
+                        sx={{ color: 'rgba(0, 243, 255, 0.2)', '&.Mui-checked': { color: '#00f3ff' } }}
+                      />
+                    }
+                    label={<Typography sx={{ fontSize: '0.8rem', color: '#fff', fontWeight: 600 }}>{task.replace(/_/g, ' ').toUpperCase()}</Typography>}
+                  />
+                ))}
+              </FormGroup>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <Button onClick={() => setSubscanModalOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem' }}>CANCEL</Button>
+          <Button
+            variant="contained"
+            onClick={handleInitiateSubscan}
+            disabled={subscanMutation.isPending || !selectedEngineId || selectedTasks.length === 0}
+            sx={{
+              bgcolor: 'rgba(0, 243, 255, 0.1)',
+              color: '#00f3ff',
+              border: '1px solid rgba(0, 243, 255, 0.2)',
+              fontSize: '0.7rem',
+              fontWeight: 900,
+              '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+            }}
+          >
+            {subscanMutation.isPending ? 'INITIATING...' : 'RUN SUBSCAN'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Attack Surface Modal */}
+      <Dialog
+        open={attackSurfaceModalOpen}
+        onClose={() => setAttackSurfaceModalOpen(false)}
+        maxWidth="md"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#0a0a0a',
+              border: '1px solid rgba(0, 243, 255, 0.2)',
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          ATTACK SURFACE ANALYSIS: {targetSubdomain?.name}
+          <IconButton onClick={() => setAttackSurfaceModalOpen(false)} size="small" sx={{ color: 'rgba(255,255,255,0.3)' }}><X size={18} /></IconButton>
+        </DialogTitle>
+        <DialogContent>
+          {attackSurfaceMutation.isPending ? (
+            <Box sx={{ py: 8, textAlign: 'center' }}>
+              <CircularProgress size={32} sx={{ color: '#00f3ff' }} />
+              <Typography sx={{ color: 'rgba(0, 243, 255, 0.5)', fontSize: '0.7rem', mt: 2, fontFamily: 'Orbitron', letterSpacing: 1 }}>
+                AI ENGINE ANALYZING TARGET VECTOR...
+              </Typography>
+            </Box>
+          ) : attackSurfaceMutation.isError ? (
+            <Alert severity="error" sx={{ bgcolor: 'rgba(255, 0, 60, 0.05)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)' }}>
+              Failed to generate attack surface. Ensure LLM is configured in settings.
+            </Alert>
+          ) : (
+            <Box sx={{
+              p: 3,
+              bgcolor: 'rgba(255,255,255,0.02)',
+              border: '1px solid rgba(255,255,255,0.05)',
+              borderRadius: 1,
+              maxHeight: '70vh',
+              overflow: 'auto',
+              color: 'rgba(255,255,255,0.9)',
+              '& .markdown-content': {
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '0.9rem',
+                lineHeight: 1.6,
+                '& h1, h2, h3': { color: '#00f3ff', fontFamily: 'Orbitron', mt: 3, mb: 1.5, letterSpacing: 1 },
+                '& p': { mb: 2 },
+                '& ul, ol': { mb: 2, pl: 3 },
+                '& li': { mb: 1 },
+                '& strong': { color: '#00f3ff', fontWeight: 800 },
+                '& code': { bgcolor: 'rgba(0, 243, 255, 0.1)', px: 0.5, borderRadius: 0.5, color: '#00f3ff', fontFamily: 'monospace' },
+                '& pre': { bgcolor: 'rgba(0,0,0,0.3)', p: 2, borderRadius: 1, border: '1px solid rgba(255,255,255,0.05)', overflow: 'auto', mb: 2 },
+              }
+            }}>
+              <div className="markdown-content">
+                <ReactMarkdown>
+                  {attackSurfaceMutation.data?.description || "No analysis provided by LLM."}
+                </ReactMarkdown>
+              </div>
+            </Box>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Add TODO Modal */}
+      <Dialog
+        open={todoModalOpen}
+        onClose={() => setTodoModalOpen(false)}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#0a0a0a',
+              border: '1px solid rgba(255, 174, 0, 0.2)',
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: '#ffae00', fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2 }}>
+          ADD RECON NOTE: {targetSubdomain?.name}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ mt: 1 }}>
+            <TextField
+              label="Title"
+              fullWidth
+              size="small"
+              value={todoTitle}
+              onChange={(e) => setTodoTitle(e.target.value)}
+              variant="outlined"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  color: '#fff',
+                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                  '&:hover fieldset': { borderColor: '#ffae00' },
+                  '&.Mui-focused fieldset': { borderColor: '#ffae00' },
+                },
+                '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.4)' }
+              }}
+            />
+            <TextField
+              label="Description"
+              fullWidth
+              multiline
+              rows={3}
+              value={todoDescription}
+              onChange={(e) => setTodoDescription(e.target.value)}
+              variant="outlined"
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  color: '#fff',
+                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                  '&:hover fieldset': { borderColor: '#ffae00' },
+                  '&.Mui-focused fieldset': { borderColor: '#ffae00' },
+                },
+                '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.4)' }
+              }}
+            />
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+          <Button onClick={() => setTodoModalOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem' }}>CANCEL</Button>
+          <Button
+            variant="contained"
+            onClick={handleAddTodo}
+            disabled={createTodoMutation.isPending}
+            sx={{
+              bgcolor: 'rgba(255, 174, 0, 0.1)',
+              color: '#ffae00',
+              border: '1px solid rgba(255, 174, 0, 0.2)',
+              fontSize: '0.7rem',
+              fontWeight: 900,
+              '&:hover': { bgcolor: 'rgba(255, 174, 0, 0.2)' }
+            }}
+          >
+            {createTodoMutation.isPending ? 'SAVING...' : 'SAVE NOTE'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+      <Snackbar 
+        open={snackbar.open} 
+        autoHideDuration={4000} 
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={handleCloseSnackbar} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

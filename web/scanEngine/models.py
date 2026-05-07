@@ -102,6 +102,7 @@ class Proxy(models.Model):
     id = models.AutoField(primary_key=True)
     use_proxy = models.BooleanField(default=False)
     proxies = models.TextField(blank=True, null=True)
+    use_proxychains = models.BooleanField(default=False)
 
 
 class OpSec(models.Model):

@@ -104,6 +104,12 @@ vulnerability_scan: {
     # 'tags': [],                 # Nuclei tags (https://github.com/projectdiscovery/nuclei-templates)
     # 'templates': [],            # Nuclei templates (https://github.com/projectdiscovery/nuclei-templates)
     # 'custom_templates': []      # Nuclei custom templates uploaded in reNgine
+    }
+  },
+  'cpanel_scanner': {
+    'run_cpanel_scan': true,
+    'cpanel_user_wordlist': '/usr/src/wordlist/cpanel_users.txt',
+    'proxy_type': 'rotating'
   }
 }
 waf_detection: {

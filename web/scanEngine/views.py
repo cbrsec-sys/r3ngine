@@ -406,7 +406,8 @@ def proxy_settings(request, slug):
     if request.headers.get('Accept') == 'application/json':
         return http.JsonResponse({
             'use_proxy': proxy.use_proxy if proxy else False,
-            'proxies': proxy.proxies if proxy else ""
+            'proxies': proxy.proxies if proxy else "",
+            'use_proxychains': proxy.use_proxychains if proxy else False
         })
 
     context['settings_nav_active'] = 'active'

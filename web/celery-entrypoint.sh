@@ -139,6 +139,38 @@ then
   wget https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml -O ~/nuclei-templates/ssrf_nagli.yaml
 fi
 
+# AI Map Templates
+echo "Checking for AI Map Templates"
+if [ ! -f ~/nuclei-templates/langserve-detect.yaml ];
+then
+  echo "Downloading langserve-detect for Nuclei"
+  wget https://raw.githubusercontent.com/BishopFox/aimap/refs/heads/main/templates/langserve-detect.yaml -O ~/nuclei-templates/langserve-detect.yaml
+fi
+
+if [ ! -f ~/nuclei-templates/mcp-server-detect.yaml ];
+then
+  echo "Downloading mcp-server-detect for Nuclei"
+  wget https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/mcp-server-detect.yaml -O ~/nuclei-templates/mcp-server-detect.yaml
+fi
+
+if [ ! -f ~/nuclei-templates/mcp-tool-enum.yaml ];
+then
+  echo "Downloading mcp-tool-enum for Nuclei"
+  wget https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/mcp-tool-enum.yaml -O ~/nuclei-templates/mcp-tool-enum.yaml
+fi
+
+if [ ! -f ~/nuclei-templates/openai-compat-detect.yaml ];
+then
+  echo "Downloading openai-compat-detect for Nuclei"
+  wget https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/openai-compat-detect.yaml -O ~/nuclei-templates/openai-compat-detect.yaml
+fi
+
+if [ ! -f ~/nuclei-templates/prompt-leak.yaml ];
+then
+  echo "Downloading prompt-leak for Nuclei"
+  wget https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/prompt-leak.yaml -O ~/nuclei-templates/prompt-leak.yaml
+fi
+
 if [ ! -d "/usr/src/github/CMSeeK" ]
 then
   echo "Cloning CMSeeK"

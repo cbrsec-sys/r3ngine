@@ -407,3 +407,20 @@ export const useStressTelemetry = (scanId: number | string | undefined) => {
     refetchInterval: 15000, // Refresh every 15s during test runs
   });
 };
+export const useFetchWhois = (projectSlug: string, scanId: number) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (target: string) => {
+      const response = await fetch(`/api/tools/whois/?target=${target}&is_reload=true`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch WHOIS data');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scan-summary', projectSlug, scanId] });
+    },
+  });
+};

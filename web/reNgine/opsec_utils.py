@@ -5,7 +5,7 @@ import re
 import tempfile
 import subprocess
 from scanEngine.models import OpSec, Proxy
-from reNgine.definitions import MEDUSA_EXEC_PATH, PROXYCHAINS_EXEC_PATH
+from reNgine.definitions import MEDUSA_EXEC_PATH, HYDRA_EXEC_PATH, PROXYCHAINS_EXEC_PATH
 
 class OpSecManager:
     """
@@ -215,6 +215,10 @@ class ProxychainsWrapper:
     def get_random_proxy(self):
         return random.choice(self.proxies) if self.proxies else None
 
+    def should_wrap(self):
+        proxy_obj = Proxy.objects.first()
+        return proxy_obj and proxy_obj.use_proxy and proxy_obj.use_proxychains
+
     def write_temp_config(self, proxy_str):
         fd, path = tempfile.mkstemp(suffix=".conf", prefix="proxychains_")
         os.close(fd)
@@ -225,6 +229,19 @@ class ProxychainsWrapper:
             f.write("[ProxyList]\n")
             f.write(f"{proxy_str}\n")
         return path
+
+    def wrap_command(self, cmd, proxy=None):
+        """
+        Conditionally wraps a command with proxychains if enabled in settings.
+        Returns (wrapped_command, temp_config_path)
+        """
+        if not proxy:
+            proxy = self.get_random_proxy()
+        
+        if proxy and self.should_wrap():
+            conf_path = self.write_temp_config(proxy)
+            return f"{PROXYCHAINS_EXEC_PATH} -f {conf_path} {cmd}", conf_path
+        return cmd, None
 
 
 class BruteForceOrchestrator:
@@ -251,7 +268,7 @@ class BruteForceOrchestrator:
         random.shuffle(combos)
         return combos
 
-    def run(self, min_attempts=1, max_attempts=10, stop_on_success=True):
+    def run(self, min_attempts=1, max_attempts=10, stop_on_success=True, engine='hydra'):
         combos = self._generate_combos()
         i = 0
         while i < len(combos):
@@ -260,14 +277,19 @@ class BruteForceOrchestrator:
             batch = combos[i:i+batch_size]
             i += batch_size
 
-            # Create temp combo file for Medusa
-            fd, combo_file = tempfile.mkstemp(suffix=".txt", prefix="medusa_combo_")
+            # Create temp combo file
+            fd, combo_file = tempfile.mkstemp(suffix=".txt", prefix="brute_combo_")
             os.close(fd)
-            # Clean target for Medusa (strip protocol and port if present)
+            
+            # Clean target for tools
             clean_target = self.target.split("://")[-1].split(":")[0]
             
-            # Medusa combo file format: host:user:pass
-            batch_data = [f"{clean_target}:{c[0]}:{c[1]}" for c in batch]
+            if engine == 'medusa':
+                # Medusa combo file format: host:user:pass
+                batch_data = [f"{clean_target}:{c[0]}:{c[1]}" for c in batch]
+            else:
+                # Hydra combo file format: user:pass
+                batch_data = [f"{c[0]}:{c[1]}" for c in batch]
             
             with open(combo_file, 'w') as f:
                 f.write("\n".join(batch_data))
@@ -276,45 +298,80 @@ class BruteForceOrchestrator:
             proxy = self.proxy_manager.get_random_proxy()
             cmd_prefix = ""
             conf_path = None
+            hydra_proxy_flag = ""
             if proxy:
-                conf_path = self.proxy_manager.write_temp_config(proxy)
-                cmd_prefix = f"{PROXYCHAINS_EXEC_PATH} -f {conf_path} "
+                if self.proxy_manager.should_wrap():
+                    conf_path = self.proxy_manager.write_temp_config(proxy)
+                    cmd_prefix = f"{PROXYCHAINS_EXEC_PATH} -f {conf_path} "
+                elif engine == 'hydra':
+                    parts = proxy.split(" ")
+                    if len(parts) >= 3:
+                        hydra_proxy_flag = f"-x {parts[0]}://{parts[1]}:{parts[2]} "
 
-            # Build Medusa command
-            # -h host, -n port, -M service, -C combo_file, -O output
+            # Build command
             port_flag = f"-n {self.port}" if self.port else ""
-            ssl_flag = "-s" if (str(self.port) == "443" or self.target.startswith("https")) else ""
-            output_file = f"/tmp/medusa_{clean_target}_{random.randint(1000,9999)}.log"
+            if engine == 'hydra':
+                # Hydra uses -s for port, -S for SSL
+                port_flag = f"-s {self.port}" if self.port else ""
+                ssl_flag = "-S" if (str(self.port) == "443" or self.target.startswith("https")) else ""
+                output_file = f"/tmp/hydra_{clean_target}_{random.randint(1000,9999)}.log"
+                # -C combo, -o output, -f stop on success
+                stop_flag = "-f" if stop_on_success else ""
+                # Map medusa service names to hydra if needed (usually they match)
+                hydra_service = self.service
+                if hydra_service == 'web-form': hydra_service = 'http-post-form'
+                
+                cmd = f"{cmd_prefix}{HYDRA_EXEC_PATH} {hydra_proxy_flag}-C {combo_file} {port_flag} {ssl_flag} {stop_flag} -o {output_file} {clean_target} {hydra_service}"
+            else:
+                # Medusa
+                ssl_flag = "-s" if (str(self.port) == "443" or self.target.startswith("https")) else ""
+                output_file = f"/tmp/medusa_{clean_target}_{random.randint(1000,9999)}.log"
+                cmd = f"{cmd_prefix}{MEDUSA_EXEC_PATH} -h {clean_target} {port_flag} {ssl_flag} -M {self.service} -C {combo_file} -O {output_file}"
             
-            medusa_cmd = f"{cmd_prefix}{MEDUSA_EXEC_PATH} -h {clean_target} {port_flag} {ssl_flag} -M {self.service} -C {combo_file} -O {output_file}"
-            self.logger.info(f"Executing brute-force batch: {medusa_cmd}")
+            self.logger.info(f"Executing brute-force batch ({engine}): {cmd}")
             
             try:
-                subprocess.run(medusa_cmd, shell=True, timeout=300)
+                subprocess.run(cmd, shell=True, timeout=300)
                 self.total_attempts += len(batch)
                 
                 if os.path.exists(output_file):
                     with open(output_file, 'r') as f:
                         output = f.read()
-                        # Medusa success pattern: "ACCOUNT FOUND"
-                        if "ACCOUNT FOUND" in output:
-                            # Medusa output can vary. v2.2 format:
-                            # ACCOUNT FOUND: [http] Host: 155.93.231.106 User: cisco Password: apo-summicron [SUCCESS]
-                            # Older/Other format might have brackets: User: [user] Password: [pass]
-                            found = re.findall(r"ACCOUNT FOUND: \[(.*?)\](?: Host: .*?)? User: (?:\[)?(.*?)(?:\])? Password: (?:\[)?(.*?)(?:\])?(?: \[SUCCESS\]|$)", output)
-                            batch_success = 0
-                            for match in found:
-                                self.results.append({
-                                    'user': match[1],
-                                    'password': match[2],
-                                    'target': self.target,
-                                    'service': self.service
-                                })
-                                batch_success += 1
-                                self.total_success += 1
+                        
+                        batch_success = 0
+                        if engine == 'hydra':
+                            # Hydra output file format: host service port user pass
+                            # Example: 1.1.1.1 http-get 80 admin password
+                            # We skip comments starting with #
+                            for line in output.splitlines():
+                                if line.startswith('#') or not line.strip(): continue
+                                parts = line.split()
+                                if len(parts) >= 5:
+                                    self.results.append({
+                                        'user': parts[3],
+                                        'password': parts[4],
+                                        'target': self.target,
+                                        'service': self.service
+                                    })
+                                    batch_success += 1
+                                    self.total_success += 1
+                        else:
+                            # Medusa
+                            if "ACCOUNT FOUND" in output:
+                                # Fixed regex: require [SUCCESS] to avoid matching [FAILURE] at end of string
+                                found = re.findall(r"ACCOUNT FOUND: \[(.*?)\](?: Host: .*?)? User: (?:\[)?(.*?)(?:\])? Password: (?:\[)?(.*?)(?:\])?\s+\[SUCCESS\]", output)
+                                for match in found:
+                                    self.results.append({
+                                        'user': match[1],
+                                        'password': match[2],
+                                        'target': self.target,
+                                        'service': self.service
+                                    })
+                                    batch_success += 1
+                                    self.total_success += 1
                             
+                        if batch_success > 0:
                             self.logger.info(f"Batch completed on {self.target}. Results: {batch_success} success, {len(batch) - batch_success} failed.")
-                            
                             if stop_on_success:
                                 self.logger.info(f"Success found. Stopping brute-force for {self.target}.")
                                 break

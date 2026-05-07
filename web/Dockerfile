@@ -79,6 +79,7 @@ RUN apt update -y && \
     ike-scan \
     sslscan \
     medusa \
+    hydra \
     proxychains4 \
     jq \
     wrk \
@@ -164,7 +165,7 @@ RUN ARCH=$(dpkg --print-architecture) \
     && rm -rf aquatone_linux_${ARCH}_1.7.0.zip README.md LICENSE.txt
 
 # Install Arjun, InQL, Netlas
-RUN pip3 install arjun inql netlas
+RUN pip3 install --upgrade arjun inql netlas
 
 RUN ARCH=$(dpkg --print-architecture) \
     && wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
@@ -257,6 +258,15 @@ RUN cd /usr/src/github && \
 
 RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot && \
     cd /usr/src/github/spiderfoot && pip3 install -r requirements.txt
+
+RUN git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner && \
+    cd /usr/src/github/cpanel2shell-scanner && pip3 install -r requirements.txt
+
+# Create a robust cPanel username wordlist
+RUN mkdir -p /usr/src/wordlist && \
+    printf "admin\nroot\ncpanel\nwebmaster\nsupport\ninfo\ntest\nuser\nclient\nhosting\nbackup\nmanager\nstaff\nowner\nsysadmin\nsystem\ndata\ndev\ndeveloper\nweb\n" > /usr/src/wordlist/cpanel_users.txt && \
+    wget -qO- https://raw.githubusercontent.com/danielmiessler/SecLists/master/Usernames/top-usernames-shortlist.txt >> /usr/src/wordlist/cpanel_users.txt && \
+    sort -u /usr/src/wordlist/cpanel_users.txt -o /usr/src/wordlist/cpanel_users.txt
 
 # Copy requirements
 COPY web/requirements.txt /tmp/requirements.txt
