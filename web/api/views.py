@@ -537,9 +537,11 @@ class CreateProjectApi(APIView):
 	renderer_classes = [JSONRenderer]
 
 
-	def get(self, request):
+	def post(self, request):
 		req = self.request
-		project_name = req.query_params.get('name')
+		project_name = req.data.get('name')
+		if not project_name:
+			return Response({'status': False, 'error': 'Project name is required'}, status=HTTP_400_BAD_REQUEST)
 		slug = slugify(project_name)
 		insert_date = timezone.now()
 
@@ -2120,6 +2122,7 @@ class VulnerabilityReport(APIView):
 class GetFileContents(APIView):
 	permission_classes = [IsPenetrationTester]
 	def get(self, request, format=None):
+		import pathlib
 		req = self.request
 		name = req.query_params.get('name')
 
@@ -2129,7 +2132,8 @@ class GetFileContents(APIView):
 		if 'nuclei_config' in req.query_params:
 			path = "/root/.config/nuclei/config.yaml"
 			if not os.path.exists(path):
-				run_command.run(f'touch {path}', shell=True)
+				pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+				pathlib.Path(path).touch()
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -2139,7 +2143,8 @@ class GetFileContents(APIView):
 		if 'subfinder_config' in req.query_params:
 			path = "/root/.config/subfinder/config.yaml"
 			if not os.path.exists(path):
-				run_command.run(f'touch {path}', shell=True)
+				pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+				pathlib.Path(path).touch()
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -2149,7 +2154,8 @@ class GetFileContents(APIView):
 		if 'naabu_config' in req.query_params:
 			path = "/root/.config/naabu/config.yaml"
 			if not os.path.exists(path):
-				run_command.run(f'touch {path}', shell=True)
+				pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+				pathlib.Path(path).touch()
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -2159,7 +2165,8 @@ class GetFileContents(APIView):
 		if 'theharvester_config' in req.query_params:
 			path = "/usr/src/github/theHarvester/api-keys.yaml"
 			if not os.path.exists(path):
-				run_command.run(f'touch {path}', shell=True)
+				pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+				pathlib.Path(path).touch()
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -2170,7 +2177,8 @@ class GetFileContents(APIView):
 			path = "/root/.config/spiderfoot.cfg"
 			if not os.path.exists(path):
 				# Create a default config or just touch
-				run_command.run(f'touch {path}', shell=True)
+				pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+				pathlib.Path(path).touch()
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True
@@ -2180,7 +2188,8 @@ class GetFileContents(APIView):
 		if 'amass_config' in req.query_params:
 			path = "/root/.config/amass.ini"
 			if not os.path.exists(path):
-				run_command.run(f'touch {path}', shell=True)
+				pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
+				pathlib.Path(path).touch()
 				response['message'] = 'File Created!'
 			f = open(path, "r")
 			response['status'] = True

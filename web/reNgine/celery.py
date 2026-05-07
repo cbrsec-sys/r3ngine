@@ -38,22 +38,38 @@ def debug_task(self):
 @app.on_after_finalize.connect
 def setup_startup_sync(sender, **kwargs):
     """
-    Trigger graph sync on startup. 
-    Uses a Redis lock to ensure it only runs once across all workers/processes.
+    Trigger essential sync tasks on startup. 
+    Uses Redis locks to ensure each task only runs once across all workers/processes.
     """
     try:
         import redis
         from django.conf import settings
+        import logging
         
-        # Connect to Redis using the configured broker URL
+        startup_logger = logging.getLogger("reNgine.startup")
+        
+        # Connect to Redis
         r = redis.from_url(settings.CELERY_BROKER_URL)
-        lock_key = "rengine:startup_graph_sync_lock"
         
-        # Attempt to acquire a lock that expires in 1 hour
-        # nx=True means it will only be set if it doesn't exist
-        if r.set(lock_key, "locked", nx=True, ex=3600):
+        # 1. Graph Synchronization
+        graph_lock_key = "rengine:startup_graph_sync_lock"
+        if r.set(graph_lock_key, "locked", nx=True, ex=3600):
+            startup_logger.info(">>> [STARTUP] Triggering global graph synchronization...")
             from reNgine.tasks import sync_all_scans_to_graph
             sync_all_scans_to_graph.delay()
+        else:
+            startup_logger.debug(">>> [STARTUP] Graph sync already triggered or lock active.")
+
+        # 2. CISA KEV Catalog Synchronization
+        kev_lock_key = "rengine:startup_kev_sync_lock"
+        if r.set(kev_lock_key, "locked", nx=True, ex=3600):
+            startup_logger.info(">>> [STARTUP] Triggering CISA KEV catalog synchronization...")
+            from reNgine.tasks import sync_cisa_kev_catalog
+            sync_cisa_kev_catalog.delay()
+        else:
+            startup_logger.debug(">>> [STARTUP] CISA KEV sync already triggered or lock active.")
+            
     except Exception as e:
         # Avoid crashing startup if Redis or task dispatch fails
-        pass
+        import logging
+        logging.error(f"Failed to trigger startup tasks: {e}")

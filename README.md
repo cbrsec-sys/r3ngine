@@ -43,14 +43,14 @@ Traditional reconnaissance tools often fall short in terms of configurability an
 
 Version 3.0 represents a complete overhaul of r3ngine, focusing on AI-driven intelligence, aesthetic excellence, and surgical discovery precision. Below are the core pillars of the v3 release:
 
-### 🎨 Cyberpunk V3 Hacker Dashboard
-A completely reimagined, glassmorphic UI designed for high-impact data visualization and aesthetic excellence.
-*   **Neon Aesthetic**: High-contrast, vibrant interface with neon accents for better visibility in dark environments.
-*   **Unified Tables**: Structurally optimized headers (including IP, Ports, and Status) for a seamless, professional look.
-*   **Interactive Analytics**: Dynamic reporting views with actionable insights and trend analysis.
+### 🎨 Multi-Tier V3 Visual Experience
+reNgine v3 now features a sophisticated, switchable theme system designed to adapt to your operational environment.
+*   **Hacker (Default)**: The full cyberpunk experience. High-intensity neons, glassmorphism, Orbitron typography, and animated scanlines for a tactical "mission control" feel.
+*   **Hybrid (Modern)**: A refined, clean version of the brand. Removes high-intensity background noise and scanlines while retaining the signature neon accents and Orbitron headings.
+*   **Enterprise (Professional)**: A premium, corporate-grade interface. Built for performance and stability with a Slate/Blue palette, Inter (Sans-Serif) typography, and a flat, high-density layout.
 *   **Theme Management**:
-    *   **How to Switch**: Toggle the intensity (Neon/Glassmorphic) via the top navigation bar or select "Hacker" in your **User Profile Settings**.
-    *   **How to Revert**: To return to the classic look, simply visit your **User Profile Settings** and switch back to the "Default" or "Classic" theme.
+    *   **How to Switch**: Click the **Palette Icon** in the top navigation bar (Topbar) to choose between Hacker, Hybrid, and Enterprise modes instantly.
+    *   **Persistence**: Your theme preference is automatically saved to `localStorage` and will persist across all browser sessions.
 
 ### 🤖 Dedicated LLM Toolkit
 Centralized AI management for smarter reconnaissance and automated reporting.
@@ -60,6 +60,14 @@ Centralized AI management for smarter reconnaissance and automated reporting.
 *   **AI-Assisted Recon**: Automated generation of vulnerability descriptions, remediation strategies, and attack surface assessments.
 *   **Vulnerability Impact Intelligence**: Interactive tactical dashboard featuring AI-generated impact narratives and Cytoscape.js-powered attack path visualizations.
 *   **PII Gate**: Integrated privacy protection to anonymize sensitive scan data (IPs, emails, hostnames) before LLM processing, ensuring secure data handling in AI-assisted analysis.
+ 
+### 🛡️ Exploitation Readiness Layer (ERL)
+A safe, modular, and production-grade validation layer for vulnerabilities.
+*   **Vulnerability Validation**: Automatically converts potential findings into "Verified" status using non-destructive, containerized validation tools (e.g., safe SQLmap profiles).
+*   **Confidence Scoring**: Integrated a Bayesian confidence engine that aggregates tool results, asset metadata, and tool reliability into a unified confidence score.
+*   **Containerized Sandboxing**: Orchestrated on-demand, ephemeral Docker sandboxes for validation execution to maintain strict isolation.
+*   **Policy-Driven Safety**: Implemented a Policy Engine that enforces safety boundaries, preventing validation on sensitive assets (e.g., .gov, production) or during restricted hours.
+*   **Interactive Evidence Viewer**: New "Validation" column and expandable evidence section in the vulnerability dashboard providing cryptographic-grade proof of findings.
 
 
 *   **Vulnerability Correlation Engine**: Advanced multi-tool unification pipeline that correlates findings from **Nuclei (DAST)**, **Semgrep (SAST)**, **Trivy (SCA)**, **Gitleaks (Secrets)**, **Acunetix (DAST)**, and **Retire.js** into a prioritized threat landscape with automated **Potential Attack Chain** generation.
@@ -73,7 +81,7 @@ The SpiderFoot discovery engine has been completely re-engineered for v3.
 ### 🛡️ Advanced OpSec & Stealth
 *   **WAF Bypass Engine**: Sophisticated modules designed to identify and bypass Web Application Firewalls (WAFs) for deeper scan penetration.
 *   **Automated Proxy Management**: A new, fully automated pipeline to gather, validate, and rotate high-quality proxies, ensuring continuous scanning without rate-limiting or IP blocking.
-*   **API Discovery Pipeline**: Integrated **Arjun**, **Kiterunner**, and **ParamSpider** for deep hidden endpoint discovery.
+*   **API Discovery Pipeline**: Integrated **Arjun**, **Kiterunner**, and **ParamSpider** for deep hidden endpoint discovery with configurable HTTP methods and thread management.
 *   **Stealth Auth Brute-Force**: **Medusa** + **Proxychains4** integration with automated portal detection.
 *   **Custom Dorking**: A new **Dork Generator** to build complex queries for sensitive data discovery.
 *   **OpSec Presets**: User-agent rotation, rate limiting, and metadata stripping modules for stealthier operations.
@@ -93,6 +101,8 @@ A robust, unified security layer ensuring data integrity and access control.
 *   **Vulnerability Dashboard Refinements**: Native support for externally synchronized findings with verified metadata.
 
 - **Multi-Architecture Build Optimization**: Resolved critical architecture conflicts in the Docker build process, ensuring correct tool installation (e.g., Trivy) across both 64-bit and ARM64 systems.
+- **Proxy Resolution Fix**: Aligned Docker Compose network aliases with Nginx configuration and modernized HTTP/2 directives to ensure proxy container stability.
+- **Frontend Asset Stabilization**: Fixed 404 errors by standardizing Vite output filenames for main entry points, ensuring seamless integration with Django's static file system.
 ### 🔬 External Tool Orchestration (Acunetix & ReconX)
 Version 3.0 introduces deep integration with high-impact external security tools, allowing reNgine to act as a centralized controller.
 - **Celery Task Resilience Engine**: Hardened the core task execution wrapper to handle non-standard tool outputs and boolean results, preventing pipeline crashes during massive scan orchestrations.
@@ -171,7 +181,8 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
   * IP and Open Ports Identification
   * Endpoints Discovery
   * Directory/Files fuzzing
-  * Screenshot Gathering
+  * **Screenshot Gathering**: Restored visual evidence pipeline with tactical gallery and secure lightbox inspection.
+  * **Enhanced GeoMap Visualization**: Dynamic pulsing marker rendering with high-precision global coordinate mapping and tactical tooltips.
   * Vulnerability Scan
     * Nuclei
     * **Acunetix (AWVS)**: Automated vulnerability scanning with native ingestion.
@@ -221,10 +232,14 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 * Toolbox: cms detector, CVE lookup, dork generator, etc.
 * **LLM Toolkit**: Dedicated settings for AI models and automated analysis.
 * **Cyberpunk V3 UI**: Glassmorphic Neon dashboard with improved readability.
+* **Sidebar Submenu Optimization**: Automatically closes submenus when navigating or when the sidebar is closed to maintain a clean tactical interface.
 * **Standardized Notification System**: Tactical MUI Snackbar-driven feedback for all administrative and configuration actions.
 * **Advanced Web App & API Discovery Pipeline**: Integrated Arjun, Kiterunner, ParamSpider, LinkFinder, InQL.
 * **Semgrep-Powered Analysis**: Automated static analysis for JS and GraphQL.
 * **OpSec Settings**: UA rotation, stealth presets, and WAF bypass.
+* **Bounty Hub**: Centralized platform for managing and importing HackerOne bug bounty programs with tactical asset browsing and direct target orchestration.
+* **Automated Startup Synchronization**: Robust, Redis-locked startup sequence ensuring Attack Surface graphs and CISA KEV intelligence are available immediately upon system boot.
+* performance-optimizer
 * integrated tools: Chaos, TLSX, CTFR, Netlas, Katana, Medusa.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
@@ -256,7 +271,7 @@ You can also find the deep dive video on how to use and install reNgine from her
 1. Clone the repository
 
     ```bash
-    git clone https://github.com/whiterabb17/rengine && cd rengine
+    git clone https://github.com/whiterabb17/r3ngine && cd r3ngine
     ```
 
 1. Configure the environment
@@ -333,7 +348,7 @@ Please note: This is community-curated content and is not owned by reNgine. The 
 1. To update reNgine, run:
 
     ```bash
-    cd rengine &&  sudo ./update.sh
+    cd r3ngine &&  sudo ./update.sh
     ```
 
     If `update.sh` lacks execution permissions, use:

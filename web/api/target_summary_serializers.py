@@ -105,6 +105,13 @@ class TargetSummarySerializer(serializers.Serializer):
     monitoring_discoveries_list = serializers.ListField(required=False)
     secret_leaks = serializers.ListField(required=False)
     
+    # OSINT Data
+    emails = serializers.ListField(required=False)
+    employees = serializers.ListField(required=False)
+    dorks = serializers.ListField(required=False)
+    documents = serializers.ListField(required=False)
+    buckets = serializers.ListField(required=False)
+    
     # Scan specific
     scan_info = serializers.DictField(required=False)
     timeline = serializers.ListField(required=False)

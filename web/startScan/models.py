@@ -5,7 +5,6 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
-from .stress_result_models import *
 from reNgine.definitions import (CELERY_TASK_STATUSES,
 								 NUCLEI_REVERSE_SEVERITY_MAP)
 from reNgine.utilities import *
@@ -208,6 +207,7 @@ class ScanHistory(models.Model):
 
 class Subdomain(models.Model):
 	# TODO: Add endpoint property instead of replicating endpoint fields here
+	# Aquatone tasks are crashing due to endpoint property not being found
 	id = models.AutoField(primary_key=True)
 	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, null=True, blank=True)
 	target_domain = models.ForeignKey(Domain, on_delete=models.CASCADE, null=True, blank=True)
@@ -443,6 +443,7 @@ class VulnerabilityReference(models.Model):
 class CveId(models.Model):
 	id = models.AutoField(primary_key=True)
 	name = models.CharField(max_length=100)
+	is_cisa_kev = models.BooleanField(default=False)
 
 	def __str__(self):
 		return self.name
@@ -525,6 +526,7 @@ class Vulnerability(models.Model):
 		('patched', 'Patched'),
 	)
 	validation_status = models.CharField(max_length=20, choices=VULNERABILITY_STATUS_CHOICES, default='unverified')
+	validation_confidence = models.FloatField(null=True, blank=True, default=0.0)
 	correlation_score = models.FloatField(null=True, blank=True, default=0.0)
 	is_suppressed = models.BooleanField(default=False)
 
@@ -532,6 +534,21 @@ class Vulnerability(models.Model):
 		cve_str = ', '.join(f'`{cve.name}`' for cve in self.cve_ids.all())
 		severity = NUCLEI_REVERSE_SEVERITY_MAP[self.severity]
 		return f'{self.http_url} | `{severity.upper()}` | `{self.name}` | `{cve_str}`'
+
+
+class ValidationResult(models.Model):
+	id = models.AutoField(primary_key=True)
+	vulnerability = models.ForeignKey(Vulnerability, on_delete=models.CASCADE, related_name='validation_results')
+	tool = models.CharField(max_length=100)
+	validated = models.BooleanField(default=False)
+	confidence = models.FloatField(default=0.0)
+	payload = models.TextField(null=True, blank=True)
+	request_evidence = models.TextField(null=True, blank=True)
+	response_evidence = models.TextField(null=True, blank=True)
+	timestamp = models.DateTimeField(auto_now_add=True)
+
+	def __str__(self):
+		return f"Validation for {self.vulnerability.name} by {self.tool}"
 
 	def get_severity(self):
 		return self.severity
@@ -812,3 +829,30 @@ class MonitoringDiscovery(models.Model):
 
 	def __str__(self):
 		return f"{self.discovery_type} - {self.domain.name}"
+
+
+class StressTestResult(models.Model):
+    scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, related_name='stress_results')
+    target_domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name='stress_results', null=True, blank=True)
+    tool_used = models.CharField(max_length=50, default="k6")
+    concurrency_used = models.IntegerField(default=0)
+    duration = models.CharField(max_length=50, blank=True, null=True)
+    
+    total_requests = models.IntegerField(default=0)
+    successful_requests = models.IntegerField(default=0)
+    failed_requests = models.IntegerField(default=0)
+    
+    avg_latency_ms = models.FloatField(default=0.0)
+    p95_latency_ms = models.FloatField(default=0.0)
+    p99_latency_ms = models.FloatField(default=0.0)
+    max_requests_per_second = models.FloatField(default=0.0)
+    
+    is_kill_switch_triggered = models.BooleanField(default=False)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Stress Test Result'
+        verbose_name_plural = 'Stress Test Results'
+
+    def __str__(self):
+        return f"Stress Test Result for Scan {self.scan_history.id} - {self.tool_used}"

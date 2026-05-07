@@ -48,6 +48,8 @@ try:
 except ImportError:
 	Acunetix = None
 
+from plugins.orchestrator import PluginOrchestrator
+
 """
 Celery tasks.
 """
@@ -248,14 +250,15 @@ def initiate_scan(
 		if 'spiderfoot_scan' in tasks:
 			sub_discovery_group.append(spiderfoot_scan.si(ctx=ctx, description='Attack Surface Intelligence'))
 
-		workflow = chain(
+		# Build Celery tasks dynamically with plugin injections
+		workflow_steps = [
 			group(sub_discovery_group),
-			port_scan.si(ctx=ctx, description='Port scan'),
-			fetch_url.si(ctx=ctx, description='Fetch URL'),
+			PluginOrchestrator.inject_tasks('PortScan', port_scan.si(ctx=ctx, description='Port scan'), ctx),
+			PluginOrchestrator.inject_tasks('FetchURL', fetch_url.si(ctx=ctx, description='Fetch URL'), ctx),
 			group(
 				dir_file_fuzz.si(ctx=ctx, description='Directories & files fuzz'),
 				web_api_discovery.si(ctx=ctx, description='Web API Discovery'),
-				vulnerability_scan.si(ctx=ctx, description='Vulnerability scan'),
+				PluginOrchestrator.inject_tasks('VulnerabilityScan', vulnerability_scan.si(ctx=ctx, description='Vulnerability scan'), ctx),
 				screenshot.si(ctx=ctx, description='Screenshot'),
 				chain(
 					waf_detection.si(ctx=ctx, description='WAF detection'),
@@ -264,8 +267,12 @@ def initiate_scan(
 				firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan')
 			),
 			correlate_vulnerabilities.si(scan_history_id=scan_history_id),
-			calculate_risk_scores.si(scan_history_id=scan_history_id)
-		)
+			calculate_risk_scores.si(scan_history_id=scan_history_id),
+			PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx),
+			run_apme.si(scan_history_id=scan_history_id)
+		]
+
+		workflow = chain(*workflow_steps)
 
 		if config.get('enable_ai_impact_analysis'):
 			workflow = chain(workflow, generate_impact_assessment.si(scan_history_id=scan_history_id))
@@ -2501,6 +2508,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
+	arjun_methods = config.get(ARJUN_METHODS, ARJUN_DEFAULT_METHODS)
 
 	# Get targets
 	if not urls:
@@ -2528,7 +2536,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if 'arjun' in uses_tools:
 			logger.info(f'Running Arjun on {url}')
 			arjun_output = f"{results_dir}/arjun_{subdomain_name}.json"
-			cmd = f"arjun -u {url} --passive -oJ {arjun_output}"
+			cmd = f"arjun -u {url} --passive -m {arjun_methods} -t {threads} --stable -oJ {arjun_output}"
 			#if proxy:
 			# 	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
@@ -2540,8 +2548,13 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 							endpoint, _ = save_endpoint(target_url, ctx=ctx, subdomain=subdomain)
 							if endpoint:
 								params = details.get('params', {})
-								for method, param_list in params.items():
-									for p in param_list:
+								if isinstance(params, dict):
+									for method, param_list in params.items():
+										for p in param_list:
+											save_parameter(endpoint, p, param_type=method)
+								elif isinstance(params, list):
+									method = details.get('method', 'unknown')
+									for p in params:
 										save_parameter(endpoint, p, param_type=method)
 				except Exception as e:
 					logger.error(f"Error parsing Arjun output for {url}: {e}")
@@ -2551,7 +2564,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running Kiterunner on {url}')
 			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
 			# kr scan -w wordlist.kite -o json
-			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j 5 -o json >> {kr_output}"
+			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json >> {kr_output}"
 			if proxy:
 				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
@@ -6276,3 +6289,54 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 				'is_ai_generated': True
 			}
 		)
+
+
+@app.task(name='sync_cisa_kev_catalog', queue='main_scan_queue', bind=False)
+def sync_cisa_kev_catalog():
+	"""
+	Syncs CISA KEV catalog and updates CVE records.
+	"""
+	import requests
+	from startScan.models import CveId
+	url = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+	try:
+		response = requests.get(url, timeout=30)
+		if response.status_code == 200:
+			data = response.json()
+			cve_list = [v.get("cveID") for v in data.get("vulnerabilities", [])]
+			if cve_list:
+				CveId.objects.filter(name__in=cve_list).update(is_cisa_kev=True)
+				logger.info(f"Successfully synced CISA KEV catalog. Updated {len(cve_list)} records.")
+	except Exception as e:
+		logger.error(f"Error syncing CISA KEV catalog: {e}")
+
+
+@app.task(name='run_apme', queue='main_scan_queue', base=RengineTask, bind=True)
+def run_apme(self, scan_history_id):
+	"""
+	Runs the Attack Path Modeling Engine (APME).
+
+	This task runs AFTER both vulnerability_scan and ERL validation to ensure:
+	- All vulnerabilities are discovered and correlated
+	- ERL validation (via Plugin) has updated confidence scores
+	- The graph has the most accurate data for path computation
+
+	Results are persisted to ImpactAssessment for API and frontend consumption.
+	"""
+	if not RENGINE_APME_ENABLED:
+		logger.info("APME is disabled in settings (RENGINE_APME_ENABLED=False). Skipping.")
+		return
+
+	logger.info(f"APME: Initiating attack path modeling for scan_history_id={scan_history_id}")
+	try:
+		from apme.orchestrator import APMEOrchestrator
+		orchestrator = APMEOrchestrator(top_n=5)
+		result = orchestrator.run(scan_history_id)
+		logger.info(
+			f"APME: Completed. Found {result.get('total_paths', 0)} paths, "
+			f"returned top {result.get('returned_paths', 0)}."
+		)
+		return result
+	except Exception as exc:
+		logger.error(f"APME: Task failed for scan {scan_history_id}: {exc}", exc_info=True)
+		return {"error": str(exc), "total_paths": 0, "returned_paths": 0, "paths": []}

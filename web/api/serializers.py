@@ -802,16 +802,29 @@ class VisualiseDataSerializer(serializers.ModelSerializer):
 						'description': 'OS',
 						'children': os})
 
-			if metainfo:
+			if metainfo_data:
 				osint_data.append({
-					'description':'Metainfo',
+					'description': 'Documents',
 					'children': metainfo_data})
 
-			return_data.append({
-				'description':'OSINT',
-				'children': osint_data})
+			if osint_data:
+				return_data.append({
+					'description': 'OSINT',
+					'children': osint_data})
 
 		return return_data
+
+
+class S3BucketSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = S3Bucket
+		fields = '__all__'
+
+
+class OnlySubdomainNameSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Subdomain
+		fields = ['name', 'id']
 
 
 class SubdomainChangesSerializer(serializers.ModelSerializer):
@@ -1060,11 +1073,18 @@ class EndpointOnlyURLsSerializer(serializers.ModelSerializer):
 		fields = ['http_url']
 
 
+class ValidationResultSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = ValidationResult
+		fields = '__all__'
+
+
 class VulnerabilitySerializer(serializers.ModelSerializer):
 
 	discovered_date = serializers.SerializerMethodField()
 	severity = serializers.SerializerMethodField()
 	scan_history = serializers.SerializerMethodField()
+	validation_results = ValidationResultSerializer(many=True, read_only=True)
 
 	def get_discovered_date(self, Vulnerability):
 		return Vulnerability.discovered_date.strftime("%b %d, %Y %H:%M")

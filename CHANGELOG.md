@@ -9,6 +9,23 @@
   - **Safety Guardrails**: Integrated a Redis-based kill-switch mechanisms for safe testing and instant termination to protect target infrastructure.
   - **Telemetry Ingestion**: Real-time aggregation of latency, throughput, and error rate metrics directly into Neo4j for topological node analysis.
   - **Visualization Dashboard**: Created a new React-based interactive UI utilizing Apache ECharts and Nivo to visually represent endpoint resilience, saturation points, and errors across the network.
+- **Exploitation Readiness Layer (ERL)**: Implemented a safe, modular, and production-grade validation layer for vulnerabilities.
+  - **Vulnerability Validation**: Automatically converts potential findings into "Verified" status using non-destructive, containerized validation tools (e.g., safe SQLmap profiles).
+  - **Confidence Scoring**: Integrated a Bayesian confidence engine that aggregates tool results, asset metadata, and tool reliability into a unified confidence score.
+  - **Containerized Sandboxing**: Orchestrated on-demand, ephemeral Docker sandboxes for validation execution to maintain strict isolation.
+  - **Policy-Driven Safety**: Implemented a Policy Engine that enforces safety boundaries, preventing validation on sensitive assets (e.g., .gov, production) or during restricted hours.
+  - **Normalizer & Adapters**: Standardized validation evidence (request/response dumps, payloads) into a unified schema for consistent UI rendering.
+  - **Global Configuration**: Added a global toggle `RENGINE_ERL_ENABLED` and updated all default scan engines to include ERL by default.
+  - **Interactive Evidence Viewer**: Added a new "Validation" column and expandable evidence section in the vulnerability dashboard to display cryptographic-grade proof of findings.
+- **Attack Path Modeling Engine (APME)**: Implemented a production-grade, graph-based attack path modeling system.
+  - **Graph-Based Asset Modeling**: Assets, vulnerabilities, credentials, identities, and capabilities are represented as a normalized Neo4j graph with typed, constraint-validated edges.
+  - **Multi-Algorithm Pathfinding**: Implemented BFS (shortest paths), DFS (deep chains), and Dijkstra (weight-optimal) traversal against Neo4j to discover all feasible attack routes.
+  - **Configuration-Driven Rules Engine**: Attack relationships (e.g., SQLi → DB Access, RCE → Pivot) are derived dynamically from `rules.yaml` — no hardcoded chains.
+  - **Constraint-Aware Validation**: All discovered paths are validated against a ConstraintEngine that enforces authentication requirements, network boundary rules, and privilege levels. Unrealistic paths are silently dropped (fail-safe).
+  - **ERL-Integrated Scoring**: Attack paths are scored using a weighted formula (severity, exploitability, path length, privilege gain). ERL-validated steps receive a confidence boost.
+  - **Validated vs. Inferred Steps**: Each step in a returned path is explicitly tagged as `validated` (ERL-confirmed) or `inferred` (rule-derived) in the output.
+  - **Automated Persistence**: Top attack paths are automatically persisted to `ImpactAssessment` after each scan for API and frontend consumption.
+  - **Pipeline Integration**: `run_apme` is chained after both `vulnerability_scan` and `run_erl` in all standard scan engines, controlled via `RENGINE_APME_ENABLED` setting.
  - **Advanced Web App & API Discovery Pipeline**: Introduced a dedicated reconnaissance engine for deep API discovery, featuring:
  - **Kiterunner**: High-performance API endpoint brute-forcing with custom `.kite` wordlists (`routes-large.kite` by default).
  - **Arjun**: Automated HTTP parameter discovery for identifying hidden API inputs.
@@ -20,6 +37,13 @@
  - Dynamic module configuration via YAML scan engines.
  - Automatic ingestion of discovered subdomains and URLs into the reNgine database.
 - Full Neo4j graph synchronization for OSINT assets.
+- **Multi-Tier Theme System (Hacker, Hybrid, Enterprise)**: Implemented a 3-tier, switchable aesthetic architecture for the React v3 frontend.
+  - **Hacker Theme (Default)**: Optimized the signature cyberpunk look with custom scanline logic and Orbitron-driven typography.
+    - **Aesthetic Refinement**: Applied signature neon pink branding (`rgb(255, 0, 241)`) and red glow effects to the brand logo and version badge across all Cyberpunk profiles (Hacker & Hybrid).
+  - **Hybrid (Modern) Theme**: Introduced a "clean" dark mode that preserves brand-essential neon accents but removes high-intensity background effects.
+  - **Enterprise (Professional) Theme**: Added a new, professional "Slate & Blue" interface using Inter typography and a flat, high-density layout for corporate use cases.
+  - **Functional Token Architecture**: Centralized all theme logic in `tokens.ts`, enabling dynamic injection of CSS variables for fonts, colors, and motion.
+  - **Persistent Selection**: Integrated a `HeaderThemeSwitcher` with `localStorage` persistence and automatic theme propagation via `ThemeContext`.
 - **Cyberpunk V3 "Neon" Dashboard**: Reimagined the entire UI with a premium glassmorphic theme, featuring:
  - Unified dark/neon color palette for enhanced data visualization.
  - Improved sorting and filtering UI for large subdomain datasets.
@@ -32,6 +56,12 @@
 - **Dynamic Model Fetching**: Implemented real-time model discovery for all supported providers, including hardware requirements and expertise insights for local models.
 - **On-Demand Model Loading**: Optimized the AI Hub by fetching available models only when the dropdown is clicked, reducing initial page load overhead.
 - **Legacy API Vault Sync**: Automatically migrates existing OpenAI keys from the legacy API Vault to the new AI Hub configuration.
+- **Enhanced Arjun Parameter Discovery**: 
+  - Implemented configurable HTTP methods (default: GET, POST, JSON, XML, FETCH, PUT, DELETE, PATCH) via Scan Engine YAML.
+  - Added support for `--stable` mode and dynamic thread orchestration.
+  - Resolved `'list' object has no attribute 'items'` parsing error by supporting both list and dictionary output formats from Arjun.
+- **Improved Tool Threading Consistency**: Standardized the use of the `threads` option from engine configurations across all discovery tools in `web_api_discovery` (Arjun, Kiterunner, etc.).
+- **Aquatone Pipeline Stability**: Resolved a `NameError` causing Aquatone task failures by standardizing the `EndPoint` model reference.
 - **404 Page Enhancement**: Added an Interdimensional Rabbit Hole background image for the 404 page.
 - **Production-Ready SSL Serial Retrieval**: Implemented a robust `_get_ssl_serial` function in `waf_utils.py` using the `cryptography` library for reliable origin discovery via Shodan.
   - **Standardized Notification System (Snackbar)**: 
@@ -52,6 +82,17 @@
   - Resolved "node bleeding" where global graph data would pollute individual scan maps.
   - Included a `sync_all_scans` migration utility to retroactively anchor historical data.
   - Added a `reset_graph` Django management command to clear and re-populate the Neo4j database in case of data corruption or schema changes.
+  - **Attack Surface Map v4.0 UI Architecture**:
+    - **Multi-Panel Layout**: Transitioned the visualization area to a multi-panel layout managed by Zustand state architecture (`useGraphStore`).
+    - **Advanced Node Analytics**: Upgraded Cytoscape rendering to dynamically scale node sizes based on degree centrality and highlight critical vulnerabilities.
+    - **Interactive Node Details**: Added a dedicated slide-out panel displaying live graph metrics (centrality, vulnerabilities) with actionable options.
+    - **Blast Radius Computation**: Integrated real-time blast radius calculations using Neo4j APOC, displaying downstream compromised assets.
+    - **AI-Driven Graph Search**: Replaced standard graph search with a mock AI natural language query interface for future conversational exploration.
+- **Enhanced GeoMap Visualization**:
+  - **Custom Tactical Markers**: Replaced broken default Leaflet markers with high-performance CSS-animated pulsing `divIcon` markers, maintaining the "Cyberpunk Hacker" aesthetic.
+  - **Comprehensive Global Mapping**: Integrated an external `countryCentroids.ts` database covering all ISO-2 country codes for high-precision asset positioning.
+  - **Improved Interaction Layer**: Replaced unsupported React-based marker children with native `react-leaflet` `Tooltip` components for reliable hover interactions and tactical styling.
+  - **Visual Polish**: Added dedicated `.map-marker-pulse` and `.tactical-tooltip` global CSS styles for smooth animations and premium UI consistency.
   - **Vulnerability Impact Intelligence**: Integrated AI-driven impact assessment and graph-based attack path visualization:
     - **AI-Driven Impact Assessment**: Automated generation of potential impact narratives and remediation priorities using LLMs (OpenAI, Anthropic, Gemini, Ollama).
     - **Attack Path Visualization**: Interactive Cytoscape.js-powered graph showing the full exploit chain from root domain to vulnerability.
@@ -74,6 +115,7 @@
     - **ReconX Auxiliary Discovery**: Integrated ReconX into the `monitor_tasks.py` pipeline to complement existing subdomain discovery and OSINT tools. ReconX findings are automatically parsed and mapped to `MonitoringDiscovery` nodes for consolidated asset tracking.
 - **Build & Infrastructure**:
     - **ReconX Installation Fix**: Corrected the Go installation path for ReconX in `web/Dockerfile` (appended `/cmd/reconx`) to resolve module package errors.
+    - **Proxy Orchestration Fix**: Resolved host resolution errors in the `proxy` container by aligning network aliases in `docker-compose.yml` with the Nginx configuration. Fixed deprecated `http2` directives in `rengine.conf`.
 - **Frontend Security & Resilience**: 
     - **Centralized Auth Architecture**: Implemented a robust `AuthContext` and `AuthProvider` to manage user sessions and state globally.
     - **Protected Route Guards**: Integrated TanStack Router `beforeLoad` hooks to enforce authentication across all sensitive application routes.
@@ -87,20 +129,61 @@
   - **Target List Menu**: Enhanced the Targets list with a tactical row menu featuring an "INITIATE SCAN" (Rescan) action for better workflow consistency.
   - **Scan Detail Header Action**: Added a primary "RESCAN" button to the Scan Detail header, allowing users to quickly restart discovery from the summary view.
   - **UI/UX Stability**: Resolved critical state race conditions where menu actions would fail due to premature cleanup of active identifiers.
-  - **Modular Scan Initiation**: Correctly linked all Rescan triggers to the `StartScanModal` and `useInitiateScan` orchestration layer, ensuring full parity with standard manual scan initiation.
+  - **Modular Scan Initiation**: Corrected all Rescan triggers to the `StartScanModal` and `useInitiateScan` orchestration layer, ensuring full parity with standard manual scan initiation.
 - **Integrated Attack Surface Map Navigation**: 
   - Properly integrated the Attack Surface Map feature into the Scan History page.
   - Replaced the broken `window.open` placeholder with a dedicated, SPA-managed `AttackSurfacePage`.
   - Implemented a new route `/$projectSlug/attack_surface/$scanId` to host the cytoscape-based visualization.
   - Enhanced the UI with navigation breadcrumbs and scan-specific metadata for better context.
+- **Security Hardening (v3)**:
+    - **Path Traversal Fix**: Secured `serve_protected_media` in `reNgine/views.py` using the existing `is_safe_path` utility to prevent `../` directory traversal attacks (LFI).
+    - **CSRF & API Method Hardening**: Migrated project creation from an unsafe `GET` request (vulnerable to CSRF via URL) to a secure `POST` request with proper CSRF token validation in both frontend (`projects/api.ts`) and backend (`CreateProjectApi`).
+    - **Frontend XSS Prevention**: Hardened `monitoring/utils/formatters.ts` to use `DOMPurify` for all dynamic content sanitization, added prototype pollution protection in JSON parsing, and applied strict type-checking before accessing object properties.
+    - **Django Security Headers**: Enabled `SECURE_CONTENT_TYPE_NOSNIFF`, `SECURE_BROWSER_XSS_FILTER`, `X_FRAME_OPTIONS = DENY`, `SECURE_REFERRER_POLICY`, and secure `SESSION_COOKIE_HTTPONLY`. Configurable HTTPS/HSTS settings via `.env` (`RENGINE_HTTPS`, `SECURE_HSTS_SECONDS`).
+    - **ALLOWED_HOSTS Hardening**: `ALLOWED_HOSTS` is now configurable via the `ALLOWED_HOSTS` environment variable (defaults to `*`; must be set to specific domains in production).
+    - **DRF Rate Limiting**: Added global REST framework throttle classes (20/min anonymous, 200/min authenticated) to protect API endpoints from brute-force attacks.
+    - **Role-Based Authorization Fix**: Corrected the `IsAuditor` DRF permission class which was incorrectly granting write access to all authenticated users. Auditors are now correctly restricted to read-only (`SAFE_METHODS`) access; `IsSysAdmin`, `IsPenetrationTester`, and `IsAuditor` role documentation updated to reflect the three-tier hierarchy.
+    - **Command Injection Mitigation**: Replaced all `run_command.run(f'touch {path}', shell=True)` subprocess calls in `GetFileContents` with safe Python-native `pathlib.Path.touch()` calls. Fixed `delete_target` in `targetApp/views.py` to use `shutil.rmtree` on a validated path instead of `rm -rf {obj.name}*` with `shell=True`.
+- **Restored Visual Evidence Pipeline (Screenshots)**: 
+  - **Frontend Integration**: Implemented a dedicated `ScreenshotsTab` component in the `ScanDetailPage`, replacing the broken placeholder.
+  - **Tactical Gallery UI**: Created a premium, responsive masonry-style gallery for screenshot thumbnails with hover effects and data labels.
+  - **Secure Media Delivery**: Integrated authenticated image fetching via the `/media/` endpoint, protected by Django session-auth and Nginx `X-Accel-Redirect`.
+  - **Interactive Lightbox**: Added a high-fidelity image overlay (lightbox) for full-size screenshot inspection with dismiss-on-click functionality.
+  - **API Optimization**: Updated the `SubdomainsViewSet` to support an `only_screenshot` filter, significantly reducing payload size for the visual gallery.
+  - **Backend Validation**: Verified and hardened the EyeWitness result ingestion pipeline (`Requests.csv` parsing) in `tasks.py` to ensure reliable DB synchronization.
 - **Proxy & Vault Persistence Stability**:
   - Resolved missing `CircularProgress` import in `ProxySettingsPage.tsx` that caused frontend build failures.
   - Fixed Acunetix (AWVS) configuration persistence bug by correctly mapping `acunetix_url` and `acunetix_key` in the `useUpdateApiVault` mutation.
   - Synchronized frontend `FormData` keys with backend expectations (`key_acunetix_url`, `key_acunetix_key`).
   - Improved UI responsiveness for rescan actions and proxy fetching with immediate Snackbar feedback.
+- **Bounty Hub Migration**: Completed the transition of the HackerOne Bounty Hub to the new React v3 architecture.
+    - **Bulk Program Import**: Implemented a modern, persistent floating action bar for bulk importing programs into current projects.
+    - **Asset Accordion Detail View**: Refactored the program details modal with grouped accordion views for organized asset browsing (Domain, IP, URL).
+    - **Integrated Target Management**: Added "Add Target" functionality directly within the Bounty Hub asset list for immediate orchestration.
+    - **HackerOne Metadata Enrichment**: Program cards now feature "Since" date, currency indicators, and "Open Scope"/"New" status badges.
+    - **Standardized Tactical Feedback**: Integrated the global Snackbar system for all import and asset addition actions.
+- **OSINT Intelligence Dashboard**: Implemented a comprehensive reconnaissance data visualization suite:
+    - **Modular OSINT Tab**: Integrated a new, tactical dashboard into the Scan Detail view to aggregate and visualize discovery data.
+    - **Email & Credential Exposure**: Displays discovered email addresses and associated leaked credentials in a secure, copy-able table.
+    - **Employee Insights**: Visualizes discovered professional personnel and their designations in a responsive card grid.
+    - **Search Engine Dorking Results**: Consolidated view of all search engine discovery URLs with direct links to findings.
+    - **Document Metadata Analysis**: Detailed table of metadata (Author, OS, Creation Software) extracted from public documents via MetaFinder.
+    - **Automated Dork Generation**: Introduced an "Autogenerate Dorks" feature in the scan initiation modal to programmatically build sensitive search queries for any target domain.
+- **Plugin Orchestration System**: Introduced a powerful, modular system to extend reNgine with custom engines and UI.
+  - **Dynamic Task Injection**: Implemented `PluginOrchestrator` to inject custom tasks into Celery scan chains at specific anchor points (e.g., after Vulnerability Scan).
+  - **Pipeline Builder**: Created a drag-and-drop UI for reordering plugins relative to core engines.
+  - **Atomic Installation**: Developed a secure installation system with automated database backups and rollback mechanisms for plugin management.
+  - **Dynamic UI Modules**: Enabled runtime injection of custom React components into scan detail pages via ESM module loading.
+  - **Plugin Registry**: Full CRUD support for plugin management, including enabling/disabling and metadata tracking.
+- **Frontend Bundle Optimization**: Implemented granular manual chunking in Vite to split massive vendor libraries into smaller, more manageable bundles.
+- **Route-Level Code Splitting**: Implemented lazy loading for all major tactical pages using TanStack Router's `lazyRouteComponent`, significantly reducing the initial application payload.
+- **Automated Startup Synchronization**:
+  - Implemented a robust, Redis-locked startup sequence in Celery to ensure essential datasets are synchronized when the system comes online.
+  - **Graph Sync**: Automatically triggers a global Attack Surface graph synchronization (`sync_all_scans_to_graph`) upon system startup.
+  - **CISA KEV Sync**: Automatically fetches and updates the Known Exploited Vulnerabilities (KEV) catalog (`sync_cisa_kev_catalog`) to ensure vulnerability intelligence is available immediately.
+  - **Distributed Locking**: Uses Redis-based mutexes (`rengine:startup_graph_sync_lock` and `rengine:startup_kev_sync_lock`) to ensure tasks run exactly once across multi-worker deployments.
 
 ### Bug Fixes
-- **Login/Logout Stability**: Resolved a critical "white page" crash by optimizing Vite development script loading in `v3_index.html` and expanding the `vite.config.ts` proxy to correctly handle authentication endpoints.
 - **SPA Navigation Hardening**: Replaced legacy `window.location.href` redirects in `LogoutPage.tsx` with TanStack Router's `navigate` to maintain application state and prevent unnecessary full-page reloads.
 - **Automated Infrastructure Stability**: Integrated `custom_engines` directory creation into the Docker build and entrypoint processes to prevent runtime `FileNotFoundError` during engine initialization.
 - **LLM Report Generation Dependency**: Fixed a `TypeError` in `create_report` where the `LLMReportGenerator` was missing its required `logger` dependency.

@@ -596,6 +596,28 @@ def get_impact_assessment_details(request, slug, vuln_id):
     return JsonResponse({'status': False, 'message': 'No assessment found.'})
 
 
+def get_node_details(request, slug, node_id):
+    graph = Neo4jManager()
+    data = graph.get_node_details(node_id)
+    graph.close()
+    return JsonResponse(data)
+
+
+def get_blast_radius(request, slug, node_id):
+    graph = Neo4jManager()
+    data = graph.get_blast_radius(node_id)
+    graph.close()
+    return JsonResponse(data)
+
+
+@ensure_csrf_cookie
+def generate_ticket(request, slug, node_id):
+    if request.method == 'POST':
+        # Mock ticket generation
+        return JsonResponse({'status': True, 'message': f'Ticket for node {node_id} has been generated in Jira/ServiceNow.'})
+    return JsonResponse({'status': False, 'message': 'Invalid request method.'})
+
+
 @ensure_csrf_cookie
 def login_v3(request):
     if request.method == 'POST':

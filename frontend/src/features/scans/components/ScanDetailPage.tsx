@@ -75,7 +75,8 @@ import {
   Key,
   X,
   Copy,
-  RefreshCw
+  RefreshCw,
+  GitBranch
 } from 'lucide-react';
 import { useScanSummary, useActivityLogs } from '../api';
 import Chart from 'react-apexcharts';
@@ -89,8 +90,14 @@ import { VulnerabilityTable } from '../../vulnerabilities/components/Vulnerabili
 import { SecretLeaksTab } from './SecretLeaksTab';
 import { AttackSurfaceTab } from './AttackSurfaceTab';
 import VisualizationTab from './VisualizationTab';
+import { ScreenshotsTab } from './ScreenshotsTab';
 import { ScanReportModal } from './ScanReportModal';
 import { StartScanModal } from './StartScanModal';
+import { OsintTab } from './OsintTab';
+import { AttackPathsTab } from './AttackPathsTab';
+import { usePlugins } from '../../plugins/api/pluginsApi';
+import PluginComponent from '../../plugins/components/PluginComponent';
+import PluginComponentLoader from '../../plugins/components/PluginComponentLoader';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   const configs: any = {
@@ -356,7 +363,7 @@ const TimelineItem: React.FC<{ activity: any, onClick?: () => void }> = ({ activ
             height: 4,
             borderRadius: '50%',
             bgcolor: config.color,
-            animation: 'pulse 1.5s infinite'
+            opacity: 0.8
           }} />
         )}
       </Box>
@@ -745,6 +752,7 @@ const DiscoveredTechWidget: React.FC<{ techs: any[], sx?: any }> = ({ techs = []
 export const ScanDetailPage = () => {
   const { projectSlug, scanId } = useParams({ from: '/$projectSlug/scan/detail/$scanId' });
   const { data, isLoading } = useScanSummary(projectSlug, parseInt(scanId));
+  const { data: plugins } = usePlugins();
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -765,7 +773,7 @@ export const ScanDetailPage = () => {
     );
   }
 
-  const tabs = [
+  const baseTabs = [
     { label: 'HOME', icon: Activity },
     { label: 'SUBDOMAINS', icon: Globe },
     { label: 'BUCKETS', icon: Database, show: data.buckets_count > 0 },
@@ -776,10 +784,29 @@ export const ScanDetailPage = () => {
     { label: 'EXPLOITS', icon: Zap, show: data.exploitable_count > 0 },
     { label: 'OSINT', icon: Search, show: data.scan_info.tasks?.includes('osint') },
     { label: 'LEAKS', icon: Shield },
+    { label: 'ATTACK PATHS', icon: GitBranch, show: data.vulnerability_count > 0 },
     { label: 'ATTACK SURFACE', icon: MapIcon },
     { label: 'RECON NOTES', icon: FileText },
     { label: 'VISUALIZATION', icon: BarChart2 },
   ].filter(t => t.show !== false);
+
+  // Inject Plugin Tabs
+  const pluginTabs: any[] = [];
+  plugins?.forEach(plugin => {
+    if (plugin.is_enabled && plugin.manifest?.ui?.tabs) {
+      plugin.manifest.ui.tabs.forEach((tab: any) => {
+        pluginTabs.push({
+          label: tab.label,
+          icon: Zap, // Default icon for plugins, could be dynamic
+          isPlugin: true,
+          pluginSlug: plugin.slug,
+          componentFile: tab.file
+        });
+      });
+    }
+  });
+
+  const tabs = [...baseTabs, ...pluginTabs];
 
   const renderSidebar = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -1118,51 +1145,7 @@ export const ScanDetailPage = () => {
   );
 
   const renderOSINT = () => (
-    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%' }}>
-      <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, width: '100%' }}>
-        <TacticalPanel title="Employees/People Found" icon={<Users size={14} />}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-                <TableRow>
-                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>NAME</TableCell>
-                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>DESIGNATION</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {/* This would be populated from data.employees if available */}
-                <TableRow>
-                  <TableCell colSpan={2} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO EMPLOYEE DATA FOUND</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </TacticalPanel>
-        <TacticalPanel title="Discovered Email Addresses" icon={<Mail size={14} />}>
-          <TableContainer>
-            <Table size="small">
-              <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
-                <TableRow>
-                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>EMAIL</TableCell>
-                  <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>EXPOSED</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {/* This would be populated from data.emails if available */}
-                <TableRow>
-                  <TableCell colSpan={2} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO EMAIL DATA FOUND</TableCell>
-                </TableRow>
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </TacticalPanel>
-      </Box>
-      <TacticalPanel title="Dorking Results" icon={<Search size={14} />}>
-        <Box sx={{ p: 4, textAlign: 'center' }}>
-          <Typography sx={{ color: 'rgba(255,255,255,0.2)' }}>OSINT MODULE DATA COMING SOON</Typography>
-        </Box>
-      </TacticalPanel>
-    </Box>
+    <OsintTab data={data} />
   );
 
   const renderLeaks = () => (
@@ -1210,7 +1193,12 @@ export const ScanDetailPage = () => {
   );
 
   const renderVulnerabilities = () => (
-    <VulnerabilityTable projectSlug={projectSlug} scanId={parseInt(scanId)} />
+    <PluginComponent 
+      name="VulnerabilityTable" 
+      default={VulnerabilityTable} 
+      projectSlug={projectSlug} 
+      scanId={parseInt(scanId)} 
+    />
   );
 
   return (
@@ -1407,14 +1395,25 @@ export const ScanDetailPage = () => {
                 {tabs[activeTab]?.label === 'URLS' && renderEndpoints()}
                 {tabs[activeTab]?.label === 'VULNERABILITIES' && renderVulnerabilities()}
                 {tabs[activeTab]?.label === 'BUCKETS' && renderBuckets()}
+                {tabs[activeTab]?.label === 'SCREENSHOTS' && <ScreenshotsTab projectSlug={projectSlug} scanId={parseInt(scanId)} />}
                 {tabs[activeTab]?.label === 'OSINT' && renderOSINT()}
                 {tabs[activeTab]?.label === 'LEAKS' && renderLeaks()}
                 {tabs[activeTab]?.label === 'ATTACK SURFACE' && renderAttackSurface()}
                 {tabs[activeTab]?.label === 'VISUALIZATION' && renderVisualization()}
                 {tabs[activeTab]?.label === 'RECON NOTES' && <ReconNotesWidget notes={data.todo_notes} />}
+                {tabs[activeTab]?.label === 'ATTACK PATHS' && <AttackPathsTab scanId={parseInt(scanId)} />}
                 {tabs[activeTab]?.label === 'EXPLOITS' && renderExploits()}
 
-                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION'].includes(tabs[activeTab]?.label) && (
+                {tabs[activeTab]?.isPlugin && (
+                  <PluginComponentLoader 
+                    pluginSlug={tabs[activeTab].pluginSlug}
+                    componentFile={tabs[activeTab].componentFile}
+                    scanId={parseInt(scanId)}
+                    projectSlug={projectSlug}
+                  />
+                )}
+
+                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'SCREENSHOTS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION', 'ATTACK PATHS'].includes(tabs[activeTab]?.label) && !tabs[activeTab]?.isPlugin && (
                   <Box sx={{ p: 4, textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 2 }}>
                     <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE STAGING AREA: {tabs[activeTab]?.label}</Typography>
                     <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem', mt: 1 }}>SYNCHRONIZING DATA FROM LEGACY INTERFACE...</Typography>

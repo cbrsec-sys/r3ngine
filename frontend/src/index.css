@@ -1,10 +1,7 @@
 :root {
-  --primary: #00f3ff;
-  --secondary: #ff00ff;
-  --bg-dark: #05050a;
-  --glass: rgba(10, 10, 15, 0.7);
-  --heading: 'Orbitron', sans-serif;
-  --body: 'Inter', sans-serif;
+  --r3-heading-font: 'Orbitron', sans-serif;
+  --r3-body-font: 'Inter', sans-serif;
+  --r3-transition: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 * {
@@ -18,17 +15,16 @@ body {
   margin: 0;
   padding: 0;
   overflow-x: hidden;
-  background-color: #05050a;
 }
 
 body {
-  font-family: var(--body);
-  color: #fff;
+  font-family: var(--r3-body-font);
   line-height: 1.6;
+  transition: background-color 0.4s var(--r3-transition);
 }
 
-/* Grain Effect Layer */
-body::after {
+/* Grain Effect Layer - Only active in Hacker theme */
+body.cyber-noise::after {
   content: "" !important;
   display: block !important;
   position: fixed !important;
@@ -39,42 +35,29 @@ body::after {
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E") !important;
   background-size: 100px 100px !important;
   background-repeat: repeat !important;
-  opacity: 0.35 !important;
-  z-index: 99999 !important;
+  opacity: 0.2 !important;
+  z-index: 9999 !important;
   pointer-events: none !important;
   mix-blend-mode: overlay !important;
-  filter: contrast(150%) brightness(100%) !important;
-  animation: scanline-move 5s linear infinite !important;
-}
-
-@keyframes scanline-move {
-  0% {
-    background-position: 0 0;
-  }
-
-  100% {
-    background-position: 0 100%;
-  }
+  filter: contrast(120%) brightness(100%) !important;
 }
 
 h1,
-h2 {
-  font-family: var(--heading);
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--r3-heading-font);
   text-transform: uppercase;
-  letter-spacing: 2px;
+  letter-spacing: 1px;
 }
 
 .neon-text {
-  color: var(--primary);
   text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
 }
 
-.MuiBox-root {
-  /* background-color: #0000002b; */
-}
-
 .glass-panel {
-  background: var(--glass);
   backdrop-filter: blur(20px);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 12px;
@@ -86,14 +69,62 @@ h2 {
 }
 
 ::-webkit-scrollbar-track {
-  background: #05050a;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1a1a25;
+  background: rgba(255, 255, 255, 0.1);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--primary);
+  background: rgba(255, 255, 255, 0.2);
+}
+/* Map Marker Pulse */
+@keyframes mapPulse {
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 243, 255, 0.7); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 243, 255, 0); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 243, 255, 0); }
+}
+
+.map-marker-pulse {
+  background: #00f3ff;
+  border-radius: 50%;
+  height: 10px;
+  width: 10px;
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+  animation: mapPulse 2s infinite;
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+/* Tactical Map Tooltip */
+.leaflet-tooltip.tactical-tooltip {
+  background-color: rgba(5, 5, 20, 0.9) !important;
+  border: 1px solid rgba(0, 243, 255, 0.3) !important;
+  border-radius: 4px !important;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.5) !important;
+  color: #fff !important;
+  padding: 0 !important;
+  font-family: 'Orbitron', sans-serif !important;
+}
+
+.leaflet-tooltip-top.tactical-tooltip:before {
+  border-top-color: rgba(0, 243, 255, 0.3) !important;
+}
+
+@keyframes tacticalPulse {
+  0%, 100% { transform: scale(1); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
+.tactical-pulse-dots > div {
+  animation: tacticalPulse 1.5s infinite ease-in-out;
+}
+
+.tactical-pulse-dots > div:nth-of-type(2) {
+  animation-delay: 0.2s;
+}
+
+.tactical-pulse-dots > div:nth-of-type(3) {
+  animation-delay: 0.4s;
 }

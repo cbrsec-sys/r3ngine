@@ -25,40 +25,41 @@ export const StressTestingPage: React.FC = () => {
 
   // Filter data based on selected endpoint for general charts if needed, 
   // or pass full data and let charts handle their own filtering
-  const filteredData = selectedEndpoint ? data.filter(d => d.endpoint === selectedEndpoint) : data;
+  // TODO: Properly type data and d variable used in data.filter
+  const filteredData = selectedEndpoint ? data.filter((d: any) => d.endpoint === selectedEndpoint) : data;
 
   return (
     <div className="flex flex-col gap-6 p-6">
       <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-             <RouterLink to={`/${projectSlug}/scan/detail/${scanId}`} className="text-gray-400 hover:text-[#00f3ff] transition-colors">
-                 <ArrowLeft size={24} />
-             </RouterLink>
-             <h2 className="text-2xl font-bold text-gray-100">Adaptive Stress & Resilience Analysis</h2>
-          </div>
-          <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors">
-             Export Report Snapshot
-          </button>
+        <div className="flex items-center gap-4">
+          <RouterLink to={`/${projectSlug}/scan/detail/${scanId}`} className="text-gray-400 hover:text-[#00f3ff] transition-colors">
+            <ArrowLeft size={24} />
+          </RouterLink>
+          <h2 className="text-2xl font-bold text-gray-100">Adaptive Stress & Resilience Analysis</h2>
+        </div>
+        <button className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm font-medium transition-colors">
+          Export Report Snapshot
+        </button>
       </div>
 
       {/* Primary KPI Cards (Mocked for layout) */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-gray-900 border border-gray-800 p-4 rounded-lg">
-             <div className="text-sm text-gray-400 mb-1">Max Concurrent Users</div>
-             <div className="text-2xl font-bold text-white">500</div>
-          </div>
-          <div className="bg-gray-900 border border-gray-800 p-4 rounded-lg">
-             <div className="text-sm text-gray-400 mb-1">Peak Throughput</div>
-             <div className="text-2xl font-bold text-green-400">1,240 RPS</div>
-          </div>
-          <div className="bg-gray-900 border border-gray-800 p-4 rounded-lg">
-             <div className="text-sm text-gray-400 mb-1">Global Error Rate</div>
-             <div className="text-2xl font-bold text-red-400">2.4%</div>
-          </div>
-          <div className="bg-gray-900 border border-gray-800 p-4 rounded-lg">
-             <div className="text-sm text-gray-400 mb-1">Endpoints Saturated</div>
-             <div className="text-2xl font-bold text-yellow-400">3 / 15</div>
-          </div>
+        <div className="bg-gray-900 border border-gray-800 p-4 rounded-lg">
+          <div className="text-sm text-gray-400 mb-1">Max Concurrent Users</div>
+          <div className="text-2xl font-bold text-white">500</div>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 p-4 rounded-lg">
+          <div className="text-sm text-gray-400 mb-1">Peak Throughput</div>
+          <div className="text-2xl font-bold text-green-400">1,240 RPS</div>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 p-4 rounded-lg">
+          <div className="text-sm text-gray-400 mb-1">Global Error Rate</div>
+          <div className="text-2xl font-bold text-red-400">2.4%</div>
+        </div>
+        <div className="bg-gray-900 border border-gray-800 p-4 rounded-lg">
+          <div className="text-sm text-gray-400 mb-1">Endpoints Saturated</div>
+          <div className="text-2xl font-bold text-yellow-400">3 / 15</div>
+        </div>
       </div>
 
       {/* Main Charts Row */}
@@ -76,10 +77,10 @@ export const StressTestingPage: React.FC = () => {
       {/* Table and Drilldown */}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         <div className="xl:col-span-1">
-           <EndpointTable data={data} />
+          <EndpointTable data={data} />
         </div>
         <div className="xl:col-span-2">
-           <DrilldownPanel data={data} />
+          <DrilldownPanel data={data} />
         </div>
       </div>
     </div>

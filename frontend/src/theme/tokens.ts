@@ -19,36 +19,47 @@ export const themeTokens = {
       },
     },
   },
-  clean: {
+  modern: { // Hybrid Theme
     bg: {
-      primary: '#0f172a',
-      secondary: '#1e293b',
-      glass: 'rgba(30, 41, 59, 0.7)',
+      primary: '#0f172a', // Slate 900
+      secondary: '#1e293b', // Slate 800
+      glass: 'rgba(15, 23, 42, 0.8)',
     },
-    primary: '#00d2ff',
-    secondary: '#3a7bd5',
-    text: '#f8fafc',
-    border: 'rgba(0, 210, 255, 0.2)',
-    hover: 'rgba(0, 210, 255, 0.1)',
+    neon: {
+      cyan: '#00f3ff',
+      pink: '#ff00ff',
+      purple: '#bc13fe',
+    },
+    cyber: {
+      text: '#f8fafc',
+      border: 'rgba(0, 243, 255, 0.15)',
+      glow: {
+        cyan: '0 0 10px rgba(0, 243, 255, 0.2)',
+        pink: '0 0 10px rgba(255, 0, 255, 0.2)',
+      },
+    },
   },
-  script_kiddie: {
+  enterprise: { // Professional Theme
     bg: {
-      primary: '#0a0a0f',
-      secondary: '#15151e',
-      glass: 'rgba(21, 21, 30, 0.8)',
+      primary: '#f8fafc', // Slate 50 (Light mode feel but keeping dark if needed, let's use dark slate for consistency with app logic)
+      secondary: '#ffffff',
     },
-    primary: '#ff00ff',
-    secondary: '#00ffff',
-    text: '#ffffff',
-    border: 'rgba(255, 0, 255, 0.4)',
-    glow: '0 0 8px rgba(255, 0, 255, 0.5)',
-    hover: 'rgba(255, 0, 255, 0.15)',
+    // We'll use a deep professional blue palette
+    palette: {
+      primary: '#0284c7', // Sky 600
+      secondary: '#475569', // Slate 600
+      background: '#f8fafc',
+      paper: '#ffffff',
+      text: '#0f172a',
+      border: '#e2e8f0',
+    }
   },
   effects: {
     blur: 'blur(14px)',
     radius: '18px',
+    bezier: 'cubic-bezier(0.32, 0.72, 0, 1)',
   }
 };
 
-export type ThemeType = 'hacker' | 'clean' | 'script_kiddie';
+export type ThemeType = 'hacker' | 'modern' | 'enterprise' | 'clean' | 'script_kiddie';
 
