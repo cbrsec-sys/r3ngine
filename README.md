@@ -29,7 +29,7 @@
 </p>
 <h4>r3ngine 3.0.0 is released!</h4>
 <p>
-  r3ngine 3.0.0 marks the official branding transition and production stabilization. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Interactive KPI Reports</b> with internal navigation, <b>Scoped Attack Surface Visualization</b>, and a comprehensive <b>OSINT Intelligence Dashboard</b>. Built on the massive v3.0 core, it includes the <b>Advanced Web App & API Discovery Pipeline</b>, full <b>Spiderfoot OSINT Integration</b>, and a dedicated <b>LLM Toolkit</b> for AI-assisted vulnerability analysis.
+  r3ngine 3.0.0 marks the official rebirth and production stabilization. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Interactive KPI Reports</b> with internal navigation, and <b>Scoped Attack Surface Visualization</b>. Built on the massive v3.0 core, it includes the <b>Advanced Web App & API Discovery Pipeline</b>, full <b>Spiderfoot OSINT Integration</b>, and a dedicated <b>LLM Toolkit</b> for AI-assisted vulnerability analysis.
 </p>
 
 <h4>What is r3ngine?</h4>
