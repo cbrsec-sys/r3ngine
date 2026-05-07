@@ -285,7 +285,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
             return (
               <React.Fragment key={item.title}>
-                <ListItem disablePadding sx={{ mb: 0.5 }}>
+                <ListItem disablePadding sx={{ mb: '-5px' }}>
                   <ListItemButton
                     {...(hasChildren ? {
                       onClick: () => handleToggle(item.title)
