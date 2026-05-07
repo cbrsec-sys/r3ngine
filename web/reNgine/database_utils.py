@@ -172,11 +172,16 @@ def store_ip(ip_address, project, description, h1_team_handle):
 		logger.info(f'Added new domain {domain.name}')
 	
 	ip_data = get_ip_info(ip_address)
-	ip_data = get_ip_info(ip_address)
 	ip, created = IpAddress.objects.get_or_create(address=ip_address)
 	ip.reverse_pointer = ip_data.reverse_pointer
 	ip.is_private = ip_data.is_private
 	ip.version = ip_data.version
+	
+	# Trigger geo localization
+	if created or ip.geo_iso is None:
+		from reNgine.tasks import geo_localize
+		geo_localize.delay(ip_address, ip_id=ip.id)
+		
 	ip.save()
 
 	return domain

@@ -1,36 +1,87 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import axios from '../../../api/axiosConfig';
+import { getCsrfToken } from '../../../api/axiosConfig';
 import type { SubdomainResponse } from '../types';
 
 export const useSubdomains = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, onlyDirectory = false, targetId?: number) => {
   return useQuery<SubdomainResponse>({
     queryKey: ['subdomains', projectSlug, page, searchQuery, scanId, onlyDirectory, targetId],
     queryFn: async () => {
-      const url = new URL(`${window.location.origin}/api/listDatatableSubdomain/`);
-      url.searchParams.append('project', projectSlug);
-      url.searchParams.append('page', page.toString());
-      if (searchQuery) {
-        url.searchParams.append('search[value]', searchQuery);
-      }
-      if (scanId) {
-        url.searchParams.append('scan_id', scanId.toString());
-      }
-      if (targetId) {
-        url.searchParams.append('target_id', targetId.toString());
-      }
-      if (onlyDirectory) {
-        url.searchParams.append('only_directory', 'true');
-      }
-      url.searchParams.append('format', 'json');
-
-      const response = await fetch(url.toString(), {
-        credentials: 'include'
+      const response = await axios.get('/api/listDatatableSubdomain/', {
+        params: {
+          project: projectSlug,
+          page: page.toString(),
+          'search[value]': searchQuery,
+          scan_id: scanId?.toString(),
+          target_id: targetId?.toString(),
+          only_directory: onlyDirectory ? 'true' : undefined,
+          format: 'json'
+        }
       });
-      
-      if (!response.ok) {
-        throw new Error('Network response was not ok');
-      }
-      return response.json();
+      return response.data;
     },
     enabled: !!projectSlug,
   });
 };
+
+export const useInitiateSubscan = () => {
+  return useMutation({
+    mutationFn: async (params: { engine_id: number; tasks: string[]; subdomain_ids: number[] }) => {
+      const response = await axios.post('/api/action/initiate/subtask/', params, {
+        headers: {
+          'X-CSRFToken': getCsrfToken()
+        }
+      });
+      return response.data;
+    },
+  });
+};
+
+export const useGPTAttackSurface = () => {
+  return useMutation({
+    mutationFn: async (subdomainId: number) => {
+      const response = await axios.get('/api/tools/gpt_get_possible_attacks/', {
+        params: {
+          format: 'json',
+          subdomain_id: subdomainId
+        }
+      });
+      return response.data;
+    },
+  });
+};
+
+export const useDeleteSubdomain = (projectSlug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (subdomain_ids: number[]) => {
+      const response = await axios.post('/api/action/subdomain/delete/', { subdomain_ids }, {
+        headers: {
+          'X-CSRFToken': getCsrfToken()
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subdomains', projectSlug] });
+    },
+  });
+};
+
+export const useToggleSubdomainImportant = (projectSlug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await axios.post('/api/toggle/subdomain/important/', { subdomain_id: id }, {
+        headers: {
+          'X-CSRFToken': getCsrfToken()
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['subdomains', projectSlug] });
+    },
+  });
+};
+

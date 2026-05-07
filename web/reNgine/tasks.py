@@ -13,7 +13,7 @@ import concurrent.futures
 import base64
 
 from datetime import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from api.serializers import SubdomainSerializer
 from celery import chain, chord, group
 from celery.result import allow_join_result
@@ -33,7 +33,7 @@ from reNgine.definitions import *
 from reNgine.settings import *
 from reNgine.llm import *
 from reNgine.utilities import *
-from reNgine.opsec_utils import OpSecManager, BruteForceOrchestrator
+from reNgine.opsec_utils import OpSecManager, BruteForceOrchestrator, ProxychainsWrapper
 from reNgine.waf_utils import OriginDiscoveryManager, WafBypassOrchestrator
 from scanEngine.models import (EngineType, InstalledExternalTool, Notification, Proxy, OpSec)
 from startScan.models import *
@@ -42,6 +42,7 @@ from targetApp.models import Domain
 from dashboard.models import AcunetixAPIKey
 from reNgine.monitor_tasks import *
 from reNgine.graph_utils import Neo4jManager
+from reNgine.vulnerability_tasks import *
 from reNgine.stress_testing_tasks import run_stress_testing
 try:
 	from acunetix import Acunetix
@@ -632,7 +633,8 @@ def subdomain_discovery(
 				shell=True,
 				history_file=self.history_file,
 				scan_id=self.scan_id,
-				activity_id=self.activity_id)
+				activity_id=self.activity_id,
+				proxy=proxy if tool not in ['amass-passive', 'amass-active', 'subfinder'] else None)
 		except Exception as e:
 			logger.error(
 				f'Subdomain discovery tool "{tool}" raised an exception')
@@ -1576,6 +1578,7 @@ def screenshot(self, ctx={}, description=None):
 	send_output_file = notification.send_scan_output_file if notification else False
 
 	# Run cmd
+	proxy = get_random_proxy()
 	cmd = f'/usr/src/github/EyeWitness/eyewitness-venv/bin/python /usr/src/github/EyeWitness/Python/EyeWitness.py -f {alive_endpoints_file} -d {screenshots_path} --no-prompt'
 	cmd += f' --timeout {timeout}' if timeout > 0 else ''
 	cmd += f' --threads {threads}' if threads > 0 else ''
@@ -1584,7 +1587,8 @@ def screenshot(self, ctx={}, description=None):
 		shell=False,
 		history_file=self.history_file,
 		scan_id=self.scan_id,
-		activity_id=self.activity_id)
+		activity_id=self.activity_id,
+		proxy=proxy)
 	if not os.path.isfile(output_path):
 		logger.error(f'Could not load EyeWitness results at {output_path} for {self.domain.name}.')
 		return
@@ -1818,6 +1822,7 @@ def port_scan(self, hosts=[], ctx={}, description=None):
 			ctx_nmap = ctx.copy()
 			ctx_nmap['description'] = get_task_title(f'nmap_{host}', self.scan_id, self.subscan_id)
 			ctx_nmap['track'] = False
+			ctx_nmap['activity_id'] = self.activity_id
 			sig = nmap.si(
 				cmd=nmap_cmd,
 				ports=port_list,
@@ -2017,9 +2022,17 @@ def waf_detection(self, ctx={}, description=None):
 		
 		if origin_ips:
 			# Store the first one as primary origin_ip
-			subdomain_query.origin_ip = origin_ips[0]
+			primary_origin = origin_ips[0]
+			subdomain_query.origin_ip = primary_origin
 			subdomain_query.save()
-			logger.info(f"Origin IP found for {subdomain}: {origin_ips[0]}")
+			
+			# Ensure this IP is stored and geolocated
+			save_ip_address(
+				primary_origin,
+				subdomain=subdomain_query,
+				subscan=self.subscan
+			)
+			logger.info(f"Origin IP found for {subdomain}: {primary_origin}")
 
 	return wafs
 
@@ -2249,7 +2262,6 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		description (str, optional): Task description shown in UI.
 	"""
 	input_path = f'{self.results_dir}/input_endpoints_fetch_url.txt'
-	proxy = get_random_proxy()
 
 	# Config
 	config = self.yaml_configuration.get(FETCH_URL) or {}
@@ -2291,43 +2303,55 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 	host_regex = f"\'https?://([a-z0-9]+[.])*{host}.*\'"
 
 	# Tools cmds
-	cmd_map = {
+	base_cmd_map = {
 		'gau': f'gau',
 		'hakrawler': 'hakrawler -subs -u',
 		'waybackurls': 'waybackurls',
 		'gospider': f'gospider -S {input_path} --js -d 2 --sitemap --robots -w -r',
 		'katana': f'katana -list {input_path} -silent -jc -kf all -d 3 -fs rdn',
 	}
-	if proxy:
-		cmd_map['gau'] += f' --proxy "{proxy}"'
-		cmd_map['gospider'] += f' -p {proxy}'
-		cmd_map['hakrawler'] += f' -proxy {proxy}'
-		cmd_map['katana'] += f' -proxy {proxy}'
-	if threads > 0:
-		cmd_map['gau'] += f' --threads {threads}'
-		cmd_map['gospider'] += f' -t {threads}'
-		cmd_map['katana'] += f' -c {threads}'
-	if custom_headers:
-		# gau, waybackurls does not support custom headers
-		formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
-		cmd_map['gospider'] += formatted_headers
-		cmd_map['hakrawler'] += ';;'.join(header for header in custom_headers)
-		cmd_map['katana'] += formatted_headers
-	cat_input = f'cat {input_path}'
-	grep_output = f'grep -Eo {host_regex}'
-	cmd_map = {
-		tool: f'{cat_input} | {cmd} | {grep_output} > {self.results_dir}/urls_{tool}.txt'
-		for tool, cmd in cmd_map.items()
-	}
-	tasks = group(
-		run_command.si(
-			cmd,
-			shell=True,
-			scan_id=self.scan_id,
-			activity_id=self.activity_id)
-		for tool, cmd in cmd_map.items()
-		if tool in tools
-	)
+
+	tasks = []
+	for tool in tools:
+		if tool in base_cmd_map:
+			p = get_random_proxy()
+			tool_cmd = base_cmd_map[tool]
+			
+			# Apply proxy
+			if p:
+				if tool == 'gau': tool_cmd += f' --proxy "{p}"'
+				elif tool == 'gospider': tool_cmd += f' -p {p}'
+				elif tool == 'hakrawler': tool_cmd += f' -proxy {p}'
+				elif tool == 'katana': tool_cmd += f' -proxy {p}'
+			
+			# Apply threads
+			if threads > 0:
+				if tool == 'gau': tool_cmd += f' --threads {threads}'
+				elif tool == 'gospider': tool_cmd += f' -t {threads}'
+				elif tool == 'katana': tool_cmd += f' -c {threads}'
+
+			# Apply custom headers
+			if custom_headers:
+				formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
+				if tool == 'gospider': tool_cmd += formatted_headers
+				elif tool == 'hakrawler': tool_cmd += ';;'.join(header for header in custom_headers)
+				elif tool == 'katana': tool_cmd += formatted_headers
+
+			full_cmd = f'cat {input_path} | {tool_cmd} | grep -Eo {host_regex} > {self.results_dir}/urls_{tool}.txt'
+			
+			tasks.append(run_command.si(
+				full_cmd,
+				shell=True,
+				scan_id=self.scan_id,
+				activity_id=self.activity_id,
+				proxy=p if tool not in ['gau', 'gospider', 'hakrawler', 'katana'] else None
+			))
+	
+	if tasks:
+		tasks = group(tasks)
+	else:
+		logger.warning('No reconnaissance tools enabled for fetch_url. Skipping.')
+		return
 
 	# Cleanup task
 	sort_output = [
@@ -2527,11 +2551,22 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		logger.warning('No targets found for Web API Discovery. Skipping.')
 		return
 
-	proxy = get_random_proxy()
+
 	results_dir = f"{self.results_dir}/web_api_discovery"
 	os.makedirs(results_dir, exist_ok=True)
 
+	processed_paramspider_subdomains = set()
+	processed_url_patterns = set()
 	for url in urls:
+		# URL Pattern Normalization to skip redundant endpoints (e.g. locale=ar vs locale=cs)
+		parsed = urlparse(url)
+		query_keys = sorted(parse_qs(parsed.query).keys())
+		url_pattern = f"{parsed.netloc}{parsed.path}?{'&'.join(query_keys)}"
+		
+		if url_pattern in processed_url_patterns:
+			continue
+		processed_url_patterns.add(url_pattern)
+
 		subdomain_name = get_subdomain_from_url(url)
 		subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=self.scan).first()
 		if not subdomain:
@@ -2541,10 +2576,11 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if 'arjun' in uses_tools:
 			logger.info(f'Running Arjun on {url}')
 			arjun_output = f"{results_dir}/arjun_{subdomain_name}.json"
-			cmd = f"arjun -u {url} --passive -m {arjun_methods} -t {threads} --stable -oJ {arjun_output}"
-			#if proxy:
-			# 	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			cmd = f"arjun -u {url} --passive -m {arjun_methods} -t {threads} -oJ {arjun_output}"
+			proxy = get_random_proxy()
+			if proxy:
+				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
 			if os.path.exists(arjun_output):
 				try:
 					with open(arjun_output, 'r') as f:
@@ -2568,11 +2604,11 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if 'kiterunner' in uses_tools:
 			logger.info(f'Running Kiterunner on {url}')
 			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
-			# kr scan -w wordlist.kite -o json
 			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json >> {kr_output}"
+			proxy = get_random_proxy()
 			if proxy:
 				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
 			if os.path.exists(kr_output):
 				try:
 					with open(kr_output, 'r') as f:
@@ -2588,15 +2624,15 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 					logger.error(f"Error parsing Kiterunner output for {url}: {e}")
 
 		# ParamSpider
-		if 'paramspider' in uses_tools:
+		if 'paramspider' in uses_tools and subdomain_name not in processed_paramspider_subdomains:
 			logger.info(f'Running ParamSpider on {subdomain_name}')
+			processed_paramspider_subdomains.add(subdomain_name)
 			ps_output = f"{results_dir}/ps_{subdomain_name}.txt"
-			cmd = f"paramspider --domain {subdomain_name}"
+			cmd = f"paramspider --domain {subdomain_name} > {ps_output}"
+			proxy = get_random_proxy()
 			if proxy:
-				cmd += f" --proxy {proxy}"
-			cmd += f" > {ps_output}"
-			print(cmd)
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+				cmd = f"paramspider --domain {subdomain_name} --proxy {proxy} > {ps_output}"
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
 			if os.path.exists(ps_output):
 				try:
 					with open(ps_output, 'r') as f:
@@ -2618,7 +2654,10 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running LinkFinder on {url}')
 			lf_output = f"{results_dir}/lf_{subdomain_name}.txt"
 			cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -i {url} -o cli > {lf_output}"
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			proxy = get_random_proxy()
+			if proxy:
+				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
 			if os.path.exists(lf_output):
 				try:
 					with open(lf_output, 'r') as f:
@@ -2639,9 +2678,10 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running InQL on {url}')
 			inql_output = f"{results_dir}/inql_{subdomain_name}"
 			cmd = f"inql -t {url} -o {inql_output}"
+			proxy = get_random_proxy()
 			if proxy:
 				cmd += f" -p {proxy}"
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
 
 	# Semgrep - Post-discovery pattern matching
 	if 'semgrep' in uses_tools:
@@ -2776,6 +2816,15 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 		)
 		grouped_tasks.append(_task)
 
+	# Run cPanel Scanner
+	should_run_cpanel = config.get('cpanel_scanner', {}).get(RUN_CPANEL_SCAN, True)
+	if should_run_cpanel:
+		_task = cpanel_scan.si(
+			ctx=ctx,
+			description=f'cPanel Vulnerability Scan'
+		)
+		grouped_tasks.append(_task)
+
 	celery_group = group(grouped_tasks)
 	job = celery_group.apply_async()
 
@@ -2797,6 +2846,9 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 	results = []
 	logger.info(f'Running vulnerability scan with severity: {severity}')
 	cmd += f' -severity {severity}'
+	proxy = get_random_proxy()
+	if proxy:
+		cmd += f' -proxy {proxy}'
 	# Send start notification
 	notif = Notification.objects.first()
 	send_status = notif.send_scan_status_notif if notif else False
@@ -3088,7 +3140,6 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	if custom_header:
 		custom_headers.append(custom_header)
 	should_fetch_gpt_report = config.get(FETCH_GPT_REPORT, DEFAULT_GET_GPT_REPORT)
-	proxy = get_random_proxy()
 	nuclei_specific_config = config.get('nuclei', {})
 	use_nuclei_conf = nuclei_specific_config.get(USE_NUCLEI_CONFIG, False)
 	severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
@@ -3167,7 +3218,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 		cmd += formatted_headers
 	cmd += f' -l {input_path}'
 	cmd += f' -c {str(concurrency)}' if concurrency > 0 else ''
-	cmd += f' -proxy {proxy} ' if proxy else ''
+
 	cmd += f' -retries {retries}' if retries > 0 else ''
 	cmd += f' -rl {rate_limit}' if rate_limit > 0 else ''
 	# cmd += f' -severity {severities_str}'
@@ -3224,7 +3275,6 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	custom_header = self.yaml_configuration.get(CUSTOM_HEADER)
 	if custom_header:
 		custom_headers.append(custom_header)
-	proxy = get_random_proxy()
 	is_waf_evasion = dalfox_config.get(WAF_EVASION, False)
 	blind_xss_server = dalfox_config.get(BLIND_XSS_SERVER)
 	user_agent = dalfox_config.get(USER_AGENT) or self.yaml_configuration.get(USER_AGENT)
@@ -3248,6 +3298,7 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	send_status = notif.send_scan_status_notif if notif else False
 
 	# command builder
+	proxy = get_random_proxy()
 	cmd = 'dalfox --silence --no-color --no-spinner'
 	cmd += f' --only-poc r '
 	cmd += f' --ignore-return 302,404,403'
@@ -3360,7 +3411,6 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 	custom_header = self.yaml_configuration.get(CUSTOM_HEADER)
 	if custom_header:
 		custom_headers.append(custom_header)
-	proxy = get_random_proxy()
 	user_agent = vuln_config.get(USER_AGENT) or self.yaml_configuration.get(USER_AGENT)
 	threads = vuln_config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
 	input_path = f'{self.results_dir}/input_endpoints_crlf.txt'
@@ -3381,6 +3431,7 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 	send_status = notif.send_scan_status_notif if notif else False
 
 	# command builder
+	proxy = get_random_proxy()
 	cmd = 'crlfuzz -s'
 	cmd += f' -l {input_path}'
 	cmd += f' -x {proxy}' if proxy else ''
@@ -4640,24 +4691,6 @@ def parse_crlfuzz_result(url):
 	}
 
 
-def record_exists(model, data, exclude_keys=[]):
-	"""
-	Check if a record already exists in the database based on the given data.
-
-	Args:
-		model (django.db.models.Model): The Django model to check against.
-		data (dict): Data dictionary containing fields and values.
-		exclude_keys (list): List of keys to exclude from the lookup.
-
-	Returns:
-		bool: True if the record exists, False otherwise.
-	"""
-
-	# Extract the keys that will be used for the lookup
-	lookup_fields = {key: data[key] for key in data if key not in exclude_keys}
-
-	# Return True if a record exists based on the lookup fields, False otherwise
-	return model.objects.filter(**lookup_fields).exists()
 
 @app.task(name='geo_localize', bind=False, queue='geo_localize_queue')
 def geo_localize(host, ip_id=None):
@@ -4670,29 +4703,57 @@ def geo_localize(host, ip_id=None):
 	Returns:
 		startScan.models.CountryISO: CountryISO object from DB or None.
 	"""
-	if validators.ipv6(host):
-		logger.info(f'Ipv6 "{host}" is not supported by geoiplookup. Skipping.')
-		return None
-	cmd = f'geoiplookup {host}'
-	_, out = run_command(cmd)
-	if 'IP Address not found' not in out and "can't resolve hostname" not in out:
-		country_iso = out.split(':')[1].strip().split(',')[0]
-		country_name = out.split(':')[1].strip().split(',')[1].strip()
-		geo_object, _ = CountryISO.objects.get_or_create(
-			iso=country_iso,
-			name=country_name
-		)
-		geo_json = {
-			'iso': country_iso,
-			'name': country_name
-		}
-		if ip_id:
+	import ipaddress
+	
+	geo_object = None
+	country_iso = "Unknown"
+	country_name = "Unknown Location"
+
+	# Check if IP is private
+	try:
+		ip_obj = ipaddress.ip_address(host)
+		if ip_obj.is_private:
+			country_iso = "PV"
+			country_name = "Private Network"
+		elif ip_obj.version == 6:
+			# geoiplookup often doesn't support IPv6 in the default DB
+			# We'll mark it as Unknown (IPv6) for now
+			country_iso = "IPv6"
+			country_name = "IPv6 Address"
+	except ValueError:
+		# Not a valid IP (could be a hostname)
+		pass
+
+	if country_iso == "Unknown":
+		cmd = f'geoiplookup {host}'
+		_, out = run_command(cmd)
+		if 'IP Address not found' not in out and "can't resolve hostname" not in out and ':' in out:
+			try:
+				parts = out.split(':')[1].strip().split(',')
+				country_iso = parts[0].strip()
+				country_name = parts[1].strip() if len(parts) > 1 else country_iso
+			except Exception as e:
+				logger.error(f"Error parsing geoiplookup output: {e}")
+		else:
+			logger.info(f'Geo IP lookup failed for host "{host}"')
+
+	geo_object, _ = CountryISO.objects.get_or_create(
+		iso=country_iso,
+		name=country_name
+	)
+
+	if ip_id:
+		try:
 			ip = IpAddress.objects.get(pk=ip_id)
 			ip.geo_iso = geo_object
 			ip.save()
-		return geo_json
-	logger.info(f'Geo IP lookup failed for host "{host}"')
-	return None
+		except IpAddress.DoesNotExist:
+			logger.error(f"IpAddress with ID {ip_id} not found during geo_localization")
+
+	return {
+		'iso': country_iso,
+		'name': country_name
+	}
 
 
 @app.task(name='query_whois', bind=False, queue='query_whois_queue')
@@ -4955,6 +5016,19 @@ def remove_duplicate_endpoints(
 					ep.delete()
 				logger.warning(msg)
 
+def sanitize_command_for_db(cmd):
+	"""
+	Strips 'export HTTP_PROXY=... &&' and 'proxychains4 -f ...' from command
+	to ensure the UI displays the actual tool name and clean command.
+	"""
+	if not cmd:
+		return cmd
+	# Strip export statements (matches both single and double quotes)
+	cmd = re.sub(r'^export\s+.*?\s+&&\s+', '', cmd)
+	# Strip proxychains4 wrapper with its config file
+	cmd = re.sub(r'^(?:[/\w]*/)?proxychains4\s+-f\s+\S+\s+', '', cmd)
+	return cmd
+
 @app.task(name='run_command', bind=False, queue='run_command_queue')
 def run_command(
 		cmd, 
@@ -4963,7 +5037,8 @@ def run_command(
 		history_file=None, 
 		scan_id=None, 
 		activity_id=None,
-		remove_ansi_sequence=False
+		remove_ansi_sequence=False,
+		proxy=None
 	):
 	"""Run a given command using subprocess module.
 
@@ -4974,15 +5049,22 @@ def run_command(
 		shell (bool): Run within separate shell if True.
 		history_file (str): Write command + output to history file.
 		remove_ansi_sequence (bool): Used to remove ANSI escape sequences from output such as color coding
+		proxy (str): If provided, may be used for proxychains wrapping.
 	Returns:
 		tuple: Tuple with return_code, output.
 	"""
 	logger.info(cmd)
 	logger.warning(activity_id)
 
+	conf_path = None
+	if proxy:
+		proxy_manager = ProxychainsWrapper()
+		if proxy_manager.should_wrap():
+			cmd, conf_path = proxy_manager.wrap_command(cmd, proxy=proxy)
+
 	# Create a command record in the database
 	command_obj = Command.objects.create(
-		command=cmd,
+		command=sanitize_command_for_db(cmd),
 		time=timezone.now(),
 		scan_history_id=scan_id,
 		activity_id=activity_id)
@@ -5014,6 +5096,9 @@ def run_command(
 		logger.error(f"Error executing command {cmd}: {str(e)}")
 		output = f"Error executing command: {str(e)}"
 		return_code = 127 # Command not found / error
+	finally:
+		if conf_path and os.path.exists(conf_path):
+			os.remove(conf_path)
 
 	command_obj.output = output
 	command_obj.return_code = return_code
@@ -5033,14 +5118,43 @@ def run_command(
 # Other utils #
 #-------------#
 
-def stream_command(cmd, cwd=None, shell=False, history_file=None, encoding='utf-8', scan_id=None, activity_id=None, trunc_char=None):
-	# Log cmd
+def stream_command(
+		cmd, 
+		cwd=None, 
+		shell=False, 
+		history_file=None, 
+		encoding='utf-8', 
+		scan_id=None, 
+		activity_id=None, 
+		trunc_char=None,
+		proxy=None
+	):
+	"""Run a command and yield output line by line.
+
+	Args:
+		cmd (str): Command to run.
+		cwd (str): Current working directory.
+		shell (bool): Run within separate shell if True.
+		history_file (str): Write command + output to history file.
+		encoding (str): Output encoding.
+		scan_id (int): Scan ID.
+		activity_id (int): Activity ID.
+		trunc_char (str): Character used to truncate the output line.
+		proxy (str): If provided, may be used for proxychains wrapping.
+	Yields:
+		str/dict: Output line.
+	"""
 	logger.info(cmd)
-	# logger.warning(activity_id)
+
+	conf_path = None
+	if proxy:
+		proxy_manager = ProxychainsWrapper()
+		if proxy_manager.should_wrap():
+			cmd, conf_path = proxy_manager.wrap_command(cmd, proxy=proxy)
 
 	# Create a command record in the database
 	command_obj = Command.objects.create(
-		command=cmd,
+		command=sanitize_command_for_db(cmd),
 		time=timezone.now(),
 		scan_history_id=scan_id,
 		activity_id=activity_id)
@@ -5060,33 +5174,37 @@ def stream_command(cmd, cwd=None, shell=False, history_file=None, encoding='utf-
 	output = ""
 
 	# Process the output
-	for line in iter(lambda: process.stdout.readline(), b''):
-		if not line:
-			break
-		line = line.strip()
-		ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-		line = ansi_escape.sub('', line)
-		line = line.replace('\\x0d\\x0a', '\n')
-		if trunc_char and line.endswith(trunc_char):
-			line = line[:-1]
-		item = line
+	try:
+		for line in iter(lambda: process.stdout.readline(), b''):
+			if not line:
+				break
+			line = line.strip()
+			ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+			line = ansi_escape.sub('', line)
+			line = line.replace('\\x0d\\x0a', '\n')
+			if trunc_char and line.endswith(trunc_char):
+				line = line[:-1]
+			item = line
 
-		# Try to parse the line as JSON
-		try:
-			item = json.loads(line)
-		except json.JSONDecodeError:
-			pass
+			# Try to parse the line as JSON
+			try:
+				item = json.loads(line)
+			except json.JSONDecodeError:
+				pass
 
-		# Yield the line
-		#logger.debug(item)
-		yield item
+			# Yield the line
+			#logger.debug(item)
+			yield item
 
-		# Add the log line to the output
-		output += line + "\n"
+			# Add the log line to the output
+			output += line + "\n"
 
-		# Update the command record in the database
-		command_obj.output = output
-		command_obj.save()
+			# Update the command record in the database
+			command_obj.output = output
+			command_obj.save()
+	finally:
+		if conf_path and os.path.exists(conf_path):
+			os.remove(conf_path)
 
 	# Retrieve the return code and output
 	process.wait()
@@ -5185,6 +5303,7 @@ def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=
 			shell=False,
 			history_file=history_file,
 			scan_id=scan_history.id,
+			proxy=proxy
 		)
 
 		if not os.path.isfile(output_file):
@@ -5224,7 +5343,7 @@ def save_metadata_info(meta_dict):
 	scan_history = ScanHistory.objects.get(id=meta_dict.scan_id)
 
 	# Proxy settings
-	get_random_proxy()
+	proxy = get_random_proxy()
 
 	# Get metadata
 	result = extract_metadata_from_google_search(meta_dict.osint_target, meta_dict.documents_limit)
@@ -5277,96 +5396,6 @@ def create_scan_activity(scan_history_id, message, status):
 #--------------------#
 
 
-def save_vulnerability(**vuln_data):
-	references = vuln_data.pop('references', [])
-	cve_ids = vuln_data.pop('cve_ids', [])
-	cwe_ids = vuln_data.pop('cwe_ids', [])
-	tags = vuln_data.pop('tags', [])
-	subscan = vuln_data.pop('subscan', None)
-
-	exploit_url = vuln_data.pop('exploit_url', None)
-	validation_status = vuln_data.pop('validation_status', 'unverified')
-
-	# If subdomain is not provided, try to find it from http_url
-	subdomain = vuln_data.get('subdomain')
-	http_url = vuln_data.get('http_url')
-	scan_history = vuln_data.get('scan_history')
-	target_domain = vuln_data.get('target_domain')
-
-	if not subdomain and http_url and scan_history and target_domain:
-		subdomain_name = get_subdomain_from_url(http_url)
-		subdomain, _ = Subdomain.objects.get_or_create(
-			name=subdomain_name,
-			scan_history=scan_history,
-			target_domain=target_domain
-		)
-		vuln_data['subdomain'] = subdomain
-
-	# remove nulls
-	vuln_data = replace_nulls(vuln_data)
-
-	# Check for False Positive rules
-	is_suppressed = False
-	try:
-		from startScan.models import FalsePositiveRule
-		rules = FalsePositiveRule.objects.filter(target_domain=target_domain, is_active=True)
-		for rule in rules:
-			if rule.matches(vuln_data.get('name', ''), http_url):
-				is_suppressed = True
-				break
-	except Exception as e:
-		logger.error(f"Error checking FP rules: {e}")
-
-	if is_suppressed:
-		vuln_data['is_suppressed'] = True
-
-	# Create vulnerability
-	vuln, created = Vulnerability.objects.get_or_create(**vuln_data)
-	if created:
-		vuln.discovered_date = timezone.now()
-		vuln.open_status = True
-		if exploit_url:
-			vuln.exploit_url = exploit_url
-		vuln.validation_status = validation_status
-		vuln.save()
-	elif exploit_url and not vuln.exploit_url:
-		vuln.exploit_url = exploit_url
-		vuln.save()
-
-	# Save vuln tags
-	for tag_name in tags or []:
-		tag, created = VulnerabilityTags.objects.get_or_create(name=tag_name)
-		if tag:
-			vuln.tags.add(tag)
-			vuln.save()
-
-	# Save CVEs
-	for cve_id in cve_ids or []:
-		cve, created = CveId.objects.get_or_create(name=cve_id)
-		if cve:
-			vuln.cve_ids.add(cve)
-			vuln.save()
-
-	# Save CWEs
-	for cve_id in cwe_ids or []:
-		cwe, created = CweId.objects.get_or_create(name=cve_id)
-		if cwe:
-			vuln.cwe_ids.add(cwe)
-			vuln.save()
-
-	# Save vuln reference
-	for url in references or []:
-		ref, created = VulnerabilityReference.objects.get_or_create(url=url)
-		if created:
-			vuln.references.add(ref)
-			vuln.save()
-
-	# Save subscan id in vuln object
-	if subscan:
-		vuln.vuln_subscan_ids.add(subscan)
-		vuln.save()
-
-	return vuln, created
 
 
 def save_endpoint(
@@ -5543,8 +5572,12 @@ def save_ip_address(ip_address, subdomain=None, subscan=None, **kwargs):
 		logger.info(f'IP {ip_address} is not a valid IP. Skipping.')
 		return None, False
 	ip, created = IpAddress.objects.get_or_create(address=ip_address)
-	# if created:
-	# 	logger.warning(f'Found new IP {ip_address}')
+	if created:
+		ip.discovered_date = timezone.now()
+
+	# Trigger geo localization if newly created OR if geo_iso is null
+	if created or ip.geo_iso is None:
+		geo_localize.delay(ip_address, ip_id=ip.id)
 
 	# Set extra attributes
 	for key, value in kwargs.items():
@@ -5903,7 +5936,6 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 	ssl_ports = config.get('ports', [443, 4444, 8443])
 
 	target = self.domain.name
-	proxy = get_random_proxy()
 
 	# 1. IKE-scan
 	if run_ike_scan:
@@ -5911,12 +5943,14 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 		ike_output_file = f'{self.results_dir}/ike_scan_{target}.txt'
 		# ike-scan does not natively support HTTP/SOCKS proxies
 		cmd = f'ike-scan --multiline {target} > {ike_output_file}'
+		proxy = get_random_proxy()
 		run_command(
 			cmd,
 			shell=True,
 			history_file=self.history_file,
 			scan_id=self.scan_id,
-			activity_id=self.activity_id)
+			activity_id=self.activity_id,
+			proxy=proxy)
 
 		if os.path.isfile(ike_output_file):
 			with open(ike_output_file, 'r') as f:
@@ -5938,12 +5972,14 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 			ssl_output_file = f'{self.results_dir}/sslscan_{target}_{port}.xml'
 			# sslscan does not natively support proxies
 			cmd = f'sslscan --xml={ssl_output_file} {target}:{port}'
+			proxy = get_random_proxy()
 			run_command(
 				cmd,
 				shell=True,
 				history_file=self.history_file,
 				scan_id=self.scan_id,
-				activity_id=self.activity_id)
+				activity_id=self.activity_id,
+				proxy=proxy)
 
 			if os.path.isfile(ssl_output_file):
 				vuln_data = {

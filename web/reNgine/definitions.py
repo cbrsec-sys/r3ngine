@@ -103,6 +103,11 @@ LEAKS_AND_SECRETS = 'leaks_and_secrets'
 LEAKLOOKUP = 'leaklookup'
 GITLEAKS = 'gitleaks'
 TRUFFLEHOG = 'trufflehog'
+RUN_CPANEL_SCAN = 'run_cpanel_scan'
+CPANEL_USER_WORDLIST = 'cpanel_user_wordlist'
+CPANEL_SCANNER_PROXY_TYPE = 'proxy_type'
+CPANEL_SCANNER_DEFAULT_WORDLIST = '/usr/src/wordlist/cpanel_users.txt'
+
 
 ###############################################################################
 # Scan DEFAULTS
@@ -673,6 +678,7 @@ GOFUZZ_EXEC_PATH = '/usr/src/github/goofuzz/GooFuzz'
 
 # Auth Brute-Force Paths
 MEDUSA_EXEC_PATH = '/usr/bin/medusa'
+HYDRA_EXEC_PATH = '/usr/bin/hydra'
 PROXYCHAINS_EXEC_PATH = '/usr/bin/proxychains4'
 AUTH_WORDLIST_PATH = '/usr/src/wordlist/auth'
 DEFAULT_AUTH_USER_WORDLIST = 'top_default_usernames.txt'
