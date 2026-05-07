@@ -57,11 +57,13 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
         
         // Build scan color map if we have multiple scans
         const uniqueScans = new Set<number>();
-        elements.nodes.forEach((n: any) => {
-            if (n.data.scan_ids) {
-                n.data.scan_ids.forEach((id: number) => uniqueScans.add(id));
-            }
-        });
+        if (elements?.nodes && Array.isArray(elements.nodes)) {
+            elements.nodes.forEach((n: any) => {
+                if (n.data?.scan_ids && Array.isArray(n.data.scan_ids)) {
+                    n.data.scan_ids.forEach((id: number) => uniqueScans.add(id));
+                }
+            });
+        }
         
         const colorMap: Record<number, string> = {};
         Array.from(uniqueScans).forEach((id, index) => {
