@@ -792,19 +792,21 @@ export const ScanDetailPage = () => {
 
   // Inject Plugin Tabs
   const pluginTabs: any[] = [];
-  plugins?.forEach(plugin => {
-    if (plugin.is_enabled && plugin.manifest?.ui?.tabs) {
-      plugin.manifest.ui.tabs.forEach((tab: any) => {
-        pluginTabs.push({
-          label: tab.label,
-          icon: Zap, // Default icon for plugins, could be dynamic
-          isPlugin: true,
-          pluginSlug: plugin.slug,
-          componentFile: tab.file
+  if (Array.isArray(plugins)) {
+    plugins.forEach(plugin => {
+      if (plugin.is_enabled && plugin.manifest?.ui?.tabs && Array.isArray(plugin.manifest.ui.tabs)) {
+        plugin.manifest.ui.tabs.forEach((tab: any) => {
+          pluginTabs.push({
+            label: tab.label,
+            icon: Zap, // Default icon for plugins, could be dynamic
+            isPlugin: true,
+            pluginSlug: plugin.slug,
+            componentFile: tab.file
+          });
         });
-      });
-    }
-  });
+      }
+    });
+  }
 
   const tabs = [...baseTabs, ...pluginTabs];
 
@@ -1404,7 +1406,7 @@ export const ScanDetailPage = () => {
                 {tabs[activeTab]?.label === 'ATTACK PATHS' && <AttackPathsTab scanId={parseInt(scanId)} />}
                 {tabs[activeTab]?.label === 'EXPLOITS' && renderExploits()}
 
-                {tabs[activeTab]?.isPlugin && (
+                {tabs[activeTab]?.isPlugin && tabs[activeTab]?.pluginSlug && tabs[activeTab]?.componentFile && (
                   <PluginComponentLoader 
                     pluginSlug={tabs[activeTab].pluginSlug}
                     componentFile={tabs[activeTab].componentFile}
