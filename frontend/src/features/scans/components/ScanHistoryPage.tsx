@@ -148,7 +148,7 @@ export const ScanHistoryPage: React.FC = () => {
       case 1: // Running
         return <Chip label="PENDING" size="small" sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<RefreshCw size={12} className="spin" />} />;
       case -1: // Pending
-        return <Chip label="PENDING" size="small" sx={{ bgcolor: 'rgba(255, 171, 0, 0.1)', color: '#ffab00', border: '1px solid rgba(255, 171, 0, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<Clock size={12} />} />;
+        return <Chip label="PENDING" size="small" sx={{ bgcolor: 'rgba(255, 171, 0, 0.1)', color: '#ffab00', border: '1px solid rgba(255, 171, 0, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<Clock size={12} className="spin" />} />;
       case 3: // Aborted
         return <Chip label="ABORTED" size="small" sx={{ bgcolor: 'rgba(255, 0, 60, 0.1)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<AlertTriangle size={12} />} />;
       case 0: // Failed
@@ -201,7 +201,7 @@ export const ScanHistoryPage: React.FC = () => {
         </Box>
       </Box>
 
-      <Card sx={{ bgcolor: 'rgba(13, 12, 20, 0.95)', border: '1px solid rgba(0, 243, 255, 0.1)', borderRadius: '0', position: 'relative', overflow: 'hidden' }}>
+      <Card sx={{ bgcolor: 'rgba(13, 12, 20, 0.95)', border: '1px solid rgba(0, 243, 255, 0.1)', borderRadius: '12px', position: 'relative', overflow: 'hidden' }}>
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>
           <TextField
             placeholder="FILTER SCAN RECORDS..."
@@ -329,8 +329,13 @@ export const ScanHistoryPage: React.FC = () => {
                             borderRadius: 0,
                             bgcolor: 'rgba(255,255,255,0.05)',
                             '& .MuiLinearProgress-bar': {
-                              bgcolor: scan.scan_status === 0 || scan.scan_status === 3 ? '#ff003c' : '#00f3ff',
-                              boxShadow: `0 0 10px ${scan.scan_status === 0 || scan.scan_status === 3 ? 'rgba(255, 0, 60, 0.5)' : 'rgba(0, 243, 255, 0.5)'}`
+                              bgcolor: (scan.scan_status === 0 || scan.scan_status === 3) ? '#ff003c' : '#00f3ff',
+                              boxShadow: `0 0 10px ${(scan.scan_status === 0 || scan.scan_status === 3) ? 'rgba(255, 0, 60, 0.5)' : 'rgba(0, 243, 255, 0.5)'}`,
+                              ...( (scan.scan_status === 1 || scan.scan_status === -1) && {
+                                background: 'linear-gradient(90deg, #00f3ff 0%, #00a8ff 50%, #00f3ff 100%)',
+                                backgroundSize: '200% 100%',
+                                animation: 'progress-flow 2s linear infinite'
+                              })
                             }
                           }}
                         />
