@@ -73,7 +73,7 @@ class TargetSummarySerializer(serializers.Serializer):
     secret_leaks_count = serializers.IntegerField(required=False)
     exploitable_count = serializers.IntegerField(required=False)
     buckets_count = serializers.IntegerField(required=False)
-    matched_gf_count = serializers.DictField(required=False)
+    matched_gf_count = serializers.ListField(required=False)
     
     # Discovery
     monitoring_discoveries = serializers.ListField()
