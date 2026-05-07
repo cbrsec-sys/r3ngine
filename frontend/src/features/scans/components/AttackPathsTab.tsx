@@ -21,7 +21,7 @@ import {
   AlertTriangle,
   ArrowRight,
 } from 'lucide-react';
-import { useAttackPaths, AttackPath, AttackStep } from '../api/useAttackPaths';
+import { useAttackPaths, type AttackPath, type AttackStep } from '../api/useAttackPaths';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 
 // ─── Risk → color mapping ────────────────────────────────────────────────────
