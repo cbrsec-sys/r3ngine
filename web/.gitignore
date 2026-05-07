@@ -1,2 +1,4 @@
 secret
 /secrets
+pg_dump
+plugins_data
