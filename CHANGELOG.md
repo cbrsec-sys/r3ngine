@@ -39,6 +39,7 @@
 - Full Neo4j graph synchronization for OSINT assets.
 - **Multi-Tier Theme System (Hacker, Hybrid, Enterprise)**: Implemented a 3-tier, switchable aesthetic architecture for the React v3 frontend.
   - **Hacker Theme (Default)**: Optimized the signature cyberpunk look with custom scanline logic and Orbitron-driven typography.
+    - **Aesthetic Refinement**: Applied signature neon pink branding (`rgb(255, 0, 241)`) and red glow effects to the brand logo and version badge across all Cyberpunk profiles (Hacker & Hybrid).
   - **Hybrid (Modern) Theme**: Introduced a "clean" dark mode that preserves brand-essential neon accents but removes high-intensity background effects.
   - **Enterprise (Professional) Theme**: Added a new, professional "Slate & Blue" interface using Inter typography and a flat, high-density layout for corporate use cases.
   - **Functional Token Architecture**: Centralized all theme logic in `tokens.ts`, enabling dynamic injection of CSS variables for fonts, colors, and motion.
@@ -87,6 +88,11 @@
     - **Interactive Node Details**: Added a dedicated slide-out panel displaying live graph metrics (centrality, vulnerabilities) with actionable options.
     - **Blast Radius Computation**: Integrated real-time blast radius calculations using Neo4j APOC, displaying downstream compromised assets.
     - **AI-Driven Graph Search**: Replaced standard graph search with a mock AI natural language query interface for future conversational exploration.
+- **Enhanced GeoMap Visualization**:
+  - **Custom Tactical Markers**: Replaced broken default Leaflet markers with high-performance CSS-animated pulsing `divIcon` markers, maintaining the "Cyberpunk Hacker" aesthetic.
+  - **Comprehensive Global Mapping**: Integrated an external `countryCentroids.ts` database covering all ISO-2 country codes for high-precision asset positioning.
+  - **Improved Interaction Layer**: Replaced unsupported React-based marker children with native `react-leaflet` `Tooltip` components for reliable hover interactions and tactical styling.
+  - **Visual Polish**: Added dedicated `.map-marker-pulse` and `.tactical-tooltip` global CSS styles for smooth animations and premium UI consistency.
   - **Vulnerability Impact Intelligence**: Integrated AI-driven impact assessment and graph-based attack path visualization:
     - **AI-Driven Impact Assessment**: Automated generation of potential impact narratives and remediation priorities using LLMs (OpenAI, Anthropic, Gemini, Ollama).
     - **Attack Path Visualization**: Interactive Cytoscape.js-powered graph showing the full exploit chain from root domain to vulnerability.
@@ -171,6 +177,11 @@
   - **Plugin Registry**: Full CRUD support for plugin management, including enabling/disabling and metadata tracking.
 - **Frontend Bundle Optimization**: Implemented granular manual chunking in Vite to split massive vendor libraries into smaller, more manageable bundles.
 - **Route-Level Code Splitting**: Implemented lazy loading for all major tactical pages using TanStack Router's `lazyRouteComponent`, significantly reducing the initial application payload.
+- **Automated Startup Synchronization**:
+  - Implemented a robust, Redis-locked startup sequence in Celery to ensure essential datasets are synchronized when the system comes online.
+  - **Graph Sync**: Automatically triggers a global Attack Surface graph synchronization (`sync_all_scans_to_graph`) upon system startup.
+  - **CISA KEV Sync**: Automatically fetches and updates the Known Exploited Vulnerabilities (KEV) catalog (`sync_cisa_kev_catalog`) to ensure vulnerability intelligence is available immediately.
+  - **Distributed Locking**: Uses Redis-based mutexes (`rengine:startup_graph_sync_lock` and `rengine:startup_kev_sync_lock`) to ensure tasks run exactly once across multi-worker deployments.
 
 ### Bug Fixes
 - **SPA Navigation Hardening**: Replaced legacy `window.location.href` redirects in `LogoutPage.tsx` with TanStack Router's `navigate` to maintain application state and prevent unnecessary full-page reloads.

@@ -2,11 +2,13 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from .models import Plugin
+from .serializers import PluginSerializer
 from .utils import AtomicInstaller, PluginManager
 import os
 
 class PluginViewSet(viewsets.ModelViewSet):
     queryset = Plugin.objects.all()
+    serializer_class = PluginSerializer
     lookup_field = 'slug'
     
     @action(detail=False, methods=['post'], url_path='upload')

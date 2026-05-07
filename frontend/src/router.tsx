@@ -403,10 +403,10 @@ const vulnsRoute = createRoute({
       justifyContent: 'center',
       gap: 3
     }}>
-      <Box sx={{ display: 'flex', gap: 1 }}>
+      <Box className="tactical-pulse-dots" sx={{ display: 'flex', gap: 1 }}>
         <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff' }} />
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', opacity: 0.7 }} />
-        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff', opacity: 0.4 }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff' }} />
+        <Box sx={{ width: 12, height: 12, borderRadius: '50%', bgcolor: '#00f3ff' }} />
       </Box>
       <Typography sx={{
         fontFamily: 'Orbitron',
@@ -419,14 +419,6 @@ const vulnsRoute = createRoute({
         INITIALIZING TACTICAL DATA... <br />
         <span style={{ fontSize: '10px', opacity: 0.5, color: '#fff' }}>FETCHING VULNERABILITIES... PLEASE WAIT</span>
       </Typography>
-      {/* <style>
-        {`
-          @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.5; }
-            50% { transform: scale(1.5); opacity: 1; }
-          }
-        `}
-      </style> */}
     </Box>
   )
 });

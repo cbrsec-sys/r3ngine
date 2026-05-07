@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { hackerTheme, modernTheme, enterpriseTheme } from '../theme';
-import type { Theme } from '@mui/material/styles';
+import { alpha, type Theme } from '@mui/material/styles';
 
 import type { ThemeType } from '../theme/tokens';
 import { themeTokens } from '../theme/tokens';
@@ -43,6 +43,7 @@ export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ childre
     // Inject typography and motion variables
     const root = document.documentElement;
     const isEnterprise = themeName === 'enterprise';
+    const isCyber = themeName === 'hacker' || themeName === 'modern' || themeName === 'script_kiddie';
     
     root.style.setProperty('--r3-heading-font', isEnterprise ? '"Inter", sans-serif' : '"Orbitron", sans-serif');
     root.style.setProperty('--r3-body-font', '"Inter", sans-serif');

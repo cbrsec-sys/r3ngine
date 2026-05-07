@@ -182,6 +182,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
   * Endpoints Discovery
   * Directory/Files fuzzing
   * **Screenshot Gathering**: Restored visual evidence pipeline with tactical gallery and secure lightbox inspection.
+  * **Enhanced GeoMap Visualization**: Dynamic pulsing marker rendering with high-precision global coordinate mapping and tactical tooltips.
   * Vulnerability Scan
     * Nuclei
     * **Acunetix (AWVS)**: Automated vulnerability scanning with native ingestion.
@@ -231,11 +232,13 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 * Toolbox: cms detector, CVE lookup, dork generator, etc.
 * **LLM Toolkit**: Dedicated settings for AI models and automated analysis.
 * **Cyberpunk V3 UI**: Glassmorphic Neon dashboard with improved readability.
+* **Sidebar Submenu Optimization**: Automatically closes submenus when navigating or when the sidebar is closed to maintain a clean tactical interface.
 * **Standardized Notification System**: Tactical MUI Snackbar-driven feedback for all administrative and configuration actions.
 * **Advanced Web App & API Discovery Pipeline**: Integrated Arjun, Kiterunner, ParamSpider, LinkFinder, InQL.
 * **Semgrep-Powered Analysis**: Automated static analysis for JS and GraphQL.
 * **OpSec Settings**: UA rotation, stealth presets, and WAF bypass.
 * **Bounty Hub**: Centralized platform for managing and importing HackerOne bug bounty programs with tactical asset browsing and direct target orchestration.
+* **Automated Startup Synchronization**: Robust, Redis-locked startup sequence ensuring Attack Surface graphs and CISA KEV intelligence are available immediately upon system boot.
 * performance-optimizer
 * integrated tools: Chaos, TLSX, CTFR, Netlas, Katana, Medusa.
 

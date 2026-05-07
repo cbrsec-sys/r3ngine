@@ -96,6 +96,7 @@ import { StartScanModal } from './StartScanModal';
 import { OsintTab } from './OsintTab';
 import { AttackPathsTab } from './AttackPathsTab';
 import { usePlugins } from '../../plugins/api/pluginsApi';
+import PluginComponent from '../../plugins/components/PluginComponent';
 import PluginComponentLoader from '../../plugins/components/PluginComponentLoader';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
@@ -1192,7 +1193,12 @@ export const ScanDetailPage = () => {
   );
 
   const renderVulnerabilities = () => (
-    <VulnerabilityTable projectSlug={projectSlug} scanId={parseInt(scanId)} />
+    <PluginComponent 
+      name="VulnerabilityTable" 
+      default={VulnerabilityTable} 
+      projectSlug={projectSlug} 
+      scanId={parseInt(scanId)} 
+    />
   );
 
   return (

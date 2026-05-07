@@ -1,12 +1,12 @@
 import React from 'react';
-import { 
-  Box, 
-  Typography, 
+import {
+  Box,
+  Typography,
   Divider,
   Paper
 } from '@mui/material';
-import { 
-  DndContext, 
+import {
+  DndContext,
   closestCenter,
   KeyboardSensor,
   PointerSensor,
@@ -97,16 +97,16 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
 
       <Box sx={{ position: 'relative', pl: 4 }}>
         {/* Timeline Line */}
-        <Box sx={{ 
-          position: 'absolute', 
-          left: '12px', 
-          top: 0, 
-          bottom: 0, 
-          width: '2px', 
-          background: 'linear-gradient(to bottom, #0076FF, #FF00E5)' 
+        <Box sx={{
+          position: 'absolute',
+          left: '12px',
+          top: 0,
+          bottom: 0,
+          width: '2px',
+          background: 'linear-gradient(to bottom, #0076FF, #FF00E5)'
         }} />
 
-        {CORE_STEPS.map((step, index) => {
+        {CORE_STEPS?.length > 0 && CORE_STEPS.map((step, index) => {
           const pluginsBefore = plugins.filter(p => p.anchor_step === step && p.runtime_position === 'BEFORE');
           const pluginsAfter = plugins.filter(p => p.anchor_step === step && p.runtime_position === 'AFTER');
 
@@ -115,12 +115,12 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
               {/* Plugins Before */}
               {pluginsBefore.length > 0 && (
                 <Box sx={{ mb: 2 }}>
-                  <DndContext 
+                  <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
                   >
-                    <SortableContext 
+                    <SortableContext
                       items={pluginsBefore.map(p => p.slug)}
                       strategy={verticalListSortingStrategy}
                     >
@@ -131,26 +131,26 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
               )}
 
               {/* Core Step Marker */}
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 2, 
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 2,
                 mb: 2,
                 position: 'relative'
               }}>
-                <Box sx={{ 
-                  width: '24px', 
-                  height: '24px', 
-                  borderRadius: '50%', 
-                  bgcolor: '#0076FF', 
+                <Box sx={{
+                  width: '24px',
+                  height: '24px',
+                  borderRadius: '50%',
+                  bgcolor: '#0076FF',
                   border: '4px solid #121212',
                   position: 'absolute',
                   left: '-23px'
                 }} />
-                <Paper sx={{ 
-                  p: 2, 
-                  flexGrow: 1, 
-                  background: 'rgba(0, 118, 255, 0.1)', 
+                <Paper sx={{
+                  p: 2,
+                  flexGrow: 1,
+                  background: 'rgba(0, 118, 255, 0.1)',
                   border: '1px solid #0076FF',
                   borderRadius: '12px'
                 }}>
@@ -162,12 +162,12 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
               {/* Plugins After */}
               {pluginsAfter.length > 0 && (
                 <Box sx={{ mt: 2 }}>
-                   <DndContext 
+                  <DndContext
                     sensors={sensors}
                     collisionDetection={closestCenter}
                     onDragEnd={handleDragEnd}
                   >
-                    <SortableContext 
+                    <SortableContext
                       items={pluginsAfter.map(p => p.slug)}
                       strategy={verticalListSortingStrategy}
                     >
@@ -178,7 +178,16 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
               )}
             </Box>
           );
-        })}
+        }) || (
+            <Box sx={{ textAlign: "center", py: 10 }}>
+              <Typography variant="h6" color="text.secondary" sx={{ justifyContent: "center" }}>
+                No plugins installed yet.
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ justifyContent: "center" }}>
+                Upload a plugin archive to get started.
+              </Typography>
+            </Box>
+          )}
       </Box>
     </Box>
   );

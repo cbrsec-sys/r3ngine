@@ -67,6 +67,7 @@ import { useUnreadCount } from '../../features/notifications/api';
 import { ScanHistoryDrawer } from '../../features/scans/components/ScanHistoryDrawer';
 import { CheckForUpdateModal } from '../../features/settings/components/CheckForUpdateModal';
 import { useRengineUpdateCheck } from '../../features/settings/api';
+import { useAppTheme } from '../../context/ThemeContext';
 import { HeaderThemeSwitcher } from './HeaderThemeSwitcher';
 
 const drawerWidth = 260;
@@ -82,6 +83,7 @@ interface NavItem {
 
 export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const theme = useTheme();
+  const { themeName } = useAppTheme();
   const { version, projectName } = useAppContext();
   const [isHovered, setIsHovered] = useState(false);
   const [openItems, setOpenItems] = useState<string[]>([]);
@@ -224,7 +226,10 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       <Drawer
         variant="permanent"
         onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+        onMouseLeave={() => {
+          setIsHovered(false);
+          setOpenItems([]);
+        }}
         sx={{
           width: isHovered ? drawerWidth : collapsedWidth,
           flexShrink: 0,
@@ -286,7 +291,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       onClick: () => handleToggle(item.title)
                     } : {
                       component: Link,
-                      to: item.path
+                      to: item.path,
+                      onClick: () => setOpenItems([])
                     })}
                     sx={{
                       borderRadius: 2,
@@ -340,6 +346,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                             key={child.title}
                             component={Link}
                             to={child.path}
+                            onClick={() => setOpenItems([])}
                             sx={{
                               py: 0.5,
                               borderRadius: 1,
@@ -395,9 +402,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 fontWeight: 900,
                 fontFamily: 'var(--r3-heading-font)',
                 letterSpacing: 2,
-                color: "rgb(255, 0, 241)",
-                textShadow: "rgb(255, 0, 0) 0px 0px 21px",
-                //textShadow: theme.palette.mode === 'dark' ? `${alpha(theme.palette.primary.main, 0.5)} 0px 0px 15px` : 'none',
+                color: "rgb(255, 0, 241) !important",
+                textShadow: "rgb(255, 0, 0) 0px 0px 21px !important",
                 fontSize: '1.4rem',
                 mr: 1.5,
                 ml: 12,
@@ -413,9 +419,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                   fontSize: '0.6rem',
                   fontWeight: 800,
                   bgcolor: 'transparent',
-                  //border: `1px solid ${theme.palette.primary.main}`,
-                  border: '1px solid #ff00ff',
-                  color: '#ff00ff',
+                  border: '1px solid #ff00ff !important',
+                  color: '#ff00ff !important',
                   borderRadius: 1
                 }}
               />

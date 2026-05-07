@@ -35,7 +35,7 @@ export const HeaderThemeSwitcher: React.FC = () => {
   };
 
   const themes = [
-    { id: 'hacker', label: 'V3 Hacker', color: themeTokens.hacker.neon.cyan },
+    { id: 'hacker', label: 'V3 Hacker', color: themeTokens.hacker.neon.pink },
     { id: 'modern', label: 'V3 Hybrid', color: themeTokens.modern.neon.cyan },
     { id: 'enterprise', label: 'V3 Enterprise', color: themeTokens.enterprise.palette.primary },
   ] as const;
@@ -111,12 +111,12 @@ export const HeaderThemeSwitcher: React.FC = () => {
               }
             }}
           >
-            <Box sx={{ 
-              width: 10, 
-              height: 10, 
-              borderRadius: '50%', 
-              bgcolor: t.color, 
-              boxShadow: themeName !== 'enterprise' ? `0 0 5px ${t.color}` : 'none' 
+            <Box sx={{
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              bgcolor: t.color,
+              boxShadow: themeName !== 'enterprise' ? `0 0 5px ${t.color}` : 'none'
             }} />
             <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600, flexGrow: 1 }}>
               {t.label}

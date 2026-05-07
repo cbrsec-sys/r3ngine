@@ -16,45 +16,13 @@ import {
     IconButton
 } from '@mui/material';
 import { Globe, Plus } from 'lucide-react';
-import { MapContainer, TileLayer, GeoJSON, Marker } from 'react-leaflet';
+import { MapContainer, TileLayer, GeoJSON, Marker, Tooltip as LeafletTooltip } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { scaleLinear } from 'd3-scale';
+import { countryCentroids } from '../types/countryCentroids';
 
-// Tactical Glowing Marker
-const PulsingDot = styled('div')(({ color }: { color: string }) => ({
-    width: 8,
-    height: 8,
-    backgroundColor: color,
-    borderRadius: '50%',
-    boxShadow: `0 0 10px ${color}`,
-    position: 'relative',
-    '&::after': {
-        content: '""',
-        position: 'absolute',
-        top: -4,
-        left: -4,
-        right: -4,
-        bottom: -4,
-        borderRadius: '50%',
-        border: `2px solid ${color}`,
-        // animation: 'mapMarkerPulse 2s infinite',
-        opacity: 0
-    },
-    // '@keyframes mapMarkerPulse': {
-    //     '0%': { transform: 'scale(0.5)', opacity: 0.8 },
-    //     '100%': { transform: 'scale(2.5)', opacity: 0 }
-    // }
-}));
-
-// Basic Centroid Mapping for Tactical Markers
-const countryCentroids: Record<string, [number, number]> = {
-    'US': [37.0902, -95.7129], 'IN': [20.5937, 78.9629], 'GB': [55.3781, -3.4360], 'CN': [35.8617, 104.1954],
-    'DE': [51.1657, 10.4515], 'BR': [-14.2350, -51.9253], 'RU': [61.5240, 105.3188], 'AU': [-25.2744, 133.7751],
-    'FR': [46.2276, 2.2137], 'CA': [56.1304, -106.3468], 'JP': [36.2048, 138.2529], 'SG': [1.3521, 103.8198],
-    'NL': [52.1326, 5.2913], 'IE': [53.4129, -8.2439], 'PK': [30.3753, 69.3451], 'ID': [-0.7893, 113.9213],
-    'VN': [14.0583, 108.2772], 'TH': [15.8700, 100.9925], 'AE': [23.4241, 53.8478], 'SA': [23.8859, 45.0792],
-};
+// Pulsing Dot is now handled via global CSS .map-marker-pulse in index.css
 
 interface CountryData {
     name: string;
@@ -190,7 +158,7 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
                 <MapContainer
                     ref={mapRef}
                     center={[5, 15]}
-                    zoom={2}
+                    zoom={1}
                     minZoom={1}
                     maxZoom={3}
                     style={{ width: '100%', height: '100%' }}
@@ -212,21 +180,34 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
                         const coords = countryCentroids[country.iso.toUpperCase()];
                         if (!coords) return null;
 
+                        const customIcon = L.divIcon({
+                            className: 'custom-pulsing-marker',
+                            html: '<div class="map-marker-pulse"></div>',
+                            iconSize: [12, 12],
+                            iconAnchor: [6, 6],
+                        });
+
                         return (
                             <Marker
                                 key={country.iso}
                                 position={coords}
+                                icon={customIcon}
                             >
-                                <Tooltip title={`${country.name}: ${country.count} Assets`} arrow>
-                                    <g>
-                                        <circle r={4} fill="rgba(0, 243, 255, 0.2)" />
-                                        <foreignObject x="-10" y="-10" width="20" height="20">
-                                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%', height: '100%' }}>
-                                                <PulsingDot color="#00f3ff" />
-                                            </div>
-                                        </foreignObject>
-                                    </g>
-                                </Tooltip>
+                                <LeafletTooltip
+                                    direction="top"
+                                    offset={[0, -8]}
+                                    opacity={1}
+                                    className="tactical-tooltip"
+                                >
+                                    <Box sx={{ p: 0.5, minWidth: 100 }}>
+                                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#00f3ff', display: 'block', mb: 0.5, fontFamily: 'Orbitron', fontSize: '0.65rem' }}>
+                                            {country.name}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ fontWeight: 900, color: '#fff', fontSize: '0.75rem', fontFamily: 'Orbitron' }}>
+                                            {country.count} ASSETS
+                                        </Typography>
+                                    </Box>
+                                </LeafletTooltip>
                             </Marker>
                         );
                     })}

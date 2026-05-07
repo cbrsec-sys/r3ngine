@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Button, 
-  Grid, 
-  Paper, 
-  Tabs, 
+import {
+  Box,
+  Typography,
+  Button,
+  Grid,
+  Paper,
+  Tabs,
   Tab,
   CircularProgress,
   Alert
@@ -44,7 +44,7 @@ const PluginManagementPage: React.FC = () => {
           variant="contained"
           component="label"
           startIcon={<UploadIcon />}
-          sx={{ 
+          sx={{
             borderRadius: '12px',
             textTransform: 'none',
             px: 3,
@@ -60,8 +60,8 @@ const PluginManagementPage: React.FC = () => {
       {error && <Alert severity="error" sx={{ mb: 3 }}>Error loading plugins: {(error as any).message}</Alert>}
 
       <Paper sx={{ borderRadius: '16px', overflow: 'hidden', mb: 4, background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)' }}>
-        <Tabs 
-          value={activeTab} 
+        <Tabs
+          value={activeTab}
           onChange={(_, val) => setActiveTab(val)}
           sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
         >
