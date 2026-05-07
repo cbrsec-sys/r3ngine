@@ -1,8 +1,38 @@
+import DOMPurify from 'dompurify';
 import type { MonitoringDiscovery } from '../types';
+
+/**
+ * Sanitizes a string value to prevent XSS before rendering in the DOM.
+ * All values derived from untrusted backend data must be passed through here.
+ */
+const sanitize = (value: unknown): string => {
+  if (value === null || value === undefined) return '';
+  return DOMPurify.sanitize(String(value), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] });
+};
+
+/**
+ * Parses a JSON string safely. Returns the original string on failure.
+ * Guards against prototype pollution by not allowing __proto__ keys.
+ */
+const tryParseJson = (str: string): unknown => {
+  try {
+    const parsed = JSON.parse(str);
+    // Prevent prototype pollution: reject objects with dangerous keys
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      if ('__proto__' in parsed || 'constructor' in parsed || 'prototype' in parsed) {
+        return str;
+      }
+    }
+    return parsed;
+  } catch {
+    return str;
+  }
+};
 
 /**
  * Formats the content of a monitoring discovery based on its type.
  * MonitoringDiscovery.content is a JSONField in the backend.
+ * All output is sanitized to prevent XSS.
  */
 export const formatDiscoveryContent = (discovery: MonitoringDiscovery): string => {
   if (!discovery.content) return 'N/A';
@@ -11,26 +41,22 @@ export const formatDiscoveryContent = (discovery: MonitoringDiscovery): string =
     ? tryParseJson(discovery.content) 
     : discovery.content;
 
+  // Only access properties if content is a plain object
+  const isObj = content !== null && typeof content === 'object' && !Array.isArray(content);
+  const obj = isObj ? (content as Record<string, unknown>) : null;
+
   switch (discovery.discovery_type) {
     case 'subdomain':
-      return content.subdomain || content.name || JSON.stringify(content);
+      return sanitize(obj?.subdomain ?? obj?.name ?? JSON.stringify(content));
     case 'directory':
-      return content.url || content.path || JSON.stringify(content);
+      return sanitize(obj?.url ?? obj?.path ?? JSON.stringify(content));
     case 'status_change':
-      return `Status: ${content.old_status} -> ${content.new_status}`;
+      return `Status: ${sanitize(obj?.old_status)} -> ${sanitize(obj?.new_status)}`;
     case 'ip':
-      return `IP: ${content.old_ip} -> ${content.new_ip}`;
+      return `IP: ${sanitize(obj?.old_ip)} -> ${sanitize(obj?.new_ip)}`;
     case 'login':
-      return content.url || 'New login page detected';
+      return sanitize(obj?.url ?? 'New login page detected');
     default:
-      return typeof content === 'object' ? JSON.stringify(content) : String(content);
-  }
-};
-
-const tryParseJson = (str: string) => {
-  try {
-    return JSON.parse(str);
-  } catch (e) {
-    return str;
+      return sanitize(typeof content === 'object' ? JSON.stringify(content) : String(content));
   }
 };

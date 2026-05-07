@@ -6,13 +6,12 @@ import os
 import re
 import redis
 import logging
-from startScan.models import ScanHistory, EndPoint
+from startScan.models import ScanHistory, EndPoint, StressTestResult
 from targetApp.models import Domain
-from startScan.stress_result_models import StressTestResult
 from reNgine.graph_utils import Neo4jManager
 from django.utils import timezone
 from .celery_custom_task import RengineTask
-from reNgine.utilities import send_notification
+#from reNgine.utilities import send_notification
 
 logger = logging.getLogger(__name__)
 
@@ -110,13 +109,13 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config):
             script_path = f"/tmp/k6_script_{scan_history_id}.js"
             with open(script_path, "w") as f:
                 f.write(f"""
-import http from 'k6/http';
-import {{ sleep }} from 'k6';
-export default function () {{
-  http.get('{endpoint.http_url}');
-  sleep(1);
-}}
-""")
+                import http from 'k6/http';
+                import {{ sleep }} from 'k6';
+                export default function () {{
+                    http.get('{endpoint.http_url}');
+                    sleep(1);
+                }}
+                """)
 
             cmd = [
                 "k6",
@@ -168,9 +167,9 @@ export default function () {{
 
     neo4j.close()
 
-    send_notification(
-        f"Stress testing completed for {target_domain_name}. Total Requests: {total_reqs}",
-        scan_history_id,
-    )
+    # send_notification(
+    #     f"Stress testing completed for {target_domain_name}. Total Requests: {total_reqs}",
+    #     scan_history_id,
+    # )
 
     return {"status": "success"}

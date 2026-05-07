@@ -3,13 +3,54 @@ import { themeTokens } from './tokens';
 
 const baseTypography = {
   fontFamily: '"Inter", "Cerebri Sans", sans-serif',
-  h1: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
-  h2: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
-  h3: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
-  h4: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '2px' },
-  h5: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '1px' },
-  h6: { fontFamily: '"Orbitron", sans-serif', letterSpacing: '1px' },
+  h1: { fontFamily: 'var(--r3-heading-font)', letterSpacing: '2px' },
+  h2: { fontFamily: 'var(--r3-heading-font)', letterSpacing: '2px' },
+  h3: { fontFamily: 'var(--r3-heading-font)', letterSpacing: '2px' },
+  h4: { fontFamily: 'var(--r3-heading-font)', letterSpacing: '2px' },
+  h5: { fontFamily: 'var(--r3-heading-font)', letterSpacing: '1px' },
+  h6: { fontFamily: 'var(--r3-heading-font)', letterSpacing: '1px' },
 };
+
+// --- Shared Component Factories ---
+
+const createHackerComponents = (tokens: any) => ({
+  MuiCard: {
+    styleOverrides: {
+      root: {
+        background: `linear-gradient(135deg, ${alpha(tokens.bg.secondary, 0.7)} 0%, ${alpha(tokens.bg.primary, 0.9)} 100%)`,
+        backdropFilter: 'blur(25px) saturate(180%)',
+        border: `1px solid ${alpha('#fff', 0.06)}`,
+        // Double-Bezel (Inner Highlight)
+        boxShadow: `inset 0 1px 1px ${alpha('#fff', 0.15)}, 0 15px 35px rgba(0, 0, 0, 0.8)`,
+        borderRadius: tokens.effects?.radius || 18,
+        transition: `all 0.4s ${themeTokens.effects.bezier}`,
+        '&:hover': {
+          transform: 'translateY(-6px) scale(1.005)',
+          boxShadow: tokens.cyber.glow.cyan,
+          borderColor: alpha(tokens.neon.cyan, 0.4),
+        },
+      },
+    },
+  },
+  MuiButton: {
+    styleOverrides: {
+      root: {
+        textTransform: 'uppercase',
+        letterSpacing: '1px',
+        fontWeight: 700,
+        borderRadius: '8px',
+        transition: `all 0.3s ${themeTokens.effects.bezier}`,
+        '&:active': { transform: 'scale(0.98)' },
+      },
+      contained: {
+        boxShadow: `0 0 10px ${alpha(tokens.neon.cyan, 0.3)}`,
+        '&:hover': {
+          boxShadow: `0 0 20px ${alpha(tokens.neon.cyan, 0.6)}`,
+        },
+      },
+    },
+  },
+});
 
 // Hacker Theme (Cyberpunk)
 export const hackerTheme: Theme = createTheme({
@@ -30,38 +71,7 @@ export const hackerTheme: Theme = createTheme({
   typography: baseTypography,
   shape: { borderRadius: 18 },
   components: {
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          background: `linear-gradient(135deg, rgba(20, 15, 30, 0.7) 0%, rgba(10, 10, 15, 0.9) 100%)`,
-          backdropFilter: 'blur(25px) saturate(180%)',
-          border: `1px solid ${alpha('#fff', 0.06)}`,
-          boxShadow: 'inset 0 0 30px rgba(0, 0, 0, 0.5), 0 15px 35px rgba(0, 0, 0, 0.8)',
-          transition: 'all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
-          '&:hover': {
-            transform: 'translateY(-6px) scale(1.005)',
-            boxShadow: themeTokens.hacker.cyber.glow.cyan,
-            borderColor: alpha(themeTokens.hacker.neon.cyan, 0.4),
-          },
-        },
-      },
-    },
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'uppercase',
-          letterSpacing: '1px',
-          fontWeight: 700,
-          borderRadius: '8px',
-        },
-        contained: {
-          boxShadow: `0 0 10px ${alpha(themeTokens.hacker.neon.cyan, 0.3)}`,
-          '&:hover': {
-            boxShadow: `0 0 20px ${alpha(themeTokens.hacker.neon.cyan, 0.6)}`,
-          },
-        },
-      },
-    },
+    ...createHackerComponents(themeTokens.hacker),
     MuiCssBaseline: {
       styleOverrides: `
         body {
@@ -79,118 +89,88 @@ export const hackerTheme: Theme = createTheme({
   },
 });
 
-// Clean Theme (Cyan Focus)
-export const cleanTheme: Theme = createTheme({
+// Modern Theme (Hybrid)
+export const modernTheme: Theme = createTheme({
   palette: {
     mode: 'dark',
-    primary: { main: themeTokens.clean.primary },
-    secondary: { main: themeTokens.clean.secondary },
+    primary: { main: themeTokens.modern.neon.cyan },
+    secondary: { main: themeTokens.modern.neon.pink },
     background: {
-      default: themeTokens.clean.bg.primary,
-      paper: themeTokens.clean.bg.secondary,
+      default: themeTokens.modern.bg.primary,
+      paper: themeTokens.modern.bg.secondary,
     },
     text: {
-      primary: themeTokens.clean.text,
-      secondary: alpha(themeTokens.clean.text, 0.7),
+      primary: themeTokens.modern.cyber.text,
+      secondary: alpha(themeTokens.modern.cyber.text, 0.7),
     },
-    divider: themeTokens.clean.border,
+    divider: themeTokens.modern.cyber.border,
   },
-  typography: {
-    ...baseTypography,
-    h1: { ...baseTypography.h1, fontFamily: '"Inter", sans-serif' },
-    h2: { ...baseTypography.h2, fontFamily: '"Inter", sans-serif' },
-    h3: { ...baseTypography.h3, fontFamily: '"Inter", sans-serif' },
-    h4: { ...baseTypography.h4, fontFamily: '"Inter", sans-serif' },
-    h5: { ...baseTypography.h5, fontFamily: '"Inter", sans-serif' },
-    h6: { ...baseTypography.h6, fontFamily: '"Inter", sans-serif' },
+  typography: baseTypography,
+  shape: { borderRadius: 18 },
+  components: {
+    ...createHackerComponents(themeTokens.modern),
+    MuiCssBaseline: {
+      styleOverrides: `
+        body {
+          background-color: ${themeTokens.modern.bg.primary};
+          color: ${themeTokens.modern.cyber.text};
+        }
+      `,
+    },
   },
+});
+
+// Enterprise Theme (Professional)
+export const enterpriseTheme: Theme = createTheme({
+  palette: {
+    mode: 'dark', // Keeping dark for now as slates are dark
+    primary: { main: themeTokens.enterprise.palette.primary },
+    secondary: { main: themeTokens.enterprise.palette.secondary },
+    background: {
+      default: themeTokens.enterprise.bg.primary,
+      paper: themeTokens.enterprise.bg.secondary,
+    },
+    text: {
+      primary: themeTokens.enterprise.palette.text,
+      secondary: alpha(themeTokens.enterprise.palette.text, 0.7),
+    },
+    divider: themeTokens.enterprise.palette.border,
+  },
+  typography: baseTypography,
   shape: { borderRadius: 4 },
   components: {
     MuiCard: {
       styleOverrides: {
         root: {
-          backgroundColor: themeTokens.clean.bg.secondary,
-          border: `1px solid ${themeTokens.clean.border}`,
-          borderRadius: 4,
-          boxShadow: 'none',
+          backgroundColor: themeTokens.enterprise.bg.secondary,
+          border: `1px solid ${themeTokens.enterprise.palette.border}`,
+          borderRadius: 8,
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          transition: 'none', // Fast & Flat
         },
       },
     },
     MuiButton: {
       styleOverrides: {
         root: {
-          textTransform: 'uppercase',
-          letterSpacing: '1px',
-          fontWeight: 'bold',
-          borderRadius: 4,
+          textTransform: 'none', // More professional
+          fontWeight: 600,
+          borderRadius: 6,
         },
       },
     },
     MuiCssBaseline: {
       styleOverrides: `
         body {
-          background-color: ${themeTokens.clean.bg.primary};
-          color: ${themeTokens.clean.text};
+          background-color: ${themeTokens.enterprise.bg.primary};
+          color: ${themeTokens.enterprise.palette.text};
         }
       `,
     },
   },
 });
 
-// Script Kiddie Theme (Magenta Focus)
-export const scriptKiddieTheme: Theme = createTheme({
-  palette: {
-    mode: 'dark',
-    primary: { main: themeTokens.script_kiddie.primary },
-    secondary: { main: themeTokens.script_kiddie.secondary },
-    background: {
-      default: themeTokens.script_kiddie.bg.primary,
-      paper: themeTokens.script_kiddie.bg.secondary,
-    },
-    text: {
-      primary: themeTokens.script_kiddie.text,
-      secondary: alpha(themeTokens.script_kiddie.text, 0.7),
-    },
-    divider: themeTokens.script_kiddie.border,
-  },
-  typography: baseTypography,
-  shape: { borderRadius: 0 },
-  components: {
-    MuiCard: {
-      styleOverrides: {
-        root: {
-          backgroundColor: themeTokens.script_kiddie.bg.secondary,
-          border: `1px solid ${themeTokens.script_kiddie.border}`,
-          boxShadow: themeTokens.script_kiddie.glow,
-        },
-      },
-    },
-    MuiButton: {
-      styleOverrides: {
-        root: {
-          textTransform: 'uppercase',
-          fontWeight: 'bold',
-          borderRadius: 0,
-          border: `1px solid ${themeTokens.script_kiddie.primary}`,
-          '&:hover': {
-            backgroundColor: themeTokens.script_kiddie.primary,
-            color: themeTokens.script_kiddie.bg.primary,
-          },
-        },
-      },
-    },
-    MuiCssBaseline: {
-      styleOverrides: `
-        body {
-          background-color: ${themeTokens.script_kiddie.bg.primary};
-          color: ${themeTokens.script_kiddie.text};
-        }
-        h1, h2, h3, h4, h5, h6 {
-            color: ${themeTokens.script_kiddie.primary};
-        }
-      `,
-    },
-  },
-});
-
+// Deprecated / Legacy fallbacks
+export const cleanTheme = modernTheme;
+export const scriptKiddieTheme = hackerTheme;
 export const neonHackerTheme = hackerTheme;

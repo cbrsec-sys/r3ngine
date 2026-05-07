@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { ThemeProvider } from '@mui/material/styles';
-import { hackerTheme, cleanTheme, scriptKiddieTheme } from '../theme';
-import type { Theme } from '@mui/material/styles';
+import { ThemeProvider, CssBaseline } from '@mui/material';
+import { hackerTheme, modernTheme, enterpriseTheme } from '../theme';
+import { alpha, type Theme } from '@mui/material/styles';
 
 import type { ThemeType } from '../theme/tokens';
+import { themeTokens } from '../theme/tokens';
 
 interface ThemeContextType {
   themeName: ThemeType;
@@ -13,16 +14,18 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
-const themes: Record<ThemeType, Theme> = {
+const themes: Record<string, Theme> = {
   hacker: hackerTheme,
-  clean: cleanTheme,
-  script_kiddie: scriptKiddieTheme,
+  modern: modernTheme,
+  enterprise: enterpriseTheme,
+  clean: modernTheme, // Legacy mapping
+  script_kiddie: hackerTheme, // Legacy mapping
 };
 
 export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [themeName, setThemeName] = useState<ThemeType>(() => {
-    const saved = localStorage.getItem('rengine-theme');
-    if (saved === 'hacker' || saved === 'clean' || saved === 'script_kiddie') {
+    const saved = localStorage.getItem('rengine-v3-theme');
+    if (saved === 'hacker' || saved === 'modern' || saved === 'enterprise') {
       return saved as ThemeType;
     }
     return 'hacker';
@@ -30,12 +33,27 @@ export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ childre
 
   const setTheme = (name: ThemeType) => {
     setThemeName(name);
-    localStorage.setItem('rengine-theme', name);
+    localStorage.setItem('rengine-v3-theme', name);
   };
 
   useEffect(() => {
     document.body.setAttribute('data-v3-theme', themeName);
     document.body.setAttribute('data-ui-version', 'v3');
+
+    // Inject typography and motion variables
+    const root = document.documentElement;
+    const isEnterprise = themeName === 'enterprise';
+    const isCyber = themeName === 'hacker' || themeName === 'modern' || themeName === 'script_kiddie';
+    
+    root.style.setProperty('--r3-heading-font', isEnterprise ? '"Inter", sans-serif' : '"Orbitron", sans-serif');
+    root.style.setProperty('--r3-body-font', '"Inter", sans-serif');
+    root.style.setProperty('--r3-transition', themeTokens.effects.bezier);
+    
+    if (themeName === 'hacker') {
+      document.body.classList.add('cyber-noise');
+    } else {
+      document.body.classList.remove('cyber-noise');
+    }
   }, [themeName]);
 
   // Ensure we always have a theme object, fallback to hackerTheme
@@ -44,6 +62,7 @@ export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ childre
   return (
     <ThemeContext.Provider value={{ themeName, setTheme }}>
       <ThemeProvider theme={activeTheme}>
+        <CssBaseline />
         {children}
       </ThemeProvider>
     </ThemeContext.Provider>
@@ -53,9 +72,9 @@ export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ childre
 
 export const useAppTheme = () => {
   const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useAppTheme must be used within a CustomThemeProvider');
+  if (context === undefined) {
+    console.error('useAppTheme: Context is undefined. Ensure that the component is wrapped in <CustomThemeProvider>.');
+    throw new Error('useAppTheme must be used within a CustomThemeProvider. If you see this, the component tree hierarchy is broken.');
   }
   return context;
 };
-

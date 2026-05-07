@@ -5,12 +5,12 @@ import { Link } from '@tanstack/react-router';
 
 export const NotFound: React.FC = () => {
   return (
-    <Box 
-      sx={{ 
-        height: '80vh', 
-        display: 'flex', 
-        flexDirection: 'column', 
-        justifyContent: 'center', 
+    <Box
+      sx={{
+        height: '80vh',
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'center',
         alignItems: 'center',
         textAlign: 'center',
         position: 'relative',
@@ -18,11 +18,11 @@ export const NotFound: React.FC = () => {
       }}
     >
       {/* Glitch Effect Background */}
-      <Box sx={{ 
-        position: 'absolute', 
-        fontSize: '15rem', 
-        fontWeight: 900, 
-        opacity: 0.03, 
+      <Box sx={{
+        position: 'absolute',
+        fontSize: '15rem',
+        fontWeight: 900,
+        opacity: 0.03,
         color: '#ff003c',
         zIndex: 0,
         userSelect: 'none',
@@ -32,27 +32,27 @@ export const NotFound: React.FC = () => {
       </Box>
 
       <Box sx={{ zIndex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <Box sx={{ 
-          p: 3, 
-          borderRadius: '50%', 
-          bgcolor: 'rgba(255, 0, 60, 0.1)', 
+        <Box sx={{
+          p: 3,
+          borderRadius: '50%',
+          bgcolor: 'rgba(255, 0, 60, 0.1)',
           border: '2px solid rgba(255, 0, 60, 0.3)',
           boxShadow: '0 0 30px rgba(255, 0, 60, 0.2)',
           mb: 4,
-          animation: 'pulse 2s infinite ease-in-out',
-          '@keyframes pulse': {
-            '0%': { transform: 'scale(1)', boxShadow: '0 0 20px rgba(255, 0, 60, 0.2)' },
-            '50%': { transform: 'scale(1.05)', boxShadow: '0 0 40px rgba(255, 0, 60, 0.4)' },
-            '100%': { transform: 'scale(1)', boxShadow: '0 0 20px rgba(255, 0, 60, 0.2)' },
-          }
+          // animation: 'pulse 2s infinite ease-in-out',
+          // '@keyframes pulse': {
+          //   '0%': { transform: 'scale(1)', boxShadow: '0 0 20px rgba(255, 0, 60, 0.2)' },
+          //   '50%': { transform: 'scale(1.05)', boxShadow: '0 0 40px rgba(255, 0, 60, 0.4)' },
+          //   '100%': { transform: 'scale(1)', boxShadow: '0 0 20px rgba(255, 0, 60, 0.2)' },
+          // }
         }}>
           <ShieldAlert size={64} color="#ff003c" />
         </Box>
 
-        <Typography variant="h2" sx={{ 
-          fontFamily: 'Orbitron', 
-          fontWeight: 900, 
-          letterSpacing: 4, 
+        <Typography variant="h2" sx={{
+          fontFamily: 'Orbitron',
+          fontWeight: 900,
+          letterSpacing: 4,
           color: '#fff',
           mb: 1,
           textShadow: '0 0 10px rgba(255, 0, 60, 0.8)'
@@ -60,9 +60,9 @@ export const NotFound: React.FC = () => {
           SIGNAL LOST
         </Typography>
 
-        <Typography variant="h6" sx={{ 
-          color: '#ff003c', 
-          fontWeight: 800, 
+        <Typography variant="h6" sx={{
+          color: '#ff003c',
+          fontWeight: 800,
           fontFamily: 'Orbitron',
           mb: 4,
           opacity: 0.8
@@ -71,17 +71,17 @@ export const NotFound: React.FC = () => {
         </Typography>
 
         <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.6)', maxWidth: 450, mb: 6, lineHeight: 1.6 }}>
-          The tactical coordinates you provided do not match any known sectors in the reNgine perimeter. 
+          The tactical coordinates you provided do not match any known sectors in the reNgine perimeter.
           Return to base or verify the target parameters.
         </Typography>
 
         <Box sx={{ display: 'flex', gap: 3 }}>
-          <Button 
+          <Button
             component={Link}
             to="/"
-            variant="contained" 
+            variant="contained"
             startIcon={<Home size={18} />}
-            sx={{ 
+            sx={{
               bgcolor: 'rgba(255, 255, 255, 0.05)',
               color: '#fff',
               border: '1px solid rgba(255,255,255,0.1)',
@@ -93,11 +93,11 @@ export const NotFound: React.FC = () => {
           >
             Return to Dashboard
           </Button>
-          <Button 
+          <Button
             onClick={() => window.location.reload()}
-            variant="outlined" 
+            variant="outlined"
             startIcon={<RefreshCw size={18} />}
-            sx={{ 
+            sx={{
               borderColor: '#ff003c',
               color: '#ff003c',
               '&:hover': { borderColor: '#ff003c', bgcolor: 'rgba(255, 0, 60, 0.05)' },

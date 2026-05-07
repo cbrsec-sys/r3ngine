@@ -2,7 +2,7 @@
 FROM node:20-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
@@ -49,7 +49,8 @@ RUN apt update -y && \
 
 
 # Install essential packages
-RUN apt install -y --no-install-recommends \
+RUN apt update -y && \
+    apt install -y --no-install-recommends \
     build-essential \
     cmake \
     geoip-bin \
@@ -82,7 +83,8 @@ RUN apt install -y --no-install-recommends \
     jq \
     wrk \
     hping3 \
-    unzip
+    postgresql-client \
+    unzip --fix-missing -y
 
 RUN add-apt-repository ppa:mozillateam/ppa
 
@@ -224,7 +226,7 @@ RUN git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/Lin
     cd /usr/src/github/LinkFinder && pip3 install -r requirements.txt && python3 setup.py install
 
 RUN git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider && \
-    cd /usr/src/github/ParamSpider && pip3 install .
+    cd /usr/src/github/ParamSpider && pip3 install . && python3 setup.py install
 
 RUN git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep && \
     cd /usr/src/github/semgrep && pip3 install .
@@ -259,25 +261,25 @@ RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
 # Copy requirements
 COPY web/requirements.txt /tmp/requirements.txt
 RUN pip3 install --upgrade pip setuptools wheel
-RUN pip3 install -r /tmp/requirements.txt --no-cache-dir
+RUN pip3 install -r /tmp/requirements.txt --no-cache-dir --ignore-installed blinker
 
 # install eyewitness
-RUN pip3 install --no-cache-dir fuzzywuzzy \
-    selenium==4.15 \
-    python-Levenshtein \
-    pyvirtualdisplay \
-    netaddr
+# RUN pip3 install --no-cache-dir fuzzywuzzy \
+#     selenium==4.15 \
+#     python-Levenshtein \
+#     pyvirtualdisplay \
+#     netaddr
 
 # Install Frontend Dependencies (for Dev mode)
 RUN mkdir -p /usr/src/app/frontend
 WORKDIR /usr/src/app/frontend
 COPY frontend/package*.json ./
-RUN npm install --legacy-peer-deps
+RUN npm install
 WORKDIR /usr/src/app
 
 # Copy source code
 COPY web/ /usr/src/app/
-RUN mkdir -p /usr/src/app/custom_engines
+#RUN mkdir -p /usr/src/app/custom_engines
 
 # Copy built frontend
 COPY --from=frontend-builder /app/frontend/dist /usr/src/frontend/dist
@@ -286,3 +288,5 @@ COPY frontend/templates /usr/src/frontend/templates
 # Ensure SPA index.html is available as a Django template
 RUN mkdir -p /usr/src/frontend/templates/dashboard && \
     cp /usr/src/frontend/dist/index.html /usr/src/frontend/templates/dashboard/v3_index.html
+
+RUN apt autoremove && apt clean

@@ -32,8 +32,13 @@ export const useCreateProject = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (name: string) => {
-      const response = await fetch(`/api/action/create/project?name=${encodeURIComponent(name)}&format=json`, {
-        method: 'GET', // The existing API uses GET for creation
+      const response = await fetch(`/api/action/create/project?format=json`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': getCookie('csrftoken') || ''
+        },
+        body: JSON.stringify({ name }),
         credentials: 'include'
       });
       if (!response.ok) {

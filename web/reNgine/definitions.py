@@ -98,6 +98,7 @@ SPIDERFOOT_SCAN = 'spiderfoot_scan'
 WEB_API_DISCOVERY = 'web_api_discovery'
 KITERUNNER_WORDLIST = 'kiterunner_wordlist'
 SCAN_ONLY_ACTIVE = 'scan_only_active'
+ARJUN_METHODS = 'arjun_methods'
 LEAKS_AND_SECRETS = 'leaks_and_secrets'
 LEAKLOOKUP = 'leaklookup'
 GITLEAKS = 'gitleaks'
@@ -208,6 +209,9 @@ OSINT_DEFAULT_DORKS = [
     'traefik',
     'git_exposed',
 ]
+
+# Arjun
+ARJUN_DEFAULT_METHODS = 'GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH'
 OSINT_DEFAULT_CONFIG = {
     'discover': OSINT_DEFAULT_LOOKUPS,
     'dork': OSINT_DEFAULT_DORKS,

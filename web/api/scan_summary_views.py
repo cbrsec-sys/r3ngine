@@ -16,7 +16,11 @@ from startScan.models import (
 from recon_note.models import TodoNote
 
 from api.target_summary_serializers import TargetSummarySerializer, TacticalScanHistorySerializer
-from api.serializers import MonitoringDiscoverySerializer, SubScanSerializer, SecretLeakSerializer
+from api.serializers import (
+    MonitoringDiscoverySerializer, SubScanSerializer, 
+    SecretLeakSerializer, EmailSerializer, EmployeeSerializer, 
+    DorkSerializer, MetafinderDocumentSerializer, S3BucketSerializer
+)
 
 class ScanSummaryAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -180,6 +184,11 @@ class ScanSummaryAPIView(APIView):
             'buckets_count': scan.buckets.count(),
             'email_count': emails.count(),
             'employees_count': Employee.objects.filter(employees=scan).count(),
+            'emails': EmailSerializer(emails, many=True).data,
+            'employees': EmployeeSerializer(Employee.objects.filter(employees=scan), many=True).data,
+            'dorks': DorkSerializer(Dork.objects.filter(dorks=scan), many=True).data,
+            'documents': MetafinderDocumentSerializer(MetaFinderDocument.objects.filter(scan_history=scan), many=True).data,
+            'buckets': S3BucketSerializer(scan.buckets.all(), many=True).data,
             'todo_notes': list(TodoNote.objects.filter(scan_history=scan).values('id', 'title', 'description', 'is_done', 'is_important')),
             'monitoring_discoveries_list': MonitoringDiscoverySerializer(monitoring_discoveries, many=True).data,
             'subscans': SubScanSerializer(subscans, many=True).data,

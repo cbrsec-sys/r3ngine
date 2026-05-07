@@ -178,4 +178,16 @@ urlpatterns = [
         '<slug:slug>/api/impact/vulnerability/<int:vuln_id>/details/',
         views.get_impact_assessment_details,
         name='get_impact_assessment_details'),
+    path(
+        '<slug:slug>/api/graph/node/<str:node_id>/details/',
+        views.get_node_details,
+        name='get_node_details'),
+    path(
+        '<slug:slug>/api/graph/blast-radius/<str:node_id>/',
+        views.get_blast_radius,
+        name='get_blast_radius'),
+    path(
+        '<slug:slug>/api/graph/node/<str:node_id>/ticket/',
+        views.generate_ticket,
+        name='generate_ticket'),
 ]
