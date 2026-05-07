@@ -651,7 +651,7 @@
     license_url: https://github.com/whiterabb17/r3ngine/blob/master/LICENSE
     version_lookup_command: null
     update_command: null
-    install_command: null
+    install_command: internal
     version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
     is_default: true
     is_subdomain_gathering: false
