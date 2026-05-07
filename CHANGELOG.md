@@ -184,6 +184,8 @@
   - **Distributed Locking**: Uses Redis-based mutexes (`rengine:startup_graph_sync_lock` and `rengine:startup_kev_sync_lock`) to ensure tasks run exactly once across multi-worker deployments.
 
 ### Bug Fixes
+- **Scan Detail Page Stability**: Resolved runtime crashes (`TypeError: i?.forEach is not a function`) by implementing defensive `Array.isArray` checks and optional chaining across `ScanDetailPage`, `VulnerabilityTable`, and `AttackSurfaceTab`.
+- **Scan Summary API Hardening**: Refactored `matched_gf_count` from a dictionary to a list of objects in the backend and API serializers to ensure type consistency and safe iteration on the frontend. Fixed a `500 Internal Server Error` in `ScanSummaryAPIView` caused by missing model imports.
 - **SPA Navigation Hardening**: Replaced legacy `window.location.href` redirects in `LogoutPage.tsx` with TanStack Router's `navigate` to maintain application state and prevent unnecessary full-page reloads.
 - **Automated Infrastructure Stability**: Integrated `custom_engines` directory creation into the Docker build and entrypoint processes to prevent runtime `FileNotFoundError` during engine initialization.
 - **LLM Report Generation Dependency**: Fixed a `TypeError` in `create_report` where the `LLMReportGenerator` was missing its required `logger` dependency.

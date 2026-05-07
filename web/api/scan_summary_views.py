@@ -11,7 +11,8 @@ from startScan.models import (
     Subdomain, EndPoint, Vulnerability, 
     VulnerabilityTags, IpAddress, Port, Technology, 
     MonitoringDiscovery, CountryISO, CveId, CweId,
-    Email, Employee, ScanHistory, SubScan, ScanActivity, SecretLeak, Command
+    Email, Employee, ScanHistory, SubScan, ScanActivity, SecretLeak, Command,
+    Dork, MetaFinderDocument
 )
 from recon_note.models import TodoNote
 
@@ -153,10 +154,13 @@ class ScanSummaryAPIView(APIView):
         secret_leaks = SecretLeak.objects.filter(scan_history=scan)
         secret_leaks_count = secret_leaks.count()
         exploitable_count = vulnerabilities.exclude(exploit_url__isnull=True).exclude(exploit_url__exact='').count()
-        matched_gf_count = {}
+        matched_gf_count = []
         if scan.used_gf_patterns:
             for gf in scan.used_gf_patterns.split(','):
-                matched_gf_count[gf] = endpoint_qs.filter(matched_gf_patterns__icontains=gf).count()
+                matched_gf_count.append({
+                    'matched_gf_patterns': gf,
+                    'count': endpoint_qs.filter(matched_gf_patterns__icontains=gf).count()
+                })
 
         data = {
             'subdomain_count': subdomain_count,
