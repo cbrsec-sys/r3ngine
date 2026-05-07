@@ -395,8 +395,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 fontWeight: 900,
                 fontFamily: 'var(--r3-heading-font)',
                 letterSpacing: 2,
-                color: theme.palette.primary.main,
-                textShadow: theme.palette.mode === 'dark' ? `${alpha(theme.palette.primary.main, 0.5)} 0px 0px 15px` : 'none',
+                color: "rgb(255, 0, 241)",
+                textShadow: "rgb(255, 0, 0) 0px 0px 21px",
+                //textShadow: theme.palette.mode === 'dark' ? `${alpha(theme.palette.primary.main, 0.5)} 0px 0px 15px` : 'none',
                 fontSize: '1.4rem',
                 mr: 1.5,
                 ml: 12,
@@ -412,8 +413,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                   fontSize: '0.6rem',
                   fontWeight: 800,
                   bgcolor: 'transparent',
-                  border: `1px solid ${theme.palette.primary.main}`,
-                  color: theme.palette.primary.main,
+                  //border: `1px solid ${theme.palette.primary.main}`,
+                  border: '1px solid #ff00ff',
+                  color: '#ff00ff',
                   borderRadius: 1
                 }}
               />

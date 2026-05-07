@@ -27,7 +27,6 @@ RENGINE_RESULTS = env('RENGINE_RESULTS', default=f'{RENGINE_HOME}/scan_results')
 RENGINE_CACHE_ENABLED = env.bool('RENGINE_CACHE_ENABLED', default=False)
 RENGINE_RECORD_ENABLED = env.bool('RENGINE_RECORD_ENABLED', default=True)
 RENGINE_RAISE_ON_ERROR = env.bool('RENGINE_RAISE_ON_ERROR', default=False)
-RENGINE_ERL_ENABLED = env.bool('RENGINE_ERL_ENABLED', default=True)
 RENGINE_APME_ENABLED = env.bool('RENGINE_APME_ENABLED', default=True)
 
 # Common env vars

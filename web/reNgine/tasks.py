@@ -268,7 +268,7 @@ def initiate_scan(
 			),
 			correlate_vulnerabilities.si(scan_history_id=scan_history_id),
 			calculate_risk_scores.si(scan_history_id=scan_history_id),
-			run_erl.si(scan_history_id=scan_history_id),
+			PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx),
 			run_apme.si(scan_history_id=scan_history_id)
 		]
 
@@ -6311,28 +6311,14 @@ def sync_cisa_kev_catalog():
 		logger.error(f"Error syncing CISA KEV catalog: {e}")
 
 
-@app.task(name='run_erl', queue='main_scan_queue', base=RengineTask, bind=True)
-def run_erl(self, scan_history_id):
-	"""
-	Runs the Exploitation Readiness Layer (ERL) validation.
-	"""
-	if not RENGINE_ERL_ENABLED:
-		logger.info("ERL is disabled in settings. Skipping.")
-		return
-
-	from erl.core.orchestrator import Orchestrator
-	orchestrator = Orchestrator()
-	orchestrator.process_scan(scan_history_id)
-
-
 @app.task(name='run_apme', queue='main_scan_queue', base=RengineTask, bind=True)
 def run_apme(self, scan_history_id):
 	"""
 	Runs the Attack Path Modeling Engine (APME).
 
-	This task runs AFTER both vulnerability_scan and run_erl to ensure:
+	This task runs AFTER both vulnerability_scan and ERL validation to ensure:
 	- All vulnerabilities are discovered and correlated
-	- ERL validation has updated confidence scores
+	- ERL validation (via Plugin) has updated confidence scores
 	- The graph has the most accurate data for path computation
 
 	Results are persisted to ImpactAssessment for API and frontend consumption.

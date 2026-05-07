@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { ThemeProvider } from '@mui/material/styles';
+import { ThemeProvider, CssBaseline } from '@mui/material';
 import { hackerTheme, modernTheme, enterpriseTheme } from '../theme';
 import type { Theme } from '@mui/material/styles';
 
@@ -61,6 +61,7 @@ export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ childre
   return (
     <ThemeContext.Provider value={{ themeName, setTheme }}>
       <ThemeProvider theme={activeTheme}>
+        <CssBaseline />
         {children}
       </ThemeProvider>
     </ThemeContext.Provider>
@@ -70,9 +71,9 @@ export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ childre
 
 export const useAppTheme = () => {
   const context = useContext(ThemeContext);
-  if (!context) {
-    throw new Error('useAppTheme must be used within a CustomThemeProvider');
+  if (context === undefined) {
+    console.error('useAppTheme: Context is undefined. Ensure that the component is wrapped in <CustomThemeProvider>.');
+    throw new Error('useAppTheme must be used within a CustomThemeProvider. If you see this, the component tree hierarchy is broken.');
   }
   return context;
 };
-

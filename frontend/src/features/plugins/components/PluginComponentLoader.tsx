@@ -4,11 +4,10 @@ import { Box, CircularProgress, Typography } from '@mui/material';
 interface Props {
   pluginSlug: string;
   componentFile: string;
-  scanId: number;
-  projectSlug: string;
+  [key: string]: any;
 }
 
-const PluginComponentLoader: React.FC<Props> = ({ pluginSlug, componentFile, scanId, projectSlug }) => {
+const PluginComponentLoader: React.FC<Props> = ({ pluginSlug, componentFile, ...rest }) => {
   const [Component, setComponent] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,14 +44,14 @@ const PluginComponentLoader: React.FC<Props> = ({ pluginSlug, componentFile, sca
   if (!Component) {
     return (
       <Box sx={{ p: 10, display: "flex", justifyContent: "center" }}>
-        <CircularProgress />
+        <CircularProgress size={24} />
       </Box>
     );
   }
 
   return (
-    <Suspense fallback={<CircularProgress />}>
-      <Component scanId={scanId} projectSlug={projectSlug} />
+    <Suspense fallback={<CircularProgress size={24} />}>
+      <Component {...rest} />
     </Suspense>
   );
 };

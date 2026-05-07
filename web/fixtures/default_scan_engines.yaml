@@ -21,7 +21,7 @@
       \ 'interestingsubs', 'lfi', 'rce', 'redirect', 'sqli', 'ssrf', 'ssti', 'xss'],\n\
       \  'ignore_file_extensions': ['png', 'jpg', 'jpeg', 'gif', 'mp4', 'mpeg', 'mp3'],\n\
       \  'threads': 30\n}\nvulnerability_scan: {\n  'run_nuclei': true,\n  'run_dalfox':\
-      \ true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'run_erl': true,\n  'run_apme': true,\n  'enable_http_crawl': true,\n  'concurrency':\
+      \ true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'run_apme': true,\n  'enable_http_crawl': true,\n  'concurrency':\
       \ 50,\n  'intensity': 'normal',\n  'rate_limit': 150,\n  'retries': 1,\n  'timeout':\
       \ 5,\n  'fetch_gpt_report': false,\n  'nuclei': {\n    'use_nuclei_config':\
       \ false,\n    'severities': ['unknown', 'info', 'low', 'medium', 'high', 'critical']\n\
@@ -75,7 +75,7 @@
       \ 'jenkins',\n    'wordpress_files',\n    'php_error',\n    'exposed_documents',
       \n    'db_files',\n    'git_exposed'\n  ],\n  'intensity': 'normal',
       \n  'documents_limit': 50\n}\nvulnerability_scan: {\n  'run_nuclei': true,
-      \n  'run_dalfox': true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'run_erl': true,\n  'run_apme': true,\n  'enable_http_crawl':\
+      \n  'run_dalfox': true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'run_apme': true,\n  'enable_http_crawl':\
       \ true,\n  'concurrency': 50,\n  'intensity': 'normal',\n  'rate_limit':\
       \ 150,\n  'retries': 1,\n  'timeout': 5,\n  'fetch_gpt_report': false,
       \n  'nuclei': {\n    'use_nuclei_config': false,\n    'severities': ['unknown',\
@@ -142,7 +142,7 @@
     engine_name: Web App & API Discovery
     yaml_configuration: "web_api_discovery: {\n  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'],\n\
       \  'scan_only_active': true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite',\n  'arjun_methods': 'GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH'\n\
-      \ }\nvulnerability_scan: {\n  'run_acunetix': true,\n  'run_erl': true,\n  'run_apme': true\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
+      \ }\nvulnerability_scan: {\n  'run_acunetix': true,\n  'run_apme': true\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
   model: scanEngine.enginetype
   pk: 8
 - fields:

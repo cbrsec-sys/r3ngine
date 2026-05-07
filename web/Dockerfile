@@ -225,7 +225,7 @@ RUN git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/Lin
     cd /usr/src/github/LinkFinder && pip3 install -r requirements.txt && python3 setup.py install
 
 RUN git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider && \
-    cd /usr/src/github/ParamSpider && pip3 install .
+    cd /usr/src/github/ParamSpider && pip3 install . && python3 setup.py install
 
 RUN git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep && \
     cd /usr/src/github/semgrep && pip3 install .

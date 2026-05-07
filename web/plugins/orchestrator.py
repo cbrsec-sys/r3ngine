@@ -61,7 +61,8 @@ class PluginOrchestrator:
                 workflow.append(task)
                 
         # Add Core task
-        workflow.append(base_task_si)
+        if base_task_si:
+            workflow.append(base_task_si)
         
         # Add 'After' plugins
         for p in plugins_after:
@@ -69,6 +70,9 @@ class PluginOrchestrator:
             if task:
                 workflow.append(task)
                 
+        if not workflow:
+            return None
+            
         if len(workflow) > 1:
             return chain(*workflow)
-        return base_task_si
+        return workflow[0]

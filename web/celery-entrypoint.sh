@@ -151,9 +151,15 @@ fi
 # clone gooFuzz
 if [ ! -d "/usr/src/github/goofuzz" ]
 then
+  DIR=$(pwd)
   echo "Cloning GooFuzz"
-  git clone https://github.com/m3n0sd0n4ld/GooFuzz.git /usr/src/github/goofuzz
-  chmod +x /usr/src/github/goofuzz/GooFuzz
+  cd /usr/src/github
+  wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip && \
+  unzip GooFuzz.v.1.2.6.zip
+  rm GooFuzz.v.1.2.6.zip
+  mv GooFuzz.v.1.2.6 goofuzz
+  chmod +x goofuzz/GooFuzz
+  cd $DIR
 fi
 
 # httpx seems to have issue, use alias instead!!!
@@ -162,7 +168,7 @@ echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
 if [ ! -d "/usr/src/github/ParamSpider" ]
 then
   echo "Cloning ParamSpider"
-  git clone https://github.com/devanshbathwal/ParamSpider /usr/src/github/ParamSpider
+  git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider
   DIR=$(pwd)
   cd /usr/src/github/ParamSpider
   pip3 install .
