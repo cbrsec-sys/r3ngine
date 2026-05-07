@@ -251,26 +251,31 @@ def initiate_scan(
 			sub_discovery_group.append(spiderfoot_scan.si(ctx=ctx, description='Attack Surface Intelligence'))
 
 		# Build Celery tasks dynamically with plugin injections
+		group_tasks = [
+			dir_file_fuzz.si(ctx=ctx, description='Directories & files fuzz'),
+			web_api_discovery.si(ctx=ctx, description='Web API Discovery'),
+			PluginOrchestrator.inject_tasks('VulnerabilityScan', vulnerability_scan.si(ctx=ctx, description='Vulnerability scan'), ctx),
+			screenshot.si(ctx=ctx, description='Screenshot'),
+			chain(
+				waf_detection.si(ctx=ctx, description='WAF detection'),
+				waf_bypass.si(ctx=ctx, description='WAF bypass')
+			),
+			firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan')
+		]
+		
 		workflow_steps = [
 			group(sub_discovery_group),
 			PluginOrchestrator.inject_tasks('PortScan', port_scan.si(ctx=ctx, description='Port scan'), ctx),
 			PluginOrchestrator.inject_tasks('FetchURL', fetch_url.si(ctx=ctx, description='Fetch URL'), ctx),
-			group(
-				dir_file_fuzz.si(ctx=ctx, description='Directories & files fuzz'),
-				web_api_discovery.si(ctx=ctx, description='Web API Discovery'),
-				PluginOrchestrator.inject_tasks('VulnerabilityScan', vulnerability_scan.si(ctx=ctx, description='Vulnerability scan'), ctx),
-				screenshot.si(ctx=ctx, description='Screenshot'),
-				chain(
-					waf_detection.si(ctx=ctx, description='WAF detection'),
-					waf_bypass.si(ctx=ctx, description='WAF bypass')
-				),
-				firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan')
-			),
+			group(*[t for t in group_tasks if t is not None]),
 			correlate_vulnerabilities.si(scan_history_id=scan_history_id),
 			calculate_risk_scores.si(scan_history_id=scan_history_id),
 			PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx),
 			run_apme.si(scan_history_id=scan_history_id)
 		]
+
+		# Filter out None steps (where plugins aren't present)
+		workflow_steps = [step for step in workflow_steps if step is not None]
 
 		workflow = chain(*workflow_steps)
 

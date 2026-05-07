@@ -128,3 +128,32 @@ h6 {
 .tactical-pulse-dots > div:nth-of-type(3) {
   animation-delay: 0.4s;
 }
+
+/* Animations */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 2s linear infinite;
+}
+
+@keyframes progress-flow {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.progress-bar-flow {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 243, 255, 0.8) 0%,
+    rgba(0, 168, 255, 1) 25%,
+    rgba(0, 243, 255, 0.8) 50%,
+    rgba(0, 168, 255, 1) 75%,
+    rgba(0, 243, 255, 0.8) 100%
+  ) !important;
+  background-size: 200% 100% !important;
+  animation: progress-flow 2s linear infinite !important;
+}
+
