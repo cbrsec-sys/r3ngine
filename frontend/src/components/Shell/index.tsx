@@ -121,6 +121,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     { title: 'Todo', icon: <CheckSquare size={20} />, path: `/${projectSlug}/todo`, color: theme.palette.primary.main },
     { title: 'Organization', icon: <Briefcase size={20} />, path: `/${projectSlug}/org`, color: theme.palette.primary.main },
     { title: 'Scan Engine', icon: <Cpu size={20} />, path: `/${projectSlug}/engines`, color: theme.palette.primary.main },
+    { title: 'Plugins', icon: <LayoutGrid size={20} />, path: `/${projectSlug}/plugins`, color: theme.palette.primary.main },
     { title: 'Bounty Hub', icon: <Command size={20} />, path: `/${projectSlug}/bounty`, color: theme.palette.primary.main },
     {
       title: 'Settings',

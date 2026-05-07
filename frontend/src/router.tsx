@@ -23,6 +23,7 @@ const TodoPage = lazyRouteComponent(() => import("./features/todos").then(m => (
 const VulnerabilityList = lazyRouteComponent(() => import("./features/vulnerabilities").then(m => ({ default: m.VulnerabilityList })));
 const BountyHubPage = lazyRouteComponent(() => import("./features/bounty/components/BountyHubPage").then(m => ({ default: m.BountyHubPage })));
 const SearchPage = lazyRouteComponent(() => import("./features/search/components/SearchPage").then(m => ({ default: m.SearchPage })));
+const PluginManagementPage = lazyRouteComponent(() => import("./features/plugins/pages/PluginManagementPage").then(m => ({ default: m.default })));
 
 // Scan Feature Lazy Routes
 const ScheduledScansPage = lazyRouteComponent(() => import("./features/scans/components/ScheduledScansPage").then(m => ({ default: m.ScheduledScansPage })));
@@ -468,6 +469,13 @@ const stressTestingRoute = createRoute({
   component: StressTestingPage,
 });
 
+// Plugins Route
+const pluginsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "plugins",
+  component: PluginManagementPage,
+});
+
 // Login Route
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -521,6 +529,7 @@ const routeTree = rootRoute.addChildren([
     adminSettingsRoute,
     bountyHubRoute,
     searchRoute,
+    pluginsRoute,
   ]),
   loginRoute,
   logoutRoute,

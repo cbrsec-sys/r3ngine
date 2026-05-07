@@ -163,6 +163,12 @@
     - **Search Engine Dorking Results**: Consolidated view of all search engine discovery URLs with direct links to findings.
     - **Document Metadata Analysis**: Detailed table of metadata (Author, OS, Creation Software) extracted from public documents via MetaFinder.
     - **Automated Dork Generation**: Introduced an "Autogenerate Dorks" feature in the scan initiation modal to programmatically build sensitive search queries for any target domain.
+- **Plugin Orchestration System**: Introduced a powerful, modular system to extend reNgine with custom engines and UI.
+  - **Dynamic Task Injection**: Implemented `PluginOrchestrator` to inject custom tasks into Celery scan chains at specific anchor points (e.g., after Vulnerability Scan).
+  - **Pipeline Builder**: Created a drag-and-drop UI for reordering plugins relative to core engines.
+  - **Atomic Installation**: Developed a secure installation system with automated database backups and rollback mechanisms for plugin management.
+  - **Dynamic UI Modules**: Enabled runtime injection of custom React components into scan detail pages via ESM module loading.
+  - **Plugin Registry**: Full CRUD support for plugin management, including enabling/disabling and metadata tracking.
 - **Frontend Bundle Optimization**: Implemented granular manual chunking in Vite to split massive vendor libraries into smaller, more manageable bundles.
 - **Route-Level Code Splitting**: Implemented lazy loading for all major tactical pages using TanStack Router's `lazyRouteComponent`, significantly reducing the initial application payload.
 

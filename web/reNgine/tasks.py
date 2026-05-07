@@ -48,6 +48,8 @@ try:
 except ImportError:
 	Acunetix = None
 
+from plugins.orchestrator import PluginOrchestrator
+
 """
 Celery tasks.
 """
@@ -248,14 +250,15 @@ def initiate_scan(
 		if 'spiderfoot_scan' in tasks:
 			sub_discovery_group.append(spiderfoot_scan.si(ctx=ctx, description='Attack Surface Intelligence'))
 
-		workflow = chain(
+		# Build Celery tasks dynamically with plugin injections
+		workflow_steps = [
 			group(sub_discovery_group),
-			port_scan.si(ctx=ctx, description='Port scan'),
-			fetch_url.si(ctx=ctx, description='Fetch URL'),
+			PluginOrchestrator.inject_tasks('PortScan', port_scan.si(ctx=ctx, description='Port scan'), ctx),
+			PluginOrchestrator.inject_tasks('FetchURL', fetch_url.si(ctx=ctx, description='Fetch URL'), ctx),
 			group(
 				dir_file_fuzz.si(ctx=ctx, description='Directories & files fuzz'),
 				web_api_discovery.si(ctx=ctx, description='Web API Discovery'),
-				vulnerability_scan.si(ctx=ctx, description='Vulnerability scan'),
+				PluginOrchestrator.inject_tasks('VulnerabilityScan', vulnerability_scan.si(ctx=ctx, description='Vulnerability scan'), ctx),
 				screenshot.si(ctx=ctx, description='Screenshot'),
 				chain(
 					waf_detection.si(ctx=ctx, description='WAF detection'),
@@ -267,7 +270,9 @@ def initiate_scan(
 			calculate_risk_scores.si(scan_history_id=scan_history_id),
 			run_erl.si(scan_history_id=scan_history_id),
 			run_apme.si(scan_history_id=scan_history_id)
-		)
+		]
+
+		workflow = chain(*workflow_steps)
 
 		if config.get('enable_ai_impact_analysis'):
 			workflow = chain(workflow, generate_impact_assessment.si(scan_history_id=scan_history_id))

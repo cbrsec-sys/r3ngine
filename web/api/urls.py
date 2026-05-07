@@ -348,6 +348,7 @@ urlpatterns = [
         AttackPathsAPIView.as_view(),
         name='apme_attack_paths'
     ),
+    path('plugins/', include('plugins.urls')),
 ]
 
 

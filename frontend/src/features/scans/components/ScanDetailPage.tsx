@@ -95,6 +95,8 @@ import { ScanReportModal } from './ScanReportModal';
 import { StartScanModal } from './StartScanModal';
 import { OsintTab } from './OsintTab';
 import { AttackPathsTab } from './AttackPathsTab';
+import { usePlugins } from '../../plugins/api/pluginsApi';
+import PluginComponentLoader from '../../plugins/components/PluginComponentLoader';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   const configs: any = {
@@ -749,6 +751,7 @@ const DiscoveredTechWidget: React.FC<{ techs: any[], sx?: any }> = ({ techs = []
 export const ScanDetailPage = () => {
   const { projectSlug, scanId } = useParams({ from: '/$projectSlug/scan/detail/$scanId' });
   const { data, isLoading } = useScanSummary(projectSlug, parseInt(scanId));
+  const { data: plugins } = usePlugins();
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
   const [reportModalOpen, setReportModalOpen] = useState(false);
@@ -769,7 +772,7 @@ export const ScanDetailPage = () => {
     );
   }
 
-  const tabs = [
+  const baseTabs = [
     { label: 'HOME', icon: Activity },
     { label: 'SUBDOMAINS', icon: Globe },
     { label: 'BUCKETS', icon: Database, show: data.buckets_count > 0 },
@@ -785,6 +788,24 @@ export const ScanDetailPage = () => {
     { label: 'RECON NOTES', icon: FileText },
     { label: 'VISUALIZATION', icon: BarChart2 },
   ].filter(t => t.show !== false);
+
+  // Inject Plugin Tabs
+  const pluginTabs: any[] = [];
+  plugins?.forEach(plugin => {
+    if (plugin.is_enabled && plugin.manifest?.ui?.tabs) {
+      plugin.manifest.ui.tabs.forEach((tab: any) => {
+        pluginTabs.push({
+          label: tab.label,
+          icon: Zap, // Default icon for plugins, could be dynamic
+          isPlugin: true,
+          pluginSlug: plugin.slug,
+          componentFile: tab.file
+        });
+      });
+    }
+  });
+
+  const tabs = [...baseTabs, ...pluginTabs];
 
   const renderSidebar = () => (
     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -1377,7 +1398,16 @@ export const ScanDetailPage = () => {
                 {tabs[activeTab]?.label === 'ATTACK PATHS' && <AttackPathsTab scanId={parseInt(scanId)} />}
                 {tabs[activeTab]?.label === 'EXPLOITS' && renderExploits()}
 
-                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'SCREENSHOTS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION', 'ATTACK PATHS'].includes(tabs[activeTab]?.label) && (
+                {tabs[activeTab]?.isPlugin && (
+                  <PluginComponentLoader 
+                    pluginSlug={tabs[activeTab].pluginSlug}
+                    componentFile={tabs[activeTab].componentFile}
+                    scanId={parseInt(scanId)}
+                    projectSlug={projectSlug}
+                  />
+                )}
+
+                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'SCREENSHOTS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION', 'ATTACK PATHS'].includes(tabs[activeTab]?.label) && !tabs[activeTab]?.isPlugin && (
                   <Box sx={{ p: 4, textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 2 }}>
                     <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE STAGING AREA: {tabs[activeTab]?.label}</Typography>
                     <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem', mt: 1 }}>SYNCHRONIZING DATA FROM LEGACY INTERFACE...</Typography>

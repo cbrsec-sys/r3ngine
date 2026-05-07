@@ -105,7 +105,8 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'mathfilters',
     'drf_yasg',
-    'rolepermissions'
+    'rolepermissions',
+    'plugins.apps.PluginsConfig',
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
