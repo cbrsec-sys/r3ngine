@@ -17,6 +17,15 @@
   - **Normalizer & Adapters**: Standardized validation evidence (request/response dumps, payloads) into a unified schema for consistent UI rendering.
   - **Global Configuration**: Added a global toggle `RENGINE_ERL_ENABLED` and updated all default scan engines to include ERL by default.
   - **Interactive Evidence Viewer**: Added a new "Validation" column and expandable evidence section in the vulnerability dashboard to display cryptographic-grade proof of findings.
+- **Attack Path Modeling Engine (APME)**: Implemented a production-grade, graph-based attack path modeling system.
+  - **Graph-Based Asset Modeling**: Assets, vulnerabilities, credentials, identities, and capabilities are represented as a normalized Neo4j graph with typed, constraint-validated edges.
+  - **Multi-Algorithm Pathfinding**: Implemented BFS (shortest paths), DFS (deep chains), and Dijkstra (weight-optimal) traversal against Neo4j to discover all feasible attack routes.
+  - **Configuration-Driven Rules Engine**: Attack relationships (e.g., SQLi → DB Access, RCE → Pivot) are derived dynamically from `rules.yaml` — no hardcoded chains.
+  - **Constraint-Aware Validation**: All discovered paths are validated against a ConstraintEngine that enforces authentication requirements, network boundary rules, and privilege levels. Unrealistic paths are silently dropped (fail-safe).
+  - **ERL-Integrated Scoring**: Attack paths are scored using a weighted formula (severity, exploitability, path length, privilege gain). ERL-validated steps receive a confidence boost.
+  - **Validated vs. Inferred Steps**: Each step in a returned path is explicitly tagged as `validated` (ERL-confirmed) or `inferred` (rule-derived) in the output.
+  - **Automated Persistence**: Top attack paths are automatically persisted to `ImpactAssessment` after each scan for API and frontend consumption.
+  - **Pipeline Integration**: `run_apme` is chained after both `vulnerability_scan` and `run_erl` in all standard scan engines, controlled via `RENGINE_APME_ENABLED` setting.
  - **Advanced Web App & API Discovery Pipeline**: Introduced a dedicated reconnaissance engine for deep API discovery, featuring:
  - **Kiterunner**: High-performance API endpoint brute-forcing with custom `.kite` wordlists (`routes-large.kite` by default).
  - **Arjun**: Automated HTTP parameter discovery for identifying hidden API inputs.

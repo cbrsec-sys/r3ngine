@@ -265,7 +265,8 @@ def initiate_scan(
 			),
 			correlate_vulnerabilities.si(scan_history_id=scan_history_id),
 			calculate_risk_scores.si(scan_history_id=scan_history_id),
-			run_erl.si(scan_history_id=scan_history_id)
+			run_erl.si(scan_history_id=scan_history_id),
+			run_apme.si(scan_history_id=scan_history_id)
 		)
 
 		if config.get('enable_ai_impact_analysis'):
@@ -6317,3 +6318,34 @@ def run_erl(self, scan_history_id):
 	from erl.core.orchestrator import Orchestrator
 	orchestrator = Orchestrator()
 	orchestrator.process_scan(scan_history_id)
+
+
+@app.task(name='run_apme', queue='main_scan_queue', base=RengineTask, bind=True)
+def run_apme(self, scan_history_id):
+	"""
+	Runs the Attack Path Modeling Engine (APME).
+
+	This task runs AFTER both vulnerability_scan and run_erl to ensure:
+	- All vulnerabilities are discovered and correlated
+	- ERL validation has updated confidence scores
+	- The graph has the most accurate data for path computation
+
+	Results are persisted to ImpactAssessment for API and frontend consumption.
+	"""
+	if not RENGINE_APME_ENABLED:
+		logger.info("APME is disabled in settings (RENGINE_APME_ENABLED=False). Skipping.")
+		return
+
+	logger.info(f"APME: Initiating attack path modeling for scan_history_id={scan_history_id}")
+	try:
+		from apme.orchestrator import APMEOrchestrator
+		orchestrator = APMEOrchestrator(top_n=5)
+		result = orchestrator.run(scan_history_id)
+		logger.info(
+			f"APME: Completed. Found {result.get('total_paths', 0)} paths, "
+			f"returned top {result.get('returned_paths', 0)}."
+		)
+		return result
+	except Exception as exc:
+		logger.error(f"APME: Task failed for scan {scan_history_id}: {exc}", exc_info=True)
+		return {"error": str(exc), "total_paths": 0, "returned_paths": 0, "paths": []}

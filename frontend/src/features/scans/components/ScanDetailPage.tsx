@@ -75,7 +75,8 @@ import {
   Key,
   X,
   Copy,
-  RefreshCw
+  RefreshCw,
+  GitBranch
 } from 'lucide-react';
 import { useScanSummary, useActivityLogs } from '../api';
 import Chart from 'react-apexcharts';
@@ -93,6 +94,7 @@ import { ScreenshotsTab } from './ScreenshotsTab';
 import { ScanReportModal } from './ScanReportModal';
 import { StartScanModal } from './StartScanModal';
 import { OsintTab } from './OsintTab';
+import { AttackPathsTab } from './AttackPathsTab';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   const configs: any = {
@@ -778,6 +780,7 @@ export const ScanDetailPage = () => {
     { label: 'EXPLOITS', icon: Zap, show: data.exploitable_count > 0 },
     { label: 'OSINT', icon: Search, show: data.scan_info.tasks?.includes('osint') },
     { label: 'LEAKS', icon: Shield },
+    { label: 'ATTACK PATHS', icon: GitBranch, show: data.vulnerability_count > 0 },
     { label: 'ATTACK SURFACE', icon: MapIcon },
     { label: 'RECON NOTES', icon: FileText },
     { label: 'VISUALIZATION', icon: BarChart2 },
@@ -1371,9 +1374,10 @@ export const ScanDetailPage = () => {
                 {tabs[activeTab]?.label === 'ATTACK SURFACE' && renderAttackSurface()}
                 {tabs[activeTab]?.label === 'VISUALIZATION' && renderVisualization()}
                 {tabs[activeTab]?.label === 'RECON NOTES' && <ReconNotesWidget notes={data.todo_notes} />}
+                {tabs[activeTab]?.label === 'ATTACK PATHS' && <AttackPathsTab scanId={parseInt(scanId)} />}
                 {tabs[activeTab]?.label === 'EXPLOITS' && renderExploits()}
 
-                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'SCREENSHOTS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION'].includes(tabs[activeTab]?.label) && (
+                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'SCREENSHOTS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION', 'ATTACK PATHS'].includes(tabs[activeTab]?.label) && (
                   <Box sx={{ p: 4, textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 2 }}>
                     <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE STAGING AREA: {tabs[activeTab]?.label}</Typography>
                     <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem', mt: 1 }}>SYNCHRONIZING DATA FROM LEGACY INTERFACE...</Typography>
