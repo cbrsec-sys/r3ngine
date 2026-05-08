@@ -68,8 +68,22 @@ class OpSecManager:
             return self._apply_ffuf(command)
         elif tool_name == "httpx":
             return self._apply_httpx(command)
+        elif tool_name == "hydra":
+            return self._apply_hydra(command)
         
         return command
+
+    def _apply_hydra(self, cmd):
+        flags = []
+        if self.settings.enable_delay:
+            # hydra -c (delay in seconds)
+            flags.insert(0, f"-c {self.settings.delay_ms / 1000.0}")
+        
+        if self.settings.enable_rate_limit:
+            # hydra -t (tasks)
+            flags.insert(0, f"-t {self.settings.max_rps}")
+            
+        return f"hydra {' '.join(flags)} {cmd.replace('hydra ', '')}"
 
     def _apply_nuclei(self, cmd):
         flags = []
@@ -246,143 +260,145 @@ class ProxychainsWrapper:
 
 class BruteForceOrchestrator:
     """
-    Orchestrates Medusa brute-force attacks with proxy rotation and stealth.
+    Orchestrates Hydra/Medusa brute-force attacks with proxy rotation, 
+    multi-protocol support, and centralized target management.
     """
-    def __init__(self, target, service, port=None, users=[], passwords=[]):
-        self.target = target
-        self.service = service
-        self.port = port
-        self.users = users
-        self.passwords = passwords
+    def __init__(self, scan_history):
+        self.scan = scan_history
         self.proxy_manager = ProxychainsWrapper()
-        self.results = []
-        self.total_attempts = 0
-        self.total_success = 0
+        self.opsec = OpSecManager()
         self.logger = logging.getLogger(__name__)
+        self.results_dir = f"{settings.SCAN_HISTORY_PATH}/{self.scan.id}/brute_force"
+        os.makedirs(self.results_dir, exist_ok=True)
 
-    def _generate_combos(self):
-        combos = []
-        for user in self.users:
-            for password in self.passwords:
-                combos.append((user, password))
-        random.shuffle(combos)
-        return combos
+    def run_orchestration(self, ctx={}):
+        """
+        Main entry point: Pulls candidates from DB, batches them, and executes.
+        """
+        from startScan.models import AuthCandidate
+        candidates = AuthCandidate.objects.filter(scan_history=self.scan, status='pending')
+        
+        if not candidates.exists():
+            self.logger.info("No pending auth candidates found for this scan.")
+            return []
 
-    def run(self, min_attempts=1, max_attempts=10, stop_on_success=True, engine='hydra'):
-        combos = self._generate_combos()
-        i = 0
-        while i < len(combos):
-            # Determine batch size (1-10 attempts)
-            batch_size = random.randint(min_attempts, max_attempts)
-            batch = combos[i:i+batch_size]
-            i += batch_size
+        # Group candidates by protocol
+        groups = {}
+        for c in candidates:
+            if c.protocol not in groups:
+                groups[c.protocol] = []
+            groups[c.protocol].append(c)
 
-            # Create temp combo file
-            fd, combo_file = tempfile.mkstemp(suffix=".txt", prefix="brute_combo_")
-            os.close(fd)
+        all_results = []
+        for protocol, cand_list in groups.items():
+            self.logger.info(f"Processing {len(cand_list)} candidates for protocol: {protocol}")
             
-            # Clean target for tools
-            clean_target = self.target.split("://")[-1].split(":")[0]
-            
-            if engine == 'medusa':
-                # Medusa combo file format: host:user:pass
-                batch_data = [f"{clean_target}:{c[0]}:{c[1]}" for c in batch]
-            else:
-                # Hydra combo file format: user:pass
-                batch_data = [f"{c[0]}:{c[1]}" for c in batch]
-            
-            with open(combo_file, 'w') as f:
-                f.write("\n".join(batch_data))
+            # For non-HTTP, we can batch targets if they share credentials
+            if protocol in ['ssh', 'ftp', 'smb', 'rdp', 'telnet']:
+                results = self._run_protocol_batch(protocol, cand_list, ctx)
+                all_results.extend(results)
+            elif protocol == 'http':
+                # HTTP needs individual handling per form
+                for c in cand_list:
+                    results = self._run_http_brute(c, ctx)
+                    all_results.extend(results)
+                    
+        return all_results
 
-            # Setup proxy
-            proxy = self.proxy_manager.get_random_proxy()
-            cmd_prefix = ""
-            conf_path = None
-            hydra_proxy_flag = ""
-            if proxy:
-                if self.proxy_manager.should_wrap():
-                    conf_path = self.proxy_manager.write_temp_config(proxy)
-                    cmd_prefix = f"{PROXYCHAINS_EXEC_PATH} -f {conf_path} "
-                elif engine == 'hydra':
-                    parts = proxy.split(" ")
-                    if len(parts) >= 3:
-                        hydra_proxy_flag = f"-x {parts[0]}://{parts[1]}:{parts[2]} "
-
-            # Build command
-            port_flag = f"-n {self.port}" if self.port else ""
-            if engine == 'hydra':
-                # Hydra uses -s for port, -S for SSL
-                port_flag = f"-s {self.port}" if self.port else ""
-                ssl_flag = "-S" if (str(self.port) == "443" or self.target.startswith("https")) else ""
-                output_file = f"/tmp/hydra_{clean_target}_{random.randint(1000,9999)}.log"
-                # -C combo, -o output, -f stop on success
-                stop_flag = "-f" if stop_on_success else ""
-                # Map medusa service names to hydra if needed (usually they match)
-                hydra_service = self.service
-                if hydra_service == 'web-form': hydra_service = 'http-post-form'
-                
-                cmd = f"{cmd_prefix}{HYDRA_EXEC_PATH} {hydra_proxy_flag}-C {combo_file} {port_flag} {ssl_flag} {stop_flag} -o {output_file} {clean_target} {hydra_service}"
-            else:
-                # Medusa
-                ssl_flag = "-s" if (str(self.port) == "443" or self.target.startswith("https")) else ""
-                output_file = f"/tmp/medusa_{clean_target}_{random.randint(1000,9999)}.log"
-                cmd = f"{cmd_prefix}{MEDUSA_EXEC_PATH} -h {clean_target} {port_flag} {ssl_flag} -M {self.service} -C {combo_file} -O {output_file}"
+    def _run_protocol_batch(self, protocol, candidates, ctx):
+        """Batch execution for simple protocols (SSH, SMB, etc.)"""
+        # Create target file
+        target_file = f"{self.results_dir}/{protocol}_targets.txt"
+        with open(target_file, 'w') as f:
+            for c in candidates:
+                f.write(f"{c.target}\n")
+        
+        # Wordlists
+        user_list = ctx.get('user_list', "/usr/src/wordlist/common_users.txt")
+        pass_list = ctx.get('pass_list', "/usr/src/wordlist/common_passwords.txt")
+        
+        # Build command (Hydra)
+        # Hydra uses -M for targets file
+        cmd = f"{HYDRA_EXEC_PATH} -L {user_list} -P {pass_list} -M {target_file} {protocol}"
+        
+        # Apply OpSec & Proxy
+        cmd = self.opsec.apply_stealth('hydra', cmd)
+        wrapped_cmd, conf_path = self.proxy_manager.wrap_command(cmd)
+        
+        results = []
+        try:
+            self.logger.info(f"Executing batch: {wrapped_cmd}")
+            output_file = f"{self.results_dir}/{protocol}_results.log"
+            proc = subprocess.run(f"{wrapped_cmd} -o {output_file}", shell=True, timeout=1200)
             
-            self.logger.info(f"Executing brute-force batch ({engine}): {cmd}")
+            if os.path.exists(output_file):
+                results = self._parse_hydra_output(output_file, protocol)
+                # Update candidate status
+                for c in candidates:
+                    c.status = 'completed'
+                    c.save()
+        except Exception as e:
+            self.logger.error(f"Error in {protocol} batch: {e}")
+        finally:
+            if conf_path and os.path.exists(conf_path): os.remove(conf_path)
             
-            try:
-                subprocess.run(cmd, shell=True, timeout=300)
-                self.total_attempts += len(batch)
-                
-                if os.path.exists(output_file):
-                    with open(output_file, 'r') as f:
-                        output = f.read()
-                        
-                        batch_success = 0
-                        if engine == 'hydra':
-                            # Hydra output file format: host service port user pass
-                            # Example: 1.1.1.1 http-get 80 admin password
-                            # We skip comments starting with #
-                            for line in output.splitlines():
-                                if line.startswith('#') or not line.strip(): continue
-                                parts = line.split()
-                                if len(parts) >= 5:
-                                    self.results.append({
-                                        'user': parts[3],
-                                        'password': parts[4],
-                                        'target': self.target,
-                                        'service': self.service
-                                    })
-                                    batch_success += 1
-                                    self.total_success += 1
-                        else:
-                            # Medusa
-                            if "ACCOUNT FOUND" in output:
-                                # Fixed regex: require [SUCCESS] to avoid matching [FAILURE] at end of string
-                                found = re.findall(r"ACCOUNT FOUND: \[(.*?)\](?: Host: .*?)? User: (?:\[)?(.*?)(?:\])? Password: (?:\[)?(.*?)(?:\])?\s+\[SUCCESS\]", output)
-                                for match in found:
-                                    self.results.append({
-                                        'user': match[1],
-                                        'password': match[2],
-                                        'target': self.target,
-                                        'service': self.service
-                                    })
-                                    batch_success += 1
-                                    self.total_success += 1
-                            
-                        if batch_success > 0:
-                            self.logger.info(f"Batch completed on {self.target}. Results: {batch_success} success, {len(batch) - batch_success} failed.")
-                            if stop_on_success:
-                                self.logger.info(f"Success found. Stopping brute-force for {self.target}.")
-                                break
-                        else:
-                            self.logger.info(f"Batch completed on {self.target}. All {len(batch)} attempts failed.")
-            except Exception as e:
-                self.logger.error(f"Error during brute-force batch execution on {self.target}: {str(e)}")
-            finally:
-                if os.path.exists(combo_file): os.remove(combo_file)
-                if conf_path and os.path.exists(conf_path): os.remove(conf_path)
-                if os.path.exists(output_file): os.remove(output_file)
+        return results
 
-        self.logger.info(f"Brute-force scan finished for {self.target}. Total Attempts: {self.total_attempts}, Total Success: {self.total_success}")
-        return self.results
+    def _run_http_brute(self, candidate, ctx):
+        """Individual execution for HTTP (handles forms)"""
+        meta = candidate.metadata or {}
+        user_list = ctx.get('user_list', "/usr/src/wordlist/common_users.txt")
+        pass_list = ctx.get('pass_list', "/usr/src/wordlist/common_passwords.txt")
+        
+        # Extract target host
+        parsed = urlparse(candidate.target)
+        host = parsed.netloc
+        path = parsed.path or "/"
+        
+        # Determine form parameters (Hydra format)
+        # Default: /login.php:user=^USER^&pass=^PASS^:F=Login failed
+        user_field = meta.get('user_field', 'username')
+        pass_field = meta.get('pass_field', 'password')
+        form_params = f"{path}:{user_field}=^USER^&{pass_field}=^PASS^:F=failed"
+        
+        cmd = f"{HYDRA_EXEC_PATH} -L {user_list} -P {pass_list} {host} http-post-form \"{form_params}\""
+        
+        # Apply OpSec & Proxy
+        cmd = self.opsec.apply_stealth('hydra', cmd)
+        wrapped_cmd, conf_path = self.proxy_manager.wrap_command(cmd)
+        
+        results = []
+        try:
+            output_file = f"{self.results_dir}/http_{host.replace(':','_')}_results.log"
+            subprocess.run(f"{wrapped_cmd} -o {output_file}", shell=True, timeout=600)
+            if os.path.exists(output_file):
+                results = self._parse_hydra_output(output_file, 'http')
+                candidate.status = 'completed'
+                candidate.save()
+        except Exception as e:
+            self.logger.error(f"Error in HTTP brute for {candidate.target}: {e}")
+        finally:
+            if conf_path and os.path.exists(conf_path): os.remove(conf_path)
+            
+        return results
+
+    def _parse_hydra_output(self, log_file, protocol):
+        results = []
+        if not os.path.exists(log_file):
+            return results
+            
+        with open(log_file, 'r') as f:
+            for line in f:
+                if line.startswith('#') or not line.strip(): continue
+                # Hydra output format: host protocol port user pass
+                parts = line.split()
+                if len(parts) >= 5:
+                    results.append({
+                        'target': parts[0],
+                        'protocol': parts[1],
+                        'port': parts[2],
+                        'user': parts[3],
+                        'password': parts[4],
+                        'service': protocol
+                    })
+        return results

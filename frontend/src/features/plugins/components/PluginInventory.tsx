@@ -24,7 +24,7 @@ const PluginInventory: React.FC<Props> = ({ plugins }) => {
   return (
     <Grid container spacing={3} sx={{ justifyContent: "center" }}>
       {plugins?.length > 0 && plugins?.map((plugin) => (
-        <Grid size={{ xs: 12, md: 6, lg: 4 }} key={plugin.slug}>
+        <Grid size={{ xs: 12, md: 6, lg: 4 }} key={plugin.slug} sx={{ justifyContent: "center" }}>
           <PluginCard plugin={plugin} />
         </Grid>
       )) || (

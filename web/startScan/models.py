@@ -341,6 +341,28 @@ class Subdomain(models.Model):
 		)
 
 
+
+class Screenshot(models.Model):
+	subdomain = models.ForeignKey(Subdomain, on_delete=models.CASCADE, related_name='screenshots')
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, related_name='screenshots')
+	url = models.URLField(max_length=2000)
+	title = models.CharField(max_length=1000, null=True, blank=True)
+	status_code = models.IntegerField(null=True, blank=True)
+	screenshot_path = models.CharField(max_length=1000)
+	html_path = models.CharField(max_length=1000, null=True, blank=True)
+	favicon_hash = models.CharField(max_length=100, null=True, blank=True)
+	technologies = models.JSONField(default=dict, blank=True)
+	tags = models.JSONField(default=list, blank=True)
+	response_headers = models.JSONField(default=dict, blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		ordering = ['-created_at']
+
+	def __str__(self):
+		return str(self.url)
+
+
 class SubScan(models.Model):
 	id = models.AutoField(primary_key=True)
 	type = models.CharField(max_length=100, blank=True, null=True)
@@ -856,3 +878,57 @@ class StressTestResult(models.Model):
 
     def __str__(self):
         return f"Stress Test Result for Scan {self.scan_history.id} - {self.tool_used}"
+
+
+class AuthCandidate(models.Model):
+	PROTOCOL_CHOICES = (
+		('http', 'HTTP'),
+		('smb', 'SMB'),
+		('rdp', 'RDP'),
+		('ssh', 'SSH'),
+		('ftp', 'FTP'),
+		('telnet', 'Telnet'),
+	)
+	STATUS_CHOICES = (
+		('pending', 'Pending'),
+		('processing', 'Processing'),
+		('completed', 'Completed'),
+		('failed', 'Failed'),
+	)
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE)
+	subdomain = models.ForeignKey(Subdomain, on_delete=models.CASCADE, null=True, blank=True)
+	endpoint = models.ForeignKey(EndPoint, on_delete=models.CASCADE, null=True, blank=True)
+	target = models.CharField(max_length=2000)
+	protocol = models.CharField(max_length=20, choices=PROTOCOL_CHOICES)
+	port = models.IntegerField()
+	source_tool = models.CharField(max_length=200, null=True, blank=True)
+	metadata = models.JSONField(default=dict, blank=True)
+	status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+	discovered_date = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name_plural = "Authentication Candidates"
+		unique_together = ('scan_history', 'target', 'protocol', 'port')
+
+	def __str__(self):
+		return f"{self.protocol.upper()} | {self.target}:{self.port}"
+
+
+class ScanReport(models.Model):
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, related_name='reports')
+	report_type = models.CharField(max_length=50) # full, vulnerability
+	report_template = models.CharField(max_length=50) # default, modern, enterprise
+	status = models.IntegerField(choices=CELERY_TASK_STATUSES, default=-1)
+	report_file = models.FileField(upload_to='reports/', null=True, blank=True)
+	error_message = models.TextField(null=True, blank=True)
+	params = models.JSONField(default=dict, blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+	completed_at = models.DateTimeField(null=True, blank=True)
+
+	class Meta:
+		verbose_name_plural = "Scan Reports"
+
+	def __str__(self):
+		return f"Report for {self.scan_history.domain.name} ({self.report_type})"

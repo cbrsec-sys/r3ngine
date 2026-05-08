@@ -135,6 +135,7 @@ brute_force_scan: {
   'users_wordlist': ['top-100-users'], # Wordlist names from reNgine Vault
   'pass_wordlist': ['top-100-pass'],
   'service': 'http',              # Target service (http, ssh, etc.)
+  'max_retries': 3,               # Max consecutive fatal errors before stopping
   # 'port': 443                   # Optional: Specific port override
 }
 spiderfoot_scan: {

@@ -11,9 +11,11 @@ def is_safe_path(basedir, path, follow_symlinks=True):
 	# resolves symbolic links
 	if follow_symlinks:
 		matchpath = os.path.realpath(path)
+		basedir = os.path.realpath(basedir)
 	else:
 		matchpath = os.path.abspath(path)
-	return basedir == os.path.commonpath((basedir, matchpath))
+		basedir = os.path.abspath(basedir)
+	return os.path.normpath(basedir) == os.path.commonpath((basedir, matchpath))
 
 
 # Source: https://stackoverflow.com/a/10408992
@@ -173,3 +175,51 @@ def sorting_key(subdomain):
 		return 3
 	else:
 		return 4
+
+
+def save_auth_candidate(scan_history, target, protocol, port, source_tool=None, metadata=None, subdomain=None, endpoint=None):
+	"""
+	Save or update an authentication candidate for brute-forcing.
+	Handles deduplication and metadata merging.
+	"""
+	from startScan.models import AuthCandidate
+
+	if metadata is None:
+		metadata = {}
+
+	# Clean protocol name to lowercase for consistency
+	protocol = protocol.lower()
+
+	# Try to find existing candidate to avoid duplicates
+	candidate, created = AuthCandidate.objects.get_or_create(
+		scan_history=scan_history,
+		target=target,
+		protocol=protocol,
+		port=port,
+		defaults={
+			'subdomain': subdomain,
+			'endpoint': endpoint,
+			'source_tool': source_tool,
+			'metadata': metadata,
+			'status': 'pending'
+		}
+	)
+
+	if not created:
+		# If it exists, update metadata and source tool if new info is provided
+		updated = False
+		if source_tool and source_tool not in (candidate.source_tool or ''):
+			candidate.source_tool = f"{candidate.source_tool}, {source_tool}" if candidate.source_tool else source_tool
+			updated = True
+
+		if metadata:
+			# Merge metadata
+			original_meta = candidate.metadata or {}
+			original_meta.update(metadata)
+			candidate.metadata = original_meta
+			updated = True
+
+		if updated:
+			candidate.save()
+
+	return candidate

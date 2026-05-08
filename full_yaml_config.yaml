@@ -136,6 +136,7 @@ brute_force_scan: {
   'users_wordlist': ['top-100-users', 'admin-users'], # Multiple wordlists
   'pass_wordlist': ['top-100-pass', 'common-firewall-pass'],
   'service': 'http',
+  'max_retries': 3,
   # 'port': 443,
   # 'stop_on_success': true,
   # 'max_attempts_per_proxy': 5

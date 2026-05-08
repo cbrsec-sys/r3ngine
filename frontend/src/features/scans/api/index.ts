@@ -159,14 +159,14 @@ export const useBulkStopSubScans = (projectSlug: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (ids: number[]) => {
-      const response = await fetch('/api/subscans/bulk_stop/', {
+      const response = await fetch('/api/action/stop/scan/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
         },
         credentials: 'include',
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify({ subscan_ids: ids }),
       });
       return response.json();
     },
@@ -218,12 +218,14 @@ export const useStopScan = (projectSlug: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (id: number) => {
-      const response = await fetch(`/api/listScans/${id}/stop_scan/`, {
+      const response = await fetch('/api/action/stop/scan/', {
         method: 'POST',
         headers: {
+          'Content-Type': 'application/json',
           'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
         },
         credentials: 'include',
+        body: JSON.stringify({ scan_ids: [id] }),
       });
       return response.json();
     },
@@ -256,14 +258,17 @@ export const useBulkScanAction = (projectSlug: string) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async ({ action, ids }: { action: 'bulk_stop' | 'bulk_delete', ids: number[] }) => {
-      const response = await fetch(`/api/listScans/${action}/`, {
+      const url = action === 'bulk_stop' ? '/api/action/stop/scan/' : `/api/listScans/${action}/`;
+      const body = action === 'bulk_stop' ? { scan_ids: ids } : { ids };
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
         },
         credentials: 'include',
-        body: JSON.stringify({ ids }),
+        body: JSON.stringify(body),
       });
       return response.json();
     },

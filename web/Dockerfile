@@ -40,6 +40,8 @@ RUN apt update -y && \
     python3.10 \
     python3-dev \
     python3-pip \
+    python3-venv \
+    xvfb \
     libpci-dev \
     libpciaccess-dev \
     libegl-dev \
@@ -87,7 +89,15 @@ RUN apt update -y && \
     postgresql-client \
     unzip --fix-missing -y
 
-RUN add-apt-repository ppa:mozillateam/ppa
+RUN add-apt-repository ppa:mozillateam/ppa && \
+    apt update -y && \
+    apt install -y --no-install-recommends \
+    firefox \
+    libgtk-3-0 \
+    libdbus-glib-1-2 \
+    libasound2 \
+    libx11-xcb1 \
+    libxt6 
 
 # Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
@@ -189,11 +199,6 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt install -y nodejs && \
     npm install -g retire
 
-# Setup Eyewitness
-RUN git clone https://github.com/RedSiege/EyeWitness /usr/src/github/EyeWitness && \
-    cd /usr/src/github/EyeWitness && \
-    bash setup/setup.sh
-
 # Update Nuclei and Nuclei-Templates
 RUN nuclei -update-templates
 
@@ -272,13 +277,7 @@ RUN mkdir -p /usr/src/wordlist && \
 COPY web/requirements.txt /tmp/requirements.txt
 RUN pip3 install --upgrade pip setuptools wheel
 RUN pip3 install -r /tmp/requirements.txt --no-cache-dir --ignore-installed blinker
-
-# install eyewitness
-# RUN pip3 install --no-cache-dir fuzzywuzzy \
-#     selenium==4.15 \
-#     python-Levenshtein \
-#     pyvirtualdisplay \
-#     netaddr
+RUN playwright install-deps chromium && playwright install chromium
 
 # Install Frontend Dependencies (for Dev mode)
 RUN mkdir -p /usr/src/app/frontend

@@ -11,7 +11,7 @@
             margin: 20mm;
 
             @bottom-left {
-                content: "{{ company_name }} - Confidential";
+                content: "{% if show_footer %}{{footer_text}}{% else %}{{company_name}} - Confidential{% endif %}";
                 font-family: 'Inter', sans-serif;
                 font-size: 8pt;
                 color: #64748b;
@@ -53,10 +53,10 @@
         .page-break { page-break-before: always; }
         
         /* Colors */
-        .text-primary { color: {{ primary_color|default:"#0f172a" }}; }
+        .text-primary { color: {{primary_color|default:"#0f172a"}}; }
         .text-secondary { color: #64748b; }
-        .bg-primary { background-color: {{ primary_color|default:"#0f172a" }}; }
-        .bg-secondary { background-color: #f8fafc; }
+        .bg-primary { background-color: {{primary_color|default:"#0f172a"}}; }
+        .bg-secondary { background-color: {{secondary_color|default:"#f8fafc"}}; }
 
         /* Severity Colors */
         .severity-critical { background-color: #991b1b; color: white; }
@@ -100,7 +100,7 @@
         .report-title {
             font-size: 32pt;
             font-weight: 700;
-            color: #0f172a;
+            color: {{primary_color|default:"#0f172a"}};
             margin: 0;
             line-height: 1.1;
         }
@@ -114,7 +114,7 @@
 
         .cover-footer {
             padding: 20mm;
-            background-color: #f8fafc;
+            background-color: {{secondary_color|default:"#f8fafc"}};
             border-top: 1px solid #e2e8f0;
         }
 
@@ -148,12 +148,18 @@
 
         /* Typography */
         h1, h2, h3, h4 {
-            color: {{ primary_color|default:"#0f172a" }};
+            color: {{primary_color|default:"#0f172a"}};
             font-weight: 600;
         }
 
-        h1 { font-size: 24pt; border-bottom: 2px solid {{ primary_color|default:"#0f172a" }}; padding-bottom: 3mm; margin-bottom: 8mm; }
-        h2 { font-size: 18pt; margin-top: 12mm; margin-bottom: 6mm; }
+        h1 { 
+            font-size: 24pt; 
+            border-bottom: 2px solid {{primary_color|default:"#0f172a"}}; 
+            padding-bottom: 3mm; 
+            margin-bottom: 8mm;
+            break-after: avoid !important;
+        }
+        h2 { font-size: 18pt; margin-top: 12mm; margin-bottom: 6mm; break-after: avoid !important; }
         h3 { font-size: 14pt; margin-top: 8mm; margin-bottom: 4mm; }
 
         /* Tables */
@@ -196,7 +202,7 @@
 
         .toc-page {
             font-weight: 600;
-            color: #0f172a;
+            color: {{primary_color|default:"#0f172a"}};
         }
         .toc-page::after {
             content: target-counter(attr(data-href), page);
@@ -325,6 +331,9 @@
     <!-- Cover Page -->
     <article id="cover">
         <div class="cover-header">
+            {% if company_logo %}
+            <img src="{{company_logo}}" class="cover-logo" />
+            {% endif %}
             <div class="report-title">{{ report_name }}</div>
             <div class="report-subtitle">Assessment for {{ scan_object.domain.name }}</div>
         </div>
@@ -341,11 +350,11 @@
                 </div>
                 <div class="detail-item">
                     <label>Prepared By</label>
-                    <span>{{ company_name }}</span>
+                    <span>{{company_name}}</span>
                 </div>
                 <div class="detail-item">
                     <label>Report ID</label>
-                    <span>RE-{{ scan_object.id }}-{{ now|date:"Ymd" }}</span>
+                    <span>RE-{{ scan_object.id }}-{% now "Ymd" %}</span>
                 </div>
             </div>
             {% if show_rengine_banner %}
@@ -810,8 +819,8 @@
                 {{ footer_text }}
             </div>
             {% endif %}
-            <p>Report ID: RE-{{ scan_object.id }}-{{ now|date:"Ymd" }}</p>
-            <p>© {{ now|year }} {{ company_name }}. All rights reserved.</p>
+            <p>Report ID: RE-{{ scan_object.id }}-{% now "Ymd" %}</p>
+            <p>© {% now "Y" %} {{ company_name }}. All rights reserved.</p>
         </div>
     </article>
 </body>

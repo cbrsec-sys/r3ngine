@@ -4,13 +4,26 @@
 **Official Repo location:** https://github.com/whiterabb17/r3ngine
  
 ### New Features
+- **Asynchronous Report Generation Pipeline**: Eliminated 502 Bad Gateway timeouts by offloading PDF generation to background workers.
+  - **Status Tracking & Polling**: Implemented a new `ScanReport` model and status API endpoints to monitor generation progress.
+  - **Dynamic UI Progress**: Added a polling mechanism to the `ScanReportModal` with real-time status updates and manual download fallback.
+  - **Custom Aesthetics**: Fully integrated user-configured branding, including custom colors and company identity settings.
+  - **Template Reliability**: Fixed 500 errors in Modern and Enterprise templates caused by parsing errors and invalid Django tags.
+  - **Speed Optimization**: Refined LLM generation to focus on high-value sections, reducing generation time by 90%.
 - **Integrated Subdomain Action Interface**: Fully wired and enabled interactive management for the Subdomains tab in the scan detail interface.
   - **Subscan Configuration Overlay**: Implemented a tactical overlay for initiating targeted subscans with multiple engine selection support.
   - **LLM-Powered Attack Surface Analysis**: Integrated on-demand attack surface generation for individual subdomains using configured LLMs.
   - **Tactical TODO Management**: Added functionality to quickly attach reconnaissance notes (TODOs) to specific subdomains.
   - **Status & Lifecycle Management**: Fully implemented deletion and importance toggling for subdomains with immediate UI feedback and query invalidation.
+- **Intelligent Brute-Force Orchestration Engine**: Replaced legacy Nmap-based triggers with a centralized, discovery-driven queue.
+  - **AuthCandidate Queue**: Implemented a new database model to track and deduplicate brute-force targets (SSH, RDP, SMB, FTP, Telnet, HTTP) across all discovery tools.
+  - **Tiered HTTP Discovery**:
+    - **Tier 1 (Tech Hints)**: Automatic detection of common services.
+    - **Tier 2 (Nuclei)**: Integrated 500+ authentication-related Nuclei templates into the candidate queue.
+    - **Tier 3 (Intelligent Extraction)**: Automated form extraction using httpx and regex to identify unknown login portals.
+  - **Unified Hydra Orchestrator**: Refactored the brute-force engine to use Hydra for high-speed, multi-protocol batching with OpSec awareness (rate-limiting and delay controls).
+  - **Stealth Integration**: Full support for rotating proxies via `proxychains` or native Hydra proxy flags.
 - **Hydra Brute-Force Integration**: Migrated from Medusa to Hydra as the primary brute-force engine for enhanced reliability and better service support.
-- **Enhanced Brute-Force Orchestration**: Support for both Hydra (primary) and Medusa (fallback) with automatic service mapping, dynamic command building, and **fixture registration** in `external_tools.yaml`.
 - **Adaptive Stress & Resilience Engine (ASRE)**: Implemented full-scale endpoint stress testing directly within the reNgine workflow.
   - **Tool Orchestration**: Seamlessly orchestrated backend stress tests via Celery, driving load testing tools such as `k6`, `wrk`, `hping3`, and `Locust`.
   - **Safety Guardrails**: Integrated a Redis-based kill-switch mechanisms for safe testing and instant termination to protect target infrastructure.
@@ -30,6 +43,8 @@
     - **Comprehensive Attack Rules**: Expanded `rules.yaml` with 20+ sophisticated rules covering XSS, XXE, SSRF, CORS, Prototype Pollution, and Open Redirects.
     - **SCA & Dependency Intelligence**: Integrated vulnerability mapping for supply chain and dependency findings, automatically deriving potential RCE and Data Exfil paths.
     - **Schema & Ingestion Hardening**: Expanded `vulnerabilities.py` to support deep subtype inference and updated `schema.py` for cloud-native capability modeling.
+    - **Subscan Pipeline Integration**: Fixed a decoupling issue where APME and ERL validation would not trigger during targeted vulnerability subscans. Integrated correlation, risk scoring, and path modeling into the per-subdomain scan chain to ensure data consistency across targeted reconnaissance.
+
 - **Advanced Web App & API Discovery Pipeline**: Introduced a dedicated reconnaissance engine for deep API discovery, featuring:
 ring:
  - **Kiterunner**: High-performance API endpoint brute-forcing with custom `.kite` wordlists (`routes-large.kite` by default).
@@ -215,6 +230,16 @@ ring:
 - **Refined Proxy Rotation Logic**: Optimized proxy rotation across all discovery and vulnerability modules. Each individual tool execution (Arjun, Kiterunner, ParamSpider, LinkFinder, Nuclei severities, etc.) now fetches a fresh random proxy, ensuring maximum traffic randomization and bypassing detection.
 - **ParamSpider Optimization**: Optimized `web_api_discovery` to ensure `ParamSpider` only runs once per unique subdomain. Previously, it was being re-executed for every URL belonging to the same subdomain, leading to redundant work and log clutter.
 - **Endpoint Deduplication**: Implemented URL pattern normalization in `web_api_discovery`. The engine now intelligently skips redundant endpoints that differ only by parameter values (e.g., locale variations), significantly reducing the number of tool calls while maintaining discovery coverage.
+- **cPanel Scan Fix**: Resolved an `AttributeError` in the `cpanel_scan` task where the system attempted to access a non-existent `use_proxy` attribute on the `ScanHistory` model. The task now correctly utilizes the global proxy configuration system.
+- **Arjun Results Parsing Fix**: Resolved `'list' object has no attribute 'items'` error during endpoint ingestion.
+- **Proper Scan Termination**: Resolved critical failures in scan termination by aligning frontend and backend to a unified `StopScan` API.
+    - **Deep Task Revocation**: Enhanced the backend to explicitly revoke all sub-tasks registered in `ScanActivity`, ensuring child processes (like port scans or nuclei) are killed immediately.
+    - **Consistent Subscan Abort**: Fixed a loop logic error in the backend that prevented subscans from being stopped reliably.
+    - **Unified API Hooks**: Refactored frontend hooks (`useStopScan`, `useBulkScanAction`, `useBulkStopSubScans`) to use the hardened `StopScan` endpoint with consistent payload structures.
+- **Hydra Brute-Force Resilience & Service Mapping**:
+    - Implemented `max_retries` in engine configuration to prevent infinite loops on tool failure.
+    - Added automated service mapping to convert generic protocols (e.g., `http`, `https`) into valid Hydra modules (`http-get`, `https-get`).
+    - Integrated automatic error tracking that terminates scan tasks after the configured retry threshold.
 
 
 
