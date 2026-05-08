@@ -4,6 +4,7 @@ from startScan.models import *
 admin.site.register(ScanHistory)
 admin.site.register(SubScan)
 admin.site.register(Subdomain)
+admin.site.register(Screenshot)
 admin.site.register(ScanActivity)
 admin.site.register(EndPoint)
 admin.site.register(Vulnerability)

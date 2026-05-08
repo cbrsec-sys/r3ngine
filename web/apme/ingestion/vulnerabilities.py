@@ -42,6 +42,12 @@ NAME_TO_SUBTYPE = {
     "ssti": "ssti",
     "open redirect": "open_redirect",
     "xxe": "xxe",
+    "xml external entity": "xxe",
+    "cors": "cors",
+    "prototype pollution": "prototype_pollution",
+    "dependency": "dependency",
+    "sca": "dependency",
+    "outdated": "dependency",
     "misconfig": "misconfig",
     "misconfiguration": "misconfig",
 }

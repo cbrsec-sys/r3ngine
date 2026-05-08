@@ -46,6 +46,7 @@ export interface OllamaPullStatus {
 export interface ProxySettings {
   use_proxy: boolean;
   proxies: string;
+  use_proxychains: boolean;
 }
 
 export interface ProxyTaskStatus {
@@ -166,6 +167,9 @@ export const useUpdateProxySettings = (slug: string) => {
       const formData = new FormData();
       if (data.use_proxy) {
         formData.append('use_proxy', 'on');
+      }
+      if (data.use_proxychains) {
+        formData.append('use_proxychains', 'on');
       }
       formData.append('proxies', data.proxies);
 

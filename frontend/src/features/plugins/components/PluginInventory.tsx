@@ -8,7 +8,7 @@ interface Props {
 }
 
 const PluginInventory: React.FC<Props> = ({ plugins }) => {
-  if (plugins.length === 0) {
+  if (!Array.isArray(plugins) || plugins.length === 0) {
     return (
       <Box sx={{ textAlign: "center", py: 10 }}>
         <Typography variant="h6" color="text.secondary">
@@ -22,17 +22,17 @@ const PluginInventory: React.FC<Props> = ({ plugins }) => {
   }
 
   return (
-    <Grid container spacing={3}>
+    <Grid container spacing={3} sx={{ justifyContent: "center" }}>
       {plugins?.length > 0 && plugins?.map((plugin) => (
-        <Grid size={{ xs: 12, md: 6, lg: 4 }} key={plugin.slug}>
+        <Grid size={{ xs: 12, md: 6, lg: 4 }} key={plugin.slug} sx={{ justifyContent: "center" }}>
           <PluginCard plugin={plugin} />
         </Grid>
       )) || (
           <Box sx={{ textAlign: "center", py: 10 }}>
-            <Typography variant="h6" color="text.secondary" sx={{ justifyContent: "center" }}>
+            <Typography variant="h6" color="text.secondary">
               No plugins installed yet.
             </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ justifyContent: "center" }}>
+            <Typography variant="body2" color="text.secondary">
               Upload a plugin archive to get started.
             </Typography>
           </Box>

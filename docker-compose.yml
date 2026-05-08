@@ -41,7 +41,7 @@ services:
       - plugins_data:/usr/src/app/plugins_data
 
     environment:
-      - DEBUG=0
+      - DEBUG=1
       - CELERY_BROKER=redis://redis:6379/0
       - CELERY_BACKEND=redis://redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}
@@ -98,7 +98,7 @@ services:
     restart: always
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     environment:
-      - DEBUG=0
+      - DEBUG=1
       - CELERY_BROKER=redis://redis:6379/0
       - CELERY_BACKEND=redis://redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}

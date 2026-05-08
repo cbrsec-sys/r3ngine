@@ -641,3 +641,54 @@
     github_clone_path: null
     subdomain_gathering_command: null
 
+- model: scanEngine.installedexternaltool
+  pk: 37
+  fields:
+    logo_url: https://raw.githubusercontent.com/vanhauser-thc/thc-hydra/master/hydra.png
+    name: hydra
+    description: Hydra is a parallelized login cracker which supports numerous protocols to attack. It is very fast and flexible, and new modules are easy to add. This tool makes it possible for researchers and security consultants to show how easy it would be to gain unauthorized access to a system remotely.
+    github_url: https://github.com/vanhauser-thc/thc-hydra
+    license_url: https://github.com/vanhauser-thc/thc-hydra/blob/master/LICENSE
+    version_lookup_command: hydra -h
+    update_command: apt install hydra --upgrade
+    install_command: apt install hydra
+    version_match_regex: 'v(?i:v)?\d+\.\d+(?:\.\d+)*'
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 38
+  fields:
+    logo_url: null
+    name: cpanel2shell-scanner
+    description: A vulnerability scanner for CVE-2023-29489 (cPanel XSS) and other cPanel related misconfigurations.
+    github_url: https://github.com/assetnote/cpanel2shell-scanner
+    license_url: https://github.com/assetnote/cpanel2shell-scanner/blob/main/LICENSE
+    version_lookup_command: python3 /usr/src/github/cpanel2shell-scanner/scanner.py --help
+    update_command: cd /usr/src/github/cpanel2shell-scanner && git pull
+    install_command: git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner
+    version_match_regex: '(?i:v)?\d+\.\d+(?:\.\d+)*'
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/cpanel2shell-scanner
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 39
+  fields:
+    logo_url: https://raw.githubusercontent.com/sensepost/gowitness/master/static/gowitness-logo.png
+    name: gowitness
+    description: gowitness is a website screenshot utility written in Golang, that uses Chrome Headless to generate screenshots of websites, with a nice report viewer to boot.
+    github_url: https://github.com/sensepost/gowitness
+    license_url: https://github.com/sensepost/gowitness/blob/master/LICENSE
+    version_lookup_command: gowitness version
+    update_command: go install github.com/sensepost/gowitness@latest
+    install_command: go install github.com/sensepost/gowitness@latest
+    version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null

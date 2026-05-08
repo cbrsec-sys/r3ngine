@@ -4,11 +4,32 @@
 **Official Repo location:** https://github.com/whiterabb17/r3ngine
  
 ### New Features
+- **Asynchronous Report Generation Pipeline**: Eliminated 502 Bad Gateway timeouts by offloading PDF generation to background workers.
+  - **Status Tracking & Polling**: Implemented a new `ScanReport` model and status API endpoints to monitor generation progress.
+  - **Dynamic UI Progress**: Added a polling mechanism to the `ScanReportModal` with real-time status updates and manual download fallback.
+  - **Custom Aesthetics**: Fully integrated user-configured branding, including custom colors and company identity settings.
+  - **Template Reliability**: Fixed 500 errors in Modern and Enterprise templates caused by parsing errors and invalid Django tags.
+  - **Speed Optimization**: Refined LLM generation to focus on high-value sections, reducing generation time by 90%.
+- **Integrated Subdomain Action Interface**: Fully wired and enabled interactive management for the Subdomains tab in the scan detail interface.
+  - **Subscan Configuration Overlay**: Implemented a tactical overlay for initiating targeted subscans with multiple engine selection support.
+  - **LLM-Powered Attack Surface Analysis**: Integrated on-demand attack surface generation for individual subdomains using configured LLMs.
+  - **Tactical TODO Management**: Added functionality to quickly attach reconnaissance notes (TODOs) to specific subdomains.
+  - **Status & Lifecycle Management**: Fully implemented deletion and importance toggling for subdomains with immediate UI feedback and query invalidation.
+- **Intelligent Brute-Force Orchestration Engine**: Replaced legacy Nmap-based triggers with a centralized, discovery-driven queue.
+  - **AuthCandidate Queue**: Implemented a new database model to track and deduplicate brute-force targets (SSH, RDP, SMB, FTP, Telnet, HTTP) across all discovery tools.
+  - **Tiered HTTP Discovery**:
+    - **Tier 1 (Tech Hints)**: Automatic detection of common services.
+    - **Tier 2 (Nuclei)**: Integrated 500+ authentication-related Nuclei templates into the candidate queue.
+    - **Tier 3 (Intelligent Extraction)**: Automated form extraction using httpx and regex to identify unknown login portals.
+  - **Unified Hydra Orchestrator**: Refactored the brute-force engine to use Hydra for high-speed, multi-protocol batching with OpSec awareness (rate-limiting and delay controls).
+  - **Stealth Integration**: Full support for rotating proxies via `proxychains` or native Hydra proxy flags.
+- **Hydra Brute-Force Integration**: Migrated from Medusa to Hydra as the primary brute-force engine for enhanced reliability and better service support.
 - **Adaptive Stress & Resilience Engine (ASRE)**: Implemented full-scale endpoint stress testing directly within the reNgine workflow.
   - **Tool Orchestration**: Seamlessly orchestrated backend stress tests via Celery, driving load testing tools such as `k6`, `wrk`, `hping3`, and `Locust`.
   - **Safety Guardrails**: Integrated a Redis-based kill-switch mechanisms for safe testing and instant termination to protect target infrastructure.
   - **Telemetry Ingestion**: Real-time aggregation of latency, throughput, and error rate metrics directly into Neo4j for topological node analysis.
   - **Visualization Dashboard**: Created a new React-based interactive UI utilizing Apache ECharts and Nivo to visually represent endpoint resilience, saturation points, and errors across the network.
+- **Documentation Overhaul**: Comprehensive restructuring of the documentation to provide high-level visibility into v3 capabilities and surgical recon pipelines, including a new dedicated section for the **Adaptive Stress & Resilience Engine (ASRE)**.
 - **Exploitation Readiness Layer (ERL)**: Implemented a safe, modular, and production-grade validation layer for vulnerabilities.
   - **Vulnerability Validation**: Automatically converts potential findings into "Verified" status using non-destructive, containerized validation tools (e.g., safe SQLmap profiles).
   - **Confidence Scoring**: Integrated a Bayesian confidence engine that aggregates tool results, asset metadata, and tool reliability into a unified confidence score.
@@ -17,16 +38,15 @@
   - **Normalizer & Adapters**: Standardized validation evidence (request/response dumps, payloads) into a unified schema for consistent UI rendering.
   - **Global Configuration**: Added a global toggle `RENGINE_ERL_ENABLED` and updated all default scan engines to include ERL by default.
   - **Interactive Evidence Viewer**: Added a new "Validation" column and expandable evidence section in the vulnerability dashboard to display cryptographic-grade proof of findings.
-- **Attack Path Modeling Engine (APME)**: Implemented a production-grade, graph-based attack path modeling system.
-  - **Graph-Based Asset Modeling**: Assets, vulnerabilities, credentials, identities, and capabilities are represented as a normalized Neo4j graph with typed, constraint-validated edges.
-  - **Multi-Algorithm Pathfinding**: Implemented BFS (shortest paths), DFS (deep chains), and Dijkstra (weight-optimal) traversal against Neo4j to discover all feasible attack routes.
-  - **Configuration-Driven Rules Engine**: Attack relationships (e.g., SQLi → DB Access, RCE → Pivot) are derived dynamically from `rules.yaml` — no hardcoded chains.
-  - **Constraint-Aware Validation**: All discovered paths are validated against a ConstraintEngine that enforces authentication requirements, network boundary rules, and privilege levels. Unrealistic paths are silently dropped (fail-safe).
-  - **ERL-Integrated Scoring**: Attack paths are scored using a weighted formula (severity, exploitability, path length, privilege gain). ERL-validated steps receive a confidence boost.
-  - **Validated vs. Inferred Steps**: Each step in a returned path is explicitly tagged as `validated` (ERL-confirmed) or `inferred` (rule-derived) in the output.
-  - **Automated Persistence**: Top attack paths are automatically persisted to `ImpactAssessment` after each scan for API and frontend consumption.
-  - **Pipeline Integration**: `run_apme` is chained after both `vulnerability_scan` and `run_erl` in all standard scan engines, controlled via `RENGINE_APME_ENABLED` setting.
- - **Advanced Web App & API Discovery Pipeline**: Introduced a dedicated reconnaissance engine for deep API discovery, featuring:
+- **Attack Path Modeling Engine (APME) Robustness & Rules Expansion**:
+    - **Virtual Goal Injection**: Implemented automated injection of "Virtual Goal Nodes" (Objectives) into the attack graph, ensuring rules always have targets to wire to.
+    - **Comprehensive Attack Rules**: Expanded `rules.yaml` with 20+ sophisticated rules covering XSS, XXE, SSRF, CORS, Prototype Pollution, and Open Redirects.
+    - **SCA & Dependency Intelligence**: Integrated vulnerability mapping for supply chain and dependency findings, automatically deriving potential RCE and Data Exfil paths.
+    - **Schema & Ingestion Hardening**: Expanded `vulnerabilities.py` to support deep subtype inference and updated `schema.py` for cloud-native capability modeling.
+    - **Subscan Pipeline Integration**: Fixed a decoupling issue where APME and ERL validation would not trigger during targeted vulnerability subscans. Integrated correlation, risk scoring, and path modeling into the per-subdomain scan chain to ensure data consistency across targeted reconnaissance.
+
+- **Advanced Web App & API Discovery Pipeline**: Introduced a dedicated reconnaissance engine for deep API discovery, featuring:
+ring:
  - **Kiterunner**: High-performance API endpoint brute-forcing with custom `.kite` wordlists (`routes-large.kite` by default).
  - **Arjun**: Automated HTTP parameter discovery for identifying hidden API inputs.
  - **ParamSpider**: Advanced parameter extraction from web archives and live sources.
@@ -56,17 +76,27 @@
 - **Dynamic Model Fetching**: Implemented real-time model discovery for all supported providers, including hardware requirements and expertise insights for local models.
 - **On-Demand Model Loading**: Optimized the AI Hub by fetching available models only when the dropdown is clicked, reducing initial page load overhead.
 - **Legacy API Vault Sync**: Automatically migrates existing OpenAI keys from the legacy API Vault to the new AI Hub configuration.
+- **Granular Proxychains Control**: Integrated a new `use_proxychains` toggle for precise control over proxy orchestration.
+  - **Conditional Wrapping**: Users can now choose whether to wrap tools with `proxychains4` or prefer native tool proxy support.
+  - **Automated Cleanup**: Implemented safe, multi-threaded configuration management that automatically cleans up temporary proxychains configs after execution.
+  - **Tool Parity**: Updated core tasks (Hydra, Amass, Subfinder, Katana, etc.) to respect the new setting and utilize native flags where available.
+  - **Integrated UI Switch**: Added a dedicated "USE PROXYCHAINS WRAPPER" switch in the Proxy Settings dashboard.
+  - **On-the-fly Validation**: Automatically verify proxy connectivity before use to ensure high reliability during automated scans.
+  - **Command UI Sanitization**: Improved timeline and results overlay by automatically stripping `export` and `proxychains` prefixes from the displayed command, ensuring the UI correctly identifies and displays the target tool name.
 - **Enhanced Arjun Parameter Discovery**: 
   - Implemented configurable HTTP methods (default: GET, POST, JSON, XML, FETCH, PUT, DELETE, PATCH) via Scan Engine YAML.
   - Added support for `--stable` mode and dynamic thread orchestration.
   - Resolved `'list' object has no attribute 'items'` parsing error by supporting both list and dictionary output formats from Arjun.
 - **Improved Tool Threading Consistency**: Standardized the use of the `threads` option from engine configurations across all discovery tools in `web_api_discovery` (Arjun, Kiterunner, etc.).
+- **Arjun Stability Fix**: Resolved a crash in the `web_api_discovery` task where Arjun would fail during target stability probing with an `AttributeError`. Removed the `--stable` flag to ensure scan reliability across diverse targets.
+- **UI/UX Standardization**: Standardized the `VulnerabilityTable` styling across the application by integrating it into the `TacticalPanel` component on the Scan Detail page and refining internal header aesthetics.
+- **Arjun Version Management**: Updated Docker build to ensure `arjun`, `inql`, and `netlas` are always upgraded to their latest stable versions during installation.
 - **Aquatone Pipeline Stability**: Resolved a `NameError` causing Aquatone task failures by standardizing the `EndPoint` model reference.
 - **404 Page Enhancement**: Added an Interdimensional Rabbit Hole background image for the 404 page.
 - **Production-Ready SSL Serial Retrieval**: Implemented a robust `_get_ssl_serial` function in `waf_utils.py` using the `cryptography` library for reliable origin discovery via Shodan.
   - **Standardized Notification System (Snackbar)**: 
     - Replaced legacy `alert()` dialogs with consistent, non-intrusive MUI `Snackbar` and `Alert` components across all settings modules.
-    - Implemented state-driven feedback for critical actions in `ApiVault`, `ProxySettings`, `ReportSettings`, `OpSecSettings`, `LlmToolkit`, `SystemSettings`, and `AdminSettings`.
+    - Implemented state-driven feedback for critical actions in `SubdomainsTab`, `ApiVault`, `ProxySettings`, `ReportSettings`, `OpSecSettings`, `LlmToolkit`, `SystemSettings`, and `AdminSettings`.
     - Enhanced error handling with detailed feedback from backend mutation responses.
     - Unified notification visuals with the "Cyberpunk" design language (Orbitron font, filled severity backgrounds).
 - **Modernized Censys Platform Integration**: 
@@ -110,6 +140,12 @@
     - Implemented a weighted correlation algorithm that unifies results from Nuclei (DAST), Semgrep (SAST), Trivy (SCA), Gitleaks, and Retire.js.
     - Introduced **Potential Attack Chain** generation to visualize sequential exploitation steps (Initial Access -> Lateral Movement -> Impact).
     - Added automated unit tests to ensure correlation logic accuracy across all security tools.
+- **Seamless AI Impact Intelligence**: 
+    - Modernized the AI-driven vulnerability assessment workflow with a state-aware Impact Explorer UI.
+    - Replaced intrusive alerts with immediate loading overlays and persistent status monitoring.
+    - Implemented auto-generation logic for first-time assessment views.
+    - Synchronized AI findings directly to the `Vulnerability` model for consistent report persistence.
+    - Fully updated the Exploit Readiness Layer (ERL) plugin to maintain cross-feature parity.
 - **Acunetix & ReconX Orchestration**: 
     - **Acunetix (AWVS) Pipeline**: Integrated automated vulnerability scanning via Acunetix API. Supports secure storage of server URLs and API keys in the reNgine Vault, automated target provisioning, and native ingestion of scan findings into the core `Vulnerability` database.
     - **ReconX Auxiliary Discovery**: Integrated ReconX into the `monitor_tasks.py` pipeline to complement existing subdomain discovery and OSINT tools. ReconX findings are automatically parsed and mapped to `MonitoringDiscovery` nodes for consolidated asset tracking.
@@ -177,6 +213,20 @@
   - **Plugin Registry**: Full CRUD support for plugin management, including enabling/disabling and metadata tracking.
 - **Frontend Bundle Optimization**: Implemented granular manual chunking in Vite to split massive vendor libraries into smaller, more manageable bundles.
 - **Route-Level Code Splitting**: Implemented lazy loading for all major tactical pages using TanStack Router's `lazyRouteComponent`, significantly reducing the initial application payload.
+- **Plugin Management Pipeline Stability**: 
+  - **404 Route Resolution**: Fixed a critical routing issue where refreshing the plugin management page would result in a 404 error by correctly registering the `/plugins/` route in the dashboard URL configuration.
+  - **Hardened Atomic Installation**: Resolved 500 Internal Server Errors during plugin uploads by improving the `AtomicInstaller` database backup and rollback logic.
+  - **Secure Authentication**: Implemented `PGPASSWORD` environment injection for secure, non-interactive database operations during plugin lifecycle events.
+  - **Robust Environment Handling**: Migrated from fragile `os.environ.get` calls to centralized Django settings for database connection parameters.
+  - **API Format Standardization**: Resolved frontend crashes and display issues by standardizing the plugin API to return non-paginated arrays and hardening React components with `Array.isArray` guards.
+
+- **Hardened Plugin Asset Lifecycle**: Implemented automatic synchronization and cleanup for plugin UI assets.
+  - **Asset Mirroring**: Updated `AtomicInstaller` to automatically mirror plugin UI components to `MEDIA_ROOT` during installation, ensuring they are accessible to the frontend via authenticated `/media/` paths.
+  - **Automated Cleanup**: Integrated `post_delete` signals to automatically prune both internal data and public assets when a plugin is removed.
+  - **Registry Robustness**: Enhanced `PluginComponent` to support both `overrides` and `components` manifest keys, ensuring compatibility with diverse plugin architectures (e.g., Exploit Readiness Layer).
+  - **Full Lifecycle UI**: Wired up the "Delete Plugin" button in the frontend with confirmation dialogs and backend synchronization.
+  - **Sync Management**: Added a `sync_plugin_ui` management command to retroactively repair UI asset placement for existing installations.
+
 - **Automated Startup Synchronization**:
   - Implemented a robust, Redis-locked startup sequence in Celery to ensure essential datasets are synchronized when the system comes online.
   - **Graph Sync**: Automatically triggers a global Attack Surface graph synchronization (`sync_all_scans_to_graph`) upon system startup.
@@ -184,6 +234,8 @@
   - **Distributed Locking**: Uses Redis-based mutexes (`rengine:startup_graph_sync_lock` and `rengine:startup_kev_sync_lock`) to ensure tasks run exactly once across multi-worker deployments.
 
 ### Bug Fixes
+- **Brute-Force Success Parsing**: Hardened the Medusa result parsing regex to require an explicit `[SUCCESS]` marker, eliminating false positives caused by misinterpreting `[FAILURE]` results.
+- **Hydra Result Extraction**: Implemented robust parsing for Hydra output logs to correctly ingest discovered credentials into the vulnerability dashboard.
 - **Scan Detail Page Stability**: Resolved runtime crashes (`TypeError: i?.forEach is not a function`) by implementing defensive `Array.isArray` checks and optional chaining across `ScanDetailPage`, `VulnerabilityTable`, and `AttackSurfaceTab`.
 - **Scan Summary API Hardening**: Refactored `matched_gf_count` from a dictionary to a list of objects in the backend and API serializers to ensure type consistency and safe iteration on the frontend. Fixed a `500 Internal Server Error` in `ScanSummaryAPIView` caused by missing model imports.
 - **SPA Navigation Hardening**: Replaced legacy `window.location.href` redirects in `LogoutPage.tsx` with TanStack Router's `navigate` to maintain application state and prevent unnecessary full-page reloads.
@@ -194,6 +246,21 @@
 - **Celery Task Resilience**: Resolved a `TypeError` in `RengineTask.write_results` caused by tasks returning boolean values. Implemented safe type checking and string casting for all task results.
 - **Dockerfile Architecture Stability**: Fixed a bug in the Trivy installation logic where it hardcoded 32-bit binaries instead of using the detected system architecture.
 - **Django System Check Cleanup**: Resolved the `(fields.W340)` warning by removing redundant `null=True` parameters from `ManyToManyField` definitions in `EndPoint` models.
+- **Missing Nmap Timeline Commands**: Resolved an issue where Nmap commands were not appearing in the scan timeline overlay. Subtasks now correctly inherit and propagate their parent's activity ID, ensuring all executed commands are properly linked and visualized in the task overlay.
+- **Refined Proxy Rotation Logic**: Optimized proxy rotation across all discovery and vulnerability modules. Each individual tool execution (Arjun, Kiterunner, ParamSpider, LinkFinder, Nuclei severities, etc.) now fetches a fresh random proxy, ensuring maximum traffic randomization and bypassing detection.
+- **ParamSpider Optimization**: Optimized `web_api_discovery` to ensure `ParamSpider` only runs once per unique subdomain. Previously, it was being re-executed for every URL belonging to the same subdomain, leading to redundant work and log clutter.
+- **Endpoint Deduplication**: Implemented URL pattern normalization in `web_api_discovery`. The engine now intelligently skips redundant endpoints that differ only by parameter values (e.g., locale variations), significantly reducing the number of tool calls while maintaining discovery coverage.
+- **cPanel Scan Fix**: Resolved an `AttributeError` in the `cpanel_scan` task where the system attempted to access a non-existent `use_proxy` attribute on the `ScanHistory` model. The task now correctly utilizes the global proxy configuration system.
+- **Arjun Results Parsing Fix**: Resolved `'list' object has no attribute 'items'` error during endpoint ingestion.
+- **Proper Scan Termination**: Resolved critical failures in scan termination by aligning frontend and backend to a unified `StopScan` API.
+    - **Deep Task Revocation**: Enhanced the backend to explicitly revoke all sub-tasks registered in `ScanActivity`, ensuring child processes (like port scans or nuclei) are killed immediately.
+    - **Consistent Subscan Abort**: Fixed a loop logic error in the backend that prevented subscans from being stopped reliably.
+    - **Unified API Hooks**: Refactored frontend hooks (`useStopScan`, `useBulkScanAction`, `useBulkStopSubScans`) to use the hardened `StopScan` endpoint with consistent payload structures.
+- **Hydra Brute-Force Resilience & Service Mapping**:
+    - Implemented `max_retries` in engine configuration to prevent infinite loops on tool failure.
+    - Added automated service mapping to convert generic protocols (e.g., `http`, `https`) into valid Hydra modules (`http-get`, `https-get`).
+    - Integrated automatic error tracking that terminates scan tasks after the configured retry threshold.
+
 
 
 ## v2.5.2

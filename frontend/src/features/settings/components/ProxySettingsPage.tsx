@@ -33,6 +33,7 @@ export const ProxySettingsPage: React.FC = () => {
   const fetchProxies = useFetchProxies(projectSlug);
   
   const [useProxy, setUseProxy] = useState(false);
+  const [useProxychains, setUseProxychains] = useState(false);
   const [proxyList, setProxyList] = useState('');
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{
@@ -50,6 +51,7 @@ export const ProxySettingsPage: React.FC = () => {
   useEffect(() => {
     if (settings) {
       setUseProxy(settings.use_proxy);
+      setUseProxychains(settings.use_proxychains);
       setProxyList(settings.proxies);
     }
   }, [settings]);
@@ -79,7 +81,7 @@ export const ProxySettingsPage: React.FC = () => {
   };
 
   const handleSave = () => {
-    updateSettings.mutate({ use_proxy: useProxy, proxies: proxyList }, {
+    updateSettings.mutate({ use_proxy: useProxy, use_proxychains: useProxychains, proxies: proxyList }, {
       onSuccess: () => {
         setSnackbar({
           open: true,
@@ -166,23 +168,49 @@ export const ProxySettingsPage: React.FC = () => {
 
         <TacticalPanel title="CONFIGURATION" icon={<Settings size={20} />}>
           <Box sx={{ p: 1 }}>
-            <FormControlLabel
-              control={
-                <Switch 
-                  checked={useProxy} 
-                  onChange={(e) => setUseProxy(e.target.checked)}
-                  sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
-                  }}
-                />
-              }
-              label={
-                <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.9rem', fontWeight: 700 }}>
-                  ENABLE PROXY ROTATION
-                </Typography>
-              }
-            />
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              <FormControlLabel
+                control={
+                  <Switch 
+                    checked={useProxy} 
+                    onChange={(e) => setUseProxy(e.target.checked)}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                    }}
+                  />
+                }
+                label={
+                  <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.9rem', fontWeight: 700 }}>
+                    ENABLE PROXY ROTATION
+                  </Typography>
+                }
+              />
+
+              <FormControlLabel
+                control={
+                  <Switch 
+                    checked={useProxychains} 
+                    onChange={(e) => setUseProxychains(e.target.checked)}
+                    disabled={!useProxy}
+                    sx={{
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#ff00ff' },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#ff00ff' }
+                    }}
+                  />
+                }
+                label={
+                  <Box>
+                    <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.9rem', fontWeight: 700 }}>
+                      USE PROXYCHAINS WRAPPER
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
+                      Force proxy usage for tools without native proxy support
+                    </Typography>
+                  </Box>
+                }
+              />
+            </Box>
             
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mt: 3, mb: 1, fontWeight: 600 }}>
               PROXY LIST (ONE PER LINE)

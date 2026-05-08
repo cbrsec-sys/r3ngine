@@ -83,6 +83,10 @@ urlpatterns = [
         views.index,
         name='vulnerabilities_v3'),
     path(
+        '<slug:slug>/plugins/',
+        views.index,
+        name='plugins_v3'),
+    path(
         '<slug:slug>/engines/',
         views.index,
         name='engines_v3'),

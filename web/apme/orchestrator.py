@@ -65,6 +65,10 @@ class APMEOrchestrator:
         all_nodes.extend(asset_nodes + ep_nodes + vuln_nodes + cred_nodes)
         all_edges.extend(asset_edges + ep_edges + vuln_edges + cred_edges)
 
+        # Inject virtual goal nodes (Objectives) to ensure rules have targets
+        goal_nodes = self._generate_virtual_goal_nodes(scan_history_id)
+        all_nodes.extend(goal_nodes)
+
         logger.info(
             f"APME [1/7] Done. Nodes={len(all_nodes)}, Edges={len(all_edges)}"
         )
@@ -169,6 +173,39 @@ class APMEOrchestrator:
             "privilege_gained": privilege_gained,
             "validated_steps": validated_steps,
         }
+
+    def _generate_virtual_goal_nodes(self, scan_history_id: int) -> List[Node]:
+        """
+        Generates static 'Capability' and 'Privilege' nodes that serve as targets
+        for attack rules. These are global objectives for the scan.
+        """
+        from apme.graph.schema import NODE_TYPES
+
+        goal_nodes = []
+        
+        # Create Capability nodes
+        for subtype in NODE_TYPES.get("Capability", []):
+            goal_nodes.append(Node(
+                id=f"goal::capability::{subtype}",
+                type="Capability",
+                subtype=subtype,
+                confidence=1.0,
+                source="APME:virtual_goal",
+                properties={"description": f"Global objective: {subtype}"}
+            ))
+
+        # Create Privilege nodes
+        for subtype in NODE_TYPES.get("Privilege", []):
+            goal_nodes.append(Node(
+                id=f"goal::privilege::{subtype}",
+                type="Privilege",
+                subtype=subtype,
+                confidence=1.0,
+                source="APME:virtual_goal",
+                properties={"description": f"Privilege level: {subtype}"}
+            ))
+
+        return goal_nodes
 
     def _persist_paths(self, paths: List[AttackPath], scan_history_id: int) -> None:
         """

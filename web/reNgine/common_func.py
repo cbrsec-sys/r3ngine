@@ -23,6 +23,7 @@ from discord_webhook import DiscordEmbed, DiscordWebhook
 from django.db.models import Q
 from dotted_dict import DottedDict
 
+from django.utils import timezone
 from reNgine.common_serializers import *
 from reNgine.definitions import *
 from reNgine.settings import *
@@ -30,7 +31,7 @@ from scanEngine.models import *
 from dashboard.models import *
 from startScan.models import *
 from targetApp.models import *
-from reNgine.utilities import is_valid_url
+from reNgine.utilities import is_valid_url, replace_nulls
 
 
 logger = get_task_logger(__name__)
@@ -501,6 +502,156 @@ def extract_path_from_url(url):
 # Utils #
 #-------#
 
+def record_exists(model, data, exclude_keys=[]):
+	"""
+	Check if a record already exists in the database based on the given data.
+
+	Args:
+		model (django.db.models.Model): The Django model to check against.
+		data (dict): Data dictionary containing fields and values.
+		exclude_keys (list): List of keys to exclude from the lookup.
+
+	Returns:
+		bool: True if the record exists, False otherwise.
+	"""
+
+	# Extract the keys that will be used for the lookup
+	lookup_fields = {key: data[key] for key in data if key not in exclude_keys}
+
+	# Return True if a record exists based on the lookup fields, False otherwise
+	return model.objects.filter(**lookup_fields).exists()
+
+def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, **kwargs):
+	# Support both positional and keyword arguments for backward compatibility
+	if vuln_data and isinstance(vuln_data, dict):
+		vuln_data.update(kwargs)
+		if scan_history:
+			vuln_data['scan_history'] = scan_history
+		if target_domain:
+			vuln_data['target_domain'] = target_domain
+	else:
+		vuln_data = kwargs
+		if scan_history:
+			vuln_data['scan_history'] = scan_history
+		if target_domain:
+			vuln_data['target_domain'] = target_domain
+
+	references = vuln_data.pop('references', [])
+	cve_ids = vuln_data.pop('cve_ids', [])
+	cwe_ids = vuln_data.pop('cwe_ids', [])
+	tags = vuln_data.pop('tags', [])
+	subscan = vuln_data.pop('subscan', None)
+
+	exploit_url = vuln_data.pop('exploit_url', None)
+	validation_status = vuln_data.pop('validation_status', 'unverified')
+
+	# If subdomain is not provided, try to find it from http_url
+	subdomain = vuln_data.get('subdomain')
+	http_url = vuln_data.get('http_url')
+	scan_history = vuln_data.get('scan_history')
+	target_domain = vuln_data.get('target_domain')
+
+	if not subdomain and http_url and scan_history and target_domain:
+		subdomain_name = get_subdomain_from_url(http_url)
+		subdomain, _ = Subdomain.objects.get_or_create(
+			name=subdomain_name,
+			scan_history=scan_history,
+			target_domain=target_domain
+		)
+		vuln_data['subdomain'] = subdomain
+
+	# remove nulls
+	vuln_data = replace_nulls(vuln_data)
+
+	# Check for False Positive rules
+	is_suppressed = False
+	try:
+		from startScan.models import FalsePositiveRule
+		rules = FalsePositiveRule.objects.filter(target_domain=target_domain, is_active=True)
+		for rule in rules:
+			if rule.matches(vuln_data.get('name', ''), http_url):
+				is_suppressed = True
+				break
+	except Exception as e:
+		logger.error(f"Error checking FP rules: {e}")
+
+	if is_suppressed:
+		vuln_data['is_suppressed'] = True
+
+	# Create vulnerability
+	vuln, created = Vulnerability.objects.get_or_create(**vuln_data)
+	if created:
+		vuln.discovered_date = timezone.now()
+		vuln.open_status = True
+		if exploit_url:
+			vuln.exploit_url = exploit_url
+		vuln.validation_status = validation_status
+		vuln.save()
+
+		# Centralized Brute-Force Candidate Registration
+		auth_keywords = ['login', 'admin', 'auth', 'portal', 'credentials', 'password']
+		name = vuln_data.get('name', '').lower()
+		description = vuln_data.get('description', '').lower()
+		
+		if any(k in name or k in description for k in auth_keywords):
+			try:
+				from reNgine.utilities import save_auth_candidate
+				http_url = vuln_data.get('http_url', '')
+				parsed = urlparse(http_url)
+				port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+				target = parsed.hostname
+				
+				if target:
+					save_auth_candidate(
+						scan_history=scan_history,
+						subdomain=subdomain,
+						target=target,
+						protocol='http',
+						port=port,
+						source_tool=vuln_data.get('type', 'vulnerability_engine'),
+						tech_hint=name
+					)
+			except Exception as e:
+				logger.error(f"Error registering AuthCandidate from vulnerability {name}: {e}")
+	elif exploit_url and not vuln.exploit_url:
+		vuln.exploit_url = exploit_url
+		vuln.save()
+
+	# Save vuln tags
+	for tag_name in tags or []:
+		tag, created = VulnerabilityTags.objects.get_or_create(name=tag_name)
+		if tag:
+			vuln.tags.add(tag)
+			vuln.save()
+
+	# Save CVEs
+	for cve_id in cve_ids or []:
+		cve, created = CveId.objects.get_or_create(name=cve_id)
+		if cve:
+			vuln.cve_ids.add(cve)
+			vuln.save()
+
+	# Save CWEs
+	for cve_id in cwe_ids or []:
+		cwe, created = CweId.objects.get_or_create(name=cve_id)
+		if cwe:
+			vuln.cwe_ids.add(cwe)
+			vuln.save()
+
+	# Save vuln reference
+	for url in references or []:
+		ref, created = VulnerabilityReference.objects.get_or_create(url=url)
+		if created:
+			vuln.references.add(ref)
+			vuln.save()
+
+	# Save subscan id in vuln object
+	if subscan:
+		vuln.vuln_subscan_ids.add(subscan)
+		vuln.save()
+
+	return vuln, created
+
 
 def get_spiderfoot_keys():
 	"""Get Spiderfoot API keys from DB.
@@ -533,11 +684,25 @@ def get_random_proxy():
 	proxy = Proxy.objects.first()
 	if not proxy.use_proxy:
 		return ''
-	proxy_name = random.choice(proxy.proxies.splitlines())
-	logger.warning('Using proxy: ' + proxy_name)
-	# os.environ['HTTP_PROXY'] = proxy_name
-	# os.environ['HTTPS_PROXY'] = proxy_name
-	return proxy_name
+
+	proxies = [p.strip() for p in proxy.proxies.splitlines() if p.strip()]
+	if not proxies:
+		return ''
+
+	random.shuffle(proxies)
+
+	for proxy_name in proxies:
+		try:
+			logger.info(f'Validating proxy: {proxy_name}')
+			# Use a short timeout to prevent blocking tasks for too long
+			requests.get('http://google.com', proxies={'http': proxy_name, 'https': proxy_name}, timeout=5)
+			logger.warning('Using valid proxy: ' + proxy_name)
+			return proxy_name
+		except Exception as e:
+			logger.error(f'Proxy {proxy_name} validation failed: {e}')
+
+	logger.error('No valid proxies found in the list!')
+	return ''
 
 def remove_ansi_escape_sequences(text):
 	# Regular expression to match ANSI escape sequences
