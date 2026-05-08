@@ -10,6 +10,7 @@ class PluginViewSet(viewsets.ModelViewSet):
     queryset = Plugin.objects.all()
     serializer_class = PluginSerializer
     lookup_field = 'slug'
+    pagination_class = None
     
     @action(detail=False, methods=['post'], url_path='upload')
     def upload_plugin(self, request):

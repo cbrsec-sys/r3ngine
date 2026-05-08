@@ -212,6 +212,8 @@ def generate_report_task(self, report_id):
             template = get_template('report/enterprise.html')
         elif report_template == 'modern':
             template = get_template('report/modern.html')
+        elif report_template == 'cyber_pro':
+            template = get_template('report/cyber_pro.html')
         else:
             template = get_template('report/default.html')
 

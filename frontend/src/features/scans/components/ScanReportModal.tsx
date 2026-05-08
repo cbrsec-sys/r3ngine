@@ -240,7 +240,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                 <RadioGroup row value={reportTemplate} onChange={(e) => {
                   const val = e.target.value;
                   setReportTemplate(val);
-                  if (val !== 'enterprise') setIncludeAttackSurface(false);
+                  if (val !== 'enterprise' && val !== 'cyber_pro') setIncludeAttackSurface(false);
                 }}>
                   <FormControlLabel
                     value="default"
@@ -256,6 +256,11 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                     value="enterprise"
                     control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
                     label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Enterprise</Typography>}
+                  />
+                  <FormControlLabel
+                    value="cyber_pro"
+                    control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
+                    label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Cyber Pro</Typography>}
                   />
                 </RadioGroup>
               </Box>
@@ -276,7 +281,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                   control={
                     <Checkbox
                       checked={includeAttackSurface}
-                      disabled={reportTemplate !== 'enterprise'}
+                      disabled={reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro'}
                       onChange={(e) => setIncludeAttackSurface(e.target.checked)}
                       sx={{ 
                         color: 'rgba(0,243,255,0.1)', 
@@ -288,15 +293,15 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                   label={
                     <Box>
                       <Typography sx={{ 
-                        color: reportTemplate === 'enterprise' ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)', 
+                        color: (reportTemplate === 'enterprise' || reportTemplate === 'cyber_pro') ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)', 
                         fontSize: '0.8rem', 
                         fontWeight: 600,
                         transition: 'color 0.2s'
                       }}>
                         Include Attack Surface Map
                       </Typography>
-                      {reportTemplate !== 'enterprise' && (
-                        <Typography sx={{ color: 'rgba(0,243,255,0.3)', fontSize: '0.65rem' }}>Only available for Enterprise template</Typography>
+                      {reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro' && (
+                        <Typography sx={{ color: 'rgba(0,243,255,0.3)', fontSize: '0.65rem' }}>Only available for Enterprise/Pro templates</Typography>
                       )}
                     </Box>
                   }

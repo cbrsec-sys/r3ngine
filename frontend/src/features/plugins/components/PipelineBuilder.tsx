@@ -73,6 +73,8 @@ const SortableItem = ({ plugin }: { plugin: Plugin }) => {
 };
 
 const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
+  if (!Array.isArray(plugins)) return null;
+
   const sensors = useSensors(
     useSensor(PointerSensor),
     useSensor(KeyboardSensor, {

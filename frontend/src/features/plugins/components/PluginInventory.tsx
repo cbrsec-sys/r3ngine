@@ -8,7 +8,7 @@ interface Props {
 }
 
 const PluginInventory: React.FC<Props> = ({ plugins }) => {
-  if (plugins.length === 0) {
+  if (!Array.isArray(plugins) || plugins.length === 0) {
     return (
       <Box sx={{ textAlign: "center", py: 10 }}>
         <Typography variant="h6" color="text.secondary">

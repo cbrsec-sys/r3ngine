@@ -1,31 +1,21 @@
-{% load static %}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <link rel="icon" type="image/png" href="/staticfiles/img/r3ngine_logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>reNgine V3 | {{ project.name }}</title>
-    <link rel="icon" type="image/svg+xml" href="{% static 'vite.svg' %}" />
-    <!-- Orbitron & Inter Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-    
-    {% if debug and VITE_ENABLED %}
-    <script type="module">
-      // Vite React HMR Preamble
-      import RefreshRuntime from '{{ VITE_DEV_SERVER_URL }}/@react-refresh'
-      RefreshRuntime.injectIntoGlobalHook(window)
-      window.$RefreshReg$ = () => {}
-      window.$RefreshSig$ = () => (type) => type
-      window.__vite_plugin_react_preamble_installed__ = true
-    </script>
-    <script type="module" src="{{ VITE_DEV_SERVER_URL }}/@vite/client"></script>
-    <script type="module" src="{{ VITE_DEV_SERVER_URL }}/src/main.tsx"></script>
-    {% else %}
-    <link rel="stylesheet" href="{% static 'assets/index.css' %}">
-    <script type="module" src="{% static 'assets/index.js' %}"></script>
-    {% endif %}
+    <title>r3ngine | Codename Phoenix</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css" />
+    <script type="module" crossorigin src="/staticfiles/assets/index.js"></script>
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/rolldown-runtime-DMWpINJ5.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-base-Dt71IBQD.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-mui-Dkq7zC39.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-router-DgiCuj5q.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-utils-CTm0AoCr.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-echarts-0HG7uiNP.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-react-CcG_wteL.js">
+    <link rel="stylesheet" crossorigin href="/staticfiles/assets/vendor-base.css">
+    <link rel="stylesheet" crossorigin href="/staticfiles/assets/index.css">
   </head>
   <body>
     <div id="root"></div>

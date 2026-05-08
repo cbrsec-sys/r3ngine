@@ -41,7 +41,7 @@ Version 3.0 and the preceding v2.5/2.4 cycles represent a paradigm shift in r3ng
 ### 🧠 The Intelligence & AI Hub
 r3ngine is now an AI-native reconnaissance suite, moving beyond simple tool automation to intelligent analysis.
 *   **Centralized AI Hub**: A unified management interface supporting **OpenAI, Anthropic (Claude 3), Google Gemini, and local Ollama models**.
-*   **Vulnerability Impact Intelligence**: Automatically generates detailed impact narratives and remediation priorities using LLMs, visualized through interactive **Cytoscape.js attack paths**.
+*   **Vulnerability Impact Intelligence**: Automated generation of detailed impact narratives and remediation priorities using LLMs, visualized through interactive **Cytoscape.js attack paths**. Features a seamless, state-aware **Impact Explorer** with real-time assessment monitoring and persistent synchronization to reporting models.
 *   **PII Gate Security**: Advanced privacy layer that anonymizes sensitive reconnaissance data (IPs, emails, hostnames) before sending it to external LLMs, ensuring enterprise-grade data protection.
 *   **Dynamic Model Discovery**: Real-time fetching of available models with hardware requirement insights for local deployments.
 
@@ -52,6 +52,7 @@ The core scanning engines have been upgraded to provide "Verification-First" rec
 *   **Adaptive Stress & Resilience Engine (ASRE)**: Full-scale endpoint stress testing directly within the workflow, orchestrating `k6`, `wrk`, `hping3`, and `Locust` with real-time telemetry ingestion.
 *   **Vulnerability Correlation Engine**: Unifies findings from **Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, and Retire.js** into a prioritized threat landscape.
 *   **Centralized Brute-Force Orchestration**: A multi-tiered authentication attack pipeline that centralizes targets from Nmap, Nuclei, and intelligent form extraction into a unified `AuthCandidate` queue, orchestrated via **Hydra** with full OpSec controls.
+*   **Atomic Plugin Management**: A powerful, modular system to extend reNgine with custom engines and dynamic UI components, featuring secure **Atomic Installation** with automated database backups and rollback guardrails.
 
 ### 🕵️ Surgical Recon & API Discovery
 The reconnaissance pipeline has been deepened to handle modern, API-centric web architectures.
@@ -124,6 +125,8 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
   - 📊 Auditor: Auditor can only view and download the report. An auditor can not change any system or scan related configurations nor can initiate any scans or subscans.
 
 🧭&nbsp;&nbsp;**Continuous Monitoring**: r3ngine's automated monitoring engine ensures your targets are under constant scrutiny. Schedule scans at regular intervals and receive real-time alerts via Discord, Slack, and Telegram for new subdomains, vulnerabilities, or asset changes.
+
+⚡&nbsp;&nbsp;**Adaptive Stress & Resilience Engine (ASRE)**: r3ngine v3 introduces the **Adaptive Stress & Resilience Engine (ASRE)**, a production-grade endpoint testing suite designed to evaluate the stability and resilience of target infrastructure. Unlike traditional scanners, ASRE orchestrates high-performance tools like `k6`, `wrk`, `hping3`, and `Locust` directly within your reconnaissance workflow. It provides real-time telemetry ingestion into the Attack Surface Graph (Neo4j), allowing you to visualize how endpoints behave under load and identify potential bottlenecks or denial-of-service vulnerabilities before they become critical failures.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
