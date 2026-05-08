@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Zap
 } from 'lucide-react';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { useScheduledScans, useToggleScheduledScan, useBulkDeleteScheduledScans } from '../api';
 
 export const ScheduledScansPage: React.FC = () => {
@@ -36,6 +37,19 @@ export const ScheduledScansPage: React.FC = () => {
   // Pagination State
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
+  // Confirmation state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'info' | 'warning';
+  }>({
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   const filteredData = useMemo(() => {
     if (!data) return [];
@@ -78,11 +92,18 @@ export const ScheduledScansPage: React.FC = () => {
   };
 
   const handleDeleteMultiple = () => {
-    if (window.confirm(`Are you sure you want to delete ${selectedIds.length} scheduled scans?`)) {
-      bulkDeleteMutation.mutate(selectedIds, {
-        onSuccess: () => setSelectedIds([])
-      });
-    }
+    if (selectedIds.length === 0) return;
+    setConfirmConfig({
+      title: 'PURGE SCHEDULED OPERATIONS',
+      message: `Are you sure you want to delete ${selectedIds.length} scheduled scans? This will terminate all future automated execution for these targets.`,
+      type: 'danger',
+      onConfirm: () => {
+        bulkDeleteMutation.mutate(selectedIds, {
+          onSuccess: () => setSelectedIds([])
+        });
+      }
+    });
+    setConfirmOpen(true);
   };
 
   if (isError) {
@@ -353,6 +374,19 @@ export const ScheduledScansPage: React.FC = () => {
           </Box>
         </Box>
       </Box>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          confirmConfig.onConfirm();
+          setConfirmOpen(false);
+        }}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+      />
     </Box>
   );
 };
