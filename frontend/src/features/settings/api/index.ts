@@ -91,6 +91,7 @@ export interface ApiVaultSettings {
   linkedin_username?: string;
   linkedin_password?: string;
   hunterio_key?: string;
+  wpscan_key?: string;
 }
 
 export interface ReportSettings {
@@ -452,6 +453,7 @@ export const useUpdateApiVault = (slug: string) => {
       formData.append('linkedin_username', data.linkedin_username || '');
       formData.append('linkedin_password', data.linkedin_password || '');
       formData.append('hunterio_key', data.hunterio_key || '');
+      formData.append('wpscan_key', data.wpscan_key || '');
 
       const response = await axios.post(`/scanEngine/${slug}/api_vault`, formData, {
         headers: {

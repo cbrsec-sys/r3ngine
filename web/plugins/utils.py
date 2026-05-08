@@ -9,6 +9,7 @@ from datetime import datetime
 from django.conf import settings
 from django.utils.text import slugify
 from django.db import transaction
+from django.core.management import call_command
 import logging
 from .models import Plugin
 
@@ -184,7 +185,32 @@ class AtomicInstaller:
                     shutil.rmtree(final_dir)
                 shutil.move(temp_dir, final_dir)
                 
-                # 5. Copy UI assets to MEDIA_ROOT
+                # 5. Ingest Engine Fixtures
+                for file in os.listdir(final_dir):
+                    if file.endswith('_engine.yaml'):
+                        fixture_path = os.path.join(final_dir, file)
+                        logger.info(f"Ingesting engine fixture: {fixture_path}")
+                        try:
+                            call_command('loaddata', fixture_path)
+                        except Exception as e:
+                            logger.error(f"Failed to ingest engine fixture {file}: {str(e)}")
+
+                # 6. Parse tools.yaml
+                tools_path = os.path.join(final_dir, 'tools.yaml')
+                if os.path.exists(tools_path):
+                    try:
+                        with open(tools_path, 'r') as f:
+                            tools_config = yaml.safe_load(f)
+                            plugin.tools_config = tools_config
+                            plugin.save()
+                        
+                        # Trigger background installation
+                        from .tasks import install_plugin_tools
+                        transaction.on_commit(lambda: install_plugin_tools.delay(plugin_slug))
+                    except Exception as e:
+                        logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
+
+                # 7. Copy UI assets to MEDIA_ROOT
                 if os.path.exists(media_plugin_dir):
                     shutil.rmtree(media_plugin_dir)
                 
@@ -193,7 +219,7 @@ class AtomicInstaller:
                     os.makedirs(media_plugin_dir, exist_ok=True)
                     shutil.copytree(ui_src, os.path.join(media_plugin_dir, 'ui'))
                 
-                # 6. Cleanup backups on success
+                # 8. Cleanup backups on success
                 if backup_fs_dir and os.path.exists(backup_fs_dir):
                     shutil.rmtree(backup_fs_dir)
                 if backup_media_dir and os.path.exists(backup_media_dir):

@@ -1,26 +1,38 @@
 # Changelog
 
+## [v3.0.0-alpha.5] - 2026-05-08
+### Added
+- **Plugin Tooling System**: Introduced `tools.yaml` contract for automated background tool installation.
+- **Engine Fixture Ingestion**: Plugins can now ship `*_engine.yaml` fixtures for automatic engine registration.
+- **Exploit Readiness Layer (ERL) v2**: Refactored to use local subprocess execution instead of Docker-in-Docker.
+- **Background Tool Installation**: Plugin tools are now installed/verified asynchronously via Celery on installation and system startup.
+- **Subprocess Execution Model**: Standardized local execution for plugins to enhance performance and simplify container orchestration.
+### Exploit Readiness Layer (ERL) Hardening (v3-beta)
+- **Proxy Support**: Native integration with reNgine's proxy settings. Tools (`sqlmap`, `XSStrike`) now respect system-wide proxy rotation via proxychains or environmental injection.
+- **OpSec Compliance**: ERL validations now inherit reNgine's OpSec policies, including random User-Agents and stealthy headers.
+- **Subprocess Execution**: Migrated from Docker-in-Docker to high-performance local subprocess execution for tool validation.
+- **Autonomous Tooling**: Standardized `tools.yaml` for automatic dependency management and installation of required binaries.
+
 ## v3.0.0
 **Official Repo location:** https://github.com/whiterabb17/r3ngine
  
 ### New Features
 - **Deep Pursuit OSINT Engine & Intelligence Hub**:
   - Replaced heavy Spiderfoot reliance with a modular, high-performance OSINT pipeline.
-  - **Tool Orchestration**: Integrated `holehe` (email pivots), `maigret` (social profile mapping), and `LinkedInt` (employee scraper) into the core Celery task chain.
+  - **Tool Orchestration**: Integrated `holehe` (email pivots), `maigret` (social profile mapping), and a custom **Playwright Social Intelligence Engine** into the core Celery task chain.
   - **Social Footprint Intelligence**: Added automated discovery of social media accounts associated with discovered emails, visualized in the enhanced "Emails & Credentials" section.
   - **Employee Dossiers**: Integrated username-to-profile mapping, allowing users to pivot from professional identities to social footprints with direct profile links.
   - **Metadata Persistence**: Added a schema-less `metadata` JSONField to `Email` and `Employee` models for storing rich, tool-specific intelligence findings.
   - **OpSec Proxy Rotation**: Fully integrated the `OpSecManager` into the OSINT pipeline, ensuring per-tool proxy rotation for all reconnaissance activities.
-- **Next-Gen Social Intelligence Engine (Playwright)**:
-  - Replaced the deprecated `LinkedInt` tool with a modern, high-performance Playwright-based discovery engine.
-  - **Persistent Context Management**: Implemented session persistence at `scan_results/context/linkedin`, reducing login frequency and bypassing bot detection.
-  - **Full Stealth Suite**: Integrated `playwright-stealth` and behavioral evasion (human-like scrolling, Gaussian delays, and viewport randomization).
-  - **Hybrid Discovery Workflow**: Automatically switches between direct Company Page extraction and Global Search filters for maximum discovery coverage.
-  - **Hunter.io Pattern Integration**: Seamlessly applies domain-level email patterns to discovered employees for automated credential profiling.
-  - **Visual Discovery Evidence**: Automatically captures and saves discovery screenshots to the scan results directory for transparency and auditability.
-- **LinkedInt & Hunter.io Credential Orchestration**:
-  - Integrated secure credential management for LinkedIn and Hunter.io in the reNgine API Vault.
-  - Implemented graceful skip logic to the OSINT pipeline, ensuring scans continue if social credentials are not configured.
+- **Internal Social Intelligence Engine (Playwright)**:
+  - Developed a custom, high-performance LinkedIn reconnaissance engine powered by Playwright.
+  - **Persistent Session Orchestration**: Implemented stateful context management in `scan_results/context/linkedin`, mimicking real-user sessions to drastically reduce account lockout risks.
+  - **Evasion & Stealth**: Integrated a full evasion suite including `playwright-stealth`, randomized human-like behavioral modeling, and Gaussian interaction delays.
+  - **Hybrid Personnel Discovery**: Sophisticated logic that pivots between Company Page scraping and global search filtering for maximum data extraction.
+  - **Visual Verification**: Every discovery run generates a unique, timestamped screenshot (`linkedin_[company]_[timestamp].png`) for investigator audit.
+- **Intelligence Credential Orchestration**:
+  - Integrated secure management for LinkedIn and Hunter.io credentials directly within the reNgine API Vault.
+  - Implemented intelligent skip logic to ensure OSINT tasks exit gracefully if credentials are not configured.
 - **Responsive Header & Mobile Navigation Orchestration**:
   - Implemented a smart, responsive header using `useMediaQuery` to adapt to limited screen real estate.
   - **Premium Hamburger Menu**: Developed a dedicated mobile drawer for viewports where header items overflow (typically < 1200px).
@@ -49,6 +61,8 @@
 - **Adaptive Stress & Resilience Engine (ASRE)**: Implemented full-scale endpoint stress testing directly within the reNgine workflow.
   - **Tool Orchestration**: Seamlessly orchestrated backend stress tests via Celery, driving load testing tools such as `k6`, `wrk`, `hping3`, and `Locust`.
   - **Safety Guardrails**: Integrated a Redis-based kill-switch mechanisms for safe testing and instant termination to protect target infrastructure.
+    - ✨ **Cyberpunk UI Evolution**: Tactical reorganization of Scan Detail headers for optimized workflow.
+    - 📊 **Enhanced Telemetry**: Fixed HTTP status breakdown logic to capture and visualize all response codes across assets.
   - **Telemetry Ingestion**: Real-time aggregation of latency, throughput, and error rate metrics directly into Neo4j for topological node analysis.
   - **Visualization Dashboard**: Created a new React-based interactive UI utilizing Apache ECharts and Nivo to visually represent endpoint resilience, saturation points, and errors across the network.
 - **Documentation Overhaul**: Comprehensive restructuring of the documentation to provide high-level visibility into v3 capabilities and surgical recon pipelines, including a new dedicated section for the **Adaptive Stress & Resilience Engine (ASRE)**.
@@ -66,6 +80,14 @@
     - **SCA & Dependency Intelligence**: Integrated vulnerability mapping for supply chain and dependency findings, automatically deriving potential RCE and Data Exfil paths.
     - **Schema & Ingestion Hardening**: Expanded `vulnerabilities.py` to support deep subtype inference and updated `schema.py` for cloud-native capability modeling.
     - **Subscan Pipeline Integration**: Fixed a decoupling issue where APME and ERL validation would not trigger during targeted vulnerability subscans. Integrated correlation, risk scoring, and path modeling into the per-subdomain scan chain to ensure data consistency across targeted reconnaissance.
+    - **Engine Decoupling**: Moved Attack Path Modeling configuration to its own independent engine block (`attack_path_modeling`), allowing it to be explicitly chained after other post-scan services like ERL validation.
+- **WPScan Vulnerability Integration**:
+  - Integrated **WPScan** as a first-class security tool for automated WordPress reconnaissance.
+  - **Secure API Orchestration**: Added a dedicated persistence layer in the reNgine Vault for WPScan API tokens, enabling detailed vulnerability reporting.
+  - **Automated Scanning & Detection**: Developed a multi-threaded Celery task that automatically detects WordPress instances, identifies vulnerable plugins/themes, and parses core version risks.
+  - **Deduplication & Persistence**: Integrated results directly into the `Vulnerability` database with intelligent deduplication against existing findings.
+  - **Tactical Configuration**: Added per-engine controls for WPScan enumeration modes and detection sensitivity via YAML configurations.
+  - **Infrastructure Support**: Updated the core Docker environment to include Ruby and WPScan as a pre-installed dependency.
 
 - **Advanced Web App & API Discovery Pipeline**: Introduced a dedicated reconnaissance engine for deep API discovery, featuring:
 ring:
@@ -151,17 +173,17 @@ ring:
     - **Impact Explorer**: A tactical React component for real-time monitoring of impact generation tasks and interactive graph exploration.
     - **PII Gate**: Implemented a privacy-preserving "gate" that anonymizes sensitive reconnaissance data (IPs, emails, hostnames) before sending it to external LLMs and deanonymizes the returned results.
     - **Persistence & Polling**: Impact findings are persisted in PostgreSQL and synchronized with React Query using smart polling for asynchronous background tasks.
-  - **Real-Time Interactive Scan Timeline**: Overhauled the scan timeline to support live task monitoring and detailed command execution logs:
+- **Real-Time Interactive Scan Timeline**: Overhauled the scan timeline to support live task monitoring and detailed command execution logs:
     - **Live Command Streaming**: Integrated real-time polling to capture and display command stdout/stderr as tools execute.
     - **Interactive Task Overlay**: Users can click on timeline events to open a terminal-style overlay showing all executed commands and their outputs.
     - **Enhanced Task Metadata**: Backend updated to track command-level lifecycle and log availability per scan activity.
     - **Smart Polling**: Implemented intelligent React Query polling that automatically adjusts based on scan status.
-  - **Advanced Vulnerability Correlation Engine**: 
-    - Integrated **Trivy** for automated Software Composition Analysis (SCA) and **Gitleaks** for secret discovery.
-    - Added **Retire.js** integration to identify vulnerable client-side JavaScript libraries.
-    - Implemented a weighted correlation algorithm that unifies results from Nuclei (DAST), Semgrep (SAST), Trivy (SCA), Gitleaks, and Retire.js.
-    - Introduced **Potential Attack Chain** generation to visualize sequential exploitation steps (Initial Access -> Lateral Movement -> Impact).
-    - Added automated unit tests to ensure correlation logic accuracy across all security tools.
+- **Advanced Vulnerability Correlation Engine**: 
+  - Integrated **Trivy** for automated Software Composition Analysis (SCA) and **Gitleaks** for secret discovery.
+  - Added **Retire.js** integration to identify vulnerable client-side JavaScript libraries.
+  - Implemented a weighted correlation algorithm that unifies results from Nuclei (DAST), Semgrep (SAST), Trivy (SCA), Gitleaks, and Retire.js.
+  - Introduced **Potential Attack Chain** generation to visualize sequential exploitation steps (Initial Access -> Lateral Movement -> Impact).
+  - Added automated unit tests to ensure correlation logic accuracy across all security tools.
 - **Seamless AI Impact Intelligence**: 
     - Modernized the AI-driven vulnerability assessment workflow with a state-aware Impact Explorer UI.
     - Replaced intrusive alerts with immediate loading overlays and persistent status monitoring.
@@ -221,6 +243,11 @@ ring:
     - **Integrated Target Management**: Added "Add Target" functionality directly within the Bounty Hub asset list for immediate orchestration.
     - **HackerOne Metadata Enrichment**: Program cards now feature "Since" date, currency indicators, and "Open Scope"/"New" status badges.
     - **Standardized Tactical Feedback**: Integrated the global Snackbar system for all import and asset addition actions.
+- **Dashboard & Scans:**
+    - Improved Scan Detail header layout (breadcrumbs stacked under actions, right-aligned).
+    - Fixed HTTP Status Breakdown chart to accurately display all status codes.
+    - Synchronized Subdomain status attributes with probing results in the background engine.
+    - Expanded Scan Summary data to include status codes from both subdomains and endpoints.
 - **OSINT Intelligence Dashboard**: Implemented a comprehensive reconnaissance data visualization suite:
     - **Modular OSINT Tab**: Integrated a new, tactical dashboard into the Scan Detail view to aggregate and visualize discovery data.
     - **Email & Credential Exposure**: Displays discovered email addresses and associated leaked credentials in a secure, copy-able table.

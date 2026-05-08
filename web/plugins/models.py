@@ -19,6 +19,7 @@ class Plugin(models.Model):
     
     # Metadata
     manifest = models.JSONField(default=dict)
+    tools_config = models.JSONField(default=dict, help_text="Metadata from tools.yaml")
     installed_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
     
