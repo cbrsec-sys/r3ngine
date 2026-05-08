@@ -34,7 +34,7 @@ ENV GOROOT="/usr/local/go"
 ENV GOPATH=$HOME/go
 ENV PATH="${PATH}:${GOROOT}/bin:${GOPATH}/bin"
 
-# Install Python
+# Install Python and Ruby
 RUN apt update -y && \
     apt install -y \
     python3.10 \
@@ -47,12 +47,21 @@ RUN apt update -y && \
     libegl-dev \
     libegl1 \
     libcap2-bin \
-    libcap2
+    libcap2 \
+    ruby-full \
+    ruby-dev \
+    libcurl4-openssl-dev \
+    libxml2 \
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
+    liblzma-dev \
+    build-essential \
+    patch
 
 
 # Install essential packages
-RUN apt update -y && \
-    apt install -y --no-install-recommends \
+RUN apt install -y --no-install-recommends \
     build-essential \
     cmake \
     ninja-build \
@@ -247,6 +256,8 @@ RUN git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r &&
 
 RUN git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll && \
     cd /usr/src/github/OneForAll && pip3 install -r requirements.txt
+# Install WPScan
+RUN gem install wpscan --no-document
 
 RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
     cd /usr/src/github/theHarvester && uv sync

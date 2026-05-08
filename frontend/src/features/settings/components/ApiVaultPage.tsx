@@ -50,7 +50,8 @@ export const ApiVaultPage: React.FC = () => {
     acunetix_key: '',
     linkedin_username: '',
     linkedin_password: '',
-    hunterio_key: ''
+    hunterio_key: '',
+    wpscan_key: ''
   });
 
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -78,7 +79,8 @@ export const ApiVaultPage: React.FC = () => {
         acunetix_key: settings.acunetix_key || '',
         linkedin_username: settings.linkedin_username || '',
         linkedin_password: settings.linkedin_password || '',
-        hunterio_key: settings.hunterio_key || ''
+        hunterio_key: settings.hunterio_key || '',
+        wpscan_key: settings.wpscan_key || ''
       });
     }
   }, [settings]);
@@ -489,6 +491,19 @@ export const ApiVaultPage: React.FC = () => {
                       />
                     </Grid>
                   </Grid>
+                </Box>
+              </TacticalPanel>
+
+              <TacticalPanel title="WPSCAN CONFIGURATION" icon={<Shield size={20} />}>
+                <Box sx={{ p: 1 }}>
+                  <KeyField
+                    label="WPSCAN API KEY"
+                    description="WPScan API key is used to retrieve vulnerability data for WordPress installations."
+                    field="wpscan_key"
+                    placeholder="Enter WPScan API Key"
+                    icon={Zap}
+                    url="https://wpscan.com/api"
+                  />
                 </Box>
               </TacticalPanel>
             </Stack>

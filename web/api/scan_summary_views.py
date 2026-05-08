@@ -71,8 +71,8 @@ class ScanSummaryAPIView(APIView):
         # Assets
         ip_addresses = IpAddress.objects.filter(ip_subscan_ids__scan_history=scan).distinct()
         asset_countries = ip_addresses.exclude(geo_iso=None).values(name=F('geo_iso__name'), iso=F('geo_iso__iso')).annotate(count=Count('geo_iso')).order_by('-count')
-        subdomain_statuses = subdomain_qs.exclude(http_status=0).values('http_status').annotate(count=Count('http_status'))
-        endpoint_statuses = endpoint_qs.exclude(http_status=0).values('http_status').annotate(count=Count('http_status'))
+        subdomain_statuses = subdomain_qs.exclude(Q(http_status=0) | Q(http_status__isnull=True)).values('http_status').annotate(count=Count('http_status'))
+        endpoint_statuses = endpoint_qs.exclude(Q(http_status=0) | Q(http_status__isnull=True)).values('http_status').annotate(count=Count('http_status'))
         
         # Combine Subdomain and EndPoint status codes for a comprehensive breakdown
         status_map = {}
@@ -236,7 +236,7 @@ class ScanSummaryAPIView(APIView):
                 'engine_name': scan.scan_type.engine_name if scan.scan_type else "Standard",
                 'start_scan_date': scan.start_scan_date,
                 'stop_scan_date': scan.stop_scan_date,
-                'duration': int((scan.stop_scan_date - scan.start_scan_date).total_seconds()) if scan.stop_scan_date else int((timezone.now() - scan.start_scan_date).total_seconds()),
+                'duration': int((scan.stop_scan_date - scan.start_scan_date).total_seconds()) if scan.stop_scan_date and scan.start_scan_date else int((timezone.now() - scan.start_scan_date).total_seconds()) if scan.start_scan_date else 0,
                 'progress': scan.get_progress() or 0,
                 'cfg_starting_point_path': scan.cfg_starting_point_path,
                 'cfg_imported_subdomains': scan.cfg_imported_subdomains or [],

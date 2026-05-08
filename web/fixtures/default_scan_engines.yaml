@@ -21,21 +21,20 @@
       \ 'interestingsubs', 'lfi', 'rce', 'redirect', 'sqli', 'ssrf', 'ssti', 'xss'],\n\
       \  'ignore_file_extensions': ['png', 'jpg', 'jpeg', 'gif', 'mp4', 'mpeg', 'mp3'],\n\
       \  'threads': 30\n}\nvulnerability_scan: {\n  'run_nuclei': true,\n  'run_dalfox':\
-      \ true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'run_apme': true,\n  'enable_http_crawl': true,\n  'concurrency':\
+      \ true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'enable_http_crawl': true,\n  'concurrency':\
       \ 50,\n  'intensity': 'normal',\n  'rate_limit': 150,\n  'retries': 1,\n  'timeout':\
       \ 5,\n  'fetch_gpt_report': false,\n  'nuclei': {\n    'use_nuclei_config':\
       \ false,\n    'severities': ['unknown', 'info', 'low', 'medium', 'high', 'critical']\n\
-      \  }\n}\nwaf_detection: {}\nwaf_bypass: {\n  'use_nuclei': true,\n  'use_benchmarking':\
+      \  }\n}\nattack_path_modeling: {\n  'enabled': true\n}\nwaf_detection: {}\nwaf_bypass: {\n  'use_nuclei': true,\n  'use_benchmarking':\
       \ true\n}\nscreenshot: {\n  'enable_http_crawl': true,\n  'intensity': 'normal',\n\
       \  'timeout': 10,\n  'threads': 40\n}\nbrute_force_scan: {\n  'users_wordlist':\
       \ ['top_default_usernames.txt', 'most_common_usernames.txt'],\n  'pass_wordlist':\
-      \ ['top_default_passwords.txt', 'most_common_passwords.txt'],\n  'service':\
-      \ 'http',\n  'stop_on_success': true\n}\nfirewall_vpn_scan: {\n  'run_ike_scan':\
+      \ ['top_default_passwords.txt', 'most_common_passwords.txt'],\n  'services': ['ssh', 'ftp', 'http', 'smb', 'rdp', 'telnet'],\n  'stop_on_success': true\n}\nfirewall_vpn_scan: {\n  'run_ike_scan':\
       \ true,\n  'threads': 20\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  \
       \ # 'intensity': 'normal',\n  # 'threads': 10\n}\nweb_api_discovery: {\n\
       \  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'],\n\
-      \  'scan_only_active': true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite',\n\
-      \  'arjun_methods': 'GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH'\n}"
+      \  'scan_only_active': true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite',\n  'arjun_methods': 'GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH'\n\
+      \}"
   model: scanEngine.enginetype
   pk: 1
 - fields:
@@ -75,11 +74,11 @@
       \ 'jenkins',\n    'wordpress_files',\n    'php_error',\n    'exposed_documents',
       \n    'db_files',\n    'git_exposed'\n  ],\n  'intensity': 'normal',
       \n  'documents_limit': 50\n}\nvulnerability_scan: {\n  'run_nuclei': true,
-      \n  'run_dalfox': true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'run_apme': true,\n  'enable_http_crawl':\
+      \n  'run_dalfox': true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'enable_http_crawl':\
       \ true,\n  'concurrency': 50,\n  'intensity': 'normal',\n  'rate_limit':\
       \ 150,\n  'retries': 1,\n  'timeout': 5,\n  'fetch_gpt_report': false,
       \n  'nuclei': {\n    'use_nuclei_config': false,\n    'severities': ['unknown',\
-      \ 'info', 'low', 'medium', 'high', 'critical']\n  }\n}\nspiderfoot_scan: {\n  'modules': 'all',\n\
+      \ 'info', 'low', 'medium', 'high', 'critical']\n  }\n}\nattack_path_modeling: {\n  'enabled': true\n}\nspiderfoot_scan: {\n  'modules': 'all',\n\
       \  # 'intensity': 'normal',\n  # 'threads': 10\n}"
   model: scanEngine.enginetype
   pk: 4
@@ -108,7 +107,7 @@
       \ false,\n  'concurrency': 50,\n  'intensity': 'normal',\n  'rate_limit':\
       \ 150,\n  'retries': 1,\n  'timeout': 5,\n  'fetch_gpt_report': false,
       \n  'nuclei': {\n    'use_nuclei_config': false,\n    'severities': ['low',\
-      \ 'medium', 'high', 'critical']\n  }\n}\nwaf_detection: {\n  'use_shodan':\
+      \ 'medium', 'high', 'critical']\n  }\n}\nattack_path_modeling: {\n  'enabled': true\n}\nwaf_detection: {\n  'use_shodan':\
       \ true,\n  'use_censys': true\n}\nwaf_bypass: {\n  'use_nuclei': true,
       \n  'use_benchmarking': true\n}\nspiderfoot_scan: {\n  'modules': 'all',\n\
       \ # 'intensity': 'normal',\n  # 'threads': 10\n}"
@@ -129,12 +128,12 @@
       \ 'fetch_gpt_report': false,\n  'nuclei': {\n    'use_nuclei_config': false,
       \n    'severities': ['medium', 'high', 'critical'],\n    'tags': ['sophos',\
       \ 'firewall', 'vpn'],\n    'custom_templates': ['/root/nuclei-templates/']
-      \n  }\n}\nfirewall_vpn_scan: {\n  'run_ike_scan': true,\n  'run_sslscan':\
+      \n  }\n}\nattack_path_modeling: {\n  'enabled': true\n}\nfirewall_vpn_scan: {\n  'run_ike_scan': true,\n  'run_sslscan':\
       \ true,\n  'ports': [443, 4444, 8443]\n}\n\nbrute_force_scan: {\n\
       \  'users_wordlist': ['top_default_usernames.txt', 'most_common_usernames.txt'],
       \n  'pass_wordlist': ['top_default_passwords.txt', 'most_common_passwords.txt'],
-      \n  'service': 'http',\n  'stop_on_success': true\n}\nspiderfoot_scan: {\n\
-      \  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
+      \n  'services': ['ssh', 'ftp', 'http', 'smb', 'rdp', 'telnet'],\n  'stop_on_success': true\n}\nspiderfoot_scan: {\n  'modules': 'all',\n\
+      \  # 'intensity': 'normal',\n  # 'threads': 10\n}"
   model: scanEngine.enginetype
   pk: 7
 - fields:
@@ -142,7 +141,7 @@
     engine_name: Web App & API Discovery
     yaml_configuration: "web_api_discovery: {\n  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'],\n\
       \  'scan_only_active': true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite',\n  'arjun_methods': 'GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH'\n\
-      \ }\nvulnerability_scan: {\n  'run_acunetix': true,\n  'run_apme': true\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
+      \ }\nvulnerability_scan: {\n  'run_acunetix': true\n}\nattack_path_modeling: {\n  'enabled': true\n}\nspiderfoot_scan: {\n  'modules': 'all',\n  # 'intensity': 'normal',\n  # 'threads': 10\n}"
   model: scanEngine.enginetype
   pk: 8
 - fields:

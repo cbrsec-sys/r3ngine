@@ -1074,7 +1074,7 @@ export const ScanDetailPage = () => {
         </Grid>
         <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex' }}>
           <TacticalPanel title="HTTP Status Breakdown" icon={<Activity size={14} />} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1 }}>
               <Chart
                 options={{
                   chart: { type: 'donut', background: 'transparent' },
@@ -1083,7 +1083,12 @@ export const ScanDetailPage = () => {
                   colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00', '#ff8000', '#0080ff', '#8000ff'],
                   stroke: { show: false },
                   dataLabels: { enabled: false },
-                  legend: { position: 'bottom', labels: { colors: 'rgba(255,255,255,0.7)' } },
+                  legend: { 
+                    position: 'right', 
+                    horizontalAlign: 'left',
+                    labels: { colors: 'rgba(255,255,255,0.7)' },
+                    itemMargin: { vertical: 2 }
+                  },
                   plotOptions: { pie: { donut: { size: '70%' } } }
                 }}
                 series={(data?.http_status_breakdown || []).slice().sort((a: any, b: any) => a.http_status - b.http_status).map((s: any) => s.count)}
@@ -1404,7 +1409,7 @@ export const ScanDetailPage = () => {
                     subtitle={`${data.alive_count} ACTIVE`}
                     color="#7000ff"
                     icon={Layers}
-                    sx={{ height: '70%' }}
+                    sx={{ height: '100%' }}
                   />
                   <KpiCard
                     title="ENDPOINTS"
@@ -1412,7 +1417,7 @@ export const ScanDetailPage = () => {
                     subtitle={`${data.endpoint_alive_count} ALIVE`}
                     color="#ff00f7"
                     icon={Target}
-                    sx={{ height: '70%' }}
+                    sx={{ height: '100%' }}
                   />
                   <KpiCard
                     title="VULNS"
@@ -1420,7 +1425,7 @@ export const ScanDetailPage = () => {
                     subtitle={`${data.critical_count} CRITICAL`}
                     color="#ff003c"
                     icon={Bug}
-                    sx={{ height: '70%' }}
+                    sx={{ height: '100%' }}
                   />
                   <KpiCard
                     title="OSINT"
@@ -1428,7 +1433,7 @@ export const ScanDetailPage = () => {
                     subtitle="SENSITIVE DATA"
                     color="#fffc00"
                     icon={Key}
-                    sx={{ height: '70%' }}
+                    sx={{ height: '100%' }}
                   />
                 </Box>
 

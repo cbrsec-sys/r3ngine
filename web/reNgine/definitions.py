@@ -96,17 +96,28 @@ FIREWALL_VPN_SCAN = 'firewall_vpn_scan'
 BRUTE_FORCE_SCAN = 'brute_force_scan'
 SPIDERFOOT_SCAN = 'spiderfoot_scan'
 WEB_API_DISCOVERY = 'web_api_discovery'
+ATTACK_PATH_MODELING = 'attack_path_modeling'
 KITERUNNER_WORDLIST = 'kiterunner_wordlist'
+SERVICES = 'services'
 SCAN_ONLY_ACTIVE = 'scan_only_active'
 ARJUN_METHODS = 'arjun_methods'
 LEAKS_AND_SECRETS = 'leaks_and_secrets'
 LEAKLOOKUP = 'leaklookup'
 GITLEAKS = 'gitleaks'
 TRUFFLEHOG = 'trufflehog'
-RUN_CPANEL_SCAN = 'run_cpanel_scan'
+RUN_CPANEL2SHELL = 'run_cpanel2shell'
 CPANEL_USER_WORDLIST = 'cpanel_user_wordlist'
 CPANEL_SCANNER_PROXY_TYPE = 'proxy_type'
 CPANEL_SCANNER_DEFAULT_WORDLIST = '/usr/src/app/wordlist/auth/cpanel_users.txt'
+
+RUN_WPSCAN = 'run_wpscan'
+WPSCAN_ENUMERATION = 'wpscan_enumeration'
+WPSCAN_DETECTION_MODE = 'wpscan_detection_mode'
+WPSCAN_SCAN_DEFAULT_CONFIG = {
+    'run_wpscan': True,
+    'wpscan_enumeration': 'vp,vt,u',
+    'wpscan_detection_mode': 'mixed'
+}
 
 
 ###############################################################################

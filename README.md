@@ -52,11 +52,11 @@ The core scanning engines have been upgraded to provide "Verification-First" rec
 *   **Adaptive Stress & Resilience Engine (ASRE)**: Full-scale endpoint stress testing directly within the workflow, orchestrating `k6`, `wrk`, `hping3`, and `Locust` with real-time telemetry ingestion.
 *   **Vulnerability Correlation Engine**: Unifies findings from **Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, and Retire.js** into a prioritized threat landscape.
 *   **Centralized Brute-Force Orchestration**: A multi-tiered authentication attack pipeline that centralizes targets from Nmap, Nuclei, and intelligent form extraction into a unified `AuthCandidate` queue, orchestrated via **Hydra** with full OpSec controls.
-*   **Atomic Plugin Management**: A powerful, modular system to extend reNgine with custom engines and dynamic UI components, featuring secure **Atomic Installation** with automated database backups and rollback guardrails.
+*   **Autonomous Plugin Management**: A powerful, modular system to extend reNgine with custom engines and dynamic UI components. Features **Atomic Installation** with background tool installation (`tools.yaml`), automated engine registration via fixtures, and persistent startup verification.
 
 ### 🕵️ Surgical Recon & API Discovery
 The reconnaissance pipeline has been deepened to handle modern, API-centric web architectures.
-*   **Deep Pursuit OSINT Engine**: A modernized, high-performance intelligence pipeline that replaces heavy Spiderfoot scans with surgical discovery. Featuring **holehe** for email pivots, **maigret** for cross-platform social profile mapping, and **LinkedInt** for corporate employee scraping.
+*   **Deep Pursuit OSINT Engine**: A modernized, high-performance intelligence pipeline that replaces heavy Spiderfoot scans with surgical discovery. Featuring **holehe** for email pivots, **maigret** for cross-platform social profile mapping, and a custom **Internal Social Intelligence Engine** for advanced LinkedIn discovery.
 *   **OSINT Intelligence Dashboard**: Aggregated view of emails, leaks, employees, dorks, and document metadata.
 
 ### 🥷 Stealth, OpSec & Infrastructure
@@ -71,7 +71,8 @@ Operational security is no longer an afterthought; it is baked into every execut
 Aesthetic excellence is a core requirement of the v3 vision.
 *   **Cyberpunk V3 "Neon" Dashboard**: A premium glassmorphic theme with a unified dark/neon palette optimized for complex data visualization.
     *   **Interactive Subdomain Management**: Fully wired tactical interface for on-demand **LLM Attack Surface Analysis**, targeted **Subscans**, and reconnaissance **TODO/Note management** directly from the inventory.
-    *   **Scan Detail Header Reorganization**: Improved the aesthetic layout of the Scan Detail page by repositioning navigation breadcrumbs below action buttons and right-aligning the control group for better visual flow.
+    *   **Scan Detail Header Reorganization**: Improved the aesthetic layout of the Scan Detail page by repositioning navigation breadcrumbs below action buttons and right-aligned the control group.
+    *   📊 **Enhanced Telemetry**: Fixed HTTP status breakdown logic to capture and visualize all response codes across assets.
 *   **Responsive Header & Mobile Menu**: Dynamic adaptation of header actions into a high-fidelity hamburger drawer for small viewports, preserving the glassmorphic aesthetic.
 *   **Multi-Tier Theme System**: Toggle between **Hacker (Cyberpunk)**, **Hybrid (Modern Dark)**, and **Enterprise (Professional Slate)** interfaces instantly.
 *   **Attack Surface Map v4.0**: Advanced node analytics scaling by degree centrality, blast radius computation, and AI-driven graph search.
@@ -150,15 +151,17 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **Exploitation Readiness Layer (ERL)**: Modular, non-destructive vulnerability validation with containerized sandboxing and confidence scoring.
 *   **Adaptive Stress & Resilience Engine (ASRE)**: Built-in endpoint stress testing using `k6`, `wrk`, `hping3`, and `Locust`.
 *   **Vulnerability Correlation Engine**: Multi-tool unification mapping findings from Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, and more.
+*   **Autonomous Tooling & Plugin System**: Background tool management ensures all plugin dependencies (e.g., sqlmap, XSStrike) are installed and verified automatically at runtime. **v3-Hardening**: Integrated native **proxy rotation** and **OpSec compliance** (User-Agent randomization, custom headers) directly into the ERL adapter layer, ensuring stealthy validation of all discovered vulnerabilities.
 *   **Continuous Monitoring**: Periodic discovery of new subdomains, endpoints, and data changes with automated diffing.
 
 ### 🕵️ Surgical Reconnaissance
 *   **Advanced Web API Discovery**: Dedicated pipeline featuring Kiterunner, Arjun, ParamSpider, LinkFinder, and InQL.
-*   **Deep OSINT OSINT 2.0**: Full Spiderfoot integration with intensity profiles and concurrency management.
+*   **Deep OSINT 2.0**: A modular, internal intelligence pipeline featuring automated email pivoting, social profile mapping, and a **Custom Playwright-driven Social Intelligence Engine** that mimics human behavior to discover corporate personnel while maintaining high OpSec.
 *   **ReconX Auxiliary Discovery**: Integrated third-party asset discovery and monitoring.
 *   **Vulnerability Scanning**:
     *   **Nuclei**: Specialized templates and rate-limited execution.
     *   **Semgrep**: Automated static analysis for JS and GraphQL.
+    *   **WPScan**: Automated WordPress reconnaissance and vulnerability identification.
     *   **Dalfox**: Advanced XSS discovery.
     *   **CRLFuzzer, S3Scanner, Gitleaks, Retire.js**.
 *   **WHOIS, WAF Detection, and IP Geolocation**.

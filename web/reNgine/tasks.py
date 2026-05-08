@@ -47,6 +47,7 @@ from reNgine.stress_testing_tasks import run_stress_testing
 from reNgine.osint_tasks import *
 from reNgine.task_utils import run_command, save_email, save_employee, sanitize_command_for_db
 from reNgine.report_tasks import *
+from reNgine.wpscan_tasks import wpscan_scan
 try:
 	from acunetix import Acunetix
 except ImportError:
@@ -275,8 +276,18 @@ def initiate_scan(
 			correlate_vulnerabilities.si(scan_history_id=scan_history_id),
 			calculate_risk_scores.si(scan_history_id=scan_history_id),
 			PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx),
-			run_apme.si(scan_history_id=scan_history_id)
 		]
+
+		# Attack Path Modeling Engine (APME)
+		apme_config = config.get(ATTACK_PATH_MODELING, {})
+		# For backward compatibility, check both the new key and the old run_apme key in vulnerability_scan
+		run_apme_enabled = apme_config.get('enabled', False)
+		if not run_apme_enabled:
+			vuln_scan_config = config.get(VULNERABILITY_SCAN, {})
+			run_apme_enabled = vuln_scan_config.get('run_apme', False)
+
+		if run_apme_enabled:
+			workflow_steps.append(run_apme.si(scan_history_id=scan_history_id))
 
 		# Filter out None steps (where plugins aren't present)
 		workflow_steps = [step for step in workflow_steps if step is not None]
@@ -425,12 +436,22 @@ def initiate_subscan(
 	# Build workflow steps
 	workflow_steps = [method.si(ctx=ctx)]
 
-	# If this is a vulnerability scan, we need to run correlation and APME
+	# If this is a vulnerability scan, we need to run correlation
 	if scan_type == 'vulnerability_scan':
 		workflow_steps.append(correlate_vulnerabilities.si(scan_history_id=scan.id))
 		workflow_steps.append(calculate_risk_scores.si(scan_history_id=scan.id))
 		# Run ERL validation if plugin is installed
 		workflow_steps.append(PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx))
+
+	# Attack Path Modeling Engine (APME)
+	apme_config = config.get(ATTACK_PATH_MODELING, {})
+	# For backward compatibility, check both the new key and the old run_apme key in vulnerability_scan
+	run_apme_enabled = apme_config.get('enabled', False)
+	if not run_apme_enabled:
+		vuln_scan_config = config.get(VULNERABILITY_SCAN, {})
+		run_apme_enabled = vuln_scan_config.get('run_apme', False)
+
+	if run_apme_enabled:
 		workflow_steps.append(run_apme.si(scan_history_id=scan.id))
 
 	# Filter out None steps (where plugins aren't present)
@@ -2852,11 +2873,20 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 		grouped_tasks.append(_task)
 
 	# Run cPanel Scanner
-	should_run_cpanel = config.get('cpanel_scanner', {}).get(RUN_CPANEL_SCAN, True)
+	should_run_cpanel = config.get('cpanel_scanner', {}).get(RUN_CPANEL2SHELL, True)
 	if should_run_cpanel:
 		_task = cpanel_scan.si(
 			ctx=ctx,
 			description=f'cPanel Vulnerability Scan'
+		)
+		grouped_tasks.append(_task)
+
+	# Run WPScan
+	should_run_wpscan = config.get(RUN_WPSCAN, True)
+	if should_run_wpscan:
+		_task = wpscan_scan.si(
+			ctx=ctx,
+			description=f'WPScan'
 		)
 		grouped_tasks.append(_task)
 
@@ -5999,8 +6029,12 @@ def brute_force_scan(self, targets=[], ctx={}, description=None):
 	from reNgine.opsec_utils import BruteForceOrchestrator
 	orchestrator = BruteForceOrchestrator(self.scan)
 	
+	# Extract allowed services from config
+	config = self.yaml_configuration.get(BRUTE_FORCE_SCAN) or {}
+	allowed_services = config.get(SERVICES, [])
+	
 	# Execute orchestration
-	results = orchestrator.run_orchestration(ctx=ctx)
+	results = orchestrator.run_orchestration(ctx=ctx, allowed_services=allowed_services)
 	
 	total_found = 0
 	for res in results:
@@ -6330,7 +6364,15 @@ def run_apme(self, scan_history_id):
 	logger.info(f"APME: Initiating attack path modeling for scan_history_id={scan_history_id}")
 	try:
 		from apme.orchestrator import APMEOrchestrator
-		orchestrator = APMEOrchestrator(top_n=5)
+		from startScan.models import ScanHistory
+		
+		# Fetch configuration from engine
+		scan = ScanHistory.objects.get(id=scan_history_id)
+		config = yaml.safe_load(scan.scan_type.yaml_configuration) or {}
+		apme_config = config.get(ATTACK_PATH_MODELING, {})
+		top_n = apme_config.get('top_n', 5)
+
+		orchestrator = APMEOrchestrator(top_n=top_n)
 		result = orchestrator.run(scan_history_id)
 		logger.info(
 			f"APME: Completed. Found {result.get('total_paths', 0)} paths, "

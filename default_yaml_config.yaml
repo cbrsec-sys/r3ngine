@@ -107,7 +107,7 @@ vulnerability_scan: {
     }
   },
   'cpanel_scanner': {
-    'run_cpanel_scan': true,
+    'run_cpanel2shell': true,
     'cpanel_user_wordlist': '/usr/src/app/wordlist/auth/cpanel_users.txt',
     'proxy_type': 'rotating'
   }

@@ -743,3 +743,55 @@
     is_github_cloned: true
     github_clone_path: /usr/src/github/LinkedInt
     subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 43
+  fields:
+    logo_url: null
+    name: wpscan
+    description: WordPress Security Scanner
+    github_url: https://github.com/wpscan/wpscan
+    license_url: null
+    version_lookup_command: wpscan --version
+    update_command: gem update wpscan
+    install_command: gem install wpscan
+    version_match_regex: null
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 44
+  fields:
+    logo_url: https://raw.githubusercontent.com/sqlmapproject/sqlmap/master/doc/README/sqlmap_logo.png
+    name: sqlmap
+    description: sqlmap is an open source penetration testing tool that automates the process of detecting and exploiting SQL injection flaws and taking over of database servers.
+    github_url: https://github.com/sqlmapproject/sqlmap
+    license_url: https://github.com/sqlmapproject/sqlmap/blob/master/LICENSE
+    version_lookup_command: python3 sqlmap.py --version
+    update_command: git pull
+    install_command: git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git
+    version_match_regex: '(?i:v)?\d+\.\d+(?:\.\d+)*'
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/sqlmap
+    subdomain_gathering_command: null
+
+- model: scanEngine.installedexternaltool
+  pk: 45
+  fields:
+    logo_url: null
+    name: XSStrike
+    description: XSStrike is a Cross Site Scripting detection suite equipped with four hand written parsers, an intelligent payload generator, a powerful fuzzing engine and an incredibly fast crawler.
+    github_url: https://github.com/s0md3v/XSStrike
+    license_url: https://github.com/s0md3v/XSStrike/blob/master/LICENSE
+    version_lookup_command: python3 xsstrike.py --help
+    update_command: git pull
+    install_command: git clone https://github.com/s0md3v/XSStrike.git
+    version_match_regex: '(?i:v)?\d+\.\d+(?:\.\d+)*'
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/XSStrike
+    subdomain_gathering_command: null
