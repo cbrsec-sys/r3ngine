@@ -8,26 +8,15 @@
         rel="stylesheet" />
     <style>
         @page {
-            size: A4;
-            margin: 25mm 15mm;
+          size: A4;
+          margin: 25mm 15mm;
 
             @bottom-left {
-                    {
-                    % if show_footer %
-                }
-
+                {% if show_footer %}
                 content: "{{footer_text}}";
-
-                    {
-                    % else %
-                }
-
+                {% else %}
                 content: '';
-
-                    {
-                    % endif %
-                }
-
+                {% endif %}
                 width: 100%;
                 border-top: 1px dashed #696969;
                 position: absolute;
@@ -75,14 +64,7 @@
         #cover {
             position: relative;
             overflow: hidden;
-
-            background-color: {
-                    {
-                    secondary_color
-                }
-            }
-
-            ;
+            background-color: {{secondary_color}};
             width: 210mm;
             height: 297mm;
         }
@@ -93,19 +75,8 @@
 
         .background-element {
             position: absolute;
-
-            background: linear-gradient(15deg, {
-                    {
-                    primary_color
-                }
-            }
-
-            , {
-                {
-                secondary_color
-            }
-        });
-        opacity: 0.4;
+            background: linear-gradient(15deg, {{primary_color}}, {{secondary_color}});
+            opacity: 0.4;
         }
 
         .circle {
@@ -134,14 +105,7 @@
         h1 {
             font-weight: 200;
             font-size: 38pt;
-
-            color: {
-                    {
-                    primary_color
-                }
-            }
-
-            ;
+            color: {{primary_color}};
             margin: 0 0 10mm 0;
             text-transform: uppercase;
             letter-spacing: 2px;
@@ -172,14 +136,7 @@
             position: absolute;
             bottom: -2mm;
             left: 0;
-
-            background: linear-gradient(to right, {
-                    {
-                    primary_color
-                }
-            }
-
-            , rgba(255, 255, 255, 0));
+            background: linear-gradient(to right, {{primary_color}}, rgba(255, 255, 255, 0));
         }
 
         .no-fade-line::after {
@@ -189,59 +146,27 @@
         .subheading {
             font-weight: 200;
             font-size: 24pt;
-
-            color: {
-                    {
-                    primary_color
-                }
-            }
-
-            ;
+            color: {{primary_color}};
             margin: 0 0 5mm 0;
         }
 
         .date {
             font-weight: 300;
             font-size: 14pt;
-
-            color: {
-                    {
-                    primary_color
-                }
-            }
-
-            ;
+            color: {{primary_color}};
             margin: 0 0 20mm 0;
         }
 
         .cover-line {
             width: 95%;
             height: 1.5px;
-
-            background: linear-gradient(to right, {
-                    {
-                    primary_color
-                }
-            }
-
-            , {
-                {
-                secondary_color
-            }
-        });
-        margin: 0 0 20mm 0;
+            background: linear-gradient(to right, {{primary_color}}, {{secondary_color}});
+            margin: 0 0 20mm 0;
         }
 
         .abstract-shape {
             position: absolute;
-
-            border: 2px solid {
-                    {
-                    primary_color
-                }
-            }
-
-            ;
+            border: 2px solid {{primary_color}};
             opacity: 0.3;
         }
 
@@ -266,22 +191,8 @@
             bottom: 0;
             left: 0;
             right: 0;
-
-            background-color: {
-                    {
-                    primary_color
-                }
-            }
-
-            ;
-
-            color: {
-                    {
-                    secondary_color
-                }
-            }
-
-            ;
+            background-color: {{primary_color}};
+            color: {{secondary_color}};
             padding: 10mm;
             font-size: 10pt;
             text-align: center;
@@ -293,14 +204,8 @@
             opacity: 0.8;
         }
 
-            {
-            % comment %
-        }
-
-        table of content page {
-            % endcomment %
-        }
-
+        
+        {% comment %} table of content page {% endcomment %}
         .toc-modern {
             background-color: white;
             font-family: 'Inter', sans-serif;
@@ -311,19 +216,14 @@
             font-weight: 400;
             text-transform: uppercase;
             letter-spacing: 2px;
-
-            color: {
-                    {
-                    primary_color
-                }
-            }
-
-            ;
-            break-after: avoid;
+            color: {{primary_color}};
+            break-after: avoid !important; 
         }
 
         .toc-list {
             display: block;
+            /*flex-direction: column;*/
+            /*gap: 10mm;*/
         }
 
         .toc-item {
@@ -338,14 +238,7 @@
         .toc-number {
             font-size: 14pt;
             font-weight: 700;
-
-            color: {
-                    {
-                    primary_color
-                }
-            }
-
-            ;
+            color: {{primary_color}};
             margin-left: auto;
             float: none;
         }
@@ -388,24 +281,11 @@
 
         .page-title {
             font-size: 24pt;
-
-            color: {
-                    {
-                    primary_color
-                }
-            }
-
-            ;
+            color: {{primary_color}};
         }
 
         @page end-of-report {
-            background: {
-                    {
-                    primary_color
-                }
-            }
-
-            ;
+            background: {{primary_color}};
             margin: 0;
 
             @top-left {
@@ -432,87 +312,39 @@
             height: 297mm;
             justify-content: center;
             page: end-of-report;
-
-            background-color: {
-                    {
-                    secondary_color
-                }
-            }
-
-            ;
+            background-color: {{secondary_color}};
         }
 
         #end-of-report h1 {
-            color: {
-                    {
-                    primary_color
-                }
-            }
-
-            ;
+            color: {{primary_color}};
             font-size: 48pt;
             font-weight: 200;
             margin: 0 0 20mm 0;
         }
 
 
-            {
-            % comment %
-        }
-
-        this line fades from both sides {
-            % endcomment %
-        }
-
+        {% comment %} this line fades from both sides {% endcomment %}
         .fading-line-both {
             width: 180mm;
             height: 1px;
             margin: 0 auto;
-
             background: linear-gradient(to right,
-                transparent,
-                {
-                    {
-                    primary_color
-                }
-            }
-
-            20%,
-            {
-                {
-                primary_color
-            }
+              transparent,
+              {{primary_color}} 20%,
+              {{primary_color}} 80%,
+              transparent
+            );
         }
 
-        80%,
-        transparent);
-        }
-
-            {
-            % comment %
-        }
-
-        for the quick summary boxes {
-            % endcomment %
-        }
-
-            {
-            % comment %
-        }
-
-        .section {
+        {% comment %} for the quick summary boxes {% endcomment %}
+        {% comment %} .section {
             margin-bottom: 15mm;
-        }
-
-            {
-            % endcomment %
-        }
-
+        } {% endcomment %}
         .grid {
             display: flex;
             justify-content: space-between;
-            width: 170mm;
-            margin-bottom: 8mm;
+          width: 170mm;
+          margin-bottom: 8mm;
         }
 
         .box-link {
@@ -565,94 +397,23 @@
             vertical-align: middle;
         }
 
-        .critical {
-            border-left: 1mm solid #e74c3c;
-        }
+        .critical { border-left: 1mm solid #e74c3c; }
+        .high { border-left: 1mm solid #e67e22; }
+        .medium { border-left: 1mm solid #f39c12; }
+        .low { border-left: 1mm solid #27ae60; }
+        .info { border-left: 1mm solid #3498db; }
+        .unknown { border-left: 1mm solid #95a5a6; }
+        .warning { border-left: 1mm solid #f1c40f; }
+        .critical .number, .critical::before { color: #e74c3c; border-right-color: #e74c3c; }
+        .high .number, .high::before { color: #e67e22; border-right-color: #e67e22; }
+        .medium .number, .medium::before { color: #f39c12; border-right-color: #f39c12; }
+        .low .number, .low::before { color: #27ae60; border-right-color: #27ae60; }
+        .info .number, .info::before { color: #3498db; border-right-color: #3498db; }
+        .unknown .number, .unknown::before { color: #95a5a6; border-right-color: #95a5a6; }
+        .warning .number, .warning::before { color: #f1c40f; border-right-color: #f1c40f; }
+        .primary { color: {{primary_color}}; }
 
-        .high {
-            border-left: 1mm solid #e67e22;
-        }
-
-        .medium {
-            border-left: 1mm solid #f39c12;
-        }
-
-        .low {
-            border-left: 1mm solid #27ae60;
-        }
-
-        .info {
-            border-left: 1mm solid #3498db;
-        }
-
-        .unknown {
-            border-left: 1mm solid #95a5a6;
-        }
-
-        .warning {
-            border-left: 1mm solid #f1c40f;
-        }
-
-        .critical .number,
-        .critical::before {
-            color: #e74c3c;
-            border-right-color: #e74c3c;
-        }
-
-        .high .number,
-        .high::before {
-            color: #e67e22;
-            border-right-color: #e67e22;
-        }
-
-        .medium .number,
-        .medium::before {
-            color: #f39c12;
-            border-right-color: #f39c12;
-        }
-
-        .low .number,
-        .low::before {
-            color: #27ae60;
-            border-right-color: #27ae60;
-        }
-
-        .info .number,
-        .info::before {
-            color: #3498db;
-            border-right-color: #3498db;
-        }
-
-        .unknown .number,
-        .unknown::before {
-            color: #95a5a6;
-            border-right-color: #95a5a6;
-        }
-
-        .warning .number,
-        .warning::before {
-            color: #f1c40f;
-            border-right-color: #f1c40f;
-        }
-
-        .primary {
-            color: {
-                    {
-                    primary_color
-                }
-            }
-
-            ;
-        }
-
-            {
-            % comment %
-        }
-
-        table related {
-            % endcomment %
-        }
-
+        {% comment %} table related {% endcomment %}
         .vuln-summary-table-container {
             width: 100%;
             margin: auto auto;
@@ -777,30 +538,15 @@
             width: 50%;
         }
 
-            {
-            % comment %
-        }
-
-        stripped table {
-            % endcomment %
-        }
-
+        {% comment %} stripped table {% endcomment %}
         .table-stripped tr:nth-child(odd) {
             background-color: #f9f9f9;
         }
-
         .table-stripped tr:nth-child(even) {
-            background-color: #f2f2f2;
+           background-color: #f2f2f2;
         }
 
-            {
-            % comment %
-        }
-
-        interesting-subdomain-table {
-            % endcomment %
-        }
-
+        {% comment %} interesting-subdomain-table {% endcomment %}
         .interesting-subdomain-table-container {
             width: 100%;
             margin: auto auto;
@@ -889,20 +635,12 @@
             margin-bottom: 1mm;
             font-size: 10pt;
         }
-
-            {
-            % comment %
-        }
-
-        vuln finding related css {
-            % endcomment %
-        }
-
+        {% comment %} vuln finding related css {% endcomment %}
         .vuln-card {
             background-color: #ffffff;
             margin-bottom: 7mm;
             border-radius: 4mm;
-            box-shadow: 0 2mm 4mm rgba(0, 0, 0, 0.1);
+            box-shadow: 0 2mm 4mm rgba(0,0,0,0.1);
             overflow: hidden;
         }
 
@@ -1029,7 +767,7 @@
             <div class="rengine-banner">
                 Generated by reNgine
                 <br />
-                https://github.com/whiterabb17/rengine
+                https://github.com/whiterabb17/r3ngine
             </div>
             {% endif %}
         </div>
@@ -1440,8 +1178,7 @@
                 {% endif %}
             </div>
             <div class="subdomain-card-content">
-                {% if subdomain.page_title %}<div class="subdomain-card-page-title">{{ subdomain.page_title }}</div>{%
-                endif %}
+                {% if subdomain.page_title %}<div class="subdomain-card-page-title">{{ subdomain.page_title }}</div>{% endif %}
                 {% if subdomain.ip_addresses.all %}
                 <div>
                     <h4>IP Addresses:</h4>
@@ -1451,8 +1188,7 @@
                             {{ ip.address }}
                             {% if ip.ports.all %}
                             <ul>
-                                {% for port in ip.ports.all %}<li>{{ port.number }}/{{ port.service_name }}</li>{%
-                                endfor %}
+                                {% for port in ip.ports.all %}<li>{{ port.number }}/{{ port.service_name }}</li>{% endfor %}
                             </ul>
                             {% endif %}
                         </li>
@@ -1533,12 +1269,10 @@
                     <span class="vuln-badge badge-cvss">CVSS: {{vulnerability.cvss_score|upper}}</span>
                     {% endif %}
                     {% if vulnerability.cve_ids.all %}
-                    {% for cve in vulnerability.cve_ids.all %}<span class="vuln-badge badge-cvss">{{cve|upper}}</span>{%
-                    endfor %}
+                    {% for cve in vulnerability.cve_ids.all %}<span class="vuln-badge badge-cvss">{{cve|upper}}</span>{% endfor %}
                     {% endif %}
                     {% if vulnerability.cwe_ids.all %}
-                    {% for cwe in vulnerability.cwe_ids.all %}<span class="vuln-badge badge-cwe">{{cwe|upper}}</span>{%
-                    endfor %}
+                    {% for cwe in vulnerability.cwe_ids.all %}<span class="vuln-badge badge-cwe">{{cwe|upper}}</span>{% endfor %}
                     {% endif %}
                 </div>
                 {% if vulnerability.cvss_metrics %}

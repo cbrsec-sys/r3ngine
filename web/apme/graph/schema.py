@@ -12,7 +12,7 @@ NODE_TYPES = {
     "Identity": ["user", "admin", "service_account"],
     "Privilege": ["user", "admin", "domain_admin", "root"],
     "Network": ["internet", "external", "internal", "dmz"],
-    "Capability": ["db_access", "data_exfil", "rce_execution", "authenticated_access", "pivot"],
+    "Capability": ["db_access", "data_exfil", "rce_execution", "authenticated_access", "pivot", "cloud_access"],
 }
 
 # Required edge types (MUST be kept in sync with models/edge.py EDGE_TYPES)

@@ -17,7 +17,7 @@ export interface Plugin {
 
 export const fetchPlugins = async (): Promise<Plugin[]> => {
   const { data } = await axios.get(API_URL);
-  return data;
+  return Array.isArray(data) ? data : data.results || [];
 };
 
 export const uploadPlugin = async (file: File) => {
@@ -39,6 +39,11 @@ export const updatePluginWeight = async ({ slug, order_weight }: { slug: string;
   return data;
 };
 
+export const deletePlugin = async (slug: string) => {
+  const { data } = await axios.delete(`${API_URL}${slug}/`);
+  return data;
+};
+
 export const usePlugins = () => {
   return useQuery({ queryKey: ['plugins'], queryFn: fetchPlugins });
 };
@@ -55,6 +60,14 @@ export const useTogglePlugin = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: togglePlugin,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plugins'] }),
+  });
+};
+
+export const useDeletePlugin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deletePlugin,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plugins'] }),
   });
 };

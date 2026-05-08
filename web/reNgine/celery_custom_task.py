@@ -80,7 +80,7 @@ class RengineTask(Task):
 		self.domain_id = self.domain.id if self.domain else None
 		self.subdomain = self.subscan.subdomain if self.subscan else None
 		self.subdomain_id = self.subdomain.id if self.subdomain else None
-		self.activity_id = None
+		self.activity_id = ctx.get('activity_id')
 
 		# Set file self.task_name if not already set
 		if not self.filename:
@@ -103,6 +103,7 @@ class RengineTask(Task):
 					'nuclei_scan': 'vulnerability_scan',
 					'nuclei_individual_severity_module': 'vulnerability_scan',
 					's3scanner': 'vulnerability_scan',
+					'cpanel_scan': 'vulnerability_scan',
 				}
 				if self.track and self.task_name not in self.engine.tasks and dependent_tasks.get(self.task_name) not in self.engine.tasks:
 					logger.debug(f'Task {self.name} is not part of engine "{self.engine.engine_name}" tasks. Skipping.')

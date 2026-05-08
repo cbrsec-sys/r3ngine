@@ -15,7 +15,8 @@ import {
   Checkbox,
   IconButton,
   Stack,
-  Divider
+  Divider,
+  CircularProgress
 } from '@mui/material';
 import { X, FileText, Shield, FileSearch, Download } from 'lucide-react';
 
@@ -30,22 +31,89 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
   const [reportTemplate, setReportTemplate] = useState('modern');
   const [ignoreInfoVuln, setIgnoreInfoVuln] = useState(false);
   const [includeAttackSurface, setIncludeAttackSurface] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<string | null>(null);
+  const [reportUrl, setReportUrl] = useState<string | null>(null);
 
-  const handleDownload = () => {
-    const url = `/scan/create_report/${scanId}?report_type=${reportType}&report_template=${reportTemplate}&ignore_info_vuln=${ignoreInfoVuln ? 'True' : 'False'}&include_attack_surface_map=${includeAttackSurface ? 'True' : 'False'}&download=True`;
-    window.open(url, '_blank');
-    onClose();
+  const pollReportStatus = async (reportId: number) => {
+    setIsGenerating(true);
+    setGenerationStatus('Generating report...');
+    
+    const checkStatus = async () => {
+      try {
+        const response = await fetch(`/scan/report/status/${reportId}`, {
+          credentials: 'include'
+        });
+        if (!response.ok) throw new Error('Failed to check status');
+        
+        const data = await response.json();
+        
+        if (data.status === 2) { // Success
+          setIsGenerating(false);
+          setGenerationStatus('Report successfully generated!');
+          setReportUrl(data.report_url);
+          
+          // Try to auto-open only if it's the first time reaching success
+          if (data.report_url) {
+            const win = window.open(data.report_url, '_blank');
+            if (!win) {
+              setGenerationStatus('Report ready! Please click the download button below (Popup was blocked).');
+            }
+          }
+        } else if (data.status === 0) { // Failed
+          setIsGenerating(false);
+          setGenerationStatus(`Error: ${data.error_message || 'Unknown error'}`);
+        } else {
+          // Continue polling
+          setTimeout(checkStatus, 3000);
+        }
+      } catch (error) {
+        setIsGenerating(false);
+        setGenerationStatus('Failed to check report status');
+      }
+    };
+    
+    checkStatus();
   };
 
-  const handlePreview = () => {
-    const url = `/scan/create_report/${scanId}?report_type=${reportType}&report_template=${reportTemplate}&ignore_info_vuln=${ignoreInfoVuln ? 'True' : 'False'}&include_attack_surface_map=${includeAttackSurface ? 'True' : 'False'}&download=False`;
-    window.open(url, '_blank');
+  const initiateReport = async (download: boolean) => {
+    setGenerationStatus('Initiating report generation...');
+    setIsGenerating(true);
+    
+    try {
+      const params = new URLSearchParams({
+        report_type: reportType,
+        report_template: reportTemplate,
+        ignore_info_vuln: ignoreInfoVuln ? 'True' : 'False',
+        include_attack_surface_map: includeAttackSurface ? 'True' : 'False',
+        download: download ? 'True' : 'False'
+      });
+      
+      const response = await fetch(`/scan/create_report/${scanId}?${params.toString()}`, {
+        credentials: 'include'
+      });
+      
+      if (!response.ok) throw new Error('Failed to initiate report');
+      
+      const data = await response.json();
+      if (data.status && data.report_id) {
+        pollReportStatus(data.report_id);
+      } else {
+        throw new Error('Invalid response from server');
+      }
+    } catch (error) {
+      setIsGenerating(false);
+      setGenerationStatus('Failed to initiate report generation');
+    }
   };
+
+  const handleDownload = () => initiateReport(true);
+  const handlePreview = () => initiateReport(false);
 
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={isGenerating ? undefined : onClose}
       maxWidth="sm"
       fullWidth
       slotProps={{
@@ -82,14 +150,34 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
             GENERATE SCAN REPORT
           </Typography>
         </Stack>
-        <IconButton onClick={onClose} sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#ff003c' } }}>
-          <X size={20} />
-        </IconButton>
+        {!isGenerating && (
+          <IconButton onClick={onClose} sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#ff003c' } }}>
+            <X size={20} />
+          </IconButton>
+        )}
       </DialogTitle>
 
       <DialogContent sx={{ p: 3 }}>
         <Stack spacing={4}>
-          <Box>
+          {generationStatus && (
+            <Box sx={{ 
+              p: 2, 
+              bgcolor: reportUrl ? 'rgba(0, 255, 127, 0.05)' : 'rgba(0, 243, 255, 0.05)', 
+              border: `1px solid ${reportUrl ? 'rgba(0, 255, 127, 0.2)' : 'rgba(0, 243, 255, 0.2)'}`,
+              borderRadius: 1,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2
+            }}>
+              {isGenerating && <CircularProgress size={20} sx={{ color: '#00f3ff' }} />}
+              {!isGenerating && reportUrl && <Shield size={20} color="#00ff7f" />}
+              <Typography sx={{ color: reportUrl ? '#00ff7f' : '#00f3ff', fontSize: '0.8rem', fontWeight: 700, fontFamily: 'Orbitron' }}>
+                {generationStatus}
+              </Typography>
+            </Box>
+          )}
+
+          <Box sx={{ opacity: isGenerating ? 0.5 : 1, pointerEvents: isGenerating ? 'none' : 'auto' }}>
             <Typography sx={{
               color: '#00f3ff',
               fontFamily: 'Orbitron',
@@ -133,7 +221,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
 
           <Divider sx={{ borderColor: 'rgba(0, 243, 255, 0.1)' }} />
 
-          <Box>
+          <Box sx={{ opacity: isGenerating ? 0.5 : 1, pointerEvents: isGenerating ? 'none' : 'auto' }}>
             <Typography sx={{
               color: '#00f3ff',
               fontFamily: 'Orbitron',
@@ -152,7 +240,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                 <RadioGroup row value={reportTemplate} onChange={(e) => {
                   const val = e.target.value;
                   setReportTemplate(val);
-                  if (val !== 'enterprise') setIncludeAttackSurface(false);
+                  if (val !== 'enterprise' && val !== 'cyber_pro') setIncludeAttackSurface(false);
                 }}>
                   <FormControlLabel
                     value="default"
@@ -168,6 +256,11 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                     value="enterprise"
                     control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
                     label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Enterprise</Typography>}
+                  />
+                  <FormControlLabel
+                    value="cyber_pro"
+                    control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
+                    label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Cyber Pro</Typography>}
                   />
                 </RadioGroup>
               </Box>
@@ -188,7 +281,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                   control={
                     <Checkbox
                       checked={includeAttackSurface}
-                      disabled={reportTemplate !== 'enterprise'}
+                      disabled={reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro'}
                       onChange={(e) => setIncludeAttackSurface(e.target.checked)}
                       sx={{ 
                         color: 'rgba(0,243,255,0.1)', 
@@ -200,15 +293,15 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                   label={
                     <Box>
                       <Typography sx={{ 
-                        color: reportTemplate === 'enterprise' ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)', 
+                        color: (reportTemplate === 'enterprise' || reportTemplate === 'cyber_pro') ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)', 
                         fontSize: '0.8rem', 
                         fontWeight: 600,
                         transition: 'color 0.2s'
                       }}>
                         Include Attack Surface Map
                       </Typography>
-                      {reportTemplate !== 'enterprise' && (
-                        <Typography sx={{ color: 'rgba(0,243,255,0.3)', fontSize: '0.65rem' }}>Only available for Enterprise template</Typography>
+                      {reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro' && (
+                        <Typography sx={{ color: 'rgba(0,243,255,0.3)', fontSize: '0.65rem' }}>Only available for Enterprise/Pro templates</Typography>
                       )}
                     </Box>
                   }
@@ -222,6 +315,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
       <DialogActions sx={{ p: 3, bgcolor: 'rgba(0, 243, 255, 0.02)', borderTop: '1px solid rgba(0, 243, 255, 0.1)' }}>
         <Button
           onClick={onClose}
+          disabled={isGenerating}
           sx={{
             color: 'rgba(255,255,255,0.5)',
             fontFamily: 'Orbitron',
@@ -233,37 +327,62 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
         >
           CANCEL
         </Button>
-        <Button
-          onClick={handlePreview}
-          sx={{
-            color: '#00f3ff',
-            fontFamily: 'Orbitron',
-            fontWeight: 800,
-            fontSize: '0.7rem',
-            border: '1px solid rgba(0, 243, 255, 0.3)',
-            px: 2,
-            '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)', borderColor: '#00f3ff' }
-          }}
-        >
-          PREVIEW
-        </Button>
-        <Button
-          onClick={handleDownload}
-          variant="contained"
-          startIcon={<Download size={16} />}
-          sx={{
-            bgcolor: '#00f3ff',
-            color: '#000',
-            fontFamily: 'Orbitron',
-            fontWeight: 900,
-            fontSize: '0.7rem',
-            px: 3,
-            '&:hover': { bgcolor: '#00d8e4' }
-          }}
-        >
-          GENERATE & DOWNLOAD
-        </Button>
+        {reportUrl ? (
+          <Button
+            href={reportUrl}
+            target="_blank"
+            variant="contained"
+            startIcon={<Download size={16} />}
+            sx={{
+              bgcolor: '#00ff7f',
+              color: '#000',
+              fontFamily: 'Orbitron',
+              fontWeight: 900,
+              fontSize: '0.75rem',
+              px: 4,
+              '&:hover': { bgcolor: '#00e672' }
+            }}
+          >
+            DOWNLOAD NOW
+          </Button>
+        ) : (
+          <>
+            <Button
+              onClick={handlePreview}
+              disabled={isGenerating}
+              sx={{
+                color: '#00f3ff',
+                fontFamily: 'Orbitron',
+                fontWeight: 800,
+                fontSize: '0.7rem',
+                border: '1px solid rgba(0, 243, 255, 0.3)',
+                px: 2,
+                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)', borderColor: '#00f3ff' }
+              }}
+            >
+              PREVIEW
+            </Button>
+            <Button
+              onClick={handleDownload}
+              variant="contained"
+              disabled={isGenerating}
+              startIcon={isGenerating ? <CircularProgress size={16} sx={{ color: '#000' }} /> : <Download size={16} />}
+              sx={{
+                bgcolor: '#00f3ff',
+                color: '#000',
+                fontFamily: 'Orbitron',
+                fontWeight: 900,
+                fontSize: '0.7rem',
+                px: 3,
+                '&:hover': { bgcolor: '#00d8e4' }
+              }}
+            >
+              {isGenerating ? 'GENERATING...' : 'GENERATE & DOWNLOAD'}
+            </Button>
+          </>
+        )}
       </DialogActions>
     </Dialog>
   );
 };
+

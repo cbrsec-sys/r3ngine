@@ -19,9 +19,9 @@ export const PluginSlot: React.FC<PluginSlotProps> = ({ name, context }) => {
   return (
     <>
       {plugins
-        .filter(p => p.is_enabled && p.manifest?.ui?.components)
+        .filter(p => p.is_enabled && Array.isArray(p.manifest?.ui?.components))
         .map(plugin => (
-          plugin.manifest.ui.components
+          (plugin.manifest.ui.components as any[])
             .filter((c: any) => c.type === name)
             .map((comp: any, cidx: number) => (
               <PluginComponentLoader 

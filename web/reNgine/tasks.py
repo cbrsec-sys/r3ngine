@@ -13,7 +13,7 @@ import concurrent.futures
 import base64
 
 from datetime import datetime
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 from api.serializers import SubdomainSerializer
 from celery import chain, chord, group
 from celery.result import allow_join_result
@@ -33,7 +33,7 @@ from reNgine.definitions import *
 from reNgine.settings import *
 from reNgine.llm import *
 from reNgine.utilities import *
-from reNgine.opsec_utils import OpSecManager, BruteForceOrchestrator
+from reNgine.opsec_utils import OpSecManager, BruteForceOrchestrator, ProxychainsWrapper
 from reNgine.waf_utils import OriginDiscoveryManager, WafBypassOrchestrator
 from scanEngine.models import (EngineType, InstalledExternalTool, Notification, Proxy, OpSec)
 from startScan.models import *
@@ -42,7 +42,9 @@ from targetApp.models import Domain
 from dashboard.models import AcunetixAPIKey
 from reNgine.monitor_tasks import *
 from reNgine.graph_utils import Neo4jManager
+from reNgine.vulnerability_tasks import *
 from reNgine.stress_testing_tasks import run_stress_testing
+from reNgine.report_tasks import *
 try:
 	from acunetix import Acunetix
 except ImportError:
@@ -418,14 +420,29 @@ def initiate_subscan(
 			subdomain.technologies.add(tech)
 		subdomain.save()
 
+	# Build workflow steps
+	workflow_steps = [method.si(ctx=ctx)]
+
+	# If this is a vulnerability scan, we need to run correlation and APME
+	if scan_type == 'vulnerability_scan':
+		workflow_steps.append(correlate_vulnerabilities.si(scan_history_id=scan.id))
+		workflow_steps.append(calculate_risk_scores.si(scan_history_id=scan.id))
+		# Run ERL validation if plugin is installed
+		workflow_steps.append(PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx))
+		workflow_steps.append(run_apme.si(scan_history_id=scan.id))
+
+	# Filter out None steps (where plugins aren't present)
+	workflow_steps = [step for step in workflow_steps if step is not None]
+
 	# Build header + callback
-	workflow = method.si(ctx=ctx)
+	workflow = chain(*workflow_steps)
 	callback = report.si(ctx=ctx).set(link_error=[report.si(ctx=ctx)])
 
 	# Run Celery tasks
 	task = chain(workflow, callback).on_error(callback).delay()
 	subscan.celery_ids.append(task.id)
 	subscan.save()
+
 
 	return {
 		'success': True,
@@ -632,7 +649,8 @@ def subdomain_discovery(
 				shell=True,
 				history_file=self.history_file,
 				scan_id=self.scan_id,
-				activity_id=self.activity_id)
+				activity_id=self.activity_id,
+				proxy=proxy if tool not in ['amass-passive', 'amass-active', 'subfinder'] else None)
 		except Exception as e:
 			logger.error(
 				f'Subdomain discovery tool "{tool}" raised an exception')
@@ -1543,112 +1561,40 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 
 @app.task(name='screenshot', queue='main_scan_queue', base=RengineTask, bind=True)
 def screenshot(self, ctx={}, description=None):
-	"""Uses EyeWitness to gather screenshot of a domain and/or url.
-
+	"""Embedded Playwright Screenshot task.
+	
 	Args:
 		description (str, optional): Task description shown in UI.
 	"""
+	from reNgine.screenshot.tasks import take_screenshot_and_save
 
 	# Config
-	screenshots_path = f'{self.results_dir}/screenshots'
-	output_path = f'{self.results_dir}/screenshots/{self.filename}'
-	alive_endpoints_file = f'{self.results_dir}/endpoints_alive.txt'
 	config = self.yaml_configuration.get(SCREENSHOT) or {}
 	enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
 	intensity = config.get(INTENSITY) or self.yaml_configuration.get(INTENSITY, DEFAULT_SCAN_INTENSITY)
-	timeout = config.get(TIMEOUT) or self.yaml_configuration.get(TIMEOUT, DEFAULT_HTTP_TIMEOUT + 5)
-	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
-
+	
 	# If intensity is normal, grab only the root endpoints of each subdomain
 	strict = True if intensity == 'normal' else False
 
-	# Get URLs to take screenshot of
-	get_http_urls(
-		is_alive=enable_http_crawl,
-		strict=strict,
-		write_filepath=alive_endpoints_file,
-		get_only_default_urls=True,
-		ctx=ctx
-	)
-
-	# Send start notif
-	notification = Notification.objects.first()
-	send_output_file = notification.send_scan_output_file if notification else False
-
-	# Run cmd
-	cmd = f'/usr/src/github/EyeWitness/eyewitness-venv/bin/python /usr/src/github/EyeWitness/Python/EyeWitness.py -f {alive_endpoints_file} -d {screenshots_path} --no-prompt'
-	cmd += f' --timeout {timeout}' if timeout > 0 else ''
-	cmd += f' --threads {threads}' if threads > 0 else ''
-	run_command(
-		cmd,
-		shell=False,
-		history_file=self.history_file,
-		scan_id=self.scan_id,
-		activity_id=self.activity_id)
-	if not os.path.isfile(output_path):
-		logger.error(f'Could not load EyeWitness results at {output_path} for {self.domain.name}.')
-		return
-
-	# Loop through results and save objects in DB
-	screenshot_paths = []
-	required_cols = [
-		'Protocol',
-		'Port',
-		'Domain',
-		'Request Status',
-		'Screenshot Path'
-	]
-	with open(output_path, 'r', newline='') as file:
-		reader = csv.DictReader(file)
-		for row in reader:
-			parsed_row = {col: row[col] for col in required_cols if col in row}
-			protocol = parsed_row['Protocol']
-			port = parsed_row['Port']
-			subdomain_name = parsed_row['Domain']
-			status = parsed_row['Request Status']
-			screenshot_path = parsed_row['Screenshot Path']
-			logger.info(f'{protocol}:{port}:{subdomain_name}:{status}')
-			subdomain_query = Subdomain.objects.filter(name=subdomain_name)
-			if self.scan:
-				subdomain_query = subdomain_query.filter(scan_history=self.scan)
-			if status == 'Successful' and subdomain_query.exists():
-				subdomain = subdomain_query.first()
-				screenshot_paths.append(screenshot_path)
-				subdomain.screenshot_path = screenshot_path.replace('/usr/src/scan_results/', '')
-				subdomain.save()
-				logger.warning(f'Added screenshot for {subdomain.name} to DB')
-
-	# Remove all db, html extra files in screenshot results
-	run_command(
-		f'rm -rf {screenshots_path}/*.csv {screenshots_path}/*.db {screenshots_path}/*.js {screenshots_path}/*.html {screenshots_path}/*.css',
-		shell=True,
-		history_file=self.history_file,
-		scan_id=self.scan_id,
-		activity_id=self.activity_id)
-	run_command(
-		f'rm -rf {screenshots_path}/source',
-		shell=True,
-		history_file=self.history_file,
-		scan_id=self.scan_id,
-		activity_id=self.activity_id)
-
-	# Send finish notifs
-	screenshots_str = '• ' + '\n• '.join([f'`{path}`' for path in screenshot_paths])
-	self.notify(fields={'Screenshots': screenshots_str})
-	if send_output_file:
-		for path in screenshot_paths:
-			title = get_output_file_name(
-				self.scan_id,
-				self.subscan_id,
-				self.filename)
-			send_file_to_discord.delay(path, title)
-
-	# Strip metadata from screenshots
-	opsec = OpSecManager()
-	for path in screenshot_paths:
-		opsec.strip_metadata(path)
-
+	# Get subdomains to process
+	subdomains = Subdomain.objects.filter(scan_history=self.scan)
+	
+	# If strict/normal intensity, we only care about subdomains that are definitely alive
+	if strict:
+		subdomains = subdomains.filter(http_status__gt=0).exclude(http_url__isnull=True)
+	
+	logger.info(f"Starting Playwright screenshot capture for {subdomains.count()} subdomains...")
+	
+	success_count = 0
+	for subdomain in subdomains:
+		# The internal task handles browser lifecycle, metadata, and DB persistence
+		if take_screenshot_and_save(subdomain.id, self.scan_id, self.results_dir):
+			success_count += 1
+			
+	self.notify(fields={'Screenshots': f'Successfully captured {success_count} screenshots using Embedded Playwright.'})
+	
 	return True
+
 
 
 @app.task(name='port_scan', queue='main_scan_queue', base=RengineTask, bind=True)
@@ -1776,6 +1722,29 @@ def port_scan(self, hosts=[], ctx={}, description=None):
 		if created:
 			logger.warning(f'Added new port {port_number} to DB')
 
+		# Centralized Brute-Force Candidate Registration for Naabu findings
+		bf_protocols = {
+			21: 'ftp',
+			22: 'ssh',
+			23: 'telnet',
+			445: 'smb',
+			3389: 'rdp'
+		}
+		if port_number in bf_protocols:
+			from reNgine.utilities import save_auth_candidate
+			try:
+				save_auth_candidate(
+					scan_history=self.scan,
+					subdomain=subdomain,
+					target=host,
+					protocol=bf_protocols[port_number],
+					port=port_number,
+					source_tool='naabu',
+					tech_hint=f"Open Port {port_number}"
+				)
+			except Exception as e:
+				logger.error(f"Error registering AuthCandidate from Naabu port {port_number}: {e}")
+
 		if port_number in UNCOMMON_WEB_PORTS:
 			port.is_uncommon = True
 			port.save()
@@ -1818,6 +1787,7 @@ def port_scan(self, hosts=[], ctx={}, description=None):
 			ctx_nmap = ctx.copy()
 			ctx_nmap['description'] = get_task_title(f'nmap_{host}', self.scan_id, self.subscan_id)
 			ctx_nmap['track'] = False
+			ctx_nmap['activity_id'] = self.activity_id
 			sig = nmap.si(
 				cmd=nmap_cmd,
 				ports=port_list,
@@ -1895,7 +1865,10 @@ def nmap(
 		activity_id=self.activity_id)
 
 	# Get nmap XML results and convert to JSON
-	vulns = parse_nmap_results(output_file_xml, output_file)
+	nmap_results = parse_nmap_results(output_file_xml, output_file)
+	vulns = nmap_results['vulns']
+	discovered_services = nmap_results['services']
+	
 	with open(vulns_file, 'w') as f:
 		json.dump(vulns, f, indent=4)
 
@@ -1919,6 +1892,45 @@ def nmap(
 		vulns_str += f'• {str(vuln)}\n'
 		if created:
 			logger.warning(str(vuln))
+		
+		# Register Auth Candidates from vulnerability tags (like auth_portal)
+		if 'auth_portal' in vuln_data.get('tags', []):
+			from reNgine.utilities import save_auth_candidate
+			save_auth_candidate(
+				scan_history=self.scan,
+				target=vuln_data['http_url'],
+				protocol='http',
+				port=int(vuln_data['http_url'].split(':')[-1]) if ':' in vuln_data['http_url'] else 80,
+				source_tool='Nmap NSE',
+				metadata={'tags': vuln_data.get('tags'), 'nse_script': vuln_data.get('name')},
+				subdomain=self.subdomain,
+				endpoint=endpoint
+			)
+
+	# Register Auth Candidates from discovered services (SMB, RDP, etc.)
+	interesting_protocols = {
+		'microsoft-ds': 'smb',
+		'smb': 'smb',
+		'ms-wbt-server': 'rdp',
+		'rdp': 'rdp',
+		'ssh': 'ssh',
+		'ftp': 'ftp',
+		'telnet': 'telnet'
+	}
+	
+	from reNgine.utilities import save_auth_candidate
+	for svc in discovered_services:
+		proto = interesting_protocols.get(svc['service'])
+		if proto:
+			save_auth_candidate(
+				scan_history=self.scan,
+				target=svc['target'],
+				protocol=proto,
+				port=svc['port'],
+				source_tool='Nmap Service Discovery',
+				metadata={'banner': svc['banner']},
+				subdomain=self.subdomain
+			)
 
 	# Send only 1 notif for all vulns to reduce number of notifs
 	if len(vulns) > 0:
@@ -1927,7 +1939,7 @@ def nmap(
 			fields={'Vulnerabilities discovered': vulns_str},
 			add_meta_info=False)
 
-	# Automatic Trigger for Brute Force Scan
+	# Automatic Trigger for Brute Force Scan (Legacy Support for chaining)
 	auth_targets = []
 	for v in vulns:
 		if 'auth_portal' in v.get('tags', []):
@@ -2017,9 +2029,17 @@ def waf_detection(self, ctx={}, description=None):
 		
 		if origin_ips:
 			# Store the first one as primary origin_ip
-			subdomain_query.origin_ip = origin_ips[0]
+			primary_origin = origin_ips[0]
+			subdomain_query.origin_ip = primary_origin
 			subdomain_query.save()
-			logger.info(f"Origin IP found for {subdomain}: {origin_ips[0]}")
+			
+			# Ensure this IP is stored and geolocated
+			save_ip_address(
+				primary_origin,
+				subdomain=subdomain_query,
+				subscan=self.subscan
+			)
+			logger.info(f"Origin IP found for {subdomain}: {primary_origin}")
 
 	return wafs
 
@@ -2249,7 +2269,6 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		description (str, optional): Task description shown in UI.
 	"""
 	input_path = f'{self.results_dir}/input_endpoints_fetch_url.txt'
-	proxy = get_random_proxy()
 
 	# Config
 	config = self.yaml_configuration.get(FETCH_URL) or {}
@@ -2291,43 +2310,55 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 	host_regex = f"\'https?://([a-z0-9]+[.])*{host}.*\'"
 
 	# Tools cmds
-	cmd_map = {
+	base_cmd_map = {
 		'gau': f'gau',
 		'hakrawler': 'hakrawler -subs -u',
 		'waybackurls': 'waybackurls',
 		'gospider': f'gospider -S {input_path} --js -d 2 --sitemap --robots -w -r',
 		'katana': f'katana -list {input_path} -silent -jc -kf all -d 3 -fs rdn',
 	}
-	if proxy:
-		cmd_map['gau'] += f' --proxy "{proxy}"'
-		cmd_map['gospider'] += f' -p {proxy}'
-		cmd_map['hakrawler'] += f' -proxy {proxy}'
-		cmd_map['katana'] += f' -proxy {proxy}'
-	if threads > 0:
-		cmd_map['gau'] += f' --threads {threads}'
-		cmd_map['gospider'] += f' -t {threads}'
-		cmd_map['katana'] += f' -c {threads}'
-	if custom_headers:
-		# gau, waybackurls does not support custom headers
-		formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
-		cmd_map['gospider'] += formatted_headers
-		cmd_map['hakrawler'] += ';;'.join(header for header in custom_headers)
-		cmd_map['katana'] += formatted_headers
-	cat_input = f'cat {input_path}'
-	grep_output = f'grep -Eo {host_regex}'
-	cmd_map = {
-		tool: f'{cat_input} | {cmd} | {grep_output} > {self.results_dir}/urls_{tool}.txt'
-		for tool, cmd in cmd_map.items()
-	}
-	tasks = group(
-		run_command.si(
-			cmd,
-			shell=True,
-			scan_id=self.scan_id,
-			activity_id=self.activity_id)
-		for tool, cmd in cmd_map.items()
-		if tool in tools
-	)
+
+	tasks = []
+	for tool in tools:
+		if tool in base_cmd_map:
+			p = get_random_proxy()
+			tool_cmd = base_cmd_map[tool]
+			
+			# Apply proxy
+			if p:
+				if tool == 'gau': tool_cmd += f' --proxy "{p}"'
+				elif tool == 'gospider': tool_cmd += f' -p {p}'
+				elif tool == 'hakrawler': tool_cmd += f' -proxy {p}'
+				elif tool == 'katana': tool_cmd += f' -proxy {p}'
+			
+			# Apply threads
+			if threads > 0:
+				if tool == 'gau': tool_cmd += f' --threads {threads}'
+				elif tool == 'gospider': tool_cmd += f' -t {threads}'
+				elif tool == 'katana': tool_cmd += f' -c {threads}'
+
+			# Apply custom headers
+			if custom_headers:
+				formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
+				if tool == 'gospider': tool_cmd += formatted_headers
+				elif tool == 'hakrawler': tool_cmd += ';;'.join(header for header in custom_headers)
+				elif tool == 'katana': tool_cmd += formatted_headers
+
+			full_cmd = f'cat {input_path} | {tool_cmd} | grep -Eo {host_regex} > {self.results_dir}/urls_{tool}.txt'
+			
+			tasks.append(run_command.si(
+				full_cmd,
+				shell=True,
+				scan_id=self.scan_id,
+				activity_id=self.activity_id,
+				proxy=p if tool not in ['gau', 'gospider', 'hakrawler', 'katana'] else None
+			))
+	
+	if tasks:
+		tasks = group(tasks)
+	else:
+		logger.warning('No reconnaissance tools enabled for fetch_url. Skipping.')
+		return
 
 	# Cleanup task
 	sort_output = [
@@ -2527,11 +2558,22 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		logger.warning('No targets found for Web API Discovery. Skipping.')
 		return
 
-	proxy = get_random_proxy()
+
 	results_dir = f"{self.results_dir}/web_api_discovery"
 	os.makedirs(results_dir, exist_ok=True)
 
+	processed_paramspider_subdomains = set()
+	processed_url_patterns = set()
 	for url in urls:
+		# URL Pattern Normalization to skip redundant endpoints (e.g. locale=ar vs locale=cs)
+		parsed = urlparse(url)
+		query_keys = sorted(parse_qs(parsed.query).keys())
+		url_pattern = f"{parsed.netloc}{parsed.path}?{'&'.join(query_keys)}"
+		
+		if url_pattern in processed_url_patterns:
+			continue
+		processed_url_patterns.add(url_pattern)
+
 		subdomain_name = get_subdomain_from_url(url)
 		subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=self.scan).first()
 		if not subdomain:
@@ -2541,10 +2583,11 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if 'arjun' in uses_tools:
 			logger.info(f'Running Arjun on {url}')
 			arjun_output = f"{results_dir}/arjun_{subdomain_name}.json"
-			cmd = f"arjun -u {url} --passive -m {arjun_methods} -t {threads} --stable -oJ {arjun_output}"
-			#if proxy:
-			# 	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			cmd = f"arjun -u {url} --passive -m {arjun_methods} -t {threads} -oJ {arjun_output}"
+			proxy = get_random_proxy()
+			if proxy:
+				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
 			if os.path.exists(arjun_output):
 				try:
 					with open(arjun_output, 'r') as f:
@@ -2568,11 +2611,11 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if 'kiterunner' in uses_tools:
 			logger.info(f'Running Kiterunner on {url}')
 			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
-			# kr scan -w wordlist.kite -o json
 			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json >> {kr_output}"
+			proxy = get_random_proxy()
 			if proxy:
 				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
 			if os.path.exists(kr_output):
 				try:
 					with open(kr_output, 'r') as f:
@@ -2588,15 +2631,15 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 					logger.error(f"Error parsing Kiterunner output for {url}: {e}")
 
 		# ParamSpider
-		if 'paramspider' in uses_tools:
+		if 'paramspider' in uses_tools and subdomain_name not in processed_paramspider_subdomains:
 			logger.info(f'Running ParamSpider on {subdomain_name}')
+			processed_paramspider_subdomains.add(subdomain_name)
 			ps_output = f"{results_dir}/ps_{subdomain_name}.txt"
-			cmd = f"paramspider --domain {subdomain_name}"
+			cmd = f"paramspider --domain {subdomain_name} > {ps_output}"
+			proxy = get_random_proxy()
 			if proxy:
-				cmd += f" --proxy {proxy}"
-			cmd += f" > {ps_output}"
-			print(cmd)
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+				cmd = f"paramspider --domain {subdomain_name} --proxy {proxy} > {ps_output}"
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
 			if os.path.exists(ps_output):
 				try:
 					with open(ps_output, 'r') as f:
@@ -2618,7 +2661,10 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running LinkFinder on {url}')
 			lf_output = f"{results_dir}/lf_{subdomain_name}.txt"
 			cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -i {url} -o cli > {lf_output}"
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			proxy = get_random_proxy()
+			if proxy:
+				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
 			if os.path.exists(lf_output):
 				try:
 					with open(lf_output, 'r') as f:
@@ -2639,9 +2685,10 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running InQL on {url}')
 			inql_output = f"{results_dir}/inql_{subdomain_name}"
 			cmd = f"inql -t {url} -o {inql_output}"
+			proxy = get_random_proxy()
 			if proxy:
 				cmd += f" -p {proxy}"
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
 
 	# Semgrep - Post-discovery pattern matching
 	if 'semgrep' in uses_tools:
@@ -2716,6 +2763,11 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		nm.sync_scan_results(self.scan_id)
 		nm.close()
 
+	# Trigger Intelligent Auth Candidate Extraction
+	from reNgine.auth_discovery_tasks import extract_auth_candidates
+	extract_auth_candidates.apply(args=(self,), kwargs={'ctx': ctx})
+
+
 
 @app.task(name='vulnerability_scan', queue='main_scan_queue', bind=True, base=RengineTask)
 def vulnerability_scan(self, urls=[], ctx={}, description=None):
@@ -2776,6 +2828,15 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 		)
 		grouped_tasks.append(_task)
 
+	# Run cPanel Scanner
+	should_run_cpanel = config.get('cpanel_scanner', {}).get(RUN_CPANEL_SCAN, True)
+	if should_run_cpanel:
+		_task = cpanel_scan.si(
+			ctx=ctx,
+			description=f'cPanel Vulnerability Scan'
+		)
+		grouped_tasks.append(_task)
+
 	celery_group = group(grouped_tasks)
 	job = celery_group.apply_async()
 
@@ -2797,6 +2858,9 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 	results = []
 	logger.info(f'Running vulnerability scan with severity: {severity}')
 	cmd += f' -severity {severity}'
+	proxy = get_random_proxy()
+	if proxy:
+		cmd += f' -proxy {proxy}'
 	# Send start notification
 	notif = Notification.objects.first()
 	send_status = notif.send_scan_status_notif if notif else False
@@ -2853,6 +2917,21 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 				output = parse_curl_output(response)
 				endpoint.http_status = output['http_status']
 				endpoint.save()
+
+		# Register Auth Candidate if Nuclei flagged it as login or auth
+		tags = line.get('info', {}).get('tags', [])
+		if any(tag in tags for tag in ['login', 'auth', 'admin', 'default-login', 'bruteforce', 'panel']):
+			from reNgine.utilities import save_auth_candidate
+			save_auth_candidate(
+				scan_history=self.scan,
+				target=http_url,
+				protocol='http',
+				port=int(urlparse(http_url).port or (443 if 'https' in http_url else 80)),
+				source_tool='Nuclei',
+				metadata={'tags': tags, 'template_id': line.get('template-id')},
+				subdomain=subdomain,
+				endpoint=endpoint
+			)
 
 		# Get or create Vulnerability object
 		vuln, _ = save_vulnerability(
@@ -3088,7 +3167,6 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	if custom_header:
 		custom_headers.append(custom_header)
 	should_fetch_gpt_report = config.get(FETCH_GPT_REPORT, DEFAULT_GET_GPT_REPORT)
-	proxy = get_random_proxy()
 	nuclei_specific_config = config.get('nuclei', {})
 	use_nuclei_conf = nuclei_specific_config.get(USE_NUCLEI_CONFIG, False)
 	severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
@@ -3167,7 +3245,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 		cmd += formatted_headers
 	cmd += f' -l {input_path}'
 	cmd += f' -c {str(concurrency)}' if concurrency > 0 else ''
-	cmd += f' -proxy {proxy} ' if proxy else ''
+
 	cmd += f' -retries {retries}' if retries > 0 else ''
 	cmd += f' -rl {rate_limit}' if rate_limit > 0 else ''
 	# cmd += f' -severity {severities_str}'
@@ -3224,7 +3302,6 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	custom_header = self.yaml_configuration.get(CUSTOM_HEADER)
 	if custom_header:
 		custom_headers.append(custom_header)
-	proxy = get_random_proxy()
 	is_waf_evasion = dalfox_config.get(WAF_EVASION, False)
 	blind_xss_server = dalfox_config.get(BLIND_XSS_SERVER)
 	user_agent = dalfox_config.get(USER_AGENT) or self.yaml_configuration.get(USER_AGENT)
@@ -3248,6 +3325,7 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	send_status = notif.send_scan_status_notif if notif else False
 
 	# command builder
+	proxy = get_random_proxy()
 	cmd = 'dalfox --silence --no-color --no-spinner'
 	cmd += f' --only-poc r '
 	cmd += f' --ignore-return 302,404,403'
@@ -3360,7 +3438,6 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 	custom_header = self.yaml_configuration.get(CUSTOM_HEADER)
 	if custom_header:
 		custom_headers.append(custom_header)
-	proxy = get_random_proxy()
 	user_agent = vuln_config.get(USER_AGENT) or self.yaml_configuration.get(USER_AGENT)
 	threads = vuln_config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
 	input_path = f'{self.results_dir}/input_endpoints_crlf.txt'
@@ -3381,6 +3458,7 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 	send_status = notif.send_scan_status_notif if notif else False
 
 	# command builder
+	proxy = get_random_proxy()
 	cmd = 'crlfuzz -s'
 	cmd += f' -l {input_path}'
 	cmd += f' -x {proxy}' if proxy else ''
@@ -4089,6 +4167,7 @@ def parse_nmap_results(xml_file, output_file=None):
 		.get('host', {})
 	)
 	all_vulns = []
+	services = []
 	if isinstance(hosts, dict):
 		hosts = [hosts]
 
@@ -4113,12 +4192,29 @@ def parse_nmap_results(xml_file, output_file=None):
 				ports = [ports]
 
 			for port in ports:
+				# Skip closed ports
+				state = port.get('state', {}).get('@state', 'unknown')
+				if state != 'open':
+					continue
+
 				url_vulns = []
 				port_number = port['@portid']
 				url = sanitize_url(f'{hostname}:{port_number}')
 				logger.info(f'Parsing nmap results for {hostname}:{port_number} ...')
 				if not port_number or not port_number.isdigit():
 					continue
+				
+				port_protocol = port['@protocol']
+				service = port.get('service', {})
+				service_name = service.get('@name', '').lower()
+				
+				# Register discovered service for brute-force candidates
+				services.append({
+					'target': hostname,
+					'port': int(port_number),
+					'service': service_name,
+					'banner': service.get('@product', '')
+				})
 				port_protocol = port['@protocol']
 				scripts = port.get('script', [])
 				if isinstance(scripts, dict):
@@ -4183,7 +4279,7 @@ def parse_nmap_results(xml_file, output_file=None):
 						vuln['http_url'] += vuln['http_path']
 					all_vulns.append(vuln)
 
-	return all_vulns
+	return {'vulns': all_vulns, 'services': services}
 
 
 def parse_nmap_https_redirect_output(script_output):
@@ -4640,24 +4736,6 @@ def parse_crlfuzz_result(url):
 	}
 
 
-def record_exists(model, data, exclude_keys=[]):
-	"""
-	Check if a record already exists in the database based on the given data.
-
-	Args:
-		model (django.db.models.Model): The Django model to check against.
-		data (dict): Data dictionary containing fields and values.
-		exclude_keys (list): List of keys to exclude from the lookup.
-
-	Returns:
-		bool: True if the record exists, False otherwise.
-	"""
-
-	# Extract the keys that will be used for the lookup
-	lookup_fields = {key: data[key] for key in data if key not in exclude_keys}
-
-	# Return True if a record exists based on the lookup fields, False otherwise
-	return model.objects.filter(**lookup_fields).exists()
 
 @app.task(name='geo_localize', bind=False, queue='geo_localize_queue')
 def geo_localize(host, ip_id=None):
@@ -4670,29 +4748,57 @@ def geo_localize(host, ip_id=None):
 	Returns:
 		startScan.models.CountryISO: CountryISO object from DB or None.
 	"""
-	if validators.ipv6(host):
-		logger.info(f'Ipv6 "{host}" is not supported by geoiplookup. Skipping.')
-		return None
-	cmd = f'geoiplookup {host}'
-	_, out = run_command(cmd)
-	if 'IP Address not found' not in out and "can't resolve hostname" not in out:
-		country_iso = out.split(':')[1].strip().split(',')[0]
-		country_name = out.split(':')[1].strip().split(',')[1].strip()
-		geo_object, _ = CountryISO.objects.get_or_create(
-			iso=country_iso,
-			name=country_name
-		)
-		geo_json = {
-			'iso': country_iso,
-			'name': country_name
-		}
-		if ip_id:
+	import ipaddress
+	
+	geo_object = None
+	country_iso = "Unknown"
+	country_name = "Unknown Location"
+
+	# Check if IP is private
+	try:
+		ip_obj = ipaddress.ip_address(host)
+		if ip_obj.is_private:
+			country_iso = "PV"
+			country_name = "Private Network"
+		elif ip_obj.version == 6:
+			# geoiplookup often doesn't support IPv6 in the default DB
+			# We'll mark it as Unknown (IPv6) for now
+			country_iso = "IPv6"
+			country_name = "IPv6 Address"
+	except ValueError:
+		# Not a valid IP (could be a hostname)
+		pass
+
+	if country_iso == "Unknown":
+		cmd = f'geoiplookup {host}'
+		_, out = run_command(cmd)
+		if 'IP Address not found' not in out and "can't resolve hostname" not in out and ':' in out:
+			try:
+				parts = out.split(':')[1].strip().split(',')
+				country_iso = parts[0].strip()
+				country_name = parts[1].strip() if len(parts) > 1 else country_iso
+			except Exception as e:
+				logger.error(f"Error parsing geoiplookup output: {e}")
+		else:
+			logger.info(f'Geo IP lookup failed for host "{host}"')
+
+	geo_object, _ = CountryISO.objects.get_or_create(
+		iso=country_iso,
+		name=country_name
+	)
+
+	if ip_id:
+		try:
 			ip = IpAddress.objects.get(pk=ip_id)
 			ip.geo_iso = geo_object
 			ip.save()
-		return geo_json
-	logger.info(f'Geo IP lookup failed for host "{host}"')
-	return None
+		except IpAddress.DoesNotExist:
+			logger.error(f"IpAddress with ID {ip_id} not found during geo_localization")
+
+	return {
+		'iso': country_iso,
+		'name': country_name
+	}
 
 
 @app.task(name='query_whois', bind=False, queue='query_whois_queue')
@@ -4955,6 +5061,19 @@ def remove_duplicate_endpoints(
 					ep.delete()
 				logger.warning(msg)
 
+def sanitize_command_for_db(cmd):
+	"""
+	Strips 'export HTTP_PROXY=... &&' and 'proxychains4 -f ...' from command
+	to ensure the UI displays the actual tool name and clean command.
+	"""
+	if not cmd:
+		return cmd
+	# Strip export statements (matches both single and double quotes)
+	cmd = re.sub(r'^export\s+.*?\s+&&\s+', '', cmd)
+	# Strip proxychains4 wrapper with its config file
+	cmd = re.sub(r'^(?:[/\w]*/)?proxychains4\s+-f\s+\S+\s+', '', cmd)
+	return cmd
+
 @app.task(name='run_command', bind=False, queue='run_command_queue')
 def run_command(
 		cmd, 
@@ -4963,7 +5082,8 @@ def run_command(
 		history_file=None, 
 		scan_id=None, 
 		activity_id=None,
-		remove_ansi_sequence=False
+		remove_ansi_sequence=False,
+		proxy=None
 	):
 	"""Run a given command using subprocess module.
 
@@ -4974,15 +5094,22 @@ def run_command(
 		shell (bool): Run within separate shell if True.
 		history_file (str): Write command + output to history file.
 		remove_ansi_sequence (bool): Used to remove ANSI escape sequences from output such as color coding
+		proxy (str): If provided, may be used for proxychains wrapping.
 	Returns:
 		tuple: Tuple with return_code, output.
 	"""
 	logger.info(cmd)
 	logger.warning(activity_id)
 
+	conf_path = None
+	if proxy:
+		proxy_manager = ProxychainsWrapper()
+		if proxy_manager.should_wrap():
+			cmd, conf_path = proxy_manager.wrap_command(cmd, proxy=proxy)
+
 	# Create a command record in the database
 	command_obj = Command.objects.create(
-		command=cmd,
+		command=sanitize_command_for_db(cmd),
 		time=timezone.now(),
 		scan_history_id=scan_id,
 		activity_id=activity_id)
@@ -5014,6 +5141,9 @@ def run_command(
 		logger.error(f"Error executing command {cmd}: {str(e)}")
 		output = f"Error executing command: {str(e)}"
 		return_code = 127 # Command not found / error
+	finally:
+		if conf_path and os.path.exists(conf_path):
+			os.remove(conf_path)
 
 	command_obj.output = output
 	command_obj.return_code = return_code
@@ -5033,14 +5163,43 @@ def run_command(
 # Other utils #
 #-------------#
 
-def stream_command(cmd, cwd=None, shell=False, history_file=None, encoding='utf-8', scan_id=None, activity_id=None, trunc_char=None):
-	# Log cmd
+def stream_command(
+		cmd, 
+		cwd=None, 
+		shell=False, 
+		history_file=None, 
+		encoding='utf-8', 
+		scan_id=None, 
+		activity_id=None, 
+		trunc_char=None,
+		proxy=None
+	):
+	"""Run a command and yield output line by line.
+
+	Args:
+		cmd (str): Command to run.
+		cwd (str): Current working directory.
+		shell (bool): Run within separate shell if True.
+		history_file (str): Write command + output to history file.
+		encoding (str): Output encoding.
+		scan_id (int): Scan ID.
+		activity_id (int): Activity ID.
+		trunc_char (str): Character used to truncate the output line.
+		proxy (str): If provided, may be used for proxychains wrapping.
+	Yields:
+		str/dict: Output line.
+	"""
 	logger.info(cmd)
-	# logger.warning(activity_id)
+
+	conf_path = None
+	if proxy:
+		proxy_manager = ProxychainsWrapper()
+		if proxy_manager.should_wrap():
+			cmd, conf_path = proxy_manager.wrap_command(cmd, proxy=proxy)
 
 	# Create a command record in the database
 	command_obj = Command.objects.create(
-		command=cmd,
+		command=sanitize_command_for_db(cmd),
 		time=timezone.now(),
 		scan_history_id=scan_id,
 		activity_id=activity_id)
@@ -5060,33 +5219,37 @@ def stream_command(cmd, cwd=None, shell=False, history_file=None, encoding='utf-
 	output = ""
 
 	# Process the output
-	for line in iter(lambda: process.stdout.readline(), b''):
-		if not line:
-			break
-		line = line.strip()
-		ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-		line = ansi_escape.sub('', line)
-		line = line.replace('\\x0d\\x0a', '\n')
-		if trunc_char and line.endswith(trunc_char):
-			line = line[:-1]
-		item = line
+	try:
+		for line in iter(lambda: process.stdout.readline(), b''):
+			if not line:
+				break
+			line = line.strip()
+			ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+			line = ansi_escape.sub('', line)
+			line = line.replace('\\x0d\\x0a', '\n')
+			if trunc_char and line.endswith(trunc_char):
+				line = line[:-1]
+			item = line
 
-		# Try to parse the line as JSON
-		try:
-			item = json.loads(line)
-		except json.JSONDecodeError:
-			pass
+			# Try to parse the line as JSON
+			try:
+				item = json.loads(line)
+			except json.JSONDecodeError:
+				pass
 
-		# Yield the line
-		#logger.debug(item)
-		yield item
+			# Yield the line
+			#logger.debug(item)
+			yield item
 
-		# Add the log line to the output
-		output += line + "\n"
+			# Add the log line to the output
+			output += line + "\n"
 
-		# Update the command record in the database
-		command_obj.output = output
-		command_obj.save()
+			# Update the command record in the database
+			command_obj.output = output
+			command_obj.save()
+	finally:
+		if conf_path and os.path.exists(conf_path):
+			os.remove(conf_path)
 
 	# Retrieve the return code and output
 	process.wait()
@@ -5185,6 +5348,7 @@ def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=
 			shell=False,
 			history_file=history_file,
 			scan_id=scan_history.id,
+			proxy=proxy
 		)
 
 		if not os.path.isfile(output_file):
@@ -5224,7 +5388,7 @@ def save_metadata_info(meta_dict):
 	scan_history = ScanHistory.objects.get(id=meta_dict.scan_id)
 
 	# Proxy settings
-	get_random_proxy()
+	proxy = get_random_proxy()
 
 	# Get metadata
 	result = extract_metadata_from_google_search(meta_dict.osint_target, meta_dict.documents_limit)
@@ -5277,96 +5441,6 @@ def create_scan_activity(scan_history_id, message, status):
 #--------------------#
 
 
-def save_vulnerability(**vuln_data):
-	references = vuln_data.pop('references', [])
-	cve_ids = vuln_data.pop('cve_ids', [])
-	cwe_ids = vuln_data.pop('cwe_ids', [])
-	tags = vuln_data.pop('tags', [])
-	subscan = vuln_data.pop('subscan', None)
-
-	exploit_url = vuln_data.pop('exploit_url', None)
-	validation_status = vuln_data.pop('validation_status', 'unverified')
-
-	# If subdomain is not provided, try to find it from http_url
-	subdomain = vuln_data.get('subdomain')
-	http_url = vuln_data.get('http_url')
-	scan_history = vuln_data.get('scan_history')
-	target_domain = vuln_data.get('target_domain')
-
-	if not subdomain and http_url and scan_history and target_domain:
-		subdomain_name = get_subdomain_from_url(http_url)
-		subdomain, _ = Subdomain.objects.get_or_create(
-			name=subdomain_name,
-			scan_history=scan_history,
-			target_domain=target_domain
-		)
-		vuln_data['subdomain'] = subdomain
-
-	# remove nulls
-	vuln_data = replace_nulls(vuln_data)
-
-	# Check for False Positive rules
-	is_suppressed = False
-	try:
-		from startScan.models import FalsePositiveRule
-		rules = FalsePositiveRule.objects.filter(target_domain=target_domain, is_active=True)
-		for rule in rules:
-			if rule.matches(vuln_data.get('name', ''), http_url):
-				is_suppressed = True
-				break
-	except Exception as e:
-		logger.error(f"Error checking FP rules: {e}")
-
-	if is_suppressed:
-		vuln_data['is_suppressed'] = True
-
-	# Create vulnerability
-	vuln, created = Vulnerability.objects.get_or_create(**vuln_data)
-	if created:
-		vuln.discovered_date = timezone.now()
-		vuln.open_status = True
-		if exploit_url:
-			vuln.exploit_url = exploit_url
-		vuln.validation_status = validation_status
-		vuln.save()
-	elif exploit_url and not vuln.exploit_url:
-		vuln.exploit_url = exploit_url
-		vuln.save()
-
-	# Save vuln tags
-	for tag_name in tags or []:
-		tag, created = VulnerabilityTags.objects.get_or_create(name=tag_name)
-		if tag:
-			vuln.tags.add(tag)
-			vuln.save()
-
-	# Save CVEs
-	for cve_id in cve_ids or []:
-		cve, created = CveId.objects.get_or_create(name=cve_id)
-		if cve:
-			vuln.cve_ids.add(cve)
-			vuln.save()
-
-	# Save CWEs
-	for cve_id in cwe_ids or []:
-		cwe, created = CweId.objects.get_or_create(name=cve_id)
-		if cwe:
-			vuln.cwe_ids.add(cwe)
-			vuln.save()
-
-	# Save vuln reference
-	for url in references or []:
-		ref, created = VulnerabilityReference.objects.get_or_create(url=url)
-		if created:
-			vuln.references.add(ref)
-			vuln.save()
-
-	# Save subscan id in vuln object
-	if subscan:
-		vuln.vuln_subscan_ids.add(subscan)
-		vuln.save()
-
-	return vuln, created
 
 
 def save_endpoint(
@@ -5450,6 +5524,26 @@ def save_endpoint(
 		endpoint.is_default = is_default
 		endpoint.discovered_date = timezone.now()
 		endpoint.save()
+
+		# Centralized Brute-Force Candidate Registration
+		auth_keywords = ['login', 'admin', 'auth', 'portal', 'controlpanel', 'signin', 'manage']
+		if any(k in http_url.lower() for k in auth_keywords):
+			from reNgine.utilities import save_auth_candidate
+			try:
+				parsed = urlparse(http_url)
+				port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+				save_auth_candidate(
+					scan_history=endpoint.scan_history,
+					subdomain=endpoint.subdomain,
+					endpoint=endpoint,
+					target=parsed.hostname,
+					protocol='http',
+					port=port,
+					source_tool=endpoint_data.get('source_tool', 'discovery_engine'),
+					tech_hint=f"Discovered URL: {http_url}"
+				)
+			except Exception as e:
+				logger.error(f"Error registering AuthCandidate from endpoint {http_url}: {e}")
 		subscan_id = ctx.get('subscan_id')
 		if subscan_id:
 			endpoint.endpoint_subscan_ids.add(subscan_id)
@@ -5543,8 +5637,12 @@ def save_ip_address(ip_address, subdomain=None, subscan=None, **kwargs):
 		logger.info(f'IP {ip_address} is not a valid IP. Skipping.')
 		return None, False
 	ip, created = IpAddress.objects.get_or_create(address=ip_address)
-	# if created:
-	# 	logger.warning(f'Found new IP {ip_address}')
+	if created:
+		ip.discovered_date = timezone.now()
+
+	# Trigger geo localization if newly created OR if geo_iso is null
+	if created or ip.geo_iso is None:
+		geo_localize.delay(ip_address, ip_id=ip.id)
 
 	# Set extra attributes
 	for key, value in kwargs.items():
@@ -5903,7 +6001,6 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 	ssl_ports = config.get('ports', [443, 4444, 8443])
 
 	target = self.domain.name
-	proxy = get_random_proxy()
 
 	# 1. IKE-scan
 	if run_ike_scan:
@@ -5911,12 +6008,14 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 		ike_output_file = f'{self.results_dir}/ike_scan_{target}.txt'
 		# ike-scan does not natively support HTTP/SOCKS proxies
 		cmd = f'ike-scan --multiline {target} > {ike_output_file}'
+		proxy = get_random_proxy()
 		run_command(
 			cmd,
 			shell=True,
 			history_file=self.history_file,
 			scan_id=self.scan_id,
-			activity_id=self.activity_id)
+			activity_id=self.activity_id,
+			proxy=proxy)
 
 		if os.path.isfile(ike_output_file):
 			with open(ike_output_file, 'r') as f:
@@ -5938,12 +6037,14 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 			ssl_output_file = f'{self.results_dir}/sslscan_{target}_{port}.xml'
 			# sslscan does not natively support proxies
 			cmd = f'sslscan --xml={ssl_output_file} {target}:{port}'
+			proxy = get_random_proxy()
 			run_command(
 				cmd,
 				shell=True,
 				history_file=self.history_file,
 				scan_id=self.scan_id,
-				activity_id=self.activity_id)
+				activity_id=self.activity_id,
+				proxy=proxy)
 
 			if os.path.isfile(ssl_output_file):
 				vuln_data = {
@@ -5968,72 +6069,46 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 @app.task(name='brute_force_scan', queue='main_scan_queue', base=RengineTask, bind=True)
 def brute_force_scan(self, targets=[], ctx={}, description=None):
 	"""
-	Perform brute-force authentication testing on selected targets.
+	Perform centralized brute-force orchestration.
+	1. Pull all pending candidates from AuthCandidate table
+	2. Execute via BruteForceOrchestrator with OpSec settings
 	"""
-	logger.info(f'Running Brute Force Scan on {len(targets)} targets...')
+	logger.info(f"Starting Centralized Brute Force Orchestration for Scan {self.scan_id}")
 	
-	# Load configuration from ctx
-	# Supporting multiple wordlists as requested ['wordlist1', 'wordlist2']
-	users_wordlists = ctx.get('users_wordlist', [DEFAULT_AUTH_USER_WORDLIST])
-	pass_wordlists = ctx.get('pass_wordlist', [DEFAULT_AUTH_PASS_WORDLIST])
+	# Prerequisite: Run Intelligent Form Extraction (Tier 3)
+	from reNgine.auth_discovery_tasks import extract_auth_candidates
+	extract_auth_candidates.apply(args=(self,), kwargs={'ctx': ctx})
 	
-	# Handle both string and list inputs for robustness
-	if isinstance(users_wordlists, str): users_wordlists = [users_wordlists]
-	if isinstance(pass_wordlists, str): pass_wordlists = [pass_wordlists]
+	# Initialize Orchestrator
+	from reNgine.opsec_utils import BruteForceOrchestrator
+	orchestrator = BruteForceOrchestrator(self.scan)
 	
-	service = ctx.get('service', 'http')
-	port = ctx.get('port', None)
+	# Execute orchestration
+	results = orchestrator.run_orchestration(ctx=ctx)
 	
-	# Load and merge wordlists
-	users = []
-	for wl in users_wordlists:
-		path = os.path.join(AUTH_WORDLIST_PATH, wl)
-		if os.path.exists(path):
-			with open(path, 'r') as f:
-				users.extend([l.strip() for l in f.readlines() if l.strip()])
-		else:
-			logger.warning(f"Wordlist not found: {path}")
-	
-	passwords = []
-	for wl in pass_wordlists:
-		path = os.path.join(AUTH_WORDLIST_PATH, wl)
-		if os.path.exists(path):
-			with open(path, 'r') as f:
-				passwords.extend([l.strip() for l in f.readlines() if l.strip()])
-		else:
-			logger.warning(f"Wordlist not found: {path}")
-
-    # Remove duplicates
-	users = list(set(users))
-	passwords = list(set(passwords))
-
-	if not users or not passwords:
-		logger.error("No valid credentials found in wordlists. Skipping brute force.")
-		return False
-
 	total_found = 0
-	for target in targets:
-		logger.warning(f"Starting brute-force orchestration for {target} ({service})")
-		orchestrator = BruteForceOrchestrator(target, service, port, users, passwords)
+	for res in results:
+		total_found += 1
+		# Determine URL for reporting
+		if res['service'] == 'http':
+			report_url = res['target']
+		else:
+			report_url = f"{res['service']}://{res['target']}:{res['port']}"
+
+		vuln_data = {
+			'name': f'Successful Brute-Force: {res["service"].upper()}',
+			'severity': 4, # Critical
+			'description': f'Successfully identified valid credentials on {res["target"]} via Hydra.\n\n'
+						 f'User: {res["user"]}\n'
+						 f'Password: {res["password"]}\n'
+						 f'Service: {res["service"]}\n'
+						 f'Port: {res["port"]}',
+			'http_url': report_url,
+			'type': 'Broken Authentication'
+		}
+		save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
 		
-		# Execute with 1-10 attempts per proxy rotation
-		results = orchestrator.run(min_attempts=1, max_attempts=10, stop_on_success=True)
-		
-		for res in results:
-			total_found += 1
-			vuln_data = {
-				'name': f'Successful Brute-Force: {res["service"]}',
-				'severity': 4, # Critical
-				'description': f'Successfully identified valid credentials via Medusa on {res["target"]}.\n\n'
-							 f'User: {res["user"]}\n'
-							 f'Password: {res["password"]}\n'
-							 f'Service: {res["service"]}',
-				'http_url': res["target"],
-				'type': 'Broken Authentication'
-			}
-			save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
-	
-	logger.info(f"Brute Force Scan completed. Targets: {len(targets)}, Credentials Found: {total_found}")
+	logger.info(f"Brute Force Orchestration completed. Credentials Found: {total_found}")
 	return True
 
 @app.task(name='pull_ollama_model', queue='main_scan_queue')
@@ -6284,7 +6359,7 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 		# Call LLM (PII protection is handled inside generator)
 		final_impact = generator.generate_impact_assessment(context)
 
-		# Persist
+		# Persist to ImpactAssessment model
 		ImpactAssessment.objects.update_or_create(
 			vulnerability=vuln,
 			defaults={
@@ -6294,6 +6369,10 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 				'is_ai_generated': True
 			}
 		)
+
+		# Also sync to Vulnerability model for reports
+		vuln.impact = final_impact
+		vuln.save()
 
 
 @app.task(name='sync_cisa_kev_catalog', queue='main_scan_queue', bind=False)

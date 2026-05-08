@@ -78,7 +78,7 @@ import {
   RefreshCw,
   GitBranch
 } from 'lucide-react';
-import { useScanSummary, useActivityLogs } from '../api';
+import { useScanSummary, useActivityLogs, useFetchWhois } from '../api';
 import Chart from 'react-apexcharts';
 import { GeoMap } from '../../dashboard/components/GeoMap';
 import { KpiCard } from '../../../components/KpiCard';
@@ -752,6 +752,7 @@ const DiscoveredTechWidget: React.FC<{ techs: any[], sx?: any }> = ({ techs = []
 export const ScanDetailPage = () => {
   const { projectSlug, scanId } = useParams({ from: '/$projectSlug/scan/detail/$scanId' });
   const { data, isLoading } = useScanSummary(projectSlug, parseInt(scanId));
+  const fetchWhois = useFetchWhois(projectSlug, parseInt(scanId));
   const { data: plugins } = usePlugins();
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
@@ -1003,9 +1004,49 @@ export const ScanDetailPage = () => {
               )}
               {infoTab === 1 && (
                 <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
-                  <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
-                    {data.domain_info?.whois_data || 'No WHOIS data available.'}
-                  </Typography>
+                  {!data.domain_info?.whois_data ? (
+                    <Box sx={{ p: 4, textAlign: 'center' }}>
+                      <Typography sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', mb: 2 }}>
+                        No WHOIS data available for this target.
+                      </Typography>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={fetchWhois.isPending ? <CircularProgress size={12} /> : <Search size={12} />}
+                        disabled={fetchWhois.isPending}
+                        onClick={() => fetchWhois.mutate(data.target_info.name)}
+                        sx={{
+                          color: '#00f3ff',
+                          borderColor: 'rgba(0,243,255,0.3)',
+                          fontSize: '0.65rem',
+                          fontWeight: 900,
+                          '&:hover': {
+                            borderColor: '#00f3ff',
+                            bgcolor: 'rgba(0,243,255,0.05)'
+                          }
+                        }}
+                      >
+                        {fetchWhois.isPending ? 'FETCHING...' : 'FETCH WHOIS DATA'}
+                      </Button>
+                    </Box>
+                  ) : (
+                    <Box>
+                      <Stack direction="row" sx={{ justifyContent: 'flex-end', mb: 1 }}>
+                        <Button
+                          size="small"
+                          startIcon={fetchWhois.isPending ? <CircularProgress size={10} /> : <RefreshCw size={10} />}
+                          disabled={fetchWhois.isPending}
+                          onClick={() => fetchWhois.mutate(data.target_info.name)}
+                          sx={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.6rem', '&:hover': { color: '#00f3ff' } }}
+                        >
+                          Refresh
+                        </Button>
+                      </Stack>
+                      <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', whiteSpace: 'pre-wrap', fontFamily: 'monospace' }}>
+                        {data.domain_info?.whois_data}
+                      </Typography>
+                    </Box>
+                  )}
                 </Box>
               )}
               {infoTab === 2 && (
@@ -1195,12 +1236,14 @@ export const ScanDetailPage = () => {
   );
 
   const renderVulnerabilities = () => (
-    <PluginComponent 
-      name="VulnerabilityTable" 
-      default={VulnerabilityTable} 
-      projectSlug={projectSlug} 
-      scanId={parseInt(scanId)} 
-    />
+    <TacticalPanel title="VULNERABILITY INTELLIGENCE" icon={<ShieldAlert size={18} color="#00f3ff" />}>
+      <PluginComponent
+        name="VulnerabilityTable"
+        default={VulnerabilityTable}
+        projectSlug={projectSlug}
+        scanId={parseInt(scanId)}
+      />
+    </TacticalPanel>
   );
 
   return (

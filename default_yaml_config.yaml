@@ -104,6 +104,12 @@ vulnerability_scan: {
     # 'tags': [],                 # Nuclei tags (https://github.com/projectdiscovery/nuclei-templates)
     # 'templates': [],            # Nuclei templates (https://github.com/projectdiscovery/nuclei-templates)
     # 'custom_templates': []      # Nuclei custom templates uploaded in reNgine
+    }
+  },
+  'cpanel_scanner': {
+    'run_cpanel_scan': true,
+    'cpanel_user_wordlist': '/usr/src/wordlist/cpanel_users.txt',
+    'proxy_type': 'rotating'
   }
 }
 waf_detection: {
@@ -129,6 +135,7 @@ brute_force_scan: {
   'users_wordlist': ['top-100-users'], # Wordlist names from reNgine Vault
   'pass_wordlist': ['top-100-pass'],
   'service': 'http',              # Target service (http, ssh, etc.)
+  'max_retries': 3,               # Max consecutive fatal errors before stopping
   # 'port': 443                   # Optional: Specific port override
 }
 spiderfoot_scan: {

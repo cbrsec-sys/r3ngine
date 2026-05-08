@@ -330,17 +330,17 @@ class Pathfinder:
     @staticmethod
     def _edge_to_action(edge_type: str, from_node: Dict, to_node: Dict) -> str:
         templates = {
-            "RESOLVES_TO": "Resolve {from} to IP {to}",
-            "HOSTS": "{from} hosts service {to}",
-            "EXPOSES": "Service {from} exposes vulnerability {to}",
-            "LEADS_TO": "Exploit {from} to gain {to}",
-            "AUTHENTICATES": "Use credential {from} to authenticate to {to}",
-            "ESCALATES_TO": "Escalate from {from} to {to}",
-            "TRUSTS": "{from} trusts {to} — lateral movement possible",
-            "CONNECTED_TO": "Pivot via {from} to reach {to}",
+            "RESOLVES_TO": "Resolve {src} to IP {dst}",
+            "HOSTS": "{src} hosts service {dst}",
+            "EXPOSES": "Service {src} exposes vulnerability {dst}",
+            "LEADS_TO": "Exploit {src} to gain {dst}",
+            "AUTHENTICATES": "Use credential {src} to authenticate to {dst}",
+            "ESCALATES_TO": "Escalate from {src} to {dst}",
+            "TRUSTS": "{src} trusts {dst} — lateral movement possible",
+            "CONNECTED_TO": "Pivot via {src} to reach {dst}",
         }
-        template = templates.get(edge_type, "{from} -> {to}")
+        template = templates.get(edge_type, "{src} -> {dst}")
         return template.format(
-            from=from_node.get("subtype", from_node.get("id", "?")),
-            to=to_node.get("subtype", to_node.get("id", "?")),
+            src=from_node.get("subtype", from_node.get("id", "?")),
+            dst=to_node.get("subtype", to_node.get("id", "?")),
         )
