@@ -112,7 +112,8 @@ vulnerability_scan: {
     'run_wpscan': true,
     'wpscan_enumeration': 'vp,vt,u',
     'wpscan_detection_mode': 'mixed'
-  }
+}
+
 attack_path_modeling: {
   'enabled': true,
   'top_n': 5

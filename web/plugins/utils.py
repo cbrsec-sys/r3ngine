@@ -28,10 +28,23 @@ class PluginManager:
         
     @classmethod
     def extract_plugin(cls, zip_path):
-        """Extracts a plugin zip and returns the path to the extracted content."""
+        """Extracts a plugin zip and returns the path to the actual plugin content (flattening root dir if needed)."""
         temp_dir = os.path.join(cls.BASE_PLUGINS_DIR, 'temp_' + datetime.now().strftime('%Y%m%d%H%M%S'))
+        os.makedirs(temp_dir, exist_ok=True)
+        
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(temp_dir)
+            
+        # If there's only one directory and no files in the root, move everything up
+        items = os.listdir(temp_dir)
+        if len(items) == 1 and os.path.isdir(os.path.join(temp_dir, items[0])):
+            root_item = os.path.join(temp_dir, items[0])
+            # Move all contents of the root_item to temp_dir
+            for sub_item in os.listdir(root_item):
+                shutil.move(os.path.join(root_item, sub_item), temp_dir)
+            # Remove the now-empty root_item
+            os.rmdir(root_item)
+            
         return temp_dir
 
     @classmethod
@@ -186,14 +199,35 @@ class AtomicInstaller:
                 shutil.move(temp_dir, final_dir)
                 
                 # 5. Ingest Engine Fixtures
+                from scanEngine.models import EngineType
                 for file in os.listdir(final_dir):
                     if file.endswith('_engine.yaml'):
                         fixture_path = os.path.join(final_dir, file)
                         logger.info(f"Ingesting engine fixture: {fixture_path}")
                         try:
-                            call_command('loaddata', fixture_path)
+                            with open(fixture_path, 'r') as f:
+                                fixture_data = yaml.safe_load(f)
+                                if isinstance(fixture_data, list):
+                                    for item in fixture_data:
+                                        if item.get('model') == 'scanEngine.enginetype':
+                                            fields = item.get('fields', {})
+                                            name = fields.get('engine_name')
+                                            if name:
+                                                obj, created = EngineType.objects.update_or_create(
+                                                    engine_name=name,
+                                                    defaults=fields
+                                                )
+                                                logger.info(f"{'Created' if created else 'Updated'} engine: {name}")
+                                            else:
+                                                logger.warning(f"Engine fixture item missing engine_name: {item}")
+                                        else:
+                                            # Fallback for other models (e.g. Wordlist, etc.)
+                                            call_command('loaddata', fixture_path, format='yaml')
+                                            logger.info(f"Fallback loaddata used for: {file}")
+                                else:
+                                    logger.error(f"Invalid fixture format in {file}")
                         except Exception as e:
-                            logger.error(f"Failed to ingest engine fixture {file}: {str(e)}")
+                            logger.error(f"CRITICAL: Failed to ingest engine fixture {file}: {str(e)}")
 
                 # 6. Parse tools.yaml
                 tools_path = os.path.join(final_dir, 'tools.yaml')

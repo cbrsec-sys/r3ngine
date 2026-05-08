@@ -104,14 +104,18 @@ vulnerability_scan: {
     # 'tags': [],                 # Nuclei tags (https://github.com/projectdiscovery/nuclei-templates)
     # 'templates': [],            # Nuclei templates (https://github.com/projectdiscovery/nuclei-templates)
     # 'custom_templates': []      # Nuclei custom templates uploaded in reNgine
-    }
   },
   'cpanel_scanner': {
     'run_cpanel2shell': true,
     'cpanel_user_wordlist': '/usr/src/app/wordlist/auth/cpanel_users.txt',
     'proxy_type': 'rotating'
+  },
+  'attack_path_modeling': {
+    'enabled': true,
+    'top_n': 5
   }
 }
+
 waf_detection: {
   'enable_http_crawl': true,
   'use_shodan': true,           # Use Shodan for Origin IP discovery

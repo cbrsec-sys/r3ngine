@@ -273,9 +273,9 @@ RUN git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-s
 RUN cd /usr/src/github && \
     wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip && \
     unzip GooFuzz.v.1.2.6.zip && \
-    rm GooFuzz.v.1.2.6.zip && \
     mv GooFuzz.v.1.2.6 goofuzz && \
-    chmod +x goofuzz/GooFuzz
+    chmod +x goofuzz/GooFuzz && \
+    rm GooFuzz.v.1.2.6.zip
 
 RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot && \
     cd /usr/src/github/spiderfoot && pip3 install -r requirements.txt

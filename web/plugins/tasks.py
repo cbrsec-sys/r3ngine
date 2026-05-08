@@ -7,7 +7,7 @@ from .models import Plugin
 
 logger = logging.getLogger(__name__)
 
-@shared_task(name='plugins.install_plugin_tools')
+@shared_task(name='plugins.install_plugin_tools', queue='run_command_queue')
 def install_plugin_tools(plugin_slug):
     """
     Task to install tools defined in a plugin's tools.yaml.
@@ -67,7 +67,7 @@ def install_plugin_tools(plugin_slug):
         except Exception as e:
             logger.error(f"Unexpected error installing tool {name}: {str(e)}")
 
-@shared_task(name='plugins.verify_all_plugin_tools')
+@shared_task(name='plugins.verify_all_plugin_tools', queue='run_command_queue')
 def verify_all_plugin_tools():
     """
     Background task to verify all enabled plugin tools are installed.
