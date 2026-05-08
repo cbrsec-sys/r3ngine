@@ -1250,64 +1250,66 @@ export const ScanDetailPage = () => {
     <Box sx={{ p: 2 }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box>
+        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Box sx={{ mt: 0.5 }}>
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN DETAIL</Typography>
             <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info.name}</Typography>
           </Box>
-          <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-            <Button
-              variant="contained"
-              startIcon={<RefreshCw size={16} />}
-              onClick={() => setStartScanTargets({ ids: [data.target_info.id], names: [data.target_info.name] })}
-              sx={{
-                bgcolor: 'rgba(0, 255, 98, 0.1)',
-                color: '#00ff62',
-                border: '1px solid rgba(0, 255, 98, 0.3)',
-                fontFamily: 'Orbitron',
-                fontSize: '0.65rem',
-                fontWeight: 900,
-                px: 2,
-                '&:hover': { bgcolor: 'rgba(0, 255, 98, 0.2)' }
-              }}
-            >
-              RESCAN
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<FileText size={16} />}
-              onClick={() => setReportModalOpen(true)}
-              sx={{
-                bgcolor: 'rgba(0, 243, 255, 0.1)',
-                color: '#00f3ff',
-                border: '1px solid rgba(0, 243, 255, 0.3)',
-                fontFamily: 'Orbitron',
-                fontSize: '0.65rem',
-                fontWeight: 900,
-                px: 2,
-                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
-              }}
-            >
-              GENERATE REPORT
-            </Button>
-            <Button
-              variant="contained"
-              component={RouterLink}
-              to={`/${projectSlug}/stress_testing/${scanId}`}
-              startIcon={<Zap size={16} />}
-              sx={{
-                bgcolor: 'rgba(255, 0, 255, 0.1)',
-                color: '#ff00ff',
-                border: '1px solid rgba(255, 0, 255, 0.3)',
-                fontFamily: 'Orbitron',
-                fontSize: '0.65rem',
-                fontWeight: 900,
-                px: 2,
-                '&:hover': { bgcolor: 'rgba(255, 0, 255, 0.2)' }
-              }}
-            >
-              STRESS TEST
-            </Button>
+          <Stack spacing={1} sx={{ alignItems: 'flex-end' }}>
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+              <Button
+                variant="contained"
+                startIcon={<RefreshCw size={16} />}
+                onClick={() => setStartScanTargets({ ids: [data.target_info.id], names: [data.target_info.name] })}
+                sx={{
+                  bgcolor: 'rgba(0, 255, 98, 0.1)',
+                  color: '#00ff62',
+                  border: '1px solid rgba(0, 255, 98, 0.3)',
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  px: 2,
+                  '&:hover': { bgcolor: 'rgba(0, 255, 98, 0.2)' }
+                }}
+              >
+                RESCAN
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<FileText size={16} />}
+                onClick={() => setReportModalOpen(true)}
+                sx={{
+                  bgcolor: 'rgba(0, 243, 255, 0.1)',
+                  color: '#00f3ff',
+                  border: '1px solid rgba(0, 243, 255, 0.3)',
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  px: 2,
+                  '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                }}
+              >
+                GENERATE REPORT
+              </Button>
+              <Button
+                variant="contained"
+                component={RouterLink}
+                to={`/${projectSlug}/stress_testing/${scanId}`}
+                startIcon={<Zap size={16} />}
+                sx={{
+                  bgcolor: 'rgba(255, 0, 255, 0.1)',
+                  color: '#ff00ff',
+                  border: '1px solid rgba(255, 0, 255, 0.3)',
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  px: 2,
+                  '&:hover': { bgcolor: 'rgba(255, 0, 255, 0.2)' }
+                }}
+              >
+                STRESS TEST
+              </Button>
+            </Stack>
             <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
               <span>SCANS</span> / <span>DETAIL</span> / <span style={{ color: '#00f3ff' }}>{data.target_info.name}</span>
             </Stack>
@@ -1401,7 +1403,7 @@ export const ScanDetailPage = () => {
                     subtitle={`${data.alive_count} ACTIVE`}
                     color="#7000ff"
                     icon={Layers}
-                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                    sx={{ height: '70%' }}
                   />
                   <KpiCard
                     title="ENDPOINTS"
@@ -1409,7 +1411,7 @@ export const ScanDetailPage = () => {
                     subtitle={`${data.endpoint_alive_count} ALIVE`}
                     color="#ff00f7"
                     icon={Target}
-                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                    sx={{ height: '70%' }}
                   />
                   <KpiCard
                     title="VULNS"
@@ -1417,7 +1419,7 @@ export const ScanDetailPage = () => {
                     subtitle={`${data.critical_count} CRITICAL`}
                     color="#ff003c"
                     icon={Bug}
-                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                    sx={{ height: '70%' }}
                   />
                   <KpiCard
                     title="OSINT"
@@ -1425,7 +1427,7 @@ export const ScanDetailPage = () => {
                     subtitle="SENSITIVE DATA"
                     color="#fffc00"
                     icon={Key}
-                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                    sx={{ height: '70%' }}
                   />
                 </Box>
 
@@ -1450,7 +1452,7 @@ export const ScanDetailPage = () => {
                 {tabs[activeTab]?.label === 'EXPLOITS' && renderExploits()}
 
                 {tabs[activeTab]?.isPlugin && tabs[activeTab]?.pluginSlug && tabs[activeTab]?.componentFile && (
-                  <PluginComponentLoader 
+                  <PluginComponentLoader
                     pluginSlug={tabs[activeTab].pluginSlug}
                     componentFile={tabs[activeTab].componentFile}
                     scanId={parseInt(scanId)}
@@ -1483,7 +1485,7 @@ export const ScanDetailPage = () => {
       />
 
       {startScanTargets && (
-        <StartScanModal 
+        <StartScanModal
           open={!!startScanTargets}
           onClose={() => setStartScanTargets(null)}
           domainIds={startScanTargets.ids}

@@ -176,6 +176,7 @@ ring:
   - **Scan History & Scan List Integration**: Wired the "RESCAN" menu item in both the Scan History page and the Dashboard Scan List, enabling immediate re-triggering of existing scans.
   - **Target List Menu**: Enhanced the Targets list with a tactical row menu featuring an "INITIATE SCAN" (Rescan) action for better workflow consistency.
   - **Scan Detail Header Action**: Added a primary "RESCAN" button to the Scan Detail header, allowing users to quickly restart discovery from the summary view.
+  - **Scan Detail Header Reorganization**: Improved the aesthetic layout of the Scan Detail page by repositioning navigation breadcrumbs below action buttons and right-aligning the control group for better visual flow.
   - **UI/UX Stability**: Resolved critical state race conditions where menu actions would fail due to premature cleanup of active identifiers.
   - **Modular Scan Initiation**: Corrected all Rescan triggers to the `StartScanModal` and `useInitiateScan` orchestration layer, ensuring full parity with standard manual scan initiation.
 - **Integrated Attack Surface Map Navigation**: 
