@@ -19,7 +19,7 @@ from rolepermissions.decorators import has_permission_decorator
 from reNgine.celery import app
 from reNgine.charts import *
 from reNgine.common_func import *
-from reNgine.definitions import ABORTED_TASK, SUCCESS_TASK
+from reNgine.definitions import ABORTED_TASK, SUCCESS_TASK, PERM_MODIFY_SCAN_REPORT, FOUR_OH_FOUR_URL
 from reNgine.tasks import create_scan_activity, initiate_scan, run_command
 from scanEngine.models import EngineType
 from startScan.models import *
@@ -461,6 +461,7 @@ def start_multiple_scan(request, slug):
     }
     return render(request, 'dashboard/v3_index.html', context)
 
+@has_permission_decorator(PERM_MODIFY_SCAN_REPORT, redirect_url=FOUR_OH_FOUR_URL)
 def export_subdomains(request, scan_id):
     subdomain_list = Subdomain.objects.filter(scan_history__id=scan_id)
     scan = ScanHistory.objects.get(id=scan_id)
@@ -476,6 +477,7 @@ def export_subdomains(request, scan_id):
     return response
 
 
+@has_permission_decorator(PERM_MODIFY_SCAN_REPORT, redirect_url=FOUR_OH_FOUR_URL)
 def export_endpoints(request, scan_id):
     endpoint_list = EndPoint.objects.filter(scan_history__id=scan_id)
     scan = ScanHistory.objects.get(id=scan_id)
@@ -491,6 +493,7 @@ def export_endpoints(request, scan_id):
     return response
 
 
+@has_permission_decorator(PERM_MODIFY_SCAN_REPORT, redirect_url=FOUR_OH_FOUR_URL)
 def export_urls(request, scan_id):
     urls_list = Subdomain.objects.filter(scan_history__id=scan_id)
     scan = ScanHistory.objects.get(id=scan_id)
@@ -1079,226 +1082,40 @@ def delete_leak(request, id):
     return JsonResponse({'status': False})
 
 
+@has_permission_decorator(PERM_MODIFY_SCAN_REPORT, redirect_url=FOUR_OH_FOUR_URL)
 def create_report(request, id):
-    primary_color = '#FFB74D'
-    secondary_color = '#212121'
-    # get report type
-    report_type = request.GET['report_type'] if 'report_type' in request.GET  else 'full'
-    report_template = request.GET['report_template'] if 'report_template' in request.GET else 'default'
-
-    is_ignore_info_vuln = True if 'ignore_info_vuln' in request.GET else False
-    if report_type == 'recon':
-        show_recon = True
-        show_vuln = False
-        report_name = 'Reconnaissance Report'
-    elif report_type == 'vulnerability':
-        show_recon = False
-        show_vuln = True
-        report_name = 'Vulnerability Report'
-    else:
-        # default
-        show_recon = True
-        show_vuln = True
-        report_name = 'Full Scan Report'
-
-    scan = ScanHistory.objects.get(id=id)
-    vulns = (
-        Vulnerability.objects
-        .filter(scan_history=scan)
-        .order_by('-severity')
-    ) if not is_ignore_info_vuln else (
-        Vulnerability.objects
-        .filter(scan_history=scan)
-        .exclude(severity=0)
-        .order_by('-severity')
-    )
-    unique_vulns = (
-        Vulnerability.objects
-        .filter(scan_history=scan)
-        .values("name", "severity")
-        .annotate(count=Count('name'))
-        .order_by('-severity', '-count')
-    ) if not is_ignore_info_vuln else (
-        Vulnerability.objects
-        .filter(scan_history=scan)
-        .exclude(severity=0)
-        .values("name", "severity")
-        .annotate(count=Count('name'))
-        .order_by('-severity', '-count')
-    )
-
-    subdomains = (
-        Subdomain.objects
-        .filter(scan_history=scan)
-        .order_by('-content_length')
-    )
-    subdomain_alive_count = (
-        Subdomain.objects
-        .filter(scan_history__id=id)
-        .values('name')
-        .distinct()
-        .filter(http_status__exact=200)
-        .count()
-    )
-    interesting_subdomains = get_interesting_subdomains(scan_history=id)
-    interesting_subdomains = interesting_subdomains.annotate(
-        sort_order=Case(
-            When(http_status__gte=200, http_status__lt=300, then=1),
-            When(http_status__gte=300, http_status__lt=400, then=2),
-            When(http_status__gte=400, http_status__lt=500, then=3),
-            default=4,
-            output_field=IntegerField(),
-        )
-    ).order_by('sort_order', 'http_status')
-
-    subdomains = subdomains.annotate(
-        sort_order=Case(
-            When(http_status__gte=200, http_status__lt=300, then=1),
-            When(http_status__gte=300, http_status__lt=400, then=2),
-            When(http_status__gte=400, http_status__lt=500, then=3),
-            default=4,
-            output_field=IntegerField(),
-        )
-    ).order_by('sort_order', 'http_status')
-
-
-
-
-    ip_addresses = (
-        IpAddress.objects
-        .filter(ip_addresses__in=subdomains)
-        .distinct()
-    )
-
-    # Attack Surface Map (Optional for Enterprise)
+    report_type = request.GET.get('report_type', 'full')
+    report_template = request.GET.get('report_template', 'default')
+    is_ignore_info_vuln = request.GET.get('ignore_info_vuln', 'False') == 'True'
     include_attack_surface_map = request.GET.get('include_attack_surface_map', 'False') == 'True'
-    attack_surface_map_image = None
-    if report_template == 'enterprise' and include_attack_surface_map:
-        try:
-            neo4j_manager = Neo4jManager()
-            graph_data = neo4j_manager.get_cytoscape_json(id)
-            if graph_data and graph_data.get('nodes'):
-                attack_surface_map_image = generate_attack_surface_map(graph_data)
-            neo4j_manager.close()
-        except Exception as e:
-            logger.error(f"Error generating Attack Surface Map for report: {e}")
 
-    data = {
-        'scan_object': scan,
-        'unique_vulnerabilities': unique_vulns,
-        'all_vulnerabilities': vulns,
-        'all_vulnerabilities_count': vulns.count(),
-        'subdomain_alive_count': subdomain_alive_count,
-        'interesting_subdomains': interesting_subdomains,
-        'subdomains': subdomains,
-        'ip_addresses': ip_addresses,
-        'show_recon': show_recon,
-        'show_vuln': show_vuln,
-        'report_name': report_name,
-        'is_ignore_info_vuln': is_ignore_info_vuln,
-        'attack_surface_map_image': attack_surface_map_image,
+    scan = get_object_or_404(ScanHistory, id=id)
+
+    report_obj = ScanReport.objects.create(
+        scan_history=scan,
+        report_type=report_type,
+        report_template=report_template,
+        status=-1, # Initiated
+        params={
+            'ignore_info_vuln': is_ignore_info_vuln,
+            'include_attack_surface_map': include_attack_surface_map
+        }
+    )
+
+    from reNgine.report_tasks import generate_report_task
+    generate_report_task.delay(report_obj.id)
+
+    return JsonResponse({'status': True, 'report_id': report_obj.id})
+
+
+@has_permission_decorator(PERM_MODIFY_SCAN_REPORT, redirect_url=FOUR_OH_FOUR_URL)
+def get_report_status(request, id):
+    report = get_object_or_404(ScanReport, id=id)
+    response = {
+        'status': report.status,
+        'error_message': report.error_message,
+        'report_url': report.report_file.url if report.report_file else None,
+        'completed_at': report.completed_at
     }
+    return JsonResponse(response)
 
-    # Get report related config
-    vuln_report_query = VulnerabilityReportSetting.objects.all()
-    if vuln_report_query.exists():
-        report = vuln_report_query[0]
-        data['company_name'] = report.company_name
-        data['company_address'] = report.company_address
-        data['company_email'] = report.company_email
-        data['company_website'] = report.company_website
-        data['show_rengine_banner'] = report.show_rengine_banner
-        data['show_footer'] = report.show_footer
-        data['footer_text'] = report.footer_text
-        data['show_executive_summary'] = report.show_executive_summary
-
-        # Replace executive_summary_description with template syntax
-        description = report.executive_summary_description
-        description = description.replace('{scan_date}', scan.start_scan_date.strftime('%d %B, %Y'))
-        description = description.replace('{company_name}', report.company_name)
-        description = description.replace('{target_name}', scan.domain.name)
-        description = description.replace('{subdomain_count}', str(subdomains.count()))
-        description = description.replace('{vulnerability_count}', str(vulns.count()))
-        description = description.replace('{critical_count}', str(vulns.filter(severity=4).count()))
-        description = description.replace('{high_count}', str(vulns.filter(severity=3).count()))
-        description = description.replace('{medium_count}', str(vulns.filter(severity=2).count()))
-        description = description.replace('{low_count}', str(vulns.filter(severity=1).count()))
-        description = description.replace('{info_count}', str(vulns.filter(severity=0).count()))
-        description = description.replace('{unknown_count}', str(vulns.filter(severity=-1).count()))
-        if scan.domain.description:
-            description = description.replace('{target_description}', scan.domain.description)
-
-        # Convert to Markdown
-        data['executive_summary_description'] = markdown.markdown(description)
-
-        # LLM Generated Sections
-        if report.enable_llm_report_generation:
-            from reNgine.llm import LLMReportGenerator
-            llm_gen = LLMReportGenerator(logger=logger)
-            
-            # Prepare context for LLM
-            llm_context = f"Target: {scan.domain.name}\n"
-            if scan.domain.description:
-                llm_context += f"Target Description: {scan.domain.description}\n"
-            llm_context += f"Scan Date: {scan.start_scan_date.strftime('%d %B, %Y')}\n"
-            llm_context += f"Subdomains discovered: {subdomains.count()}\n"
-            llm_context += f"Vulnerabilities identified: {vulns.count()}\n"
-            llm_context += f"- Critical: {vulns.filter(severity=4).count()}\n"
-            llm_context += f"- High: {vulns.filter(severity=3).count()}\n"
-            llm_context += f"- Medium: {vulns.filter(severity=2).count()}\n"
-            llm_context += f"- Low: {vulns.filter(severity=1).count()}\n"
-            llm_context += f"- Info: {vulns.filter(severity=0).count()}\n"
-            
-            # List some vulnerability names if any
-            if vulns.exists():
-                llm_context += "Top Vulnerabilities:\n"
-                for v in unique_vulns[:10]:
-                    llm_context += f"- {v['name']} ({v['count']})\n"
-
-            data['llm_overview'] = markdown.markdown(llm_gen.generate_overview(llm_context))
-            data['llm_executive_brief'] = markdown.markdown(llm_gen.generate_executive_brief(llm_context))
-            data['llm_conclusion'] = markdown.markdown(llm_gen.generate_conclusion(llm_context))
-            data['enable_llm_report_generation'] = True
-
-            # Generate attack scenarios for exploitable vulnerabilities
-            exploitable_vulns = vulns.exclude(exploit_url__isnull=True).exclude(exploit_url__exact='')
-            for v in exploitable_vulns:
-                vuln_context = f"Vulnerability: {v.name}\n"
-                vuln_context += f"Description: {v.description}\n"
-                vuln_context += f"Exploit URL: {v.exploit_url}\n"
-                v.attack_scenario = markdown.markdown(llm_gen.generate_attack_scenario(vuln_context))
-
-        primary_color = report.primary_color
-        secondary_color = report.secondary_color
-
-    data['primary_color'] = primary_color
-    data['secondary_color'] = secondary_color
-
-    data['subdomain_http_status_chart'] = generate_subdomain_chart_by_http_status(subdomains)
-    data['vulns_severity_chart'] = generate_vulnerability_chart_by_severity(vulns) if vulns else ''
-
-    if report_template == 'enterprise':
-        template = get_template('report/enterprise.html')
-    elif report_template == 'modern':
-        template = get_template('report/modern.html')
-    else:
-        template = get_template('report/default.html')
-
-    html = template.render(data)
-    pdf = HTML(string=html).write_pdf()
-    # pdf = HTML(string=html).write_pdf(stylesheets=[CSS(string='@page { size: A4; margin: 0; }')])
-
-    should_download = request.GET.get('download', 'false').lower() == 'true'
-    
-    target_name = scan.domain.name
-    date_str = datetime.now().strftime('%Y-%m-%d')
-    filename = f"{target_name} Report {date_str}.pdf"
-
-    if should_download:
-        response = HttpResponse(pdf, content_type='application/octet-stream')
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-    else:
-        response = HttpResponse(pdf, content_type='application/pdf')
-        response['Content-Disposition'] = f'inline; filename="{filename}"'
-
-    return response

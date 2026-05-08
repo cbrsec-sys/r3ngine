@@ -521,7 +521,21 @@ def record_exists(model, data, exclude_keys=[]):
 	# Return True if a record exists based on the lookup fields, False otherwise
 	return model.objects.filter(**lookup_fields).exists()
 
-def save_vulnerability(**vuln_data):
+def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, **kwargs):
+	# Support both positional and keyword arguments for backward compatibility
+	if vuln_data and isinstance(vuln_data, dict):
+		vuln_data.update(kwargs)
+		if scan_history:
+			vuln_data['scan_history'] = scan_history
+		if target_domain:
+			vuln_data['target_domain'] = target_domain
+	else:
+		vuln_data = kwargs
+		if scan_history:
+			vuln_data['scan_history'] = scan_history
+		if target_domain:
+			vuln_data['target_domain'] = target_domain
+
 	references = vuln_data.pop('references', [])
 	cve_ids = vuln_data.pop('cve_ids', [])
 	cwe_ids = vuln_data.pop('cwe_ids', [])
@@ -573,6 +587,32 @@ def save_vulnerability(**vuln_data):
 			vuln.exploit_url = exploit_url
 		vuln.validation_status = validation_status
 		vuln.save()
+
+		# Centralized Brute-Force Candidate Registration
+		auth_keywords = ['login', 'admin', 'auth', 'portal', 'credentials', 'password']
+		name = vuln_data.get('name', '').lower()
+		description = vuln_data.get('description', '').lower()
+		
+		if any(k in name or k in description for k in auth_keywords):
+			try:
+				from reNgine.utilities import save_auth_candidate
+				http_url = vuln_data.get('http_url', '')
+				parsed = urlparse(http_url)
+				port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+				target = parsed.hostname
+				
+				if target:
+					save_auth_candidate(
+						scan_history=scan_history,
+						subdomain=subdomain,
+						target=target,
+						protocol='http',
+						port=port,
+						source_tool=vuln_data.get('type', 'vulnerability_engine'),
+						tech_hint=name
+					)
+			except Exception as e:
+				logger.error(f"Error registering AuthCandidate from vulnerability {name}: {e}")
 	elif exploit_url and not vuln.exploit_url:
 		vuln.exploit_url = exploit_url
 		vuln.save()

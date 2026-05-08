@@ -44,6 +44,7 @@ from reNgine.monitor_tasks import *
 from reNgine.graph_utils import Neo4jManager
 from reNgine.vulnerability_tasks import *
 from reNgine.stress_testing_tasks import run_stress_testing
+from reNgine.report_tasks import *
 try:
 	from acunetix import Acunetix
 except ImportError:
@@ -419,14 +420,29 @@ def initiate_subscan(
 			subdomain.technologies.add(tech)
 		subdomain.save()
 
+	# Build workflow steps
+	workflow_steps = [method.si(ctx=ctx)]
+
+	# If this is a vulnerability scan, we need to run correlation and APME
+	if scan_type == 'vulnerability_scan':
+		workflow_steps.append(correlate_vulnerabilities.si(scan_history_id=scan.id))
+		workflow_steps.append(calculate_risk_scores.si(scan_history_id=scan.id))
+		# Run ERL validation if plugin is installed
+		workflow_steps.append(PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx))
+		workflow_steps.append(run_apme.si(scan_history_id=scan.id))
+
+	# Filter out None steps (where plugins aren't present)
+	workflow_steps = [step for step in workflow_steps if step is not None]
+
 	# Build header + callback
-	workflow = method.si(ctx=ctx)
+	workflow = chain(*workflow_steps)
 	callback = report.si(ctx=ctx).set(link_error=[report.si(ctx=ctx)])
 
 	# Run Celery tasks
 	task = chain(workflow, callback).on_error(callback).delay()
 	subscan.celery_ids.append(task.id)
 	subscan.save()
+
 
 	return {
 		'success': True,
@@ -1545,114 +1561,40 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 
 @app.task(name='screenshot', queue='main_scan_queue', base=RengineTask, bind=True)
 def screenshot(self, ctx={}, description=None):
-	"""Uses EyeWitness to gather screenshot of a domain and/or url.
-
+	"""Embedded Playwright Screenshot task.
+	
 	Args:
 		description (str, optional): Task description shown in UI.
 	"""
+	from reNgine.screenshot.tasks import take_screenshot_and_save
 
 	# Config
-	screenshots_path = f'{self.results_dir}/screenshots'
-	output_path = f'{self.results_dir}/screenshots/{self.filename}'
-	alive_endpoints_file = f'{self.results_dir}/endpoints_alive.txt'
 	config = self.yaml_configuration.get(SCREENSHOT) or {}
 	enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
 	intensity = config.get(INTENSITY) or self.yaml_configuration.get(INTENSITY, DEFAULT_SCAN_INTENSITY)
-	timeout = config.get(TIMEOUT) or self.yaml_configuration.get(TIMEOUT, DEFAULT_HTTP_TIMEOUT + 5)
-	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
-
+	
 	# If intensity is normal, grab only the root endpoints of each subdomain
 	strict = True if intensity == 'normal' else False
 
-	# Get URLs to take screenshot of
-	get_http_urls(
-		is_alive=enable_http_crawl,
-		strict=strict,
-		write_filepath=alive_endpoints_file,
-		get_only_default_urls=True,
-		ctx=ctx
-	)
-
-	# Send start notif
-	notification = Notification.objects.first()
-	send_output_file = notification.send_scan_output_file if notification else False
-
-	# Run cmd
-	proxy = get_random_proxy()
-	cmd = f'/usr/src/github/EyeWitness/eyewitness-venv/bin/python /usr/src/github/EyeWitness/Python/EyeWitness.py -f {alive_endpoints_file} -d {screenshots_path} --no-prompt'
-	cmd += f' --timeout {timeout}' if timeout > 0 else ''
-	cmd += f' --threads {threads}' if threads > 0 else ''
-	run_command(
-		cmd,
-		shell=False,
-		history_file=self.history_file,
-		scan_id=self.scan_id,
-		activity_id=self.activity_id,
-		proxy=proxy)
-	if not os.path.isfile(output_path):
-		logger.error(f'Could not load EyeWitness results at {output_path} for {self.domain.name}.')
-		return
-
-	# Loop through results and save objects in DB
-	screenshot_paths = []
-	required_cols = [
-		'Protocol',
-		'Port',
-		'Domain',
-		'Request Status',
-		'Screenshot Path'
-	]
-	with open(output_path, 'r', newline='') as file:
-		reader = csv.DictReader(file)
-		for row in reader:
-			parsed_row = {col: row[col] for col in required_cols if col in row}
-			protocol = parsed_row['Protocol']
-			port = parsed_row['Port']
-			subdomain_name = parsed_row['Domain']
-			status = parsed_row['Request Status']
-			screenshot_path = parsed_row['Screenshot Path']
-			logger.info(f'{protocol}:{port}:{subdomain_name}:{status}')
-			subdomain_query = Subdomain.objects.filter(name=subdomain_name)
-			if self.scan:
-				subdomain_query = subdomain_query.filter(scan_history=self.scan)
-			if status == 'Successful' and subdomain_query.exists():
-				subdomain = subdomain_query.first()
-				screenshot_paths.append(screenshot_path)
-				subdomain.screenshot_path = screenshot_path.replace('/usr/src/scan_results/', '')
-				subdomain.save()
-				logger.warning(f'Added screenshot for {subdomain.name} to DB')
-
-	# Remove all db, html extra files in screenshot results
-	run_command(
-		f'rm -rf {screenshots_path}/*.csv {screenshots_path}/*.db {screenshots_path}/*.js {screenshots_path}/*.html {screenshots_path}/*.css',
-		shell=True,
-		history_file=self.history_file,
-		scan_id=self.scan_id,
-		activity_id=self.activity_id)
-	run_command(
-		f'rm -rf {screenshots_path}/source',
-		shell=True,
-		history_file=self.history_file,
-		scan_id=self.scan_id,
-		activity_id=self.activity_id)
-
-	# Send finish notifs
-	screenshots_str = '• ' + '\n• '.join([f'`{path}`' for path in screenshot_paths])
-	self.notify(fields={'Screenshots': screenshots_str})
-	if send_output_file:
-		for path in screenshot_paths:
-			title = get_output_file_name(
-				self.scan_id,
-				self.subscan_id,
-				self.filename)
-			send_file_to_discord.delay(path, title)
-
-	# Strip metadata from screenshots
-	opsec = OpSecManager()
-	for path in screenshot_paths:
-		opsec.strip_metadata(path)
-
+	# Get subdomains to process
+	subdomains = Subdomain.objects.filter(scan_history=self.scan)
+	
+	# If strict/normal intensity, we only care about subdomains that are definitely alive
+	if strict:
+		subdomains = subdomains.filter(http_status__gt=0).exclude(http_url__isnull=True)
+	
+	logger.info(f"Starting Playwright screenshot capture for {subdomains.count()} subdomains...")
+	
+	success_count = 0
+	for subdomain in subdomains:
+		# The internal task handles browser lifecycle, metadata, and DB persistence
+		if take_screenshot_and_save(subdomain.id, self.scan_id, self.results_dir):
+			success_count += 1
+			
+	self.notify(fields={'Screenshots': f'Successfully captured {success_count} screenshots using Embedded Playwright.'})
+	
 	return True
+
 
 
 @app.task(name='port_scan', queue='main_scan_queue', base=RengineTask, bind=True)
@@ -1780,6 +1722,29 @@ def port_scan(self, hosts=[], ctx={}, description=None):
 		if created:
 			logger.warning(f'Added new port {port_number} to DB')
 
+		# Centralized Brute-Force Candidate Registration for Naabu findings
+		bf_protocols = {
+			21: 'ftp',
+			22: 'ssh',
+			23: 'telnet',
+			445: 'smb',
+			3389: 'rdp'
+		}
+		if port_number in bf_protocols:
+			from reNgine.utilities import save_auth_candidate
+			try:
+				save_auth_candidate(
+					scan_history=self.scan,
+					subdomain=subdomain,
+					target=host,
+					protocol=bf_protocols[port_number],
+					port=port_number,
+					source_tool='naabu',
+					tech_hint=f"Open Port {port_number}"
+				)
+			except Exception as e:
+				logger.error(f"Error registering AuthCandidate from Naabu port {port_number}: {e}")
+
 		if port_number in UNCOMMON_WEB_PORTS:
 			port.is_uncommon = True
 			port.save()
@@ -1900,7 +1865,10 @@ def nmap(
 		activity_id=self.activity_id)
 
 	# Get nmap XML results and convert to JSON
-	vulns = parse_nmap_results(output_file_xml, output_file)
+	nmap_results = parse_nmap_results(output_file_xml, output_file)
+	vulns = nmap_results['vulns']
+	discovered_services = nmap_results['services']
+	
 	with open(vulns_file, 'w') as f:
 		json.dump(vulns, f, indent=4)
 
@@ -1924,6 +1892,45 @@ def nmap(
 		vulns_str += f'• {str(vuln)}\n'
 		if created:
 			logger.warning(str(vuln))
+		
+		# Register Auth Candidates from vulnerability tags (like auth_portal)
+		if 'auth_portal' in vuln_data.get('tags', []):
+			from reNgine.utilities import save_auth_candidate
+			save_auth_candidate(
+				scan_history=self.scan,
+				target=vuln_data['http_url'],
+				protocol='http',
+				port=int(vuln_data['http_url'].split(':')[-1]) if ':' in vuln_data['http_url'] else 80,
+				source_tool='Nmap NSE',
+				metadata={'tags': vuln_data.get('tags'), 'nse_script': vuln_data.get('name')},
+				subdomain=self.subdomain,
+				endpoint=endpoint
+			)
+
+	# Register Auth Candidates from discovered services (SMB, RDP, etc.)
+	interesting_protocols = {
+		'microsoft-ds': 'smb',
+		'smb': 'smb',
+		'ms-wbt-server': 'rdp',
+		'rdp': 'rdp',
+		'ssh': 'ssh',
+		'ftp': 'ftp',
+		'telnet': 'telnet'
+	}
+	
+	from reNgine.utilities import save_auth_candidate
+	for svc in discovered_services:
+		proto = interesting_protocols.get(svc['service'])
+		if proto:
+			save_auth_candidate(
+				scan_history=self.scan,
+				target=svc['target'],
+				protocol=proto,
+				port=svc['port'],
+				source_tool='Nmap Service Discovery',
+				metadata={'banner': svc['banner']},
+				subdomain=self.subdomain
+			)
 
 	# Send only 1 notif for all vulns to reduce number of notifs
 	if len(vulns) > 0:
@@ -1932,7 +1939,7 @@ def nmap(
 			fields={'Vulnerabilities discovered': vulns_str},
 			add_meta_info=False)
 
-	# Automatic Trigger for Brute Force Scan
+	# Automatic Trigger for Brute Force Scan (Legacy Support for chaining)
 	auth_targets = []
 	for v in vulns:
 		if 'auth_portal' in v.get('tags', []):
@@ -2756,6 +2763,11 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		nm.sync_scan_results(self.scan_id)
 		nm.close()
 
+	# Trigger Intelligent Auth Candidate Extraction
+	from reNgine.auth_discovery_tasks import extract_auth_candidates
+	extract_auth_candidates.apply(args=(self,), kwargs={'ctx': ctx})
+
+
 
 @app.task(name='vulnerability_scan', queue='main_scan_queue', bind=True, base=RengineTask)
 def vulnerability_scan(self, urls=[], ctx={}, description=None):
@@ -2905,6 +2917,21 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 				output = parse_curl_output(response)
 				endpoint.http_status = output['http_status']
 				endpoint.save()
+
+		# Register Auth Candidate if Nuclei flagged it as login or auth
+		tags = line.get('info', {}).get('tags', [])
+		if any(tag in tags for tag in ['login', 'auth', 'admin', 'default-login', 'bruteforce', 'panel']):
+			from reNgine.utilities import save_auth_candidate
+			save_auth_candidate(
+				scan_history=self.scan,
+				target=http_url,
+				protocol='http',
+				port=int(urlparse(http_url).port or (443 if 'https' in http_url else 80)),
+				source_tool='Nuclei',
+				metadata={'tags': tags, 'template_id': line.get('template-id')},
+				subdomain=subdomain,
+				endpoint=endpoint
+			)
 
 		# Get or create Vulnerability object
 		vuln, _ = save_vulnerability(
@@ -4140,6 +4167,7 @@ def parse_nmap_results(xml_file, output_file=None):
 		.get('host', {})
 	)
 	all_vulns = []
+	services = []
 	if isinstance(hosts, dict):
 		hosts = [hosts]
 
@@ -4164,12 +4192,29 @@ def parse_nmap_results(xml_file, output_file=None):
 				ports = [ports]
 
 			for port in ports:
+				# Skip closed ports
+				state = port.get('state', {}).get('@state', 'unknown')
+				if state != 'open':
+					continue
+
 				url_vulns = []
 				port_number = port['@portid']
 				url = sanitize_url(f'{hostname}:{port_number}')
 				logger.info(f'Parsing nmap results for {hostname}:{port_number} ...')
 				if not port_number or not port_number.isdigit():
 					continue
+				
+				port_protocol = port['@protocol']
+				service = port.get('service', {})
+				service_name = service.get('@name', '').lower()
+				
+				# Register discovered service for brute-force candidates
+				services.append({
+					'target': hostname,
+					'port': int(port_number),
+					'service': service_name,
+					'banner': service.get('@product', '')
+				})
 				port_protocol = port['@protocol']
 				scripts = port.get('script', [])
 				if isinstance(scripts, dict):
@@ -4234,7 +4279,7 @@ def parse_nmap_results(xml_file, output_file=None):
 						vuln['http_url'] += vuln['http_path']
 					all_vulns.append(vuln)
 
-	return all_vulns
+	return {'vulns': all_vulns, 'services': services}
 
 
 def parse_nmap_https_redirect_output(script_output):
@@ -5479,6 +5524,26 @@ def save_endpoint(
 		endpoint.is_default = is_default
 		endpoint.discovered_date = timezone.now()
 		endpoint.save()
+
+		# Centralized Brute-Force Candidate Registration
+		auth_keywords = ['login', 'admin', 'auth', 'portal', 'controlpanel', 'signin', 'manage']
+		if any(k in http_url.lower() for k in auth_keywords):
+			from reNgine.utilities import save_auth_candidate
+			try:
+				parsed = urlparse(http_url)
+				port = parsed.port or (443 if parsed.scheme == 'https' else 80)
+				save_auth_candidate(
+					scan_history=endpoint.scan_history,
+					subdomain=endpoint.subdomain,
+					endpoint=endpoint,
+					target=parsed.hostname,
+					protocol='http',
+					port=port,
+					source_tool=endpoint_data.get('source_tool', 'discovery_engine'),
+					tech_hint=f"Discovered URL: {http_url}"
+				)
+			except Exception as e:
+				logger.error(f"Error registering AuthCandidate from endpoint {http_url}: {e}")
 		subscan_id = ctx.get('subscan_id')
 		if subscan_id:
 			endpoint.endpoint_subscan_ids.add(subscan_id)
@@ -6004,72 +6069,46 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 @app.task(name='brute_force_scan', queue='main_scan_queue', base=RengineTask, bind=True)
 def brute_force_scan(self, targets=[], ctx={}, description=None):
 	"""
-	Perform brute-force authentication testing on selected targets.
+	Perform centralized brute-force orchestration.
+	1. Pull all pending candidates from AuthCandidate table
+	2. Execute via BruteForceOrchestrator with OpSec settings
 	"""
-	logger.info(f'Running Brute Force Scan on {len(targets)} targets...')
+	logger.info(f"Starting Centralized Brute Force Orchestration for Scan {self.scan_id}")
 	
-	# Load configuration from ctx
-	# Supporting multiple wordlists as requested ['wordlist1', 'wordlist2']
-	users_wordlists = ctx.get('users_wordlist', [DEFAULT_AUTH_USER_WORDLIST])
-	pass_wordlists = ctx.get('pass_wordlist', [DEFAULT_AUTH_PASS_WORDLIST])
+	# Prerequisite: Run Intelligent Form Extraction (Tier 3)
+	from reNgine.auth_discovery_tasks import extract_auth_candidates
+	extract_auth_candidates.apply(args=(self,), kwargs={'ctx': ctx})
 	
-	# Handle both string and list inputs for robustness
-	if isinstance(users_wordlists, str): users_wordlists = [users_wordlists]
-	if isinstance(pass_wordlists, str): pass_wordlists = [pass_wordlists]
+	# Initialize Orchestrator
+	from reNgine.opsec_utils import BruteForceOrchestrator
+	orchestrator = BruteForceOrchestrator(self.scan)
 	
-	service = ctx.get('service', 'http')
-	port = ctx.get('port', None)
+	# Execute orchestration
+	results = orchestrator.run_orchestration(ctx=ctx)
 	
-	# Load and merge wordlists
-	users = []
-	for wl in users_wordlists:
-		path = os.path.join(AUTH_WORDLIST_PATH, wl)
-		if os.path.exists(path):
-			with open(path, 'r') as f:
-				users.extend([l.strip() for l in f.readlines() if l.strip()])
-		else:
-			logger.warning(f"Wordlist not found: {path}")
-	
-	passwords = []
-	for wl in pass_wordlists:
-		path = os.path.join(AUTH_WORDLIST_PATH, wl)
-		if os.path.exists(path):
-			with open(path, 'r') as f:
-				passwords.extend([l.strip() for l in f.readlines() if l.strip()])
-		else:
-			logger.warning(f"Wordlist not found: {path}")
-
-    # Remove duplicates
-	users = list(set(users))
-	passwords = list(set(passwords))
-
-	if not users or not passwords:
-		logger.error("No valid credentials found in wordlists. Skipping brute force.")
-		return False
-
 	total_found = 0
-	for target in targets:
-		logger.warning(f"Starting brute-force orchestration for {target} ({service})")
-		orchestrator = BruteForceOrchestrator(target, service, port, users, passwords)
+	for res in results:
+		total_found += 1
+		# Determine URL for reporting
+		if res['service'] == 'http':
+			report_url = res['target']
+		else:
+			report_url = f"{res['service']}://{res['target']}:{res['port']}"
+
+		vuln_data = {
+			'name': f'Successful Brute-Force: {res["service"].upper()}',
+			'severity': 4, # Critical
+			'description': f'Successfully identified valid credentials on {res["target"]} via Hydra.\n\n'
+						 f'User: {res["user"]}\n'
+						 f'Password: {res["password"]}\n'
+						 f'Service: {res["service"]}\n'
+						 f'Port: {res["port"]}',
+			'http_url': report_url,
+			'type': 'Broken Authentication'
+		}
+		save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
 		
-		# Execute with 1-10 attempts per proxy rotation
-		results = orchestrator.run(min_attempts=1, max_attempts=10, stop_on_success=True)
-		
-		for res in results:
-			total_found += 1
-			vuln_data = {
-				'name': f'Successful Brute-Force: {res["service"]}',
-				'severity': 4, # Critical
-				'description': f'Successfully identified valid credentials via Medusa on {res["target"]}.\n\n'
-							 f'User: {res["user"]}\n'
-							 f'Password: {res["password"]}\n'
-							 f'Service: {res["service"]}',
-				'http_url': res["target"],
-				'type': 'Broken Authentication'
-			}
-			save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
-	
-	logger.info(f"Brute Force Scan completed. Targets: {len(targets)}, Credentials Found: {total_found}")
+	logger.info(f"Brute Force Orchestration completed. Credentials Found: {total_found}")
 	return True
 
 @app.task(name='pull_ollama_model', queue='main_scan_queue')

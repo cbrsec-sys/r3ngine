@@ -30,6 +30,8 @@ from reNgine.common_func import *
 from reNgine.database_utils import *
 from reNgine.definitions import (
 	ABORTED_TASK,
+	RUNNING_TASK,
+	SUCCESS_TASK,
 	PERM_MODIFY_TARGETS,
 	PERM_MODIFY_SCAN_CONFIGURATIONS,
 	PERM_MODIFY_WORDLISTS,
@@ -724,7 +726,9 @@ class UniversalSearch(APIView):
 			Q(cname__icontains=query) |
 			Q(page_title__icontains=query) |
 			Q(http_url__icontains=query)
-		).distinct('name')
+		).distinct('name').prefetch_related(
+			'screenshots', 'technologies', 'ip_addresses', 'ip_addresses__ports'
+		)
 		subdomain_data = SubdomainSerializer(subdomain, many=True).data
 		response['results']['subdomains'] = subdomain_data
 
@@ -1386,6 +1390,11 @@ class StopScan(APIView):
 				for task_id in task_ids:
 					app.control.revoke(task_id, terminate=True, signal='SIGKILL')
 
+				# Also abort associated subscans
+				subscans = SubScan.objects.filter(scan_history=scan, status=RUNNING_TASK)
+				for subscan in subscans:
+					abort_subscan(subscan)
+
 				tasks = (
 					ScanActivity.objects
 					.filter(scan_of=scan)
@@ -1393,6 +1402,7 @@ class StopScan(APIView):
 					.order_by('-pk')
 				)
 				for task in tasks:
+					app.control.revoke(task.celery_id, terminate=True, signal='SIGKILL')
 					task.status = ABORTED_TASK
 					task.time = timezone.now()
 					task.save()
@@ -1448,7 +1458,7 @@ class StopScan(APIView):
 		for subscan_id in subscan_ids:
 			try:
 				subscan = SubScan.objects.get(id=subscan_id)
-				if subscan.scan_status == SUCCESS_TASK or subscan.scan_status == ABORTED_TASK:
+				if subscan.status == SUCCESS_TASK or subscan.status == ABORTED_TASK:
 					continue
 				response = abort_subscan(subscan)
 			except Exception as e:
@@ -2531,7 +2541,9 @@ class ListSubdomains(APIView):
 		port = req.query_params.get('port')
 		tech = req.query_params.get('tech')
 
-		subdomains = Subdomain.objects.filter(target_domain__project__slug=project) if project else Subdomain.objects.all()
+		subdomains = Subdomain.objects.all()
+		if project:
+			subdomains = subdomains.filter(target_domain__project__slug=project)
 
 		if scan_id:
 			subdomain_query = subdomains.filter(scan_history__id=scan_id).distinct('name')
@@ -2539,6 +2551,11 @@ class ListSubdomains(APIView):
 			subdomain_query = subdomains.filter(target_domain__id=target_id).distinct('name')
 		else:
 			subdomain_query = subdomains.all().distinct('name')
+
+		# Prefetch for performance
+		subdomain_query = subdomain_query.prefetch_related(
+			'screenshots', 'technologies', 'ip_addresses', 'ip_addresses__ports'
+		)
 
 		if ip_address:
 			subdomain_query = subdomain_query.filter(ip_addresses__address=ip_address)
@@ -2554,7 +2571,6 @@ class ListSubdomains(APIView):
 
 		if 'only_important' in req.query_params:
 			subdomain_query = subdomain_query.filter(is_important=True)
-
 
 		if 'no_lookup_interesting' in req.query_params:
 			serializer = OnlySubdomainNameSerializer(subdomain_query, many=True)
@@ -2667,12 +2683,14 @@ class SubdomainsViewSet(viewsets.ModelViewSet):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
 		if scan_id:
+			queryset = Subdomain.objects.filter(scan_history__id=scan_id).prefetch_related(
+				'screenshots', 'technologies', 'ip_addresses', 'ip_addresses__ports'
+			)
 			if 'only_screenshot' in self.request.query_params:
-				return (
-					Subdomain.objects
-					.filter(scan_history__id=scan_id)
-					.exclude(screenshot_path__isnull=True))
-			return Subdomain.objects.filter(scan_history=scan_id)
+				return queryset.filter(
+					Q(screenshot_path__isnull=False) | Q(screenshots__isnull=False)
+				).distinct()
+			return queryset
 
 	def paginate_queryset(self, queryset, view=None):
 		if 'no_page' in self.request.query_params:
