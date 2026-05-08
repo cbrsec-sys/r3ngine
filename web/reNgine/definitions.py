@@ -192,14 +192,7 @@ SEMGREP_SEVERITY_MAP = {
     'ERROR': 3,
 }
 
-# trivy
-TRIVY_SEVERITY_MAP = {
-    'UNKNOWN': 0,
-    'LOW': 1,
-    'MEDIUM': 2,
-    'HIGH': 3,
-    'CRITICAL': 4,
-}
+
 
 # s3scanner
 S3SCANNER_DEFAULT_PROVIDERS = ['gcp', 'aws', 'digitalocean', 'dreamhost', 'linode']

@@ -50,7 +50,7 @@ The core scanning engines have been upgraded to provide "Verification-First" rec
 *   **Attack Path Modeling Engine (APME)**: A production-grade, graph-based modeling system utilizing **Neo4j**. It discovers feasible attack routes (e.g., SQLi → DB Access → Pivot) based on a dynamic rules engine. **v3 Update**: Expanded rule set with 20+ sophisticated security patterns and automated "Goal Injection" for robust path discovery.
 *   **Exploitation Readiness Layer (ERL)**: A safe, modular validation layer that converts potential findings into **"Verified" status** using containerized, non-destructive validation tools.
 *   **Adaptive Stress & Resilience Engine (ASRE)**: Full-scale endpoint stress testing directly within the workflow, orchestrating `k6`, `wrk`, `hping3`, and `Locust` with real-time telemetry ingestion.
-*   **Vulnerability Correlation Engine**: Unifies findings from **Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, and Retire.js** into a prioritized threat landscape.
+*   **Vulnerability Correlation Engine**: Unifies findings from **Nuclei, Semgrep, Gitleaks, Acunetix, and Retire.js** into a prioritized threat landscape.
 *   **Centralized Brute-Force Orchestration**: A multi-tiered authentication attack pipeline that supports **multi-service targeting (SSH, FTP, HTTP, SMB, RDP, Telnet)**. Centralizes targets from Nmap, Nuclei, and intelligent form extraction into a unified `AuthCandidate` queue, orchestrated via **Hydra** with full OpSec controls.
 *   **Autonomous Plugin Management**: A powerful, modular system to extend reNgine with custom engines and dynamic UI components. Features **Atomic Installation** with background tool installation (`tools.yaml`), automated engine registration via fixtures, and persistent startup verification.
 
