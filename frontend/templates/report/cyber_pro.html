@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8" />
-    <title>Enterprise Security Assessment Report</title>
+    <title>Cyber Pro Security Intelligence Report</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     <style>
         @page {
@@ -65,86 +65,6 @@
         .severity-low { background-color: #eab308; color: black; }
         .severity-info { background-color: #3b82f6; color: white; }
         .severity-unknown { background-color: #94a3b8; color: white; }
-
-        /* Footer */
-        .report-footer {
-            margin-top: 10mm;
-            padding-top: 5mm;
-            border-top: 1px solid #e2e8f0;
-            font-size: 8pt;
-            color: #64748b;
-            text-align: center;
-        }
-
-        /* Cover Page */
-        #cover {
-            height: 297mm;
-            width: 210mm;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            background-color: #ffffff;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .cover-header {
-            padding: 40mm 20mm 20mm 20mm;
-        }
-
-        .cover-logo {
-            max-width: 60mm;
-            margin-bottom: 20mm;
-        }
-
-        .report-title {
-            font-size: 32pt;
-            font-weight: 700;
-            color: {{primary_color|default:"#0f172a"}};
-            margin: 0;
-            line-height: 1.1;
-        }
-
-        .report-subtitle {
-            font-size: 18pt;
-            font-weight: 300;
-            color: #64748b;
-            margin-top: 5mm;
-        }
-
-        .cover-footer {
-            padding: 20mm;
-            background-color: {{secondary_color|default:"#f8fafc"}};
-            border-top: 1px solid #e2e8f0;
-        }
-
-        .cover-details {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10mm;
-        }
-
-        .detail-item label {
-            display: block;
-            font-size: 8pt;
-            text-transform: uppercase;
-            color: #94a3b8;
-            margin-bottom: 2mm;
-        }
-
-        .detail-item span {
-            font-size: 11pt;
-            font-weight: 500;
-            color: #1e293b;
-        }
-
-        /* Confidentiality Page */
-        .confidential-notice {
-            border: 1px solid #e2e8f0;
-            padding: 10mm;
-            background-color: #fff;
-            margin-top: 40mm;
-        }
 
         /* Typography */
         h1, h2, h3, h4 {
@@ -208,31 +128,117 @@
             content: target-counter(attr(data-href), page);
         }
 
-        /* Finding Summary Box */
-        .risk-grid {
+        /* Style C: Modern Dark Pro Cover */
+        #cover {
+            height: 297mm;
+            width: 210mm;
+            background-color: {{secondary_color|default:"#0f172a"}};
+            position: relative;
+            overflow: hidden;
+            color: #ffffff;
+        }
+
+        .border-accent {
+            position: absolute;
+            border: 1px solid {{primary_color|default:"#00f3ff"}};
+            opacity: 0.3;
+        }
+        .accent-1 { top: 10mm; left: 10mm; right: 40mm; height: 1px; }
+        .accent-2 { top: 10mm; right: 10mm; bottom: 40mm; width: 1px; }
+        .accent-3 { bottom: 10mm; right: 10mm; left: 40mm; height: 1px; }
+        .accent-4 { bottom: 10mm; left: 10mm; top: 40mm; width: 1px; }
+
+        .corner-mark {
+            position: absolute;
+            width: 30mm;
+            height: 30mm;
+            border: 4px solid {{primary_color|default:"#00f3ff"}};
+            opacity: 0.8;
+        }
+        .top-left { top: 0; left: 0; border-right: none; border-bottom: none; }
+        
+        .content-box {
+            position: absolute;
+            top: 60mm;
+            left: 20mm;
+            right: 20mm;
+        }
+
+        .report-type-tag {
+            display: inline-block;
+            background-color: {{primary_color|default:"#00f3ff"}};
+            color: {{secondary_color|default:"#0f172a"}};
+            padding: 2mm 6mm;
+            font-size: 10pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8mm;
+        }
+
+        .cover-report-title {
+            font-size: 42pt;
+            font-weight: 200;
+            letter-spacing: -1px;
+            line-height: 1;
+            margin: 0;
+            color: white;
+        }
+
+        .cover-report-title b {
+            font-weight: 800;
+            color: {{primary_color|default:"#00f3ff"}};
+        }
+
+        .target-box {
+            margin-top: 20mm;
+            padding: 10mm;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03);
+        }
+
+        .metadata-grid {
+            position: absolute;
+            bottom: 30mm;
+            left: 20mm;
+            right: 20mm;
             display: grid;
             grid-template-columns: repeat(3, 1fr);
-            gap: 5mm;
+            gap: 10mm;
+            font-size: 9pt;
+        }
+
+        .meta-item label {
+            display: block;
+            color: {{primary_color|default:"#00f3ff"}};
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 1mm;
+            opacity: 0.8;
+        }
+
+        .footer-strip {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 5mm;
+            background-color: {{primary_color|default:"#00f3ff"}};
+        }
+
+        /* Charts */
+        .chart-container {
+            text-align: center;
+            padding: 10mm;
+            background-color: #ffffff;
+            border: 1px solid #f1f5f9;
+            border-radius: 2mm;
             margin-bottom: 10mm;
         }
 
-        .risk-box {
-            padding: 5mm;
-            border-radius: 2mm;
-            text-align: center;
-            border: 1px solid #e2e8f0;
-        }
-
-        .risk-count {
-            font-size: 24pt;
-            font-weight: 700;
-            display: block;
-        }
-
-        .risk-label {
-            font-size: 9pt;
-            text-transform: uppercase;
-            color: #64748b;
+        .chart-img {
+            max-width: 120mm;
+            height: auto;
         }
 
         /* Finding Card */
@@ -295,33 +301,30 @@
             font-size: 9pt;
         }
 
-        .meta-item b {
-            color: #475569;
-        }
-
-        /* Charts */
-        .chart-container {
-            text-align: center;
-            padding: 10mm;
-            background-color: #ffffff;
-            border: 1px solid #f1f5f9;
-            border-radius: 2mm;
+        .risk-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5mm;
             margin-bottom: 10mm;
         }
 
-        .chart-img {
-            max-width: 120mm;
-            height: auto;
+        .risk-box {
+            padding: 5mm;
+            border-radius: 2mm;
+            text-align: center;
+            border: 1px solid #e2e8f0;
         }
 
-        /* Links */
-        a {
-            color: #3b82f6;
-            text-decoration: none;
+        .risk-count {
+            font-size: 24pt;
+            font-weight: 700;
+            display: block;
         }
-        
-        .anchor-link {
-            color: inherit;
+
+        .risk-label {
+            font-size: 9pt;
+            text-transform: uppercase;
+            color: #64748b;
         }
 
     </style>
@@ -330,45 +333,51 @@
 <body>
     <!-- Cover Page -->
     <article id="cover">
-        <div class="cover-header">
+        <div class="corner-mark top-left"></div>
+        <div class="border-accent accent-1"></div>
+        <div class="border-accent accent-2"></div>
+        <div class="border-accent accent-3"></div>
+        <div class="border-accent accent-4"></div>
+
+        <div class="content-box">
             {% if company_logo %}
-            <img src="{{company_logo}}" class="cover-logo" />
+            <img src="{{company_logo}}" style="max-width: 50mm; margin-bottom: 10mm; display: block;" />
             {% endif %}
-            <div class="report-title">{{ report_name }}</div>
-            <div class="report-subtitle">Assessment for {{ scan_object.domain.name }}</div>
+            <div class="report-type-tag">Technical Intelligence</div>
+            <h1 class="cover-report-title">
+                {% with name_parts=report_name.split %}
+                    {{ name_parts.0 }} <b>{{ name_parts.1 }} {{ name_parts.2 }}</b>
+                {% endwith %}
+            </h1>
+            
+            <div class="target-box">
+                <div style="font-size: 10pt; opacity: 0.6; text-transform: uppercase; margin-bottom: 2mm;">Assessment Target</div>
+                <div style="font-size: 20pt; font-weight: 300;">{{ scan_object.domain.name }}</div>
+            </div>
         </div>
 
-        <div class="cover-footer">
-            <div class="cover-details">
-                <div class="detail-item">
-                    <label>Client</label>
-                    <span>{{ scan_object.domain.name }}</span>
-                </div>
-                <div class="detail-item">
-                    <label>Date</label>
-                    <span>{% now "F j, Y" %}</span>
-                </div>
-                <div class="detail-item">
-                    <label>Prepared By</label>
-                    <span>{{company_name}}</span>
-                </div>
-                <div class="detail-item">
-                    <label>Report ID</label>
-                    <span>RE-{{ scan_object.id }}-{% now "Ymd" %}</span>
-                </div>
+        <div class="metadata-grid">
+            <div class="meta-item">
+                <label>Issued By</label>
+                <div>{{ company_name }}</div>
             </div>
-            {% if show_rengine_banner %}
-            <div style="margin-top: 10mm; font-size: 8pt; color: #94a3b8; text-align: center;">
-                Generated by reNgine Enterprise Security Platform
+            <div class="meta-item">
+                <label>Date</label>
+                <div>{% now "F j, Y" %}</div>
             </div>
-            {% endif %}
+            <div class="meta-item">
+                <label>Classification</label>
+                <div>PROPRIETARY / CONFIDENTIAL</div>
+            </div>
         </div>
+
+        <div class="footer-strip"></div>
     </article>
 
     <!-- Confidentiality Page -->
     <article class="page-break">
         <h1>Confidentiality Notice</h1>
-        <div class="confidential-notice">
+        <div style="border: 1px solid #e2e8f0; padding: 10mm; background-color: #fff; margin-top: 40mm;">
             <p><b>CONFIDENTIALITY NOTICE:</b> This report contains highly sensitive information regarding the security posture of <b>{{ scan_object.domain.name }}</b>. The information contained herein is intended solely for the use of the individual or entity to which it is addressed and others authorized to receive it.</p>
             <p>Disclosure, copying, distribution, or taking any action in reliance on the contents of this information by unauthorized parties is strictly prohibited. The findings and recommendations presented in this report represent the security state of the target at the time of the assessment.</p>
             <p>Security is a continuous process, and this report should be used as a tool to guide remediation efforts and improve overall security resilience.</p>
@@ -537,8 +546,6 @@
     <!-- Summary Table -->
     <article class="page-break" id="finding-summary">
         <h1>Summary of Findings</h1>
-        <p>The following table provides a high-level summary of all identified security findings. Click on a finding name to view technical details.</p>
-        
         <table>
             <thead>
                 <tr>
@@ -552,7 +559,7 @@
                 {% for vulnerability in unique_vulnerabilities %}
                 <tr>
                     <td>{{ forloop.counter }}</td>
-                    <td><a href="#vuln_{{ vulnerability.name|slugify }}" class="anchor-link">{{ vulnerability.name }}</a></td>
+                    <td><a href="#vuln_{{ vulnerability.name|slugify }}">{{ vulnerability.name }}</a></td>
                     <td style="text-align: center;">
                         <span class="severity-badge {% if vulnerability.severity == 4 %}severity-critical{% elif vulnerability.severity == 3 %}severity-high{% elif vulnerability.severity == 2 %}severity-medium{% elif vulnerability.severity == 1 %}severity-low{% elif vulnerability.severity == 0 %}severity-info{% else %}severity-unknown{% endif %}">
                             {% if vulnerability.severity == 4 %}Critical{% elif vulnerability.severity == 3 %}High{% elif vulnerability.severity == 2 %}Medium{% elif vulnerability.severity == 1 %}Low{% elif vulnerability.severity == 0 %}Info{% else %}Unknown{% endif %}
@@ -563,217 +570,31 @@
                 {% endfor %}
             </tbody>
         </table>
-
-        {% if interesting_subdomains %}
-        <h3>Interesting Assets</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 10mm;">#</th>
-                    <th>Subdomain</th>
-                    <th>Page Title</th>
-                    <th style="width: 20mm; text-align: center;">Status</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for subdomain in interesting_subdomains %}
-                <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td>{{ subdomain.name }}</td>
-                    <td>{{ subdomain.page_title|default:"-" }}</td>
-                    <td style="text-align: center;">{{ subdomain.http_status|default:"-" }}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% endif %}
     </article>
-
-    <!-- Reconnaissance Details -->
-    {% if show_recon %}
-    <article class="page-break" id="recon-findings">
-        <h1>Asset Inventory</h1>
-        <p>A total of <b>{{ scan_object.get_subdomain_count }}</b> subdomains were identified during the assessment. The table below lists the active assets and their security status.</p>
-        
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 10mm;">#</th>
-                    <th>Subdomain</th>
-                    <th>IP Address(es)</th>
-                    <th style="width: 15mm; text-align: center;">Status</th>
-                    {% if show_vuln %}<th style="width: 20mm; text-align: center;">Vulns</th>{% endif %}
-                </tr>
-            </thead>
-            <tbody>
-                {% for subdomain in subdomains %}
-                <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td><a href="#subdomain_{{ subdomain.name|slugify }}" class="anchor-link">{{ subdomain.name }}</a></td>
-                    <td>
-                        {% for ip in subdomain.ip_addresses.all %}
-                        {{ ip.address }}{% if not forloop.last %}, {% endif %}
-                        {% empty %}-
-                        {% endfor %}
-                    </td>
-                    <td style="text-align: center;">{{ subdomain.http_status|default:"-" }}</td>
-                    {% if show_vuln %}
-                    <td style="text-align: center;">{{ subdomain.get_total_vulnerability_count|default:"0" }}</td>
-                    {% endif %}
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-
-        {% if ip_addresses %}
-        <h3>Network Infrastructure (IP Assets)</h3>
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 10mm;">#</th>
-                    <th>IP Address</th>
-                    <th>Open Ports</th>
-                    <th>Geo Location</th>
-                    <th style="width: 20mm; text-align: center;">CDN</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for ip in ip_addresses %}
-                <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td><b>{{ ip.address }}</b></td>
-                    <td>
-                        {% for port in ip.ports.all %}
-                        {{ port.number }}/{{ port.service_name }}{% if not forloop.last %}, {% endif %}
-                        {% empty %}-
-                        {% endfor %}
-                    </td>
-                    <td>{{ ip.geo_iso|default:"-" }}</td>
-                    <td style="text-align: center;">{% if ip.is_cdn %}Yes{% else %}No{% endif %}</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-        {% endif %}
-    </article>
-
-    <article class="page-break">
-        <h1>Detailed Asset Information</h1>
-        <p>Technical details for discovered subdomains, including resolved IP addresses and open network services.</p>
-        
-        {% for subdomain in subdomains %}
-        <div class="finding-card" id="subdomain_{{ subdomain.name|slugify }}" style="border-left: 4px solid #3b82f6;">
-            <div class="finding-header" style="background-color: #f8fafc;">
-                <h4 class="finding-title">{{ subdomain.name }}</h4>
-                <span class="severity-badge" style="background-color: #3b82f6; color: white;">HTTP {{ subdomain.http_status|default:"N/A" }}</span>
-            </div>
-            <div class="finding-body" style="padding: 4mm;">
-                <div class="finding-meta" style="margin-bottom: 0;">
-                    <div class="meta-item"><b>Page Title:</b> {{ subdomain.page_title|default:"N/A" }}</div>
-                    <div class="meta-item"><b>Content Type:</b> {{ subdomain.content_type|default:"N/A" }}</div>
-                    <div class="meta-item"><b>Web Server:</b> {{ subdomain.server|default:"N/A" }}</div>
-                    <div class="meta-item"><b>Technologies:</b> {{ subdomain.technologies|default:"N/A" }}</div>
-                </div>
-                
-                {% if subdomain.ip_addresses.all %}
-                <div class="mt-4">
-                    <span class="section-label">Resolved IPs & Ports</span>
-                    <ul style="margin: 0; font-size: 9pt;">
-                        {% for ip in subdomain.ip_addresses.all %}
-                        <li>
-                            <b>{{ ip.address }}</b>
-                            {% if ip.ports.all %}
-                            (Ports: {% for port in ip.ports.all %}{{ port.number }}/{{ port.service_name }}{% if not forloop.last %}, {% endif %}{% endfor %})
-                            {% endif %}
-                        </li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-
-                {% if show_vuln and subdomain.get_vulnerabilities_without_info %}
-                <div class="mt-4">
-                    <span class="section-label">Security Findings</span>
-                    <ul style="margin: 0; font-size: 9pt;">
-                        {% regroup subdomain.get_vulnerabilities_without_info by name as vuln_list %}
-                        {% for vuln in vuln_list %}
-                        <li><a href="#vuln_{{ vuln.grouper|slugify }}">{{ vuln.grouper }}</a></li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
-            </div>
-        </div>
-        {% endfor %}
-    </article>
-    {% endif %}
 
     <!-- Detailed Findings -->
     {% if show_vuln %}
     <article class="page-break" id="detailed-findings">
         <h1>Technical Finding Details</h1>
-        
         {% regroup all_vulnerabilities by name as grouped_vulnerabilities %}
         {% for group in grouped_vulnerabilities %}
         {% with vulnerability=group.list.0 %}
         <div class="finding-card" id="vuln_{{ vulnerability.name|slugify }}">
             <div class="finding-header {% if vulnerability.severity == 4 %}severity-critical{% elif vulnerability.severity == 3 %}severity-high{% elif vulnerability.severity == 2 %}severity-medium{% elif vulnerability.severity == 1 %}severity-low{% elif vulnerability.severity == 0 %}severity-info{% else %}severity-unknown{% endif %}">
-                <h4 class="finding-title">{{ vulnerability.name }}</h4>
-                <span class="severity-badge bg-secondary text-primary">
+                <h4 class="finding-title" style="color: white;">{{ vulnerability.name }}</h4>
+                <span class="severity-badge" style="background: white; color: black;">
                     {% if vulnerability.severity == 4 %}Critical{% elif vulnerability.severity == 3 %}High{% elif vulnerability.severity == 2 %}Medium{% elif vulnerability.severity == 1 %}Low{% elif vulnerability.severity == 0 %}Info{% else %}Unknown{% endif %}
                 </span>
             </div>
-            
             <div class="finding-body">
                 <div class="finding-meta">
                     <div class="meta-item"><b>Source:</b> {{ vulnerability.source|upper }}</div>
                     <div class="meta-item"><b>CVSS Score:</b> {{ vulnerability.cvss_score|default:"N/A" }}</div>
-                    <div class="meta-item"><b>CVE:</b> 
-                        {% for cve in vulnerability.cve_ids.all %}{{ cve.name }}{% if not forloop.last %}, {% endif %}{% empty %}N/A{% endfor %}
-                    </div>
-                    <div class="meta-item"><b>CWE:</b> 
-                        {% for cwe in vulnerability.cwe_ids.all %}{{ cwe.name }}{% if not forloop.last %}, {% endif %}{% empty %}N/A{% endfor %}
-                    </div>
-                    {% if vulnerability.cvss_metrics %}
-                    <div class="meta-item" style="grid-column: span 2;"><b>CVSS Metrics:</b> <code>{{ vulnerability.cvss_metrics }}</code></div>
-                    {% endif %}
                 </div>
-
                 <div class="finding-section">
                     <span class="section-label">Description</span>
                     <p>{{ vulnerability.description|linebreaks }}</p>
                 </div>
-                
-                {% if vulnerability.exploit_url %}
-                <div class="finding-section">
-                    <span class="section-label">Exploit Reference</span>
-                    <p><a href="{{ vulnerability.exploit_url }}" target="_blank">{{ vulnerability.exploit_url }}</a></p>
-                </div>
-                {% endif %}
-
-                {% if vulnerability.impact %}
-                <div class="finding-section">
-                    <span class="section-label">Impact</span>
-                    <p>{{ vulnerability.impact|linebreaks }}</p>
-                </div>
-                {% endif %}
-
-                {% if vulnerability.remediation %}
-                <div class="finding-section">
-                    <span class="section-label">Remediation</span>
-                    <p>{{ vulnerability.remediation|linebreaks }}</p>
-                </div>
-                {% endif %}
-
-                {% if vulnerability.attack_scenario %}
-                <div class="finding-section" style="background-color: #fff1f2; border-left: 4px solid #be123c; padding: 4mm; margin-top: 4mm;">
-                    <span class="section-label" style="color: #be123c;">Exploitation Scenario (Attacker Perspective)</span>
-                    <div class="attack-scenario-content">
-                        {{ vulnerability.attack_scenario | safe }}
-                    </div>
-                </div>
-                {% endif %}
-
                 <div class="finding-section">
                     <span class="section-label">Affected Asset(s)</span>
                     <div style="background-color: #f1f5f9; padding: 3mm; border-radius: 1mm; font-family: monospace; font-size: 8pt;">
@@ -782,58 +603,34 @@
                         {% endfor %}
                     </div>
                 </div>
-
-                {% if vulnerability.references.all %}
-                <div class="finding-section">
-                    <span class="section-label">References</span>
-                    <ul style="margin: 0; padding-left: 5mm; font-size: 9pt;">
-                        {% for ref in vulnerability.references.all %}
-                        <li><a href="{{ ref.url }}" target="_blank">{{ ref.url }}</a></li>
-                        {% endfor %}
-                    </ul>
-                </div>
-                {% endif %}
             </div>
         </div>
         {% endwith %}
         {% endfor %}
     </article>
     {% endif %}
-    
+
     <!-- Attack Surface Map -->
     {% if attack_surface_map_image %}
     <article class="page-break" id="attack-surface-map">
         <h1>Attack Surface Map</h1>
-        <p>The following diagram visualizes the relationships between identified assets, services, and vulnerabilities, providing a holistic view of the target's attack surface.</p>
+        <p>The following diagram visualizes the relationships between identified assets, services, and vulnerabilities.</p>
         <div class="chart-container" style="margin-top: 10mm; height: auto;">
             <img class="chart-img" src="data:image/png;base64,{{ attack_surface_map_image }}" style="max-height: 180mm;" />
-            <p style="font-size: 8pt; color: #94a3b8; margin-top: 5mm;">Fig 3: Visual representation of the infrastructure relationships</p>
         </div>
     </article>
     {% endif %}
 
     <!-- Final Conclusion -->
-    <article class="page-break">
+    <article class="page-break" id="conclusion">
         <h1>Conclusion & Next Steps</h1>
-        <div class="summary-content">
-            {% if enable_llm_report_generation %}
+        {% if enable_llm_report_generation %}
+        <div class="llm-section">
             {{ llm_conclusion | safe }}
-            {% else %}
-            <p>This security assessment has identified several areas for improvement in the security posture of <b>{{ scan_object.domain.name }}</b>. We recommend prioritizing the remediation of Critical and High severity findings as soon as possible.</p>
-            <p>Following remediation, a re-scan should be performed to verify that the identified vulnerabilities have been successfully addressed and that no new issues have been introduced.</p>
-            {% endif %}
         </div>
-        
-        <h3 class="mt-8">End of Report</h3>
-        <div class="text-center" style="margin-top: 20mm; color: #94a3b8;">
-            {% if show_footer %}
-            <div class="report-footer">
-                {{ footer_text }}
-            </div>
-            {% endif %}
-            <p>Report ID: RE-{{ scan_object.id }}-{% now "Ymd" %}</p>
-            <p>© {% now "Y" %} {{ company_name }}. All rights reserved.</p>
-        </div>
+        {% else %}
+        <p>The assessment revealed several areas for security improvement. Prioritize the remediation of Critical and High severity findings to significantly reduce the risk profile.</p>
+        {% endif %}
     </article>
 </body>
 

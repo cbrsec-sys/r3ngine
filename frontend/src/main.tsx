@@ -8,6 +8,8 @@ import './index.css';
 import '@fontsource/orbitron';
 // @ts-ignore
 import '@fontsource/inter';
+// @ts-ignore
+import '@fontsource/black-ops-one';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

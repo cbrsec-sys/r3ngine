@@ -11,7 +11,7 @@ import {
 } from '@mui/material';
 import { Settings as SettingsIcon, Delete as DeleteIcon } from '@mui/icons-material';
 import type { Plugin } from '../api/pluginsApi';
-import { useTogglePlugin } from '../api/pluginsApi';
+import { useTogglePlugin, useDeletePlugin } from '../api/pluginsApi';
 
 interface Props {
   plugin: Plugin;
@@ -19,9 +19,16 @@ interface Props {
 
 const PluginCard: React.FC<Props> = ({ plugin }) => {
   const toggleMutation = useTogglePlugin();
+  const deleteMutation = useDeletePlugin();
 
   const handleToggle = () => {
     toggleMutation.mutate({ slug: plugin.slug, is_enabled: !plugin.is_enabled });
+  };
+
+  const handleDelete = () => {
+    if (window.confirm(`Are you sure you want to delete the plugin "${plugin.name}"? This will remove all associated files.`)) {
+      deleteMutation.mutate(plugin.slug);
+    }
   };
 
   return (
@@ -53,6 +60,7 @@ const PluginCard: React.FC<Props> = ({ plugin }) => {
             checked={plugin.is_enabled} 
             onChange={handleToggle}
             color="primary" 
+            disabled={toggleMutation.isPending}
           />
         </Box>
 
@@ -79,7 +87,12 @@ const PluginCard: React.FC<Props> = ({ plugin }) => {
             <IconButton size="small" sx={{ color: 'text.secondary' }}>
               <SettingsIcon fontSize="small" />
             </IconButton>
-            <IconButton size="small" sx={{ color: 'error.main' }}>
+            <IconButton 
+              size="small" 
+              sx={{ color: 'error.main' }}
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+            >
               <DeleteIcon fontSize="small" />
             </IconButton>
           </Box>

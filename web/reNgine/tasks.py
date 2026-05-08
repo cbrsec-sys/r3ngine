@@ -6359,7 +6359,7 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 		# Call LLM (PII protection is handled inside generator)
 		final_impact = generator.generate_impact_assessment(context)
 
-		# Persist
+		# Persist to ImpactAssessment model
 		ImpactAssessment.objects.update_or_create(
 			vulnerability=vuln,
 			defaults={
@@ -6369,6 +6369,10 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 				'is_ai_generated': True
 			}
 		)
+
+		# Also sync to Vulnerability model for reports
+		vuln.impact = final_impact
+		vuln.save()
 
 
 @app.task(name='sync_cisa_kev_catalog', queue='main_scan_queue', bind=False)
