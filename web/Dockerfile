@@ -55,7 +55,6 @@ RUN apt update -y && \
     apt install -y --no-install-recommends \
     build-essential \
     cmake \
-    meson \
     ninja-build \
     pkg-config \
     libcairo2-dev \
@@ -180,8 +179,8 @@ RUN ARCH=$(dpkg --print-architecture) \
     && mv aquatone /usr/local/bin/ \
     && rm -rf aquatone_linux_${ARCH}_1.7.0.zip README.md LICENSE.txt
 
-# Install Arjun, InQL, Netlas, holehe, maigret
-RUN pip3 install --upgrade arjun inql netlas holehe maigret
+# Install Arjun, InQL, Netlas, holehe, maigret (needs newer meson for pycairo)
+RUN pip3 install --upgrade meson ninja && pip3 install --upgrade arjun inql netlas holehe maigret
 
 RUN ARCH=$(dpkg --print-architecture) \
     && wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
