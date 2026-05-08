@@ -1,12 +1,19 @@
 # Changelog
 
-## [v3.0.0-alpha.5] - 2026-05-08
+## [v3.0.0-rc] - 2026-05-08
 ### Added
+- **Multi-Service Brute-Force Orchestration**: Updated brute-force engine schema to support an array of services (SSH, FTP, HTTP, SMB, RDP, Telnet).
+- **Brute-Force Candidate Filtering**: Refactored `BruteForceOrchestrator` to dynamically filter `AuthCandidate` records based on the engine's allowed services.
+- **Fixture Standardization**: Aligned default scan engine fixtures with the new multi-service schema and resolved YAML deserialization issues.
 - **Plugin Tooling System**: Introduced `tools.yaml` contract for automated background tool installation.
 - **Engine Fixture Ingestion**: Plugins can now ship `*_engine.yaml` fixtures for automatic engine registration.
 - **Exploit Readiness Layer (ERL) v2**: Refactored to use local subprocess execution instead of Docker-in-Docker.
 - **Background Tool Installation**: Plugin tools are now installed/verified asynchronously via Celery on installation and system startup.
 - **Subprocess Execution Model**: Standardized local execution for plugins to enhance performance and simplify container orchestration.
+### Bug Fixes
+- **Scan Summary API**: Resolved a 500 Internal Server Error in the scan summary dashboard caused by NULL status codes and missing scan start dates.
+- **Trivy SCA Integration**: Documented the integration of Trivy for Software Composition Analysis (SCA) within the discovery and correlation engines.
+
 ### Exploit Readiness Layer (ERL) Hardening (v3-beta)
 - **Proxy Support**: Native integration with reNgine's proxy settings. Tools (`sqlmap`, `XSStrike`) now respect system-wide proxy rotation via proxychains or environmental injection.
 - **OpSec Compliance**: ERL validations now inherit reNgine's OpSec policies, including random User-Agents and stealthy headers.

@@ -2885,6 +2885,7 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	should_run_wpscan = config.get(RUN_WPSCAN, True)
 	if should_run_wpscan:
 		_task = wpscan_scan.si(
+			urls=urls,
 			ctx=ctx,
 			description=f'WPScan'
 		)
@@ -6345,7 +6346,7 @@ def sync_cisa_kev_catalog():
 		logger.error(f"Error syncing CISA KEV catalog: {e}")
 
 
-@app.task(name='run_apme', queue='main_scan_queue', base=RengineTask, bind=True)
+@app.task(name='run_apme', queue='attack_path_modeling_queue', base=RengineTask, bind=True)
 def run_apme(self, scan_history_id):
 	"""
 	Runs the Attack Path Modeling Engine (APME).

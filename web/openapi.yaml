@@ -1,10 +1,10 @@
 swagger: '2.0'
 info:
-  title: reNgine API
+  title: reNgine v3 API
   description: 'reNgine: An Automated reconnaissance framework.'
   contact:
-    email: yogesh.ojha11@gmail.com
-  version: v1
+    email: [EMAIL_ADDRESS]
+  version: v3
 basePath: /api
 consumes:
 - application/json

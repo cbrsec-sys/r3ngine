@@ -98,10 +98,10 @@ def save_finding(task_instance, finding, subdomain, default_title):
     )
 
 @app.task(name='wpscan_scan', queue='main_scan_queue', base=RengineTask, bind=True)
-def wpscan_scan(self, ctx={}, description=None):
+def wpscan_scan(self, urls=[], ctx={}, description=None):
     """
     WPScan task for WordPress vulnerability scanning.
-    Runs against all discovered subdomains.
+    Runs against all discovered subdomains or specific URLs.
     """
     logger.info("Starting WPScan Vulnerability Scan")
     
@@ -120,10 +120,23 @@ def wpscan_scan(self, ctx={}, description=None):
     api_key_obj = WpScanAPIKey.objects.first()
     api_key = api_key_obj.key if api_key_obj else None
 
-    # Get subdomains
-    subdomains = Subdomain.objects.filter(scan_history=self.scan)
-    if not subdomains.exists():
-        logger.info("No subdomains found for WPScan.")
+    # Determine targets
+    targets = []
+    if urls:
+        # Targeted scan on specific URLs
+        for url in urls:
+            subdomain_name = get_subdomain_from_url(url)
+            subdomain = Subdomain.objects.filter(scan_history=self.scan, name=subdomain_name).first()
+            if subdomain:
+                targets.append((url, subdomain))
+    else:
+        # Full scan on all subdomains
+        subdomains = Subdomain.objects.filter(scan_history=self.scan)
+        for subdomain in subdomains:
+            targets.append((f"http://{subdomain.name}", subdomain))
+
+    if not targets:
+        logger.info("No targets found for WPScan.")
         return
 
     results_dir = f"{self.scan.results_dir}/vulnerability/wpscan"
@@ -131,14 +144,14 @@ def wpscan_scan(self, ctx={}, description=None):
 
     from reNgine.tasks import stream_command
 
-    for subdomain in subdomains:
-        target = subdomain.name
-        logger.info(f"WPScan target: {target}")
+    for target_url, subdomain in targets:
+        target_name = subdomain.name
+        logger.info(f"WPScan target: {target_url}")
         
-        output_file = f"{results_dir}/{target}_wpscan.json"
+        output_file = f"{results_dir}/{target_name}_wpscan.json"
         
         # Command construction
-        cmd = f"wpscan --url {target} --format json --output {output_file} --enumerate {enumeration} --detection-mode {detection_mode} --no-banner"
+        cmd = f"wpscan --url {target_url} --format json --output {output_file} --enumerate {enumeration} --detection-mode {detection_mode} --no-banner"
         
         if api_key:
             cmd += f" --api-token {api_key}"

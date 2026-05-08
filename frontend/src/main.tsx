@@ -9,7 +9,7 @@ import '@fontsource/orbitron';
 // @ts-ignore
 import '@fontsource/inter';
 // @ts-ignore
-import '@fontsource/syncopate';
+import '@fontsource/bahiana';
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

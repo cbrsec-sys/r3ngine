@@ -363,6 +363,11 @@ LOGGING = {
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False
         },
+        'plugins': {
+            'handlers': ['task', 'console'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False
+        },
         'api.views': {
             'handlers': ['console'],
             'level': 'DEBUG' if DEBUG else 'INFO',

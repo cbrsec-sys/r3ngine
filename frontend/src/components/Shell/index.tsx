@@ -406,7 +406,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             <Box sx={{ display: 'flex', alignItems: 'center', mr: 4 }}>
               <Typography variant="h6" sx={{
                 fontWeight: 900,
-                fontFamily: "'Syncopate', sans-serif",
+                fontFamily: "'Bahiana', display",
                 letterSpacing: 2,
                 color: "rgb(255, 0, 241) !important",
                 textShadow: "rgb(255, 0, 0) 0px 0px 21px !important",

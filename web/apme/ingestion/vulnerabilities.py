@@ -69,10 +69,9 @@ def _make_id(prefix: str, value: str) -> str:
     return f"{prefix}::{value}"
 
 
-def ingest_vulnerabilities(scan_history_id: int) -> Tuple[List[Node], List[Edge]]:
+def ingest_vulnerabilities(target_id: int) -> Tuple[List[Node], List[Edge]]:
     """
-    Ingests Vulnerability records, creating APME nodes and EXPOSES edges
-    to connect them to their parent asset nodes.
+    Ingests Vulnerability records for a given target.
     """
     from startScan.models import Vulnerability
 
@@ -80,7 +79,7 @@ def ingest_vulnerabilities(scan_history_id: int) -> Tuple[List[Node], List[Edge]
     edges: List[Edge] = []
 
     vulns = Vulnerability.objects.filter(
-        scan_history_id=scan_history_id,
+        target_domain_id=target_id,
         open_status=True,
         is_suppressed=False,
     ).select_related("subdomain", "endpoint")
@@ -117,7 +116,7 @@ def ingest_vulnerabilities(scan_history_id: int) -> Tuple[List[Node], List[Edge]
                 "http_url": vuln.http_url or "",
                 "template_id": vuln.template_id or "",
                 "exploit_url": vuln.exploit_url or "",
-                "scan_history_id": scan_history_id,
+                "target_id": target_id,
                 "vuln_id": vuln.id,
             },
         )
@@ -147,6 +146,6 @@ def ingest_vulnerabilities(scan_history_id: int) -> Tuple[List[Node], List[Edge]
 
     logger.info(
         f"APME Ingestion [vulnerabilities]: {len(nodes)} nodes, {len(edges)} edges "
-        f"(scan_history_id={scan_history_id})"
+        f"(target_id={target_id})"
     )
     return nodes, edges

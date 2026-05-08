@@ -119,6 +119,12 @@ WPSCAN_SCAN_DEFAULT_CONFIG = {
     'wpscan_detection_mode': 'mixed'
 }
 
+ATTACK_PATH_MODELING_DEFAULT_CONFIG = {
+    'enabled': True,
+    'top_n': 5
+}
+
+
 
 ###############################################################################
 # Scan DEFAULTS

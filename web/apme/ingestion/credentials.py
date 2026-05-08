@@ -39,10 +39,9 @@ def _make_id(prefix: str, value: str) -> str:
     return f"{prefix}::{value}"
 
 
-def ingest_credentials(scan_history_id: int) -> Tuple[List[Node], List[Edge]]:
+def ingest_credentials(target_id: int) -> Tuple[List[Node], List[Edge]]:
     """
-    Ingests SecretLeak records as Credential nodes.
-    Confidence is set based on validation status.
+    Ingests SecretLeak records for a given target.
     """
     from startScan.models import SecretLeak
 
@@ -50,7 +49,7 @@ def ingest_credentials(scan_history_id: int) -> Tuple[List[Node], List[Edge]]:
     edges: List[Edge] = []
 
     leaks = SecretLeak.objects.filter(
-        scan_history_id=scan_history_id
+        subdomain__target_domain_id=target_id
     ).select_related("subdomain")
 
     for leak in leaks:
@@ -71,7 +70,7 @@ def ingest_credentials(scan_history_id: int) -> Tuple[List[Node], List[Edge]]:
                 "source_url": leak.source_url,
                 "validated": validated,
                 "tool_name": leak.tool_name,
-                "scan_history_id": scan_history_id,
+                "target_id": target_id,
             },
         )
         nodes.append(cred_node)
@@ -92,6 +91,6 @@ def ingest_credentials(scan_history_id: int) -> Tuple[List[Node], List[Edge]]:
 
     logger.info(
         f"APME Ingestion [credentials]: {len(nodes)} nodes, {len(edges)} edges "
-        f"(scan_history_id={scan_history_id})"
+        f"(target_id={target_id})"
     )
     return nodes, edges
