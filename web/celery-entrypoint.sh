@@ -178,8 +178,6 @@ then
   pip install -r /usr/src/github/CMSeeK/requirements.txt
 fi
 
-# clone ctfr is now in Dockerfile
-
 # clone gooFuzz
 if [ ! -d "/usr/src/github/goofuzz" ]
 then

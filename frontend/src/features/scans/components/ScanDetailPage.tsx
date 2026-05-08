@@ -1079,13 +1079,14 @@ export const ScanDetailPage = () => {
                 options={{
                   chart: { type: 'donut', background: 'transparent' },
                   theme: { mode: 'dark' as any },
+                  labels: (data?.http_status_breakdown || []).slice().sort((a: any, b: any) => a.http_status - b.http_status).map((s: any) => `HTTP ${s.http_status}`),
+                  colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00', '#ff8000', '#0080ff', '#8000ff'],
                   stroke: { show: false },
-                  labels: data.http_status_breakdown.map((s: any) => `HTTP ${s.http_status}`),
                   dataLabels: { enabled: false },
-                  legend: { position: 'bottom', fontSize: '10px', labels: { colors: 'rgba(255,255,255,0.7)' } },
-                  colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00']
+                  legend: { position: 'bottom', labels: { colors: 'rgba(255,255,255,0.7)' } },
+                  plotOptions: { pie: { donut: { size: '70%' } } }
                 }}
-                series={data.http_status_breakdown.map((s: any) => s.count)}
+                series={(data?.http_status_breakdown || []).slice().sort((a: any, b: any) => a.http_status - b.http_status).map((s: any) => s.count)}
                 type="donut"
                 width="100%"
                 height={300}

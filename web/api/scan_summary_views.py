@@ -71,7 +71,23 @@ class ScanSummaryAPIView(APIView):
         # Assets
         ip_addresses = IpAddress.objects.filter(ip_subscan_ids__scan_history=scan).distinct()
         asset_countries = ip_addresses.exclude(geo_iso=None).values(name=F('geo_iso__name'), iso=F('geo_iso__iso')).annotate(count=Count('geo_iso')).order_by('-count')
-        http_status_breakdown = subdomain_qs.exclude(http_status=0).values('http_status').annotate(count=Count('http_status'))
+        subdomain_statuses = subdomain_qs.exclude(http_status=0).values('http_status').annotate(count=Count('http_status'))
+        endpoint_statuses = endpoint_qs.exclude(http_status=0).values('http_status').annotate(count=Count('http_status'))
+        
+        # Combine Subdomain and EndPoint status codes for a comprehensive breakdown
+        status_map = {}
+        for item in subdomain_statuses:
+            status = item['http_status']
+            status_map[status] = status_map.get(status, 0) + item['count']
+        
+        for item in endpoint_statuses:
+            status = item['http_status']
+            status_map[status] = status_map.get(status, 0) + item['count']
+            
+        http_status_breakdown = sorted(
+            [{'http_status': k, 'count': v} for k, v in status_map.items()],
+            key=lambda x: x['http_status']
+        )
         
         discovered_ports = Port.objects.filter(ports__in=ip_addresses).values('number', 'service_name', 'is_uncommon').annotate(count=Count('number')).order_by('-count')[:20]
         

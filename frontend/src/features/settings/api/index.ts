@@ -88,6 +88,9 @@ export interface ApiVaultSettings {
   hackerone_key: string;
   acunetix_url: string;
   acunetix_key: string;
+  linkedin_username?: string;
+  linkedin_password?: string;
+  hunterio_key?: string;
 }
 
 export interface ReportSettings {
@@ -446,6 +449,9 @@ export const useUpdateApiVault = (slug: string) => {
       formData.append('key_hackerone', data.hackerone_key);
       formData.append('key_acunetix_url', data.acunetix_url);
       formData.append('key_acunetix_key', data.acunetix_key);
+      formData.append('linkedin_username', data.linkedin_username || '');
+      formData.append('linkedin_password', data.linkedin_password || '');
+      formData.append('hunterio_key', data.hunterio_key || '');
 
       const response = await axios.post(`/scanEngine/${slug}/api_vault`, formData, {
         headers: {

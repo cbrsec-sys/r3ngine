@@ -3760,6 +3760,18 @@ def http_crawl(
 		endpoint.response_time = response_time
 		endpoint.content_type = content_type
 		endpoint.save()
+
+		# Sync Subdomain status attributes if this is the default endpoint
+		if is_ran_from_subdomain_scan:
+			subdomain.http_status = http_status
+			subdomain.page_title = page_title
+			subdomain.content_length = content_length
+			subdomain.webserver = webserver
+			subdomain.response_time = response_time
+			subdomain.content_type = content_type
+			subdomain.http_url = http_url
+			subdomain.save()
+
 		endpoint_str = f'{http_url} [{http_status}] `{content_length}B` `{webserver}` `{rt}`'
 		logger.warning(endpoint_str)
 		if endpoint and endpoint.is_alive and endpoint.http_status != 403:
