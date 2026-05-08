@@ -779,11 +779,13 @@ class Email(models.Model):
 	id = models.AutoField(primary_key=True)
 	address = models.CharField(max_length=200, blank=True, null=True)
 	password = models.CharField(max_length=200, blank=True, null=True)
+	metadata = models.JSONField(default=dict, blank=True)
 
 class Employee(models.Model):
 	id = models.AutoField(primary_key=True)
 	name = models.CharField(max_length=1000, null=True, blank=True)
 	designation = models.CharField(max_length=1000, null=True, blank=True)
+	metadata = models.JSONField(default=dict, blank=True)
 
 
 class Dork(models.Model):

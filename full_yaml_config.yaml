@@ -58,7 +58,11 @@ osint: {
     'db_files',
     'git_exposed'
   ],
-  # 'custom_dorks': [],
+  'custom_dorks': [
+    'site:_target_ ext:php',
+    'site:_target_ intitle:"index of"',
+    # { 'lookup_site': '_target_', 'lookup_extensions': 'php,asp,aspx' }
+  ],
   'intensity': 'normal',
   'documents_limit': 50
 }
@@ -105,7 +109,7 @@ vulnerability_scan: {
     # 'templates': [],            # Nuclei templates (https://github.com/projectdiscovery/nuclei-templates)
     # 'custom_templates': []      # Nuclei custom templates uploaded in reNgine
     }
-  },
+  }
   'cpanel_scanner': {
     'run_cpanel_scan': true,
     'cpanel_user_wordlist': '/usr/src/wordlist/cpanel_users.txt',

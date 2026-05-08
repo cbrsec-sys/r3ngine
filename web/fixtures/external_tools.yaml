@@ -692,3 +692,54 @@
     is_github_cloned: false
     github_clone_path: null
     subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 40
+  fields:
+    logo_url: null
+    name: holehe
+    description: holehe checks if an email is attached to any social media accounts on over 120 websites.
+    github_url: https://github.com/megadose/holehe
+    license_url: https://github.com/megadose/holehe/blob/master/LICENSE
+    version_lookup_command: holehe --version
+    update_command: pip3 install holehe --upgrade
+    install_command: pip3 install holehe
+    version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 41
+  fields:
+    logo_url: null
+    name: maigret
+    description: Collect a dossier on a person by username from a huge number of social networks and other resources.
+    github_url: https://github.com/soxoj/maigret
+    license_url: https://github.com/soxoj/maigret/blob/main/LICENSE
+    version_lookup_command: maigret --version
+    update_command: pip3 install maigret --upgrade
+    install_command: pip3 install maigret
+    version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 42
+  fields:
+    logo_url: null
+    name: LinkedInt
+    description: LinkedIn reconnaissance tool that scrapes LinkedIn for information about a company's employees.
+    github_url: https://github.com/mdunivant/LinkedInt
+    license_url: https://github.com/mdunivant/LinkedInt/blob/master/LICENSE
+    version_lookup_command: null
+    update_command: cd /usr/src/github/LinkedInt && git pull
+    install_command: git clone https://github.com/mdunivant/LinkedInt /usr/src/github/LinkedInt
+    version_match_regex: null
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/LinkedInt
+    subdomain_gathering_command: null
