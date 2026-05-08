@@ -12,7 +12,7 @@
 - **Subprocess Execution Model**: Standardized local execution for plugins to enhance performance and simplify container orchestration.
 ### Bug Fixes
 - **Scan Summary API**: Resolved a 500 Internal Server Error in the scan summary dashboard caused by NULL status codes and missing scan start dates.
-- **Trivy SCA Integration**: Documented the integration of Trivy for Software Composition Analysis (SCA) within the discovery and correlation engines.
+- **Trivy SCA Removal**: Safely excised the Trivy filesystem scanning engine and associated dependencies to refocus reNgine on remote reconnaissance workflows.
 
 ### Exploit Readiness Layer (ERL) Hardening (v3-beta)
 - **Proxy Support**: Native integration with reNgine's proxy settings. Tools (`sqlmap`, `XSStrike`) now respect system-wide proxy rotation via proxychains or environmental injection.

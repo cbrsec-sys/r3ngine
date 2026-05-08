@@ -2748,21 +2748,6 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 					vuln_data = parse_semgrep_result(match)
 					save_vulnerability(vuln_data, self.scan, self.domain)
 
-	# Trivy - SCA for discovered dependency files
-	if 'trivy' in uses_tools:
-		logger.info(f'Running Trivy SCA on discovery results')
-		trivy_output = f"{results_dir}/trivy_results.json"
-		cmd = f"trivy fs --format json --output {trivy_output} {results_dir}"
-		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
-		# Parse Trivy results
-		if os.path.exists(trivy_output):
-			with open(trivy_output, 'r') as f:
-				data = json.load(f)
-				for result in data.get('Results', []):
-					for vuln in result.get('Vulnerabilities', []):
-						vuln_data = parse_trivy_result(vuln)
-						save_vulnerability(vuln_data, self.scan, self.domain)
-
 	# Retire.js - JS Library vulnerability scan
 	if 'retire' in uses_tools:
 		logger.info(f'Running Retire.js on discovery results')

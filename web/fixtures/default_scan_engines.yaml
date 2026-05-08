@@ -138,7 +138,7 @@
       \  'linkfinder', 'paramspider', 'aquatone', 'semgrep'],\n  'scan_only_active':\n\
       \  true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite',\n\
       \  'arjun_methods': 'GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH'\n}\n\
-      vulnerability_scan: {\n  'run_acunetix': true\n}\nattack_path_modeling: {\n\
+      vulnerability_scan: {\n  'run_acunetix': true\n,  'run_wpscan': true\n}\nattack_path_modeling: {\n\
       \  'enabled': true\n}\nspiderfoot_scan: {\n  'modules': 'all'\n}"
   model: scanEngine.enginetype
   pk: 8

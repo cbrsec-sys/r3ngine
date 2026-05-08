@@ -102,6 +102,124 @@ then
   echo "Usage in reNgine, set vulscan/vulscan.nse in nmap_script scanEngine port_scan config parameter"
 fi
 
+if [ ! -f '/usr/local/bin/kr']
+then
+  echo "Installing kiterunner"
+  ARCH=$(dpkg --print-architecture)
+  wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz
+  tar -xvf kiterunner_1.0.2_linux_${ARCH}.tar.gz
+  mv kr /usr/local/bin/
+  rm -rf kiterunner_1.0.2_linux_${ARCH}.tar.gz
+fi
+
+# Install CMSeeK
+if [ ! -d '/usr/src/github/CMSeeK']
+then
+  echo "Cloning CMSeeK"
+  git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK
+  pip3 install -r /usr/src/github/CMSeeK/requirements.txt
+fi
+
+# Install LinkFinder
+if [ ! -d '/usr/src/github/LinkFinder']
+then
+  echo "Cloning LinkFinder"
+  git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder
+  cd /usr/src/github/LinkFinder && pip3 install -r requirements.txt && python3 setup.py install
+fi
+
+# Install ParamSpider
+if [ ! -d '/usr/src/github/ParamSpider']
+then
+  echo "Cloning ParamSpider"
+  git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider
+  cd /usr/src/github/ParamSpider && pip3 install . && python3 setup.py install
+fi
+
+# Install Semgrep
+if [ ! -d '/usr/src/github/semgrep']
+then
+  echo "Cloning Semgrep"
+  git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep
+  cd /usr/src/github/semgrep && pip3 install .
+fi
+
+if [ ! -d '/usr/src/github/Sublist3r']
+then
+  echo "Cloning Sublist3r"
+  git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r
+  cd /usr/src/github/Sublist3r && pip3 install -r requirements.txt
+fi
+
+if [ ! -d '/usr/src/github/OneForAll']
+then
+  echo "Cloning OneForAll"
+  git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll
+  cd /usr/src/github/OneForAll && pip3 install -r requirements.txt
+fi
+
+if [ ! -d '/usr/src/github/theHarvester']
+then
+  echo "Cloning theHarvester"
+  git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester
+  cd /usr/src/github/theHarvester && uv sync
+fi
+
+if [ ! -d '/usr/src/github/ctfr']
+then
+  echo "Cloning ctfr"
+  git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr
+  cd /usr/src/github/ctfr && pip3 install -r requirements.txt
+fi
+
+if [ ! -d '/usr/src/github/acunetix-python']
+then
+  echo "Cloning acunetix-python"
+  git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python
+  cd /usr/src/github/acunetix-python && pip3 install .
+fi
+
+if [ ! -d '/usr/src/github/awvs14-scan']
+then
+  echo "Cloning awvs14-scan"
+  git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-scan
+fi
+
+if [ ! -d '/usr/src/github/GooFuzz']
+then
+  echo "Cloning GooFuzz"
+  DIR=$(pwd)
+  cd /usr/src/github
+  wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip
+  unzip GooFuzz.v.1.2.6.zip
+  mv GooFuzz.v.1.2.6 goofuzz
+  chmod +x goofuzz/GooFuzz
+  rm GooFuzz.v.1.2.6.zip
+  cd $DIR
+fi
+
+if [ ! -d '/usr/src/github/spiderfoot']
+then
+  echo "Cloning spiderfoot"
+  git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
+  cd /usr/src/github/spiderfoot && pip3 install -r requirements.txt
+fi
+
+if [ ! -d '/usr/src/github/cpanel2shell-scanner']
+then
+  echo "Cloning cpanel2shell-scanner"
+  git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner
+  cd /usr/src/github/cpanel2shell-scanner && pip3 install -r requirements.txt
+fi
+
+# Create a robust cPanel username wordlist
+if [ ! -f '/usr/src/wordlist/cpanel_users.txt' ]; then
+  echo "Fetching cPanel2Shell wordlist"
+  mkdir -p /usr/src/wordlist
+  wget -qO- https://raw.githubusercontent.com/danielmiessler/SecLists/master/Usernames/top-usernames-shortlist.txt >> /usr/src/wordlist/cpanel_users.txt
+  sort -u /usr/src/wordlist/cpanel_users.txt -o /usr/src/wordlist/cpanel_users.txt
+fi
+
 # install h8mail
 python3 -m pip install h8mail
 
@@ -173,83 +291,8 @@ then
   wget https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/prompt-leak.yaml -O ~/nuclei-templates/prompt-leak.yaml
 fi
 
-if [ ! -d "/usr/src/github/CMSeeK" ]
-then
-  echo "Cloning CMSeeK"
-  git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK
-  pip install -r /usr/src/github/CMSeeK/requirements.txt
-fi
-
-# clone gooFuzz
-if [ ! -d "/usr/src/github/goofuzz" ]
-then
-  DIR=$(pwd)
-  echo "Cloning GooFuzz"
-  cd /usr/src/github
-  wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip && \
-  unzip GooFuzz.v.1.2.6.zip
-  rm GooFuzz.v.1.2.6.zip
-  mv GooFuzz.v.1.2.6 goofuzz
-  chmod +x goofuzz/GooFuzz
-  cd $DIR
-fi
-
 # httpx seems to have issue, use alias instead!!!
 echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
-
-if [ ! -d "/usr/src/github/ParamSpider" ]
-then
-  echo "Cloning ParamSpider"
-  git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider
-  DIR=$(pwd)
-  cd /usr/src/github/ParamSpider
-  pip3 install .
-  python3 setup.py install
-  cd $DIR
-fi
-
-if [ ! -d "/usr/src/github/semgrep" ]
-then
-  echo "Installing Semgrep"
-  git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep
-  DIR=$(pwd)
-  cd /usr/src/github/semgrep
-  pip3 install .
-  cd $DIR
-fi
-
-if [ ! -d "/usr/src/github/scipag_vulscan" ]
-then
-  echo "Installing VulScan"
-  git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan
-  ln -s /usr/src/github/scipag_vulscan /usr/share/nmap/scripts/vulscan
-fi
-
-if [ ! -d "/usr/src/github/spiderfoot" ]
-then
-  echo "Installing SpiderFoot"
-  git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
-  DIR=$(pwd)
-  cd /usr/src/github/spiderfoot
-  pip3 install -r requirements.txt
-  cd $DIR
-fi
-
-if [ ! -d "/usr/src/github/acunetix-python" ]
-then
-  echo "Cloning Acunetix Python"
-  git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python
-  DIR=$(pwd)
-  cd /usr/src/github/acunetix-python
-  pip3 install .
-  cd $DIR
-fi
-
-if [ ! -d "/usr/src/github/awvs14-scan" ]
-then
-  echo "Cloning AWVS 14 Scan"
-  git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-scan
-fi
 
 # TEMPORARY FIX, httpcore is causing issues with celery, removing it as temp fix
 #python3 -m pip uninstall -y httpcore
