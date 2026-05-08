@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 import zipfile
 import yaml
 import json
@@ -130,26 +131,38 @@ class AtomicInstaller:
             logger.error(f"CRITICAL: Rollback failed! {str(e)}")
 
     @classmethod
-    def install(cls, zip_path):
+    def install(cls, zip_path: str):
         """Performs the full atomic installation."""
         PluginManager.ensure_dirs()
         temp_dir = None
-        backup_file = None
+        backup_db_file = None
+        backup_fs_dir = None
+        backup_media_dir = None
         plugin_slug = None
         
         try:
             temp_dir = PluginManager.extract_plugin(zip_path)
-            # If the zip had a subfolder, we should adjust temp_dir
-            # For simplicity, we assume files are at the root or we find the manifest
             manifest = PluginManager.validate_manifest(temp_dir)
             plugin_name = manifest['name']
             plugin_slug = slugify(plugin_name)
             
             # 1. Backup DB
-            backup_file = cls.backup_db(plugin_slug)
+            backup_db_file = cls.backup_db(plugin_slug)
             
+            # 2. Prepare FS Backups
+            final_dir = os.path.join(PluginManager.BASE_PLUGINS_DIR, plugin_slug)
+            media_plugin_dir = os.path.join(settings.MEDIA_ROOT, 'plugins', plugin_slug)
+            
+            if os.path.exists(final_dir):
+                backup_fs_dir = f"{final_dir}_bak_{int(time.time())}"
+                shutil.copytree(final_dir, backup_fs_dir)
+                
+            if os.path.exists(media_plugin_dir):
+                backup_media_dir = f"{media_plugin_dir}_bak_{int(time.time())}"
+                shutil.copytree(media_plugin_dir, backup_media_dir)
+
             with transaction.atomic():
-                # 2. Register in DB
+                # 3. Register in DB
                 runtime = manifest.get('runtime', {})
                 anchor = runtime.get('run after') or runtime.get('run before')
                 position = 'AFTER' if 'run after' in runtime else 'BEFORE'
@@ -166,32 +179,48 @@ class AtomicInstaller:
                     }
                 )
                 
-                # 3. Handle migrations if custom_models.py exists
-                # This part is complex because we need to dynamically load models
-                # For v1, we might skip full dynamic model registration or use a hook
-                
                 # 4. Finalize file placement
-                final_dir = os.path.join(PluginManager.BASE_PLUGINS_DIR, plugin_slug)
                 if os.path.exists(final_dir):
                     shutil.rmtree(final_dir)
                 shutil.move(temp_dir, final_dir)
                 
-                # 5. Copy UI assets to MEDIA_ROOT for frontend access
-                media_plugin_dir = os.path.join(settings.MEDIA_ROOT, 'plugins', plugin_slug)
+                # 5. Copy UI assets to MEDIA_ROOT
                 if os.path.exists(media_plugin_dir):
                     shutil.rmtree(media_plugin_dir)
                 
                 ui_src = os.path.join(final_dir, 'ui')
                 if os.path.exists(ui_src):
                     os.makedirs(media_plugin_dir, exist_ok=True)
-                    # We copy the 'ui' directory into the plugin's media folder
                     shutil.copytree(ui_src, os.path.join(media_plugin_dir, 'ui'))
                 
-            return plugin
-            
+                # 6. Cleanup backups on success
+                if backup_fs_dir and os.path.exists(backup_fs_dir):
+                    shutil.rmtree(backup_fs_dir)
+                if backup_media_dir and os.path.exists(backup_media_dir):
+                    shutil.rmtree(backup_media_dir)
+                if backup_db_file and os.path.exists(backup_db_file):
+                    os.remove(backup_db_file)
+                
+                return plugin
+                
         except Exception as e:
-            if backup_file:
-                cls.rollback_db(backup_file)
+            logger.error(f"Installation failed for {plugin_slug}: {str(e)}")
+            # Rollback DB
+            if backup_db_file:
+                cls.rollback_db(backup_db_file)
+            
+            # Rollback FS
+            if backup_fs_dir and os.path.exists(backup_fs_dir):
+                if os.path.exists(final_dir):
+                    shutil.rmtree(final_dir)
+                shutil.move(backup_fs_dir, final_dir)
+            
+            # Rollback Media
+            if backup_media_dir and os.path.exists(backup_media_dir):
+                if os.path.exists(media_plugin_dir):
+                    shutil.rmtree(media_plugin_dir)
+                shutil.move(backup_media_dir, media_plugin_dir)
+                
             if temp_dir and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
             raise e

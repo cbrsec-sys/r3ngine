@@ -3,41 +3,90 @@ import {
   Box,
   Typography,
   Button,
-  Grid,
   Paper,
   Tabs,
   Tab,
   CircularProgress,
-  Alert
+  Backdrop,
+  Snackbar,
+  Alert,
+  Stack
 } from '@mui/material';
-import { Upload as UploadIcon, Extension as ExtensionIcon, AccountTree as PipelineIcon } from '@mui/icons-material';
+import { 
+  Upload as UploadIcon, 
+  Extension as ExtensionIcon, 
+  AccountTree as PipelineIcon
+} from '@mui/icons-material';
+import { 
+  ShieldAlert
+} from 'lucide-react';
 import { usePlugins, useUploadPlugin } from '../api/pluginsApi';
 import PluginInventory from '../components/PluginInventory';
 import PipelineBuilder from '../components/PipelineBuilder';
 
 const PluginManagementPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
   const { data: plugins, isLoading, error } = usePlugins();
   const uploadMutation = useUploadPlugin();
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      uploadMutation.mutate(file);
+      uploadMutation.mutate(file, {
+        onSuccess: () => {
+          setSnackbar({ open: true, message: 'Plugin uploaded successfully!', severity: 'success' });
+        },
+        onError: (err: any) => {
+          setSnackbar({ 
+            open: true, 
+            message: `Upload failed: ${err.response?.data?.error || err.message}`, 
+            severity: 'error' 
+          });
+        }
+      });
     }
   };
 
-  if (isLoading) return <Box sx={{ display: "flex", justifyContent: "center", p: 5 }}><CircularProgress /></Box>;
+  if (isLoading) {
+    return (
+      <Box sx={{ display: "flex", flexDirection: 'column', alignItems: "center", justifyContent: 'center', height: '60vh', gap: 2 }}>
+        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <Typography sx={{ fontFamily: 'Orbitron', color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', letterSpacing: 2 }}>
+          LOADING ORCHESTRATION LAYER...
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", mb: 4 }}>
+    <Box sx={{ p: 4 }}>
+      <Backdrop
+        sx={{ color: '#00f3ff', zIndex: (theme) => theme.zIndex.drawer + 1, flexDirection: 'column', gap: 2, backdropFilter: 'blur(4px)' }}
+        open={uploadMutation.isPending}
+      >
+        <CircularProgress color="inherit" size={60} thickness={2} />
+        <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: 2 }}>
+          INSTALLING PLUGIN...
+        </Typography>
+      </Backdrop>
+
+      <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", mb: 6 }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: "bold" }} gutterBottom>
-            Plugin Orchestration
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Extend reNgine with custom engines, tasks, and UI modules.
+          <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 1 }}>
+            <ShieldAlert size={32} color="#00f3ff" />
+            <Typography variant="h3" sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: -1, color: '#fff' }}>
+              PLUGIN ORCHESTRATION
+            </Typography>
+          </Stack>
+          <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.5)', maxWidth: 600 }}>
+            Extend system capabilities with modular reconnaissance engines and intelligence layers. 
+            Maintain total control over the execution pipeline.
           </Typography>
         </Box>
         <Button
@@ -45,31 +94,61 @@ const PluginManagementPage: React.FC = () => {
           component="label"
           startIcon={<UploadIcon />}
           sx={{
-            borderRadius: '12px',
-            textTransform: 'none',
-            px: 3,
+            bgcolor: '#00f3ff',
+            color: '#000',
+            fontFamily: 'Orbitron',
+            fontWeight: 900,
+            borderRadius: 0,
+            px: 4,
             py: 1.5,
-            boxShadow: '0 4px 14px 0 rgba(0,118,255,0.39)'
+            clipPath: 'polygon(10% 0, 100% 0, 90% 100%, 0% 100%)',
+            '&:hover': { bgcolor: '#00d8e4' }
           }}
         >
-          Upload Plugin
+          UPLOAD PLUGIN
           <input type="file" hidden accept=".zip" onChange={handleFileUpload} />
         </Button>
       </Box>
 
-      {error && <Alert severity="error" sx={{ mb: 3 }}>Error loading plugins: {(error as any).message}</Alert>}
+      {error && (
+        <Alert 
+          severity="error" 
+          variant="outlined"
+          sx={{ mb: 4, borderColor: 'rgba(255, 0, 60, 0.3)', color: '#ff003c', bgcolor: 'rgba(255, 0, 60, 0.05)' }}
+        >
+          CRITICAL ERROR: Failed to synchronize with orchestration backend.
+        </Alert>
+      )}
 
-      <Paper sx={{ borderRadius: '16px', overflow: 'hidden', mb: 4, background: 'rgba(255, 255, 255, 0.05)', backdropFilter: 'blur(10px)' }}>
+      <Paper sx={{ 
+        borderRadius: 0, 
+        overflow: 'hidden', 
+        bgcolor: 'transparent',
+        border: '1px solid rgba(255,255,255,0.05)'
+      }}>
         <Tabs
           value={activeTab}
           onChange={(_, val) => setActiveTab(val)}
-          sx={{ borderBottom: 1, borderColor: 'divider', px: 2 }}
+          sx={{ 
+            borderBottom: '1px solid rgba(255,255,255,0.1)',
+            bgcolor: 'rgba(255,255,255,0.02)',
+            '& .MuiTab-root': {
+              minHeight: 70,
+              fontFamily: 'Orbitron',
+              fontWeight: 800,
+              fontSize: '0.8rem',
+              letterSpacing: 1,
+              color: 'rgba(255,255,255,0.4)',
+              '&.Mui-selected': { color: '#00f3ff' }
+            },
+            '& .MuiTabs-indicator': { bgcolor: '#00f3ff', height: 3 }
+          }}
         >
-          <Tab icon={<ExtensionIcon />} iconPosition="start" label="Inventory" sx={{ minHeight: 64 }} />
-          <Tab icon={<PipelineIcon />} iconPosition="start" label="Pipeline Builder" sx={{ minHeight: 64 }} />
+          <Tab icon={<ExtensionIcon sx={{ fontSize: 20 }} />} iconPosition="start" label="INVENTORY" />
+          <Tab icon={<PipelineIcon sx={{ fontSize: 20 }} />} iconPosition="start" label="PIPELINE BUILDER" />
         </Tabs>
 
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: 4, minHeight: '400px' }}>
           {activeTab === 0 ? (
             <PluginInventory plugins={plugins || []} />
           ) : (
@@ -77,6 +156,28 @@ const PluginManagementPage: React.FC = () => {
           )}
         </Box>
       </Paper>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={() => setSnackbar({ ...snackbar, open: false })} 
+          severity={snackbar.severity} 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontWeight: 800,
+            bgcolor: snackbar.severity === 'success' ? '#00ffaa' : '#ff003c',
+            color: '#000',
+            borderRadius: 0
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };

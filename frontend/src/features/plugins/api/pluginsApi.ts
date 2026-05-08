@@ -71,3 +71,11 @@ export const useDeletePlugin = () => {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plugins'] }),
   });
 };
+
+export const useUpdatePluginWeight = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updatePluginWeight,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plugins'] }),
+  });
+};

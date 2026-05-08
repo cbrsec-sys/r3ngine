@@ -61,6 +61,7 @@ import {
 import { useEngines } from '../../engines/api';
 import { useCreateTodo } from '../../todos/api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface SubdomainsTabProps {
   projectSlug: string;
@@ -86,6 +87,19 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   
   // Selected subdomain for single actions
   const [targetSubdomain, setTargetSubdomain] = useState<any>(null);
+  
+  // Confirmation state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'info' | 'warning';
+  }>({
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
   
   // Subscan state
   const [selectedEngineId, setSelectedEngineId] = useState<number | null>(null);
@@ -165,28 +179,40 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this subdomain?')) {
-      try {
-        await deleteMutation.mutateAsync([id]);
-        showNotification('Subdomain deleted successfully');
-      } catch (error: any) {
-        showNotification(error.message || 'Failed to delete subdomain', 'error');
+    setConfirmConfig({
+      title: 'DELETE ASSET',
+      message: 'Are you sure you want to delete this subdomain? This action cannot be undone.',
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteMutation.mutateAsync([id]);
+          showNotification('Subdomain deleted successfully');
+        } catch (error: any) {
+          showNotification(error.message || 'Failed to delete subdomain', 'error');
+        }
+        handleActionClose();
       }
-    }
-    handleActionClose();
+    });
+    setConfirmOpen(true);
   };
 
   const handleBulkDelete = async () => {
     if (selectedAssets.length === 0) return;
-    if (window.confirm(`Are you sure you want to delete ${selectedAssets.length} subdomains?`)) {
-      try {
-        await deleteMutation.mutateAsync(selectedAssets);
-        showNotification(`${selectedAssets.length} subdomains deleted`);
-        setSelectedAssets([]);
-      } catch (error: any) {
-        showNotification(error.message || 'Failed to delete subdomains', 'error');
+    setConfirmConfig({
+      title: 'BULK DELETE ASSETS',
+      message: `Are you sure you want to delete ${selectedAssets.length} subdomains? This operation is permanent.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteMutation.mutateAsync(selectedAssets);
+          showNotification(`${selectedAssets.length} subdomains deleted`);
+          setSelectedAssets([]);
+        } catch (error: any) {
+          showNotification(error.message || 'Failed to delete subdomains', 'error');
+        }
       }
-    }
+    });
+    setConfirmOpen(true);
   };
 
   const handleToggleImportant = async (id: number) => {
@@ -956,6 +982,19 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           </Button>
         </DialogActions>
       </Dialog>
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          confirmConfig.onConfirm();
+          setConfirmOpen(false);
+        }}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+      />
+
       <Snackbar 
         open={snackbar.open} 
         autoHideDuration={4000} 

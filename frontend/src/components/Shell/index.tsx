@@ -22,7 +22,8 @@ import {
   Chip,
   Grid,
   Badge,
-  alpha
+  alpha,
+  useMediaQuery
 } from '@mui/material';
 
 import {
@@ -51,7 +52,9 @@ import {
   User as UserIcon,
   Wrench,
   List as ListIcon,
-  Bug
+  Bug,
+  Menu as MenuIcon,
+  X
 } from 'lucide-react';
 import { useTheme } from '@mui/material/styles';
 import { Link, useRouterState, useParams } from '@tanstack/react-router';
@@ -95,6 +98,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [scanHistoryOpen, setScanHistoryOpen] = useState(false);
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  const isMobileHeader = useMediaQuery(theme.breakpoints.down('lg'));
 
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: unreadData } = useUnreadCount(projectSlug);
@@ -429,7 +435,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             <Box sx={{ flexGrow: 1 }} />
 
             {/* Action Group */}
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3, backgroundColor: "transparent" }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: isMobileHeader ? 1 : 3, backgroundColor: "transparent" }}>
               {/* Universal Search */}
               <Box sx={{
                 display: 'flex',
@@ -438,7 +444,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 px: 2,
                 py: 0.5,
                 borderRadius: 10,
-                width: 240,
+                width: isMobileHeader ? 180 : 240,
                 border: '1px solid rgba(255,255,255,0.05)',
                 '&:hover': { borderColor: 'rgba(0, 243, 255, 0.3)' }
               }}>
@@ -448,76 +454,95 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 />
                 <Search size={14} style={{ color: '#ff00ff', opacity: 0.8 }} />
               </Box>
-              <Box
-                component={Link}
-                to={`/${projectSlug}/projects`}
-                sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5, textDecoration: 'none' }}
-              >
-                <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Projects</Typography>
-                <ChevronDown size={14} style={{ opacity: 0.5, color: 'rgba(255,255,255,0.6)' }} />
-              </Box>
 
+              {!isMobileHeader ? (
+                <>
+                  <Box
+                    component={Link}
+                    to={`/${projectSlug}/projects`}
+                    sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5, textDecoration: 'none' }}
+                  >
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Projects</Typography>
+                    <ChevronDown size={14} style={{ opacity: 0.5, color: 'rgba(255,255,255,0.6)' }} />
+                  </Box>
 
-              <Box
-                onClick={handleQuickAddOpen}
-                sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5 }}
-              >
-                <Plus size={14} style={{ opacity: 0.6 }} />
-                <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Quick Add</Typography>
-                <ChevronDown size={14} style={{ opacity: 0.5 }} />
-              </Box>
+                  <Box
+                    onClick={handleQuickAddOpen}
+                    sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5 }}
+                  >
+                    <Plus size={14} style={{ opacity: 0.6 }} />
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.6)' }}>Quick Add</Typography>
+                    <ChevronDown size={14} style={{ opacity: 0.5 }} />
+                  </Box>
 
-              <Box sx={{ display: 'flex', gap: 1, mx: 2 }}>
-                <HeaderThemeSwitcher />
+                  <Box sx={{ display: 'flex', gap: 1, mx: 2 }}>
+                    <HeaderThemeSwitcher />
+                    <IconButton
+                      onClick={handleToolboxOpen}
+                      size="small"
+                      sx={{
+                        color: toolboxAnchorEl ? theme.palette.primary.main : alpha(theme.palette.text.secondary, 0.5),
+                        bgcolor: toolboxAnchorEl ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                        boxShadow: toolboxAnchorEl && theme.palette.mode === 'dark' ? `0 0 15px ${alpha(theme.palette.primary.main, 0.3)}` : 'none',
+                        '&:hover': {
+                          color: theme.palette.primary.main,
+                          bgcolor: alpha(theme.palette.primary.main, 0.05),
+                        }
+                      }}
+                    >
+                      <LayoutGrid size={18} />
+                    </IconButton>
+                    <IconButton
+                      onClick={handleNotificationOpen}
+                      size="small"
+                      sx={{
+                        color: notificationAnchorEl ? theme.palette.primary.main : alpha(theme.palette.text.secondary, 0.5),
+                        bgcolor: notificationAnchorEl ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                        '&:hover': {
+                          color: theme.palette.primary.main,
+                          bgcolor: alpha(theme.palette.primary.main, 0.05),
+                        }
+                      }}
+                    >
+                      <Badge badgeContent={unreadData?.count} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
+                        <Bell size={18} />
+                      </Badge>
+                    </IconButton>
+                  </Box>
+
+                  <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }} onClick={handleMenuOpen}>
+                    <Avatar
+                      src="https://api.dicebear.com/7.x/bottts-neutral/svg?seed=hacker&backgroundColor=transparent"
+                      sx={{
+                        width: 32,
+                        height: 32,
+                        bgcolor: alpha(theme.palette.text.primary, 0.05),
+                        border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`,
+                        p: 0.2
+                      }}
+                    />
+                    <Box sx={{ ml: 1, display: 'flex', alignItems: 'center' }}>
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>root</Typography>
+                      <ChevronDown size={14} style={{ opacity: 0.4, marginLeft: 4 }} />
+                    </Box>
+                  </Box>
+                </>
+              ) : (
                 <IconButton
-                  onClick={handleToolboxOpen}
-                  size="small"
+                  onClick={() => setMobileMenuOpen(true)}
                   sx={{
-                    color: toolboxAnchorEl ? theme.palette.primary.main : alpha(theme.palette.text.secondary, 0.5),
-                    bgcolor: toolboxAnchorEl ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
-                    boxShadow: toolboxAnchorEl && theme.palette.mode === 'dark' ? `0 0 15px ${alpha(theme.palette.primary.main, 0.3)}` : 'none',
+                    color: alpha(theme.palette.primary.main, 0.8),
+                    bgcolor: alpha(theme.palette.primary.main, 0.05),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
                     '&:hover': {
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
                       color: theme.palette.primary.main,
-                      bgcolor: alpha(theme.palette.primary.main, 0.05),
                     }
                   }}
                 >
-                  <LayoutGrid size={18} />
+                  <MenuIcon size={20} />
                 </IconButton>
-                <IconButton
-                  onClick={handleNotificationOpen}
-                  size="small"
-                  sx={{
-                    color: notificationAnchorEl ? theme.palette.primary.main : alpha(theme.palette.text.secondary, 0.5),
-                    bgcolor: notificationAnchorEl ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
-                    '&:hover': {
-                      color: theme.palette.primary.main,
-                      bgcolor: alpha(theme.palette.primary.main, 0.05),
-                    }
-                  }}
-                >
-                  <Badge badgeContent={unreadData?.count} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
-                    <Bell size={18} />
-                  </Badge>
-                </IconButton>
-              </Box>
-
-              <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }} onClick={handleMenuOpen}>
-                <Avatar
-                  src="https://api.dicebear.com/7.x/bottts-neutral/svg?seed=hacker&backgroundColor=transparent"
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    bgcolor: alpha(theme.palette.text.primary, 0.05),
-                    border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`,
-                    p: 0.2
-                  }}
-                />
-                <Box sx={{ ml: 1, display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)' }}>root</Typography>
-                  <ChevronDown size={14} style={{ opacity: 0.4, marginLeft: 4 }} />
-                </Box>
-              </Box>
+              )}
             </Box>
 
             <Menu
@@ -700,6 +725,168 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               onClose={() => setUpdateModalOpen(false)}
               onUpdateFound={setUpdateAvailable}
             />
+
+            {/* Mobile Header Menu Drawer */}
+            <Drawer
+              anchor="right"
+              open={mobileMenuOpen}
+              onClose={() => setMobileMenuOpen(false)}
+              slotProps={{
+                paper: {
+                  sx: {
+                  width: 300,
+                  bgcolor: alpha(theme.palette.background.paper, 0.8),
+                  backdropFilter: 'blur(25px)',
+                  borderLeft: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                  boxShadow: `-10px 0 30px ${alpha('#000', 0.5)}`,
+                  backgroundImage: 'none',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  overflow: 'hidden'
+                  }
+                }
+              }}
+            >
+              {/* Drawer Header */}
+              <Box sx={{
+                p: 3,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottom: `1px solid ${alpha(theme.palette.divider, 0.1)}`,
+                bgcolor: alpha(theme.palette.primary.main, 0.03)
+              }}>
+                <Typography sx={{
+                  fontFamily: 'Orbitron',
+                  fontWeight: 900,
+                  fontSize: '0.9rem',
+                  letterSpacing: '2px',
+                  color: theme.palette.primary.main,
+                  textShadow: `0 0 10px ${alpha(theme.palette.primary.main, 0.3)}`
+                }}>
+                  NAVIGATION
+                </Typography>
+                <IconButton onClick={() => setMobileMenuOpen(false)} size="small" sx={{ color: alpha(theme.palette.text.primary, 0.5) }}>
+                  <X size={20} />
+                </IconButton>
+              </Box>
+
+              {/* Drawer Content */}
+              <Box sx={{ flex: 1, overflowY: 'auto', p: 2, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                {/* Profile Section */}
+                <Box sx={{
+                  p: 2,
+                  mb: 2,
+                  borderRadius: 3,
+                  bgcolor: alpha(theme.palette.primary.main, 0.05),
+                  border: `1px solid ${alpha(theme.palette.primary.main, 0.1)}`,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 2,
+                  cursor: 'pointer',
+                  '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.08) }
+                }} onClick={(e) => { handleMenuOpen(e); setMobileMenuOpen(false); }}>
+                  <Avatar
+                    src="https://api.dicebear.com/7.x/bottts-neutral/svg?seed=hacker&backgroundColor=transparent"
+                    sx={{
+                      width: 48,
+                      height: 48,
+                      bgcolor: alpha(theme.palette.text.primary, 0.05),
+                      border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`,
+                      p: 0.2
+                    }}
+                  />
+                  <Box>
+                    <Typography sx={{ fontWeight: 800, fontSize: '1rem', color: theme.palette.text.primary }}>root</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: alpha(theme.palette.text.primary, 0.5) }}>Administrator</Typography>
+                  </Box>
+                  <ChevronRight size={16} style={{ marginLeft: 'auto', opacity: 0.5 }} />
+                </Box>
+
+                <Typography variant="caption" sx={{ px: 2, mb: 1, color: alpha(theme.palette.text.primary, 0.3), fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                  Quick Actions
+                </Typography>
+
+                <ListItemButton
+                  component={Link}
+                  to={`/${projectSlug}/projects`}
+                  onClick={() => setMobileMenuOpen(false)}
+                  sx={{ borderRadius: 2, py: 1.5 }}
+                >
+                  <ListItemIcon sx={{ color: theme.palette.primary.main }}><Folder size={20} /></ListItemIcon>
+                  <ListItemText primary={<Typography sx={{ fontWeight: 600, fontSize: '0.9rem' }}>Projects</Typography>} />
+                </ListItemButton>
+
+                <ListItemButton
+                  onClick={(e) => { handleQuickAddOpen(e); setMobileMenuOpen(false); }}
+                  sx={{ borderRadius: 2, py: 1.5 }}
+                >
+                  <ListItemIcon sx={{ color: theme.palette.primary.main }}><Plus size={20} /></ListItemIcon>
+                  <ListItemText primary={<Typography sx={{ fontWeight: 600, fontSize: '0.9rem' }}>Quick Add</Typography>} />
+                </ListItemButton>
+
+                <Divider sx={{ my: 2, opacity: 0.1 }} />
+
+                <Typography variant="caption" sx={{ px: 2, mb: 1, color: alpha(theme.palette.text.primary, 0.3), fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase' }}>
+                  Tools & Utilities
+                </Typography>
+
+                <Box sx={{ display: 'flex', gap: 2, px: 1, mb: 2 }}>
+                  <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                    <HeaderThemeSwitcher />
+                    <Typography variant="caption" sx={{ fontSize: '0.6rem', fontWeight: 600 }}>Theme</Typography>
+                  </Box>
+                  <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                    <IconButton
+                      onClick={(e) => { handleToolboxOpen(e); setMobileMenuOpen(false); }}
+                      sx={{
+                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        color: theme.palette.primary.main,
+                        width: 48,
+                        height: 48
+                      }}
+                    >
+                      <LayoutGrid size={20} />
+                    </IconButton>
+                    <Typography variant="caption" sx={{ fontSize: '0.6rem', fontWeight: 600 }}>Toolbox</Typography>
+                  </Box>
+                  <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1 }}>
+                    <IconButton
+                      onClick={(e) => { handleNotificationOpen(e); setMobileMenuOpen(false); }}
+                      sx={{
+                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        color: theme.palette.primary.main,
+                        width: 48,
+                        height: 48
+                      }}
+                    >
+                      <Badge badgeContent={unreadData?.count} color="error">
+                        <Bell size={20} />
+                      </Badge>
+                    </IconButton>
+                    <Typography variant="caption" sx={{ fontSize: '0.6rem', fontWeight: 600 }}>Alerts</Typography>
+                  </Box>
+                </Box>
+              </Box>
+
+              {/* Drawer Footer */}
+              <Box sx={{ p: 3, borderTop: `1px solid ${alpha(theme.palette.divider, 0.1)}` }}>
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  color="error"
+                  startIcon={<LogOut size={16} />}
+                  href="/logout"
+                  sx={{
+                    borderRadius: 2,
+                    borderColor: alpha(theme.palette.error.main, 0.3),
+                    '&:hover': { bgcolor: alpha(theme.palette.error.main, 0.1) }
+                  }}
+                >
+                  Logout
+                </Button>
+              </Box>
+            </Drawer>
 
             <Menu
               anchorEl={anchorEl}

@@ -60,6 +60,7 @@ import {
 import { useParams, Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import { ScanReportModal } from './ScanReportModal';
 import { StartScanModal } from './StartScanModal';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 import { timeout } from 'd3';
 
@@ -90,6 +91,19 @@ export const ScanHistoryPage: React.FC = () => {
 
   const [activeTarget, setActiveTarget] = React.useState<{ id: number; name: string } | null>(null);
   const [startScanTargets, setStartScanTargets] = React.useState<{ ids: number[]; names: string[] } | null>(null);
+
+  // Confirmation state
+  const [confirmOpen, setConfirmOpen] = React.useState(false);
+  const [confirmConfig, setConfirmConfig] = React.useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'info' | 'warning';
+  }>({
+    title: '',
+    message: '',
+    onConfirm: () => { },
+  });
 
   const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
 
@@ -191,7 +205,18 @@ export const ScanHistoryPage: React.FC = () => {
                 variant="outlined"
                 color="error"
                 startIcon={<Trash2 size={18} />}
-                onClick={() => bulkActionMutation.mutate({ action: 'bulk_delete', ids: selected })}
+                onClick={() => {
+                  setConfirmConfig({
+                    title: 'BULK DELETE SCANS',
+                    message: `Are you sure you want to delete ${selected.length} scan records? This will permanently remove all associated data.`,
+                    type: 'danger',
+                    onConfirm: () => {
+                      bulkActionMutation.mutate({ action: 'bulk_delete', ids: selected });
+                      setSelected([]);
+                    }
+                  });
+                  setConfirmOpen(true);
+                }}
                 sx={{ fontFamily: 'Orbitron', fontSize: '0.7rem', fontWeight: 800, borderColor: '#ff003c', color: '#ff003c' }}
               >
                 DELETE SELECTED
@@ -331,7 +356,7 @@ export const ScanHistoryPage: React.FC = () => {
                             '& .MuiLinearProgress-bar': {
                               bgcolor: (scan.scan_status === 0 || scan.scan_status === 3) ? '#ff003c' : '#00f3ff',
                               boxShadow: `0 0 10px ${(scan.scan_status === 0 || scan.scan_status === 3) ? 'rgba(255, 0, 60, 0.5)' : 'rgba(0, 243, 255, 0.5)'}`,
-                              ...( (scan.scan_status === 1 || scan.scan_status === -1) && {
+                              ...((scan.scan_status === 1 || scan.scan_status === -1) && {
                                 background: 'linear-gradient(90deg, #00f3ff 0%, #00a8ff 50%, #00f3ff 100%)',
                                 backgroundSize: '200% 100%',
                                 animation: 'progress-flow 2s linear infinite'
@@ -497,8 +522,16 @@ export const ScanHistoryPage: React.FC = () => {
         </MenuItem>
         <MenuItem onClick={() => {
           if (activeScanId) {
-            deleteScanMutation.mutate(activeScanId);
-            handleMenuClose();
+            setConfirmConfig({
+              title: 'DELETE SCAN RECORD',
+              message: 'Are you sure you want to delete this scan? This action is irreversible.',
+              type: 'danger',
+              onConfirm: () => {
+                deleteScanMutation.mutate(activeScanId);
+                handleMenuClose();
+              }
+            });
+            setConfirmOpen(true);
           }
         }} sx={{ color: '#ff003c !important', '& svg': { color: '#ff003c !important' } }}>
           <Trash2 size={14} /> DELETE SCAN
@@ -534,18 +567,19 @@ export const ScanHistoryPage: React.FC = () => {
           projectSlug={projectSlug}
         />
       )}
-      {/* {rescanTarget && ( 
-        <StartScanModal
-          open={rescanModalOpen}
-          onClose={() => {
-            setRescanTarget(null)
-            setRescanModalOpen(false)
-          }}
-          domainIds={rescanTarget.ids}
-          domainNames={rescanTarget.names}
-          projectSlug={projectSlug}
-        />
-      )*/}
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          confirmConfig.onConfirm();
+          setConfirmOpen(false);
+        }}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+      />
 
       <Snackbar
         open={snackbar.open}
