@@ -11,6 +11,7 @@ db.sqlite3
 db.sqlite3-journal
 media
 .dev
+release.ps1
 
 ### Django.Python Stack ###
 # Byte-compiled / optimized / DLL files

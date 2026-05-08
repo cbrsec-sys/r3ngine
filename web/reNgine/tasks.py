@@ -44,6 +44,8 @@ from reNgine.monitor_tasks import *
 from reNgine.graph_utils import Neo4jManager
 from reNgine.vulnerability_tasks import *
 from reNgine.stress_testing_tasks import run_stress_testing
+from reNgine.osint_tasks import *
+from reNgine.task_utils import run_command, save_email, save_employee, sanitize_command_for_db
 from reNgine.report_tasks import *
 try:
 	from acunetix import Acunetix
@@ -780,11 +782,18 @@ def osint(self, host=None, ctx={}, description=None):
 		)
 		grouped_tasks.append(_task)
 
-	celery_group = group(grouped_tasks)
-	job = celery_group.apply_async()
-	while not job.ready():
-		# wait for all jobs to complete
-		time.sleep(5)
+	if grouped_tasks:
+		celery_group = group(grouped_tasks)
+		job = celery_group.apply_async()
+		while not job.ready():
+			# wait for all jobs to complete
+			time.sleep(5)
+
+	logger.info('Standard OSINT Tasks finished...')
+
+	# Deep Pursuit OSINT Pipeline (holehe, maigret, LinkedInt)
+	logger.info('Starting Deep Pursuit OSINT Pipeline...')
+	osint_orchestrator.delay(scan_history_id=self.scan.id)
 
 	logger.info('OSINT Tasks finished...')
 
@@ -924,26 +933,40 @@ def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
 	# custom dorking has higher priority
 	try:
 		for custom_dork in custom_dorks:
-			lookup_target = custom_dork.get('lookup_site')
-			# replace with original host if _target_
-			lookup_target = host if lookup_target == '_target_' else lookup_target
-			if 'lookup_extensions' in custom_dork:
-				results = get_and_save_dork_results(
-					lookup_target=lookup_target,
+			if isinstance(custom_dork, str):
+				# Handle simple string query from YAML
+				query = custom_dork.replace('_target_', host)
+				logger.info(f'Processing YAML custom dork: {query}')
+				get_and_save_dork_results(
+					lookup_target=host,
 					results_dir=results_dir,
-					type='custom_dork',
-					lookup_extensions=custom_dork.get('lookup_extensions'),
+					type='custom_dork_yaml',
+					lookup_keywords=query,
 					scan_history=scan_history
 				)
-			elif 'lookup_keywords' in custom_dork:
-				results = get_and_save_dork_results(
-					lookup_target=lookup_target,
-					results_dir=results_dir,
-					type='custom_dork',
-					lookup_keywords=custom_dork.get('lookup_keywords'),
-					scan_history=scan_history
-				)
+			elif isinstance(custom_dork, dict):
+				# Handle structured dict from YAML
+				lookup_target = custom_dork.get('lookup_site')
+				# replace with original host if _target_
+				lookup_target = host if lookup_target == '_target_' else lookup_target
+				if 'lookup_extensions' in custom_dork:
+					results = get_and_save_dork_results(
+						lookup_target=lookup_target,
+						results_dir=results_dir,
+						type='custom_dork',
+						lookup_extensions=custom_dork.get('lookup_extensions'),
+						scan_history=scan_history
+					)
+				elif 'lookup_keywords' in custom_dork:
+					results = get_and_save_dork_results(
+						lookup_target=lookup_target,
+						results_dir=results_dir,
+						type='custom_dork',
+						lookup_keywords=custom_dork.get('lookup_keywords'),
+						scan_history=scan_history
+					)
 	except Exception as e:
+		logger.error(f'Error processing custom dorks from YAML: {str(e)}')
 		logger.exception(e)
 
 	# Process raw custom dorks from UI/ScanHistory
@@ -5061,102 +5084,8 @@ def remove_duplicate_endpoints(
 					ep.delete()
 				logger.warning(msg)
 
-def sanitize_command_for_db(cmd):
-	"""
-	Strips 'export HTTP_PROXY=... &&' and 'proxychains4 -f ...' from command
-	to ensure the UI displays the actual tool name and clean command.
-	"""
-	if not cmd:
-		return cmd
-	# Strip export statements (matches both single and double quotes)
-	cmd = re.sub(r'^export\s+.*?\s+&&\s+', '', cmd)
-	# Strip proxychains4 wrapper with its config file
-	cmd = re.sub(r'^(?:[/\w]*/)?proxychains4\s+-f\s+\S+\s+', '', cmd)
-	return cmd
+# run_command and sanitize_command_for_db moved to task_utils.py
 
-@app.task(name='run_command', bind=False, queue='run_command_queue')
-def run_command(
-		cmd, 
-		cwd=None, 
-		shell=False, 
-		history_file=None, 
-		scan_id=None, 
-		activity_id=None,
-		remove_ansi_sequence=False,
-		proxy=None
-	):
-	"""Run a given command using subprocess module.
-
-	Args:
-		cmd (str): Command to run.
-		cwd (str): Current working directory.
-		echo (bool): Log command.
-		shell (bool): Run within separate shell if True.
-		history_file (str): Write command + output to history file.
-		remove_ansi_sequence (bool): Used to remove ANSI escape sequences from output such as color coding
-		proxy (str): If provided, may be used for proxychains wrapping.
-	Returns:
-		tuple: Tuple with return_code, output.
-	"""
-	logger.info(cmd)
-	logger.warning(activity_id)
-
-	conf_path = None
-	if proxy:
-		proxy_manager = ProxychainsWrapper()
-		if proxy_manager.should_wrap():
-			cmd, conf_path = proxy_manager.wrap_command(cmd, proxy=proxy)
-
-	# Create a command record in the database
-	command_obj = Command.objects.create(
-		command=sanitize_command_for_db(cmd),
-		time=timezone.now(),
-		scan_history_id=scan_id,
-		activity_id=activity_id)
-
-	# Run the command using subprocess
-	try:
-		popen = subprocess.Popen(
-			cmd if shell else cmd.split(),
-			shell=shell,
-			stdout=subprocess.PIPE,
-			stderr=subprocess.STDOUT,
-			cwd=cwd,
-			universal_newlines=True)
-		output = ''
-		for stdout_line in iter(popen.stdout.readline, ""):
-			item = stdout_line.strip()
-			output += '\n' + item
-			logger.debug(item)
-		popen.stdout.close()
-		try:
-			popen.wait(timeout=30)
-		except subprocess.TimeoutExpired:
-			popen.kill()
-			return_code = 124 # Timeout
-			output += "\nCommand timed out after 30 seconds."
-		else:
-			return_code = popen.returncode
-	except Exception as e:
-		logger.error(f"Error executing command {cmd}: {str(e)}")
-		output = f"Error executing command: {str(e)}"
-		return_code = 127 # Command not found / error
-	finally:
-		if conf_path and os.path.exists(conf_path):
-			os.remove(conf_path)
-
-	command_obj.output = output
-	command_obj.return_code = return_code
-	command_obj.save()
-	if history_file:
-		mode = 'a'
-		if not os.path.exists(history_file):
-			mode = 'w'
-		with open(history_file, mode) as f:
-			f.write(f'\n{cmd}\n{return_code}\n{output}\n------------------\n')
-	if remove_ansi_sequence:
-		output = remove_ansi_escape_sequences(output)
-	return return_code, output
 
 
 #-------------#
@@ -5327,25 +5256,28 @@ def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=
 			scan_history (startScan.ScanHistory): Scan History Object
 	"""
 	results = []
-	gofuzz_command = f'{GOFUZZ_EXEC_PATH} -t {lookup_target} -d {delay} -p {page_count}'
+	# Use quotes around arguments to handle spaces and special characters safely in the shell
+	gofuzz_command = f'{GOFUZZ_EXEC_PATH} -t "{lookup_target}" -d {delay} -p {page_count}'
 	proxy = get_random_proxy()
 
 	if lookup_extensions:
-		gofuzz_command += f' -e {lookup_extensions}'
+		gofuzz_command += f' -e "{lookup_extensions}"'
 	elif lookup_keywords:
-		gofuzz_command += f' -w {lookup_keywords}'
+		# Double quote keywords to preserve complex dork queries, escaping any inner quotes
+		escaped_keywords = lookup_keywords.replace('"', '\\"')
+		gofuzz_command += f' -w "{escaped_keywords}"'
 
 	if proxy:
-		gofuzz_command += f' -r {proxy}'
+		gofuzz_command += f' -r "{proxy}"'
 
 	output_file = f'{results_dir}/gofuzz.txt'
-	gofuzz_command += f' -o {output_file}'
+	gofuzz_command += f' -o "{output_file}"'
 	history_file = f'{results_dir}/commands.txt'
 
 	try:
 		run_command(
 			gofuzz_command,
-			shell=False,
+			shell=True, # Use shell=True to handle quoted arguments correctly
 			history_file=history_file,
 			scan_id=scan_history.id,
 			proxy=proxy
@@ -5601,35 +5533,7 @@ def save_subdomain(subdomain_name, ctx={}):
 	return subdomain, created
 
 
-def save_email(email_address, scan_history=None):
-	if not validators.email(email_address):
-		logger.info(f'Email {email_address} is invalid. Skipping.')
-		return None, False
-	email, created = Email.objects.get_or_create(address=email_address)
-	# if created:
-	# 	logger.warning(f'Found new email address {email_address}')
-
-	# Add email to ScanHistory
-	if scan_history:
-		scan_history.emails.add(email)
-		scan_history.save()
-
-	return email, created
-
-
-def save_employee(name, designation, scan_history=None):
-	employee, created = Employee.objects.get_or_create(
-		name=name,
-		designation=designation)
-	# if created:
-	# 	logger.warning(f'Found new employee {name}')
-
-	# Add employee to ScanHistory
-	if scan_history:
-		scan_history.employees.add(employee)
-		scan_history.save()
-
-	return employee, created
+# save_email and save_employee moved to task_utils.py
 
 
 def save_ip_address(ip_address, subdomain=None, subscan=None, **kwargs):

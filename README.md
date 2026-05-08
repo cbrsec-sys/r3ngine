@@ -56,10 +56,8 @@ The core scanning engines have been upgraded to provide "Verification-First" rec
 
 ### 🕵️ Surgical Recon & API Discovery
 The reconnaissance pipeline has been deepened to handle modern, API-centric web architectures.
-*   **Advanced Web API Discovery**: A dedicated pipeline featuring **Kiterunner** (API brute-forcing), **Arjun** (Parameter discovery), **ParamSpider**, **InQL** (GraphQL analysis), and **LinkFinder**.
-*   **Spiderfoot OSINT 2.0**: Full integration of Spiderfoot as a standalone scan module with custom intensity profiles (`fast`, `normal`, `deep`) and concurrency management.
-*   **Continuous Monitoring Engine**: Automated periodic discovery of new subdomains, directories, and login pages with real-time alerting via Discord, Slack, and Telegram.
-*   **OSINT Intelligence Dashboard**: A new visualization suite aggregating email exposures, leaked credentials, employee insights, and automated search engine dorking.
+*   **Deep Pursuit OSINT Engine**: A modernized, high-performance intelligence pipeline that replaces heavy Spiderfoot scans with surgical discovery. Featuring **holehe** for email pivots, **maigret** for cross-platform social profile mapping, and **LinkedInt** for corporate employee scraping.
+*   **OSINT Intelligence Dashboard**: Aggregated view of emails, leaks, employees, dorks, and document metadata.
 
 ### 🥷 Stealth, OpSec & Infrastructure
 Operational security is no longer an afterthought; it is baked into every execution.

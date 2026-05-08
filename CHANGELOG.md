@@ -4,6 +4,13 @@
 **Official Repo location:** https://github.com/whiterabb17/r3ngine
  
 ### New Features
+- **Deep Pursuit OSINT Engine & Intelligence Hub**:
+  - Replaced heavy Spiderfoot reliance with a modular, high-performance OSINT pipeline.
+  - **Tool Orchestration**: Integrated `holehe` (email pivots), `maigret` (social profile mapping), and `LinkedInt` (employee scraper) into the core Celery task chain.
+  - **Social Footprint Intelligence**: Added automated discovery of social media accounts associated with discovered emails, visualized in the enhanced "Emails & Credentials" section.
+  - **Employee Dossiers**: Integrated username-to-profile mapping, allowing users to pivot from professional identities to social footprints with direct profile links.
+  - **Metadata Persistence**: Added a schema-less `metadata` JSONField to `Email` and `Employee` models for storing rich, tool-specific intelligence findings.
+  - **OpSec Proxy Rotation**: Fully integrated the `OpSecManager` into the OSINT pipeline, ensuring per-tool proxy rotation for all reconnaissance activities.
 - **Responsive Header & Mobile Navigation Orchestration**:
   - Implemented a smart, responsive header using `useMediaQuery` to adapt to limited screen real estate.
   - **Premium Hamburger Menu**: Developed a dedicated mobile drawer for viewports where header items overflow (typically < 1200px).

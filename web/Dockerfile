@@ -55,11 +55,17 @@ RUN apt update -y && \
     apt install -y --no-install-recommends \
     build-essential \
     cmake \
+    meson \
+    ninja-build \
+    pkg-config \
+    libcairo2-dev \
     geoip-bin \
     geoip-database \
     gcc \
     git \
     libpq-dev \
+    libxml2-dev \
+    libxslt-dev \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     libpcap-dev \
@@ -174,8 +180,8 @@ RUN ARCH=$(dpkg --print-architecture) \
     && mv aquatone /usr/local/bin/ \
     && rm -rf aquatone_linux_${ARCH}_1.7.0.zip README.md LICENSE.txt
 
-# Install Arjun, InQL, Netlas
-RUN pip3 install --upgrade arjun inql netlas
+# Install Arjun, InQL, Netlas, holehe, maigret
+RUN pip3 install --upgrade arjun inql netlas holehe maigret
 
 RUN ARCH=$(dpkg --print-architecture) \
     && wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
@@ -266,6 +272,9 @@ RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
 
 RUN git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner && \
     cd /usr/src/github/cpanel2shell-scanner && pip3 install -r requirements.txt
+
+RUN git clone https://github.com/mdunivant/LinkedInt /usr/src/github/LinkedInt && \
+    cd /usr/src/github/LinkedInt && pip3 install -r requirements.txt
 
 # Create a robust cPanel username wordlist
 RUN mkdir -p /usr/src/wordlist && \
