@@ -8,6 +8,8 @@ from reNgine.task_utils import run_command, save_email, save_employee
 from reNgine.opsec_utils import OpSecManager
 from startScan.models import ScanHistory, Email, Employee
 from reNgine.definitions import *
+from reNgine.linkedint_utils import LinkedIntRunner
+from dashboard.models import LinkedInCredentials, HunterIOAPIKey
 
 logger = get_task_logger(__name__)
 
@@ -108,19 +110,61 @@ def run_linkedint(company_name, scan_history_id):
     """
     try:
         scan_history = ScanHistory.objects.get(pk=scan_history_id)
-        linkedint_dir = '/usr/src/github/LinkedInt'
-        results_dir = f"{scan_history.results_dir}/osint/linkedint"
-        os.makedirs(results_dir, exist_ok=True)
         
-        # LinkedInt needs a lot of setup (cookies, etc.), 
-        # this is a placeholder for the actual command execution.
-        # Ideally we'd have a session cookie in the configuration.
+        # 1. Check for credentials
+        linkedin_creds = LinkedInCredentials.objects.first()
+        hunter_key = HunterIOAPIKey.objects.first()
         
-        # For now, let's assume it's configured or we're just running a basic check.
-        # cmd = ['python3', 'LinkedInt.py', '-c', company_name, '-o', f"{results_dir}/employees.csv"]
+        if not linkedin_creds or not linkedin_creds.username or not linkedin_creds.password:
+            logger.warning(f"LinkedIn credentials not configured for {company_name}. Skipping LinkedInt.")
+            return []
+            
+        if not hunter_key or not hunter_key.key:
+            logger.warning(f"Hunter.io API key not configured for {company_name}. Skipping LinkedInt.")
+            return []
+
+        # 2. Update the original script file if it exists (User request for persistence)
+        linkedint_path = '/usr/src/github/LinkedInt/LinkedInt.py'
+        if os.path.exists(linkedint_path):
+            try:
+                with open(linkedint_path, 'r') as f:
+                    content = f.read()
+                
+                # Update variables in the script
+                # This is a bit brute-force but follows user requirement
+                new_content = content
+                new_content = re.sub(r'api_key\s*=\s*".*"', f'api_key = "{hunter_key.key}"', new_content)
+                new_content = re.sub(r'username\s*=\s*".*"', f'username = "{linkedin_creds.username}"', new_content)
+                new_content = re.sub(r'password\s*=\s*".*"', f'password = "{linkedin_creds.password}"', new_content)
+                
+                if new_content != content:
+                    with open(linkedint_path, 'w') as f:
+                        f.write(new_content)
+                    logger.info("Updated LinkedInt.py script with latest credentials.")
+            except Exception as e:
+                logger.error(f"Failed to update LinkedInt.py file: {str(e)}")
+
+        # 3. Execute using internal Runner (Python 3 compatible)
+        runner = LinkedIntRunner(
+            username=linkedin_creds.username,
+            password=linkedin_creds.password,
+            hunter_api_key=hunter_key.key,
+            logger=logger
+        )
         
-        # Placeholder for LinkedInt logic
-        return []
+        domain = scan_history.domain.name
+        employees = runner.run(company_name, domain)
+        
+        # For now, we'll log that we've finished. 
+        # In the future, we'll save the employees list.
+        if employees:
+            for emp_data in employees:
+                # Assuming emp_data is {name, email, position}
+                emp, _ = save_employee(emp_data['name'], scan_history=scan_history)
+                if 'email' in emp_data:
+                    save_email(emp_data['email'], scan_history=scan_history, employee=emp)
+        
+        return [f"LinkedInt processed {len(employees)} employees for {company_name}"]
     except Exception as e:
         logger.error(f"Error running LinkedInt for {company_name}: {str(e)}")
         return []

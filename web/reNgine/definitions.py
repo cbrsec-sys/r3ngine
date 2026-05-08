@@ -106,7 +106,7 @@ TRUFFLEHOG = 'trufflehog'
 RUN_CPANEL_SCAN = 'run_cpanel_scan'
 CPANEL_USER_WORDLIST = 'cpanel_user_wordlist'
 CPANEL_SCANNER_PROXY_TYPE = 'proxy_type'
-CPANEL_SCANNER_DEFAULT_WORDLIST = '/usr/src/wordlist/cpanel_users.txt'
+CPANEL_SCANNER_DEFAULT_WORDLIST = '/usr/src/app/wordlist/auth/cpanel_users.txt'
 
 
 ###############################################################################

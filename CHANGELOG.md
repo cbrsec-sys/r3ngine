@@ -11,6 +11,11 @@
   - **Employee Dossiers**: Integrated username-to-profile mapping, allowing users to pivot from professional identities to social footprints with direct profile links.
   - **Metadata Persistence**: Added a schema-less `metadata` JSONField to `Email` and `Employee` models for storing rich, tool-specific intelligence findings.
   - **OpSec Proxy Rotation**: Fully integrated the `OpSecManager` into the OSINT pipeline, ensuring per-tool proxy rotation for all reconnaissance activities.
+- **LinkedInt & Hunter.io Credential Orchestration**:
+  - Integrated secure credential management for LinkedIn and Hunter.io in the reNgine API Vault.
+  - Refactored `LinkedInt` into a Python 3 native `LinkedIntRunner` utility for seamless background execution.
+  - Implemented automated credential injection into legacy OSINT scripts for backward compatibility.
+  - Added graceful skip logic to the OSINT pipeline, ensuring scans continue if social credentials are not configured.
 - **Responsive Header & Mobile Navigation Orchestration**:
   - Implemented a smart, responsive header using `useMediaQuery` to adapt to limited screen real estate.
   - **Premium Hamburger Menu**: Developed a dedicated mobile drawer for viewports where header items overflow (typically < 1200px).
