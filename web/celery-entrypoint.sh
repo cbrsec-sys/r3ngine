@@ -84,7 +84,7 @@ then
 fi
 
 # Setup Auth Brute-Force Wordlists
-if [ ! -d "/usr/src/wordlist/auth" ]
+if [ ! -d "/usr/src/wordlist/auth" ];
 then
   echo "Making Auth Wordlist directory"
   mkdir -p /usr/src/wordlist/auth
@@ -93,7 +93,7 @@ echo "Copying Auth Wordlists"
 cp -r /usr/src/app/wordlist/auth/* /usr/src/wordlist/auth/
 
 # vulscan is a special case (nmap script)
-if [ ! -d "/usr/src/github/scipag_vulscan" ]
+if [ ! -d "/usr/src/github/scipag_vulscan" ];
 then
   echo "Cloning Nmap Vulscan script"
   git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan
@@ -102,18 +102,20 @@ then
   echo "Usage in reNgine, set vulscan/vulscan.nse in nmap_script scanEngine port_scan config parameter"
 fi
 
-if [ ! -f '/usr/local/bin/kr']
+if [ ! -f '/usr/local/bin/kr' ];
 then
   echo "Installing kiterunner"
-  ARCH=$(dpkg --print-architecture)
-  wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz
-  tar -xvf kiterunner_1.0.2_linux_${ARCH}.tar.gz
-  mv kr /usr/local/bin/
+  cd /usr/src/github
+  ARCH=$(dpkg --print-architecture) && \
+  wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
+  tar -xvf kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
+  mv kr /usr/local/bin/ && \
   rm -rf kiterunner_1.0.2_linux_${ARCH}.tar.gz
+  cd /usr/src/app
 fi
 
 # Install CMSeeK
-if [ ! -d '/usr/src/github/CMSeeK']
+if [ ! -d '/usr/src/github/CMSeeK' ];
 then
   echo "Cloning CMSeeK"
   git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK
@@ -121,7 +123,7 @@ then
 fi
 
 # Install LinkFinder
-if [ ! -d '/usr/src/github/LinkFinder']
+if [ ! -d '/usr/src/github/LinkFinder' ];
 then
   echo "Cloning LinkFinder"
   git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder
@@ -129,7 +131,7 @@ then
 fi
 
 # Install ParamSpider
-if [ ! -d '/usr/src/github/ParamSpider']
+if [ ! -d '/usr/src/github/ParamSpider' ];
 then
   echo "Cloning ParamSpider"
   git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider
@@ -137,55 +139,55 @@ then
 fi
 
 # Install Semgrep
-if [ ! -d '/usr/src/github/semgrep']
+if [ ! -d '/usr/src/github/semgrep' ];
 then
   echo "Cloning Semgrep"
   git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep
   cd /usr/src/github/semgrep && pip3 install .
 fi
 
-if [ ! -d '/usr/src/github/Sublist3r']
+if [ ! -d '/usr/src/github/Sublist3r' ];
 then
   echo "Cloning Sublist3r"
   git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r
   cd /usr/src/github/Sublist3r && pip3 install -r requirements.txt
 fi
 
-if [ ! -d '/usr/src/github/OneForAll']
+if [ ! -d '/usr/src/github/OneForAll' ];
 then
   echo "Cloning OneForAll"
   git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll
   cd /usr/src/github/OneForAll && pip3 install -r requirements.txt
 fi
 
-if [ ! -d '/usr/src/github/theHarvester']
+if [ ! -d '/usr/src/github/theHarvester' ];
 then
   echo "Cloning theHarvester"
   git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester
   cd /usr/src/github/theHarvester && uv sync
 fi
 
-if [ ! -d '/usr/src/github/ctfr']
+if [ ! -d '/usr/src/github/ctfr' ];
 then
   echo "Cloning ctfr"
   git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr
   cd /usr/src/github/ctfr && pip3 install -r requirements.txt
 fi
 
-if [ ! -d '/usr/src/github/acunetix-python']
+if [ ! -d '/usr/src/github/acunetix-python' ];
 then
   echo "Cloning acunetix-python"
   git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python
   cd /usr/src/github/acunetix-python && pip3 install .
 fi
 
-if [ ! -d '/usr/src/github/awvs14-scan']
+if [ ! -d '/usr/src/github/awvs14-scan' ];
 then
   echo "Cloning awvs14-scan"
   git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-scan
 fi
 
-if [ ! -d '/usr/src/github/GooFuzz']
+if [ ! -d '/usr/src/github/goofuzz' ];
 then
   echo "Cloning GooFuzz"
   DIR=$(pwd)
@@ -198,14 +200,14 @@ then
   cd $DIR
 fi
 
-if [ ! -d '/usr/src/github/spiderfoot']
+if [ ! -d '/usr/src/github/spiderfoot' ];
 then
   echo "Cloning spiderfoot"
   git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
   cd /usr/src/github/spiderfoot && pip3 install -r requirements.txt
 fi
 
-if [ ! -d '/usr/src/github/cpanel2shell-scanner']
+if [ ! -d '/usr/src/github/cpanel2shell-scanner' ];
 then
   echo "Cloning cpanel2shell-scanner"
   git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner
@@ -220,6 +222,7 @@ if [ ! -f '/usr/src/wordlist/cpanel_users.txt' ]; then
   sort -u /usr/src/wordlist/cpanel_users.txt -o /usr/src/wordlist/cpanel_users.txt
 fi
 
+cd /usr/src/app
 # install h8mail
 python3 -m pip install h8mail
 
