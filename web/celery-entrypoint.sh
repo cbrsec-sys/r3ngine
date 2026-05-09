@@ -119,67 +119,73 @@ if [ ! -d '/usr/src/github/CMSeeK' ];
 then
   echo "Cloning CMSeeK"
   git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK
-  pip3 install -r /usr/src/github/CMSeeK/requirements.txt
 fi
+pip3 install -r /usr/src/github/CMSeeK/requirements.txt
 
 # Install LinkFinder
 if [ ! -d '/usr/src/github/LinkFinder' ];
 then
   echo "Cloning LinkFinder"
   git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder
-  cd /usr/src/github/LinkFinder && pip3 install -r requirements.txt && python3 setup.py install
 fi
+pip3 install -r /usr/src/github/LinkFinder/requirements.txt
+cd /usr/src/github/LinkFinder
+python3 setup.py install
+cd /usr/src/app
 
 # Install ParamSpider
 if [ ! -d '/usr/src/github/ParamSpider' ];
 then
   echo "Cloning ParamSpider"
   git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider
-  cd /usr/src/github/ParamSpider && pip3 install . && python3 setup.py install
 fi
+cd /usr/src/github/ParamSpider && pip3 install . && python3 setup.py install
+cd /usr/src/app
 
 # Install Semgrep
 if [ ! -d '/usr/src/github/semgrep' ];
 then
   echo "Cloning Semgrep"
   git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep
-  cd /usr/src/github/semgrep && pip3 install .
 fi
+cd /usr/src/github/semgrep
+pip3 install .
+cd /usr/src/app
 
 if [ ! -d '/usr/src/github/Sublist3r' ];
 then
   echo "Cloning Sublist3r"
   git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r
-  cd /usr/src/github/Sublist3r && pip3 install -r requirements.txt
 fi
+pip3 install -r /usr/src/github/Sublist3r/requirements.txt
 
 if [ ! -d '/usr/src/github/OneForAll' ];
 then
   echo "Cloning OneForAll"
   git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll
-  cd /usr/src/github/OneForAll && pip3 install -r requirements.txt
 fi
+pip3 install -r /usr/src/github/OneForAll/requirements.txt
 
 if [ ! -d '/usr/src/github/theHarvester' ];
 then
   echo "Cloning theHarvester"
   git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester
-  cd /usr/src/github/theHarvester && uv sync
 fi
+uv sync /usr/src/github/theHarvester
 
 if [ ! -d '/usr/src/github/ctfr' ];
 then
   echo "Cloning ctfr"
   git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr
-  cd /usr/src/github/ctfr && pip3 install -r requirements.txt
 fi
+pip3 install -r /usr/src/github/ctfr/requirements.txt
 
 if [ ! -d '/usr/src/github/acunetix-python' ];
 then
   echo "Cloning acunetix-python"
   git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python
-  cd /usr/src/github/acunetix-python && pip3 install .
 fi
+pip3 install -r /usr/src/github/acunetix-python/requirements.txt
 
 if [ ! -d '/usr/src/github/goofuzz' ];
 then
@@ -198,15 +204,15 @@ if [ ! -d '/usr/src/github/spiderfoot' ];
 then
   echo "Cloning spiderfoot"
   git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
-  cd /usr/src/github/spiderfoot && pip3 install -r requirements.txt
 fi
+pip3 install -r /usr/src/github/spiderfoot/requirements.txt
 
 if [ ! -d '/usr/src/github/cpanel2shell-scanner' ];
 then
   echo "Cloning cpanel2shell-scanner"
   git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner
-  cd /usr/src/github/cpanel2shell-scanner && pip3 install -r requirements.txt
 fi
+pip3 install -r /usr/src/github/cpanel2shell-scanner/requirements.txt
 
 # Create a robust cPanel username wordlist
 if [ ! -f '/usr/src/wordlist/cpanel_users.txt' ]; then

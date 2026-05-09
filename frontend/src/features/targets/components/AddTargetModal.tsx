@@ -57,7 +57,7 @@ export const AddTargetModal: React.FC<AddTargetModalProps> = ({ open, onClose, p
 
     addTarget({ 
       domain_name: formData.domain_name, 
-      project_slug: projectSlug,
+      slug: projectSlug,
       organization: formData.organization,
       h1_team_handle: formData.h1_team_handle,
       description: formData.description,

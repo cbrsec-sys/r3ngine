@@ -1,5 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Domain, Organization } from '../types';
+import type { paths, operations, components } from '@/types/api';
+import type { Domain, Organization, Engine } from '../types';
+
+
+
 
 export const useDomains = (projectSlug: string) => {
   return useQuery<Domain[]>({
@@ -11,15 +15,13 @@ export const useDomains = (projectSlug: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json();
-      if (Array.isArray(data)) return data;
-      if (data.results && Array.isArray(data.results)) return data.results;
-      if (data.data && Array.isArray(data.data)) return data.data;
-      return [];
+      const data = await response.json() as operations["listTargets_list"]["responses"]["200"]["content"]["application/json"];
+      return data.results || [];
     },
     enabled: !!projectSlug,
   });
 };
+
 
 export const useAddTarget = (projectSlug: string) => {
   const queryClient = useQueryClient();
@@ -27,7 +29,7 @@ export const useAddTarget = (projectSlug: string) => {
   return useMutation({
     mutationFn: async (params: {
       domain_name: string;
-      project_slug: string;
+      slug: string;
       organization?: string;
       h1_team_handle?: string;
       description?: string;
@@ -45,19 +47,7 @@ export const useAddTarget = (projectSlug: string) => {
           'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
         },
         credentials: 'include',
-        body: JSON.stringify({
-          domain_name: params.domain_name,
-          slug: params.project_slug,
-          organization: params.organization,
-          h1_team_handle: params.h1_team_handle,
-          description: params.description,
-          is_monitored: params.is_monitored,
-          monitor_frequency: params.monitor_frequency,
-          monitor_engine_id: params.monitor_engine_id,
-          monitor_scan_scope: params.monitor_scan_scope,
-          starting_point_path: params.starting_point_path,
-          excluded_paths: params.excluded_paths,
-        }),
+        body: JSON.stringify(params),
       });
 
       if (!response.ok) {
@@ -72,6 +62,7 @@ export const useAddTarget = (projectSlug: string) => {
     },
   });
 };
+
 
 export const useOrganizations = () => {
   return useQuery<Organization[]>({
@@ -139,7 +130,7 @@ export const useTargetSummary = (projectSlug: string, targetId: number) => {
 };
 
 export const useEngines = () => {
-  return useQuery<any[]>({
+  return useQuery<Engine[]>({
     queryKey: ['engines'],
     queryFn: async () => {
       const response = await fetch('/api/listEngines/', {
@@ -148,11 +139,15 @@ export const useEngines = () => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json();
-      return data.engines || data || [];
+      const data = await response.json() as any;
+      // listEngines returns a list directly in some cases, or wrapped in an object
+      if (Array.isArray(data)) return data as Engine[];
+      if ('engines' in data && Array.isArray(data.engines)) return data.engines as Engine[];
+      return [] as Engine[];
     },
   });
 };
+
 
 export const useResolveIP = () => {
   return useMutation({

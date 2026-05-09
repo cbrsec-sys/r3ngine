@@ -42,8 +42,8 @@ export const SubScansPage: React.FC = () => {
   const filteredData = useMemo(() => {
     if (!data) return [];
     return data.filter(scan => 
-      scan.subdomain_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      scan.type.toLowerCase().includes(searchQuery.toLowerCase())
+      scan.subdomain_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      scan.type?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [data, searchQuery]);
 
@@ -63,7 +63,7 @@ export const SubScansPage: React.FC = () => {
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedIds(filteredData.map(s => s.id));
+      setSelectedIds(filteredData.map(s => s.id!));
     } else {
       setSelectedIds([]);
     }
@@ -260,7 +260,7 @@ export const SubScansPage: React.FC = () => {
             ) : (
               paginatedData.map((scan) => (
                 <tr 
-                  key={scan.id} 
+                  key={scan.id!} 
                   style={{ 
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     transition: 'background 0.2s',
@@ -271,14 +271,14 @@ export const SubScansPage: React.FC = () => {
                   <td style={{ padding: '12px 16px' }}>
                     <input 
                       type="checkbox" 
-                      checked={selectedIds.includes(scan.id)}
-                      onChange={() => handleSelectOne(scan.id)}
+                      checked={selectedIds.includes(scan.id!)}
+                      onChange={() => handleSelectOne(scan.id!)}
                       style={{ accentColor: '#bc13fe' }}
                     />
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '13px' }}>{scan.subdomain_name}</Typography>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>{scan.subdomain_name.split('.').slice(-2).join('.')}</Typography>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>{scan.subdomain_name?.split('.').slice(-2).join('.') || ''}</Typography>
                     <Box sx={{ mt: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       <Typography sx={{ color: '#00f3ff', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}>
                         Recent Scan <ExternalLink size={10} />

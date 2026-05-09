@@ -120,7 +120,7 @@ export const ScanHistoryPage: React.FC = () => {
 
   const handleSelectAllClick = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked && scans) {
-      const newSelecteds = scans.map((n) => n.id);
+      const newSelecteds = scans.map((n) => n.id!);
       setSelected(newSelecteds);
       return;
     }
@@ -279,13 +279,13 @@ export const ScanHistoryPage: React.FC = () => {
             </TableHead>
             <TableBody>
               {paginatedScans.map((scan) => {
-                const isItemSelected = isSelected(scan.id);
-                const displayProgress = (scan.scan_status === 2 || scan.scan_status === 0 || scan.scan_status === 3) ? 100 : (scan.current_progress || 0);
+                const isItemSelected = isSelected(scan.id!);
+                const displayProgress = (scan.scan_status === 2 || scan.scan_status === 0 || scan.scan_status === 3) ? 100 : Number(scan.current_progress || 0);
                 return (
                   <TableRow
-                    key={scan.id}
+                    key={scan.id!}
                     hover
-                    onClick={() => handleClick(scan.id)}
+                    onClick={() => handleClick(scan.id!)}
                     role="checkbox"
                     aria-checked={isItemSelected}
                     selected={isItemSelected}
@@ -341,7 +341,7 @@ export const ScanHistoryPage: React.FC = () => {
                       />
                     </TableCell>
                     <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      {getStatusChip(scan.scan_status)}
+                      {getStatusChip(scan.scan_status!)}
                     </TableCell>
                     <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', minWidth: 120 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -365,7 +365,7 @@ export const ScanHistoryPage: React.FC = () => {
                           }}
                         />
                         <Typography variant="caption" sx={{ fontWeight: 900, color: '#fff', fontSize: '0.65rem', fontFamily: 'Orbitron', minWidth: 30 }}>
-                          {Math.round(displayProgress)}%
+                          {Math.round(Number(displayProgress))}%
                         </Typography>
                       </Box>
                     </TableCell>
@@ -402,11 +402,11 @@ export const ScanHistoryPage: React.FC = () => {
                         <IconButton
                           size="small"
                           onClick={() => {
-                            const match = domains?.find(d => d.id === scan.domain.id);
+                            const match = domains?.find(d => d.id === scan.domain?.id);
                             if (!match) return;
                             setStartScanTargets({
-                              ids: [match.id],
-                              names: [match.name],
+                              ids: [match.id!],
+                              names: [match.name!],
                             });
                           }}
                           sx={{ color: 'rgba(112, 206, 35, 0.63)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
@@ -417,7 +417,7 @@ export const ScanHistoryPage: React.FC = () => {
                           size="small"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleMenuOpen(e, scan.id, scan.domain?.name);
+                            handleMenuOpen(e, scan.id!, scan.domain?.name || 'N/A');
                           }}
                           sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
                         >

@@ -19,6 +19,7 @@
       "node",
       "react",
       "react-dom"
-    ]
+    ],
+    "ignoreDeprecations": "6.0"
   }
 }

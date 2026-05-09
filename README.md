@@ -54,7 +54,6 @@ The core scanning engines have been upgraded to provide "Verification-First" rec
 *   **Persistent Vulnerability State Tracking**: Automated lifecycle management that identifies **"RESOLVED"** findings by diffing historical scan runs. Features a manual **"CLOSED"** verification flow, ensuring consistent and historical vulnerability data across the entire target lifecycle.
 *   **Centralized Brute-Force Orchestration**: A multi-tiered authentication attack pipeline that supports **multi-service targeting (SSH, FTP, HTTP, SMB, RDP, Telnet)**. Centralizes targets from Nmap, Nuclei, and intelligent form extraction into a unified `AuthCandidate` queue, orchestrated via **Hydra** with full OpSec controls.
 *   **Autonomous Plugin Management**: A powerful, modular system to extend reNgine with custom engines and dynamic UI components. Features **Atomic Installation** with background tool installation (`tools.yaml`), automated engine registration via fixtures, and persistent startup verification.
-*   **Bulk Target Ingestion & Monitoring Parity**: Completely overhauled the "Add Target" workflow to support bulk multiline input and advanced continuous monitoring settings (Frequency, Engine, and Scope), achieving full feature parity with the legacy architecture.
 
 ### ⚡ Resource Management & Efficiency
 Optimization is a first-class citizen in v3, ensuring high-performance reconnaissance even on resource-constrained host machines.
@@ -194,6 +193,17 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **Export/Import**: Interoperable with other tools via JSON, CSV, and TXT.
 -optimizer
 * integrated tools: Chaos, TLSX, CTFR, Netlas, Katana, Medusa.
+
+![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
+
+## 🛠️ Development & Strict Type Safety
+
+The r3ngine v3 frontend is built with a "Safety-First" philosophy, enforcing strict TypeScript constraints to ensure production reliability.
+
+*   **Full Strict Mode**: The entire React codebase compiles under `strict: true`, eliminating hidden null pointers and undefined property access at build time.
+*   **Contract Integrity**: Frontend models are strictly mapped to the auto-generated OpenAPI schema (`src/types/api.ts`). We enforce `verbatimModuleSyntax` to optimize build-time tree shaking and ensure type-only imports are explicitly marked.
+*   **Modular Architecture**: Following a feature-based structure, each module (`targets`, `scans`, `vulnerabilities`) maintains its own API hooks and types, inheriting from the global contract while providing specialized UI adaptations.
+*   **Production Hardening**: Our CI/CD pipeline validates every commit against `tsc -b` and `vite build`. We prioritize type-safe UI components over loose `any` declarations, utilizing safe type guards and defensive casting for robust API integration.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
