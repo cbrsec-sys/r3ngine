@@ -6,6 +6,11 @@
 ### Added
 - **Multi-Service Brute-Force Orchestration**: Updated brute-force engine schema to support an array of services (SSH, FTP, HTTP, SMB, RDP, Telnet).
 - **Brute-Force Candidate Filtering**: Refactored `BruteForceOrchestrator` to dynamically filter `AuthCandidate` records based on the engine's allowed services.
+- **Adaptive Stress & Resilience Engine (ASRE)**: Implemented full-scale endpoint stress testing directly within the reNgine workflow.
+  - **Multi-Tool Orchestration**: Seamlessly orchestrated backend stress tests via Celery, driving load testing tools such as `k6`, `wrk`, `hping3`, and `Locust`.
+  - **Real-Time Telemetry**: High-frequency metrics streaming (Latency, RPS, Error Rate) via Redis Streams and WebSockets.
+  - **Interactive Dashboard**: Premium React monitoring interface with synchronized ECharts and saturation heatmaps.
+  - **Safety Guardrails**: Integrated Redis-based kill-switch mechanisms for instant termination.
 - **Fixture Standardization**: Aligned default scan engine fixtures with the new multi-service schema and resolved YAML deserialization issues.
 - **Plugin Tooling System**: Introduced `tools.yaml` contract for automated background tool installation.
 - **Engine Fixture Ingestion**: Plugins can now ship `*_engine.yaml` fixtures for automatic engine registration.

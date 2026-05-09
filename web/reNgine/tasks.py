@@ -78,6 +78,42 @@ def sync_all_scans_to_graph(self):
 	logger.info("Global graph synchronization completed.")
 	print(">>> [GRAPH SYNC] Global graph synchronization completed.")
 
+@app.task(name='finish_chord', queue='main_scan_queue')
+def finish_chord(results, description="Task"):
+    """Generic callback for Celery chords to mark a grouped operation as complete."""
+    logger.info(f"Grouped task '{description}' completed.")
+    return results
+
+@app.task(name='finish_osint', queue='main_scan_queue')
+def finish_osint(results, scan_history_id):
+    """Callback for OSINT tasks, triggers Deep Pursuit pipeline."""
+    from reNgine.tasks import osint_orchestrator
+    logger.info(f"OSINT discovery completed for scan {scan_history_id}")
+    logger.info('Starting Deep Pursuit OSINT Pipeline...')
+    osint_orchestrator.delay(scan_history_id=scan_history_id)
+    return results
+
+@app.task(name='finish_vulnerability_scan', queue='main_scan_queue')
+def finish_vulnerability_scan(results, scan_history_id):
+    """Callback for vulnerability scan tasks."""
+    logger.info(f"Vulnerability scan completed for scan {scan_history_id}")
+    return results
+
+@app.task(name='finish_nuclei_scan', queue='main_scan_queue')
+def finish_nuclei_scan(results, scan_history_id):
+    """Callback for Nuclei scan tasks."""
+    logger.info(f"Nuclei scan completed for scan {scan_history_id}")
+    return results
+
+@app.task(name='finish_osint_discovery', queue='main_scan_queue')
+def finish_osint_discovery(results, results_dir):
+    """Callback for OSINT discovery tasks. Strips metadata from results."""
+    from reNgine.common_func import OpSecManager
+    opsec = OpSecManager()
+    opsec.strip_directory(results_dir)
+    logger.info(f"OSINT discovery completed and cleaned up in {results_dir}")
+    return results
+
 
 @app.task(name='initiate_scan', bind=False, queue='initiate_scan_queue')
 def initiate_scan(
@@ -278,9 +314,21 @@ def initiate_scan(
 			PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx),
 		]
 
-		# Attack Path Modeling Engine (APME)
+		# Filter out None steps (where plugins aren't present)
+		workflow_steps = [step for step in workflow_steps if step is not None]
+
+		if config.get('enable_ai_impact_analysis'):
+			workflow_steps.append(generate_impact_assessment.si(scan_history_id=scan_history_id))
+
+		if 'stress_test' in tasks:
+			workflow_steps.append(run_stress_testing.si(
+				scan_history_id=scan_history_id, 
+				target_domain_name=domain.name, 
+				yaml_config=config
+			))
+
+		# Attack Path Modeling Engine (APME) - MUST BE FINAL
 		apme_config = config.get(ATTACK_PATH_MODELING, {})
-		# For backward compatibility, check both the new key and the old run_apme key in vulnerability_scan
 		run_apme_enabled = apme_config.get('enabled', False)
 		if not run_apme_enabled:
 			vuln_scan_config = config.get(VULNERABILITY_SCAN, {})
@@ -289,20 +337,7 @@ def initiate_scan(
 		if run_apme_enabled:
 			workflow_steps.append(run_apme.si(scan_history_id=scan_history_id))
 
-		# Filter out None steps (where plugins aren't present)
-		workflow_steps = [step for step in workflow_steps if step is not None]
-
 		workflow = chain(*workflow_steps)
-
-		if config.get('enable_ai_impact_analysis'):
-			workflow = chain(workflow, generate_impact_assessment.si(scan_history_id=scan_history_id))
-
-		if 'stress_test' in tasks:
-			workflow = chain(workflow, run_stress_testing.si(
-				scan_history_id=scan_history_id, 
-				target_domain_name=domain.name, 
-				yaml_config=config
-			))
 
 		# Build callback
 		callback = report.si(ctx=ctx).set(link_error=[report.si(ctx=ctx)])
@@ -852,11 +887,7 @@ def osint(self, host=None, ctx={}, description=None):
 		grouped_tasks.append(_task)
 
 	if grouped_tasks:
-		celery_group = group(grouped_tasks)
-		job = celery_group.apply_async()
-		while not job.ready():
-			# wait for all jobs to complete
-			time.sleep(5)
+		return self.replace(chord(grouped_tasks)(finish_osint.si(results=[], scan_history_id=self.scan.id)))
 
 	logger.info('Standard OSINT Tasks finished...')
 
@@ -967,13 +998,11 @@ def osint_discovery(self, config, host, scan_history_id, activity_id, results_di
 			)
 			grouped_tasks.append(_task)
 
-	celery_group = group(grouped_tasks)
-	job = celery_group.apply_async()
-	while not job.ready():
-		# wait for all jobs to complete
-		time.sleep(5)
+	if grouped_tasks:
+		return self.replace(chord(grouped_tasks)(finish_osint_discovery.si(results=[], results_dir=results_dir)))
 
 	# Strip metadata from OSINT results
+	from reNgine.common_func import OpSecManager
 	opsec = OpSecManager()
 	opsec.strip_directory(results_dir)
 
@@ -2923,12 +2952,8 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 		)
 		grouped_tasks.append(_task)
 
-	celery_group = group(grouped_tasks)
-	job = celery_group.apply_async()
-
-	while not job.ready():
-		# wait for all jobs to complete
-		time.sleep(5)
+	if grouped_tasks:
+		return self.replace(chord(grouped_tasks)(finish_vulnerability_scan.si(results=[], scan_history_id=ctx.get('scan_history_id'))))
 
 	logger.info('Vulnerability scan completed...')
 
@@ -3356,12 +3381,8 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 		)
 		grouped_tasks.append(_task)
 
-	celery_group = group(grouped_tasks)
-	job = celery_group.apply_async()
-
-	while not job.ready():
-		# wait for all jobs to complete
-		time.sleep(5)
+	if grouped_tasks:
+		return self.replace(chord(grouped_tasks)(finish_nuclei_scan.si(results=[], scan_history_id=ctx.get('scan_history_id'))))
 
 	logger.info('Vulnerability scan with all severities completed...')
 
@@ -3780,64 +3801,13 @@ def http_crawl(
 		if line.get('failed', False):
 			continue
 
-		# Parse httpx output
-		host = line.get('host', '')
-		ip_address = line.get('ip')
-		content_length = line.get('content_length', 0)
-		http_status = line.get('status_code')
-		http_url, is_redirect = extract_httpx_url(line)
-		page_title = line.get('title')
-		webserver = line.get('webserver')
-		cdn = line.get('cdn', False)
-		rt = line.get('time')
-		techs = line.get('tech', [])
-		cname = line.get('cname', '')
-		content_type = line.get('content_type', '')
-		response_time = -1
-		if rt:
-			response_time = float(''.join(ch for ch in rt if not ch.isalpha()))
-			if rt[-2:] == 'ms':
-				response_time = response_time / 1000
-
-		# Create Subdomain object in DB
-		subdomain_name = get_subdomain_from_url(http_url)
-		subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
-
-		if not subdomain:
-			continue
-
-		# Save default HTTP URL to endpoint object in DB
-		endpoint, created = save_endpoint(
-			http_url,
-			crawl=False,
-			ctx=ctx,
-			subdomain=subdomain,
-			is_default=is_ran_from_subdomain_scan
-		)
+		endpoint = process_httpx_response(line, ctx=ctx, is_ran_from_subdomain_scan=is_ran_from_subdomain_scan)
 		if not endpoint:
 			continue
-		endpoint.http_status = http_status
-		endpoint.page_title = page_title
-		endpoint.content_length = content_length
-		endpoint.webserver = webserver
-		endpoint.response_time = response_time
-		endpoint.content_type = content_type
-		endpoint.save()
 
-		# Sync Subdomain status attributes if this is the default endpoint
-		if is_ran_from_subdomain_scan:
-			subdomain.http_status = http_status
-			subdomain.page_title = page_title
-			subdomain.content_length = content_length
-			subdomain.webserver = webserver
-			subdomain.response_time = response_time
-			subdomain.content_type = content_type
-			subdomain.http_url = http_url
-			subdomain.save()
-
-		endpoint_str = f'{http_url} [{http_status}] `{content_length}B` `{webserver}` `{rt}`'
+		endpoint_str = f'{endpoint.http_url} [{endpoint.http_status}] `{endpoint.content_length}B` `{endpoint.webserver}` `{line.get("time")}`'
 		logger.warning(endpoint_str)
-		if endpoint and endpoint.is_alive and endpoint.http_status != 403:
+		if endpoint.is_alive and endpoint.http_status != 403:
 			self.notify(
 				fields={'Alive endpoint': f'• {endpoint_str}'},
 				add_meta_info=False)
@@ -5218,6 +5188,7 @@ def stream_command(
 	output = ""
 
 	# Process the output
+	line_count = 0
 	try:
 		for line in iter(lambda: process.stdout.readline(), b''):
 			if not line:
@@ -5237,15 +5208,20 @@ def stream_command(
 				pass
 
 			# Yield the line
-			#logger.debug(item)
 			yield item
 
 			# Add the log line to the output
 			output += line + "\n"
+			line_count += 1
 
-			# Update the command record in the database
-			command_obj.output = output
-			command_obj.save()
+			# Update the command record in the database every 20 lines
+			if line_count % 20 == 0:
+				command_obj.output = output
+				command_obj.save()
+
+		# Final save after loop
+		command_obj.output = output
+		command_obj.save()
 	finally:
 		if conf_path and os.path.exists(conf_path):
 			os.remove(conf_path)
@@ -5264,8 +5240,69 @@ def stream_command(
 			f.write(f"{cmd}\n{return_code}\n{output}\n")
 
 
-def process_httpx_response(line):
-	"""TODO: implement this"""
+def process_httpx_response(line, ctx={}, is_ran_from_subdomain_scan=False):
+	"""Process a single line of httpx output and save to database."""
+	if not line or not isinstance(line, dict):
+		return None
+
+	# No response from endpoint
+	if line.get('failed', False):
+		return None
+
+	# Parse httpx output
+	http_status = line.get('status_code')
+	http_url, is_redirect = extract_httpx_url(line)
+	content_length = line.get('content_length', 0)
+	page_title = line.get('title')
+	webserver = line.get('webserver')
+	rt = line.get('time')
+	content_type = line.get('content_type', '')
+	
+	response_time = -1
+	if rt:
+		response_time = float(''.join(ch for ch in rt if not ch.isalpha()))
+		if rt[-2:] == 'ms':
+			response_time = response_time / 1000
+
+	# Create Subdomain object in DB
+	subdomain_name = get_subdomain_from_url(http_url)
+	from reNgine.common_func import save_subdomain, save_endpoint
+	subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
+
+	if not subdomain:
+		return None
+
+	# Save default HTTP URL to endpoint object in DB
+	endpoint, created = save_endpoint(
+		http_url,
+		crawl=False,
+		ctx=ctx,
+		subdomain=subdomain,
+		is_default=is_ran_from_subdomain_scan
+	)
+	if not endpoint:
+		return None
+	
+	endpoint.http_status = http_status
+	endpoint.page_title = page_title
+	endpoint.content_length = content_length
+	endpoint.webserver = webserver
+	endpoint.response_time = response_time
+	endpoint.content_type = content_type
+	endpoint.save()
+
+	# Sync Subdomain status attributes if this is the default endpoint
+	if is_ran_from_subdomain_scan:
+		subdomain.http_status = http_status
+		subdomain.page_title = page_title
+		subdomain.content_length = content_length
+		subdomain.webserver = webserver
+		subdomain.response_time = response_time
+		subdomain.content_type = content_type
+		subdomain.http_url = http_url
+		subdomain.save()
+	
+	return endpoint
 
 
 def extract_httpx_url(line):

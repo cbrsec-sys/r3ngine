@@ -81,7 +81,7 @@ def run_command(
             logger.warning(item)
         popen.stdout.close()
         try:
-            popen.wait(timeout=30)
+            popen.wait(timeout=7200)
         except subprocess.TimeoutExpired:
             popen.kill()
             return_code = 124 # Timeout
