@@ -236,6 +236,7 @@ ring:
     - Implemented `max_retries` in engine configuration to prevent infinite loops on tool failure.
     - Added automated service mapping to convert generic protocols (e.g., `http`, `https`) into valid Hydra modules (`http-get`, `https-get`).
     - Integrated automatic error tracking that terminates scan tasks after the configured retry threshold.
+- **Onboarding Crash Fix**: Resolved a `TypeError` in the `onboarding` view where `AnonymousUser` would trigger a crash when accessing or creating `UserPreferences`.
 
 
 

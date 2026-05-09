@@ -196,6 +196,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **Bounty Hub**: Centralized platform for managing HackerOne programs and assets.
 *   **Automated Startup Sync**: Immediate synchronization of Attack Surface graphs and CISA KEV intelligence.
 *   **Target Deletion API**: Resolved a critical 404 error during target deletion by synchronizing the frontend request with the correct backend orchestration endpoint.
+*   **Onboarding Authentication Resilience**: Resolved a critical `TypeError` that caused the application to crash when unauthenticated users accessed the onboarding page.
 *   **Customizable Alerts**: Notifications via Slack, Discord, Telegram, and Lark.
 *   **HackerOne Integration**: Direct reporting of vulnerabilities to bug bounty platforms.
 *   **Screenshot Gallery**: Automated visual captures with advanced filtering and tagging.

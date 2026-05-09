@@ -184,21 +184,21 @@ services:
         reservations:
           memory: 256M
 
-  # ollama:
-  #   image: ollama/ollama
-  #   container_name: ollama
-  #   volumes:
-  #     - ollama_data:/root/.ollama
-  #   ports:
-  #     - "11434:11434"
-  #   networks:
-  #     - rengine_network
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 4G
-  #       reservations:
-  #         memory: 2G
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    volumes:
+      - ollama_data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - rengine_network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
 
   neo4j:
     image: neo4j:5.12.0
@@ -240,8 +240,8 @@ volumes:
     name: r3ngine_scan_results
   static_volume:
     name: r3ngine_static_volume
-  # ollama_data:
-  #   name: r3ngine_ollama_data
+  ollama_data:
+    name: r3ngine_ollama_data
   neo4j_data:
     name: r3ngine_neo4j_data
   plugins_data:

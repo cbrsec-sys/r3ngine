@@ -675,11 +675,11 @@ def subdomain_discovery(
 				cmd = f'chaos -d {host} -silent -key {chaos_key} -o {results_file}'
 
 			elif tool == 'reconx':
-				reconx_results = f"{results_dir}/reconx_findings"
+				reconx_results = f"{self.results_dir}/reconx_findings"
 				os.makedirs(reconx_results, exist_ok=True)
 				
 				# Create a temporary targets file for reconx
-				reconx_targets = f"{results_dir}/reconx_targets.txt"
+				reconx_targets = f"{self.results_dir}/reconx_targets.txt"
 				with open(reconx_targets, 'w') as f:
 					f.write(domain.name)
 				
