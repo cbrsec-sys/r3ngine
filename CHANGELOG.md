@@ -1,6 +1,8 @@
 # Changelog
 
-## [v3.0.0-rc] - 2026-05-08
+**Official Repo location:** https://github.com/whiterabb17/r3ngine
+## [v3.0.0-beta] - 2026-05-09
+
 ### Added
 - **Multi-Service Brute-Force Orchestration**: Updated brute-force engine schema to support an array of services (SSH, FTP, HTTP, SMB, RDP, Telnet).
 - **Brute-Force Candidate Filtering**: Refactored `BruteForceOrchestrator` to dynamically filter `AuthCandidate` records based on the engine's allowed services.
@@ -19,9 +21,6 @@
 - **OpSec Compliance**: ERL validations now inherit reNgine's OpSec policies, including random User-Agents and stealthy headers.
 - **Subprocess Execution**: Migrated from Docker-in-Docker to high-performance local subprocess execution for tool validation.
 - **Autonomous Tooling**: Standardized `tools.yaml` for automatic dependency management and installation of required binaries.
-
-## v3.0.0
-**Official Repo location:** https://github.com/whiterabb17/r3ngine
  
 ### New Features
 - **Deep Pursuit OSINT Engine & Intelligence Hub**:
