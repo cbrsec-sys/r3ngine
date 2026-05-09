@@ -1,3 +1,6 @@
+<div style="background:#e74c3c;color:#fff;border-color:#c0392b; text-align:center; top:0; z-index:9999; padding:12px 16px; font-size:13px; line-height:1.2; border-bottom:3px solid transparent;">
+  <em>THIS IS AN <strong>ALPHA</strong> RELEASE AND MAY CONTAIN BUGS</em>
+</div>
 <p align="center">
 <a href="https://rengine.wiki"><img src="frontend/public/img/banner.png" height="400px" width="520px" alt=""/></a>
 </p>
@@ -36,7 +39,7 @@
 
 ## 🚀 The v3 Evolution: Comprehensive Enhancements (Since v2.2)
 
-Version 3.0 and the preceding v2.5/2.4 cycles represent a paradigm shift in r3ngine's capabilities. Below are the core pillars of the recent evolution, detailed for security professionals who require surgical precision.
+Version 3.0 and the preceding v2.5/2.4 cycles represent a paradigm shift in r3ngine's capabilities. From **AI-native intelligence** and **graph-based attack modeling** to the new **high-performance stress testing dashboard**, below are the core pillars of the recent evolution, detailed for security professionals who require surgical precision.
 
 ### 🧠 The Intelligence & AI Hub
 r3ngine is now an AI-native reconnaissance suite, moving beyond simple tool automation to intelligent analysis.
@@ -49,9 +52,14 @@ r3ngine is now an AI-native reconnaissance suite, moving beyond simple tool auto
 The core scanning engines have been upgraded to provide "Verification-First" reconnaissance.
 *   **Attack Path Modeling Engine (APME)**: A production-grade, graph-based modeling system utilizing **Neo4j**. It discovers feasible attack routes (e.g., SQLi → DB Access → Pivot) based on a dynamic rules engine. **v3 Update**: Expanded rule set with 20+ sophisticated security patterns and automated "Goal Injection" for robust path discovery.
 *   **Exploitation Readiness Layer (ERL)**: A safe, modular validation layer that converts potential findings into **"Verified" status** using containerized, non-destructive validation tools.
-*   **Adaptive Stress & Resilience Engine (ASRE)**: Full-scale endpoint stress testing directly within the workflow, orchestrating `k6`, `wrk`, `hping3`, and `Locust` with real-time telemetry ingestion.
+### 🌪️ Adaptive Stress & Resilience Engine (ASRE)
+reNgine now features a high-performance stress testing suite, enabling users to evaluate endpoint stability and saturation limits directly from the reconnaissance workflow.
+*   **Multi-Tool Orchestration**: Seamlessly execute and control `k6`, `wrk`, `hping3`, and `Locust` with synchronized backend orchestration.
+*   **Real-Time Telemetry Dashboard**: A premium monitoring interface featuring synchronized **ECharts** for Latency, RPS, and Throughput, powered by low-latency **Redis Streams** and **WebSockets**.
+*   **Scenario-Based Testing**: Support for headless Locust execution with dynamic scenario generation and aggregated stats parsing.
+*   **Infrastructure Safety**: Integrated safety guardrails and Redis-backed kill-switch mechanisms for instant termination of high-load tests.
 *   **Vulnerability Correlation Engine**: Unifies findings from **Nuclei, Semgrep, Gitleaks, Acunetix, and Retire.js** into a prioritized threat landscape.
-*   **Persistent Vulnerability State Tracking**: Automated lifecycle management that identifies **"RESOLVED"** findings by diffing historical scan runs. Features a manual **"CLOSED"** verification flow, ensuring consistent and historical vulnerability data across the entire target lifecycle.
+*   **Persistent Vulnerability State Tracking**: Automated lifecycle management that identifies vulnerabilities and their status over time.
 *   **Centralized Brute-Force Orchestration**: A multi-tiered authentication attack pipeline that supports **multi-service targeting (SSH, FTP, HTTP, SMB, RDP, Telnet)**. Centralizes targets from Nmap, Nuclei, and intelligent form extraction into a unified `AuthCandidate` queue, orchestrated via **Hydra** with full OpSec controls.
 *   **Autonomous Plugin Management**: A powerful, modular system to extend reNgine with custom engines and dynamic UI components. Features **Atomic Installation** with background tool installation (`tools.yaml`), automated engine registration via fixtures, and persistent startup verification.
 
@@ -125,9 +133,9 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 
 📃&nbsp;&nbsp; PDF Reports: In addition to its robust reconnaissance capabilities, reNgine goes the extra mile by simplifying the report generation process, recognizing the crucial role that PDF reports play in the realm of end-to-end reconnaissance. Users can effortlessly generate and customize PDF reports to suit their exact needs. Whether it's a Full Scan Report, Vulnerability Report, or a concise reconnaissance report, reNgine provides the flexibility to choose the report type that best communicates your findings. Moreover, the level of customization is unparalleled, allowing users to select report colors, fine-tune executive summaries, and even add personalized touches like company names and footers. With GPT and LLM integration, your reports aren't just a report; with Assessment Overviews, Executive Briefs, Final Conclusions, remediation steps, and impacts, you get a 360-degree view of the vulnerabilities you've uncovered.
 
-🔖&nbsp; &nbsp; Say Hello to Projects! reNgine 2.0 introduces a powerful addition that enables you to efficiently organize your web application reconnaissance efforts. With this feature, you can create distinct project spaces, each tailored to a specific purpose, such as personal bug bounty hunting, client engagements, or any other specialized recon task. Each projects will have separate dashboard and all the scan results will be separated from each project, while scan engines and configuration will be shared across all the projects.
+🔖&nbsp; &nbsp; Say Hello to Projects! reNgine 3.0 introduces many many more powerful additions to really boost your recon experience. Checkout all the features below. 
 
-⚙&nbsp; &nbsp; Roles and Permissions! In reNgine 2.0, we've taken your web application reconnaissance to a whole new level of control and security. Now, you can assign distinct roles to your team members—Sys Admin, Penetration Tester, and Auditor—each with precisely defined permissions to tailor their access and actions within the reNgine ecosystem.
+⚙&nbsp; &nbsp; Roles and Permissions! In reNgine 3.0, we've taken your web application reconnaissance to a whole new level of control and security. Now, you can assign distinct roles to your team members—Sys Admin, Penetration Tester, and Auditor—each with precisely defined permissions to tailor their access and actions within the reNgine ecosystem.
 
   - 🔐 Sys Admin: Sys Admin is a superuser that has permission to modify system and scan related configurations, scan engines, create new users, add new tools etc. Superuser can initiate scans and subscans effortlessly.
   - 🔍 Penetration Tester: Penetration Tester will be allowed to modify and initiate scans and subscans, add or update targets, etc. A penetration tester will not be allowed to modify system configurations.
@@ -155,9 +163,10 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **Natural Language Querying**: Perform complex database lookups using intuitive, human-like operators.
 
 ### 🛠️ Advanced Scan Engines
-*   **Attack Path Modeling Engine (APME)**: Graph-based visualization and discovery of multi-stage attack routes via Neo4j.
-*   **Exploitation Readiness Layer (ERL)**: Modular, non-destructive vulnerability validation with containerized sandboxing and confidence scoring.
-*   **Adaptive Stress & Resilience Engine (ASRE)**: Built-in endpoint stress testing using `k6`, `wrk`, `hping3`, and `Locust`.
+*   **Attack Path Modeling Engine (APME)**: Sophisticated graph-based visualization of multi-stage attack vectors using Neo4j and AI-driven path discovery.
+*   **Adaptive Stress & Resilience Engine (ASRE)**: High-performance real-time stress testing dashboard integrated with `k6`, `wrk`, `hping3`, and `Locust` for endpoint saturation analysis.
+*   **Exploit Readiness Layer (ERL)**: Hardened automated vulnerability verification system with multi-scanner support and stealthy OpSec guardrails.
+*   **Autonomous Recon Orchestration**: Next-generation Celery-based task pipeline with non-blocking orchestration and non-destructive tool execution.
 *   **Vulnerability Correlation Engine**: Multi-tool unification mapping findings from Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, and more.
 *   **Autonomous Tooling & Plugin System**: Background tool management ensures all plugin dependencies (e.g., sqlmap, XSStrike) are installed and verified automatically at runtime. **v3-Hardening**: Integrated native **proxy rotation** and **OpSec compliance** (User-Agent randomization, custom headers) directly into the ERL adapter layer, ensuring stealthy validation of all discovered vulnerabilities.
 *   **Continuous Monitoring**: Periodic discovery of new subdomains, endpoints, and data changes with automated diffing.
