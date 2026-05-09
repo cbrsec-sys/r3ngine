@@ -20,7 +20,13 @@ def bulk_import_targets(
 	project_slug: str, 
 	organization_name: str = None, 
 	org_description: str = None, 
-	h1_team_handle: str = None):
+	h1_team_handle: str = None,
+	is_monitored: bool = False,
+	monitor_frequency: str = 'daily',
+	monitor_engine_id: int = None,
+	monitor_scan_scope: str = 'none',
+	starting_point_path: str = None,
+	excluded_paths: list = None):
 	""" 
 		Used to import targets in reNgine
 
@@ -38,6 +44,13 @@ def bulk_import_targets(
 	project = Project.objects.get(slug=project_slug)
 
 	all_targets = []
+	
+	from scanEngine.models import EngineType
+	from targetApp.views import manage_monitoring_task
+
+	monitor_engine = None
+	if monitor_engine_id:
+		monitor_engine = EngineType.objects.filter(id=monitor_engine_id).first()
 
 	for target in targets:
 		name = target.get('name', '').strip()
@@ -54,16 +67,26 @@ def bulk_import_targets(
 		logger.info(f'{name} | Domain? {is_domain} | IP? {is_ip} | URL? {is_url}')
 
 		if is_domain:
-			target_obj = store_domain(name, project, description, h1_team_handle)
+			target_obj = store_domain(name, project, description, h1_team_handle, starting_point_path, excluded_paths)
 		elif is_url:
-			target_obj = store_url(name, project, description, h1_team_handle)
+			target_obj = store_url(name, project, description, h1_team_handle, starting_point_path, excluded_paths)
 		elif is_ip:
-			target_obj = store_ip(name, project, description, h1_team_handle)
+			target_obj = store_ip(name, project, description, h1_team_handle, starting_point_path, excluded_paths)
 		else:
 			logger.warning(f'{name} is not supported by reNgine')
 			continue
 
 		if target_obj:
+			# Apply monitoring settings
+			target_obj.is_monitored = is_monitored
+			target_obj.monitor_frequency = monitor_frequency
+			target_obj.monitor_engine = monitor_engine
+			target_obj.monitor_scan_scope = monitor_scan_scope
+			target_obj.save()
+			
+			if is_monitored:
+				manage_monitoring_task(target_obj)
+				
 			all_targets.append(target_obj)
 			new_targets_imported = True
 
@@ -103,7 +126,7 @@ def remove_wildcard(input_string):
 	"""
 	return re.sub(r'^\*\.', '', input_string)
 
-def store_domain(domain_name, project, description, h1_team_handle):
+def store_domain(domain_name, project, description, h1_team_handle, starting_point_path=None, excluded_paths=None):
 	"""
 		This function is used to store domain in reNgine
 	"""
@@ -120,14 +143,16 @@ def store_domain(domain_name, project, description, h1_team_handle):
 		description=description,
 		h1_team_handle=h1_team_handle,
 		project=project,
-		insert_date=current_time
+		insert_date=current_time,
+		starting_point_path=starting_point_path,
+		excluded_paths=excluded_paths or []
 	)
 
 	logger.info(f'Added new domain {new_domain.name}')
 
 	return new_domain
 
-def store_url(url, project, description, h1_team_handle):
+def store_url(url, project, description, h1_team_handle, starting_point_path=None, excluded_paths=None):
 	parsed_url = urlparse(url)
 	http_url = parsed_url.geturl()
 	domain_name = parsed_url.netloc
@@ -143,7 +168,9 @@ def store_url(url, project, description, h1_team_handle):
 			description=description,
 			h1_team_handle=h1_team_handle,
 			project=project,
-			insert_date=timezone.now()
+			insert_date=timezone.now(),
+			starting_point_path=starting_point_path,
+			excluded_paths=excluded_paths or []
 		)
 		logger.info(f'Added new domain {domain.name}')
 
@@ -154,7 +181,7 @@ def store_url(url, project, description, h1_team_handle):
 
 	return domain
 
-def store_ip(ip_address, project, description, h1_team_handle):
+def store_ip(ip_address, project, description, h1_team_handle, starting_point_path=None, excluded_paths=None):
 
 	domain = Domain.objects.filter(name=ip_address).first()
 	
@@ -167,7 +194,9 @@ def store_ip(ip_address, project, description, h1_team_handle):
 			h1_team_handle=h1_team_handle,
 			project=project,
 			insert_date=timezone.now(),
-			ip_address_cidr=ip_address
+			ip_address_cidr=ip_address,
+			starting_point_path=starting_point_path,
+			excluded_paths=excluded_paths or []
 		)
 		logger.info(f'Added new domain {domain.name}')
 	

@@ -1027,43 +1027,59 @@ class AddTarget(APIView):
 	permission_required = PERM_MODIFY_TARGETS
 
 	def post(self, request):
-		req = self.request
-		data = req.data
+		data = request.data
 		h1_team_handle = data.get('h1_team_handle')
 		description = data.get('description')
-		domain_name = data.get('domain_name')
-		# remove wild card from domain
-		domain_name = domain_name.replace('*', '')
-		# if domain_name begins with . remove that
-		if domain_name.startswith('.'):
-			domain_name = domain_name[1:]
+		domain_name_input = data.get('domain_name', '')
 		organization_name = data.get('organization')
 		slug = data.get('slug')
 
-		# Validate domain name
-		if not validators.domain(domain_name):
-			return Response({'status': False, 'message': 'Invalid domain or IP'})
+		# Monitoring settings
+		is_monitored = data.get('is_monitored', False)
+		monitor_frequency = data.get('monitor_frequency', 'daily')
+		monitor_scan_scope = data.get('monitor_scan_scope', 'none')
+		monitor_engine_id = data.get('monitor_engine_id')
+
+		# Advanced scan configuration
+		starting_point_path = data.get('starting_point_path')
+		excluded_paths = data.get('excluded_paths', [])
+
+		# Support for multiple targets separated by newline
+		target_names = [t.strip().replace('*', '') for t in domain_name_input.split('\n') if t.strip()]
+		
+		# Clean up targets (remove leading dots)
+		cleaned_targets = []
+		for name in target_names:
+			if name.startswith('.'):
+				name = name[1:]
+			cleaned_targets.append(name)
+
+		if not cleaned_targets:
+			return Response({'status': False, 'message': 'No valid targets provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+		targets_to_import = [{'name': name, 'description': description} for name in cleaned_targets]
 
 		status = bulk_import_targets(
-			targets=[{
-				'name': domain_name,
-				'description': description,
-			}],
+			targets=targets_to_import,
 			organization_name=organization_name,
 			h1_team_handle=h1_team_handle,
-			project_slug=slug
+			project_slug=slug,
+			is_monitored=is_monitored,
+			monitor_frequency=monitor_frequency,
+			monitor_engine_id=monitor_engine_id,
+			monitor_scan_scope=monitor_scan_scope,
+			starting_point_path=starting_point_path,
+			excluded_paths=excluded_paths
 		)
 
 		if status:
 			return Response({
 				'status': True,
-				'message': 'Domain successfully added as target !',
-				'domain_name': domain_name,
-				# 'domain_id': domain.id
+				'message': f'{len(cleaned_targets)} targets successfully processed!',
 			})
 		return Response({
 			'status': False,
-			'message': 'Failed to add as target !'
+			'message': 'Failed to add targets! They may already exist or are invalid.'
 		})
 
 

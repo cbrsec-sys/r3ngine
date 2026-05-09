@@ -3,6 +3,13 @@
 **Official Repo location:** https://github.com/whiterabb17/r3ngine
 ## [v3.0.0-beta] - 2026-05-09
 
+### Memory & Performance Optimization
+- **Worker Consolidation**: Refactored `celery-entrypoint.sh` to consolidate 20+ independent Celery workers into 4 optimized worker groups (Core, Service, LLM, OSINT). This reduces the Python interpreter overhead by ~80%, reclaiming several GBs of RAM.
+- **Resource Limits**: Implemented Docker resource limits and reservations for all major services (Celery, Web, Ollama, Neo4j) to prevent host resource exhaustion.
+- **Celery Memory Management**: Added `CELERY_WORKER_MAX_TASKS_PER_CHILD` and `CELERY_WORKER_MAX_MEMORY_PER_CHILD` to prevent long-running worker bloat.
+- **Cache Optimization**: Switched from `LocMemCache` to `RedisCache` in Django settings for better memory sharing across workers.
+- **Concurrency Tuning**: Reduced default `MAX_CONCURRENCY` and `MIN_CONCURRENCY` values in `.env` for a smaller baseline memory footprint.
+
 ### Added
 - **Multi-Service Brute-Force Orchestration**: Updated brute-force engine schema to support an array of services (SSH, FTP, HTTP, SMB, RDP, Telnet).
 - **Brute-Force Candidate Filtering**: Refactored `BruteForceOrchestrator` to dynamically filter `AuthCandidate` records based on the engine's allowed services.
@@ -22,6 +29,7 @@
 - **Scan Summary API**: Resolved a 500 Internal Server Error in the scan summary dashboard caused by NULL status codes and missing scan start dates.
 - **Vulnerability Summary Regression**: Fixed a regression where `important_subdomains` was undefined in the scan summary API.
 - **Trivy SCA Removal**: Safely excised the Trivy filesystem scanning engine and associated dependencies to refocus reNgine on remote reconnaissance workflows.
+- **Target Deletion API**: Resolved a 404 Not Found error when deleting targets by correcting the frontend API endpoint from `/api/action/delete/rows/` to the correct backend route `/api/action/rows/delete/`.
 
 ### Vulnerability Status Tracking Refactor
 - **Automated Lifecycle Management**: Implemented an automated "RESOLVED" status tracking mechanism that identifies vulnerabilities missing from current scan runs compared to historical target data.

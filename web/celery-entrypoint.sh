@@ -295,75 +295,34 @@ echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
 #python3 -m pip uninstall -y httpcore
 
 # TEMPORARY FIX FOR langchain
-pip install tenacity==8.2.2
+pip install tenacity==8.2.2 urllib3<2.0.0
 
-loglevel='info'
+loglevel='warning'
 if [ "$DEBUG" == "1" ]; then
     loglevel='debug'
 fi
 
-generate_worker_command() {
-    local queue=$1
-    local concurrency=$2
-    local worker_name=$3
-    local app=${4:-"reNgine.tasks"}
-    local directory=${5:-"/usr/src/app/reNgine/"}
+echo "Starting Consolidated Celery Workers..."
 
-    local base_command="celery -A $app worker --pool=gevent --optimization=fair --autoscale=$concurrency,1 --loglevel=$loglevel -Q $queue -n $worker_name"
+# 1. Main Scan Worker (Prefork pool for CPU-intensive tasks)
+# Listens to: main_scan_queue
+echo "Starting Core Scan Worker..."
+celery -A reNgine.tasks worker --loglevel=$loglevel --optimization=fair --autoscale=$MAX_CONCURRENCY,$MIN_CONCURRENCY -Q main_scan_queue -n core_scan_worker &
 
-    if [ "$DEBUG" == "1" ]; then
-        echo "watchmedo auto-restart --recursive --pattern=\"*.py\" --directory=\"$directory\" -- $base_command &"
-    else
-        echo "$base_command &"
-    fi
-}
+# 2. Service Worker (Gevent pool for I/O bound tasks)
+# Listens to: api_queue, initiate_scan_queue, subscan_queue, report_queue, send_notif_queue, etc.
+SERVICE_QUEUES="api_queue,initiate_scan_queue,subscan_queue,report_queue,send_notif_queue,send_task_notif_queue,send_file_to_discord_queue,send_hackerone_report_queue,parse_nmap_results_queue,geo_localize_queue,query_whois_queue,remove_duplicate_endpoints_queue,run_command_queue,query_reverse_whois_queue,query_ip_history_queue,send_scan_notif_queue"
+echo "Starting Service Worker Group..."
+celery -A reNgine worker --pool=gevent --concurrency=100 --optimization=fair --loglevel=$loglevel -Q $SERVICE_QUEUES -n service_worker &
 
-echo "Starting Celery Workers..."
+# 3. LLM Worker (Gevent pool for AI/LLM tasks)
+# Listens to: llm_queue
+echo "Starting LLM Worker..."
+celery -A reNgine.tasks worker --pool=gevent --concurrency=20 --optimization=fair --loglevel=$loglevel -Q llm_queue -n llm_worker &
 
-commands=""
-
-# Main scan worker
-if [ "$DEBUG" == "1" ]; then
-    commands+="watchmedo auto-restart --recursive --pattern=\"*.py\" --directory=\"/usr/src/app/reNgine/\" -- celery -A reNgine.tasks worker --loglevel=$loglevel --optimization=fair --autoscale=$MAX_CONCURRENCY,$MIN_CONCURRENCY -Q main_scan_queue &"$'\n'
-else
-    commands+="celery -A reNgine.tasks worker --loglevel=$loglevel --optimization=fair --autoscale=$MAX_CONCURRENCY,$MIN_CONCURRENCY -Q main_scan_queue &"$'\n'
-fi
-
-# API shared task worker
-if [ "$DEBUG" == "1" ]; then
-    commands+="watchmedo auto-restart --recursive --pattern=\"*.py\" --directory=\"/usr/src/app/api/\" -- celery -A api.shared_api_tasks worker --pool=gevent --optimization=fair --concurrency=30 --loglevel=$loglevel -Q api_queue -n api_worker &"$'\n'
-else
-    commands+="celery -A api.shared_api_tasks worker --pool=gevent --concurrency=30 --optimization=fair --loglevel=$loglevel -Q api_queue -n api_worker &"$'\n'
-fi
-
-# worker format: "queue_name:concurrency:worker_name"
-workers=(
-    "initiate_scan_queue:30:initiate_scan_worker"
-    "subscan_queue:30:subscan_worker"
-    "report_queue:20:report_worker"
-    "send_notif_queue:10:send_notif_worker"
-    "send_task_notif_queue:10:send_task_notif_worker"
-    "send_file_to_discord_queue:5:send_file_to_discord_worker"
-    "send_hackerone_report_queue:5:send_hackerone_report_worker"
-    "parse_nmap_results_queue:10:parse_nmap_results_worker"
-    "geo_localize_queue:20:geo_localize_worker"
-    "query_whois_queue:10:query_whois_worker"
-    "remove_duplicate_endpoints_queue:30:remove_duplicate_endpoints_worker"
-    "run_command_queue:50:run_command_worker"
-    "query_reverse_whois_queue:10:query_reverse_whois_worker"
-    "query_ip_history_queue:10:query_ip_history_worker"
-    "llm_queue:30:llm_worker"
-    "osint_queue:5:osint_worker"
-    "send_scan_notif_queue:10:send_scan_notif_worker"
-    "spiderfoot_queue:1:spiderfoot_worker"
-)
-
-for worker in "${workers[@]}"; do
-    IFS=':' read -r queue concurrency worker_name <<< "$worker"
-    commands+="$(generate_worker_command "$queue" "$concurrency" "$worker_name")"$'\n'
-done
-commands="${commands%&}"
-
-eval "$commands"
+# 4. OSINT Worker (Gevent pool for OSINT/Spiderfoot tasks)
+# Listens to: osint_queue, spiderfoot_queue
+echo "Starting OSINT Worker..."
+celery -A reNgine.tasks worker --pool=gevent --concurrency=10 --optimization=fair --loglevel=$loglevel -Q osint_queue,spiderfoot_queue -n osint_worker &
 
 wait

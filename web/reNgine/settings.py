@@ -247,6 +247,9 @@ CELERY_IGNORE_RESULTS = False
 CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
 CELERY_TRACK_STARTED = True
 CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+# Memory Management
+CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
+CELERY_WORKER_MAX_MEMORY_PER_CHILD = 400000  # 400MB
 '''
 ROLES and PERMISSIONS
 '''
@@ -387,8 +390,12 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = None
 '''
 CACHES = {
     'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'TIMEOUT': 60 * 30,  # 30 minutes caching will be used
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': env("CELERY_BROKER", default="redis://redis:6379/0"),
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        },
+        'TIMEOUT': 60 * 30,
     }
 }
 
