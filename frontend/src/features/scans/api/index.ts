@@ -1,6 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { operations, components } from '@/types/api';
 import type { ScanHistory, ScheduledScan, SubScan } from '../types';
 import type { Domain } from '../../targets/types';
+
+
 
 export const useDomains = (projectSlug: string) => {
   return useQuery<Domain[]>({
@@ -12,15 +15,13 @@ export const useDomains = (projectSlug: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json();
-      if (Array.isArray(data)) return data;
-      if (data.results && Array.isArray(data.results)) return data.results;
-      if (data.data && Array.isArray(data.data)) return data.data;
-      return [];
+      const data = await response.json() as operations["listTargets_list"]["responses"]["200"]["content"]["application/json"];
+      return data.results || [];
     },
     enabled: !!projectSlug,
   });
 };
+
 
 export const useScans = (projectSlug: string) => {
   return useQuery<ScanHistory[]>({
@@ -32,15 +33,13 @@ export const useScans = (projectSlug: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json();
-      if (Array.isArray(data)) return data;
-      if (data.results && Array.isArray(data.results)) return data.results;
-      if (data.data && Array.isArray(data.data)) return data.data;
-      return [];
+      const data = await response.json() as any;
+      return (data.results || []) as ScanHistory[];
     },
     enabled: !!projectSlug,
   });
 };
+
 
 export const useInitiateScan = (projectSlug: string) => {
   const queryClient = useQueryClient();
@@ -207,12 +206,13 @@ export const useScansHistory = (project: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json();
-      return Array.isArray(data) ? data : data.results || [];
+      const data = await response.json() as any;
+      return (data.results || []) as ScanHistory[];
     },
     enabled: !!project,
   });
 };
+
 
 export const useStopScan = (projectSlug: string) => {
   const queryClient = useQueryClient();

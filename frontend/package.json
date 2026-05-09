@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "generate-types": "npx swagger2openapi ../web/openapi.json --outfile ../web/openapi3.json --patch && npx openapi-typescript ../web/openapi3.json --output src/types/api.ts"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",

@@ -639,6 +639,54 @@ def subdomain_discovery(
 				results_file = self.results_dir + '/subdomains_chaos.txt'
 				cmd = f'chaos -d {host} -silent -key {chaos_key} -o {results_file}'
 
+			elif tool == 'reconx':
+				reconx_results = f"{results_dir}/reconx_findings"
+				os.makedirs(reconx_results, exist_ok=True)
+				
+				# Create a temporary targets file for reconx
+				reconx_targets = f"{results_dir}/reconx_targets.txt"
+				with open(reconx_targets, 'w') as f:
+					f.write(domain.name)
+				
+				# Run reconx
+				# reconx run uses targets from config, but we can override or use a specific config
+				# For simplicity, we'll use a direct command if supported, or create a minimal config
+				reconx_cmd = f"reconx run --targets {reconx_targets} --output {reconx_results}"
+				os.system(reconx_cmd)
+				
+				# Parse reconx findings (JSONL format in findings directory)
+				# Findings are usually in ~/.local/share/reconx/findings/ but we try to direct output if possible
+				# If not, we'll check the default location
+				reconx_default_findings = os.path.expanduser("~/.local/share/reconx/findings/")
+				if os.path.exists(reconx_default_findings):
+					for file in os.listdir(reconx_default_findings):
+						if file.endswith(".jsonl"):
+							try:
+								with open(os.path.join(reconx_default_findings, file), 'r') as f:
+									for line in f:
+										finding = json.loads(line)
+										# ReconX findings can be subdomains or vulnerabilities
+										if finding.get('type') == 'subdomain':
+											sub_name = finding.get('data', {}).get('subdomain')
+											if sub_name and sub_name.endswith(domain.name) and sub_name not in existing_subs:
+												from reNgine.tasks import save_subdomain
+												sub_obj, created = save_subdomain(sub_name, ctx=ctx)
+												if created:
+													new_discoveries.append(f"Subdomain (ReconX): {sub_name}")
+													existing_subs.add(sub_name)
+													MonitoringDiscovery.objects.create(
+														domain=domain,
+														discovery_type='subdomain',
+														content={'name': sub_name, 'source': 'ReconX'},
+														scan_history=scan_history
+													)
+										elif finding.get('type') == 'vulnerability':
+											# If reconx found a vulnerability, we can also log it
+											vuln_info = finding.get('data', {})
+											new_discoveries.append(f"Vulnerability (ReconX): {vuln_info.get('template-id')}")
+							except Exception as e:
+								logger.error(f"Error parsing ReconX findings: {str(e)}")
+
 		elif tool in custom_subdomain_tools:
 			tool_query = InstalledExternalTool.objects.filter(name__icontains=tool.lower())
 			if not tool_query.exists():
@@ -824,8 +872,8 @@ def osint(self, host=None, ctx={}, description=None):
 	# return results
 
 
-@app.task(name='osint_discovery', queue='main_scan_queue', bind=False)
-def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx={}):
+@app.task(name='osint_discovery', queue='main_scan_queue', base=RengineTask, bind=True)
+def osint_discovery(self, config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run OSINT discovery.
 
 	Args:
@@ -932,7 +980,7 @@ def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx
 	return results
 
 
-@app.task(name='dorking', bind=False, queue='main_scan_queue')
+@app.task(name='dorking', queue='main_scan_queue', base=RengineTask, bind=True)
 def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
 	"""Run Google dorks.
 
@@ -2797,7 +2845,6 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	extract_auth_candidates.apply(args=(self,), kwargs={'ctx': ctx})
 
 
-
 @app.task(name='vulnerability_scan', queue='main_scan_queue', bind=True, base=RengineTask)
 def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	"""
@@ -2811,6 +2858,8 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	should_run_dalfox = config.get(RUN_DALFOX, False)
 	should_run_s3scanner = config.get(RUN_S3SCANNER, True)
 	should_run_acunetix = config.get(RUN_ACUNETIX, False)
+	should_run_wpscan = config.get(RUN_WPSCAN, True)
+	should_run_cpanel = config.get('cpanel_scanner', {}).get(RUN_CPANEL2SHELL, True)
 
 	grouped_tasks = []
 	if should_run_nuclei:
@@ -2858,7 +2907,6 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 		grouped_tasks.append(_task)
 
 	# Run cPanel Scanner
-	should_run_cpanel = config.get('cpanel_scanner', {}).get(RUN_CPANEL2SHELL, True)
 	if should_run_cpanel:
 		_task = cpanel_scan.si(
 			ctx=ctx,
@@ -2867,7 +2915,6 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 		grouped_tasks.append(_task)
 
 	# Run WPScan
-	should_run_wpscan = config.get(RUN_WPSCAN, True)
 	if should_run_wpscan:
 		_task = wpscan_scan.si(
 			urls=urls,
@@ -3882,7 +3929,6 @@ def http_crawl(
 #---------------------#
 # Notifications tasks #
 #---------------------#
-
 @app.task(name='send_notif', bind=False, queue='send_notif_queue')
 def send_notif(
 		message,
@@ -4186,7 +4232,6 @@ def send_hackerone_report(vulnerability_id):
 #-------------#
 # Utils tasks #
 #-------------#
-
 
 @app.task(name='parse_nmap_results', bind=False, queue='parse_nmap_results_queue')
 def parse_nmap_results(xml_file, output_file=None):
@@ -4982,7 +5027,6 @@ def fetch_related_tlds_and_domains(domain):
 	return list(related_tlds), list(related_domains)
 
 
-
 def fetch_whois_data_using_netlas(target):
 	"""
 		Fetch WHOIS data using netlas.
@@ -5115,11 +5159,9 @@ def remove_duplicate_endpoints(
 # run_command and sanitize_command_for_db moved to task_utils.py
 
 
-
 #-------------#
 # Other utils #
 #-------------#
-
 def stream_command(
 		cmd, 
 		cwd=None, 
@@ -5268,7 +5310,6 @@ def extract_httpx_url(line):
 #-------------#
 # OSInt utils #
 #-------------#
-
 def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=None, lookup_extensions=None, delay=3, page_count=2, scan_history=None):
 	"""
 		Uses gofuzz to dork and store information
@@ -5385,7 +5426,6 @@ def save_metadata_info(meta_dict):
 #-----------------#
 # Utils functions #
 #-----------------#
-
 def create_scan_activity(scan_history_id, message, status):
 	scan_activity = ScanActivity()
 	scan_activity.scan_of = ScanHistory.objects.get(pk=scan_history_id)
@@ -5399,10 +5439,6 @@ def create_scan_activity(scan_history_id, message, status):
 #--------------------#
 # Database functions #
 #--------------------#
-
-
-
-
 def save_endpoint(
 		http_url,
 		ctx={},
@@ -5562,8 +5598,6 @@ def save_subdomain(subdomain_name, ctx={}):
 
 
 # save_email and save_employee moved to task_utils.py
-
-
 def save_ip_address(ip_address, subdomain=None, subscan=None, **kwargs):
 	if not (validators.ipv4(ip_address) or validators.ipv6(ip_address)):
 		logger.info(f'IP {ip_address} is not a valid IP. Skipping.')
@@ -5814,7 +5848,6 @@ def fetch_proxies_task(self):
     
     logger.info("Automated proxy fetch task finished successfully.")
     return "\n".join(final_list)
-
 
 
 def parse_sslscan_results(xml_file):
@@ -6111,7 +6144,7 @@ def map_acunetix_severity(severity):
 	return mapping.get(severity, 0)
 
 
-@app.task(name='acunetix_scan', queue='main_scan_queue', base=RengineTask, bind=True)
+@app.task(name='run_acunetix', queue='main_scan_queue', base=RengineTask, bind=True)
 def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 	"""
 	Run Acunetix (AWVS) scan for the given domain.

@@ -44,12 +44,44 @@ export const useGPTAttackSurface = () => {
         params: {
           format: 'json',
           subdomain_id: subdomainId
+        },
+        headers: {
+          'X-CSRFToken': getCsrfToken()
         }
       });
       return response.data;
     },
   });
 };
+
+export const use_show_attack_surface_modal = async (subdomainId: number) => {
+  try {
+    const response = await axios.get('/api/tools/gpt_get_possible_attacks/', {
+      params: {
+        format: 'json',
+        subdomain_id: subdomainId
+      },
+      headers: {
+        'X-CSRFToken': getCsrfToken()
+      }
+    });
+    const data = response.data;
+    if (data.status) {
+      console.log("data");
+      console.log(data);
+      // Should be displayed in the modal dialog.
+      // $('#modal_title').html(`Attack Surface Suggestion for ${data.subdomain_name} (BETA)`);
+      // $('#modal-content').empty();
+      // $('#modal-content').append(data.description.replace(new RegExp('\r?\n', 'g'), '<br />'));
+      // $('#modal_dialog').modal('show');
+    }
+    else {
+      console.log("no data");
+    }
+  } catch (error) {
+    console.error(error);
+  }
+}
 
 export const useDeleteSubdomain = (projectSlug: string) => {
   const queryClient = useQueryClient();

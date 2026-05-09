@@ -728,7 +728,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           }
         }}
       >
-        <MenuItem onClick={() => { handleActionClose(); setAttackSurfaceModalOpen(true); }}>
+        {/* <MenuItem onClick={() => { handleActionClose(); setAttackSurfaceModalOpen(true); }}>
           <ListItemIcon><Eye size={16} color="#00f3ff" /></ListItemIcon>
           <ListItemText primary="ATTACK SURFACE" />
         </MenuItem>
@@ -739,7 +739,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         <MenuItem onClick={() => { handleActionClose(); setTodoModalOpen(true); }}>
           <ListItemIcon><FilePlus size={16} color="#00f3ff" /></ListItemIcon>
           <ListItemText primary="ADD NOTE" />
-        </MenuItem>
+        </MenuItem> */}
         <MenuItem onClick={() => handleToggleImportant(selectedId!)} sx={{ color: '#ffae00' }}>
           <ListItemIcon><Shield size={16} color="#ffae00" /></ListItemIcon>
           <ListItemText primary={targetSubdomain?.is_important ? "UNMARK IMPORTANT" : "MARK IMPORTANT"} />

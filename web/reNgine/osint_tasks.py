@@ -9,11 +9,12 @@ from reNgine.opsec_utils import OpSecManager
 from startScan.models import ScanHistory, Email, Employee
 from reNgine.definitions import *
 from reNgine.osint.linkedin_intelligence import LinkedInScraper
+from reNgine.celery_custom_task import RengineTask
 
 logger = get_task_logger(__name__)
 
-@app.task(name='run_holehe', queue='main_scan_queue')
-def run_holehe(email_address, scan_history_id):
+@app.task(name='run_holehe', queue='main_scan_queue', base=RengineTask, bind=True)
+def run_holehe(self, email_address, scan_history_id):
     """
     Run holehe for a specific email address to find associated social media accounts.
     """
@@ -55,8 +56,8 @@ def run_holehe(email_address, scan_history_id):
         logger.error(f"Error running holehe for {email_address}: {str(e)}")
         return []
 
-@app.task(name='run_maigret', queue='main_scan_queue')
-def run_maigret(username, scan_history_id):
+@app.task(name='run_maigret', queue='main_scan_queue', base=RengineTask, bind=True)
+def run_maigret(self, username, scan_history_id):
     """
     Run maigret to find social media profiles for a given username.
     """
@@ -102,8 +103,8 @@ def run_maigret(username, scan_history_id):
         logger.error(f"Error running maigret for {username}: {str(e)}")
         return []
 
-@app.task(name='run_linkedint', queue='osint_queue')
-def run_linkedint(company_name, scan_history_id):
+@app.task(name='run_linkedint', queue='osint_queue', base=RengineTask, bind=True)
+def run_linkedint(self, company_name, scan_history_id):
     """
     Run LinkedIn Scraper (Playwright) to scrape LinkedIn for employees of a company.
     """
@@ -149,8 +150,8 @@ def run_linkedint(company_name, scan_history_id):
         return []
 
 
-@app.task(name='osint_orchestrator', queue='main_scan_queue')
-def osint_orchestrator(scan_history_id):
+@app.task(name='osint_orchestrator', queue='main_scan_queue', base=RengineTask, bind=True)
+def osint_orchestrator(self, scan_history_id):
     """
     Orchestrate the new OSINT pipeline.
     """

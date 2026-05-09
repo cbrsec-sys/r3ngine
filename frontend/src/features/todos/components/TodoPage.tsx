@@ -263,8 +263,8 @@ export const TodoPage: React.FC = () => {
                   >
                     <MenuItem value={0} sx={{ color: 'rgba(255,255,255,0.4)' }}>Choose Scan History...</MenuItem>
                     {scans?.map(scan => (
-                      <MenuItem key={scan.id} value={scan.id}>
-                        {scan.domain.name} - {new Date(scan.start_scan_date).toLocaleString()}
+                      <MenuItem key={scan.id!} value={scan.id!}>
+                        {scan.domain?.name || 'Unknown'} - {new Date(scan.start_scan_date).toLocaleString()}
                       </MenuItem>
                     ))}
                   </Select>
@@ -302,7 +302,7 @@ export const TodoPage: React.FC = () => {
                   >
                     <MenuItem value={0} sx={{ color: 'rgba(255,255,255,0.4)' }}>Choose Subdomain...</MenuItem>
                     {subdomains?.map(sub => (
-                      <MenuItem key={sub.id} value={sub.id}>{sub.name}</MenuItem>
+                      <MenuItem key={sub.id!} value={sub.id!}>{sub.name}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>

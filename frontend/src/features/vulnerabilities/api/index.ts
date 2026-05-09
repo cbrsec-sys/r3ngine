@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { operations } from '@/types/api';
 import type { VulnerabilityResponse } from '../types';
+
 
 export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, targetId?: number) => {
   return useQuery<VulnerabilityResponse>({
@@ -30,8 +32,9 @@ export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = 
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      return response.json();
+      return await response.json() as operations["listVulnerability_list"]["responses"]["200"]["content"]["application/json"];
     },
+
     enabled: !!projectSlug,
   });
 };

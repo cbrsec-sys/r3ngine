@@ -1,8 +1,8 @@
 from drf_yasg import openapi
 
 info = openapi.Info(
-    title="reNgine API",
+    title="R3ngine API",
     default_version='v1',
-    description="reNgine: An Automated reconnaissance framework.",
-    contact=openapi.Contact(email="yogesh.ojha11@gmail.com"),
+    description="R3ngine: An Automated reconnaissance framework.",
+    contact=openapi.Contact(email="[EMAIL_ADDRESS]"),
 )
