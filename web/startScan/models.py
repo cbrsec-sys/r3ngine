@@ -546,6 +546,7 @@ class Vulnerability(models.Model):
 		('verified', 'Verified'),
 		('not_working', 'Not Working'),
 		('patched', 'Patched'),
+		('closed', 'Closed'),
 	)
 	validation_status = models.CharField(max_length=20, choices=VULNERABILITY_STATUS_CHOICES, default='unverified')
 	validation_confidence = models.FloatField(null=True, blank=True, default=0.0)

@@ -824,7 +824,7 @@ def osint(self, host=None, ctx={}, description=None):
 	# return results
 
 
-@app.task(name='osint_discovery', queue='osint_discovery_queue', bind=False)
+@app.task(name='osint_discovery', queue='main_scan_queue', bind=False)
 def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run OSINT discovery.
 
@@ -932,7 +932,7 @@ def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx
 	return results
 
 
-@app.task(name='dorking', bind=False, queue='dorking_queue')
+@app.task(name='dorking', bind=False, queue='main_scan_queue')
 def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
 	"""Run Google dorks.
 
@@ -1242,7 +1242,7 @@ def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
 	return results
 
 
-@app.task(name='theHarvester', queue='theHarvester_queue', bind=False)
+@app.task(name='theHarvester', queue='main_scan_queue', bind=False)
 def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run theHarvester to get save emails, hosts, employees found in domain.
 
@@ -1356,7 +1356,7 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}
 	return data
 
 
-@app.task(name='h8mail', queue='h8mail_queue', bind=False)
+@app.task(name='h8mail', queue='main_scan_queue', bind=False)
 def h8mail(config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run h8mail.
 
@@ -1401,7 +1401,7 @@ def h8mail(config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	return creds
 
 
-@app.task(name='leaklookup', queue='osint_discovery_queue', base=RengineTask, bind=True)
+@app.task(name='leaklookup', queue='main_scan_queue', base=RengineTask, bind=True)
 def leaklookup(self, host=None, ctx=None):
 	"""Run LeakLookup query."""
 	api_key = get_leaklookup_key()
@@ -1440,7 +1440,7 @@ def leaklookup(self, host=None, ctx=None):
 		raise e
 
 
-@app.task(name='secret_scanning', queue='osint_discovery_queue', base=RengineTask, bind=True)
+@app.task(name='secret_scanning', queue='main_scan_queue', base=RengineTask, bind=True)
 def secret_scanning(self, config=None, host=None, ctx=None):
 	"""Scan for secrets in JS files and potentially other sources."""
 	if not self.scan:
@@ -6331,7 +6331,7 @@ def sync_cisa_kev_catalog():
 		logger.error(f"Error syncing CISA KEV catalog: {e}")
 
 
-@app.task(name='run_apme', queue='attack_path_modeling_queue', base=RengineTask, bind=True)
+@app.task(name='run_apme', queue='main_scan_queue', base=RengineTask, bind=True)
 def run_apme(self, scan_history_id):
 	"""
 	Runs the Attack Path Modeling Engine (APME).

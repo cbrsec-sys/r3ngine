@@ -12,7 +12,7 @@ from reNgine.osint.linkedin_intelligence import LinkedInScraper
 
 logger = get_task_logger(__name__)
 
-@app.task(name='run_holehe', queue='osint_queue')
+@app.task(name='run_holehe', queue='main_scan_queue')
 def run_holehe(email_address, scan_history_id):
     """
     Run holehe for a specific email address to find associated social media accounts.
@@ -55,7 +55,7 @@ def run_holehe(email_address, scan_history_id):
         logger.error(f"Error running holehe for {email_address}: {str(e)}")
         return []
 
-@app.task(name='run_maigret', queue='osint_queue')
+@app.task(name='run_maigret', queue='main_scan_queue')
 def run_maigret(username, scan_history_id):
     """
     Run maigret to find social media profiles for a given username.
@@ -149,7 +149,7 @@ def run_linkedint(company_name, scan_history_id):
         return []
 
 
-@app.task(name='osint_orchestrator', queue='osint_queue')
+@app.task(name='osint_orchestrator', queue='main_scan_queue')
 def osint_orchestrator(scan_history_id):
     """
     Orchestrate the new OSINT pipeline.

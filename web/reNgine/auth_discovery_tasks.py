@@ -7,7 +7,8 @@ from django.conf import settings
 from startScan.models import EndPoint, AuthCandidate, Subdomain
 from reNgine.celery import app
 from reNgine.tasks import RengineTask
-from reNgine.utilities import run_command, save_auth_candidate, get_random_proxy
+from reNgine.utilities import save_auth_candidate
+from reNgine.common_func import get_random_proxy
 from celery.utils.log import get_task_logger
 
 logger = get_task_logger(__name__)
@@ -21,7 +22,7 @@ def extract_auth_candidates(self, ctx={}, description=None):
     logger.info(f"Starting Intelligent Auth Form Extraction for Scan {self.scan_id}")
     
     # Get all alive endpoints for this scan
-    endpoints = EndPoint.objects.filter(subdomain__scan_history=self.scan, is_alive=True)
+    endpoints = EndPoint.objects.filter(subdomain__scan_history=self.scan, http_status__gt=0, http_status__lt=500).exclude(http_status=404)
     
     # Filter for interesting keywords if they are not already candidates
     existing_candidate_urls = AuthCandidate.objects.filter(scan_history=self.scan).values_list('target', flat=True)

@@ -23,6 +23,7 @@ import {
   CheckCircle2
 } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { useProxySettings, useUpdateProxySettings, useFetchProxies, useProxyTaskStatus } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 
@@ -36,6 +37,7 @@ export const ProxySettingsPage: React.FC = () => {
   const [useProxychains, setUseProxychains] = useState(false);
   const [proxyList, setProxyList] = useState('');
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -99,31 +101,34 @@ export const ProxySettingsPage: React.FC = () => {
     });
   };
 
-  const handleFetch = () => {
-    if (window.confirm('This will fetch new proxies and update the list. Existing list will be replaced if you save. Continue?')) {
-      setSnackbar({
-        open: true,
-        message: 'Initiating proxy fetch task...',
-        severity: 'success'
-      });
-      fetchProxies.mutate(undefined, {
-        onSuccess: (data) => {
-          setCurrentTaskId(data.task_id);
-          setSnackbar({
-            open: true,
-            message: 'Proxy fetch task started. Monitoring progress...',
-            severity: 'success'
-          });
-        },
-        onError: (error: any) => {
-          setSnackbar({
-            open: true,
-            message: `Failed to start proxy fetch: ${error?.response?.data?.error || error?.response?.data?.message || error.message || 'Unknown error'}`,
-            severity: 'error'
-          });
-        }
-      });
-    }
+  const handleFetchClick = () => {
+    setIsConfirmOpen(true);
+  };
+
+  const handleConfirmFetch = () => {
+    setIsConfirmOpen(false);
+    setSnackbar({
+      open: true,
+      message: 'Initiating proxy fetch task...',
+      severity: 'success'
+    });
+    fetchProxies.mutate(undefined, {
+      onSuccess: (data) => {
+        setCurrentTaskId(data.task_id);
+        setSnackbar({
+          open: true,
+          message: 'Proxy fetch task started. Monitoring progress...',
+          severity: 'success'
+        });
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: `Failed to start proxy fetch: ${error?.response?.data?.error || error?.response?.data?.message || error.message || 'Unknown error'}`,
+          severity: 'error'
+        });
+      }
+    });
   };
 
   if (isSettingsLoading) return <LinearProgress sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />;
@@ -287,7 +292,7 @@ export const ProxySettingsPage: React.FC = () => {
               <Button
                 variant="outlined"
                 startIcon={<RefreshCw size={18} className={fetchProxies.isPending ? 'spin' : ''} />}
-                onClick={handleFetch}
+                onClick={handleFetchClick}
                 disabled={fetchProxies.isPending || (taskStatus && taskStatus.status === 'PROGRESS')}
                 sx={{
                   borderColor: '#00f3ff',
@@ -320,6 +325,17 @@ export const ProxySettingsPage: React.FC = () => {
           </Box>
         </TacticalPanel>
       </Stack>
+
+      <ConfirmDialog
+        open={isConfirmOpen}
+        title="FETCH PROXIES"
+        message="This will initiate an automated task to fetch and verify new proxies. The existing list will be updated with the results. You will need to SAVE the settings once the task completes. Proceed?"
+        onConfirm={handleConfirmFetch}
+        onClose={() => setIsConfirmOpen(false)}
+        type="info"
+        isDestructive={false}
+        confirmText="INITIATE FETCH"
+      />
 
       <Snackbar 
         open={snackbar.open} 
