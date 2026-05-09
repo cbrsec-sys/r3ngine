@@ -28,9 +28,17 @@ export const useAddTarget = (projectSlug: string) => {
     mutationFn: async (params: {
       domain_name: string;
       project_slug: string;
-      organization_ids?: number[];
+      organization?: string;
+      h1_team_handle?: string;
+      description?: string;
+      is_monitored?: boolean;
+      monitor_frequency?: string;
+      monitor_engine_id?: number;
+      monitor_scan_scope?: string;
+      starting_point_path?: string;
+      excluded_paths?: string[];
     }) => {
-      const response = await fetch('/api/target/add/', {
+      const response = await fetch('/api/add/target/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -40,7 +48,15 @@ export const useAddTarget = (projectSlug: string) => {
         body: JSON.stringify({
           domain_name: params.domain_name,
           slug: params.project_slug,
-          organization: params.organization_ids
+          organization: params.organization,
+          h1_team_handle: params.h1_team_handle,
+          description: params.description,
+          is_monitored: params.is_monitored,
+          monitor_frequency: params.monitor_frequency,
+          monitor_engine_id: params.monitor_engine_id,
+          monitor_scan_scope: params.monitor_scan_scope,
+          starting_point_path: params.starting_point_path,
+          excluded_paths: params.excluded_paths,
         }),
       });
 
@@ -81,7 +97,7 @@ export const useDeleteTargets = (projectSlug: string) => {
   
   return useMutation({
     mutationFn: async (targetIds: number[]) => {
-      const response = await fetch('/api/action/delete/rows/', {
+      const response = await fetch('/api/action/rows/delete/', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,5 +135,35 @@ export const useTargetSummary = (projectSlug: string, targetId: number) => {
       return response.json();
     },
     enabled: !!projectSlug && !!targetId,
+  });
+};
+
+export const useEngines = () => {
+  return useQuery<any[]>({
+    queryKey: ['engines'],
+    queryFn: async () => {
+      const response = await fetch('/api/listEngines/', {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      return data.engines || data || [];
+    },
+  });
+};
+
+export const useResolveIP = () => {
+  return useMutation({
+    mutationFn: async (ipAddress: string) => {
+      const response = await fetch(`/api/tools/ip_to_domain/?ip_address=${ipAddress}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to resolve IP');
+      }
+      return response.json();
+    }
   });
 };
