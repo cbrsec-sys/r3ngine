@@ -52,15 +52,18 @@ class APMEOrchestrator:
         """
         logger.info(f"APME Orchestrator: Starting for scan_history_id={scan_history_id}")
 
-        # ── Step 1: Ingest ────────────────────────────────────────────────────
-        logger.info("APME [1/7] Ingesting data from reNgine DB...")
-        all_nodes = []
-        all_edges = []
+        # Resolve Target Domain from ScanHistory to ensure we ingest ALL historical and current scan data
+        from startScan.models import ScanHistory
+        scan = ScanHistory.objects.get(id=scan_history_id)
+        target_id = scan.domain_id
 
-        asset_nodes, asset_edges = ingest_subdomains(scan_history_id)
-        ep_nodes, ep_edges = ingest_endpoints(scan_history_id)
-        vuln_nodes, vuln_edges = ingest_vulnerabilities(scan_history_id)
-        cred_nodes, cred_edges = ingest_credentials(scan_history_id)
+        asset_nodes, asset_edges = ingest_subdomains(target_id)
+        ep_nodes, ep_edges = ingest_endpoints(target_id)
+        vuln_nodes, vuln_edges = ingest_vulnerabilities(target_id)
+        cred_nodes, cred_edges = ingest_credentials(target_id)
+
+        all_nodes: List[Node] = []
+        all_edges: List[Any] = []
 
         all_nodes.extend(asset_nodes + ep_nodes + vuln_nodes + cred_nodes)
         all_edges.extend(asset_edges + ep_edges + vuln_edges + cred_edges)

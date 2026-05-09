@@ -23,6 +23,7 @@ import {
   AlertCircle,
   Zap
 } from 'lucide-react';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { useScheduledScans, useToggleScheduledScan, useBulkDeleteScheduledScans } from '../api';
 
 export const ScheduledScansPage: React.FC = () => {
@@ -37,11 +38,24 @@ export const ScheduledScansPage: React.FC = () => {
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
+  // Confirmation state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'info' | 'warning';
+  }>({
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+
   const filteredData = useMemo(() => {
     if (!data) return [];
     return data.filter(scan => 
-      scan.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      scan.name.toLowerCase().includes(searchQuery.toLowerCase())
+      scan.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      scan.name?.toLowerCase().includes(searchQuery.toLowerCase())
     );
   }, [data, searchQuery]);
 
@@ -61,7 +75,7 @@ export const ScheduledScansPage: React.FC = () => {
 
   const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.checked) {
-      setSelectedIds(filteredData.map(s => s.id));
+      setSelectedIds(filteredData.map(s => s.id!));
     } else {
       setSelectedIds([]);
     }
@@ -78,11 +92,18 @@ export const ScheduledScansPage: React.FC = () => {
   };
 
   const handleDeleteMultiple = () => {
-    if (window.confirm(`Are you sure you want to delete ${selectedIds.length} scheduled scans?`)) {
-      bulkDeleteMutation.mutate(selectedIds, {
-        onSuccess: () => setSelectedIds([])
-      });
-    }
+    if (selectedIds.length === 0) return;
+    setConfirmConfig({
+      title: 'PURGE SCHEDULED OPERATIONS',
+      message: `Are you sure you want to delete ${selectedIds.length} scheduled scans? This will terminate all future automated execution for these targets.`,
+      type: 'danger',
+      onConfirm: () => {
+        bulkDeleteMutation.mutate(selectedIds, {
+          onSuccess: () => setSelectedIds([])
+        });
+      }
+    });
+    setConfirmOpen(true);
   };
 
   if (isError) {
@@ -228,7 +249,7 @@ export const ScheduledScansPage: React.FC = () => {
             ) : (
               paginatedData.map((scan) => (
                 <tr 
-                  key={scan.id} 
+                  key={scan.id!} 
                   style={{ 
                     borderBottom: '1px solid rgba(255,255,255,0.05)',
                     transition: 'background 0.2s',
@@ -239,19 +260,19 @@ export const ScheduledScansPage: React.FC = () => {
                   <td style={{ padding: '12px 16px' }}>
                     <input 
                       type="checkbox" 
-                      checked={selectedIds.includes(scan.id)}
-                      onChange={() => handleSelectOne(scan.id)}
+                      checked={selectedIds.includes(scan.id!)}
+                      onChange={() => handleSelectOne(scan.id!)}
                       style={{ accentColor: '#00f3ff' }}
                     />
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '13px' }}>{scan.description}</Typography>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontFamily: 'monospace' }}>ID: {scan.id}</Typography>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontFamily: 'monospace' }}>ID: {scan.id!}</Typography>
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Calendar size={14} color="#00f3ff" />
-                      <Typography sx={{ color: '#00f3ff', fontSize: '11px', fontWeight: 800 }}>{scan.frequency.toUpperCase()}</Typography>
+                      <Typography sx={{ color: '#00f3ff', fontSize: '11px', fontWeight: 800 }}>{scan.frequency?.toUpperCase() || 'UNKNOWN'}</Typography>
                     </Box>
                   </td>
                   <td style={{ padding: '12px 16px' }}>
@@ -284,7 +305,7 @@ export const ScheduledScansPage: React.FC = () => {
                     <Switch 
                       size="small"
                       checked={scan.enabled}
-                      onChange={() => handleToggle(scan.id)}
+                      onChange={() => handleToggle(scan.id!)}
                       sx={{
                         '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
                         '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' },
@@ -301,7 +322,7 @@ export const ScheduledScansPage: React.FC = () => {
                       <Tooltip title="DELETE">
                         <IconButton 
                           size="small" 
-                          onClick={() => { handleSelectOne(scan.id); handleDeleteMultiple(); }}
+                          onClick={() => { handleSelectOne(scan.id!); handleDeleteMultiple(); }}
                           sx={{ color: '#ff003c', '&:hover': { bgcolor: 'rgba(255, 0, 60, 0.1)' } }}
                         >
                           <Trash2 size={16} />
@@ -353,6 +374,19 @@ export const ScheduledScansPage: React.FC = () => {
           </Box>
         </Box>
       </Box>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          confirmConfig.onConfirm();
+          setConfirmOpen(false);
+        }}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+      />
     </Box>
   );
 };

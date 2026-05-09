@@ -138,7 +138,7 @@ export const ScanList: React.FC = () => {
             </TableHead>
             <TableBody>
               {scans?.map((scan) => (
-                <TableRow key={scan.id} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }, transition: 'all 0.2s' }}>
+                <TableRow key={scan.id!} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }, transition: 'all 0.2s' }}>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Typography variant="body2" sx={{ fontWeight: 700, color: '#fff' }}>{scan.domain?.name || 'N/A'}</Typography>
                     <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontWeight: 600 }}>{scan.scan_type?.engine_name || 'Standard'}</Typography>
@@ -147,7 +147,7 @@ export const ScanList: React.FC = () => {
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       <LinearProgress 
                         variant="determinate" 
-                        value={scan.current_progress || 0} 
+                        value={Number(scan.current_progress || 0)} 
                         sx={{ 
                           flexGrow: 1, 
                           height: 4, 
@@ -160,7 +160,7 @@ export const ScanList: React.FC = () => {
                         }} 
                       />
                       <Typography variant="caption" sx={{ fontWeight: 900, color: scan.scan_status === -1 ? '#ff003c' : '#00f3ff', width: 35 }}>
-                        {Math.round(scan.current_progress || 0)}%
+                        {Math.round(Number(scan.current_progress || 0))}%
                       </Typography>
                     </Box>
                   </TableCell>
@@ -175,7 +175,7 @@ export const ScanList: React.FC = () => {
                       <Tooltip title="Vulnerabilities Detected">
                         <Box sx={{ textAlign: 'center' }}>
                           <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>VUL</Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 900, color: (scan.vulnerability_count || 0) > 0 ? '#ff003c' : '#fff' }}>
+                          <Typography variant="body2" sx={{ fontWeight: 900, color: Number(scan.vulnerability_count || 0) > 0 ? '#ff003c' : '#fff' }}>
                             {scan.vulnerability_count || 0}
                           </Typography>
                         </Box>
@@ -183,7 +183,7 @@ export const ScanList: React.FC = () => {
                     </Box>
                   </TableCell>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    {getStatusChip(scan.scan_status)}
+                    {getStatusChip(scan.scan_status!)}
                   </TableCell>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
@@ -200,7 +200,7 @@ export const ScanList: React.FC = () => {
                         <IconButton 
                           size="small" 
                           component="a"
-                          href={`/scan/detail/${scan.id}`}
+                          href={`/scan/detail/${scan.id!}`}
                           target="_blank"
                           sx={{ color: '#00f3ff', '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
                         >
@@ -216,7 +216,7 @@ export const ScanList: React.FC = () => {
                       )}
                       <IconButton 
                         size="small" 
-                        onClick={(e) => handleMenuOpen(e, scan.id)}
+                        onClick={(e) => handleMenuOpen(e, scan.id!)}
                         sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
                       >
                         <MoreVertical size={16} />
@@ -263,7 +263,7 @@ export const ScanList: React.FC = () => {
             console.log('Found scan (ScanList):', scan);
             if (scan && scan.domain) {
               setRescanTarget({
-                ids: [scan.domain.id],
+                ids: [scan.domain.id!],
                 names: [scan.domain.name]
               });
             }

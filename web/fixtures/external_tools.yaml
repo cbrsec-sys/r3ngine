@@ -541,14 +541,14 @@
     description: Acunetix is an automated web application security testing tool that audits your web applications by checking for vulnerabilities like SQL Injection, Cross-site Scripting, and other exploitable vulnerabilities.
     github_url: https://github.com/WazeHell/acunetix-python
     license_url: https://github.com/WazeHell/acunetix-python/blob/master/LICENSE
-    version_lookup_command: pip3 show acunetix-python
-    update_command: pip3 install acunetix-python --upgrade
-    install_command: pip3 install acunetix-python
+    version_lookup_command: pip3 show acunetix
+    update_command: pip3 install /usr/src/github/acunetix-python --upgrade
+    install_command: pip3 install /usr/src/github/acunetix-python
     version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
     is_default: true
     is_subdomain_gathering: false
-    is_github_cloned: false
-    github_clone_path: null
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/acunetix-python
     subdomain_gathering_command: null
 
 - model: scanEngine.installedexternaltool
@@ -691,4 +691,107 @@
     is_subdomain_gathering: false
     is_github_cloned: false
     github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 40
+  fields:
+    logo_url: null
+    name: holehe
+    description: holehe checks if an email is attached to any social media accounts on over 120 websites.
+    github_url: https://github.com/megadose/holehe
+    license_url: https://github.com/megadose/holehe/blob/master/LICENSE
+    version_lookup_command: holehe --version
+    update_command: pip3 install holehe --upgrade
+    install_command: pip3 install holehe
+    version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 41
+  fields:
+    logo_url: null
+    name: maigret
+    description: Collect a dossier on a person by username from a huge number of social networks and other resources.
+    github_url: https://github.com/soxoj/maigret
+    license_url: https://github.com/soxoj/maigret/blob/main/LICENSE
+    version_lookup_command: maigret --version
+    update_command: pip3 install maigret --upgrade
+    install_command: pip3 install maigret
+    version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 42
+  fields:
+    logo_url: null
+    name: LinkedInt
+    description: LinkedIn reconnaissance tool that scrapes LinkedIn for information about a company's employees.
+    github_url: https://github.com/mdunivant/LinkedInt
+    license_url: https://github.com/mdunivant/LinkedInt/blob/master/LICENSE
+    version_lookup_command: null
+    update_command: cd /usr/src/github/LinkedInt && git pull
+    install_command: git clone https://github.com/mdunivant/LinkedInt /usr/src/github/LinkedInt
+    version_match_regex: null
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/LinkedInt
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 43
+  fields:
+    logo_url: null
+    name: wpscan
+    description: WordPress Security Scanner
+    github_url: https://github.com/wpscan/wpscan
+    license_url: null
+    version_lookup_command: wpscan --version
+    update_command: gem update wpscan
+    install_command: gem install wpscan
+    version_match_regex: null
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 44
+  fields:
+    logo_url: https://raw.githubusercontent.com/sqlmapproject/sqlmap/master/doc/README/sqlmap_logo.png
+    name: sqlmap
+    description: sqlmap is an open source penetration testing tool that automates the process of detecting and exploiting SQL injection flaws and taking over of database servers.
+    github_url: https://github.com/sqlmapproject/sqlmap
+    license_url: https://github.com/sqlmapproject/sqlmap/blob/master/LICENSE
+    version_lookup_command: python3 sqlmap.py --version
+    update_command: git pull
+    install_command: git clone --depth 1 https://github.com/sqlmapproject/sqlmap.git
+    version_match_regex: '(?i:v)?\d+\.\d+(?:\.\d+)*'
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/sqlmap
+    subdomain_gathering_command: null
+
+- model: scanEngine.installedexternaltool
+  pk: 45
+  fields:
+    logo_url: null
+    name: XSStrike
+    description: XSStrike is a Cross Site Scripting detection suite equipped with four hand written parsers, an intelligent payload generator, a powerful fuzzing engine and an incredibly fast crawler.
+    github_url: https://github.com/s0md3v/XSStrike
+    license_url: https://github.com/s0md3v/XSStrike/blob/master/LICENSE
+    version_lookup_command: python3 xsstrike.py --help
+    update_command: git pull
+    install_command: git clone https://github.com/s0md3v/XSStrike.git
+    version_match_regex: '(?i:v)?\d+\.\d+(?:\.\d+)*'
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/XSStrike
     subdomain_gathering_command: null

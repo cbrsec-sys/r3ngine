@@ -13,6 +13,12 @@ services:
       - postgres_data:/var/lib/postgresql/data/
     networks:
       - rengine_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   redis:
     restart: always
@@ -20,6 +26,12 @@ services:
     hostname: redis
     networks:
       - rengine_network
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   celery:
     build:
@@ -39,7 +51,6 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       - plugins_data:/usr/src/app/plugins_data
-
     environment:
       - DEBUG=1
       - CELERY_BROKER=redis://redis:6379/0
@@ -57,6 +68,12 @@ services:
       - redis
     networks:
       - rengine_network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
 
   celery-beat:
     build:
@@ -78,7 +95,6 @@ services:
       - db
     volumes:
       - ./web:/usr/src/app
-      - ./frontend/templates:/usr/src/app/frontend/templates
       - github_repos:/usr/src/github
       - wordlist:/usr/src/wordlist
       - scan_results:/usr/src/scan_results
@@ -86,10 +102,9 @@ services:
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
       - plugins_data:/usr/src/app/plugins_data
-
     networks:
       - rengine_network
-
+      
   web:
     build:
       context: .
@@ -120,7 +135,6 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       - plugins_data:/usr/src/app/plugins_data
-
     ports:
       - "127.0.0.1:8000:8000"
       - "5173:5173"
@@ -132,6 +146,12 @@ services:
       rengine_network:
         aliases:
           - rengine
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
 
   proxy:
     restart: always
@@ -156,6 +176,12 @@ services:
       - scan_results:/usr/src/scan_results
     networks:
       - rengine_network
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+        reservations:
+          memory: 256M
   ollama:
     image: ollama/ollama
     container_name: ollama
@@ -165,6 +191,12 @@ services:
       - "11434:11434"
     networks:
       - rengine_network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
 
   neo4j:
     image: neo4j:5.12.0
@@ -179,6 +211,12 @@ services:
       - neo4j_data:/data
     networks:
       - rengine_network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
 
 networks:
   rengine_network:

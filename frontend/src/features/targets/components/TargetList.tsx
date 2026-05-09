@@ -68,7 +68,7 @@ export const TargetList: React.FC = () => {
 
   const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked && domains) {
-      setSelectedIds(domains.map(d => d.id));
+      setSelectedIds(domains.map(d => d.id!));
     } else {
       setSelectedIds([]);
     }
@@ -148,7 +148,7 @@ export const TargetList: React.FC = () => {
             variant="contained"
             disabled={selectedIds.length === 0}
             onClick={() => {
-              const selectedDomains = domains?.filter(d => selectedIds.includes(d.id)) || [];
+              const selectedDomains = domains?.filter(d => selectedIds.includes(d.id!)) || [];
               setStartScanTargets({
                 ids: selectedIds,
                 names: selectedDomains.map(d => d.name)
@@ -262,8 +262,8 @@ export const TargetList: React.FC = () => {
             <TableBody>
               {domains?.map((domain) => (
                 <TableRow 
-                  key={domain.id} 
-                  selected={selectedIds.includes(domain.id)}
+                  key={domain.id!} 
+                  selected={selectedIds.includes(domain.id!)}
                   sx={{ 
                     '&:hover': { bgcolor: 'rgba(255,255,255,0.03)' }, 
                     '&.Mui-selected': { bgcolor: 'rgba(0, 243, 255, 0.05)' },
@@ -272,8 +272,8 @@ export const TargetList: React.FC = () => {
                 >
                   <TableCell padding="checkbox" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Checkbox 
-                      checked={selectedIds.includes(domain.id)}
-                      onChange={() => handleSelectOne(domain.id)}
+                      checked={selectedIds.includes(domain.id!)}
+                      onChange={() => handleSelectOne(domain.id!)}
                       sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00f3ff' } }} 
                     />
                   </TableCell>
@@ -310,7 +310,7 @@ export const TargetList: React.FC = () => {
                 </TableCell>
                 <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>
-                      {domain.organization?.join(', ') || 'No Organization'}
+                      {domain.organization || 'No Organization'}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -348,7 +348,7 @@ export const TargetList: React.FC = () => {
                       <Button
                         size="small"
                         component={Link}
-                        to={`/${projectSlug}/target/${domain.id}/summary`}
+                        to={`/${projectSlug}/target/${domain.id!}/summary`}
                         startIcon={<Target size={14} />}
                         sx={{
                           bgcolor: 'rgba(0, 170, 255, 0.05)',
@@ -365,7 +365,7 @@ export const TargetList: React.FC = () => {
                       <Button
                         size="small"
                         startIcon={<Play size={14} />}
-                        onClick={() => setStartScanTargets({ ids: [domain.id], names: [domain.name] })}
+                        onClick={() => setStartScanTargets({ ids: [domain.id!], names: [domain.name] })}
                         sx={{
                           bgcolor: 'rgba(0, 170, 255, 0.05)',
                           color: '#00aaff',
@@ -380,7 +380,7 @@ export const TargetList: React.FC = () => {
                       </Button>
                       <IconButton 
                         size="small" 
-                        onClick={(e) => handleMenuOpen(e, { id: domain.id, name: domain.name })}
+                        onClick={(e) => handleMenuOpen(e, { id: domain.id!, name: domain.name })}
                         sx={{ color: 'rgba(0, 170, 255, 0.5)', bgcolor: 'rgba(0, 170, 255, 0.05)', borderRadius: 1 }}
                       >
                         <MoreVertical size={18} />

@@ -16,7 +16,7 @@ const PluginComponentLoader: React.FC<Props> = ({ pluginSlug, componentFile, ...
       try {
         // The UI files are served at /media/plugins/{slug}/ui/{file}
         // We use a dynamic import which works in modern browsers for ESM
-        const moduleUrl = `/media/plugins/${pluginSlug}/ui/${componentFile}`;
+        const moduleUrl = `/media/plugins/${pluginSlug}/ui/${componentFile}?v=${Date.now()}`;
         const module = await import(/* @vite-ignore */ moduleUrl);
         
         if (module.default) {

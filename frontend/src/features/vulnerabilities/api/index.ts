@@ -1,5 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import type { operations } from '@/types/api';
 import type { VulnerabilityResponse } from '../types';
+
 
 export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, targetId?: number) => {
   return useQuery<VulnerabilityResponse>({
@@ -30,8 +32,9 @@ export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = 
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      return response.json();
+      return await response.json() as operations["listVulnerability_list"]["responses"]["200"]["content"]["application/json"];
     },
+
     enabled: !!projectSlug,
   });
 };
@@ -101,6 +104,31 @@ export const useToggleVulnerabilityStatus = () => {
       });
       if (!response.ok) {
         throw new Error('Failed to toggle vulnerability status');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });
+    }
+  });
+};
+
+export const useUpdateVulnerabilityValidationStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const formData = new FormData();
+      formData.append('status', status);
+      const response = await fetch(`/scan/update/vuln_validation_status/${id}/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || ''
+        },
+        body: formData,
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update vulnerability validation status');
       }
       return response.json();
     },

@@ -12,7 +12,7 @@ from startScan.models import (
     VulnerabilityTags, IpAddress, Port, Technology, 
     MonitoringDiscovery, CountryISO, CveId, CweId,
     Email, Employee, ScanHistory, SubScan, ScanActivity, SecretLeak, Command,
-    Dork, MetaFinderDocument
+    Dork, MetaFinderDocument, S3Bucket
 )
 from recon_note.models import TodoNote
 
@@ -40,21 +40,34 @@ class ScanSummaryAPIView(APIView):
         this_week_scan_count = all_scans.filter(start_scan_date__gte=timezone.now() - timedelta(days=7)).count()
         recent_scans = all_scans[:5]
 
-        # Subdomains for THIS scan
-        subdomain_qs = Subdomain.objects.filter(scan_history=scan)
+        # Query sets for the target domain
+        subdomain_qs = Subdomain.objects.filter(target_domain=target)
+        alive_count = subdomain_qs.filter(http_status__gt=0, http_status__lt=500).exclude(http_status=404).count()
         subdomain_count = subdomain_qs.count()
-        alive_count = subdomain_qs.filter(http_status__exact=200).count()
-        
-        # Important subdomains for THIS scan
-        important_subdomains = subdomain_qs.filter(http_status__exact=200).values('name', 'http_status', 'page_title')[:10]
+        important_subdomains = subdomain_qs.filter(is_important=True)
 
-        # Endpoints for THIS scan
-        endpoint_qs = EndPoint.objects.filter(scan_history=scan)
+        endpoint_qs = EndPoint.objects.filter(target_domain=target)
         endpoint_count = endpoint_qs.count()
-        endpoint_alive_count = endpoint_qs.filter(http_status__exact=200).count()
+        endpoint_alive_count = endpoint_qs.filter(http_status__in=[200, 301, 302, 403]).count()
 
-        # Vulnerabilities for THIS scan
-        vulnerabilities = Vulnerability.objects.filter(scan_history=scan)
+        # Vulnerabilities - Cumulative for target
+        vulnerabilities = Vulnerability.objects.filter(target_domain=target)
+        # Auto-mark RESOLVED vulnerabilities if this scan included vuln scan and is finished
+        if scan.scan_status == 2 and scan.tasks and 'vulnerability_scan' in scan.tasks:
+            current_vulns = vulnerabilities.filter(scan_history=scan)
+            current_vuln_keys = set((v.name, v.http_url) for v in current_vulns)
+            
+            # Find open vulns from previous scans that were NOT found in this scan
+            previous_open_vulns = vulnerabilities.filter(
+                open_status=True,
+                is_suppressed=False
+            ).exclude(scan_history=scan)
+            
+            for v in previous_open_vulns:
+                if (v.name, v.http_url) not in current_vuln_keys:
+                    v.open_status = False
+                    v.save()
+
         critical_count = vulnerabilities.filter(severity=4).count()
         high_count = vulnerabilities.filter(severity=3).count()
         medium_count = vulnerabilities.filter(severity=2).count()
@@ -69,14 +82,31 @@ class ScanSummaryAPIView(APIView):
         most_common_cwe = CweId.objects.filter(cwe_ids__in=vulnerabilities).annotate(nused=Count('cwe_ids')).order_by('-nused').values('name', 'nused')[:7]
 
         # Assets
-        ip_addresses = IpAddress.objects.filter(ip_subscan_ids__scan_history=scan).distinct()
+        # IP Addresses and Country ISO - Target-wide
+        ip_addresses = IpAddress.objects.filter(ip_addresses__target_domain=target).distinct()
         asset_countries = ip_addresses.exclude(geo_iso=None).values(name=F('geo_iso__name'), iso=F('geo_iso__iso')).annotate(count=Count('geo_iso')).order_by('-count')
-        http_status_breakdown = subdomain_qs.exclude(http_status=0).values('http_status').annotate(count=Count('http_status'))
+        subdomain_statuses = subdomain_qs.exclude(Q(http_status=0) | Q(http_status__isnull=True)).values('http_status').annotate(count=Count('http_status'))
+        endpoint_statuses = endpoint_qs.exclude(Q(http_status=0) | Q(http_status__isnull=True)).values('http_status').annotate(count=Count('http_status'))
+        
+        # Combine Subdomain and EndPoint status codes for a comprehensive breakdown
+        status_map = {}
+        for item in subdomain_statuses:
+            status = item['http_status']
+            status_map[status] = status_map.get(status, 0) + item['count']
+        
+        for item in endpoint_statuses:
+            status = item['http_status']
+            status_map[status] = status_map.get(status, 0) + item['count']
+            
+        http_status_breakdown = sorted(
+            [{'http_status': k, 'count': v} for k, v in status_map.items()],
+            key=lambda x: x['http_status']
+        )
         
         discovered_ports = Port.objects.filter(ports__in=ip_addresses).values('number', 'service_name', 'is_uncommon').annotate(count=Count('number')).order_by('-count')[:20]
         
-        endpoint_techs = Technology.objects.filter(techs__in=EndPoint.objects.filter(scan_history=scan))
-        subdomain_techs = Technology.objects.filter(technologies__in=Subdomain.objects.filter(scan_history=scan))
+        endpoint_techs = Technology.objects.filter(techs__target_domain=target)
+        subdomain_techs = Technology.objects.filter(technologies__target_domain=target)
         discovered_technologies = (endpoint_techs | subdomain_techs).distinct().values('name').annotate(count=Count('name')).order_by('-count')[:20]
 
         # Domain Information
@@ -148,10 +178,10 @@ class ScanSummaryAPIView(APIView):
                 'has_commands': Command.objects.filter(activity=activity).exists()
             })
 
-        # Extra counts
-        emails = Email.objects.filter(emails=scan)
+        # OSINT - Cumulative for target
+        emails = Email.objects.filter(emails__domain=target).distinct()
         exposed_count = emails.exclude(password__isnull=True).count()
-        secret_leaks = SecretLeak.objects.filter(scan_history=scan)
+        secret_leaks = SecretLeak.objects.filter(scan_history__domain=target)
         secret_leaks_count = secret_leaks.count()
         exploitable_count = vulnerabilities.exclude(exploit_url__isnull=True).exclude(exploit_url__exact='').count()
         matched_gf_count = []
@@ -185,14 +215,14 @@ class ScanSummaryAPIView(APIView):
             'secret_leaks_count': secret_leaks_count,
             'exploitable_count': exploitable_count,
             'matched_gf_count': matched_gf_count,
-            'buckets_count': scan.buckets.count(),
+            'buckets_count': S3Bucket.objects.filter(buckets__domain=target).distinct().count(),
             'email_count': emails.count(),
-            'employees_count': Employee.objects.filter(employees=scan).count(),
+            'employees_count': Employee.objects.filter(employees__domain=target).distinct().count(),
             'emails': EmailSerializer(emails, many=True).data,
-            'employees': EmployeeSerializer(Employee.objects.filter(employees=scan), many=True).data,
-            'dorks': DorkSerializer(Dork.objects.filter(dorks=scan), many=True).data,
-            'documents': MetafinderDocumentSerializer(MetaFinderDocument.objects.filter(scan_history=scan), many=True).data,
-            'buckets': S3BucketSerializer(scan.buckets.all(), many=True).data,
+            'employees': EmployeeSerializer(Employee.objects.filter(employees__domain=target).distinct(), many=True).data,
+            'dorks': DorkSerializer(Dork.objects.filter(dorks__domain=target).distinct(), many=True).data,
+            'documents': MetafinderDocumentSerializer(MetaFinderDocument.objects.filter(target_domain=target), many=True).data,
+            'buckets': S3BucketSerializer(S3Bucket.objects.filter(buckets__domain=target).distinct(), many=True).data,
             'todo_notes': list(TodoNote.objects.filter(scan_history=scan).values('id', 'title', 'description', 'is_done', 'is_important')),
             'monitoring_discoveries_list': MonitoringDiscoverySerializer(monitoring_discoveries, many=True).data,
             'subscans': SubScanSerializer(subscans, many=True).data,
@@ -220,7 +250,7 @@ class ScanSummaryAPIView(APIView):
                 'engine_name': scan.scan_type.engine_name if scan.scan_type else "Standard",
                 'start_scan_date': scan.start_scan_date,
                 'stop_scan_date': scan.stop_scan_date,
-                'duration': int((scan.stop_scan_date - scan.start_scan_date).total_seconds()) if scan.stop_scan_date else int((timezone.now() - scan.start_scan_date).total_seconds()),
+                'duration': int((scan.stop_scan_date - scan.start_scan_date).total_seconds()) if scan.stop_scan_date and scan.start_scan_date else int((timezone.now() - scan.start_scan_date).total_seconds()) if scan.start_scan_date else 0,
                 'progress': scan.get_progress() or 0,
                 'cfg_starting_point_path': scan.cfg_starting_point_path,
                 'cfg_imported_subdomains': scan.cfg_imported_subdomains or [],

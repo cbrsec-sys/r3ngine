@@ -96,17 +96,35 @@ FIREWALL_VPN_SCAN = 'firewall_vpn_scan'
 BRUTE_FORCE_SCAN = 'brute_force_scan'
 SPIDERFOOT_SCAN = 'spiderfoot_scan'
 WEB_API_DISCOVERY = 'web_api_discovery'
+ATTACK_PATH_MODELING = 'attack_path_modeling'
 KITERUNNER_WORDLIST = 'kiterunner_wordlist'
+SERVICES = 'services'
 SCAN_ONLY_ACTIVE = 'scan_only_active'
 ARJUN_METHODS = 'arjun_methods'
 LEAKS_AND_SECRETS = 'leaks_and_secrets'
 LEAKLOOKUP = 'leaklookup'
 GITLEAKS = 'gitleaks'
 TRUFFLEHOG = 'trufflehog'
-RUN_CPANEL_SCAN = 'run_cpanel_scan'
+RUN_CPANEL2SHELL = 'run_cpanel2shell'
 CPANEL_USER_WORDLIST = 'cpanel_user_wordlist'
 CPANEL_SCANNER_PROXY_TYPE = 'proxy_type'
-CPANEL_SCANNER_DEFAULT_WORDLIST = '/usr/src/wordlist/cpanel_users.txt'
+CPANEL_SCANNER_DEFAULT_WORDLIST = '/usr/src/app/wordlist/auth/cpanel_users.txt'
+
+RUN_WPSCAN = 'run_wpscan'
+WPSCAN_ENUMERATION = 'wpscan_enumeration'
+WPSCAN_DETECTION_MODE = 'wpscan_detection_mode'
+WPSCAN_SCAN_DEFAULT_CONFIG = {
+    'run_wpscan': True,
+    'wpscan_enumeration': 'vp,vt,u',
+    'wpscan_detection_mode': 'mixed'
+}
+
+ATTACK_PATH_MODELING = 'attack_path_modeling'
+ATTACK_PATH_MODELING_DEFAULT_CONFIG = {
+    'enabled': True,
+    'top_n': 5
+}
+
 
 
 ###############################################################################
@@ -175,14 +193,7 @@ SEMGREP_SEVERITY_MAP = {
     'ERROR': 3,
 }
 
-# trivy
-TRIVY_SEVERITY_MAP = {
-    'UNKNOWN': 0,
-    'LOW': 1,
-    'MEDIUM': 2,
-    'HIGH': 3,
-    'CRITICAL': 4,
-}
+
 
 # s3scanner
 S3SCANNER_DEFAULT_PROVIDERS = ['gcp', 'aws', 'digitalocean', 'dreamhost', 'linode']

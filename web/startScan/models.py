@@ -546,6 +546,7 @@ class Vulnerability(models.Model):
 		('verified', 'Verified'),
 		('not_working', 'Not Working'),
 		('patched', 'Patched'),
+		('closed', 'Closed'),
 	)
 	validation_status = models.CharField(max_length=20, choices=VULNERABILITY_STATUS_CHOICES, default='unverified')
 	validation_confidence = models.FloatField(null=True, blank=True, default=0.0)
@@ -779,11 +780,13 @@ class Email(models.Model):
 	id = models.AutoField(primary_key=True)
 	address = models.CharField(max_length=200, blank=True, null=True)
 	password = models.CharField(max_length=200, blank=True, null=True)
+	metadata = models.JSONField(default=dict, blank=True)
 
 class Employee(models.Model):
 	id = models.AutoField(primary_key=True)
 	name = models.CharField(max_length=1000, null=True, blank=True)
 	designation = models.CharField(max_length=1000, null=True, blank=True)
+	metadata = models.JSONField(default=dict, blank=True)
 
 
 class Dork(models.Model):

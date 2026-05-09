@@ -271,12 +271,15 @@ class BruteForceOrchestrator:
         self.results_dir = f"{settings.SCAN_HISTORY_PATH}/{self.scan.id}/brute_force"
         os.makedirs(self.results_dir, exist_ok=True)
 
-    def run_orchestration(self, ctx={}):
+    def run_orchestration(self, ctx={}, allowed_services=[]):
         """
         Main entry point: Pulls candidates from DB, batches them, and executes.
         """
         from startScan.models import AuthCandidate
         candidates = AuthCandidate.objects.filter(scan_history=self.scan, status='pending')
+        
+        if allowed_services:
+            candidates = candidates.filter(protocol__in=allowed_services)
         
         if not candidates.exists():
             self.logger.info("No pending auth candidates found for this scan.")

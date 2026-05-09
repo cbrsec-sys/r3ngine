@@ -10,6 +10,7 @@ import { TacticalPanel } from '../../../components/TacticalPanel';
 
 import { useScans } from '../../scans/api';
 import { useSubdomains } from '../../subdomains/api';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 export const TodoPage: React.FC = () => {
   const { projectSlug } = useParams({ strict: false }) as any;
@@ -24,6 +25,19 @@ export const TodoPage: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedNote, setSelectedNote] = useState<TodoNote | null>(null);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  
+  // Confirmation state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'info' | 'warning';
+  }>({
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
   
   // Create/Update/Delete Mutations
   const createMutation = useCreateTodo();
@@ -88,9 +102,15 @@ export const TodoPage: React.FC = () => {
   };
 
   const handleDeleteTodo = (id: number) => {
-    if (window.confirm('Are you sure you want to delete this tactical note?')) {
-      deleteMutation.mutate({ id, projectSlug });
-    }
+    setConfirmConfig({
+      title: 'DELETE TACTICAL NOTE',
+      message: 'Are you sure you want to delete this tactical note? This action is permanent.',
+      type: 'danger',
+      onConfirm: () => {
+        deleteMutation.mutate({ id, projectSlug });
+      }
+    });
+    setConfirmOpen(true);
   };
 
   if (isLoading) {
@@ -243,8 +263,8 @@ export const TodoPage: React.FC = () => {
                   >
                     <MenuItem value={0} sx={{ color: 'rgba(255,255,255,0.4)' }}>Choose Scan History...</MenuItem>
                     {scans?.map(scan => (
-                      <MenuItem key={scan.id} value={scan.id}>
-                        {scan.domain.name} - {new Date(scan.start_scan_date).toLocaleString()}
+                      <MenuItem key={scan.id!} value={scan.id!}>
+                        {scan.domain?.name || 'Unknown'} - {new Date(scan.start_scan_date).toLocaleString()}
                       </MenuItem>
                     ))}
                   </Select>
@@ -282,7 +302,7 @@ export const TodoPage: React.FC = () => {
                   >
                     <MenuItem value={0} sx={{ color: 'rgba(255,255,255,0.4)' }}>Choose Subdomain...</MenuItem>
                     {subdomains?.map(sub => (
-                      <MenuItem key={sub.id} value={sub.id}>{sub.name}</MenuItem>
+                      <MenuItem key={sub.id!} value={sub.id!}>{sub.name}</MenuItem>
                     ))}
                   </Select>
                 </FormControl>
@@ -368,6 +388,19 @@ export const TodoPage: React.FC = () => {
           <Button onClick={() => setSelectedNote(null)} sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '0.7rem', fontWeight: 900 }}>CLOSE</Button>
         </DialogActions>
       </Dialog>
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          confirmConfig.onConfirm();
+          setConfirmOpen(false);
+        }}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+      />
     </Box>
   );
 };

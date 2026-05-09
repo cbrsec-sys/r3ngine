@@ -47,7 +47,11 @@ export const ApiVaultPage: React.FC = () => {
     hackerone_username: '',
     hackerone_key: '',
     acunetix_url: '',
-    acunetix_key: ''
+    acunetix_key: '',
+    linkedin_username: '',
+    linkedin_password: '',
+    hunterio_key: '',
+    wpscan_key: ''
   });
 
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -72,7 +76,11 @@ export const ApiVaultPage: React.FC = () => {
         hackerone_username: settings.hackerone_username || '',
         hackerone_key: settings.hackerone_key || '',
         acunetix_url: settings.acunetix_url || '',
-        acunetix_key: settings.acunetix_key || ''
+        acunetix_key: settings.acunetix_key || '',
+        linkedin_username: settings.linkedin_username || '',
+        linkedin_password: settings.linkedin_password || '',
+        hunterio_key: settings.hunterio_key || '',
+        wpscan_key: settings.wpscan_key || ''
       });
     }
   }, [settings]);
@@ -236,8 +244,76 @@ export const ApiVaultPage: React.FC = () => {
                   icon={Shield}
                   url="https://leak-lookup.com"
                 />
+                <KeyField
+                  label="HUNTER.IO"
+                  description="Used for professional email discovery and corporate dossiers."
+                  field="hunterio_key"
+                  placeholder="Enter Hunter.io API Key"
+                  icon={Zap}
+                  url="https://hunter.io"
+                />
               </Box>
             </TacticalPanel>
+
+            <Box sx={{ mt: 3 }}>
+              <TacticalPanel title="SOCIAL INTELLIGENCE" icon={<Shield size={20} />}>
+                <Box sx={{ p: 1 }}>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 3, display: 'block' }}>
+                    Credentials for LinkedInt employee scraping. Dedicated accounts are recommended.
+                  </Typography>
+                  <Grid container spacing={2}>
+                    <Grid size={{ xs: 12 }} >
+                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>LINKEDIN USERNAME / EMAIL</Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        value={form.linkedin_username}
+                        onChange={(e) => setForm((prev) => ({ ...prev, linkedin_username: e.target.value }))}
+                        placeholder="research@example.com"
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            color: '#fff',
+                            bgcolor: 'rgba(255,255,255,0.02)',
+                            fontFamily: 'monospace',
+                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                          }
+                        }}
+                      />
+                    </Grid>
+                    <Grid size={{ xs: 12 }} >
+                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>LINKEDIN PASSWORD</Typography>
+                      <TextField
+                        fullWidth
+                        size="small"
+                        type={showKeys.linkedin_password ? 'text' : 'password'}
+                        value={form.linkedin_password}
+                        onChange={(e) => setForm((prev) => ({ ...prev, linkedin_password: e.target.value }))}
+                        placeholder="••••••••••••"
+                        slotProps={{
+                          input: {
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton onClick={() => toggleVisibility('linkedin_password')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                                  {showKeys.linkedin_password ? <EyeOff size={16} /> : <Eye size={16} />}
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }
+                        }}
+                        sx={{
+                          '& .MuiOutlinedInput-root': {
+                            color: '#fff',
+                            bgcolor: 'rgba(255,255,255,0.02)',
+                            fontFamily: 'monospace',
+                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                          }
+                        }}
+                      />
+                    </Grid>
+                  </Grid>
+                </Box>
+              </TacticalPanel>
+            </Box>
           </Grid>
 
           <Grid size={{ xs: 12, md: 6 }} >
@@ -415,6 +491,19 @@ export const ApiVaultPage: React.FC = () => {
                       />
                     </Grid>
                   </Grid>
+                </Box>
+              </TacticalPanel>
+
+              <TacticalPanel title="WPSCAN CONFIGURATION" icon={<Shield size={20} />}>
+                <Box sx={{ p: 1 }}>
+                  <KeyField
+                    label="WPSCAN API KEY"
+                    description="WPScan API key is used to retrieve vulnerability data for WordPress installations."
+                    field="wpscan_key"
+                    placeholder="Enter WPScan API Key"
+                    icon={Zap}
+                    url="https://wpscan.com/api"
+                  />
                 </Box>
               </TacticalPanel>
             </Stack>

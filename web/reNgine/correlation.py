@@ -7,7 +7,7 @@ logger = logging.getLogger(__name__)
 
 class VulnerabilityCorrelationEngine:
     """
-    Orchestrates vulnerability correlation across multiple tools (Nuclei, Semgrep, Trivy, Retire.js).
+    Orchestrates vulnerability correlation across multiple tools (Nuclei, Semgrep, Retire.js).
     """
     
     def __init__(self, scan_history=None):
@@ -96,7 +96,6 @@ class VulnerabilityCorrelationEngine:
         """Heuristic to determine tool name from vulnerability type/name."""
         name = vuln.name.lower()
         if 'gitleaks' in name: return 'Gitleaks'
-        if 'trivy' in name: return 'Trivy'
         if 'semgrep' in name: return 'Semgrep'
         if 'retire' in name: return 'Retire.js'
         if 'nuclei' in name: return 'Nuclei'
@@ -134,23 +133,3 @@ class VulnerabilityCorrelationEngine:
             }
         )
 
-    def run_trivy_scan(self, target_path):
-        """
-        Wrapper to run Trivy on a specific directory and return findings.
-        """
-        import subprocess
-        import json
-        import os
-        
-        output_file = "/tmp/trivy_results.json"
-        cmd = f"trivy fs --format json --output {output_file} {target_path}"
-        
-        try:
-            subprocess.run(cmd, shell=True, check=True)
-            if os.path.exists(output_file):
-                with open(output_file, 'r') as f:
-                    return json.load(f)
-        except Exception as e:
-            logger.error(f"Trivy scan failed: {e}")
-            
-        return None

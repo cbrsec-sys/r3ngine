@@ -23,7 +23,13 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "noFallthroughCasesInSwitch": true,
+    "ignoreDeprecations": "6.0"
+
   },
   "include": [
     "src"

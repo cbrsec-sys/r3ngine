@@ -164,7 +164,7 @@ export const BountyHubPage: React.FC = () => {
     try {
       await addTargetMutation.mutateAsync({
         domain_name: asset,
-        project_slug: projectSlug,
+        slug: projectSlug,
       });
       setSnackbar({
         open: true,
