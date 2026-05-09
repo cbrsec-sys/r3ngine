@@ -16,7 +16,7 @@ export interface Vulnerability {
   request: string | null;
   response: string | null;
   open_status: boolean;
-  validation_status: 'unverified' | 'verified' | 'not_working' | 'patched';
+  validation_status: 'unverified' | 'verified' | 'not_working' | 'patched' | 'closed';
   validation_confidence: number | null;
   validation_results: {
     id: number;

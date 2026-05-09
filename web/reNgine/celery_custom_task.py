@@ -217,6 +217,18 @@ class RengineTask(Task):
 		self.activity.traceback = self.traceback
 		self.activity.time = timezone.now()
 		self.activity.save()
+
+		# Update scan status if task failed
+		if self.status == FAILED_TASK:
+			if self.scan:
+				self.scan.scan_status = FAILED_TASK
+				# Prepend task name to error message for better visibility in ScanHistory
+				self.scan.error_message = f"[{self.task_name}] {error_message}"
+				self.scan.save()
+			if self.subscan:
+				self.subscan.status = FAILED_TASK
+				self.subscan.error_message = f"[{self.task_name}] {error_message}"
+				self.subscan.save()
 		self.notify()
 
 	def notify(self, name=None, severity=None, fields={}, add_meta_info=True):

@@ -119,6 +119,7 @@ WPSCAN_SCAN_DEFAULT_CONFIG = {
     'wpscan_detection_mode': 'mixed'
 }
 
+ATTACK_PATH_MODELING = 'attack_path_modeling'
 ATTACK_PATH_MODELING_DEFAULT_CONFIG = {
     'enabled': True,
     'top_n': 5

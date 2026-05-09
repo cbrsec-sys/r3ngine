@@ -44,7 +44,6 @@ def ingest_subdomains(target_id: int) -> Tuple[List[Node], List[Edge]]:
                 "name": sub.name,
                 "http_status": sub.http_status,
                 "is_cdn": sub.is_cdn,
-                "scan_history_id": scan_history_id,
             },
         )
         nodes.append(domain_node)

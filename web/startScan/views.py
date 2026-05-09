@@ -788,7 +788,7 @@ def update_vuln_validation_status(request, id):
     if request.method == 'POST':
         vuln = get_object_or_404(Vulnerability, id=id)
         status = request.POST.get('status')
-        if status in ['unverified', 'verified', 'not_working', 'patched']:
+        if status in ['unverified', 'verified', 'not_working', 'patched', 'closed']:
             vuln.validation_status = status
             vuln.save()
             return JsonResponse({'status': True})

@@ -966,7 +966,7 @@ export const ScanDetailPage = () => {
                     <Stack spacing={2.5}>
                       <Box>
                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Domain</Typography>
-                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: '#ff003c', fontFamily: 'Orbitron', wordBreak: 'break-all' }}>{data.target_info.name}</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: '#ff003c', fontFamily: 'Orbitron', wordBreak: 'break-all' }}>{data.target_info?.name || 'N/A'}</Typography>
                       </Box>
                       <Box>
                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Dnssec</Typography>
@@ -1259,7 +1259,7 @@ export const ScanDetailPage = () => {
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <Box sx={{ mt: 0.5 }}>
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN DETAIL</Typography>
-            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info.name}</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info?.name || 'N/A'}</Typography>
           </Box>
           <Stack spacing={1} sx={{ alignItems: 'flex-end' }}>
             <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>

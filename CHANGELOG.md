@@ -7,14 +7,26 @@
 - **Multi-Service Brute-Force Orchestration**: Updated brute-force engine schema to support an array of services (SSH, FTP, HTTP, SMB, RDP, Telnet).
 - **Brute-Force Candidate Filtering**: Refactored `BruteForceOrchestrator` to dynamically filter `AuthCandidate` records based on the engine's allowed services.
 - **Fixture Standardization**: Aligned default scan engine fixtures with the new multi-service schema and resolved YAML deserialization issues.
+- **Bug Fix**: Resolved `TypeError` in `save_auth_candidate` by adding missing `tech_hint` parameter to support URL and Port discovery ingestion.
+- **Import Fix**: Resolved `ImportError` in `auth_discovery_tasks.py` by correcting function import sources and removing unused `run_command`.
 - **Plugin Tooling System**: Introduced `tools.yaml` contract for automated background tool installation.
 - **Engine Fixture Ingestion**: Plugins can now ship `*_engine.yaml` fixtures for automatic engine registration.
 - **Exploit Readiness Layer (ERL) v2**: Refactored to use local subprocess execution instead of Docker-in-Docker.
 - **Background Tool Installation**: Plugin tools are now installed/verified asynchronously via Celery on installation and system startup.
 - **Subprocess Execution Model**: Standardized local execution for plugins to enhance performance and simplify container orchestration.
 ### Bug Fixes
+- **Scan Summary API Stabilization**: Resolved a critical 500 Internal Server Error in the `ScanSummaryAPIView` by fixing a `FieldError` where the invalid `is_alive` property was being used in QuerySet filters. Replaced it with valid `http_status` range queries.
+- **Dependency Resolution**: Fixed missing `S3Bucket` model and multiple serializer imports (`VulnerabilitySerializer`, `ScanActivitySerializer`, `ReconNoteSerializer`) that were causing runtime crashes in the scan detail dashboard.
+- **Scan Summary Data Visualization**: Refactored the backend API to query assets, vulnerabilities, and geographical data using target-wide models. This ensures that historical and cumulative data is correctly displayed on the Scan Detail page, especially for rescans and module-specific runs.
+- **Frontend Resiliency**: Implemented defensive UI patterns and optional chaining in `ScanDetailPage` and `GeoMap` to prevent crashes and handle missing data states gracefully.
 - **Scan Summary API**: Resolved a 500 Internal Server Error in the scan summary dashboard caused by NULL status codes and missing scan start dates.
+- **Vulnerability Summary Regression**: Fixed a regression where `important_subdomains` was undefined in the scan summary API.
 - **Trivy SCA Removal**: Safely excised the Trivy filesystem scanning engine and associated dependencies to refocus reNgine on remote reconnaissance workflows.
+
+### Vulnerability Status Tracking Refactor
+- **Automated Lifecycle Management**: Implemented an automated "RESOLVED" status tracking mechanism that identifies vulnerabilities missing from current scan runs compared to historical target data.
+- **Verification Flow**: Integrated a "CLOSED" verification state for manual user confirmation of resolved findings.
+- **UI Enhancements**: Updated the vulnerability dashboard with advanced status visualization (OPEN, RESOLVED, CLOSED) and integrated manual state transition controls.
 
 ### Exploit Readiness Layer (ERL) Hardening (v3-beta)
 - **Proxy Support**: Native integration with reNgine's proxy settings. Tools (`sqlmap`, `XSStrike`) now respect system-wide proxy rotation via proxychains or environmental injection.

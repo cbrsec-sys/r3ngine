@@ -541,14 +541,14 @@
     description: Acunetix is an automated web application security testing tool that audits your web applications by checking for vulnerabilities like SQL Injection, Cross-site Scripting, and other exploitable vulnerabilities.
     github_url: https://github.com/WazeHell/acunetix-python
     license_url: https://github.com/WazeHell/acunetix-python/blob/master/LICENSE
-    version_lookup_command: pip3 show acunetix-python
-    update_command: pip3 install acunetix-python --upgrade
-    install_command: pip3 install acunetix-python
+    version_lookup_command: pip3 show acunetix
+    update_command: pip3 install /usr/src/github/acunetix-python --upgrade
+    install_command: pip3 install /usr/src/github/acunetix-python
     version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
     is_default: true
     is_subdomain_gathering: false
-    is_github_cloned: false
-    github_clone_path: null
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/acunetix-python
     subdomain_gathering_command: null
 
 - model: scanEngine.installedexternaltool

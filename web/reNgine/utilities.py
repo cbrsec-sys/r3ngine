@@ -177,7 +177,7 @@ def sorting_key(subdomain):
 		return 4
 
 
-def save_auth_candidate(scan_history, target, protocol, port, source_tool=None, metadata=None, subdomain=None, endpoint=None):
+def save_auth_candidate(scan_history, target, protocol, port, source_tool=None, metadata=None, subdomain=None, endpoint=None, tech_hint=None):
 	"""
 	Save or update an authentication candidate for brute-forcing.
 	Handles deduplication and metadata merging.
@@ -186,6 +186,9 @@ def save_auth_candidate(scan_history, target, protocol, port, source_tool=None, 
 
 	if metadata is None:
 		metadata = {}
+
+	if tech_hint:
+		metadata['tech_hint'] = tech_hint
 
 	# Clean protocol name to lowercase for consistency
 	protocol = protocol.lower()

@@ -106,6 +106,7 @@ INSTALLED_APPS = [
     'drf_yasg',
     'rolepermissions',
     'plugins.apps.PluginsConfig',
+    'apme.apps.ApmeConfig',
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',

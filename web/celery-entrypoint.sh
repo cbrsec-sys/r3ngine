@@ -181,12 +181,6 @@ then
   cd /usr/src/github/acunetix-python && pip3 install .
 fi
 
-if [ ! -d '/usr/src/github/awvs14-scan' ];
-then
-  echo "Cloning awvs14-scan"
-  git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-scan
-fi
-
 if [ ! -d '/usr/src/github/goofuzz' ];
 then
   echo "Cloning GooFuzz"
@@ -359,13 +353,9 @@ workers=(
     "query_reverse_whois_queue:10:query_reverse_whois_worker"
     "query_ip_history_queue:10:query_ip_history_worker"
     "llm_queue:30:llm_worker"
-    "dorking_queue:10:dorking_worker"
-    "osint_discovery_queue:10:osint_discovery_worker"
-    "h8mail_queue:10:h8mail_worker"
-    "theHarvester_queue:10:theHarvester_worker"
+    "osint_queue:5:osint_worker"
     "send_scan_notif_queue:10:send_scan_notif_worker"
     "spiderfoot_queue:1:spiderfoot_worker"
-    "attack_path_modeling_queue:10:apme_worker"
 )
 
 for worker in "${workers[@]}"; do

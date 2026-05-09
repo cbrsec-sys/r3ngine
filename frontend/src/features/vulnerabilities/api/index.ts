@@ -110,6 +110,31 @@ export const useToggleVulnerabilityStatus = () => {
   });
 };
 
+export const useUpdateVulnerabilityValidationStatus = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: string }) => {
+      const formData = new FormData();
+      formData.append('status', status);
+      const response = await fetch(`/scan/update/vuln_validation_status/${id}/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || ''
+        },
+        body: formData,
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to update vulnerability validation status');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['vulnerabilities'] });
+    }
+  });
+};
+
 export const useGenerateImpact = (projectSlug: string) => {
   return useMutation({
     mutationFn: async (vulnId: number) => {
