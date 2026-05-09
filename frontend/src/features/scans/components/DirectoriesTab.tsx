@@ -10,7 +10,10 @@ import {
   Collapse,
   Button,
   Chip,
-  InputBase
+  InputBase,
+  Modal,
+  Backdrop,
+  Fade
 } from '@mui/material';
 import { 
   Search, 
@@ -24,7 +27,9 @@ import {
   Eye,
   FileText,
   MoreHorizontal,
-  Download
+  Download,
+  X,
+  Camera
 } from 'lucide-react';
 
 import { useSubdomains } from '../../subdomains/api';
@@ -43,6 +48,8 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
   const [activeSearch, setActiveSearch] = useState('');
   const [expandedSubdomains, setExpandedSubdomains] = useState<Record<number, boolean>>({});
   const [expandedScans, setExpandedScans] = useState<Record<string, boolean>>({});
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [lightboxLabel, setLightboxLabel] = useState<string>('');
 
   const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, true, targetId);
 
@@ -57,6 +64,16 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
 
   const toggleScan = (id: string) => {
     setExpandedScans(prev => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const openLightbox = (path: string, label: string) => {
+    setLightboxSrc(`/media/${path}`);
+    setLightboxLabel(label);
+  };
+
+  const closeLightbox = () => {
+    setLightboxSrc(null);
+    setLightboxLabel('');
   };
 
   const getStatusColor = (status: number) => {
@@ -183,6 +200,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                 backgroundColor: 'rgba(255,255,255,0.02)'
               }}>
                 <th style={{ width: '40px', padding: '12px 16px' }}></th>
+                <th style={{ width: '80px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>VISUAL</th>
                 <th style={{ width: '250px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SUBDOMAIN</th>
                 <th style={{ width: '100px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</th>
                 <th style={{ width: '200px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PAGE TITLE</th>
@@ -211,10 +229,33 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                       {expandedSubdomains[sub.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </IconButton>
                   </td>
+                  <td style={{ padding: '12px 16px', verticalAlign: 'top', textAlign: 'center' }}>
+                    {sub.screenshot_path ? (
+                      <IconButton 
+                        size="small" 
+                        onClick={() => openLightbox(sub.screenshot_path!, sub.name)}
+                        sx={{ 
+                          color: '#00f3ff', 
+                          bgcolor: 'rgba(0, 243, 255, 0.05)',
+                          border: '1px solid rgba(0, 243, 255, 0.2)',
+                          '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)', borderColor: '#00f3ff' }
+                        }}
+                      >
+                        <Eye size={14} />
+                      </IconButton>
+                    ) : (
+                      <Camera size={14} style={{ color: 'rgba(255,255,255,0.1)' }} />
+                    )}
+                  </td>
                   <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{sub.name}</Typography>
+                        {sub.http_url && (
+                          <IconButton size="small" component="a" href={sub.http_url} target="_blank" sx={{ p: 0.2, color: '#00f3ff' }}>
+                            <ExternalLink size={12} />
+                          </IconButton>
+                        )}
                         <IconButton size="small" sx={{ p: 0.2, color: 'rgba(255,255,255,0.3)' }}>
                           <Copy size={12} />
                         </IconButton>
@@ -230,7 +271,8 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                             bgcolor: 'rgba(255, 0, 60, 0.1)', 
                             color: '#ff003c', 
                             borderRadius: 0.5,
-                            border: '1px solid rgba(255, 0, 60, 0.2)'
+                            border: '1px solid rgba(255, 0, 60, 0.2)',
+                            boxShadow: '0 0 5px rgba(255, 0, 60, 0.2)'
                           }} 
                         />
                       )}
@@ -390,6 +432,135 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
           </Stack>
         </Box>
       </TacticalPanel>
+
+      {/* Lightbox Modal */}
+      <Modal
+        open={!!lightboxSrc}
+        onClose={closeLightbox}
+        closeAfterTransition
+        slots={{ backdrop: Backdrop }}
+        slotProps={{
+          backdrop: {
+            sx: { bgcolor: 'rgba(0, 0, 0, 0.92)', backdropFilter: 'blur(6px)' },
+            timeout: 200,
+          },
+        }}
+      >
+        <Fade in={!!lightboxSrc} timeout={200}>
+          <Box
+            onClick={closeLightbox}
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              p: 4,
+              outline: 'none',
+            }}
+          >
+            {/* Controls bar */}
+            <Box
+              onClick={(e) => e.stopPropagation()}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                width: '100%',
+                maxWidth: '90vw',
+                mb: 1.5,
+              }}
+            >
+              <Typography sx={{
+                color: '#00f3ff',
+                fontFamily: 'Orbitron',
+                fontSize: '12px',
+                fontWeight: 700,
+                letterSpacing: 1,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: 'calc(100% - 80px)',
+              }}>
+                {lightboxLabel}
+              </Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <IconButton
+                  component="a"
+                  href={lightboxSrc ?? '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  size="small"
+                  sx={{
+                    color: 'rgba(255,255,255,0.6)',
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    '&:hover': { color: '#00f3ff', borderColor: 'rgba(0,243,255,0.4)' },
+                  }}
+                >
+                  <ExternalLink size={14} />
+                </IconButton>
+                <IconButton
+                  onClick={closeLightbox}
+                  size="small"
+                  sx={{
+                    color: 'rgba(255,255,255,0.6)',
+                    bgcolor: 'rgba(255,255,255,0.05)',
+                    border: '1px solid rgba(255,255,255,0.1)',
+                    '&:hover': { color: '#ff003c', borderColor: 'rgba(255,0,60,0.4)' },
+                  }}
+                >
+                  <X size={14} />
+                </IconButton>
+              </Box>
+            </Box>
+
+            {/* Image */}
+            <Box
+              onClick={(e) => e.stopPropagation()}
+              sx={{
+                maxWidth: '90vw',
+                maxHeight: '80vh',
+                border: '1px solid rgba(0, 243, 255, 0.2)',
+                borderRadius: 1,
+                overflow: 'hidden',
+                boxShadow: '0 0 60px rgba(0, 243, 255, 0.1)',
+              }}
+            >
+              {lightboxSrc && (
+                <img
+                  src={lightboxSrc}
+                  alt={lightboxLabel}
+                  style={{
+                    display: 'block',
+                    maxWidth: '90vw',
+                    maxHeight: '80vh',
+                    objectFit: 'contain',
+                  }}
+                />
+              )}
+            </Box>
+
+            {/* Dismiss hint */}
+            <Typography
+              onClick={closeLightbox}
+              sx={{
+                mt: 2,
+                fontSize: '10px',
+                color: 'rgba(255,255,255,0.2)',
+                fontFamily: 'Orbitron',
+                letterSpacing: 1,
+                cursor: 'pointer',
+                userSelect: 'none',
+              }}
+            >
+              CLICK ANYWHERE TO CLOSE
+            </Typography>
+          </Box>
+        </Fade>
+      </Modal>
     </Box>
   );
 };
