@@ -78,7 +78,7 @@ def run_command(
         for stdout_line in iter(popen.stdout.readline, ""):
             item = stdout_line.strip()
             output += '\n' + item
-            logger.debug(item)
+            logger.warning(item)
         popen.stdout.close()
         try:
             popen.wait(timeout=30)
@@ -96,6 +96,7 @@ def run_command(
         if conf_path and os.path.exists(conf_path):
             os.remove(conf_path)
 
+    logger.warning(f"Command {command_obj.id} finished with return code {return_code}")
     command_obj.output = output
     command_obj.return_code = return_code
     command_obj.save()

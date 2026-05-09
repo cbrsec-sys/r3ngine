@@ -48,8 +48,14 @@ class VulnerabilityCorrelationEngine:
         match_boost, tools = self._calculate_tool_match_boost(vuln)
         score += match_boost * self.weights['multi_tool_match']
         
-        # 3. Exploitability
-        exploit_score = 1.0 if vuln.exploit_url else 0.5
+        # 3. Exploitability (Check CISA KEV)
+        exploit_score = 0.5
+        if vuln.exploit_url:
+            exploit_score = 1.0
+        elif vuln.cve_ids.filter(is_cisa_kev=True).exists():
+            exploit_score = 1.0
+            logger.info(f"Vulnerability {vuln.id} ({vuln.name}) boosted due to CISA KEV status.")
+        
         score += exploit_score * self.weights['exploitability']
         
         # 4. Asset Criticality

@@ -1015,11 +1015,21 @@ class SubdomainSerializer(serializers.ModelSerializer):
 	directories = DirectoryScanSerializer(many=True)
 	waf_bypass_findings = WafBypassFindingSerializer(many=True, read_only=True)
 	screenshots = ScreenshotSerializer(many=True, read_only=True)
+	screenshot_path = serializers.SerializerMethodField('get_screenshot_path')
 
 
 	class Meta:
 		model = Subdomain
 		fields = '__all__'
+
+	def get_screenshot_path(self, subdomain):
+		if subdomain.screenshot_path:
+			return subdomain.screenshot_path
+		# Fallback to the first available screenshot object
+		first_screenshot = subdomain.screenshots.first()
+		if first_screenshot:
+			return first_screenshot.screenshot_path
+		return None
 
 	def get_is_interesting(self, subdomain):
 		scan_id = subdomain.scan_history.id if subdomain.scan_history else None
