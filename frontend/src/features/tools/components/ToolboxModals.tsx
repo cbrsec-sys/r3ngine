@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  Dialog, 
-  DialogContent, 
-  Box, 
-  Typography, 
-  TextField, 
-  Button, 
+import {
+  Dialog,
+  DialogContent,
+  Box,
+  Typography,
+  TextField,
+  Button,
   CircularProgress,
   IconButton,
   Stack,
@@ -23,8 +23,8 @@ interface ToolModalProps {
 const ToolDialog: React.FC<{ open: boolean; onClose: () => void; title: string; icon: React.ReactNode; color: string; children: React.ReactNode }> = ({
   open, onClose, title, icon, color, children
 }) => (
-  <Dialog 
-    open={open} 
+  <Dialog
+    open={open}
     onClose={onClose}
     maxWidth="md"
     fullWidth
@@ -34,7 +34,7 @@ const ToolDialog: React.FC<{ open: boolean; onClose: () => void; title: string; 
           bgcolor: 'rgba(10, 10, 15, 0.95)',
           backdropFilter: 'blur(20px)',
           border: `1px solid ${color}44`,
-          borderRadius: 4,
+          borderRadius: '25px',
           backgroundImage: 'none',
           boxShadow: `0 0 40px ${color}11`,
           overflow: 'hidden'
@@ -82,19 +82,19 @@ export const WhoisModal: React.FC<ToolModalProps> = ({ open, onClose }) => {
               }
             }}
           />
-          <Button 
-            variant="contained" 
-            onClick={() => refetch()} 
+          <Button
+            variant="contained"
+            onClick={() => refetch()}
             disabled={isFetching || !target}
             sx={{ bgcolor: '#00f3ff', color: '#000', fontWeight: 900, px: 4, '&:hover': { bgcolor: '#00d8e4' } }}
           >
             {isFetching ? <CircularProgress size={20} color="inherit" /> : 'QUERY'}
           </Button>
         </Stack>
-        
+
         {data && (
           <Paper sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)', maxHeight: 400, overflow: 'auto' }}>
-             <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
+            <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}>
               {data.status === false ? data.message : JSON.stringify(data, null, 2)}
             </Typography>
           </Paper>
@@ -125,16 +125,16 @@ export const CMSDetectorModal: React.FC<ToolModalProps> = ({ open, onClose }) =>
               }
             }}
           />
-          <Button 
-            variant="contained" 
-            onClick={() => refetch()} 
+          <Button
+            variant="contained"
+            onClick={() => refetch()}
             disabled={isFetching || !url}
             sx={{ bgcolor: '#00f3ff', color: '#000', fontWeight: 900, px: 4 }}
           >
             {isFetching ? <CircularProgress size={20} color="inherit" /> : 'DETECT'}
           </Button>
         </Stack>
-        
+
         {data && (
           <Paper sx={{ p: 3, bgcolor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
             <Typography sx={{ color: '#00f3ff', fontFamily: 'Orbitron', mb: 2, fontSize: '0.8rem' }}>
@@ -171,16 +171,16 @@ export const CVELookupModal: React.FC<ToolModalProps> = ({ open, onClose }) => {
               }
             }}
           />
-          <Button 
-            variant="contained" 
-            onClick={() => refetch()} 
+          <Button
+            variant="contained"
+            onClick={() => refetch()}
             disabled={isFetching || !cveId}
             sx={{ bgcolor: '#ff00ff', color: '#fff', fontWeight: 900, px: 4, '&:hover': { bgcolor: '#e600e6' } }}
           >
             {isFetching ? <CircularProgress size={20} color="inherit" /> : 'SEARCH'}
           </Button>
         </Stack>
-        
+
         {data && (
           <Paper sx={{ p: 3, bgcolor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
             {data.id ? (
@@ -224,16 +224,16 @@ export const WAFDetectorModal: React.FC<ToolModalProps> = ({ open, onClose }) =>
               }
             }}
           />
-          <Button 
-            variant="contained" 
-            onClick={() => refetch()} 
+          <Button
+            variant="contained"
+            onClick={() => refetch()}
             disabled={isFetching || !url}
             sx={{ bgcolor: '#ff9800', color: '#000', fontWeight: 900, px: 4, '&:hover': { bgcolor: '#e68a00' } }}
           >
             {isFetching ? <CircularProgress size={20} color="inherit" /> : 'ANALYZE'}
           </Button>
         </Stack>
-        
+
         {data && (
           <Paper sx={{ p: 3, bgcolor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
             <Typography sx={{ color: '#ff9800', fontFamily: 'Orbitron', mb: 2, fontSize: '0.8rem' }}>

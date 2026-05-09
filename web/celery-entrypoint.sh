@@ -44,6 +44,10 @@ python3 manage.py loaddata fixtures/default_scan_engines.yaml --app scanEngine.E
 python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.InterestingLookupModel
 python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
 
+# TEMPORARY FIX FOR langchain
+pip install urllib3<2.0.0
+pip install tenacity==8.2.2
+
 # install firefox https://askubuntu.com/a/1404401
 echo '
 Package: *
@@ -171,7 +175,8 @@ then
   echo "Cloning theHarvester"
   git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester
 fi
-uv sync /usr/src/github/theHarvester
+cd /usr/src/github/theHarvester && uv sync
+cd /usr/src/app
 
 if [ ! -d '/usr/src/github/ctfr' ];
 then
@@ -301,7 +306,8 @@ echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
 #python3 -m pip uninstall -y httpcore
 
 # TEMPORARY FIX FOR langchain
-pip install tenacity==8.2.2 urllib3<2.0.0
+pip install urllib3<2.0.0
+pip install tenacity==8.2.2
 
 loglevel='warning'
 if [ "$DEBUG" == "1" ]; then
