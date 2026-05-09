@@ -1,5 +1,5 @@
 <p align="center">
-<a href="https://rengine.wiki"><img src="frontend/public/img/r3ngine_logo.png" height="520px" width="520px" alt=""/></a>
+<a href="https://rengine.wiki"><img src="frontend/public/img/banner.png" height="400px" width="520px" alt=""/></a>
 </p>
 
 <p align="center">
@@ -50,16 +50,22 @@ The core scanning engines have been upgraded to provide "Verification-First" rec
 *   **Attack Path Modeling Engine (APME)**: A production-grade, graph-based modeling system utilizing **Neo4j**. It discovers feasible attack routes (e.g., SQLi → DB Access → Pivot) based on a dynamic rules engine. **v3 Update**: Expanded rule set with 20+ sophisticated security patterns and automated "Goal Injection" for robust path discovery.
 *   **Exploitation Readiness Layer (ERL)**: A safe, modular validation layer that converts potential findings into **"Verified" status** using containerized, non-destructive validation tools.
 *   **Adaptive Stress & Resilience Engine (ASRE)**: Full-scale endpoint stress testing directly within the workflow, orchestrating `k6`, `wrk`, `hping3`, and `Locust` with real-time telemetry ingestion.
-*   **Vulnerability Correlation Engine**: Unifies findings from **Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, and Retire.js** into a prioritized threat landscape.
-*   **Centralized Brute-Force Orchestration**: A multi-tiered authentication attack pipeline that centralizes targets from Nmap, Nuclei, and intelligent form extraction into a unified `AuthCandidate` queue, orchestrated via **Hydra** with full OpSec controls.
-*   **Atomic Plugin Management**: A powerful, modular system to extend reNgine with custom engines and dynamic UI components, featuring secure **Atomic Installation** with automated database backups and rollback guardrails.
+*   **Vulnerability Correlation Engine**: Unifies findings from **Nuclei, Semgrep, Gitleaks, Acunetix, and Retire.js** into a prioritized threat landscape.
+*   **Persistent Vulnerability State Tracking**: Automated lifecycle management that identifies **"RESOLVED"** findings by diffing historical scan runs. Features a manual **"CLOSED"** verification flow, ensuring consistent and historical vulnerability data across the entire target lifecycle.
+*   **Centralized Brute-Force Orchestration**: A multi-tiered authentication attack pipeline that supports **multi-service targeting (SSH, FTP, HTTP, SMB, RDP, Telnet)**. Centralizes targets from Nmap, Nuclei, and intelligent form extraction into a unified `AuthCandidate` queue, orchestrated via **Hydra** with full OpSec controls.
+*   **Autonomous Plugin Management**: A powerful, modular system to extend reNgine with custom engines and dynamic UI components. Features **Atomic Installation** with background tool installation (`tools.yaml`), automated engine registration via fixtures, and persistent startup verification.
+
+### ⚡ Resource Management & Efficiency
+Optimization is a first-class citizen in v3, ensuring high-performance reconnaissance even on resource-constrained host machines.
+*   **Worker Consolidation Architecture**: Replaced the legacy multi-worker sprawl with 4 highly optimized worker groups (Core, Service, LLM, and OSINT). This reduces base memory overhead by ~80% (approx. 3.2GB RAM recovery).
+*   **Intelligent Process Recycling**: Native integration of `CELERY_WORKER_MAX_TASKS_PER_CHILD` and `CELERY_WORKER_MAX_MEMORY_PER_CHILD` to automatically recycle worker processes, preventing memory bloat from long-running scans.
+*   **Global Redis Caching**: Migrated from per-process local memory caching to a unified Redis-backed caching layer, ensuring shared state efficiency and reduced RAM footprint.
+*   **Deterministic Resource Limits**: All production services (Celery, Ollama, Neo4j, Web) now feature native Docker `deploy.resources` limits and reservations, preventing system-wide resource starvation.
 
 ### 🕵️ Surgical Recon & API Discovery
 The reconnaissance pipeline has been deepened to handle modern, API-centric web architectures.
-*   **Advanced Web API Discovery**: A dedicated pipeline featuring **Kiterunner** (API brute-forcing), **Arjun** (Parameter discovery), **ParamSpider**, **InQL** (GraphQL analysis), and **LinkFinder**.
-*   **Spiderfoot OSINT 2.0**: Full integration of Spiderfoot as a standalone scan module with custom intensity profiles (`fast`, `normal`, `deep`) and concurrency management.
-*   **Continuous Monitoring Engine**: Automated periodic discovery of new subdomains, directories, and login pages with real-time alerting via Discord, Slack, and Telegram.
-*   **OSINT Intelligence Dashboard**: A new visualization suite aggregating email exposures, leaked credentials, employee insights, and automated search engine dorking.
+*   **Deep Pursuit OSINT Engine**: A modernized, high-performance intelligence pipeline that replaces heavy Spiderfoot scans with surgical discovery. Featuring **holehe** for email pivots, **maigret** for cross-platform social profile mapping, and a custom **Internal Social Intelligence Engine** for advanced LinkedIn discovery.
+*   **OSINT Intelligence Dashboard**: Aggregated view of emails, leaks, employees, dorks, and document metadata.
 
 ### 🥷 Stealth, OpSec & Infrastructure
 Operational security is no longer an afterthought; it is baked into every execution.
@@ -73,6 +79,9 @@ Operational security is no longer an afterthought; it is baked into every execut
 Aesthetic excellence is a core requirement of the v3 vision.
 *   **Cyberpunk V3 "Neon" Dashboard**: A premium glassmorphic theme with a unified dark/neon palette optimized for complex data visualization.
     *   **Interactive Subdomain Management**: Fully wired tactical interface for on-demand **LLM Attack Surface Analysis**, targeted **Subscans**, and reconnaissance **TODO/Note management** directly from the inventory.
+    *   **Scan Detail Header Reorganization**: Improved the aesthetic layout of the Scan Detail page by repositioning navigation breadcrumbs below action buttons and right-aligned the control group.
+    * 📊 **Enhanced Telemetry**: Fixed HTTP status breakdown logic to capture and visualize all response codes across assets. Resolved critical Scan Summary API stability issues by refactoring to target-wide cumulative data queries, ensuring full data visibility for rescans and historical targets.
+*   **Responsive Header & Mobile Menu**: Dynamic adaptation of header actions into a high-fidelity hamburger drawer for small viewports, preserving the glassmorphic aesthetic.
 *   **Multi-Tier Theme System**: Toggle between **Hacker (Cyberpunk)**, **Hybrid (Modern Dark)**, and **Enterprise (Professional Slate)** interfaces instantly.
 *   **Attack Surface Map v4.0**: Advanced node analytics scaling by degree centrality, blast radius computation, and AI-driven graph search.
 *   **Tactical GeoMap Visualization**: Custom high-performance CSS-animated markers and tooltip interactions for global asset positioning.
@@ -150,22 +159,24 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **Exploitation Readiness Layer (ERL)**: Modular, non-destructive vulnerability validation with containerized sandboxing and confidence scoring.
 *   **Adaptive Stress & Resilience Engine (ASRE)**: Built-in endpoint stress testing using `k6`, `wrk`, `hping3`, and `Locust`.
 *   **Vulnerability Correlation Engine**: Multi-tool unification mapping findings from Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, and more.
+*   **Autonomous Tooling & Plugin System**: Background tool management ensures all plugin dependencies (e.g., sqlmap, XSStrike) are installed and verified automatically at runtime. **v3-Hardening**: Integrated native **proxy rotation** and **OpSec compliance** (User-Agent randomization, custom headers) directly into the ERL adapter layer, ensuring stealthy validation of all discovered vulnerabilities.
 *   **Continuous Monitoring**: Periodic discovery of new subdomains, endpoints, and data changes with automated diffing.
 
 ### 🕵️ Surgical Reconnaissance
 *   **Advanced Web API Discovery**: Dedicated pipeline featuring Kiterunner, Arjun, ParamSpider, LinkFinder, and InQL.
-*   **Deep OSINT OSINT 2.0**: Full Spiderfoot integration with intensity profiles and concurrency management.
+*   **Deep OSINT 2.0**: A modular, internal intelligence pipeline featuring automated email pivoting, social profile mapping, and a **Custom Playwright-driven Social Intelligence Engine** that mimics human behavior to discover corporate personnel while maintaining high OpSec.
 *   **ReconX Auxiliary Discovery**: Integrated third-party asset discovery and monitoring.
 *   **Vulnerability Scanning**:
     *   **Nuclei**: Specialized templates and rate-limited execution.
     *   **Semgrep**: Automated static analysis for JS and GraphQL.
+    *   **WPScan**: Automated WordPress reconnaissance and vulnerability identification.
     *   **Dalfox**: Advanced XSS discovery.
     *   **CRLFuzzer, S3Scanner, Gitleaks, Retire.js**.
 *   **WHOIS, WAF Detection, and IP Geolocation**.
 
 ### 🥷 Stealth & Operational Security
 *   **Enhanced Proxy Orchestration**: Automated fetching, validation, and per-tool rotation of high-quality proxies.
-*   **Brute-Force Engines**: High-performance Hydra and Medusa integration with Proxychains4, automated service mapping (e.g., http → http-get), and configurable `max_retries` to ensure scan resilience.
+*   **Brute-Force Engines**: High-performance Hydra and Medusa integration with Proxychains4, **multi-service orchestration (SSH, FTP, HTTP, SMB, RDP, Telnet)**, automated service mapping (e.g., http → http-get), and configurable `max_retries` to ensure scan resilience.
 *   **OpSec Presets**: User-Agent rotation, stealth timing, and WAF bypass headers.
 *   **Metadata Stripping**: Automated removal of sensitive information from discovered assets.
 
@@ -175,12 +186,24 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **Interactive Subdomain Action Interface**: Real-time management for subdomains, subscans, and TODOs.
 *   **Bounty Hub**: Centralized platform for managing HackerOne programs and assets.
 *   **Automated Startup Sync**: Immediate synchronization of Attack Surface graphs and CISA KEV intelligence.
+*   **Target Deletion API**: Resolved a critical 404 error during target deletion by synchronizing the frontend request with the correct backend orchestration endpoint.
 *   **Customizable Alerts**: Notifications via Slack, Discord, Telegram, and Lark.
 *   **HackerOne Integration**: Direct reporting of vulnerabilities to bug bounty platforms.
 *   **Screenshot Gallery**: Automated visual captures with advanced filtering and tagging.
 *   **Export/Import**: Interoperable with other tools via JSON, CSV, and TXT.
 -optimizer
 * integrated tools: Chaos, TLSX, CTFR, Netlas, Katana, Medusa.
+
+![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
+
+## 🛠️ Development & Strict Type Safety
+
+The r3ngine v3 frontend is built with a "Safety-First" philosophy, enforcing strict TypeScript constraints to ensure production reliability.
+
+*   **Full Strict Mode**: The entire React codebase compiles under `strict: true`, eliminating hidden null pointers and undefined property access at build time.
+*   **Contract Integrity**: Frontend models are strictly mapped to the auto-generated OpenAPI schema (`src/types/api.ts`). We enforce `verbatimModuleSyntax` to optimize build-time tree shaking and ensure type-only imports are explicitly marked.
+*   **Modular Architecture**: Following a feature-based structure, each module (`targets`, `scans`, `vulnerabilities`) maintains its own API hooks and types, inheriting from the global contract while providing specialized UI adaptations.
+*   **Production Hardening**: Our CI/CD pipeline validates every commit against `tsc -b` and `vite build`. We prioritize type-safe UI components over loose `any` declarations, utilizing safe type guards and defensive casting for robust API integration.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 

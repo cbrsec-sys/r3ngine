@@ -966,7 +966,7 @@ export const ScanDetailPage = () => {
                     <Stack spacing={2.5}>
                       <Box>
                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Domain</Typography>
-                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: '#ff003c', fontFamily: 'Orbitron', wordBreak: 'break-all' }}>{data.target_info.name}</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: '#ff003c', fontFamily: 'Orbitron', wordBreak: 'break-all' }}>{data.target_info?.name || 'N/A'}</Typography>
                       </Box>
                       <Box>
                         <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Dnssec</Typography>
@@ -1074,18 +1074,24 @@ export const ScanDetailPage = () => {
         </Grid>
         <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex' }}>
           <TacticalPanel title="HTTP Status Breakdown" icon={<Activity size={14} />} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', flex: 1 }}>
+            <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', flex: 1 }}>
               <Chart
                 options={{
                   chart: { type: 'donut', background: 'transparent' },
                   theme: { mode: 'dark' as any },
+                  labels: (data?.http_status_breakdown || []).slice().sort((a: any, b: any) => a.http_status - b.http_status).map((s: any) => `HTTP ${s.http_status}`),
+                  colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00', '#ff8000', '#0080ff', '#8000ff'],
                   stroke: { show: false },
-                  labels: data.http_status_breakdown.map((s: any) => `HTTP ${s.http_status}`),
                   dataLabels: { enabled: false },
-                  legend: { position: 'bottom', fontSize: '10px', labels: { colors: 'rgba(255,255,255,0.7)' } },
-                  colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00']
+                  legend: { 
+                    position: 'right', 
+                    horizontalAlign: 'left',
+                    labels: { colors: 'rgba(255,255,255,0.7)' },
+                    itemMargin: { vertical: 2 }
+                  },
+                  plotOptions: { pie: { donut: { size: '70%' } } }
                 }}
-                series={data.http_status_breakdown.map((s: any) => s.count)}
+                series={(data?.http_status_breakdown || []).slice().sort((a: any, b: any) => a.http_status - b.http_status).map((s: any) => s.count)}
                 type="donut"
                 width="100%"
                 height={300}
@@ -1250,64 +1256,66 @@ export const ScanDetailPage = () => {
     <Box sx={{ p: 2 }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box>
+        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <Box sx={{ mt: 0.5 }}>
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN DETAIL</Typography>
-            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info.name}</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info?.name || 'N/A'}</Typography>
           </Box>
-          <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
-            <Button
-              variant="contained"
-              startIcon={<RefreshCw size={16} />}
-              onClick={() => setStartScanTargets({ ids: [data.target_info.id], names: [data.target_info.name] })}
-              sx={{
-                bgcolor: 'rgba(0, 255, 98, 0.1)',
-                color: '#00ff62',
-                border: '1px solid rgba(0, 255, 98, 0.3)',
-                fontFamily: 'Orbitron',
-                fontSize: '0.65rem',
-                fontWeight: 900,
-                px: 2,
-                '&:hover': { bgcolor: 'rgba(0, 255, 98, 0.2)' }
-              }}
-            >
-              RESCAN
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<FileText size={16} />}
-              onClick={() => setReportModalOpen(true)}
-              sx={{
-                bgcolor: 'rgba(0, 243, 255, 0.1)',
-                color: '#00f3ff',
-                border: '1px solid rgba(0, 243, 255, 0.3)',
-                fontFamily: 'Orbitron',
-                fontSize: '0.65rem',
-                fontWeight: 900,
-                px: 2,
-                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
-              }}
-            >
-              GENERATE REPORT
-            </Button>
-            <Button
-              variant="contained"
-              component={RouterLink}
-              to={`/${projectSlug}/stress_testing/${scanId}`}
-              startIcon={<Zap size={16} />}
-              sx={{
-                bgcolor: 'rgba(255, 0, 255, 0.1)',
-                color: '#ff00ff',
-                border: '1px solid rgba(255, 0, 255, 0.3)',
-                fontFamily: 'Orbitron',
-                fontSize: '0.65rem',
-                fontWeight: 900,
-                px: 2,
-                '&:hover': { bgcolor: 'rgba(255, 0, 255, 0.2)' }
-              }}
-            >
-              STRESS TEST
-            </Button>
+          <Stack spacing={1} sx={{ alignItems: 'flex-end' }}>
+            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+              <Button
+                variant="contained"
+                startIcon={<RefreshCw size={16} />}
+                onClick={() => setStartScanTargets({ ids: [data.target_info.id], names: [data.target_info.name] })}
+                sx={{
+                  bgcolor: 'rgba(0, 255, 98, 0.1)',
+                  color: '#00ff62',
+                  border: '1px solid rgba(0, 255, 98, 0.3)',
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  px: 2,
+                  '&:hover': { bgcolor: 'rgba(0, 255, 98, 0.2)' }
+                }}
+              >
+                RESCAN
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<FileText size={16} />}
+                onClick={() => setReportModalOpen(true)}
+                sx={{
+                  bgcolor: 'rgba(0, 243, 255, 0.1)',
+                  color: '#00f3ff',
+                  border: '1px solid rgba(0, 243, 255, 0.3)',
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  px: 2,
+                  '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                }}
+              >
+                GENERATE REPORT
+              </Button>
+              <Button
+                variant="contained"
+                component={RouterLink}
+                to={`/${projectSlug}/stress_testing/${scanId}`}
+                startIcon={<Zap size={16} />}
+                sx={{
+                  bgcolor: 'rgba(255, 0, 255, 0.1)',
+                  color: '#ff00ff',
+                  border: '1px solid rgba(255, 0, 255, 0.3)',
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  px: 2,
+                  '&:hover': { bgcolor: 'rgba(255, 0, 255, 0.2)' }
+                }}
+              >
+                STRESS TEST
+              </Button>
+            </Stack>
             <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
               <span>SCANS</span> / <span>DETAIL</span> / <span style={{ color: '#00f3ff' }}>{data.target_info.name}</span>
             </Stack>
@@ -1401,7 +1409,7 @@ export const ScanDetailPage = () => {
                     subtitle={`${data.alive_count} ACTIVE`}
                     color="#7000ff"
                     icon={Layers}
-                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                    sx={{ height: '100%' }}
                   />
                   <KpiCard
                     title="ENDPOINTS"
@@ -1409,7 +1417,7 @@ export const ScanDetailPage = () => {
                     subtitle={`${data.endpoint_alive_count} ALIVE`}
                     color="#ff00f7"
                     icon={Target}
-                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                    sx={{ height: '100%' }}
                   />
                   <KpiCard
                     title="VULNS"
@@ -1417,7 +1425,7 @@ export const ScanDetailPage = () => {
                     subtitle={`${data.critical_count} CRITICAL`}
                     color="#ff003c"
                     icon={Bug}
-                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                    sx={{ height: '100%' }}
                   />
                   <KpiCard
                     title="OSINT"
@@ -1425,7 +1433,7 @@ export const ScanDetailPage = () => {
                     subtitle="SENSITIVE DATA"
                     color="#fffc00"
                     icon={Key}
-                    sx={{ aspectRatio: '1/1', height: '100%' }}
+                    sx={{ height: '100%' }}
                   />
                 </Box>
 
@@ -1450,7 +1458,7 @@ export const ScanDetailPage = () => {
                 {tabs[activeTab]?.label === 'EXPLOITS' && renderExploits()}
 
                 {tabs[activeTab]?.isPlugin && tabs[activeTab]?.pluginSlug && tabs[activeTab]?.componentFile && (
-                  <PluginComponentLoader 
+                  <PluginComponentLoader
                     pluginSlug={tabs[activeTab].pluginSlug}
                     componentFile={tabs[activeTab].componentFile}
                     scanId={parseInt(scanId)}
@@ -1483,7 +1491,7 @@ export const ScanDetailPage = () => {
       />
 
       {startScanTargets && (
-        <StartScanModal 
+        <StartScanModal
           open={!!startScanTargets}
           onClose={() => setStartScanTargets(null)}
           domainIds={startScanTargets.ids}

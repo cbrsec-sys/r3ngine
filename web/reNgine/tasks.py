@@ -44,7 +44,10 @@ from reNgine.monitor_tasks import *
 from reNgine.graph_utils import Neo4jManager
 from reNgine.vulnerability_tasks import *
 from reNgine.stress_testing_tasks import run_stress_testing
+from reNgine.osint_tasks import *
+from reNgine.task_utils import run_command, save_email, save_employee, sanitize_command_for_db
 from reNgine.report_tasks import *
+from reNgine.wpscan_tasks import wpscan_scan
 try:
 	from acunetix import Acunetix
 except ImportError:
@@ -273,8 +276,18 @@ def initiate_scan(
 			correlate_vulnerabilities.si(scan_history_id=scan_history_id),
 			calculate_risk_scores.si(scan_history_id=scan_history_id),
 			PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx),
-			run_apme.si(scan_history_id=scan_history_id)
 		]
+
+		# Attack Path Modeling Engine (APME)
+		apme_config = config.get(ATTACK_PATH_MODELING, {})
+		# For backward compatibility, check both the new key and the old run_apme key in vulnerability_scan
+		run_apme_enabled = apme_config.get('enabled', False)
+		if not run_apme_enabled:
+			vuln_scan_config = config.get(VULNERABILITY_SCAN, {})
+			run_apme_enabled = vuln_scan_config.get('run_apme', False)
+
+		if run_apme_enabled:
+			workflow_steps.append(run_apme.si(scan_history_id=scan_history_id))
 
 		# Filter out None steps (where plugins aren't present)
 		workflow_steps = [step for step in workflow_steps if step is not None]
@@ -423,12 +436,22 @@ def initiate_subscan(
 	# Build workflow steps
 	workflow_steps = [method.si(ctx=ctx)]
 
-	# If this is a vulnerability scan, we need to run correlation and APME
+	# If this is a vulnerability scan, we need to run correlation
 	if scan_type == 'vulnerability_scan':
 		workflow_steps.append(correlate_vulnerabilities.si(scan_history_id=scan.id))
 		workflow_steps.append(calculate_risk_scores.si(scan_history_id=scan.id))
 		# Run ERL validation if plugin is installed
 		workflow_steps.append(PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx))
+
+	# Attack Path Modeling Engine (APME)
+	apme_config = config.get(ATTACK_PATH_MODELING, {})
+	# For backward compatibility, check both the new key and the old run_apme key in vulnerability_scan
+	run_apme_enabled = apme_config.get('enabled', False)
+	if not run_apme_enabled:
+		vuln_scan_config = config.get(VULNERABILITY_SCAN, {})
+		run_apme_enabled = vuln_scan_config.get('run_apme', False)
+
+	if run_apme_enabled:
 		workflow_steps.append(run_apme.si(scan_history_id=scan.id))
 
 	# Filter out None steps (where plugins aren't present)
@@ -616,6 +639,54 @@ def subdomain_discovery(
 				results_file = self.results_dir + '/subdomains_chaos.txt'
 				cmd = f'chaos -d {host} -silent -key {chaos_key} -o {results_file}'
 
+			elif tool == 'reconx':
+				reconx_results = f"{results_dir}/reconx_findings"
+				os.makedirs(reconx_results, exist_ok=True)
+				
+				# Create a temporary targets file for reconx
+				reconx_targets = f"{results_dir}/reconx_targets.txt"
+				with open(reconx_targets, 'w') as f:
+					f.write(domain.name)
+				
+				# Run reconx
+				# reconx run uses targets from config, but we can override or use a specific config
+				# For simplicity, we'll use a direct command if supported, or create a minimal config
+				reconx_cmd = f"reconx run --targets {reconx_targets} --output {reconx_results}"
+				os.system(reconx_cmd)
+				
+				# Parse reconx findings (JSONL format in findings directory)
+				# Findings are usually in ~/.local/share/reconx/findings/ but we try to direct output if possible
+				# If not, we'll check the default location
+				reconx_default_findings = os.path.expanduser("~/.local/share/reconx/findings/")
+				if os.path.exists(reconx_default_findings):
+					for file in os.listdir(reconx_default_findings):
+						if file.endswith(".jsonl"):
+							try:
+								with open(os.path.join(reconx_default_findings, file), 'r') as f:
+									for line in f:
+										finding = json.loads(line)
+										# ReconX findings can be subdomains or vulnerabilities
+										if finding.get('type') == 'subdomain':
+											sub_name = finding.get('data', {}).get('subdomain')
+											if sub_name and sub_name.endswith(domain.name) and sub_name not in existing_subs:
+												from reNgine.tasks import save_subdomain
+												sub_obj, created = save_subdomain(sub_name, ctx=ctx)
+												if created:
+													new_discoveries.append(f"Subdomain (ReconX): {sub_name}")
+													existing_subs.add(sub_name)
+													MonitoringDiscovery.objects.create(
+														domain=domain,
+														discovery_type='subdomain',
+														content={'name': sub_name, 'source': 'ReconX'},
+														scan_history=scan_history
+													)
+										elif finding.get('type') == 'vulnerability':
+											# If reconx found a vulnerability, we can also log it
+											vuln_info = finding.get('data', {})
+											new_discoveries.append(f"Vulnerability (ReconX): {vuln_info.get('template-id')}")
+							except Exception as e:
+								logger.error(f"Error parsing ReconX findings: {str(e)}")
+
 		elif tool in custom_subdomain_tools:
 			tool_query = InstalledExternalTool.objects.filter(name__icontains=tool.lower())
 			if not tool_query.exists():
@@ -780,11 +851,18 @@ def osint(self, host=None, ctx={}, description=None):
 		)
 		grouped_tasks.append(_task)
 
-	celery_group = group(grouped_tasks)
-	job = celery_group.apply_async()
-	while not job.ready():
-		# wait for all jobs to complete
-		time.sleep(5)
+	if grouped_tasks:
+		celery_group = group(grouped_tasks)
+		job = celery_group.apply_async()
+		while not job.ready():
+			# wait for all jobs to complete
+			time.sleep(5)
+
+	logger.info('Standard OSINT Tasks finished...')
+
+	# Deep Pursuit OSINT Pipeline (holehe, maigret, LinkedInt)
+	logger.info('Starting Deep Pursuit OSINT Pipeline...')
+	osint_orchestrator.delay(scan_history_id=self.scan.id)
 
 	logger.info('OSINT Tasks finished...')
 
@@ -794,8 +872,8 @@ def osint(self, host=None, ctx={}, description=None):
 	# return results
 
 
-@app.task(name='osint_discovery', queue='osint_discovery_queue', bind=False)
-def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx={}):
+@app.task(name='osint_discovery', queue='main_scan_queue', base=RengineTask, bind=True)
+def osint_discovery(self, config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run OSINT discovery.
 
 	Args:
@@ -902,7 +980,7 @@ def osint_discovery(config, host, scan_history_id, activity_id, results_dir, ctx
 	return results
 
 
-@app.task(name='dorking', bind=False, queue='dorking_queue')
+@app.task(name='dorking', queue='main_scan_queue', base=RengineTask, bind=True)
 def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
 	"""Run Google dorks.
 
@@ -924,26 +1002,40 @@ def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
 	# custom dorking has higher priority
 	try:
 		for custom_dork in custom_dorks:
-			lookup_target = custom_dork.get('lookup_site')
-			# replace with original host if _target_
-			lookup_target = host if lookup_target == '_target_' else lookup_target
-			if 'lookup_extensions' in custom_dork:
-				results = get_and_save_dork_results(
-					lookup_target=lookup_target,
+			if isinstance(custom_dork, str):
+				# Handle simple string query from YAML
+				query = custom_dork.replace('_target_', host)
+				logger.info(f'Processing YAML custom dork: {query}')
+				get_and_save_dork_results(
+					lookup_target=host,
 					results_dir=results_dir,
-					type='custom_dork',
-					lookup_extensions=custom_dork.get('lookup_extensions'),
+					type='custom_dork_yaml',
+					lookup_keywords=query,
 					scan_history=scan_history
 				)
-			elif 'lookup_keywords' in custom_dork:
-				results = get_and_save_dork_results(
-					lookup_target=lookup_target,
-					results_dir=results_dir,
-					type='custom_dork',
-					lookup_keywords=custom_dork.get('lookup_keywords'),
-					scan_history=scan_history
-				)
+			elif isinstance(custom_dork, dict):
+				# Handle structured dict from YAML
+				lookup_target = custom_dork.get('lookup_site')
+				# replace with original host if _target_
+				lookup_target = host if lookup_target == '_target_' else lookup_target
+				if 'lookup_extensions' in custom_dork:
+					results = get_and_save_dork_results(
+						lookup_target=lookup_target,
+						results_dir=results_dir,
+						type='custom_dork',
+						lookup_extensions=custom_dork.get('lookup_extensions'),
+						scan_history=scan_history
+					)
+				elif 'lookup_keywords' in custom_dork:
+					results = get_and_save_dork_results(
+						lookup_target=lookup_target,
+						results_dir=results_dir,
+						type='custom_dork',
+						lookup_keywords=custom_dork.get('lookup_keywords'),
+						scan_history=scan_history
+					)
 	except Exception as e:
+		logger.error(f'Error processing custom dorks from YAML: {str(e)}')
 		logger.exception(e)
 
 	# Process raw custom dorks from UI/ScanHistory
@@ -1198,7 +1290,7 @@ def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
 	return results
 
 
-@app.task(name='theHarvester', queue='theHarvester_queue', bind=False)
+@app.task(name='theHarvester', queue='main_scan_queue', bind=False)
 def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run theHarvester to get save emails, hosts, employees found in domain.
 
@@ -1312,7 +1404,7 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}
 	return data
 
 
-@app.task(name='h8mail', queue='h8mail_queue', bind=False)
+@app.task(name='h8mail', queue='main_scan_queue', bind=False)
 def h8mail(config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run h8mail.
 
@@ -1357,7 +1449,7 @@ def h8mail(config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	return creds
 
 
-@app.task(name='leaklookup', queue='osint_discovery_queue', base=RengineTask, bind=True)
+@app.task(name='leaklookup', queue='main_scan_queue', base=RengineTask, bind=True)
 def leaklookup(self, host=None, ctx=None):
 	"""Run LeakLookup query."""
 	api_key = get_leaklookup_key()
@@ -1396,7 +1488,7 @@ def leaklookup(self, host=None, ctx=None):
 		raise e
 
 
-@app.task(name='secret_scanning', queue='osint_discovery_queue', base=RengineTask, bind=True)
+@app.task(name='secret_scanning', queue='main_scan_queue', base=RengineTask, bind=True)
 def secret_scanning(self, config=None, host=None, ctx=None):
 	"""Scan for secrets in JS files and potentially other sources."""
 	if not self.scan:
@@ -2704,21 +2796,6 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 					vuln_data = parse_semgrep_result(match)
 					save_vulnerability(vuln_data, self.scan, self.domain)
 
-	# Trivy - SCA for discovered dependency files
-	if 'trivy' in uses_tools:
-		logger.info(f'Running Trivy SCA on discovery results')
-		trivy_output = f"{results_dir}/trivy_results.json"
-		cmd = f"trivy fs --format json --output {trivy_output} {results_dir}"
-		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
-		# Parse Trivy results
-		if os.path.exists(trivy_output):
-			with open(trivy_output, 'r') as f:
-				data = json.load(f)
-				for result in data.get('Results', []):
-					for vuln in result.get('Vulnerabilities', []):
-						vuln_data = parse_trivy_result(vuln)
-						save_vulnerability(vuln_data, self.scan, self.domain)
-
 	# Retire.js - JS Library vulnerability scan
 	if 'retire' in uses_tools:
 		logger.info(f'Running Retire.js on discovery results')
@@ -2768,7 +2845,6 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	extract_auth_candidates.apply(args=(self,), kwargs={'ctx': ctx})
 
 
-
 @app.task(name='vulnerability_scan', queue='main_scan_queue', bind=True, base=RengineTask)
 def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	"""
@@ -2782,6 +2858,8 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	should_run_dalfox = config.get(RUN_DALFOX, False)
 	should_run_s3scanner = config.get(RUN_S3SCANNER, True)
 	should_run_acunetix = config.get(RUN_ACUNETIX, False)
+	should_run_wpscan = config.get(RUN_WPSCAN, True)
+	should_run_cpanel = config.get('cpanel_scanner', {}).get(RUN_CPANEL2SHELL, True)
 
 	grouped_tasks = []
 	if should_run_nuclei:
@@ -2829,11 +2907,19 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 		grouped_tasks.append(_task)
 
 	# Run cPanel Scanner
-	should_run_cpanel = config.get('cpanel_scanner', {}).get(RUN_CPANEL_SCAN, True)
 	if should_run_cpanel:
 		_task = cpanel_scan.si(
 			ctx=ctx,
 			description=f'cPanel Vulnerability Scan'
+		)
+		grouped_tasks.append(_task)
+
+	# Run WPScan
+	if should_run_wpscan:
+		_task = wpscan_scan.si(
+			urls=urls,
+			ctx=ctx,
+			description=f'WPScan'
 		)
 		grouped_tasks.append(_task)
 
@@ -3737,6 +3823,18 @@ def http_crawl(
 		endpoint.response_time = response_time
 		endpoint.content_type = content_type
 		endpoint.save()
+
+		# Sync Subdomain status attributes if this is the default endpoint
+		if is_ran_from_subdomain_scan:
+			subdomain.http_status = http_status
+			subdomain.page_title = page_title
+			subdomain.content_length = content_length
+			subdomain.webserver = webserver
+			subdomain.response_time = response_time
+			subdomain.content_type = content_type
+			subdomain.http_url = http_url
+			subdomain.save()
+
 		endpoint_str = f'{http_url} [{http_status}] `{content_length}B` `{webserver}` `{rt}`'
 		logger.warning(endpoint_str)
 		if endpoint and endpoint.is_alive and endpoint.http_status != 403:
@@ -3831,7 +3929,6 @@ def http_crawl(
 #---------------------#
 # Notifications tasks #
 #---------------------#
-
 @app.task(name='send_notif', bind=False, queue='send_notif_queue')
 def send_notif(
 		message,
@@ -4135,7 +4232,6 @@ def send_hackerone_report(vulnerability_id):
 #-------------#
 # Utils tasks #
 #-------------#
-
 
 @app.task(name='parse_nmap_results', bind=False, queue='parse_nmap_results_queue')
 def parse_nmap_results(xml_file, output_file=None):
@@ -4931,7 +5027,6 @@ def fetch_related_tlds_and_domains(domain):
 	return list(related_tlds), list(related_domains)
 
 
-
 def fetch_whois_data_using_netlas(target):
 	"""
 		Fetch WHOIS data using netlas.
@@ -5061,108 +5156,12 @@ def remove_duplicate_endpoints(
 					ep.delete()
 				logger.warning(msg)
 
-def sanitize_command_for_db(cmd):
-	"""
-	Strips 'export HTTP_PROXY=... &&' and 'proxychains4 -f ...' from command
-	to ensure the UI displays the actual tool name and clean command.
-	"""
-	if not cmd:
-		return cmd
-	# Strip export statements (matches both single and double quotes)
-	cmd = re.sub(r'^export\s+.*?\s+&&\s+', '', cmd)
-	# Strip proxychains4 wrapper with its config file
-	cmd = re.sub(r'^(?:[/\w]*/)?proxychains4\s+-f\s+\S+\s+', '', cmd)
-	return cmd
-
-@app.task(name='run_command', bind=False, queue='run_command_queue')
-def run_command(
-		cmd, 
-		cwd=None, 
-		shell=False, 
-		history_file=None, 
-		scan_id=None, 
-		activity_id=None,
-		remove_ansi_sequence=False,
-		proxy=None
-	):
-	"""Run a given command using subprocess module.
-
-	Args:
-		cmd (str): Command to run.
-		cwd (str): Current working directory.
-		echo (bool): Log command.
-		shell (bool): Run within separate shell if True.
-		history_file (str): Write command + output to history file.
-		remove_ansi_sequence (bool): Used to remove ANSI escape sequences from output such as color coding
-		proxy (str): If provided, may be used for proxychains wrapping.
-	Returns:
-		tuple: Tuple with return_code, output.
-	"""
-	logger.info(cmd)
-	logger.warning(activity_id)
-
-	conf_path = None
-	if proxy:
-		proxy_manager = ProxychainsWrapper()
-		if proxy_manager.should_wrap():
-			cmd, conf_path = proxy_manager.wrap_command(cmd, proxy=proxy)
-
-	# Create a command record in the database
-	command_obj = Command.objects.create(
-		command=sanitize_command_for_db(cmd),
-		time=timezone.now(),
-		scan_history_id=scan_id,
-		activity_id=activity_id)
-
-	# Run the command using subprocess
-	try:
-		popen = subprocess.Popen(
-			cmd if shell else cmd.split(),
-			shell=shell,
-			stdout=subprocess.PIPE,
-			stderr=subprocess.STDOUT,
-			cwd=cwd,
-			universal_newlines=True)
-		output = ''
-		for stdout_line in iter(popen.stdout.readline, ""):
-			item = stdout_line.strip()
-			output += '\n' + item
-			logger.debug(item)
-		popen.stdout.close()
-		try:
-			popen.wait(timeout=30)
-		except subprocess.TimeoutExpired:
-			popen.kill()
-			return_code = 124 # Timeout
-			output += "\nCommand timed out after 30 seconds."
-		else:
-			return_code = popen.returncode
-	except Exception as e:
-		logger.error(f"Error executing command {cmd}: {str(e)}")
-		output = f"Error executing command: {str(e)}"
-		return_code = 127 # Command not found / error
-	finally:
-		if conf_path and os.path.exists(conf_path):
-			os.remove(conf_path)
-
-	command_obj.output = output
-	command_obj.return_code = return_code
-	command_obj.save()
-	if history_file:
-		mode = 'a'
-		if not os.path.exists(history_file):
-			mode = 'w'
-		with open(history_file, mode) as f:
-			f.write(f'\n{cmd}\n{return_code}\n{output}\n------------------\n')
-	if remove_ansi_sequence:
-		output = remove_ansi_escape_sequences(output)
-	return return_code, output
+# run_command and sanitize_command_for_db moved to task_utils.py
 
 
 #-------------#
 # Other utils #
 #-------------#
-
 def stream_command(
 		cmd, 
 		cwd=None, 
@@ -5311,7 +5310,6 @@ def extract_httpx_url(line):
 #-------------#
 # OSInt utils #
 #-------------#
-
 def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=None, lookup_extensions=None, delay=3, page_count=2, scan_history=None):
 	"""
 		Uses gofuzz to dork and store information
@@ -5327,25 +5325,28 @@ def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=
 			scan_history (startScan.ScanHistory): Scan History Object
 	"""
 	results = []
-	gofuzz_command = f'{GOFUZZ_EXEC_PATH} -t {lookup_target} -d {delay} -p {page_count}'
+	# Use quotes around arguments to handle spaces and special characters safely in the shell
+	gofuzz_command = f'{GOFUZZ_EXEC_PATH} -t "{lookup_target}" -d {delay} -p {page_count}'
 	proxy = get_random_proxy()
 
 	if lookup_extensions:
-		gofuzz_command += f' -e {lookup_extensions}'
+		gofuzz_command += f' -e "{lookup_extensions}"'
 	elif lookup_keywords:
-		gofuzz_command += f' -w {lookup_keywords}'
+		# Double quote keywords to preserve complex dork queries, escaping any inner quotes
+		escaped_keywords = lookup_keywords.replace('"', '\\"')
+		gofuzz_command += f' -w "{escaped_keywords}"'
 
 	if proxy:
-		gofuzz_command += f' -r {proxy}'
+		gofuzz_command += f' -r "{proxy}"'
 
 	output_file = f'{results_dir}/gofuzz.txt'
-	gofuzz_command += f' -o {output_file}'
+	gofuzz_command += f' -o "{output_file}"'
 	history_file = f'{results_dir}/commands.txt'
 
 	try:
 		run_command(
 			gofuzz_command,
-			shell=False,
+			shell=True, # Use shell=True to handle quoted arguments correctly
 			history_file=history_file,
 			scan_id=scan_history.id,
 			proxy=proxy
@@ -5425,7 +5426,6 @@ def save_metadata_info(meta_dict):
 #-----------------#
 # Utils functions #
 #-----------------#
-
 def create_scan_activity(scan_history_id, message, status):
 	scan_activity = ScanActivity()
 	scan_activity.scan_of = ScanHistory.objects.get(pk=scan_history_id)
@@ -5439,10 +5439,6 @@ def create_scan_activity(scan_history_id, message, status):
 #--------------------#
 # Database functions #
 #--------------------#
-
-
-
-
 def save_endpoint(
 		http_url,
 		ctx={},
@@ -5601,37 +5597,7 @@ def save_subdomain(subdomain_name, ctx={}):
 	return subdomain, created
 
 
-def save_email(email_address, scan_history=None):
-	if not validators.email(email_address):
-		logger.info(f'Email {email_address} is invalid. Skipping.')
-		return None, False
-	email, created = Email.objects.get_or_create(address=email_address)
-	# if created:
-	# 	logger.warning(f'Found new email address {email_address}')
-
-	# Add email to ScanHistory
-	if scan_history:
-		scan_history.emails.add(email)
-		scan_history.save()
-
-	return email, created
-
-
-def save_employee(name, designation, scan_history=None):
-	employee, created = Employee.objects.get_or_create(
-		name=name,
-		designation=designation)
-	# if created:
-	# 	logger.warning(f'Found new employee {name}')
-
-	# Add employee to ScanHistory
-	if scan_history:
-		scan_history.employees.add(employee)
-		scan_history.save()
-
-	return employee, created
-
-
+# save_email and save_employee moved to task_utils.py
 def save_ip_address(ip_address, subdomain=None, subscan=None, **kwargs):
 	if not (validators.ipv4(ip_address) or validators.ipv6(ip_address)):
 		logger.info(f'IP {ip_address} is not a valid IP. Skipping.')
@@ -5884,7 +5850,6 @@ def fetch_proxies_task(self):
     return "\n".join(final_list)
 
 
-
 def parse_sslscan_results(xml_file):
 	"""Parse results from sslscan XML output file.
 
@@ -6083,8 +6048,12 @@ def brute_force_scan(self, targets=[], ctx={}, description=None):
 	from reNgine.opsec_utils import BruteForceOrchestrator
 	orchestrator = BruteForceOrchestrator(self.scan)
 	
+	# Extract allowed services from config
+	config = self.yaml_configuration.get(BRUTE_FORCE_SCAN) or {}
+	allowed_services = config.get(SERVICES, [])
+	
 	# Execute orchestration
-	results = orchestrator.run_orchestration(ctx=ctx)
+	results = orchestrator.run_orchestration(ctx=ctx, allowed_services=allowed_services)
 	
 	total_found = 0
 	for res in results:
@@ -6175,7 +6144,7 @@ def map_acunetix_severity(severity):
 	return mapping.get(severity, 0)
 
 
-@app.task(name='acunetix_scan', queue='main_scan_queue', base=RengineTask, bind=True)
+@app.task(name='run_acunetix', queue='main_scan_queue', base=RengineTask, bind=True)
 def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 	"""
 	Run Acunetix (AWVS) scan for the given domain.
@@ -6414,7 +6383,15 @@ def run_apme(self, scan_history_id):
 	logger.info(f"APME: Initiating attack path modeling for scan_history_id={scan_history_id}")
 	try:
 		from apme.orchestrator import APMEOrchestrator
-		orchestrator = APMEOrchestrator(top_n=5)
+		from startScan.models import ScanHistory
+		
+		# Fetch configuration from engine
+		scan = ScanHistory.objects.get(id=scan_history_id)
+		config = yaml.safe_load(scan.scan_type.yaml_configuration) or {}
+		apme_config = config.get(ATTACK_PATH_MODELING, {})
+		top_n = apme_config.get('top_n', 5)
+
+		orchestrator = APMEOrchestrator(top_n=top_n)
 		result = orchestrator.run(scan_history_id)
 		logger.info(
 			f"APME: Completed. Found {result.get('total_paths', 0)} paths, "

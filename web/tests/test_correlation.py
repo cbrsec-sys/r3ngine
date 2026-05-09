@@ -72,13 +72,13 @@ class TestVulnerabilityCorrelation(unittest.TestCase):
         )
         vuln1.cve_ids.add(cve)
         
-        # Vuln 2: Trivy (SCA)
+        # Vuln 2: Semgrep (SAST)
         vuln2 = Vulnerability.objects.create(
-            name="Trivy: CVE-2024-TEST",
+            name="Semgrep: CVE-2024-TEST",
             severity=4,
             subdomain=self.subdomain,
             scan_history=self.scan,
-            type="SCA"
+            type="SAST"
         )
         vuln2.cve_ids.add(cve)
         

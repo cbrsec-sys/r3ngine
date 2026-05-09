@@ -10,7 +10,7 @@ from startScan.models import ScanHistory, EndPoint, StressTestResult
 from targetApp.models import Domain
 from reNgine.graph_utils import Neo4jManager
 from django.utils import timezone
-from .celery_custom_task import RengineTask
+from reNgine.celery_custom_task import RengineTask
 #from reNgine.utilities import send_notification
 
 logger = logging.getLogger(__name__)
@@ -59,7 +59,7 @@ def parse_k6_output(output_str):
     return metrics
 
 
-@shared_task(base=RengineTask, bind=True)
+@shared_task(name='stress_testing', queue='main_scan_queue', bind=True, base=RengineTask)
 def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config):
     # Extract config
     stress_config = yaml_config.get("stress_test", {})
@@ -167,9 +167,9 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config):
 
     neo4j.close()
 
-    # send_notification(
-    #     f"Stress testing completed for {target_domain_name}. Total Requests: {total_reqs}",
-    #     scan_history_id,
-    # )
+    notif.send_scan_status_notif(
+        f"Stress testing completed for {target_domain_name}. Total Requests: {total_reqs}",
+        scan_history_id,
+    )
 
     return {"status": "success"}

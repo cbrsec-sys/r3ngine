@@ -46,8 +46,9 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
     const mapRef = useRef<L.Map>(null);
     const geoJsonRef = useRef<GeoJSONFeatureCollection | null>(null);
 
+    const maxCount = data && data.length > 0 ? Math.max(...data.map(d => d.count), 1) : 1;
     const colorScale = scaleLinear<string>()
-        .domain([0, Math.max(...data.map(d => d.count), 1)])
+        .domain([0, maxCount])
         .range(["rgba(0, 243, 255, 0.05)", "rgba(0, 243, 255, 0.4)"]);
 
     const findCountry = (properties: any) => {

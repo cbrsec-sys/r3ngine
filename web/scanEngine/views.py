@@ -21,7 +21,7 @@ from dashboard.models import LLMConfig
 from scanEngine.forms import *
 from scanEngine.forms import ConfigurationForm
 from scanEngine.models import *
-from dashboard.models import SpiderfootAPIKey
+from dashboard.models import SpiderfootAPIKey, LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey
 
 
 def index(request, slug):
@@ -757,8 +757,10 @@ def api_vault(request, slug):
         key_censys = _pick('key_censys', 'censys_key')
         key_acunetix_url = _pick('key_acunetix_url', 'acunetix_url')
         key_acunetix_key = _pick('key_acunetix_key', 'acunetix_key')
-        print(f"key_acunetix_url: {key_acunetix_url}")
-        print(f"key_acunetix_key: {key_acunetix_key}")
+        key_hunterio = _pick('key_hunterio', 'hunterio_key')
+        linkedin_username = _pick('linkedin_username', 'linkedin_username')
+        linkedin_password = _pick('linkedin_password', 'linkedin_password')
+        key_wpscan = _pick('key_wpscan', 'wpscan_key')
 
         # Treat empty strings as "clear value" (fixes: unsetting defaults to last value).
         if key_openai is not None:
@@ -844,6 +846,27 @@ def api_vault(request, slug):
                 }
             )
 
+        if key_hunterio is not None:
+            HunterIOAPIKey.objects.update_or_create(
+                id=1,
+                defaults={'key': key_hunterio or ""}
+            )
+
+        if key_wpscan is not None:
+            WpScanAPIKey.objects.update_or_create(
+                id=1,
+                defaults={'key': key_wpscan or ""}
+            )
+
+        if (linkedin_username is not None) or (linkedin_password is not None):
+            LinkedInCredentials.objects.update_or_create(
+                id=1,
+                defaults={
+                    'username': linkedin_username or "",
+                    'password': linkedin_password or ""
+                }
+            )
+
         delete_sf_key = request.POST.get('delete_sf_key')
         if delete_sf_key:
             SpiderfootAPIKey.objects.filter(id=delete_sf_key).delete()
@@ -885,6 +908,10 @@ def api_vault(request, slug):
             'hackerone_key': hackerone_key or "",
             'acunetix_url': context['acunetix_key'].server_url if context['acunetix_key'] else "",
             'acunetix_key': context['acunetix_key'].api_key if context['acunetix_key'] else "",
+            'hunterio_key': HunterIOAPIKey.objects.first().key if HunterIOAPIKey.objects.exists() else "",
+            'linkedin_username': LinkedInCredentials.objects.first().username if LinkedInCredentials.objects.exists() else "",
+            'linkedin_password': LinkedInCredentials.objects.first().password if LinkedInCredentials.objects.exists() else "",
+            'wpscan_key': WpScanAPIKey.objects.first().key if WpScanAPIKey.objects.exists() else "",
         })
 
     return render(request, 'dashboard/v3_index.html', context)

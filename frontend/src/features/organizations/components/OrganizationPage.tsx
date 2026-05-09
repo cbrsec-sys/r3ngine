@@ -7,6 +7,7 @@ import { OrganizationTable } from './OrganizationTable';
 import { CreateOrganizationModal } from './CreateOrganizationModal';
 import type { Organization } from '../orgTypes';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 export const OrganizationPage: React.FC = () => {
   const { projectSlug } = useParams({ strict: false }) as any;
@@ -17,6 +18,19 @@ export const OrganizationPage: React.FC = () => {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingOrg, setEditingOrg] = useState<Organization | undefined>(undefined);
+
+  // Confirmation state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'info' | 'warning';
+  }>({
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
 
   const filteredOrgs = organizations?.filter(org => 
     org.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -48,16 +62,29 @@ export const OrganizationPage: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (window.confirm('Are you sure you want to delete this organization?')) {
-      await deleteMutation.mutateAsync([id]);
-    }
+    setConfirmConfig({
+      title: 'DELETE ORGANIZATION',
+      message: 'Are you sure you want to delete this organization? All associated data will be archived or removed.',
+      type: 'danger',
+      onConfirm: async () => {
+        await deleteMutation.mutateAsync([id]);
+      }
+    });
+    setConfirmOpen(true);
   };
 
   const handleDeleteMultiple = async () => {
-    if (window.confirm(`Are you sure you want to delete ${selectedIds.length} organizations?`)) {
-      await deleteMutation.mutateAsync(selectedIds);
-      setSelectedIds([]);
-    }
+    if (selectedIds.length === 0) return;
+    setConfirmConfig({
+      title: 'BULK DELETE ORGANIZATIONS',
+      message: `Are you sure you want to delete ${selectedIds.length} organizations?`,
+      type: 'danger',
+      onConfirm: async () => {
+        await deleteMutation.mutateAsync(selectedIds);
+        setSelectedIds([]);
+      }
+    });
+    setConfirmOpen(true);
   };
 
   return (
@@ -161,6 +188,19 @@ export const OrganizationPage: React.FC = () => {
         onClose={() => setIsModalOpen(false)}
         organization={editingOrg}
         projectSlug={projectSlug}
+      />
+
+      {/* Confirmation Dialog */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => setConfirmOpen(false)}
+        onConfirm={() => {
+          confirmConfig.onConfirm();
+          setConfirmOpen(false);
+        }}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
       />
     </Box>
   );

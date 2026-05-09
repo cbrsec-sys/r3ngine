@@ -10,6 +10,8 @@ apps=(
     "startScan"
     "dashboard"
     "recon_note"
+    "plugins"
+    "apme"
 )
 
 create_migrations() {
@@ -82,7 +84,7 @@ then
 fi
 
 # Setup Auth Brute-Force Wordlists
-if [ ! -d "/usr/src/wordlist/auth" ]
+if [ ! -d "/usr/src/wordlist/auth" ];
 then
   echo "Making Auth Wordlist directory"
   mkdir -p /usr/src/wordlist/auth
@@ -91,7 +93,7 @@ echo "Copying Auth Wordlists"
 cp -r /usr/src/app/wordlist/auth/* /usr/src/wordlist/auth/
 
 # vulscan is a special case (nmap script)
-if [ ! -d "/usr/src/github/scipag_vulscan" ]
+if [ ! -d "/usr/src/github/scipag_vulscan" ];
 then
   echo "Cloning Nmap Vulscan script"
   git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan
@@ -100,6 +102,127 @@ then
   echo "Usage in reNgine, set vulscan/vulscan.nse in nmap_script scanEngine port_scan config parameter"
 fi
 
+if [ ! -f '/usr/local/bin/kr' ];
+then
+  echo "Installing kiterunner"
+  cd /usr/src/github
+  ARCH=$(dpkg --print-architecture) && \
+  wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
+  tar -xvf kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
+  mv kr /usr/local/bin/ && \
+  rm -rf kiterunner_1.0.2_linux_${ARCH}.tar.gz
+  cd /usr/src/app
+fi
+
+# Install CMSeeK
+if [ ! -d '/usr/src/github/CMSeeK' ];
+then
+  echo "Cloning CMSeeK"
+  git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK
+fi
+pip3 install -r /usr/src/github/CMSeeK/requirements.txt
+
+# Install LinkFinder
+if [ ! -d '/usr/src/github/LinkFinder' ];
+then
+  echo "Cloning LinkFinder"
+  git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder
+fi
+pip3 install -r /usr/src/github/LinkFinder/requirements.txt
+cd /usr/src/github/LinkFinder
+python3 setup.py install
+cd /usr/src/app
+
+# Install ParamSpider
+if [ ! -d '/usr/src/github/ParamSpider' ];
+then
+  echo "Cloning ParamSpider"
+  git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider
+fi
+cd /usr/src/github/ParamSpider && pip3 install . && python3 setup.py install
+cd /usr/src/app
+
+# Install Semgrep
+if [ ! -d '/usr/src/github/semgrep' ];
+then
+  echo "Cloning Semgrep"
+  git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep
+fi
+cd /usr/src/github/semgrep
+pip3 install .
+cd /usr/src/app
+
+if [ ! -d '/usr/src/github/Sublist3r' ];
+then
+  echo "Cloning Sublist3r"
+  git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r
+fi
+pip3 install -r /usr/src/github/Sublist3r/requirements.txt
+
+if [ ! -d '/usr/src/github/OneForAll' ];
+then
+  echo "Cloning OneForAll"
+  git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll
+fi
+pip3 install -r /usr/src/github/OneForAll/requirements.txt
+
+if [ ! -d '/usr/src/github/theHarvester' ];
+then
+  echo "Cloning theHarvester"
+  git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester
+fi
+uv sync /usr/src/github/theHarvester
+
+if [ ! -d '/usr/src/github/ctfr' ];
+then
+  echo "Cloning ctfr"
+  git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr
+fi
+pip3 install -r /usr/src/github/ctfr/requirements.txt
+
+if [ ! -d '/usr/src/github/acunetix-python' ];
+then
+  echo "Cloning acunetix-python"
+  git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python
+fi
+pip3 install -r /usr/src/github/acunetix-python/requirements.txt
+
+if [ ! -d '/usr/src/github/goofuzz' ];
+then
+  echo "Cloning GooFuzz"
+  DIR=$(pwd)
+  cd /usr/src/github
+  wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip
+  unzip GooFuzz.v.1.2.6.zip
+  mv GooFuzz.v.1.2.6 goofuzz
+  chmod +x goofuzz/GooFuzz
+  rm GooFuzz.v.1.2.6.zip
+  cd $DIR
+fi
+
+if [ ! -d '/usr/src/github/spiderfoot' ];
+then
+  echo "Cloning spiderfoot"
+  git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
+fi
+pip3 install -r /usr/src/github/spiderfoot/requirements.txt
+
+if [ ! -d '/usr/src/github/cpanel2shell-scanner' ];
+then
+  echo "Cloning cpanel2shell-scanner"
+  git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner
+fi
+pip3 install -r /usr/src/github/cpanel2shell-scanner/requirements.txt
+
+# Create a robust cPanel username wordlist
+if [ ! -f '/usr/src/wordlist/cpanel_users.txt' ]; then
+  echo "Fetching cPanel2Shell wordlist"
+  mkdir -p /usr/src/wordlist
+  wget -qO- https://raw.githubusercontent.com/danielmiessler/SecLists/master/Usernames/top-usernames-shortlist.txt >> /usr/src/wordlist/cpanel_users.txt
+  sort -u /usr/src/wordlist/cpanel_users.txt -o /usr/src/wordlist/cpanel_users.txt
+fi
+
+cd /usr/src/app
 # install h8mail
 python3 -m pip install h8mail
 
@@ -171,162 +294,41 @@ then
   wget https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/prompt-leak.yaml -O ~/nuclei-templates/prompt-leak.yaml
 fi
 
-if [ ! -d "/usr/src/github/CMSeeK" ]
-then
-  echo "Cloning CMSeeK"
-  git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK
-  pip install -r /usr/src/github/CMSeeK/requirements.txt
-fi
-
-# clone ctfr is now in Dockerfile
-
-# clone gooFuzz
-if [ ! -d "/usr/src/github/goofuzz" ]
-then
-  DIR=$(pwd)
-  echo "Cloning GooFuzz"
-  cd /usr/src/github
-  wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip && \
-  unzip GooFuzz.v.1.2.6.zip
-  rm GooFuzz.v.1.2.6.zip
-  mv GooFuzz.v.1.2.6 goofuzz
-  chmod +x goofuzz/GooFuzz
-  cd $DIR
-fi
-
 # httpx seems to have issue, use alias instead!!!
 echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
-
-if [ ! -d "/usr/src/github/ParamSpider" ]
-then
-  echo "Cloning ParamSpider"
-  git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider
-  DIR=$(pwd)
-  cd /usr/src/github/ParamSpider
-  pip3 install .
-  python3 setup.py install
-  cd $DIR
-fi
-
-if [ ! -d "/usr/src/github/semgrep" ]
-then
-  echo "Installing Semgrep"
-  git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep
-  DIR=$(pwd)
-  cd /usr/src/github/semgrep
-  pip3 install .
-  cd $DIR
-fi
-
-if [ ! -d "/usr/src/github/scipag_vulscan" ]
-then
-  echo "Installing VulScan"
-  git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan
-  ln -s /usr/src/github/scipag_vulscan /usr/share/nmap/scripts/vulscan
-fi
-
-if [ ! -d "/usr/src/github/spiderfoot" ]
-then
-  echo "Installing SpiderFoot"
-  git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
-  DIR=$(pwd)
-  cd /usr/src/github/spiderfoot
-  pip3 install -r requirements.txt
-  cd $DIR
-fi
-
-if [ ! -d "/usr/src/github/acunetix-python" ]
-then
-  echo "Cloning Acunetix Python"
-  git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python
-  DIR=$(pwd)
-  cd /usr/src/github/acunetix-python
-  pip3 install .
-  cd $DIR
-fi
-
-if [ ! -d "/usr/src/github/awvs14-scan" ]
-then
-  echo "Cloning AWVS 14 Scan"
-  git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-scan
-fi
 
 # TEMPORARY FIX, httpcore is causing issues with celery, removing it as temp fix
 #python3 -m pip uninstall -y httpcore
 
 # TEMPORARY FIX FOR langchain
-pip install tenacity==8.2.2
+pip install tenacity==8.2.2 urllib3<2.0.0
 
-loglevel='info'
+loglevel='warning'
 if [ "$DEBUG" == "1" ]; then
     loglevel='debug'
 fi
 
-generate_worker_command() {
-    local queue=$1
-    local concurrency=$2
-    local worker_name=$3
-    local app=${4:-"reNgine.tasks"}
-    local directory=${5:-"/usr/src/app/reNgine/"}
+echo "Starting Consolidated Celery Workers..."
 
-    local base_command="celery -A $app worker --pool=gevent --optimization=fair --autoscale=$concurrency,1 --loglevel=$loglevel -Q $queue -n $worker_name"
+# 1. Main Scan Worker (Prefork pool for CPU-intensive tasks)
+# Listens to: main_scan_queue
+echo "Starting Core Scan Worker..."
+celery -A reNgine.tasks worker --loglevel=$loglevel --optimization=fair --autoscale=$MAX_CONCURRENCY,$MIN_CONCURRENCY -Q main_scan_queue -n core_scan_worker &
 
-    if [ "$DEBUG" == "1" ]; then
-        echo "watchmedo auto-restart --recursive --pattern=\"*.py\" --directory=\"$directory\" -- $base_command &"
-    else
-        echo "$base_command &"
-    fi
-}
+# 2. Service Worker (Gevent pool for I/O bound tasks)
+# Listens to: api_queue, initiate_scan_queue, subscan_queue, report_queue, send_notif_queue, etc.
+SERVICE_QUEUES="api_queue,initiate_scan_queue,subscan_queue,report_queue,send_notif_queue,send_task_notif_queue,send_file_to_discord_queue,send_hackerone_report_queue,parse_nmap_results_queue,geo_localize_queue,query_whois_queue,remove_duplicate_endpoints_queue,run_command_queue,query_reverse_whois_queue,query_ip_history_queue,send_scan_notif_queue"
+echo "Starting Service Worker Group..."
+celery -A reNgine worker --pool=gevent --concurrency=100 --optimization=fair --loglevel=$loglevel -Q $SERVICE_QUEUES -n service_worker &
 
-echo "Starting Celery Workers..."
+# 3. LLM Worker (Gevent pool for AI/LLM tasks)
+# Listens to: llm_queue
+echo "Starting LLM Worker..."
+celery -A reNgine.tasks worker --pool=gevent --concurrency=20 --optimization=fair --loglevel=$loglevel -Q llm_queue -n llm_worker &
 
-commands=""
-
-# Main scan worker
-if [ "$DEBUG" == "1" ]; then
-    commands+="watchmedo auto-restart --recursive --pattern=\"*.py\" --directory=\"/usr/src/app/reNgine/\" -- celery -A reNgine.tasks worker --loglevel=$loglevel --optimization=fair --autoscale=$MAX_CONCURRENCY,$MIN_CONCURRENCY -Q main_scan_queue &"$'\n'
-else
-    commands+="celery -A reNgine.tasks worker --loglevel=$loglevel --optimization=fair --autoscale=$MAX_CONCURRENCY,$MIN_CONCURRENCY -Q main_scan_queue &"$'\n'
-fi
-
-# API shared task worker
-if [ "$DEBUG" == "1" ]; then
-    commands+="watchmedo auto-restart --recursive --pattern=\"*.py\" --directory=\"/usr/src/app/api/\" -- celery -A api.shared_api_tasks worker --pool=gevent --optimization=fair --concurrency=30 --loglevel=$loglevel -Q api_queue -n api_worker &"$'\n'
-else
-    commands+="celery -A api.shared_api_tasks worker --pool=gevent --concurrency=30 --optimization=fair --loglevel=$loglevel -Q api_queue -n api_worker &"$'\n'
-fi
-
-# worker format: "queue_name:concurrency:worker_name"
-workers=(
-    "initiate_scan_queue:30:initiate_scan_worker"
-    "subscan_queue:30:subscan_worker"
-    "report_queue:20:report_worker"
-    "send_notif_queue:10:send_notif_worker"
-    "send_task_notif_queue:10:send_task_notif_worker"
-    "send_file_to_discord_queue:5:send_file_to_discord_worker"
-    "send_hackerone_report_queue:5:send_hackerone_report_worker"
-    "parse_nmap_results_queue:10:parse_nmap_results_worker"
-    "geo_localize_queue:20:geo_localize_worker"
-    "query_whois_queue:10:query_whois_worker"
-    "remove_duplicate_endpoints_queue:30:remove_duplicate_endpoints_worker"
-    "run_command_queue:50:run_command_worker"
-    "query_reverse_whois_queue:10:query_reverse_whois_worker"
-    "query_ip_history_queue:10:query_ip_history_worker"
-    "llm_queue:30:llm_worker"
-    "dorking_queue:10:dorking_worker"
-    "osint_discovery_queue:10:osint_discovery_worker"
-    "h8mail_queue:10:h8mail_worker"
-    "theHarvester_queue:10:theHarvester_worker"
-    "send_scan_notif_queue:10:send_scan_notif_worker"
-    "spiderfoot_queue:1:spiderfoot_worker"
-)
-
-for worker in "${workers[@]}"; do
-    IFS=':' read -r queue concurrency worker_name <<< "$worker"
-    commands+="$(generate_worker_command "$queue" "$concurrency" "$worker_name")"$'\n'
-done
-commands="${commands%&}"
-
-eval "$commands"
+# 4. OSINT Worker (Gevent pool for OSINT/Spiderfoot tasks)
+# Listens to: osint_queue, spiderfoot_queue
+echo "Starting OSINT Worker..."
+celery -A reNgine.tasks worker --pool=gevent --concurrency=10 --optimization=fair --loglevel=$loglevel -Q osint_queue,spiderfoot_queue -n osint_worker &
 
 wait

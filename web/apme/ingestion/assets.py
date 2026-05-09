@@ -19,10 +19,9 @@ def _make_id(prefix: str, value: str) -> str:
     return f"{prefix}::{value}"
 
 
-def ingest_subdomains(scan_history_id: int) -> Tuple[List[Node], List[Edge]]:
+def ingest_subdomains(target_id: int) -> Tuple[List[Node], List[Edge]]:
     """
-    Ingests Subdomains and their IP addresses from reNgine DB.
-    Returns (nodes, edges) for the graph builder.
+    Ingests Subdomains and their IP addresses for a given target domain.
     """
     from startScan.models import Subdomain
 
@@ -30,7 +29,7 @@ def ingest_subdomains(scan_history_id: int) -> Tuple[List[Node], List[Edge]]:
     edges: List[Edge] = []
 
     subdomains = Subdomain.objects.filter(
-        scan_history_id=scan_history_id
+        target_domain_id=target_id
     ).prefetch_related("ip_addresses", "ip_addresses__ports")
 
     for sub in subdomains:
@@ -45,7 +44,6 @@ def ingest_subdomains(scan_history_id: int) -> Tuple[List[Node], List[Edge]]:
                 "name": sub.name,
                 "http_status": sub.http_status,
                 "is_cdn": sub.is_cdn,
-                "scan_history_id": scan_history_id,
             },
         )
         nodes.append(domain_node)
@@ -106,20 +104,20 @@ def ingest_subdomains(scan_history_id: int) -> Tuple[List[Node], List[Edge]]:
 
     logger.info(
         f"APME Ingestion [assets]: {len(nodes)} nodes, {len(edges)} edges "
-        f"(scan_history_id={scan_history_id})"
+        f"(target_id={target_id})"
     )
     return nodes, edges
 
 
-def ingest_endpoints(scan_history_id: int) -> Tuple[List[Node], List[Edge]]:
-    """Ingests EndPoint models as Asset nodes linked to their subdomain."""
+def ingest_endpoints(target_id: int) -> Tuple[List[Node], List[Edge]]:
+    """Ingests EndPoint models for a given target linked to their subdomain."""
     from startScan.models import EndPoint
 
     nodes: List[Node] = []
     edges: List[Edge] = []
 
     endpoints = EndPoint.objects.filter(
-        scan_history_id=scan_history_id
+        subdomain__target_domain_id=target_id
     ).select_related("subdomain")
 
     for ep in endpoints:

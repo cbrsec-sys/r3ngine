@@ -1,5 +1,6 @@
 import os
 import shutil
+import time
 import zipfile
 import yaml
 import json
@@ -8,6 +9,7 @@ from datetime import datetime
 from django.conf import settings
 from django.utils.text import slugify
 from django.db import transaction
+from django.core.management import call_command
 import logging
 from .models import Plugin
 
@@ -26,10 +28,23 @@ class PluginManager:
         
     @classmethod
     def extract_plugin(cls, zip_path):
-        """Extracts a plugin zip and returns the path to the extracted content."""
+        """Extracts a plugin zip and returns the path to the actual plugin content (flattening root dir if needed)."""
         temp_dir = os.path.join(cls.BASE_PLUGINS_DIR, 'temp_' + datetime.now().strftime('%Y%m%d%H%M%S'))
+        os.makedirs(temp_dir, exist_ok=True)
+        
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
             zip_ref.extractall(temp_dir)
+            
+        # If there's only one directory and no files in the root, move everything up
+        items = os.listdir(temp_dir)
+        if len(items) == 1 and os.path.isdir(os.path.join(temp_dir, items[0])):
+            root_item = os.path.join(temp_dir, items[0])
+            # Move all contents of the root_item to temp_dir
+            for sub_item in os.listdir(root_item):
+                shutil.move(os.path.join(root_item, sub_item), temp_dir)
+            # Remove the now-empty root_item
+            os.rmdir(root_item)
+            
         return temp_dir
 
     @classmethod
@@ -130,26 +145,38 @@ class AtomicInstaller:
             logger.error(f"CRITICAL: Rollback failed! {str(e)}")
 
     @classmethod
-    def install(cls, zip_path):
+    def install(cls, zip_path: str):
         """Performs the full atomic installation."""
         PluginManager.ensure_dirs()
         temp_dir = None
-        backup_file = None
+        backup_db_file = None
+        backup_fs_dir = None
+        backup_media_dir = None
         plugin_slug = None
         
         try:
             temp_dir = PluginManager.extract_plugin(zip_path)
-            # If the zip had a subfolder, we should adjust temp_dir
-            # For simplicity, we assume files are at the root or we find the manifest
             manifest = PluginManager.validate_manifest(temp_dir)
             plugin_name = manifest['name']
             plugin_slug = slugify(plugin_name)
             
             # 1. Backup DB
-            backup_file = cls.backup_db(plugin_slug)
+            backup_db_file = cls.backup_db(plugin_slug)
             
+            # 2. Prepare FS Backups
+            final_dir = os.path.join(PluginManager.BASE_PLUGINS_DIR, plugin_slug)
+            media_plugin_dir = os.path.join(settings.MEDIA_ROOT, 'plugins', plugin_slug)
+            
+            if os.path.exists(final_dir):
+                backup_fs_dir = f"{final_dir}_bak_{int(time.time())}"
+                shutil.copytree(final_dir, backup_fs_dir)
+                
+            if os.path.exists(media_plugin_dir):
+                backup_media_dir = f"{media_plugin_dir}_bak_{int(time.time())}"
+                shutil.copytree(media_plugin_dir, backup_media_dir)
+
             with transaction.atomic():
-                # 2. Register in DB
+                # 3. Register in DB
                 runtime = manifest.get('runtime', {})
                 anchor = runtime.get('run after') or runtime.get('run before')
                 position = 'AFTER' if 'run after' in runtime else 'BEFORE'
@@ -166,32 +193,94 @@ class AtomicInstaller:
                     }
                 )
                 
-                # 3. Handle migrations if custom_models.py exists
-                # This part is complex because we need to dynamically load models
-                # For v1, we might skip full dynamic model registration or use a hook
-                
                 # 4. Finalize file placement
-                final_dir = os.path.join(PluginManager.BASE_PLUGINS_DIR, plugin_slug)
                 if os.path.exists(final_dir):
                     shutil.rmtree(final_dir)
                 shutil.move(temp_dir, final_dir)
                 
-                # 5. Copy UI assets to MEDIA_ROOT for frontend access
-                media_plugin_dir = os.path.join(settings.MEDIA_ROOT, 'plugins', plugin_slug)
+                # 5. Ingest Engine Fixtures
+                from scanEngine.models import EngineType
+                for file in os.listdir(final_dir):
+                    if file.endswith('_engine.yaml'):
+                        fixture_path = os.path.join(final_dir, file)
+                        logger.info(f"Ingesting engine fixture: {fixture_path}")
+                        try:
+                            with open(fixture_path, 'r') as f:
+                                fixture_data = yaml.safe_load(f)
+                                if isinstance(fixture_data, list):
+                                    for item in fixture_data:
+                                        if item.get('model') == 'scanEngine.enginetype':
+                                            fields = item.get('fields', {})
+                                            name = fields.get('engine_name')
+                                            if name:
+                                                obj, created = EngineType.objects.update_or_create(
+                                                    engine_name=name,
+                                                    defaults=fields
+                                                )
+                                                logger.info(f"{'Created' if created else 'Updated'} engine: {name}")
+                                            else:
+                                                logger.warning(f"Engine fixture item missing engine_name: {item}")
+                                        else:
+                                            # Fallback for other models (e.g. Wordlist, etc.)
+                                            call_command('loaddata', fixture_path, format='yaml')
+                                            logger.info(f"Fallback loaddata used for: {file}")
+                                else:
+                                    logger.error(f"Invalid fixture format in {file}")
+                        except Exception as e:
+                            logger.error(f"CRITICAL: Failed to ingest engine fixture {file}: {str(e)}")
+
+                # 6. Parse tools.yaml
+                tools_path = os.path.join(final_dir, 'tools.yaml')
+                if os.path.exists(tools_path):
+                    try:
+                        with open(tools_path, 'r') as f:
+                            tools_config = yaml.safe_load(f)
+                            plugin.tools_config = tools_config
+                            plugin.save()
+                        
+                        # Trigger background installation
+                        from .tasks import install_plugin_tools
+                        transaction.on_commit(lambda: install_plugin_tools.delay(plugin_slug))
+                    except Exception as e:
+                        logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
+
+                # 7. Copy UI assets to MEDIA_ROOT
                 if os.path.exists(media_plugin_dir):
                     shutil.rmtree(media_plugin_dir)
                 
                 ui_src = os.path.join(final_dir, 'ui')
                 if os.path.exists(ui_src):
                     os.makedirs(media_plugin_dir, exist_ok=True)
-                    # We copy the 'ui' directory into the plugin's media folder
                     shutil.copytree(ui_src, os.path.join(media_plugin_dir, 'ui'))
                 
-            return plugin
-            
+                # 8. Cleanup backups on success
+                if backup_fs_dir and os.path.exists(backup_fs_dir):
+                    shutil.rmtree(backup_fs_dir)
+                if backup_media_dir and os.path.exists(backup_media_dir):
+                    shutil.rmtree(backup_media_dir)
+                if backup_db_file and os.path.exists(backup_db_file):
+                    os.remove(backup_db_file)
+                
+                return plugin
+                
         except Exception as e:
-            if backup_file:
-                cls.rollback_db(backup_file)
+            logger.error(f"Installation failed for {plugin_slug}: {str(e)}")
+            # Rollback DB
+            if backup_db_file:
+                cls.rollback_db(backup_db_file)
+            
+            # Rollback FS
+            if backup_fs_dir and os.path.exists(backup_fs_dir):
+                if os.path.exists(final_dir):
+                    shutil.rmtree(final_dir)
+                shutil.move(backup_fs_dir, final_dir)
+            
+            # Rollback Media
+            if backup_media_dir and os.path.exists(backup_media_dir):
+                if os.path.exists(media_plugin_dir):
+                    shutil.rmtree(media_plugin_dir)
+                shutil.move(backup_media_dir, media_plugin_dir)
+                
             if temp_dir and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
             raise e

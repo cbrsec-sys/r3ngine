@@ -1909,15 +1909,7 @@ def parse_semgrep_result(result):
 		'type': 'SAST',
 	}
 
-def parse_trivy_result(result):
-	"""Parses a single Trivy vulnerability into reNgine vulnerability format."""
-	return {
-		'name': f"Trivy: {result.get('Title') or result.get('VulnerabilityID')}",
-		'description': result.get('Description', ''),
-		'severity': TRIVY_SEVERITY_MAP.get(result.get('Severity', 'UNKNOWN'), 0),
-		'http_url': result.get('PrimaryURL', ''),
-		'type': 'SCA',
-	}
+
 
 def parse_retire_result(result):
 	"""Parses a single Retire.js vulnerability into reNgine vulnerability format."""

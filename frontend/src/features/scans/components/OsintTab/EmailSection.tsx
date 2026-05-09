@@ -18,6 +18,9 @@ interface Email {
   id: number;
   address: string;
   password?: string;
+  metadata?: {
+    holehe?: string[];
+  };
 }
 
 interface EmailSectionProps {
@@ -43,6 +46,7 @@ export const EmailSection: React.FC<EmailSectionProps> = ({ emails }) => {
             <TableRow>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold' }}>ADDRESS</TableCell>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold' }}>CREDENTIALS</TableCell>
+              <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold' }}>SOCIAL FOOTPRINT</TableCell>
               <TableCell align="right" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>ACTIONS</TableCell>
             </TableRow>
           </TableHead>
@@ -69,6 +73,31 @@ export const EmailSection: React.FC<EmailSectionProps> = ({ emails }) => {
                       No password found
                     </Typography>
                   )}
+                </TableCell>
+                <TableCell>
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {email.metadata?.holehe && email.metadata.holehe.length > 0 ? (
+                      email.metadata.holehe.map((site, index) => (
+                        <Box 
+                          key={index}
+                          sx={{ 
+                            fontSize: '10px', 
+                            px: 1, 
+                            py: 0.2, 
+                            background: 'rgba(0, 230, 118, 0.1)', 
+                            color: 'success.light',
+                            border: '1px solid rgba(0, 230, 118, 0.3)',
+                            fontFamily: 'monospace',
+                            textTransform: 'uppercase'
+                          }}
+                        >
+                          {site}
+                        </Box>
+                      ))
+                    ) : (
+                      <Typography variant="caption" sx={{ color: 'text.disabled' }}>-</Typography>
+                    )}
+                  </Box>
                 </TableCell>
                 <TableCell align="right">
                   <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>

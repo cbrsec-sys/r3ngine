@@ -1,4 +1,11 @@
 import json
+import warnings
+try:
+    from urllib3.exceptions import DependencyWarning
+    warnings.filterwarnings("ignore", category=DependencyWarning)
+except ImportError:
+    pass
+
 from datetime import datetime
 try:
     from zoneinfo import ZoneInfo

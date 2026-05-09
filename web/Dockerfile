@@ -34,7 +34,7 @@ ENV GOROOT="/usr/local/go"
 ENV GOPATH=$HOME/go
 ENV PATH="${PATH}:${GOROOT}/bin:${GOPATH}/bin"
 
-# Install Python
+# Install Python and Ruby
 RUN apt update -y && \
     apt install -y \
     python3.10 \
@@ -47,19 +47,33 @@ RUN apt update -y && \
     libegl-dev \
     libegl1 \
     libcap2-bin \
-    libcap2
+    libcap2 \
+    ruby-full \
+    ruby-dev \
+    libcurl4-openssl-dev \
+    libxml2 \
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
+    liblzma-dev \
+    build-essential \
+    patch
 
 
 # Install essential packages
-RUN apt update -y && \
-    apt install -y --no-install-recommends \
+RUN apt install -y --no-install-recommends \
     build-essential \
     cmake \
+    ninja-build \
+    pkg-config \
+    libcairo2-dev \
     geoip-bin \
     geoip-database \
     gcc \
     git \
     libpq-dev \
+    libxml2-dev \
+    libxslt-dev \
     libpango-1.0-0 \
     libpangoft2-1.0-0 \
     libpcap-dev \
@@ -174,25 +188,8 @@ RUN ARCH=$(dpkg --print-architecture) \
     && mv aquatone /usr/local/bin/ \
     && rm -rf aquatone_linux_${ARCH}_1.7.0.zip README.md LICENSE.txt
 
-# Install Arjun, InQL, Netlas
-RUN pip3 install --upgrade arjun inql netlas
-
-RUN ARCH=$(dpkg --print-architecture) \
-    && wget https://github.com/assetnote/kiterunner/releases/download/v1.0.2/kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
-    tar -xvf kiterunner_1.0.2_linux_${ARCH}.tar.gz && \
-    mv kr /usr/local/bin/ && \
-    rm -rf kiterunner_1.0.2_linux_${ARCH}.tar.gz
-
-# Install Trivy with checksum verification
-RUN ARCH=$(dpkg --print-architecture) \
-    && if [ "${ARCH}" = "arm64" ]; then TRIVY_ARCH="ARM64"; else TRIVY_ARCH="64bit"; fi \
-    && TRIVY_VERSION="0.70.0" \
-    && wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-32bit.tar.gz \
-    && wget https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_checksums.txt \
-    && grep "trivy_${TRIVY_VERSION}_Linux-32bit.tar.gz" trivy_${TRIVY_VERSION}_checksums.txt | sha256sum -c - \
-    && tar -xvf trivy_${TRIVY_VERSION}_Linux-32bit.tar.gz \
-    && mv trivy /usr/local/bin/ \
-    && rm -rf trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz trivy_${TRIVY_VERSION}_checksums.txt
+# Install Arjun, InQL, Netlas, holehe, maigret (needs newer meson for pycairo)
+RUN pip3 install --upgrade meson ninja && pip3 install --upgrade arjun inql netlas holehe maigret
 
 # Install Node.js 20 and Retire.js
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -220,58 +217,8 @@ RUN mkdir -p /usr/src/wordlist/kr && \
     tar -xvf routes-small.kite.tar.gz && \
     rm -rf routes-small.kite.tar.gz
 
-# Pre-clone nmap scripts and other tools
-RUN mkdir -p /usr/src/github && \
-    git clone https://github.com/scipag/vulscan /usr/src/github/scipag_vulscan && \
-    ln -s /usr/src/github/scipag_vulscan /usr/share/nmap/scripts/vulscan && \
-    git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK && \
-    pip3 install -r /usr/src/github/CMSeeK/requirements.txt
-
-# Clone and install managed tools
-RUN git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder && \
-    cd /usr/src/github/LinkFinder && pip3 install -r requirements.txt && python3 setup.py install
-
-RUN git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider && \
-    cd /usr/src/github/ParamSpider && pip3 install . && python3 setup.py install
-
-RUN git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep && \
-    cd /usr/src/github/semgrep && pip3 install .
-
-RUN git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r && \
-    cd /usr/src/github/Sublist3r && pip3 install -r requirements.txt
-
-RUN git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll && \
-    cd /usr/src/github/OneForAll && pip3 install -r requirements.txt
-
-RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
-    cd /usr/src/github/theHarvester && uv sync
-
-RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
-    cd /usr/src/github/ctfr && pip3 install -r requirements.txt
-
-RUN git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python && \
-    cd /usr/src/github/acunetix-python && pip3 install .
-
-RUN git clone https://github.com/test502git/awvs14-scan /usr/src/github/awvs14-scan
-
-RUN cd /usr/src/github && \
-    wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip && \
-    unzip GooFuzz.v.1.2.6.zip && \
-    rm GooFuzz.v.1.2.6.zip && \
-    mv GooFuzz.v.1.2.6 goofuzz && \
-    chmod +x goofuzz/GooFuzz
-
-RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot && \
-    cd /usr/src/github/spiderfoot && pip3 install -r requirements.txt
-
-RUN git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner && \
-    cd /usr/src/github/cpanel2shell-scanner && pip3 install -r requirements.txt
-
-# Create a robust cPanel username wordlist
-RUN mkdir -p /usr/src/wordlist && \
-    printf "admin\nroot\ncpanel\nwebmaster\nsupport\ninfo\ntest\nuser\nclient\nhosting\nbackup\nmanager\nstaff\nowner\nsysadmin\nsystem\ndata\ndev\ndeveloper\nweb\n" > /usr/src/wordlist/cpanel_users.txt && \
-    wget -qO- https://raw.githubusercontent.com/danielmiessler/SecLists/master/Usernames/top-usernames-shortlist.txt >> /usr/src/wordlist/cpanel_users.txt && \
-    sort -u /usr/src/wordlist/cpanel_users.txt -o /usr/src/wordlist/cpanel_users.txt
+# Install WPScan
+RUN gem install wpscan --no-document
 
 # Copy requirements
 COPY web/requirements.txt /tmp/requirements.txt
