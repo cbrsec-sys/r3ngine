@@ -278,6 +278,7 @@ def initiate_scan(
 
 		# Build Celery tasks sequentially based on engine config order
 		tasks = engine.tasks
+		logger.warning(f"Engine tasks for {engine.engine_name}: {tasks}")
 		
 		# WAF Logic: If WAF Bypass is enabled, WAF Detection MUST also be enabled
 		if 'waf_bypass' in tasks and 'waf_detection' not in tasks:
@@ -371,11 +372,14 @@ def initiate_scan(
 		if config.get('enable_ai_impact_analysis'):
 			workflow_steps.append(generate_impact_assessment.si(scan_history_id=scan_history_id))
 
-		if 'stress_test' in tasks:
+		stress_test_config = config.get('stress_test', {})
+		logger.warning(f"Stress test check for scan {scan_history_id}: 'stress_test' in tasks={'stress_test' in tasks}, enabled={stress_test_config.get('enabled', False)}")
+		if 'stress_test' in tasks and stress_test_config.get('enabled', False):
 			workflow_steps.append(run_stress_testing.si(
 				scan_history_id=scan_history_id, 
 				target_domain_name=domain.name, 
-				yaml_config=config
+				yaml_config=config,
+				ctx=ctx
 			))
 
 		# Attack Path Modeling Engine (APME) - MUST BE FINAL
@@ -390,6 +394,16 @@ def initiate_scan(
 
 		# Filter out None steps
 		workflow_steps = [step for step in workflow_steps if step is not None]
+		
+		# Debug task list
+		task_names = []
+		for step in workflow_steps:
+			if hasattr(step, 'task'):
+				task_names.append(step.task)
+			elif hasattr(step, 'tasks'):
+				task_names.append([t.task for t in step.tasks])
+		logger.warning(f"Scan {scan_history_id} Workflow: {task_names}")
+
 		workflow = chain(*workflow_steps)
 
 		# Build callback
@@ -3994,8 +4008,12 @@ def send_scan_notif(
 		engine_id (int, optional): EngineType id.
 	"""
 	# Get domain, engine, scan_history objects
-	engine = EngineType.objects.filter(pk=engine_id).first()
 	scan = ScanHistory.objects.filter(pk=scan_history_id).first()
+	if not engine_id and scan:
+		engine = scan.scan_type
+	else:
+		engine = EngineType.objects.filter(pk=engine_id).first()
+	
 	subscan = SubScan.objects.filter(pk=subscan_id).first()
 	tasks = ScanActivity.objects.filter(scan_of=scan) if scan else 0
 

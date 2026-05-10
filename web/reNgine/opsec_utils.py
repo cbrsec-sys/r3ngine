@@ -269,7 +269,7 @@ class BruteForceOrchestrator:
         self.proxy_manager = ProxychainsWrapper()
         self.opsec = OpSecManager()
         self.logger = logging.getLogger(__name__)
-        self.results_dir = f"{settings.SCAN_HISTORY_PATH}/{self.scan.id}/brute_force"
+        self.results_dir = f"{self.scan.results_dir}/brute_force"
         os.makedirs(self.results_dir, exist_ok=True)
 
     def run_orchestration(self, ctx={}, allowed_services=[]):

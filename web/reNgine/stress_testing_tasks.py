@@ -53,7 +53,7 @@ def is_kill_switch_active(scan_id):
 
 
 @shared_task(name='stress_testing', queue='main_scan_queue', bind=True, base=StressTestTask)
-def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config):
+def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, **kwargs):
     # Extract config
     stress_config = yaml_config.get("stress_test", {})
     if not stress_config:

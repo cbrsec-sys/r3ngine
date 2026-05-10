@@ -1011,7 +1011,7 @@ def get_scan_fields(engine, scan, subscan=None, status='RUNNING', tasks=[]):
 	url = get_scan_url(scan.id)
 	fields = {
 		'Status': f'**{status}**',
-		'Engine': engine.engine_name,
+		'Engine': engine.engine_name if engine else "Default",
 		'Scan ID': f'[#{scan.id}]({url})'
 	}
 
