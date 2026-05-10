@@ -45,7 +45,7 @@ python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.Inter
 python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
 
 # TEMPORARY FIX FOR langchain
-pip install urllib3==2.0.0
+pip install requests==2.32.3 "urllib3>=1.26.0,<3.0.0" "charset-normalizer>=3.0.0,<4.0.0" "chardet>=5.0.0,<6.0.0"
 pip install tenacity==8.2.2
 
 # install firefox https://askubuntu.com/a/1404401
@@ -190,6 +190,7 @@ then
   echo "Cloning acunetix-python"
   git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python
 fi
+pip3 install /usr/src/github/acunetix-python
 pip3 install -r /usr/src/github/acunetix-python/requirements.txt
 
 if [ ! -d '/usr/src/github/goofuzz' ];
@@ -306,8 +307,8 @@ echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
 #python3 -m pip uninstall -y httpcore
 
 # TEMPORARY FIX FOR langchain
-pip install urllib3<2.0.0
-pip install tenacity==8.2.2
+pip install requests==2.32.3 "urllib3>=1.26.0,<3.0.0" "charset-normalizer>=3.0.0,<4.0.0" "chardet>=5.0.0,<6.0.0"
+pip3 install tenacity==8.2.2
 
 loglevel='warning'
 if [ "$DEBUG" == "1" ]; then

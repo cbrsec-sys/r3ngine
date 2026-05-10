@@ -3,6 +3,9 @@ import os
 import re
 import shutil
 import subprocess
+import logging
+
+logger = logging.getLogger(__name__)
 
 from datetime import datetime
 from django import http
@@ -48,8 +51,10 @@ def add_engine(request, slug):
                 'Scan Engine Added successfully')
             return http.HttpResponseRedirect(reverse('scan_engine_index', kwargs={'slug': slug}))
     context = {
-        'scan_engine_nav_active': 'active',
-        'form': form
+        'engine_nav_active': 'active',
+        'add_engine_li': 'active',
+        'engine_ul_show': 'show',
+        'form': form,
     }
     return render(request, 'dashboard/v3_index.html', context)
 
@@ -59,80 +64,64 @@ def delete_engine(request, slug, id):
     obj = get_object_or_404(EngineType, id=id)
     if request.method == "POST":
         obj.delete()
-        responseData = {'status': 'true'}
         messages.add_message(
             request,
             messages.INFO,
-            'Engine successfully deleted!')
-    else:
-        responseData = {'status': 'false'}
-        messages.add_message(
-            request,
-            messages.ERROR,
-            'Oops! Engine could not be deleted!')
-    return http.JsonResponse(responseData)
+            'Scan Engine Deleted successfully')
+    return http.HttpResponseRedirect(reverse('scan_engine_index', kwargs={'slug': slug}))
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def update_engine(request, slug, id):
-    engine = get_object_or_404(EngineType, id=id)
-    form = UpdateEngineForm(
-        initial={
-            'yaml_configuration': engine.yaml_configuration,
-            'engine_name': engine.engine_name
-    })
+    obj = get_object_or_404(EngineType, id=id)
+    form = AddEngineForm(instance=obj)
     if request.method == "POST":
-        form = UpdateEngineForm(request.POST, instance=engine)
+        form = AddEngineForm(request.POST, instance=obj)
         if form.is_valid():
             form.save()
             messages.add_message(
                 request,
                 messages.INFO,
-                'Engine edited successfully')
+                'Scan Engine Updated successfully')
             return http.HttpResponseRedirect(reverse('scan_engine_index', kwargs={'slug': slug}))
     context = {
-        'scan_engine_nav_active': 'active',
-        'form': form
+        'engine_nav_active': 'active',
+        'engine_ul_show': 'show',
+        'form': form,
+    }
+    return render(request, 'dashboard/v3_index.html', context)
+
+
+@has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def wordlist_list(request, slug):
+    wordlists = Wordlist.objects.all()
+    context = {
+        'settings_nav_active': 'active',
+        'wordlist_li': 'active',
+        'settings_ul_show': 'show',
+        'wordlists': wordlists,
     }
     return render(request, 'dashboard/v3_index.html', context)
 
 
 @has_permission_decorator(PERM_MODIFY_WORDLISTS, redirect_url=FOUR_OH_FOUR_URL)
-def wordlist_list(request, slug):
-    wordlists = Wordlist.objects.all().order_by('id')
-    context = {
-            'scan_engine_nav_active': 'active',
-            'wordlist_li': 'active',
-            'wordlists': wordlists}
-    return render(request, 'dashboard/v3_index.html', context)
-
-
-@has_permission_decorator(PERM_MODIFY_WORDLISTS, redirect_url=FOUR_OH_FOUR_URL)
 def add_wordlist(request, slug):
-    context = {'scan_engine_nav_active': 'active', 'wordlist_li': 'active'}
-    form = AddWordlistForm(request.POST or None, request.FILES or None)
+    form = WordlistForm()
     if request.method == "POST":
-        if form.is_valid() and 'upload_file' in request.FILES:
-            txt_file = request.FILES['upload_file']
-            if txt_file.content_type == 'text/plain':
-                wordlist_content = txt_file.read().decode('UTF-8', "ignore")
-                wordlist_file = open(
-                    '/usr/src/' +
-                    'wordlist/' +
-                    form.cleaned_data['short_name'] + '.txt',
-                    'w')
-                wordlist_file.write(wordlist_content)
-                Wordlist.objects.create(
-                    name=form.cleaned_data['name'],
-                    short_name=form.cleaned_data['short_name'],
-                    count=wordlist_content.count('\n'))
-                messages.add_message(
-                    request,
-                    messages.INFO,
-                    'Wordlist ' + form.cleaned_data['name'] +
-                    ' added successfully')
-                return http.HttpResponseRedirect(reverse('wordlist_list', kwargs={'slug': slug}))
-    context['form'] = form
+        form = WordlistForm(request.POST, request.FILES)
+        if form.is_valid():
+            form.save()
+            messages.add_message(
+                request,
+                messages.INFO,
+                'Wordlist Added successfully')
+            return http.HttpResponseRedirect(reverse('wordlist_list', kwargs={'slug': slug}))
+    context = {
+        'settings_nav_active': 'active',
+        'wordlist_li': 'active',
+        'settings_ul_show': 'show',
+        'form': form,
+    }
     return render(request, 'dashboard/v3_index.html', context)
 
 
@@ -141,45 +130,30 @@ def delete_wordlist(request, slug, id):
     obj = get_object_or_404(Wordlist, id=id)
     if request.method == "POST":
         obj.delete()
-        try:
-            os.remove(
-            '/usr/src/' +
-            'wordlist/' +
-            obj.short_name +
-            '.txt')
-            responseData = {'status': True}
-        except Exception as e:
-            responseData = {'status': False}
         messages.add_message(
             request,
             messages.INFO,
-            'Wordlist successfully deleted!')
-    else:
-        responseData = {'status': 'false'}
-        messages.add_message(
-            request,
-            messages.ERROR,
-            'Oops! Wordlist could not be deleted!')
-    return http.JsonResponse(responseData)
+            'Wordlist Deleted successfully')
+    return http.HttpResponseRedirect(reverse('wordlist_list', kwargs={'slug': slug}))
 
 
-@has_permission_decorator(PERM_MODIFY_INTERESTING_LOOKUP, redirect_url=FOUR_OH_FOUR_URL)
+@has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def interesting_lookup(request, slug):
-    lookup_keywords = None
     context = {}
-    context['scan_engine_nav_active'] = 'active'
-    context['interesting_lookup_li'] = 'active'
-    context['engine_ul_show'] = 'show'
     form = InterestingLookupForm()
-    if InterestingLookupModel.objects.filter(custom_type=True).exists():
-        lookup_keywords = InterestingLookupModel.objects.filter(custom_type=True).order_by('-id')[0]
+    lookup_keywords = None
+    if InterestingLookupModel.objects.filter(id=1).exists():
+        lookup_keywords = InterestingLookupModel.objects.get(id=1)
+        form.set_value(lookup_keywords)
     else:
-        form.initial_checkbox()
+        form.set_initial()
+
     if request.method == "POST":
         if lookup_keywords:
             form = InterestingLookupForm(request.POST, instance=lookup_keywords)
         else:
             form = InterestingLookupForm(request.POST or None)
+
         if form.is_valid():
             form.save()
             messages.add_message(
@@ -567,23 +541,17 @@ def report_settings(request, slug):
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def fetch_proxies(request, slug):
-    logger.info(f"fetch_proxies view hit! Method: {request.method}, Slug: {slug}, User: {request.user}")
     if request.method == "POST":
-        logger.info("Initiating fetch_proxies_task...")
         try:
             task = fetch_proxies_task.delay()
-            logger.info(f"Task successfully queued with ID: {task.id}")
             return http.JsonResponse({'task_id': task.id})
         except Exception as e:
-            logger.error(f"Failed to queue fetch_proxies_task: {str(e)}")
             return http.JsonResponse({'error': f"Celery error: {str(e)}"}, status=500)
-    logger.warning(f"Invalid request method to fetch_proxies: {request.method}")
     return http.JsonResponse({'error': 'Invalid request method. POST required.'}, status=405)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def get_proxy_task_status(request, slug, task_id):
-    logger.info(f"Checking status for task: {task_id}")
     task_result = AsyncResult(task_id, app=app)
     result = {
         "task_id": task_id,
@@ -597,7 +565,6 @@ def get_proxy_task_status(request, slug, task_id):
         result['message'] = 'Proxy list updated'
         result['progress'] = 100
     
-    logger.info(f"Task {task_id} status: {task_result.status}")
     return http.JsonResponse(result)
 
 
@@ -724,6 +691,7 @@ def get_ollama_pull_status(request, slug):
 
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def api_vault(request, slug):
+    logger.info(f"api_vault view hit! Method: {request.method}, Slug: {slug}, User: {request.user}")
     context = {}
     if request.method == "POST":
         
@@ -983,3 +951,15 @@ def modify_tool_in_arsenal(request, slug, id):
             'scan_engine_nav_active':
             'active', 'form': form}
     return render(request, 'dashboard/v3_index.html', context)
+
+
+@has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def update_github_tool(request, slug, id):
+    tool = get_object_or_404(InstalledExternalTool, id=id)
+    if tool.github_clone_path:
+        update_command = f"cd {tool.github_clone_path} && git pull"
+        if tool.update_command:
+             update_command = tool.update_command
+        run_command.apply_async(args=(update_command,))
+        messages.add_message(request, messages.INFO, f'Update started for {tool.name}')
+    return http.HttpResponseRedirect(reverse('tool_arsenal', kwargs={'slug': slug}))

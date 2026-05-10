@@ -1515,6 +1515,7 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}
 				yaml.dump(yaml_data, file)
 
 	# Run cmd
+	cmd = f'python3 theHarvester.py -d {host} -b all -f {output_path_json}'
 	run_command(
 		cmd,
 		shell=False,
@@ -5347,7 +5348,7 @@ def stream_command(
 		str/dict: Output line.
 	"""
 	color = get_tool_color(cmd)
-	logger.info(f"{color}{cmd}{COLOR_RESET}")
+	logger.debug(f"{color}{cmd}{COLOR_RESET}")
 
 	conf_path = None
 	if proxy:
@@ -5483,6 +5484,7 @@ def process_httpx_response(line, ctx={}, is_ran_from_subdomain_scan=False):
 	endpoint.webserver = webserver
 	endpoint.response_time = response_time
 	endpoint.content_type = content_type
+	endpoint.is_redirect = is_redirect
 	endpoint.save()
 
 	# Sync Subdomain status attributes if this is the default endpoint
@@ -6407,33 +6409,27 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 		
 		# Use the library's start_scan which typically adds target and starts scan
 		# Based on the user provided example
-		acunetix.start_scan(domain.name)
+		scan_info = acunetix.start_scan(domain.name)
+		target_id = scan_info.get('target_id')
 		
 		# Now we need to poll for status and fetch findings.
-		# Since acunetix-python is a light wrapper, we might need to use requests for some parts
-		# if the library doesn't expose them.
-		
 		headers = {
 			'X-Auth': creds.api_key,
 			'Content-Type': 'application/json'
 		}
 		base_url = creds.server_url if creds.server_url.startswith('http') else f"https://{creds.server_url}"
 		
-		# Get target ID for the domain
-		targets_resp = requests.get(f"{base_url}/api/v1/targets?q=text_search:{domain.name}", headers=headers, verify=False)
-		if targets_resp.status_code != 200:
-			logger.error(f"Failed to fetch target ID from Acunetix: {targets_resp.text}")
-			return False
-		
-		targets_data = targets_resp.json()
-		target = next((t for t in targets_data.get('targets', []) if t['address'].strip('http://').strip('https://') == domain.name), None)
-		
-		if not target:
+		# If target_id wasn't in scan_info, try to find it
+		if not target_id:
+			targets_data = acunetix.targets()
+			target = next((t for t in targets_data.get('targets', []) if domain.name in t['address']), None)
+			if target:
+				target_id = target['target_id']
+
+		if not target_id:
 			logger.error(f"Target {domain.name} not found in Acunetix after start_scan.")
 			return False
 			
-		target_id = target['target_id']
-		
 		# Wait for scan to complete
 		# We'll poll /api/v1/scans
 		max_retries = 360 # 1 hour
@@ -6442,21 +6438,33 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 			scans_resp = requests.get(f"{base_url}/api/v1/scans?q=target_id:{target_id}", headers=headers, verify=False)
 			if scans_resp.status_code == 200:
 				scans_data = scans_resp.json()
-				latest_scan = scans_data.get('scans', [{}])[0]
-				current_status = latest_scan.get('current_session', {}).get('status')
-				
-				if current_status == 'completed':
-					logger.info(f"Acunetix scan for {domain.name} completed.")
-					break
-				elif current_status in ['failed', 'aborted']:
-					logger.error(f"Acunetix scan for {domain.name} {current_status}.")
-					return False
+				scans_list = scans_data.get('scans', [])
+				if scans_list:
+					latest_scan = scans_list[0]
+					current_status = latest_scan.get('current_session', {}).get('status')
+					
+					if current_status == 'completed':
+						logger.info(f"Acunetix scan for {domain.name} completed.")
+						scan_id = latest_scan.get('scan_id')
+						break
+					elif current_status in ['failed', 'aborted']:
+						logger.error(f"Acunetix scan for {domain.name} {current_status}.")
+						return False
 			
 			time.sleep(10)
 			retries += 1
 			
-		# Fetch Vulnerabilities
-		vulns_resp = requests.get(f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}", headers=headers, verify=False)
+		# Fetch Vulnerabilities for the specific scan
+		if not scan_id:
+			# Fallback to target_id if scan_id not found
+			vulns_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
+		else:
+			# Fetch vulnerabilities for the specific scan
+			# Note: The API for scan vulnerabilities might be different, 
+			# but q=scan_id:ID or the sub-resource works in many versions.
+			vulns_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
+
+		vulns_resp = requests.get(vulns_url, headers=headers, verify=False)
 		if vulns_resp.status_code == 200:
 			vulns_data = vulns_resp.json()
 			for vuln in vulns_data.get('vulnerabilities', []):
@@ -6480,15 +6488,27 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 						'template_id': v_detail.get('vt_id'),
 					}
 					
-					# Handle references
+					# Handle references, CVEs, CWEs
 					refs = []
-					# v_detail might have references as a list of dicts
 					for r in v_detail.get('references', []):
 						if isinstance(r, dict):
 							refs.append(r.get('href'))
 						else:
 							refs.append(str(r))
 					save_v_data['references'] = refs
+
+					# Extract CVEs
+					cves = []
+					for ref in v_detail.get('references', []):
+						if isinstance(ref, dict) and 'CVE-' in ref.get('rel', ''):
+							cves.append(ref.get('rel'))
+					save_v_data['cve_ids'] = cves
+
+					# Extract CWEs
+					cwes = []
+					if v_detail.get('cwe_id'):
+						cwes.append(f"CWE-{v_detail['cwe_id']}")
+					save_v_data['cwe_ids'] = cwes
 					
 					save_vulnerability(**save_v_data)
 					
