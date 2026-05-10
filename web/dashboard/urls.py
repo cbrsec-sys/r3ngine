@@ -59,6 +59,10 @@ urlpatterns = [
         views.attack_surface,
         name='attack_surface'),
     path(
+        '<slug:slug>/stress_testing/<int:scan_id>/',
+        views.index,
+        name='stress_testing_v3'),
+    path(
         '<slug:slug>/targets/',
         views.index,
         name='targets_v3'),

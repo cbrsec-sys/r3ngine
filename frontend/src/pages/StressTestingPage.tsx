@@ -1,14 +1,11 @@
 import React, { useState } from 'react';
-import { useParams, Link as RouterLink } from 'react-router-dom';
+import { useParams, Link as RouterLink } from '@tanstack/react-router';
 import { 
   Box, 
   Grid, 
-  Paper, 
   Typography, 
   Button, 
   IconButton, 
-  Card,
-  CardContent,
   CircularProgress,
   TextField,
   Dialog,
@@ -24,7 +21,9 @@ import {
   FormControl,
   InputLabel,
   OutlinedInput,
-  Chip
+  Chip,
+  useTheme,
+  alpha
 } from '@mui/material';
 import { 
   Play, 
@@ -41,10 +40,13 @@ import {
 import ReactECharts from 'echarts-for-react';
 import { useStressStore } from '../store/stressStore';
 import { useStressTelemetry } from '../hooks/useStressTelemetry';
+import { KpiCard } from '../components/KpiCard';
+import { TacticalPanel } from '../components/TacticalPanel';
 import axios from 'axios';
 
 export const StressTestingPage: React.FC = () => {
-  const { projectSlug, scanId } = useParams<{ projectSlug: string, scanId: string }>();
+  const theme = useTheme();
+  const { projectSlug, scanId } = useParams({ from: '/$projectSlug/stress_testing/$scanId' });
   const { 
     isScanning, 
     telemetryData, 
@@ -91,22 +93,36 @@ export const StressTestingPage: React.FC = () => {
     const data = telemetryData.filter(p => p.avg_latency || p.latency);
     return {
       backgroundColor: 'transparent',
-      title: { text: 'REAL-TIME LATENCY (ms)', textStyle: { color: '#00f3ff', fontFamily: 'Orbitron', fontSize: 14 } },
+      title: { 
+        text: 'REAL-TIME LATENCY (ms)', 
+        textStyle: { 
+          color: theme.palette.primary.main, 
+          fontFamily: 'Orbitron', 
+          fontSize: 12,
+          fontWeight: 800,
+          letterSpacing: 1
+        } 
+      },
       tooltip: { 
         trigger: 'axis',
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        borderColor: '#00f3ff',
-        textStyle: { color: '#fff' }
+        backgroundColor: 'rgba(5, 5, 10, 0.95)',
+        borderColor: alpha(theme.palette.primary.main, 0.3),
+        textStyle: { color: '#fff', fontSize: 11, fontFamily: 'monospace' },
+        borderWidth: 1,
+        borderRadius: 4
       },
+      grid: { top: 60, bottom: 40, left: 50, right: 20 },
       xAxis: { 
         type: 'time',
         splitLine: { show: false },
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } }
+        axisLine: { lineStyle: { color: alpha(theme.palette.text.primary, 0.1) } },
+        axisLabel: { color: alpha(theme.palette.text.primary, 0.4), fontSize: 10 }
       },
       yAxis: { 
         type: 'value',
-        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } },
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.1)' } }
+        splitLine: { lineStyle: { color: alpha(theme.palette.text.primary, 0.05) } },
+        axisLine: { show: false },
+        axisLabel: { color: alpha(theme.palette.text.primary, 0.4), fontSize: 10 }
       },
       series: [{
         name: 'Avg Latency',
@@ -114,12 +130,16 @@ export const StressTestingPage: React.FC = () => {
         smooth: true,
         showSymbol: false,
         data: data.map(p => [p.timestamp * 1000, p.avg_latency || p.latency]),
-        itemStyle: { color: '#00f3ff' },
+        itemStyle: { color: theme.palette.primary.main },
+        lineStyle: { width: 3, shadowBlur: 10, shadowColor: alpha(theme.palette.primary.main, 0.5) },
         areaStyle: {
           color: {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
-            colorStops: [{ offset: 0, color: 'rgba(0, 243, 255, 0.3)' }, { offset: 1, color: 'rgba(0, 243, 255, 0)' }]
+            colorStops: [
+              { offset: 0, color: alpha(theme.palette.primary.main, 0.25) }, 
+              { offset: 1, color: 'rgba(0, 0, 0, 0)' }
+            ]
           }
         }
       }]
@@ -130,22 +150,53 @@ export const StressTestingPage: React.FC = () => {
     const data = telemetryData.filter(p => p.throughput_rps);
     return {
       backgroundColor: 'transparent',
-      title: { text: 'THROUGHPUT (RPS)', textStyle: { color: '#6be6c1', fontFamily: 'Orbitron', fontSize: 14 } },
+      title: { 
+        text: 'THROUGHPUT (RPS)', 
+        textStyle: { 
+          color: '#6be6c1', 
+          fontFamily: 'Orbitron', 
+          fontSize: 12,
+          fontWeight: 800,
+          letterSpacing: 1
+        } 
+      },
       tooltip: { 
         trigger: 'axis',
-        backgroundColor: 'rgba(0,0,0,0.8)',
-        borderColor: '#6be6c1',
-        textStyle: { color: '#fff' }
+        backgroundColor: 'rgba(5, 5, 10, 0.95)',
+        borderColor: 'rgba(107, 230, 193, 0.3)',
+        textStyle: { color: '#fff', fontSize: 11, fontFamily: 'monospace' },
+        borderWidth: 1
       },
-      xAxis: { type: 'time', splitLine: { show: false } },
-      yAxis: { type: 'value', splitLine: { lineStyle: { color: 'rgba(255,255,255,0.05)' } } },
+      grid: { top: 60, bottom: 40, left: 50, right: 20 },
+      xAxis: { 
+        type: 'time', 
+        splitLine: { show: false },
+        axisLine: { lineStyle: { color: alpha(theme.palette.text.primary, 0.1) } },
+        axisLabel: { color: alpha(theme.palette.text.primary, 0.4), fontSize: 10 }
+      },
+      yAxis: { 
+        type: 'value', 
+        splitLine: { lineStyle: { color: alpha(theme.palette.text.primary, 0.05) } },
+        axisLabel: { color: alpha(theme.palette.text.primary, 0.4), fontSize: 10 }
+      },
       series: [{
         name: 'RPS',
         type: 'line',
         smooth: true,
         showSymbol: false,
         data: data.map(p => [p.timestamp * 1000, p.throughput_rps]),
-        itemStyle: { color: '#6be6c1' }
+        itemStyle: { color: '#6be6c1' },
+        lineStyle: { width: 3 },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(107, 230, 193, 0.2)' }, 
+              { offset: 1, color: 'rgba(0, 0, 0, 0)' }
+            ]
+          }
+        }
       }]
     };
   };
@@ -194,22 +245,33 @@ export const StressTestingPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 4, minHeight: '100vh', background: '#0a0a0a', color: '#fff' }}>
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 6 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
           <IconButton 
             component={RouterLink} 
             to={`/${projectSlug}/scans`} 
-            sx={{ color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.1)' }}
+            sx={{ 
+              color: 'rgba(255,255,255,0.5)', 
+              border: '1px solid rgba(255,255,255,0.1)',
+              borderRadius: 2,
+              '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05), borderColor: theme.palette.primary.main }
+            }}
           >
             <ArrowLeft size={20} />
           </IconButton>
           <Box>
-            <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', letterSpacing: 2 }}>
+            <Typography variant="h4" sx={{ 
+              fontFamily: 'Orbitron', 
+              fontWeight: 900, 
+              color: '#fff', 
+              letterSpacing: 4,
+              textShadow: `0 0 20px ${alpha(theme.palette.primary.main, 0.3)}`
+            }}>
               ADAPTIVE_STRESS_ANALYSIS
             </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(0,243,255,0.7)', fontFamily: 'Orbitron', fontSize: 10 }}>
+            <Typography variant="body2" sx={{ color: alpha(theme.palette.primary.main, 0.7), fontFamily: 'Orbitron', fontSize: 10, letterSpacing: 2 }}>
               LIVE_TELEMETRY_PIPELINE // SCAN_ID: {scanId}
             </Typography>
           </Box>
@@ -218,8 +280,14 @@ export const StressTestingPage: React.FC = () => {
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Button 
             variant="outlined" 
-            sx={{ borderColor: 'rgba(255,255,255,0.1)', color: '#fff' }}
-            startIcon={<SettingsIcon size={18} />}
+            sx={{ 
+              borderColor: alpha(theme.palette.text.primary, 0.1), 
+              color: alpha(theme.palette.text.primary, 0.7),
+              fontFamily: 'Orbitron',
+              fontSize: '0.75rem',
+              fontWeight: 700
+            }}
+            startIcon={<SettingsIcon size={16} />}
             onClick={() => setOpenSettings(true)}
           >
             CONFIGURE
@@ -227,11 +295,18 @@ export const StressTestingPage: React.FC = () => {
           <Button 
             variant="contained" 
             sx={{ 
-              background: 'linear-gradient(45deg, #00f3ff, #0066ff)',
-              fontWeight: 'bold',
-              '&:disabled': { opacity: 0.5 }
+              background: `linear-gradient(45deg, ${theme.palette.primary.main}, ${theme.palette.primary.dark})`,
+              fontFamily: 'Orbitron',
+              fontSize: '0.75rem',
+              fontWeight: 900,
+              px: 3,
+              boxShadow: `0 0 20px ${alpha(theme.palette.primary.main, 0.4)}`,
+              '&:hover': {
+                boxShadow: `0 0 30px ${alpha(theme.palette.primary.main, 0.6)}`,
+              },
+              '&:disabled': { opacity: 0.3 }
             }}
-            startIcon={<Play />}
+            startIcon={<Play size={18} />}
             onClick={handleStart}
             disabled={isScanning}
           >
@@ -239,8 +314,15 @@ export const StressTestingPage: React.FC = () => {
           </Button>
           <Button 
             variant="contained" 
-            sx={{ background: '#ff003c', fontWeight: 'bold' }}
-            startIcon={isStopping ? <CircularProgress size={18} color="inherit" /> : <Square />}
+            sx={{ 
+              background: '#ff003c', 
+              fontFamily: 'Orbitron',
+              fontSize: '0.75rem',
+              fontWeight: 900,
+              px: 3,
+              '&:hover': { bgcolor: '#cc0030' }
+            }}
+            startIcon={isStopping ? <CircularProgress size={16} color="inherit" /> : <Square size={18} />}
             onClick={handleStop}
             disabled={!isScanning || isStopping}
           >
@@ -250,123 +332,101 @@ export const StressTestingPage: React.FC = () => {
       </Box>
 
       {/* Main Grid */}
-      <Grid container spacing={3}>
+      <Grid container spacing={4}>
         {/* KPI Row */}
         <Grid size={{ xs: 12 }}>
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Activity size={16} color="#00f3ff" />
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron' }}>LATENCY_AVG</Typography>
-                  </Box>
-                  <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 700 }}>
-                    {telemetryData.length > 0 ? (telemetryData[telemetryData.length-1].avg_latency || 0).toFixed(2) : '0.00'}
-                    <span style={{ fontSize: '14px', marginLeft: 8, opacity: 0.5 }}>ms</span>
-                  </Typography>
-                </CardContent>
-              </Card>
+              <KpiCard 
+                title="LATENCY_AVG"
+                value={telemetryData.length > 0 ? telemetryData[telemetryData.length-1].avg_latency || 0 : 0}
+                icon={Activity}
+                color={theme.palette.primary.main}
+                subtitle="Milliseconds"
+              />
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Zap size={16} color="#6be6c1" />
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron' }}>THROUGHPUT</Typography>
-                  </Box>
-                  <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 700 }}>
-                    {telemetryData.length > 0 ? (telemetryData[telemetryData.length-1].throughput_rps || 0).toFixed(0) : '0'}
-                    <span style={{ fontSize: '14px', marginLeft: 8, opacity: 0.5 }}>RPS</span>
-                  </Typography>
-                </CardContent>
-              </Card>
+              <KpiCard 
+                title="THROUGHPUT"
+                value={telemetryData.length > 0 ? telemetryData[telemetryData.length-1].throughput_rps || 0 : 0}
+                icon={Zap}
+                color="#6be6c1"
+                subtitle="Req / Sec"
+              />
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <AlertTriangle size={16} color="#ff003c" />
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron' }}>ERROR_RATE</Typography>
-                  </Box>
-                  <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 700 }}>
-                    {telemetryData.length > 0 ? ((telemetryData[telemetryData.length-1].error_rate || 0) * 100).toFixed(1) : '0.0'}
-                    <span style={{ fontSize: '14px', marginLeft: 8, opacity: 0.5 }}>%</span>
-                  </Typography>
-                </CardContent>
-              </Card>
+              <KpiCard 
+                title="ERROR_RATE"
+                value={telemetryData.length > 0 ? (telemetryData[telemetryData.length-1].error_rate || 0) * 100 : 0}
+                icon={AlertTriangle}
+                color="#ff003c"
+                subtitle="Percentage %"
+              />
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                <CardContent>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <Server size={16} color="#facc15" />
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron' }}>CONCURRENCY</Typography>
-                  </Box>
-                  <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 700 }}>
-                    {config.concurrency}
-                    <span style={{ fontSize: '14px', marginLeft: 8, opacity: 0.5 }}>VUs</span>
-                  </Typography>
-                </CardContent>
-              </Card>
+              <KpiCard 
+                title="CONCURRENCY"
+                value={config.concurrency}
+                icon={Server}
+                color="#facc15"
+                subtitle="Virtual Users"
+              />
             </Grid>
           </Grid>
         </Grid>
 
         {/* Charts Row */}
         <Grid size={{ xs: 12, lg: 8 }}>
-          <Paper sx={{ p: 3, bgcolor: '#141414', border: '1px solid rgba(255,255,255,0.05)', height: '400px' }}>
-            <ReactECharts option={getLatencyOption()} style={{ height: '350px' }} theme="dark" />
-          </Paper>
+          <TacticalPanel title="LATENCY_METRICS" icon={<Activity size={18} color={theme.palette.primary.main} />}>
+            <ReactECharts option={getLatencyOption()} style={{ height: '320px' }} theme="dark" />
+          </TacticalPanel>
         </Grid>
         <Grid size={{ xs: 12, lg: 4 }}>
-          <Paper sx={{ p: 3, bgcolor: '#141414', border: '1px solid rgba(255,255,255,0.05)', height: '400px' }}>
-            <ReactECharts option={getRpsOption()} style={{ height: '350px' }} theme="dark" />
-          </Paper>
+          <TacticalPanel title="THROUGHPUT_LOAD" icon={<Zap size={18} color="#6be6c1" />}>
+            <ReactECharts option={getRpsOption()} style={{ height: '320px' }} theme="dark" />
+          </TacticalPanel>
         </Grid>
 
         {/* Heatmap & Logs Row */}
         <Grid size={{ xs: 12, lg: 8 }}>
-          <Paper sx={{ p: 3, bgcolor: '#141414', border: '1px solid rgba(255,255,255,0.05)', height: '500px' }}>
-            <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', color: 'rgba(255,255,255,0.5)', mb: 2 }}>
-              ENDPOINT_SATURATION_HEATMAP
-            </Typography>
+          <TacticalPanel title="ENDPOINT_SATURATION_HEATMAP" icon={<Server size={18} color="#facc15" />}>
             <ReactECharts option={getHeatmapOption()} style={{ height: '400px' }} theme="dark" />
-          </Paper>
+          </TacticalPanel>
         </Grid>
         <Grid size={{ xs: 12, lg: 4 }}>
-          <Paper sx={{ p: 3, bgcolor: '#141414', border: '1px solid rgba(255,255,255,0.05)', height: '500px', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-              <Terminal size={16} color="#00f3ff" />
-              <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', color: 'rgba(255,255,255,0.5)' }}>
-                TELEMETRY_LOG
-              </Typography>
-            </Box>
-            <Box sx={{ flexGrow: 1, overflowY: 'auto', bgcolor: '#000', p: 2, borderRadius: 1, border: '1px solid rgba(255,255,255,0.1)' }}>
+          <TacticalPanel 
+            title="TELEMETRY_LOG" 
+            icon={<Terminal size={18} color={theme.palette.primary.main} />}
+            sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+          >
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', bgcolor: 'rgba(0,0,0,0.3)', p: 1, borderRadius: 2, maxHeight: '410px' }}>
               <List dense>
                 {telemetryData.slice(-100).reverse().map((p, i) => (
-                  <ListItem key={i} sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <ListItem key={i} sx={{ borderBottom: `1px solid ${alpha(theme.palette.text.primary, 0.05)}` }}>
                     <ListItemIcon sx={{ minWidth: 30 }}>
-                      <Clock size={12} color="rgba(255,255,255,0.3)" />
+                      <Clock size={12} color={alpha(theme.palette.text.primary, 0.3)} />
                     </ListItemIcon>
                     <ListItemText 
                       primary={`${p.tool.toUpperCase()} -> ${p.endpoint.split('/').pop()}`}
                       secondary={`Latency: ${p.avg_latency || p.latency}ms | Status: OK`}
                       slotProps={{
-                        primary: { sx: { fontSize: 10, color: '#fff', fontFamily: 'monospace' } },
-                        secondary: { sx: { fontSize: 9, color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace' } }
+                        primary: { sx: { fontSize: 10, color: '#fff', fontFamily: 'monospace', fontWeight: 600 } },
+                        secondary: { sx: { fontSize: 9, color: alpha(theme.palette.text.primary, 0.4), fontFamily: 'monospace' } }
                       }}
                     />
                   </ListItem>
                 ))}
                 {telemetryData.length === 0 && (
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.2)', textAlign: 'center', display: 'block', mt: 4 }}>
-                    WAITING_FOR_DATA...
-                  </Typography>
+                  <Box sx={{ py: 10, textAlign: 'center', opacity: 0.3 }}>
+                    <Terminal size={40} style={{ margin: '0 auto 16px', display: 'block' }} />
+                    <Typography variant="caption" sx={{ fontFamily: 'Orbitron', letterSpacing: 2 }}>
+                      WAITING_FOR_DATA_STREAM...
+                    </Typography>
+                  </Box>
                 )}
               </List>
             </Box>
-          </Paper>
+          </TacticalPanel>
         </Grid>
       </Grid>
 
