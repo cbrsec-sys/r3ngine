@@ -18,8 +18,8 @@ export default defineConfig(({ command }) => ({
       output: {
         // Main entry points should NOT have hashes for Django compatibility
         entryFileNames: 'assets/[name].js',
-        // Chunks can have hashes for caching
-        chunkFileNames: 'assets/[name]-[hash].js',
+        // Chunks should NOT have hashes for stable template integration
+        chunkFileNames: 'assets/[name].js',
         // Assets like CSS should also have stable names if possible
         assetFileNames: 'assets/[name].[ext]',
         manualChunks: (id) => {
