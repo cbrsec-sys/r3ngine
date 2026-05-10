@@ -78,6 +78,9 @@ class RengineTask(Task):
 		self.scan = ScanHistory.objects.filter(pk=self.scan_id).first()
 		self.subscan = SubScan.objects.filter(pk=self.subscan_id).first()
 		self.engine = EngineType.objects.filter(pk=self.engine_id).first()
+		if not self.engine and self.scan:
+			self.engine = self.scan.scan_type
+			self.engine_id = self.engine.id if self.engine else None
 		self.domain = self.scan.domain if self.scan else None
 		self.domain_id = self.domain.id if self.domain else None
 		self.subdomain = self.subscan.subdomain if self.subscan else None
@@ -107,10 +110,10 @@ class RengineTask(Task):
 					's3scanner': 'vulnerability_scan',
 					'cpanel_scan': 'vulnerability_scan',
 					'wpscan_scan': 'vulnerability_scan',
-					'run_stress_testing': 'stress_test',
+					'stress_testing': 'stress_test',
 				}
 				# Tasks that are post-processing and don't require engine validation
-				post_processing_tasks = ['run_stress_testing', 'correlate_vulnerabilities', 'calculate_risk_scores', 'run_apme', 'generate_impact_assessment', 'report']
+				post_processing_tasks = ['correlate_vulnerabilities', 'calculate_risk_scores', 'run_apme', 'generate_impact_assessment', 'report']
 				
 				if self.track and self.task_name not in self.engine.tasks and dependent_tasks.get(self.task_name) not in self.engine.tasks and self.task_name not in post_processing_tasks:
 					logger.debug(f'Task {self.name} is not part of engine "{self.engine.engine_name}" tasks. Skipping.')
