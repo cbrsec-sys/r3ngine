@@ -244,5 +244,3 @@ COPY frontend/templates /usr/src/frontend/templates
 # Ensure SPA index.html is available as a Django template
 RUN mkdir -p /usr/src/frontend/templates/dashboard && \
     cp /usr/src/frontend/dist/index.html /usr/src/frontend/templates/dashboard/v3_index.html
-
-RUN apt autoremove && apt clean

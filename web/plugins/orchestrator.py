@@ -51,6 +51,9 @@ class PluginOrchestrator:
             runtime_position='AFTER', 
             is_enabled=True
         ).order_by('order_weight')
+
+        if plugins_before.exists() or plugins_after.exists():
+            print(f">>> [PLUGIN INJECT] Anchor: {anchor_name} | Before: {plugins_before.count()} | After: {plugins_after.count()}")
         
         workflow = []
         

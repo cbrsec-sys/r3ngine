@@ -2,3 +2,6 @@ secret
 /secrets
 pg_dump
 plugins_data
+scan_results
+frontend
+tests/sample_data

@@ -65,6 +65,58 @@ Celery tasks.
 logger = get_task_logger(__name__)
 
 
+SCAN_PIPELINE_DEFINITION = [
+    {
+        'tier': 1,
+        'name': 'Discovery',
+        'type': 'CONCURRENT',
+        'tasks': ['subdomain_discovery', 'osint', 'spiderfoot_scan', 'firewall_vpn_scan']
+    },
+    {
+        'tier': 2,
+        'name': 'Enumeration',
+        'type': 'CONCURRENT',
+        'tasks': ['http_crawl', 'port_scan', 'screenshot']
+    },
+    {
+        'tier': 3,
+        'name': 'Fuzzing',
+        'type': 'SEQUENTIAL',
+        'tasks': ['dir_file_fuzz']
+    },
+    {
+        'tier': 4,
+        'name': 'URL Extraction',
+        'type': 'SEQUENTIAL',
+        'tasks': ['fetch_url']
+    },
+    {
+        'tier': 5,
+        'name': 'Analysis',
+        'type': 'CONCURRENT',
+        'tasks': ['web_api_discovery', 'waf_detection']
+    },
+    {
+        'tier': 6,
+        'name': 'Security Assessment',
+        'type': 'CONCURRENT',
+        'tasks': ['waf_bypass', 'vulnerability_scan', 'brute_force_scan']
+    },
+    {
+        'tier': 7,
+        'name': 'Finalization',
+        'type': 'SEQUENTIAL',
+        'tasks': [
+            'correlate_vulnerabilities',
+            'calculate_risk_scores',
+            'generate_impact_assessment',
+            'stress_test',
+            'run_apme'
+        ]
+    }
+]
+
+
 #----------------------#
 # Scan / Subscan tasks #
 #----------------------#
@@ -131,8 +183,6 @@ def initiate_scan(
 		starting_point_path='',
 		excluded_paths=[],
 		custom_dorks=None,
-		api_discovery_tools=None,
-		kr_wordlist=None,
 		enable_spiderfoot_scan=False,
 	):
 	"""Initiate a new scan.
@@ -166,7 +216,10 @@ def initiate_scan(
 		config = yaml.safe_load(engine.yaml_configuration)
 		enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
 		gf_patterns = config.get(GF_PATTERNS, [])
-		kr_wordlist = config.get(KITERUNNER_WORDLIST, [])
+		# Get web_api_discovery config
+		api_discovery_config = config.get(WEB_API_DISCOVERY, {})
+		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
+		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
 
 		# Get domain and set last_scan_date
 		domain = Domain.objects.get(pk=domain_id)
@@ -301,98 +354,138 @@ def initiate_scan(
 			'osint': osint.si(ctx=ctx, description='OS Intelligence'),
 			'spiderfoot_scan': spiderfoot_scan.si(ctx=ctx, description='Attack Surface Intelligence'),
 			'http_crawl': http_crawl.si(ctx=ctx, description='HTTP Crawl'),
-			'port_scan': PluginOrchestrator.inject_tasks('PortScan', port_scan.si(ctx=ctx, description='Port scan'), ctx),
-			'fetch_url': PluginOrchestrator.inject_tasks('FetchURL', fetch_url.si(ctx=ctx, description='Fetch URL'), ctx),
+			'port_scan': port_scan.si(ctx=ctx, description='Port scan'),
+			'fetch_url': fetch_url.si(ctx=ctx, description='Fetch URL'),
 			'dir_file_fuzz': dir_file_fuzz.si(ctx=ctx, description='Directories & files fuzz'),
 			'web_api_discovery': web_api_discovery.si(ctx=ctx, description='Web API Discovery'),
-			'vulnerability_scan': PluginOrchestrator.inject_tasks('VulnerabilityScan', vulnerability_scan.si(ctx=ctx, description='Vulnerability scan'), ctx),
+			'vulnerability_scan': vulnerability_scan.si(ctx=ctx, description='Vulnerability scan'),
 			'screenshot': screenshot.si(ctx=ctx, description='Screenshot'),
 			'waf_detection': waf_detection.si(ctx=ctx, description='WAF detection'),
 			'waf_bypass': waf_bypass.si(ctx=ctx, description='WAF bypass'),
 			'firewall_vpn_scan': firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan'),
 			'brute_force_scan': brute_force_scan.si(ctx=ctx, description='Brute force scan'),
-		}
-
-		# Define Execution Tiers
-		# Tier 1: Discovery (Concurrent)
-		tier_1 = []
-		if 'subdomain_discovery' in tasks: tier_1.append(task_map['subdomain_discovery'])
-		if 'osint' in tasks: tier_1.append(task_map['osint'])
-		if 'spiderfoot_scan' in tasks: tier_1.append(task_map['spiderfoot_scan'])
-		if 'firewall_vpn_scan' in tasks: tier_1.append(task_map['firewall_vpn_scan'])
-
-		# Tier 2: Enumeration (Concurrent)
-		tier_2 = []
-		if 'http_crawl' in tasks: tier_2.append(task_map['http_crawl'])
-		if 'port_scan' in tasks: tier_2.append(task_map['port_scan'])
-		if 'screenshot' in tasks: tier_2.append(task_map['screenshot'])
-
-		# Tier 3: Content Fuzzing (Sequential Step)
-		tier_3 = []
-		if 'dir_file_fuzz' in tasks: tier_3.append(task_map['dir_file_fuzz'])
-
-		# Tier 4: URL Collection (Sequential Step)
-		tier_4 = []
-		if 'fetch_url' in tasks: tier_4.append(task_map['fetch_url'])
-
-		# Tier 5: App & WAF (Concurrent)
-		tier_5 = []
-		if 'web_api_discovery' in tasks: tier_5.append(task_map['web_api_discovery'])
-		if 'waf_detection' in tasks: tier_5.append(task_map['waf_detection'])
-
-		# Tier 6: Security Assessment (Sequential)
-		tier_6 = []
-		if 'waf_bypass' in tasks: tier_6.append(task_map['waf_bypass'])
-		if 'vulnerability_scan' in tasks: tier_6.append(task_map['vulnerability_scan'])
-		if 'brute_force_scan' in tasks: tier_6.append(task_map['brute_force_scan'])
-
-		def get_tier_step(tasks_list):
-			if not tasks_list:
-				return None
-			if len(tasks_list) == 1:
-				return tasks_list[0]
-			return group(tasks_list)
-
-		workflow_steps = []
-		for tier in [tier_1, tier_2, tier_3, tier_4, tier_5, tier_6]:
-			step = get_tier_step(tier)
-			if step:
-				workflow_steps.append(step)
-
-		# Terminal internal tasks
-		vuln_producing_tasks = {'vulnerability_scan', 'dir_file_fuzz', 'web_api_discovery', 'brute_force_scan', 'osint'}
-		has_vuln_tasks = any(t in tasks for t in vuln_producing_tasks)
-
-		if has_vuln_tasks:
-			workflow_steps.append(correlate_vulnerabilities.si(scan_history_id=scan_history_id))
-			workflow_steps.append(calculate_risk_scores.si(scan_history_id=scan_history_id))
-		
-		workflow_steps.append(PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx))
-
-		if config.get('enable_ai_impact_analysis'):
-			workflow_steps.append(generate_impact_assessment.si(scan_history_id=scan_history_id))
-
-		stress_test_config = config.get('stress_test', {})
-		logger.warning(f"Stress test check for scan {scan_history_id}: 'stress_test' in tasks={'stress_test' in tasks}, enabled={stress_test_config.get('enabled', False)}")
-		if 'stress_test' in tasks and stress_test_config.get('enabled', False):
-			workflow_steps.append(run_stress_testing.si(
+			'correlate_vulnerabilities': correlate_vulnerabilities.si(scan_history_id=scan_history_id),
+			'calculate_risk_scores': calculate_risk_scores.si(scan_history_id=scan_history_id),
+			'generate_impact_assessment': generate_impact_assessment.si(scan_history_id=scan_history_id),
+			'stress_test': run_stress_testing.si(
 				scan_history_id=scan_history_id, 
 				target_domain_name=domain.name, 
 				yaml_config=config,
 				ctx=ctx
-			))
+			),
+			'run_apme': run_apme.si(scan_history_id=scan_history_id)
+		}
 
-		# Attack Path Modeling Engine (APME) - MUST BE FINAL
-		apme_config = config.get(ATTACK_PATH_MODELING, {})
-		run_apme_enabled = apme_config.get('enabled', False)
-		if not run_apme_enabled:
-			vuln_scan_config = config.get(VULNERABILITY_SCAN, {})
-			run_apme_enabled = vuln_scan_config.get('run_apme', False)
+		def is_task_enabled(task_name):
+			if task_name in ['subdomain_discovery', 'osint', 'spiderfoot_scan', 'http_crawl', 'port_scan', 'screenshot', 
+							'dir_file_fuzz', 'fetch_url', 'web_api_discovery', 'waf_detection', 'waf_bypass', 
+							'vulnerability_scan', 'brute_force_scan', 'firewall_vpn_scan']:
+				return task_name in tasks
+			
+			if task_name in ['correlate_vulnerabilities', 'calculate_risk_scores']:
+				vuln_producing_tasks = {'vulnerability_scan', 'dir_file_fuzz', 'web_api_discovery', 'brute_force_scan', 'osint'}
+				return any(t in tasks for t in vuln_producing_tasks)
+			
+			if task_name == 'generate_impact_assessment':
+				return config.get('enable_ai_impact_analysis', False)
+			
+			if task_name == 'stress_test':
+				stress_test_config = config.get('stress_test', {})
+				return 'stress_test' in tasks and stress_test_config.get('enabled', False)
+			
+			if task_name == 'run_apme':
+				apme_config = config.get(ATTACK_PATH_MODELING, {})
+				if apme_config.get('enabled', False): return True
+				return config.get(VULNERABILITY_SCAN, {}).get('run_apme', False)
+			
+			return False
 
-		if run_apme_enabled:
-			workflow_steps.append(run_apme.si(scan_history_id=scan_history_id))
+		workflow_steps = []
+		
+		# --- NEW REFACTORED PIPELINE WITH NON-BLOCKING BRANCHES ---
+		
+		# Helper to wrap task with plugins
+		def get_wrapped(name):
+			if not is_task_enabled(name): return None
+			return PluginOrchestrator.inject_tasks(name, task_map[name], ctx)
 
-		# Filter out None steps
+		# Tier 7: Sequential terminal chain
+		t7_tasks = []
+		for t in ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'stress_test', 'run_apme']:
+			wrapped = get_wrapped(t)
+			if wrapped: t7_tasks.append(wrapped)
+		t7_chain = chain(*t7_tasks) if t7_tasks else None
+
+		# Tier 6: Blockers for Tier 7
+		t6_tasks = []
+		for t in ['waf_bypass', 'vulnerability_scan', 'brute_force_scan']:
+			wrapped = get_wrapped(t)
+			if wrapped: t6_tasks.append(wrapped)
+		t6_step = group(t6_tasks) if t6_tasks else None
+
+		# Tier 5: Blockers for Tier 6
+		t5_tasks = []
+		for t in ['web_api_discovery', 'waf_detection']:
+			wrapped = get_wrapped(t)
+			if wrapped: t5_tasks.append(wrapped)
+		t5_step = group(t5_tasks) if t5_tasks else None
+
+		# Build Assessment Chain (T5 -> T6 -> T7)
+		assessment_steps = []
+		if t5_step: assessment_steps.append(t5_step)
+		if t6_step: assessment_steps.append(t6_step)
+		if t7_chain: assessment_steps.append(t7_chain)
+		assessment_chain = chain(*assessment_steps) if assessment_steps else None
+
+		# Tier 4: Blocker for Tier 5
+		t4_task = get_wrapped('fetch_url')
+		t4_chain = chain(t4_task, assessment_chain) if t4_task else assessment_chain
+
+		# Tier 3: Blocker for Tier 4
+		t3_task = get_wrapped('dir_file_fuzz')
+		t3_chain = chain(t3_task, t4_chain) if t3_task else t4_chain
+
+		# Tier 2: Branching logic
+		t2_blocker = get_wrapped('http_crawl')
+		t2_main_branch = chain(t2_blocker, t3_chain) if t2_blocker else t3_chain
+		
+		t2_background = []
+		for t in ['port_scan', 'screenshot']:
+			wrapped = get_wrapped(t)
+			if wrapped: t2_background.append(wrapped)
+		
+		t2_step = group(t2_background + ([t2_main_branch] if t2_main_branch else []))
+
+		# Tier 1: Branching logic
+		t1_blockers = []
+		for t in ['subdomain_discovery', 'firewall_vpn_scan']:
+			wrapped = get_wrapped(t)
+			if wrapped: t1_blockers.append(wrapped)
+		
+		t1_main_branch = chain(group(t1_blockers), t2_step) if t1_blockers else t2_step
+
+		t1_background = []
+		for t in ['osint', 'spiderfoot_scan']:
+			wrapped = get_wrapped(t)
+			if wrapped: t1_background.append(wrapped)
+
+		# Final Workflow construction
+		workflow_steps = []
+		# Global Start Plugin (Virtual)
+		start_plugin = PluginOrchestrator.inject_tasks("Tier_1_Start", None, ctx)
+		if start_plugin: workflow_steps.append(start_plugin)
+
+		# Combine background and main branches
+		if t1_background:
+			workflow_steps.append(group(t1_background + ([t1_main_branch] if t1_main_branch else [])))
+		elif t1_main_branch:
+			workflow_steps.append(t1_main_branch)
+
+		# Global End Plugin (Virtual)
+		end_plugin = PluginOrchestrator.inject_tasks("Tier_7_End", None, ctx)
+		if end_plugin: workflow_steps.append(end_plugin)
+
+		# Filter out duplicates or None steps
 		workflow_steps = [step for step in workflow_steps if step is not None]
 		
 		# Debug task list
@@ -401,7 +494,9 @@ def initiate_scan(
 			if hasattr(step, 'task'):
 				task_names.append(step.task)
 			elif hasattr(step, 'tasks'):
-				task_names.append([t.task for t in step.tasks])
+				task_names.append([t.task if hasattr(t, 'task') else "complex_step" for t in step.tasks])
+			else:
+				task_names.append("complex_step")
 		logger.warning(f"Scan {scan_history_id} Workflow: {task_names}")
 
 		workflow = chain(*workflow_steps)
@@ -466,6 +561,11 @@ def initiate_subscan(
 	# Get YAML config
 	config = yaml.safe_load(engine.yaml_configuration)
 	enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
+	
+	# Get web_api_discovery config
+	api_discovery_config = config.get(WEB_API_DISCOVERY, {})
+	api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
+	kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
 
 	# Create scan activity of SubScan Model
 	subscan = SubScan(
@@ -478,8 +578,6 @@ def initiate_subscan(
 		engine=engine)
 	subscan.save()
 
-	# Get YAML configuration
-	config = yaml.safe_load(engine.yaml_configuration)
 
 	# Create results directory
 	results_dir = f'{scan.results_dir}/subscans/{subscan.id}'
@@ -511,6 +609,8 @@ def initiate_subscan(
 		'results_dir': results_dir,
 		'starting_point_path': starting_point_path,
 		'excluded_paths': excluded_paths,
+		'api_discovery_tools': api_discovery_tools,
+		'kr_wordlist': kr_wordlist
 	}
 
 	# Create initial endpoints in DB: find domain HTTP endpoint so that HTTP
@@ -1415,6 +1515,7 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}
 				yaml.dump(yaml_data, file)
 
 	# Run cmd
+	cmd = f'python3 theHarvester.py -d {host} -b all -f {output_path_json}'
 	run_command(
 		cmd,
 		shell=False,
@@ -5247,7 +5348,7 @@ def stream_command(
 		str/dict: Output line.
 	"""
 	color = get_tool_color(cmd)
-	logger.info(f"{color}{cmd}{COLOR_RESET}")
+	logger.debug(f"{color}{cmd}{COLOR_RESET}")
 
 	conf_path = None
 	if proxy:
@@ -5383,6 +5484,7 @@ def process_httpx_response(line, ctx={}, is_ran_from_subdomain_scan=False):
 	endpoint.webserver = webserver
 	endpoint.response_time = response_time
 	endpoint.content_type = content_type
+	endpoint.is_redirect = is_redirect
 	endpoint.save()
 
 	# Sync Subdomain status attributes if this is the default endpoint
@@ -6307,33 +6409,27 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 		
 		# Use the library's start_scan which typically adds target and starts scan
 		# Based on the user provided example
-		acunetix.start_scan(domain.name)
+		scan_info = acunetix.start_scan(domain.name)
+		target_id = scan_info.get('target_id')
 		
 		# Now we need to poll for status and fetch findings.
-		# Since acunetix-python is a light wrapper, we might need to use requests for some parts
-		# if the library doesn't expose them.
-		
 		headers = {
 			'X-Auth': creds.api_key,
 			'Content-Type': 'application/json'
 		}
 		base_url = creds.server_url if creds.server_url.startswith('http') else f"https://{creds.server_url}"
 		
-		# Get target ID for the domain
-		targets_resp = requests.get(f"{base_url}/api/v1/targets?q=text_search:{domain.name}", headers=headers, verify=False)
-		if targets_resp.status_code != 200:
-			logger.error(f"Failed to fetch target ID from Acunetix: {targets_resp.text}")
-			return False
-		
-		targets_data = targets_resp.json()
-		target = next((t for t in targets_data.get('targets', []) if t['address'].strip('http://').strip('https://') == domain.name), None)
-		
-		if not target:
+		# If target_id wasn't in scan_info, try to find it
+		if not target_id:
+			targets_data = acunetix.targets()
+			target = next((t for t in targets_data.get('targets', []) if domain.name in t['address']), None)
+			if target:
+				target_id = target['target_id']
+
+		if not target_id:
 			logger.error(f"Target {domain.name} not found in Acunetix after start_scan.")
 			return False
 			
-		target_id = target['target_id']
-		
 		# Wait for scan to complete
 		# We'll poll /api/v1/scans
 		max_retries = 360 # 1 hour
@@ -6342,21 +6438,33 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 			scans_resp = requests.get(f"{base_url}/api/v1/scans?q=target_id:{target_id}", headers=headers, verify=False)
 			if scans_resp.status_code == 200:
 				scans_data = scans_resp.json()
-				latest_scan = scans_data.get('scans', [{}])[0]
-				current_status = latest_scan.get('current_session', {}).get('status')
-				
-				if current_status == 'completed':
-					logger.info(f"Acunetix scan for {domain.name} completed.")
-					break
-				elif current_status in ['failed', 'aborted']:
-					logger.error(f"Acunetix scan for {domain.name} {current_status}.")
-					return False
+				scans_list = scans_data.get('scans', [])
+				if scans_list:
+					latest_scan = scans_list[0]
+					current_status = latest_scan.get('current_session', {}).get('status')
+					
+					if current_status == 'completed':
+						logger.info(f"Acunetix scan for {domain.name} completed.")
+						scan_id = latest_scan.get('scan_id')
+						break
+					elif current_status in ['failed', 'aborted']:
+						logger.error(f"Acunetix scan for {domain.name} {current_status}.")
+						return False
 			
 			time.sleep(10)
 			retries += 1
 			
-		# Fetch Vulnerabilities
-		vulns_resp = requests.get(f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}", headers=headers, verify=False)
+		# Fetch Vulnerabilities for the specific scan
+		if not scan_id:
+			# Fallback to target_id if scan_id not found
+			vulns_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
+		else:
+			# Fetch vulnerabilities for the specific scan
+			# Note: The API for scan vulnerabilities might be different, 
+			# but q=scan_id:ID or the sub-resource works in many versions.
+			vulns_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
+
+		vulns_resp = requests.get(vulns_url, headers=headers, verify=False)
 		if vulns_resp.status_code == 200:
 			vulns_data = vulns_resp.json()
 			for vuln in vulns_data.get('vulnerabilities', []):
@@ -6380,15 +6488,27 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 						'template_id': v_detail.get('vt_id'),
 					}
 					
-					# Handle references
+					# Handle references, CVEs, CWEs
 					refs = []
-					# v_detail might have references as a list of dicts
 					for r in v_detail.get('references', []):
 						if isinstance(r, dict):
 							refs.append(r.get('href'))
 						else:
 							refs.append(str(r))
 					save_v_data['references'] = refs
+
+					# Extract CVEs
+					cves = []
+					for ref in v_detail.get('references', []):
+						if isinstance(ref, dict) and 'CVE-' in ref.get('rel', ''):
+							cves.append(ref.get('rel'))
+					save_v_data['cve_ids'] = cves
+
+					# Extract CWEs
+					cwes = []
+					if v_detail.get('cwe_id'):
+						cwes.append(f"CWE-{v_detail['cwe_id']}")
+					save_v_data['cwe_ids'] = cwes
 					
 					save_vulnerability(**save_v_data)
 					
