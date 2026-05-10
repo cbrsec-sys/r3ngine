@@ -12,7 +12,7 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
     serializer_class = ScanHistorySerializer
 
     def get_queryset(self):
-        queryset = ScanHistory.objects.all().order_by('-start_scan_date')
+        queryset = ScanHistory.objects.all().order_by('-id')
         project = self.request.query_params.get('project')
         if project:
             queryset = queryset.filter(domain__project__slug=project)

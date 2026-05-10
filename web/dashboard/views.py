@@ -355,16 +355,16 @@ def delete_project(request, id):
     return JsonResponse(responseData)
 
 
+def home_redirect(request):
+    project = Project.objects.first()
+    if project:
+        return redirect('dashboardIndex', slug=project.slug)
+    return redirect('onboarding')
+
+
 def onboarding(request):
     context = {}
     error = ''
-
-    # check is any projects exists, then redirect to project list else onboarding
-    project = Project.objects.first()
-
-    if project:
-        slug = project.slug
-        return HttpResponseRedirect(reverse('dashboardIndex', kwargs={'slug': slug}))
 
     if request.method == "POST":
         project_name = request.POST.get('project_name')
@@ -394,9 +394,10 @@ def onboarding(request):
 
 
         # update currently logged in user's preferences for bug bounty mode
-        user_preferences, _ = UserPreferences.objects.get_or_create(user=request.user)
-        user_preferences.bug_bounty_mode = bug_bounty_mode
-        user_preferences.save()
+        if request.user.is_authenticated:
+            user_preferences, _ = UserPreferences.objects.get_or_create(user=request.user)
+            user_preferences.bug_bounty_mode = bug_bounty_mode
+            user_preferences.save()
 
 
         try:
@@ -480,9 +481,12 @@ def onboarding(request):
     context['shodan_key'] = ShodanAPIKey.objects.first()
     context['censys_key'] = CensysAPIKey.objects.first()
 
-    context['user_preferences'], _ = UserPreferences.objects.get_or_create(
-        user=request.user
-    )
+    if request.user.is_authenticated:
+        context['user_preferences'], _ = UserPreferences.objects.get_or_create(
+            user=request.user
+        )
+    else:
+        context['user_preferences'] = None
 
     return render(request, 'dashboard/v3_index.html', context)
 

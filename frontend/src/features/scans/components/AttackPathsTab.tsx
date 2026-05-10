@@ -9,6 +9,9 @@ import {
   IconButton,
   Divider,
   Tooltip,
+  Button,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   ChevronDown,
@@ -21,8 +24,14 @@ import {
   AlertTriangle,
   ArrowRight,
 } from 'lucide-react';
-import { useAttackPaths, type AttackPath, type AttackStep } from '../api/useAttackPaths';
+import { 
+  useAttackPaths, 
+  useTriggerAttackPathModeling,
+  type AttackPath, 
+  type AttackStep 
+} from '../api/useAttackPaths';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { Bot } from 'lucide-react';
 
 // ─── Risk → color mapping ────────────────────────────────────────────────────
 const RISK_COLOR: Record<string, string> = {
@@ -329,21 +338,61 @@ interface AttackPathsTabProps {
 }
 
 export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
-  const { data, isLoading, isError } = useAttackPaths(scanId);
+  const { data, isLoading, isError, refetch } = useAttackPaths(scanId);
+  const triggerAi = useTriggerAttackPathModeling();
+
+  const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
+    open: false,
+    message: '',
+    severity: 'success'
+  });
+
+  const handleTriggerAi = async () => {
+    try {
+      await triggerAi.mutateAsync(scanId);
+      setSnackbar({ open: true, message: 'AI Modeling initiated in background', severity: 'success' });
+      // Refresh after a delay to see if results started appearing
+      setTimeout(refetch, 5000);
+    } catch {
+      setSnackbar({ open: true, message: 'Failed to trigger AI modeling', severity: 'error' });
+    }
+  };
 
   return (
     <TacticalPanel
       title="ATTACK PATH MODELING"
       icon={<ShieldAlert size={14} color="#ff003c" />}
       headerAction={
-        data && data.total_paths > 0 ? (
-          <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-            <Zap size={12} color="#fffc00" />
-            <Typography sx={{ fontSize: '0.65rem', color: '#fffc00', fontWeight: 900, fontFamily: 'Orbitron' }}>
-              {data.total_paths} PATHS FOUND
-            </Typography>
-          </Stack>
-        ) : undefined
+        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={handleTriggerAi}
+            disabled={triggerAi.isPending}
+            startIcon={triggerAi.isPending ? <CircularProgress size={12} /> : <Bot size={14} />}
+            sx={{
+              fontSize: '0.6rem',
+              height: 24,
+              borderColor: 'rgba(0,243,255,0.3)',
+              color: '#00f3ff',
+              fontFamily: 'Orbitron',
+              '&:hover': {
+                borderColor: '#00f3ff',
+                bgcolor: 'rgba(0,243,255,0.05)',
+              },
+            }}
+          >
+            {triggerAi.isPending ? 'MODELING...' : 'TRIGGER AI MODELING'}
+          </Button>
+          {data && data.total_paths > 0 && (
+            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+              <Zap size={12} color="#fffc00" />
+              <Typography sx={{ fontSize: '0.65rem', color: '#fffc00', fontWeight: 900, fontFamily: 'Orbitron' }}>
+                {data.total_paths} PATHS FOUND
+              </Typography>
+            </Stack>
+          )}
+        </Stack>
       }
     >
       <Box sx={{ p: 2 }}>
@@ -421,6 +470,30 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
           )
         )}
       </Box>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={5000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar({ ...snackbar, open: false })}
+          severity={snackbar.severity}
+          variant="filled"
+          sx={{
+            fontFamily: 'Orbitron',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            color: '#000',
+            border: '1px solid rgba(255,255,255,0.1)',
+            '& .MuiAlert-icon': { color: '#000' }
+          }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </TacticalPanel>
   );
 };

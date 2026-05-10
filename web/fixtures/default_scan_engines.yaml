@@ -1,41 +1,127 @@
 - fields:
     default_engine: true
     engine_name: Full Scan
-    yaml_configuration: "subdomain_discovery: {\n  'uses_tools': ['subfinder', 'chaos',\n\
-      \  'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'reconx'],\n  'enable_http_crawl':\n\
-      \  true,\n  'threads': 30,\n  'timeout': 5,\n}\nhttp_crawl: {}\nport_scan: {\n\n\
-      \  'enable_http_crawl': true,\n  'timeout': 5,\n  'ports': ['top-100'],\n  'rate_limit':\n\
-      \  150,\n  'threads': 30,\n  'passive': false\n}\nosint: {\n  'discover': ['emails',\n\
-      \  'metainfo', 'employees'],\n  'dorks': ['login_pages', 'admin_panels', 'dashboard_pages',\n\
-      \  'stackoverflow', 'social_media', 'project_management', 'code_sharing', 'config_files',\n\
-      \  'jenkins', 'wordpress_files', 'php_error', 'exposed_documents', 'db_files',\n\
-      \  'git_exposed'],\n  'intensity': 'normal',\n  'documents_limit': 50\n}\ndir_file_fuzz:\n\
-      \  {\n  'auto_calibration': true,\n  'enable_http_crawl': true,\n  'rate_limit':\n\
-      \  150,\n  'extensions': ['html', 'php','git','yaml','conf','cnf','config','gz','env','log','db','mysql','bak','asp','aspx','txt','conf','sql','json','yml','pdf'],\n\
-      \  'follow_redirect': false,\n  'max_time': 0,\n  'match_http_status': [200,\n\
-      \  204],\n  'recursive_level': 2,\n  'stop_on_error': false,\n  'timeout': 5,\n\
-      \  'threads': 30,\n  'wordlist_name': 'dicc'\n}\nfetch_url: {\n  'uses_tools':\n\
-      \  ['gospider', 'hakrawler', 'waybackurls', 'katana', 'gau'],\n  'remove_duplicate_endpoints':\n\
-      \  true,\n  'duplicate_fields': ['content_length', 'page_title'],\n  'enable_http_crawl':\n\
-      \  true,\n  'gf_patterns': ['debug_logic', 'idor', 'interestingEXT', 'interestingparams',\n\
-      \  'interestingsubs', 'lfi', 'rce', 'redirect', 'sqli', 'ssrf', 'ssti', 'xss'],\n\
-      \  'ignore_file_extensions': ['png', 'jpg', 'jpeg', 'gif', 'mp4', 'mpeg', 'mp3'],\n\
-      \  'threads': 30\n}\nvulnerability_scan: {\n  'run_nuclei': true,\n  'run_dalfox':\n\
-      \  true,\n  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'enable_http_crawl': true,\n\
-      \  'concurrency': 50,\n  'intensity': 'normal',\n  'rate_limit': 150,\n  'retries': 1,\n\
-      \  'timeout': 5,\n  'fetch_gpt_report': false,\n  'nuclei': {\n    'use_nuclei_config':\n\
-      \  false,\n    'severities': ['unknown', 'info', 'low', 'medium', 'high', 'critical']\n\
-      \  }\n}\nattack_path_modeling: {\n  'enabled': true\n}\nwaf_detection: {}\nwaf_bypass: {\n\
-      \  'use_nuclei': true,\n  'use_benchmarking': true\n}\nscreenshot: {\n  'enable_http_crawl':\n\
-      \  true,\n  'intensity': 'normal',\n  'timeout': 10,\n  'threads': 40\n}\nbrute_force_scan: {\n\
-      \  'users_wordlist': ['top_default_usernames.txt', 'most_common_usernames.txt'],\n\
-      \  'pass_wordlist': ['top_default_passwords.txt', 'most_common_passwords.txt'],\n\
-      \  'services': ['ssh', 'ftp', 'http', 'smb', 'rdp', 'telnet'],\n  'stop_on_success': true\n}\n\
-      firewall_vpn_scan: {\n  'run_ike_scan': true,\n  'threads': 20\n}\nspiderfoot_scan: {\n\
-      \  'modules': 'all'\n}\nweb_api_discovery: {\n\n  'uses_tools': ['kiterunner', 'arjun',\n\
-      \  'linkfinder', 'paramspider', 'aquatone', 'semgrep'],\n\n  'scan_only_active': true,\n\
-      \  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite',\n\
-      \  'arjun_methods': 'GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH'\n}"
+    yaml_configuration: |
+      subdomain_discovery: {
+        'uses_tools': ['subfinder', 'amass-passive', 'amass-active', 'chaos', 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'reconx'],
+        'enable_http_crawl': true,
+        'threads': 30,
+        'timeout': 5,
+      }
+      http_crawl: {}
+      port_scan: {
+        'enable_http_crawl': true,
+        'timeout': 5,
+        'ports': ['top-1000'],
+        'rate_limit': 150,
+        'threads': 30,
+        'passive': false,
+        'enable_nmap': true,
+        'nmap_cmd': '-sV --script vuln'
+      }
+      osint: {
+        'discover': ['emails', 'metainfo', 'employees'],
+        'dorks': ['login_pages', 'admin_panels', 'dashboard_pages', 'stackoverflow', 'social_media', 'project_management', 'code_sharing', 'config_files', 'jenkins', 'wordpress_files', 'php_error', 'exposed_documents', 'db_files', 'git_exposed'],
+        'intensity': 'normal',
+        'documents_limit': 50,
+        'leaks_and_secrets': {
+          'leaklookup': true,
+          'gitleaks': true,
+          'trufflehog': true
+        }
+      }
+      dir_file_fuzz: {
+        'auto_calibration': true,
+        'enable_http_crawl': true,
+        'rate_limit': 150,
+        'extensions': ['html', 'php','git','yaml','conf','cnf','config','gz','env','log','db','mysql','bak','asp','aspx','txt','conf','sql','json','yml','pdf'],
+        'follow_redirect': false,
+        'max_time': 0,
+        'match_http_status': [200, 204],
+        'recursive_level': 2,
+        'stop_on_error': false,
+        'timeout': 5,
+        'threads': 30,
+        'wordlist_name': 'dicc'
+      }
+      fetch_url: {
+        'uses_tools': ['gospider', 'hakrawler', 'waybackurls', 'katana', 'gau'],
+        'remove_duplicate_endpoints': true,
+        'duplicate_fields': ['content_length', 'page_title'],
+        'enable_http_crawl': true,
+        'gf_patterns': ['debug_logic', 'idor', 'interestingEXT', 'interestingparams', 'interestingsubs', 'lfi', 'rce', 'redirect', 'sqli', 'ssrf', 'ssti', 'xss'],
+        'ignore_file_extensions': ['png', 'jpg', 'jpeg', 'gif', 'mp4', 'mpeg', 'mp3'],
+        'threads': 30
+      }
+      vulnerability_scan: {
+        'run_nuclei': true,
+        'run_dalfox': true,
+        'run_crlfuzz': true,
+        'run_acunetix': true,
+        'run_wpscan': true,
+        'run_s3scanner': true,
+        'cpanel_scanner': {
+          'run_cpanel2shell': true
+        },
+        'enable_http_crawl': true,
+        'concurrency': 50,
+        'intensity': 'normal',
+        'rate_limit': 150,
+        'retries': 1,
+        'timeout': 5,
+        'fetch_gpt_report': true,
+        'nuclei': {
+          'use_nuclei_config': false,
+          'severities': ['unknown', 'info', 'low', 'medium', 'high', 'critical']
+        }
+      }
+      attack_path_modeling: {
+        'enabled': true,
+        'top_n': 10
+      }
+      waf_detection: {
+        'use_shodan': true,
+        'use_censys': true
+      }
+      waf_bypass: {
+        'use_nuclei': true,
+        'use_benchmarking': true
+      }
+      screenshot: {
+        'enable_http_crawl': true,
+        'intensity': 'normal',
+        'timeout': 10,
+        'threads': 40
+      }
+      brute_force_scan: {
+        'users_wordlist': ['top_default_usernames.txt', 'most_common_usernames.txt'],
+        'pass_wordlist': ['top_default_passwords.txt', 'most_common_passwords.txt'],
+        'services': ['ssh', 'ftp', 'http', 'smb', 'rdp', 'telnet'],
+        'stop_on_success': true
+      }
+      firewall_vpn_scan: {
+        'run_ike_scan': true,
+        'run_sslscan': true,
+        'threads': 20
+      }
+      spiderfoot_scan: {
+        'modules': 'all'
+      }
+      web_api_discovery: {
+        'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep', 'inql'],
+        'scan_only_active': true,
+        'threads': 30,
+        'kiterunner_wordlist': 'routes-large.kite',
+        'arjun_methods': 'GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH'
+      }
+      stress_test: {
+        'uses_tools': ['k6', 'wrk', 'hping3', 'locust'],
+        'concurrency': 50,
+        'duration': '30s',
+        'rate_limit': 100,
+        'kill_switch': true,
+        'intensity': 'normal'
+      }
   model: scanEngine.enginetype
   pk: 1
 - fields:

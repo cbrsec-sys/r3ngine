@@ -12,7 +12,7 @@ from .subscans import SubScanViewSet
 from .scan_history import ScanHistoryViewSet
 from .users import UserManageViewSet
 from .stress_testing_views import StressTestingAPIView
-from .apme_views import AttackPathsAPIView
+from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView
 
 
 app_name = 'api'
@@ -347,6 +347,11 @@ urlpatterns = [
         'apme/paths/',
         AttackPathsAPIView.as_view(),
         name='apme_attack_paths'
+    ),
+    path(
+        'apme/trigger/',
+        TriggerLLMAPMEAPIView.as_view(),
+        name='apme_trigger'
     ),
     path('plugins/', include('plugins.urls')),
 ]

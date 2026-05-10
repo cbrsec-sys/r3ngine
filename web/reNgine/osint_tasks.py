@@ -159,15 +159,15 @@ def osint_orchestrator(self, scan_history_id):
     domain = scan_history.domain.name
     
     # 1. Get already discovered emails
-    emails = Email.objects.filter(scan_history=scan_history)
+    emails = scan_history.emails.all()
     for email in emails:
         run_holehe.delay(email.address, scan_history_id)
         
     # 2. Get already discovered employees/usernames
-    employees = Employee.objects.filter(scan_history=scan_history)
+    employees = scan_history.employees.all()
     for employee in employees:
         # Use name as username for maigret as a guess, or if it looks like a username
-        if ' ' not in employee.name:
+        if employee.name and ' ' not in employee.name:
             run_maigret.delay(employee.name, scan_history_id)
             
     # 3. LinkedInt for the domain/company

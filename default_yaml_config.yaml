@@ -113,7 +113,16 @@ vulnerability_scan: {
   'attack_path_modeling': {
     'enabled': true,
     'top_n': 5
-  }
+  },
+  'run_wpscan': true,
+  'wpscan_enumeration': 'vp,vt,u',
+  'wpscan_detection_mode': 'mixed'
+}
+
+leaks_and_secrets: {
+  'gitleaks': true,
+  'trufflehog': true,
+  'leaklookup': false
 }
 
 waf_detection: {
