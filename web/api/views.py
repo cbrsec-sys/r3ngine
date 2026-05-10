@@ -1514,8 +1514,6 @@ class InitiateScan(APIView):
 						excluded_paths = [path.strip() for path in excluded_paths.split(',')]
 					
 					custom_dorks = data.get('customDorkTextarea', '').strip() if data.get('customDorkSwitch') else None
-					api_discovery_tools = data.get('api_discovery_tools', [])
-					kr_wordlist = data.get('kr_wordlist', 'routes-large.kite')
 					spiderfoot_scan = data.get('spiderfoot_scan', False)
 
 					# Create ScanHistory object
@@ -1541,8 +1539,6 @@ class InitiateScan(APIView):
 						'starting_point_path': starting_point_path,
 						'excluded_paths': excluded_paths,
 						'custom_dorks': custom_dorks,
-						'api_discovery_tools': api_discovery_tools,
-						'kr_wordlist': kr_wordlist,
 						'enable_spiderfoot_scan': spiderfoot_scan,
 						'initiated_by_id': request.user.id
 					}
