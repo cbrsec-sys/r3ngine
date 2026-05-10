@@ -61,7 +61,7 @@ class RengineTask(Task):
 		# Get reNgine context
 		ctx = kwargs.get('ctx', {})
 		self.track = ctx.pop('track', True)
-		self.scan_id = ctx.get('scan_history_id')
+		self.scan_id = ctx.get('scan_history_id') or kwargs.get('scan_history_id')
 		self.subscan_id = ctx.get('subscan_id')
 		self.engine_id = ctx.get('engine_id')
 		self.filename = ctx.get('filename')

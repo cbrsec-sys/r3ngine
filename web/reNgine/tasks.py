@@ -658,6 +658,9 @@ def subdomain_discovery(
 
 	# Run tools
 	opsec = OpSecManager()
+	existing_subs = set(Subdomain.objects.filter(scan_history=self.scan).values_list('name', flat=True))
+	new_discoveries = []
+
 	for tool in tools:
 		cmd = None
 		logger.info(f'Scanning subdomains for {host} with {tool}')
@@ -734,46 +737,10 @@ def subdomain_discovery(
 				# Create a temporary targets file for reconx
 				reconx_targets = f"{self.results_dir}/reconx_targets.txt"
 				with open(reconx_targets, 'w') as f:
-					f.write(domain.name)
+					f.write(self.domain.name)
 				
 				# Run reconx
-				# reconx run uses targets from config, but we can override or use a specific config
-				# For simplicity, we'll use a direct command if supported, or create a minimal config
-				reconx_cmd = f"reconx run --targets {reconx_targets} --output {reconx_results}"
-				os.system(reconx_cmd)
-				
-				# Parse reconx findings (JSONL format in findings directory)
-				# Findings are usually in ~/.local/share/reconx/findings/ but we try to direct output if possible
-				# If not, we'll check the default location
-				reconx_default_findings = os.path.expanduser("~/.local/share/reconx/findings/")
-				if os.path.exists(reconx_default_findings):
-					for file in os.listdir(reconx_default_findings):
-						if file.endswith(".jsonl"):
-							try:
-								with open(os.path.join(reconx_default_findings, file), 'r') as f:
-									for line in f:
-										finding = json.loads(line)
-										# ReconX findings can be subdomains or vulnerabilities
-										if finding.get('type') == 'subdomain':
-											sub_name = finding.get('data', {}).get('subdomain')
-											if sub_name and sub_name.endswith(domain.name) and sub_name not in existing_subs:
-												from reNgine.tasks import save_subdomain
-												sub_obj, created = save_subdomain(sub_name, ctx=ctx)
-												if created:
-													new_discoveries.append(f"Subdomain (ReconX): {sub_name}")
-													existing_subs.add(sub_name)
-													MonitoringDiscovery.objects.create(
-														domain=domain,
-														discovery_type='subdomain',
-														content={'name': sub_name, 'source': 'ReconX'},
-														scan_history=scan_history
-													)
-										elif finding.get('type') == 'vulnerability':
-											# If reconx found a vulnerability, we can also log it
-											vuln_info = finding.get('data', {})
-											new_discoveries.append(f"Vulnerability (ReconX): {vuln_info.get('template-id')}")
-							except Exception as e:
-								logger.error(f"Error parsing ReconX findings: {str(e)}")
+				cmd = f"reconx run --targets {reconx_targets} --output {reconx_results}"
 
 		elif tool in custom_subdomain_tools:
 			tool_query = InstalledExternalTool.objects.filter(name__icontains=tool.lower())
@@ -810,6 +777,31 @@ def subdomain_discovery(
 				scan_id=self.scan_id,
 				activity_id=self.activity_id,
 				proxy=proxy if tool not in ['amass-passive', 'amass-active', 'subfinder'] else None)
+			
+			# Parse reconx findings if tool was reconx
+			if tool == 'reconx':
+				reconx_default_findings = os.path.expanduser("~/.local/share/reconx/findings/")
+				if os.path.exists(reconx_default_findings):
+					for file in os.listdir(reconx_default_findings):
+						if file.endswith(".jsonl"):
+							try:
+								with open(os.path.join(reconx_default_findings, file), 'r') as f:
+									for line in f:
+										finding = json.loads(line)
+										if finding.get('type') == 'subdomain':
+											sub_name = finding.get('data', {}).get('subdomain')
+											if sub_name and sub_name.endswith(self.domain.name) and sub_name not in existing_subs:
+												sub_obj, created = save_subdomain(sub_name, ctx=ctx)
+												if created:
+													existing_subs.add(sub_name)
+													MonitoringDiscovery.objects.create(
+														domain=self.domain,
+														discovery_type='subdomain',
+														content={'name': sub_name, 'source': 'ReconX'},
+														scan_history=self.scan
+													)
+							except Exception as e:
+								logger.error(f"Error parsing ReconX findings: {str(e)}")
 		except Exception as e:
 			logger.error(
 				f'Subdomain discovery tool "{tool}" raised an exception')
@@ -1545,7 +1537,7 @@ def h8mail(self, config, host, scan_history_id, activity_id, results_dir, ctx={}
 
 
 @app.task(name='leaklookup', queue='main_scan_queue', base=RengineTask, bind=True)
-def leaklookup(self, host=None, ctx=None):
+def leaklookup(self, host=None, ctx=None, **kwargs):
 	"""Run LeakLookup query."""
 	api_key = get_leaklookup_key()
 	if not api_key:
@@ -1584,7 +1576,7 @@ def leaklookup(self, host=None, ctx=None):
 
 
 @app.task(name='secret_scanning', queue='main_scan_queue', base=RengineTask, bind=True)
-def secret_scanning(self, config=None, host=None, ctx=None):
+def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 	"""Scan for secrets in JS files and potentially other sources."""
 	if not self.scan:
 		return "No scan history found."
@@ -3880,12 +3872,19 @@ def http_crawl(
 				fields={'Alive endpoint': f'• {endpoint_str}'},
 				add_meta_info=False)
 
-		# Add endpoint to results
+		# Add endpoint to results for UI tabs
 		line['_cmd'] = cmd
 		line['final_url'] = endpoint.http_url
 		line['endpoint_id'] = endpoint.id
 		line['endpoint_created'] = created
 		line['is_redirect'] = endpoint.is_redirect
+		line['status_code'] = endpoint.http_status
+		line['title'] = endpoint.page_title
+		line['content_length'] = endpoint.content_length
+		line['webserver'] = endpoint.webserver
+		line['content_type'] = endpoint.content_type
+		line['response_time'] = endpoint.response_time
+		
 		results.append(line)
 
 		techs = line.get('tech', [])
@@ -3906,44 +3905,36 @@ def http_crawl(
 
 		# Add IP objects for 'a' records to DB
 		a_records = line.get('a', [])
+		cdn = line.get('cdn', False)
 		for ip_address in a_records:
-			ip, created = save_ip_address(
+			ip, _ = save_ip_address(
 				ip_address,
 				subdomain,
 				subscan=self.subscan,
 				scan_id=self.scan_id,
 				activity_id=self.activity_id,
 				cdn=cdn)
-		ips_str = '• ' + '\n• '.join([f'`{ip}`' for ip in a_records])
-		self.notify(
-			fields={'IPs': ips_str},
-			add_meta_info=False)
+		
+		if a_records:
+			ips_str = '• ' + '\n• '.join([f'`{ip}`' for ip in a_records])
+			self.notify(
+				fields={'IPs': ips_str},
+				add_meta_info=False)
 
-		# Add IP object for host in DB
-		if ip_address:
-			ip, created = save_ip_address(
-				ip_address,
-				subdomain,
-				subscan=self.subscan,
-				scan_id=self.scan_id,
-				activity_id=self.activity_id,
-				cdn=cdn)
-			if ip:
-				self.notify(
-					fields={'IPs': f'• `{ip.address}`'},
-					add_meta_info=False)
-
-		# Save subdomain and endpoint
-		if is_ran_from_subdomain_scan:
-			# save subdomain stuffs
-			subdomain.http_url = http_url
-			subdomain.http_status = http_status
-			subdomain.page_title = page_title
-			subdomain.content_length = content_length
-			subdomain.webserver = webserver
-			subdomain.response_time = response_time
-			subdomain.content_type = content_type
-			subdomain.cname = ','.join(cname)
+		# Update subdomain status attributes if this is the default endpoint
+		if is_ran_from_subdomain_scan and endpoint.is_default:
+			subdomain.http_url = endpoint.http_url
+			subdomain.http_status = endpoint.http_status
+			subdomain.page_title = endpoint.page_title
+			subdomain.content_length = endpoint.content_length
+			subdomain.webserver = endpoint.webserver
+			subdomain.response_time = endpoint.response_time
+			subdomain.content_type = endpoint.content_type
+			
+			cnames = line.get('cnames', [])
+			if cnames:
+				subdomain.cname = ','.join(cnames)
+			
 			subdomain.is_cdn = cdn
 			if cdn:
 				subdomain.cdn_name = line.get('cdn_name')

@@ -1,16 +1,6 @@
 # Changelog
 
 **Official Repo location:** https://github.com/whiterabb17/r3ngine
-## [v3.0.0-beta] - 2026-05-10
-
-### Fixed
-- **EndPoint AttributeError**: Resolved `AttributeError: 'EndPoint' object has no attribute 'created_at'` in `http_crawl` task by standardizing the `endpoint_created` flag as a boolean and using `discovered_date` for timestamping.
-- **APME Pathfinding Stabilization**: Fixed critical pathfinding issues where results were returning zero by expanding `HIGH_VALUE_TARGET_SUBTYPES` to include `rce_execution`, `pivot`, and `authenticated_access`.
-- **Neo4j Scan Isolation**: Enforced strict `scan_id` isolation across the Attack Path Modeling Engine, ensuring concurrent scans do not bleed graph data or relationships.
-
-### Changed
-- **Concurrent Task Orchestration**: Refactored the scan execution pipeline into 6 concurrent execution tiers (Discovery, Enumeration, Analysis, etc.), significantly reducing total scan time while maintaining strict dependency resolution.
-
 ## [v3.0.0-beta] - 2026-05-09
 
 ### Added
