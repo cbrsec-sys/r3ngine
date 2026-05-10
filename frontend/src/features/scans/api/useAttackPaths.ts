@@ -1,5 +1,21 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
+
+// ... (interfaces stay same)
+
+export const useTriggerAttackPathModeling = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (scanId: number) => {
+      const { data } = await axios.post(`/api/apme/trigger/`, { scan_id: scanId });
+      return data;
+    },
+    onSuccess: (_, scanId) => {
+      // Invalidate paths to refresh when done (though it's async in backend)
+      queryClient.invalidateQueries({ queryKey: ['attack-paths', scanId] });
+    },
+  });
+};
 
 export interface AttackStep {
   from: string;

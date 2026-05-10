@@ -6,11 +6,20 @@
 ### Added
 - **Multi-Service Brute-Force Orchestration**: Updated brute-force engine schema to support an array of services (SSH, FTP, HTTP, SMB, RDP, Telnet).
 - **Brute-Force Candidate Filtering**: Refactored `BruteForceOrchestrator` to dynamically filter `AuthCandidate` records based on the engine's allowed services.
+- **Adaptive Stress & Resilience Engine (ASRE)**: Implemented full-scale endpoint stress testing directly within the reNgine workflow.
+  - **Multi-Tool Orchestration**: Seamlessly orchestrated backend stress tests via Celery, driving load testing tools such as `k6`, `wrk`, `hping3`, and `Locust`.
+  - **Real-Time Telemetry**: High-frequency metrics streaming (Latency, RPS, Error Rate) via Redis Streams and WebSockets.
+  - **Interactive Dashboard**: Premium React monitoring interface with synchronized ECharts and saturation heatmaps.
+  - **Safety Guardrails**: Integrated Redis-based kill-switch mechanisms for instant termination.
 - **Fixture Standardization**: Aligned default scan engine fixtures with the new multi-service schema and resolved YAML deserialization issues.
 - **Plugin Tooling System**: Introduced `tools.yaml` contract for automated background tool installation.
 - **Engine Fixture Ingestion**: Plugins can now ship `*_engine.yaml` fixtures for automatic engine registration.
 - **Background Tool Installation**: Plugin tools are now installed/verified asynchronously via Celery on installation and system startup.
 - **Subprocess Execution Model**: Standardized local execution for plugins to enhance performance and simplify container orchestration.
+- **Chronological Table Ordering**: Standardized descending ID ordering across Scan History and Target Lists to ensure the most recent entries appear at the top.
+- **Enhanced Pagination & Filtering**:
+  - **Scan History**: Implemented memoized sorting and filtering logic in the frontend for consistent recency.
+  - **Target List**: Introduced frontend-driven pagination and functional search filtering to the target management interface.
 
 ### Exploit Readiness Layer (ERL) Hardening (v3-beta)
 - **Proxy Support**: Native integration with reNgine's proxy settings. Tools (`sqlmap`, `XSStrike`) now respect system-wide proxy rotation via proxychains or environmental injection.
@@ -231,6 +240,7 @@ ring:
     - Implemented `max_retries` in engine configuration to prevent infinite loops on tool failure.
     - Added automated service mapping to convert generic protocols (e.g., `http`, `https`) into valid Hydra modules (`http-get`, `https-get`).
     - Integrated automatic error tracking that terminates scan tasks after the configured retry threshold.
+- **Onboarding Crash Fix**: Resolved a `TypeError` in the `onboarding` view where `AnonymousUser` would trigger a crash when accessing or creating `UserPreferences`.
 
 
 

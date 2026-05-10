@@ -86,6 +86,7 @@ DATABASES = {
 
 # Application definition
 INSTALLED_APPS = [
+    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -107,6 +108,7 @@ INSTALLED_APPS = [
     'rolepermissions',
     'plugins.apps.PluginsConfig',
     'apme.apps.ApmeConfig',
+    'channels',
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -170,6 +172,16 @@ SWAGGER_SETTINGS = {
     'DEFAULT_INFO': 'reNgine.openapi_info.info',
 }
 WSGI_APPLICATION = 'reNgine.wsgi.application'
+ASGI_APPLICATION = 'reNgine.routing.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {
+            "hosts": [os.environ.get('CELERY_BROKER', 'redis://redis:6379/0')],
+        },
+    },
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/2.2/ref/settings/#auth-password-validators

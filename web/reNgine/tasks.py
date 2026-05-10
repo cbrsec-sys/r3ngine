@@ -45,7 +45,10 @@ from reNgine.graph_utils import Neo4jManager
 from reNgine.vulnerability_tasks import *
 from reNgine.stress_testing_tasks import run_stress_testing
 from reNgine.osint_tasks import *
-from reNgine.task_utils import run_command, save_email, save_employee, sanitize_command_for_db
+from reNgine.task_utils import (
+    run_command, save_email, save_employee, save_subdomain, save_endpoint,
+    sanitize_command_for_db, get_tool_color
+)
 from reNgine.report_tasks import *
 from reNgine.wpscan_tasks import wpscan_scan
 try:
@@ -77,6 +80,42 @@ def sync_all_scans_to_graph(self):
 	nm.close()
 	logger.info("Global graph synchronization completed.")
 	print(">>> [GRAPH SYNC] Global graph synchronization completed.")
+
+@app.task(name='finish_chord', queue='main_scan_queue')
+def finish_chord(results, description="Task"):
+    """Generic callback for Celery chords to mark a grouped operation as complete."""
+    logger.info(f"Grouped task '{description}' completed.")
+    return results
+
+@app.task(name='finish_osint', queue='main_scan_queue')
+def finish_osint(results, scan_history_id):
+    """Callback for OSINT tasks, triggers Deep Pursuit pipeline."""
+    from reNgine.tasks import osint_orchestrator
+    logger.info(f"OSINT discovery completed for scan {scan_history_id}")
+    logger.info('Starting Deep Pursuit OSINT Pipeline...')
+    osint_orchestrator.delay(scan_history_id=scan_history_id)
+    return results
+
+@app.task(name='finish_vulnerability_scan', queue='main_scan_queue')
+def finish_vulnerability_scan(results, scan_history_id):
+    """Callback for vulnerability scan tasks."""
+    logger.info(f"Vulnerability scan completed for scan {scan_history_id}")
+    return results
+
+@app.task(name='finish_nuclei_scan', queue='main_scan_queue')
+def finish_nuclei_scan(results, scan_history_id):
+    """Callback for Nuclei scan tasks."""
+    logger.info(f"Nuclei scan completed for scan {scan_history_id}")
+    return results
+
+@app.task(name='finish_osint_discovery', queue='main_scan_queue')
+def finish_osint_discovery(results, results_dir):
+    """Callback for OSINT discovery tasks. Strips metadata from results."""
+    from reNgine.common_func import OpSecManager
+    opsec = OpSecManager()
+    opsec.strip_directory(results_dir)
+    logger.info(f"OSINT discovery completed and cleaned up in {results_dir}")
+    return results
 
 
 @app.task(name='initiate_scan', bind=False, queue='initiate_scan_queue')
@@ -114,14 +153,20 @@ def initiate_scan(
 	logger.info('Initiating scan on celery')
 	scan = None
 	try:
+		# Get scan history
+		if scan_history_id:
+			scan = ScanHistory.objects.filter(pk=scan_history_id).first()
+
 		# Get scan engine
-		engine_id = engine_id or scan.scan_type.id # scan history engine_id
+		if not engine_id and scan:
+			engine_id = scan.scan_type.id
 		engine = EngineType.objects.get(pk=engine_id)
 
 		# Get YAML config
 		config = yaml.safe_load(engine.yaml_configuration)
 		enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
 		gf_patterns = config.get(GF_PATTERNS, [])
+		kr_wordlist = config.get(KITERUNNER_WORDLIST, [])
 
 		# Get domain and set last_scan_date
 		domain = Domain.objects.get(pk=domain_id)
@@ -142,7 +187,8 @@ def initiate_scan(
 				initiated_by_id=initiated_by_id,
 			)
 
-		scan = ScanHistory.objects.get(pk=scan_history_id)
+		if not scan:
+			scan = ScanHistory.objects.get(pk=scan_history_id)
 		scan.scan_status = RUNNING_TASK
 		scan.scan_type = engine
 		scan.celery_ids = [initiate_scan.request.id]
@@ -230,15 +276,16 @@ def initiate_scan(
 			subdomain.save()
 
 
-		# Build Celery tasks, crafted according to the dependency graph below:
-		# subdomain_discovery --> port_scan --> fetch_url --> dir_file_fuzz
-		# osint								             	  vulnerability_scan
-		# osint								             	  dalfox xss scan
-		#						 	   		         	  	  screenshot
-		# WAF Logic: If WAF Bypass is enabled, WAF Detection MUST also be enabled
+		# Build Celery tasks sequentially based on engine config order
 		tasks = engine.tasks
+		
+		# WAF Logic: If WAF Bypass is enabled, WAF Detection MUST also be enabled
 		if 'waf_bypass' in tasks and 'waf_detection' not in tasks:
-			tasks.append('waf_detection')
+			try:
+				index = tasks.index('waf_bypass')
+				tasks.insert(index, 'waf_detection')
+			except ValueError:
+				tasks.append('waf_detection')
 			scan.tasks = tasks
 			scan.save()
 
@@ -247,40 +294,92 @@ def initiate_scan(
 			scan.tasks = tasks
 			scan.save()
 
-		sub_discovery_group = [
-			subdomain_discovery.si(ctx=ctx, description='Subdomain discovery'),
-			osint.si(ctx=ctx, description='OS Intelligence')
-		]
+		# Map YAML keys to their respective Celery tasks
+		task_map = {
+			'subdomain_discovery': subdomain_discovery.si(ctx=ctx, description='Subdomain discovery'),
+			'osint': osint.si(ctx=ctx, description='OS Intelligence'),
+			'spiderfoot_scan': spiderfoot_scan.si(ctx=ctx, description='Attack Surface Intelligence'),
+			'http_crawl': http_crawl.si(ctx=ctx, description='HTTP Crawl'),
+			'port_scan': PluginOrchestrator.inject_tasks('PortScan', port_scan.si(ctx=ctx, description='Port scan'), ctx),
+			'fetch_url': PluginOrchestrator.inject_tasks('FetchURL', fetch_url.si(ctx=ctx, description='Fetch URL'), ctx),
+			'dir_file_fuzz': dir_file_fuzz.si(ctx=ctx, description='Directories & files fuzz'),
+			'web_api_discovery': web_api_discovery.si(ctx=ctx, description='Web API Discovery'),
+			'vulnerability_scan': PluginOrchestrator.inject_tasks('VulnerabilityScan', vulnerability_scan.si(ctx=ctx, description='Vulnerability scan'), ctx),
+			'screenshot': screenshot.si(ctx=ctx, description='Screenshot'),
+			'waf_detection': waf_detection.si(ctx=ctx, description='WAF detection'),
+			'waf_bypass': waf_bypass.si(ctx=ctx, description='WAF bypass'),
+			'firewall_vpn_scan': firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan'),
+			'brute_force_scan': brute_force_scan.si(ctx=ctx, description='Brute force scan'),
+		}
 
-		if 'spiderfoot_scan' in tasks:
-			sub_discovery_group.append(spiderfoot_scan.si(ctx=ctx, description='Attack Surface Intelligence'))
+		# Define Execution Tiers
+		# Tier 1: Discovery (Concurrent)
+		tier_1 = []
+		if 'subdomain_discovery' in tasks: tier_1.append(task_map['subdomain_discovery'])
+		if 'osint' in tasks: tier_1.append(task_map['osint'])
+		if 'spiderfoot_scan' in tasks: tier_1.append(task_map['spiderfoot_scan'])
+		if 'firewall_vpn_scan' in tasks: tier_1.append(task_map['firewall_vpn_scan'])
 
-		# Build Celery tasks dynamically with plugin injections
-		group_tasks = [
-			dir_file_fuzz.si(ctx=ctx, description='Directories & files fuzz'),
-			web_api_discovery.si(ctx=ctx, description='Web API Discovery'),
-			PluginOrchestrator.inject_tasks('VulnerabilityScan', vulnerability_scan.si(ctx=ctx, description='Vulnerability scan'), ctx),
-			screenshot.si(ctx=ctx, description='Screenshot'),
-			chain(
-				waf_detection.si(ctx=ctx, description='WAF detection'),
-				waf_bypass.si(ctx=ctx, description='WAF bypass')
-			),
-			firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan')
-		]
+		# Tier 2: Enumeration (Concurrent)
+		tier_2 = []
+		if 'http_crawl' in tasks: tier_2.append(task_map['http_crawl'])
+		if 'port_scan' in tasks: tier_2.append(task_map['port_scan'])
+		if 'screenshot' in tasks: tier_2.append(task_map['screenshot'])
+
+		# Tier 3: Content Fuzzing (Sequential Step)
+		tier_3 = []
+		if 'dir_file_fuzz' in tasks: tier_3.append(task_map['dir_file_fuzz'])
+
+		# Tier 4: URL Collection (Sequential Step)
+		tier_4 = []
+		if 'fetch_url' in tasks: tier_4.append(task_map['fetch_url'])
+
+		# Tier 5: App & WAF (Concurrent)
+		tier_5 = []
+		if 'web_api_discovery' in tasks: tier_5.append(task_map['web_api_discovery'])
+		if 'waf_detection' in tasks: tier_5.append(task_map['waf_detection'])
+
+		# Tier 6: Security Assessment (Sequential)
+		tier_6 = []
+		if 'waf_bypass' in tasks: tier_6.append(task_map['waf_bypass'])
+		if 'vulnerability_scan' in tasks: tier_6.append(task_map['vulnerability_scan'])
+		if 'brute_force_scan' in tasks: tier_6.append(task_map['brute_force_scan'])
+
+		def get_tier_step(tasks_list):
+			if not tasks_list:
+				return None
+			if len(tasks_list) == 1:
+				return tasks_list[0]
+			return group(tasks_list)
+
+		workflow_steps = []
+		for tier in [tier_1, tier_2, tier_3, tier_4, tier_5, tier_6]:
+			step = get_tier_step(tier)
+			if step:
+				workflow_steps.append(step)
+
+		# Terminal internal tasks
+		vuln_producing_tasks = {'vulnerability_scan', 'dir_file_fuzz', 'web_api_discovery', 'brute_force_scan', 'osint'}
+		has_vuln_tasks = any(t in tasks for t in vuln_producing_tasks)
+
+		if has_vuln_tasks:
+			workflow_steps.append(correlate_vulnerabilities.si(scan_history_id=scan_history_id))
+			workflow_steps.append(calculate_risk_scores.si(scan_history_id=scan_history_id))
 		
-		workflow_steps = [
-			group(sub_discovery_group),
-			PluginOrchestrator.inject_tasks('PortScan', port_scan.si(ctx=ctx, description='Port scan'), ctx),
-			PluginOrchestrator.inject_tasks('FetchURL', fetch_url.si(ctx=ctx, description='Fetch URL'), ctx),
-			group(*[t for t in group_tasks if t is not None]),
-			correlate_vulnerabilities.si(scan_history_id=scan_history_id),
-			calculate_risk_scores.si(scan_history_id=scan_history_id),
-			PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx),
-		]
+		workflow_steps.append(PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx))
 
-		# Attack Path Modeling Engine (APME)
+		if config.get('enable_ai_impact_analysis'):
+			workflow_steps.append(generate_impact_assessment.si(scan_history_id=scan_history_id))
+
+		if 'stress_test' in tasks:
+			workflow_steps.append(run_stress_testing.si(
+				scan_history_id=scan_history_id, 
+				target_domain_name=domain.name, 
+				yaml_config=config
+			))
+
+		# Attack Path Modeling Engine (APME) - MUST BE FINAL
 		apme_config = config.get(ATTACK_PATH_MODELING, {})
-		# For backward compatibility, check both the new key and the old run_apme key in vulnerability_scan
 		run_apme_enabled = apme_config.get('enabled', False)
 		if not run_apme_enabled:
 			vuln_scan_config = config.get(VULNERABILITY_SCAN, {})
@@ -289,20 +388,9 @@ def initiate_scan(
 		if run_apme_enabled:
 			workflow_steps.append(run_apme.si(scan_history_id=scan_history_id))
 
-		# Filter out None steps (where plugins aren't present)
+		# Filter out None steps
 		workflow_steps = [step for step in workflow_steps if step is not None]
-
 		workflow = chain(*workflow_steps)
-
-		if config.get('enable_ai_impact_analysis'):
-			workflow = chain(workflow, generate_impact_assessment.si(scan_history_id=scan_history_id))
-
-		if 'stress_test' in tasks:
-			workflow = chain(workflow, run_stress_testing.si(
-				scan_history_id=scan_history_id, 
-				target_domain_name=domain.name, 
-				yaml_config=config
-			))
 
 		# Build callback
 		callback = report.si(ctx=ctx).set(link_error=[report.si(ctx=ctx)])
@@ -570,6 +658,9 @@ def subdomain_discovery(
 
 	# Run tools
 	opsec = OpSecManager()
+	existing_subs = set(Subdomain.objects.filter(scan_history=self.scan).values_list('name', flat=True))
+	new_discoveries = []
+
 	for tool in tools:
 		cmd = None
 		logger.info(f'Scanning subdomains for {host} with {tool}')
@@ -640,52 +731,16 @@ def subdomain_discovery(
 				cmd = f'chaos -d {host} -silent -key {chaos_key} -o {results_file}'
 
 			elif tool == 'reconx':
-				reconx_results = f"{results_dir}/reconx_findings"
+				reconx_results = f"{self.results_dir}/reconx_findings"
 				os.makedirs(reconx_results, exist_ok=True)
 				
 				# Create a temporary targets file for reconx
-				reconx_targets = f"{results_dir}/reconx_targets.txt"
+				reconx_targets = f"{self.results_dir}/reconx_targets.txt"
 				with open(reconx_targets, 'w') as f:
-					f.write(domain.name)
+					f.write(self.domain.name)
 				
 				# Run reconx
-				# reconx run uses targets from config, but we can override or use a specific config
-				# For simplicity, we'll use a direct command if supported, or create a minimal config
-				reconx_cmd = f"reconx run --targets {reconx_targets} --output {reconx_results}"
-				os.system(reconx_cmd)
-				
-				# Parse reconx findings (JSONL format in findings directory)
-				# Findings are usually in ~/.local/share/reconx/findings/ but we try to direct output if possible
-				# If not, we'll check the default location
-				reconx_default_findings = os.path.expanduser("~/.local/share/reconx/findings/")
-				if os.path.exists(reconx_default_findings):
-					for file in os.listdir(reconx_default_findings):
-						if file.endswith(".jsonl"):
-							try:
-								with open(os.path.join(reconx_default_findings, file), 'r') as f:
-									for line in f:
-										finding = json.loads(line)
-										# ReconX findings can be subdomains or vulnerabilities
-										if finding.get('type') == 'subdomain':
-											sub_name = finding.get('data', {}).get('subdomain')
-											if sub_name and sub_name.endswith(domain.name) and sub_name not in existing_subs:
-												from reNgine.tasks import save_subdomain
-												sub_obj, created = save_subdomain(sub_name, ctx=ctx)
-												if created:
-													new_discoveries.append(f"Subdomain (ReconX): {sub_name}")
-													existing_subs.add(sub_name)
-													MonitoringDiscovery.objects.create(
-														domain=domain,
-														discovery_type='subdomain',
-														content={'name': sub_name, 'source': 'ReconX'},
-														scan_history=scan_history
-													)
-										elif finding.get('type') == 'vulnerability':
-											# If reconx found a vulnerability, we can also log it
-											vuln_info = finding.get('data', {})
-											new_discoveries.append(f"Vulnerability (ReconX): {vuln_info.get('template-id')}")
-							except Exception as e:
-								logger.error(f"Error parsing ReconX findings: {str(e)}")
+				cmd = f"reconx run --targets {reconx_targets} --output {reconx_results}"
 
 		elif tool in custom_subdomain_tools:
 			tool_query = InstalledExternalTool.objects.filter(name__icontains=tool.lower())
@@ -722,6 +777,31 @@ def subdomain_discovery(
 				scan_id=self.scan_id,
 				activity_id=self.activity_id,
 				proxy=proxy if tool not in ['amass-passive', 'amass-active', 'subfinder'] else None)
+			
+			# Parse reconx findings if tool was reconx
+			if tool == 'reconx':
+				reconx_default_findings = os.path.expanduser("~/.local/share/reconx/findings/")
+				if os.path.exists(reconx_default_findings):
+					for file in os.listdir(reconx_default_findings):
+						if file.endswith(".jsonl"):
+							try:
+								with open(os.path.join(reconx_default_findings, file), 'r') as f:
+									for line in f:
+										finding = json.loads(line)
+										if finding.get('type') == 'subdomain':
+											sub_name = finding.get('data', {}).get('subdomain')
+											if sub_name and sub_name.endswith(self.domain.name) and sub_name not in existing_subs:
+												sub_obj, created = save_subdomain(sub_name, ctx=ctx)
+												if created:
+													existing_subs.add(sub_name)
+													MonitoringDiscovery.objects.create(
+														domain=self.domain,
+														discovery_type='subdomain',
+														content={'name': sub_name, 'source': 'ReconX'},
+														scan_history=self.scan
+													)
+							except Exception as e:
+								logger.error(f"Error parsing ReconX findings: {str(e)}")
 		except Exception as e:
 			logger.error(
 				f'Subdomain discovery tool "{tool}" raised an exception')
@@ -846,17 +926,14 @@ def osint(self, host=None, ctx={}, description=None):
 			config=config,
 			host=self.scan.domain.name,
 			scan_history_id=self.scan.id,
+			activity_id=self.activity_id,
 			results_dir=self.results_dir,
 			raw_dorks=self.scan.cfg_custom_dorks
 		)
 		grouped_tasks.append(_task)
 
 	if grouped_tasks:
-		celery_group = group(grouped_tasks)
-		job = celery_group.apply_async()
-		while not job.ready():
-			# wait for all jobs to complete
-			time.sleep(5)
+		return self.replace(chord(grouped_tasks, finish_osint.s(scan_history_id=self.scan.id)))
 
 	logger.info('Standard OSINT Tasks finished...')
 
@@ -967,21 +1044,19 @@ def osint_discovery(self, config, host, scan_history_id, activity_id, results_di
 			)
 			grouped_tasks.append(_task)
 
-	celery_group = group(grouped_tasks)
-	job = celery_group.apply_async()
-	while not job.ready():
-		# wait for all jobs to complete
-		time.sleep(5)
+	if grouped_tasks:
+		return self.replace(chord(grouped_tasks, finish_osint_discovery.s(results_dir=results_dir)))
 
 	# Strip metadata from OSINT results
+	from reNgine.common_func import OpSecManager
 	opsec = OpSecManager()
 	opsec.strip_directory(results_dir)
 
 	return results
 
 
-@app.task(name='dorking', queue='main_scan_queue', base=RengineTask, bind=True)
-def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
+@app.task(name='dorking', queue='main_scan_queue', base=RengineTask, bind=False)
+def dorking(config, host, scan_history_id, results_dir, activity_id=None, raw_dorks=None):
 	"""Run Google dorks.
 
 	Args:
@@ -1011,7 +1086,8 @@ def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
 					results_dir=results_dir,
 					type='custom_dork_yaml',
 					lookup_keywords=query,
-					scan_history=scan_history
+					scan_history=scan_history,
+					activity_id=activity_id
 				)
 			elif isinstance(custom_dork, dict):
 				# Handle structured dict from YAML
@@ -1024,7 +1100,8 @@ def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
 						results_dir=results_dir,
 						type='custom_dork',
 						lookup_extensions=custom_dork.get('lookup_extensions'),
-						scan_history=scan_history
+						scan_history=scan_history,
+						activity_id=activity_id
 					)
 				elif 'lookup_keywords' in custom_dork:
 					results = get_and_save_dork_results(
@@ -1032,7 +1109,8 @@ def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
 						results_dir=results_dir,
 						type='custom_dork',
 						lookup_keywords=custom_dork.get('lookup_keywords'),
-						scan_history=scan_history
+						scan_history=scan_history,
+						activity_id=activity_id
 					)
 	except Exception as e:
 		logger.error(f'Error processing custom dorks from YAML: {str(e)}')
@@ -1059,7 +1137,8 @@ def dorking(config, host, scan_history_id, results_dir, raw_dorks=None):
 						results_dir=results_dir,
 						type='custom_dork_ui',
 						lookup_keywords=query_to_run,
-						scan_history=scan_history
+						scan_history=scan_history,
+						activity_id=activity_id
 					)
 		except Exception as e:
 			logger.exception(e)
@@ -1404,8 +1483,8 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}
 	return data
 
 
-@app.task(name='h8mail', queue='main_scan_queue', bind=False)
-def h8mail(config, host, scan_history_id, activity_id, results_dir, ctx={}):
+@app.task(name='h8mail', queue='main_scan_queue', base=RengineTask, bind=True)
+def h8mail(self, config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run h8mail.
 
 	Args:
@@ -1433,9 +1512,17 @@ def h8mail(config, host, scan_history_id, activity_id, results_dir, ctx={}):
 		scan_id=scan_history_id,
 		activity_id=activity_id)
 
-	with open(output_file) as f:
-		data = json.load(f)
-		creds = data.get('targets', [])
+	if os.path.exists(output_file):
+		try:
+			with open(output_file) as f:
+				data = json.load(f)
+				creds = data.get('targets', [])
+		except Exception as e:
+			logger.error(f"Error reading h8mail output: {e}")
+			creds = []
+	else:
+		logger.warning(f"h8mail output file {output_file} not found.")
+		creds = []
 
 	# TODO: go through h8mail output and save emails to DB
 	for cred in creds:
@@ -1443,14 +1530,14 @@ def h8mail(config, host, scan_history_id, activity_id, results_dir, ctx={}):
 		email_address = cred['target']
 		pwn_num = cred['pwn_num']
 		pwn_data = cred.get('data', [])
-		email, created = save_email(email_address, scan_history=scan)
+		email, created = save_email(email_address, scan_history=scan_history)
 		# if email:
 		# 	self.notify(fields={'Emails': f'• `{email.address}`'})
 	return creds
 
 
 @app.task(name='leaklookup', queue='main_scan_queue', base=RengineTask, bind=True)
-def leaklookup(self, host=None, ctx=None):
+def leaklookup(self, host=None, ctx=None, **kwargs):
 	"""Run LeakLookup query."""
 	api_key = get_leaklookup_key()
 	if not api_key:
@@ -1489,7 +1576,7 @@ def leaklookup(self, host=None, ctx=None):
 
 
 @app.task(name='secret_scanning', queue='main_scan_queue', base=RengineTask, bind=True)
-def secret_scanning(self, config=None, host=None, ctx=None):
+def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 	"""Scan for secrets in JS files and potentially other sources."""
 	if not self.scan:
 		return "No scan history found."
@@ -1680,7 +1767,7 @@ def screenshot(self, ctx={}, description=None):
 	success_count = 0
 	for subdomain in subdomains:
 		# The internal task handles browser lifecycle, metadata, and DB persistence
-		if take_screenshot_and_save(subdomain.id, self.scan_id, self.results_dir):
+		if take_screenshot_and_save(subdomain.id, self.scan_id, self.results_dir, activity_id=self.activity_id):
 			success_count += 1
 			
 	self.notify(fields={'Screenshots': f'Successfully captured {success_count} screenshots using Embedded Playwright.'})
@@ -1784,7 +1871,7 @@ def port_scan(self, hosts=[], ctx={}, description=None):
 		).first()
 
 		# Add IP DB
-		ip, _ = save_ip_address(ip_address, subdomain, subscan=self.subscan)
+		ip, _ = save_ip_address(ip_address, subdomain, subscan=self.subscan, scan_id=self.scan_id, activity_id=self.activity_id)
 		if self.subscan:
 			ip.ip_subscan_ids.add(self.subscan)
 			ip.save()
@@ -2129,7 +2216,9 @@ def waf_detection(self, ctx={}, description=None):
 			save_ip_address(
 				primary_origin,
 				subdomain=subdomain_query,
-				subscan=self.subscan
+				subscan=self.subscan,
+				scan_id=self.scan_id,
+				activity_id=self.activity_id
 			)
 			logger.info(f"Origin IP found for {subdomain}: {primary_origin}")
 
@@ -2923,12 +3012,8 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 		)
 		grouped_tasks.append(_task)
 
-	celery_group = group(grouped_tasks)
-	job = celery_group.apply_async()
-
-	while not job.ready():
-		# wait for all jobs to complete
-		time.sleep(5)
+	if grouped_tasks:
+		return self.replace(chord(grouped_tasks, finish_vulnerability_scan.s(scan_history_id=ctx.get('scan_history_id'))))
 
 	logger.info('Vulnerability scan completed...')
 
@@ -3150,7 +3235,7 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 				try:
 					future.result()
 				except Exception as e:
-					logger.error(f"Exception for Vulnerability {vuln}: {e}")
+					logger.error(f"Exception for Vulnerability {gpt}: {e}")
 
 		return None
 
@@ -3356,12 +3441,8 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 		)
 		grouped_tasks.append(_task)
 
-	celery_group = group(grouped_tasks)
-	job = celery_group.apply_async()
-
-	while not job.ready():
-		# wait for all jobs to complete
-		time.sleep(5)
+	if grouped_tasks:
+		return self.replace(chord(grouped_tasks, finish_nuclei_scan.s(scan_history_id=ctx.get('scan_history_id'))))
 
 	logger.info('Vulnerability scan with all severities completed...')
 
@@ -3500,7 +3581,7 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 				try:
 					future.result()
 				except Exception as e:
-					logger.error(f"Exception for Vulnerability {vuln}: {e}")
+					logger.error(f"Exception for Vulnerability {gpt}: {e}")
 	return results
 
 
@@ -3631,7 +3712,7 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 				try:
 					future.result()
 				except Exception as e:
-					logger.error(f"Exception for Vulnerability {vuln}: {e}")
+					logger.error(f"Exception for Vulnerability {gpt}: {e}")
 
 	return results
 
@@ -3780,75 +3861,34 @@ def http_crawl(
 		if line.get('failed', False):
 			continue
 
-		# Parse httpx output
-		host = line.get('host', '')
-		ip_address = line.get('ip')
-		content_length = line.get('content_length', 0)
-		http_status = line.get('status_code')
-		http_url, is_redirect = extract_httpx_url(line)
-		page_title = line.get('title')
-		webserver = line.get('webserver')
-		cdn = line.get('cdn', False)
-		rt = line.get('time')
-		techs = line.get('tech', [])
-		cname = line.get('cname', '')
-		content_type = line.get('content_type', '')
-		response_time = -1
-		if rt:
-			response_time = float(''.join(ch for ch in rt if not ch.isalpha()))
-			if rt[-2:] == 'ms':
-				response_time = response_time / 1000
-
-		# Create Subdomain object in DB
-		subdomain_name = get_subdomain_from_url(http_url)
-		subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
-
-		if not subdomain:
-			continue
-
-		# Save default HTTP URL to endpoint object in DB
-		endpoint, created = save_endpoint(
-			http_url,
-			crawl=False,
-			ctx=ctx,
-			subdomain=subdomain,
-			is_default=is_ran_from_subdomain_scan
-		)
+		endpoint, created = process_httpx_response(line, ctx=ctx, is_ran_from_subdomain_scan=is_ran_from_subdomain_scan)
 		if not endpoint:
 			continue
-		endpoint.http_status = http_status
-		endpoint.page_title = page_title
-		endpoint.content_length = content_length
-		endpoint.webserver = webserver
-		endpoint.response_time = response_time
-		endpoint.content_type = content_type
-		endpoint.save()
 
-		# Sync Subdomain status attributes if this is the default endpoint
-		if is_ran_from_subdomain_scan:
-			subdomain.http_status = http_status
-			subdomain.page_title = page_title
-			subdomain.content_length = content_length
-			subdomain.webserver = webserver
-			subdomain.response_time = response_time
-			subdomain.content_type = content_type
-			subdomain.http_url = http_url
-			subdomain.save()
-
-		endpoint_str = f'{http_url} [{http_status}] `{content_length}B` `{webserver}` `{rt}`'
+		endpoint_str = f'{endpoint.http_url} [{endpoint.http_status}] `{endpoint.content_length}B` `{endpoint.webserver}` `{line.get("time")}`'
 		logger.warning(endpoint_str)
-		if endpoint and endpoint.is_alive and endpoint.http_status != 403:
+		if endpoint.is_alive and endpoint.http_status != 403:
 			self.notify(
 				fields={'Alive endpoint': f'• {endpoint_str}'},
 				add_meta_info=False)
 
-		# Add endpoint to results
+		# Add endpoint to results for UI tabs
 		line['_cmd'] = cmd
-		line['final_url'] = http_url
+		line['final_url'] = endpoint.http_url
 		line['endpoint_id'] = endpoint.id
 		line['endpoint_created'] = created
-		line['is_redirect'] = is_redirect
+		line['is_redirect'] = endpoint.is_redirect
+		line['status_code'] = endpoint.http_status
+		line['title'] = endpoint.page_title
+		line['content_length'] = endpoint.content_length
+		line['webserver'] = endpoint.webserver
+		line['content_type'] = endpoint.content_type
+		line['response_time'] = endpoint.response_time
+		
 		results.append(line)
+
+		techs = line.get('tech', [])
+		subdomain = endpoint.subdomain
 
 		# Add technology objects to DB
 		for technology in techs:
@@ -3865,40 +3905,36 @@ def http_crawl(
 
 		# Add IP objects for 'a' records to DB
 		a_records = line.get('a', [])
+		cdn = line.get('cdn', False)
 		for ip_address in a_records:
-			ip, created = save_ip_address(
+			ip, _ = save_ip_address(
 				ip_address,
 				subdomain,
 				subscan=self.subscan,
+				scan_id=self.scan_id,
+				activity_id=self.activity_id,
 				cdn=cdn)
-		ips_str = '• ' + '\n• '.join([f'`{ip}`' for ip in a_records])
-		self.notify(
-			fields={'IPs': ips_str},
-			add_meta_info=False)
+		
+		if a_records:
+			ips_str = '• ' + '\n• '.join([f'`{ip}`' for ip in a_records])
+			self.notify(
+				fields={'IPs': ips_str},
+				add_meta_info=False)
 
-		# Add IP object for host in DB
-		if ip_address:
-			ip, created = save_ip_address(
-				ip_address,
-				subdomain,
-				subscan=self.subscan,
-				cdn=cdn)
-			if ip:
-				self.notify(
-					fields={'IPs': f'• `{ip.address}`'},
-					add_meta_info=False)
-
-		# Save subdomain and endpoint
-		if is_ran_from_subdomain_scan:
-			# save subdomain stuffs
-			subdomain.http_url = http_url
-			subdomain.http_status = http_status
-			subdomain.page_title = page_title
-			subdomain.content_length = content_length
-			subdomain.webserver = webserver
-			subdomain.response_time = response_time
-			subdomain.content_type = content_type
-			subdomain.cname = ','.join(cname)
+		# Update subdomain status attributes if this is the default endpoint
+		if is_ran_from_subdomain_scan and endpoint.is_default:
+			subdomain.http_url = endpoint.http_url
+			subdomain.http_status = endpoint.http_status
+			subdomain.page_title = endpoint.page_title
+			subdomain.content_length = endpoint.content_length
+			subdomain.webserver = endpoint.webserver
+			subdomain.response_time = endpoint.response_time
+			subdomain.content_type = endpoint.content_type
+			
+			cnames = line.get('cnames', [])
+			if cnames:
+				subdomain.cname = ','.join(cnames)
+			
 			subdomain.is_cdn = cdn
 			if cdn:
 				subdomain.cdn_name = line.get('cdn_name')
@@ -4834,17 +4870,20 @@ def parse_crlfuzz_result(url):
 
 
 @app.task(name='geo_localize', bind=False, queue='geo_localize_queue')
-def geo_localize(host, ip_id=None):
+def geo_localize(host, ip_id=None, scan_id=None, activity_id=None):
 	"""Uses geoiplookup to find location associated with host.
 
 	Args:
 		host (str): Hostname.
 		ip_id (int): IpAddress object id.
+		scan_id (int): ScanHistory object id.
+		activity_id (int): ScanActivity object id.
 
 	Returns:
 		startScan.models.CountryISO: CountryISO object from DB or None.
 	"""
 	import ipaddress
+	import re
 	
 	geo_object = None
 	country_iso = "Unknown"
@@ -4867,38 +4906,39 @@ def geo_localize(host, ip_id=None):
 
 	if country_iso == "Unknown":
 		cmd = f'geoiplookup {host}'
-		_, out = run_command(cmd)
+		_, out = run_command(cmd, scan_id=scan_id, activity_id=activity_id)
 		if 'IP Address not found' not in out and "can't resolve hostname" not in out and ':' in out:
 			try:
-				parts = out.split(':')[1].strip().split(',')
-				country_iso = parts[0].strip()
-				country_name = parts[1].strip() if len(parts) > 1 else country_iso
+				# Use regex for more robust parsing of geoiplookup output
+				# Typical format: "GeoIP Country Edition: US, United States"
+				# We look for the line containing "Country Edition" for precision
+				match = re.search(r"Country Edition:\s*([A-Z0-9]{2,}),\s*(.*)", out)
+				if match:
+					country_iso = match.group(1).strip()
+					country_name = match.group(2).strip()
+				else:
+					# Fallback to general colon-based split if specific line not found
+					parts = out.split(':')[1].strip().split(',')
+					country_iso = parts[0].strip()
+					country_name = parts[1].strip() if len(parts) > 1 else country_iso
 			except Exception as e:
-				logger.error(f"Error parsing geoiplookup output: {e}")
+				logger.error(f"Error parsing geoiplookup output for {host}: {e}")
 		else:
 			logger.info(f'Geo IP lookup failed for host "{host}"')
 
 	geo_object, _ = CountryISO.objects.get_or_create(
 		iso=country_iso,
-		name=country_name
+		defaults={'name': country_name}
 	)
 
 	if ip_id:
-		try:
-			ip = IpAddress.objects.get(pk=ip_id)
-			ip.geo_iso = geo_object
-			ip.save()
-		except IpAddress.DoesNotExist:
-			logger.error(f"IpAddress with ID {ip_id} not found during geo_localization")
+		IpAddress.objects.filter(id=ip_id).update(geo_iso=geo_object)
 
-	return {
-		'iso': country_iso,
-		'name': country_name
-	}
+	return geo_object
 
 
 @app.task(name='query_whois', bind=False, queue='query_whois_queue')
-def query_whois(target, force_reload_whois=False):
+def query_whois(target, force_reload_whois=False, scan_id=None, activity_id=None):
 	"""Query WHOIS information for an IP or a domain name.
 
 	Args:
@@ -4929,9 +4969,9 @@ def query_whois(target, force_reload_whois=False):
 		with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
 			futures_func = {
 				executor.submit(get_domain_historical_ip_address, target): 'historical_ips',
-				executor.submit(fetch_related_tlds_and_domains, target): 'related_tlds_and_domains',
+				executor.submit(fetch_related_tlds_and_domains, target, scan_id=scan_id, activity_id=activity_id): 'related_tlds_and_domains',
 				executor.submit(reverse_whois, target): 'reverse_whois',
-				executor.submit(fetch_whois_data_using_netlas, target): 'whois_data',
+				executor.submit(fetch_whois_data_using_netlas, target, scan_id=scan_id, activity_id=activity_id): 'whois_data',
 			}
 
 			for future in concurrent.futures.as_completed(futures_func):
@@ -4984,7 +5024,7 @@ def query_whois(target, force_reload_whois=False):
 		}
 
 
-def fetch_related_tlds_and_domains(domain):
+def fetch_related_tlds_and_domains(domain, scan_id=None, activity_id=None):
 	"""
 	Fetch related TLDs and domains using TLSx.
 	related domains are those that are not part of related TLDs.
@@ -5004,7 +5044,7 @@ def fetch_related_tlds_and_domains(domain):
 	base_domain = f"{extracted.domain}.{extracted.suffix}"
 	
 	cmd = f'tlsx -san -cn -silent -ro -host {domain}'
-	_, result = run_command(cmd, shell=True)
+	_, result = run_command(cmd, shell=True, scan_id=scan_id, activity_id=activity_id)
 
 	for line in result.splitlines():
 		try:
@@ -5027,7 +5067,7 @@ def fetch_related_tlds_and_domains(domain):
 	return list(related_tlds), list(related_domains)
 
 
-def fetch_whois_data_using_netlas(target):
+def fetch_whois_data_using_netlas(target, scan_id=None, activity_id=None):
 	"""
 		Fetch WHOIS data using netlas.
 		Args:
@@ -5042,7 +5082,7 @@ def fetch_whois_data_using_netlas(target):
 		command += f' -a {netlas_key}'
 
 	try:
-		_, result = run_command(command, remove_ansi_sequence=True)
+		_, result = run_command(command, remove_ansi_sequence=True, scan_id=scan_id, activity_id=activity_id)
 		
 		# catch errors
 		if 'Failed to parse response data' in result:
@@ -5188,7 +5228,8 @@ def stream_command(
 	Yields:
 		str/dict: Output line.
 	"""
-	logger.info(cmd)
+	color = get_tool_color(cmd)
+	logger.info(f"{color}{cmd}{COLOR_RESET}")
 
 	conf_path = None
 	if proxy:
@@ -5218,6 +5259,7 @@ def stream_command(
 	output = ""
 
 	# Process the output
+	line_count = 0
 	try:
 		for line in iter(lambda: process.stdout.readline(), b''):
 			if not line:
@@ -5236,16 +5278,27 @@ def stream_command(
 			except json.JSONDecodeError:
 				pass
 
+			# Log to console for visibility
+			if isinstance(item, str):
+				logger.info(f"{COLOR_WHITE}{item}{COLOR_RESET}")
+			else:
+				logger.info(f"{COLOR_WHITE}{json.dumps(item)}{COLOR_RESET}")
+
 			# Yield the line
-			#logger.debug(item)
 			yield item
 
 			# Add the log line to the output
 			output += line + "\n"
+			line_count += 1
 
-			# Update the command record in the database
-			command_obj.output = output
-			command_obj.save()
+			# Update the command record in the database every 20 lines
+			if line_count % 20 == 0:
+				command_obj.output = output
+				command_obj.save()
+
+		# Final save after loop
+		command_obj.output = output
+		command_obj.save()
 	finally:
 		if conf_path and os.path.exists(conf_path):
 			os.remove(conf_path)
@@ -5264,8 +5317,68 @@ def stream_command(
 			f.write(f"{cmd}\n{return_code}\n{output}\n")
 
 
-def process_httpx_response(line):
-	"""TODO: implement this"""
+def process_httpx_response(line, ctx={}, is_ran_from_subdomain_scan=False):
+	"""Process a single line of httpx output and save to database."""
+	if not line or not isinstance(line, dict):
+		return None
+
+	# No response from endpoint
+	if line.get('failed', False):
+		return None
+
+	# Parse httpx output
+	http_status = line.get('status_code')
+	http_url, is_redirect = extract_httpx_url(line)
+	content_length = line.get('content_length', 0)
+	page_title = line.get('title')
+	webserver = line.get('webserver')
+	rt = line.get('time')
+	content_type = line.get('content_type', '')
+	
+	response_time = -1
+	if rt:
+		response_time = float(''.join(ch for ch in rt if not ch.isalpha()))
+		if rt[-2:] == 'ms':
+			response_time = response_time / 1000
+
+	# Create Subdomain object in DB
+	subdomain_name = get_subdomain_from_url(http_url)
+	subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
+
+	if not subdomain:
+		return None
+
+	# Save default HTTP URL to endpoint object in DB
+	endpoint, created = save_endpoint(
+		http_url,
+		crawl=False,
+		ctx=ctx,
+		subdomain=subdomain,
+		is_default=is_ran_from_subdomain_scan
+	)
+	if not endpoint:
+		return None
+	
+	endpoint.http_status = http_status
+	endpoint.page_title = page_title
+	endpoint.content_length = content_length
+	endpoint.webserver = webserver
+	endpoint.response_time = response_time
+	endpoint.content_type = content_type
+	endpoint.save()
+
+	# Sync Subdomain status attributes if this is the default endpoint
+	if is_ran_from_subdomain_scan:
+		subdomain.http_status = http_status
+		subdomain.page_title = page_title
+		subdomain.content_length = content_length
+		subdomain.webserver = webserver
+		subdomain.response_time = response_time
+		subdomain.content_type = content_type
+		subdomain.http_url = http_url
+		subdomain.save()
+	
+	return endpoint, created
 
 
 def extract_httpx_url(line):
@@ -5310,7 +5423,7 @@ def extract_httpx_url(line):
 #-------------#
 # OSInt utils #
 #-------------#
-def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=None, lookup_extensions=None, delay=3, page_count=2, scan_history=None):
+def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=None, lookup_extensions=None, delay=3, page_count=2, scan_history=None, activity_id=None):
 	"""
 		Uses gofuzz to dork and store information
 
@@ -5348,7 +5461,8 @@ def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=
 			gofuzz_command,
 			shell=True, # Use shell=True to handle quoted arguments correctly
 			history_file=history_file,
-			scan_id=scan_history.id,
+			scan_id=scan_history.id if scan_history else None,
+			activity_id=activity_id,
 			proxy=proxy
 		)
 
@@ -5392,7 +5506,12 @@ def save_metadata_info(meta_dict):
 	proxy = get_random_proxy()
 
 	# Get metadata
-	result = extract_metadata_from_google_search(meta_dict.osint_target, meta_dict.documents_limit)
+	try:
+		result = extract_metadata_from_google_search(meta_dict.osint_target, meta_dict.documents_limit)
+	except Exception as e:
+		logger.error(f'Error extracting metadata from Google Search for {meta_dict.osint_target}: {str(e)}')
+		return []
+
 	if not result:
 		logger.error(f'No metadata result from Google Search for {meta_dict.osint_target}.')
 		return []
@@ -5598,7 +5717,7 @@ def save_subdomain(subdomain_name, ctx={}):
 
 
 # save_email and save_employee moved to task_utils.py
-def save_ip_address(ip_address, subdomain=None, subscan=None, **kwargs):
+def save_ip_address(ip_address, subdomain=None, subscan=None, scan_id=None, activity_id=None, **kwargs):
 	if not (validators.ipv4(ip_address) or validators.ipv6(ip_address)):
 		logger.info(f'IP {ip_address} is not a valid IP. Skipping.')
 		return None, False
@@ -5608,7 +5727,7 @@ def save_ip_address(ip_address, subdomain=None, subscan=None, **kwargs):
 
 	# Trigger geo localization if newly created OR if geo_iso is null
 	if created or ip.geo_iso is None:
-		geo_localize.delay(ip_address, ip_id=ip.id)
+		geo_localize.delay(ip_address, ip_id=ip.id, scan_id=scan_id, activity_id=activity_id)
 
 	# Set extra attributes
 	for key, value in kwargs.items():

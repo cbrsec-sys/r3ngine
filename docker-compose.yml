@@ -12,7 +12,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     networks:
-      - rengine_network
+      - r3ngine_network
     deploy:
       resources:
         limits:
@@ -25,7 +25,7 @@ services:
     image: "redis:alpine"
     hostname: redis
     networks:
-      - rengine_network
+      - r3ngine_network
     deploy:
       resources:
         limits:
@@ -39,7 +39,7 @@ services:
       dockerfile: web/Dockerfile
     restart: always
     entrypoint: /usr/src/app/celery-entrypoint.sh
-    command: celery -A reNgine worker --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l INFO
+    command: celery -A reNgine worker --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l WARNING
     volumes:
       - ./web:/usr/src/app
       - ./frontend:/usr/src/app/frontend
@@ -52,7 +52,7 @@ services:
       - static_volume:/usr/src/app/staticfiles/
       - plugins_data:/usr/src/app/plugins_data
     environment:
-      - DEBUG=1
+      - DEBUG=0
       - CELERY_BROKER=redis://redis:6379/0
       - CELERY_BACKEND=redis://redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}
@@ -67,7 +67,7 @@ services:
       - db
       - redis
     networks:
-      - rengine_network
+      - r3ngine_network
     deploy:
       resources:
         limits:
@@ -103,7 +103,7 @@ services:
       - tool_config:/root/.config
       - plugins_data:/usr/src/app/plugins_data
     networks:
-      - rengine_network
+      - r3ngine_network
       
   web:
     build:
@@ -113,7 +113,7 @@ services:
     restart: always
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     environment:
-      - DEBUG=1
+      - DEBUG=0
       - CELERY_BROKER=redis://redis:6379/0
       - CELERY_BACKEND=redis://redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}
@@ -143,15 +143,16 @@ services:
       - celery
       - celery-beat
     networks:
-      rengine_network:
+      r3ngine_network:
         aliases:
           - rengine
+          - r3ngine
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 2G
         reservations:
-          memory: 512M
+          memory: 1G
 
   proxy:
     restart: always
@@ -175,13 +176,14 @@ services:
       - static_volume:/usr/src/app/staticfiles/
       - scan_results:/usr/src/scan_results
     networks:
-      - rengine_network
+      - r3ngine_network
     deploy:
       resources:
         limits:
           memory: 512M
         reservations:
           memory: 256M
+
   ollama:
     image: ollama/ollama
     container_name: ollama
@@ -190,7 +192,7 @@ services:
     ports:
       - "11434:11434"
     networks:
-      - rengine_network
+      - r3ngine_network
     deploy:
       resources:
         limits:
@@ -210,7 +212,7 @@ services:
     volumes:
       - neo4j_data:/data
     networks:
-      - rengine_network
+      - r3ngine_network
     deploy:
       resources:
         limits:
@@ -219,41 +221,31 @@ services:
           memory: 1G
 
 networks:
-  rengine_network:
+  r3ngine_network:
 
 volumes:
   tool_config:
-    name: rengine_tool_config
-    external: true
+    name: r3ngine_tool_config
   postgres_data:
-    name: rengine_postgres_data
-    external: true
+    name: r3ngine_postgres_data
   gf_patterns:
-    name: rengine_gf_patterns
-    external: true
+    name: r3ngine_gf_patterns
   nuclei_templates:
-    name: rengine_nuclei_templates
-    external: true
+    name: r3ngine_nuclei_templates
   github_repos:
-    name: rengine_github_repos
-    external: true
+    name: r3ngine_github_repos
   wordlist:
-    name: rengine_wordlist
-    external: true
+    name: r3ngine_wordlist
   scan_results:
-    name: rengine_scan_results
-    external: true
+    name: r3ngine_scan_results
   static_volume:
-    name: rengine_static_volume
-    external: true
+    name: r3ngine_static_volume
   ollama_data:
-    name: rengine_ollama_data
-    external: true
+    name: r3ngine_ollama_data
   neo4j_data:
-    name: rengine_neo4j_data
-    external: true
+    name: r3ngine_neo4j_data
   plugins_data:
-    name: rengine_plugins_data
+    name: r3ngine_plugins_data
 
 
 secrets:

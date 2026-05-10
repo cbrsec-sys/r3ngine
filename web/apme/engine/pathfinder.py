@@ -29,7 +29,17 @@ logger = logging.getLogger(__name__)
 INTERNET_ENTRY_SUBTYPES = {"domain", "ip", "service", "endpoint"}
 
 # Target node subtypes considered high-value
-HIGH_VALUE_TARGET_SUBTYPES = {"domain_admin", "root", "admin", "db_access", "data_exfil"}
+HIGH_VALUE_TARGET_SUBTYPES = {
+    "domain_admin",
+    "root",
+    "admin",
+    "db_access",
+    "data_exfil",
+    "rce_execution",
+    "cloud_access",
+    "authenticated_access",
+    "pivot",
+}
 
 
 class Pathfinder:
@@ -62,6 +72,7 @@ class Pathfinder:
 
     def find_paths_bfs(
         self,
+        scan_id: int,
         start_node_id: str,
         target_subtypes: Optional[List[str]] = None,
         top_n: int = 5,
@@ -70,11 +81,12 @@ class Pathfinder:
         BFS: finds shortest paths (minimum hops) from start to any high-value target.
         """
         targets = target_subtypes or list(HIGH_VALUE_TARGET_SUBTYPES)
-        raw_paths = self._bfs_query(start_node_id, targets)
+        raw_paths = self._bfs_query(scan_id, start_node_id, targets)
         return self._validate_and_build(raw_paths, "bfs", top_n)
 
     def find_paths_dfs(
         self,
+        scan_id: int,
         start_node_id: str,
         target_subtypes: Optional[List[str]] = None,
         top_n: int = 5,
@@ -83,11 +95,12 @@ class Pathfinder:
         DFS: discovers deeper, more complex attack chains.
         """
         targets = target_subtypes or list(HIGH_VALUE_TARGET_SUBTYPES)
-        raw_paths = self._dfs_query(start_node_id, targets)
+        raw_paths = self._dfs_query(scan_id, start_node_id, targets)
         return self._validate_and_build(raw_paths, "dfs", top_n)
 
     def find_paths_dijkstra(
         self,
+        scan_id: int,
         start_node_id: str,
         target_subtypes: Optional[List[str]] = None,
         top_n: int = 5,
@@ -97,11 +110,12 @@ class Pathfinder:
         Higher confidence edges are preferred.
         """
         targets = target_subtypes or list(HIGH_VALUE_TARGET_SUBTYPES)
-        raw_paths = self._dijkstra_query(start_node_id, targets)
+        raw_paths = self._dijkstra_query(scan_id, start_node_id, targets)
         return self._validate_and_build(raw_paths, "dijkstra", top_n)
 
     def find_all_paths(
         self,
+        scan_id: int,
         start_node_ids: Optional[List[str]] = None,
         target_subtypes: Optional[List[str]] = None,
         top_n: int = 5,
@@ -110,12 +124,14 @@ class Pathfinder:
         Runs all three algorithms across all entry points and deduplicates results.
         Returns the top N paths by step count (shortest first).
         """
-        entries = start_node_ids or self._get_internet_entry_points()
+        entries = start_node_ids or self._get_internet_entry_points(scan_id)
         all_paths: List[AttackPath] = []
 
         for entry_id in entries:
-            all_paths.extend(self.find_paths_bfs(entry_id, target_subtypes, top_n))
-            all_paths.extend(self.find_paths_dfs(entry_id, target_subtypes, top_n))
+            all_paths.extend(self.find_paths_bfs(scan_id, entry_id, target_subtypes, top_n))
+            all_paths.extend(self.find_paths_dfs(scan_id, entry_id, target_subtypes, top_n))
+
+        # Deduplicate by step fingerprint
 
         # Deduplicate by step fingerprint
         seen = set()
@@ -132,12 +148,12 @@ class Pathfinder:
     # Neo4j Queries
     # -------------------------------------------------------------------------
 
-    def _bfs_query(self, start_id: str, target_subtypes: List[str]) -> List[List[Dict]]:
+    def _bfs_query(self, scan_id: int, start_id: str, target_subtypes: List[str]) -> List[List[Dict]]:
         query = """
             MATCH path = shortestPath(
-                (start:APMENode {apme_id: $start_id})-[:APME_EDGE*1..%d]->(target:APMENode)
+                (start:APMENode {apme_id: $start_id, scan_id: $scan_id})-[:APME_EDGE*1..%d]->(target:APMENode)
             )
-            WHERE target.subtype IN $target_subtypes
+            WHERE target.subtype IN $target_subtypes AND target.scan_id = $scan_id
             RETURN [n in nodes(path) | {
                 id: n.apme_id, type: n.type, subtype: n.subtype,
                 confidence: n.confidence, properties: n.properties
@@ -148,12 +164,12 @@ class Pathfinder:
             LIMIT $limit
         """ % self.MAX_DEPTH
 
-        return self._run_path_query(query, start_id, target_subtypes)
+        return self._run_path_query(query, scan_id, start_id, target_subtypes)
 
-    def _dfs_query(self, start_id: str, target_subtypes: List[str]) -> List[List[Dict]]:
+    def _dfs_query(self, scan_id: int, start_id: str, target_subtypes: List[str]) -> List[List[Dict]]:
         query = """
-            MATCH path = (start:APMENode {apme_id: $start_id})-[:APME_EDGE*1..%d]->(target:APMENode)
-            WHERE target.subtype IN $target_subtypes
+            MATCH path = (start:APMENode {apme_id: $start_id, scan_id: $scan_id})-[:APME_EDGE*1..%d]->(target:APMENode)
+            WHERE target.subtype IN $target_subtypes AND target.scan_id = $scan_id
             RETURN [n in nodes(path) | {
                 id: n.apme_id, type: n.type, subtype: n.subtype,
                 confidence: n.confidence, properties: n.properties
@@ -164,16 +180,16 @@ class Pathfinder:
             LIMIT $limit
         """ % self.MAX_DEPTH
 
-        return self._run_path_query(query, start_id, target_subtypes)
+        return self._run_path_query(query, scan_id, start_id, target_subtypes)
 
-    def _dijkstra_query(self, start_id: str, target_subtypes: List[str]) -> List[List[Dict]]:
+    def _dijkstra_query(self, scan_id: int, start_id: str, target_subtypes: List[str]) -> List[List[Dict]]:
         """
         Dijkstra using APOC's weighted shortest path.
         Edge cost = 1 - confidence (higher confidence = lower cost = preferred).
         Falls back to BFS if APOC is unavailable.
         """
         query = """
-            MATCH (start:APMENode {apme_id: $start_id}), (target:APMENode)
+            MATCH (start:APMENode {apme_id: $start_id, scan_id: $scan_id}), (target:APMENode {scan_id: $scan_id})
             WHERE target.subtype IN $target_subtypes
             CALL apoc.algo.dijkstra(start, target, 'APME_EDGE', 'cost') YIELD path, weight
             RETURN [n in nodes(path) | {
@@ -186,13 +202,13 @@ class Pathfinder:
             LIMIT $limit
         """
         try:
-            return self._run_path_query(query, start_id, target_subtypes)
+            return self._run_path_query(query, scan_id, start_id, target_subtypes)
         except Exception:
             logger.warning("APME Pathfinder: APOC Dijkstra unavailable, falling back to BFS.")
-            return self._bfs_query(start_id, target_subtypes)
+            return self._bfs_query(scan_id, start_id, target_subtypes)
 
     def _run_path_query(
-        self, query: str, start_id: str, target_subtypes: List[str]
+        self, query: str, scan_id: int, start_id: str, target_subtypes: List[str]
     ) -> List[List[Dict]]:
         results = []
         if not self._driver:
@@ -201,6 +217,7 @@ class Pathfinder:
             with self._driver.session() as session:
                 records = session.run(
                     query,
+                    scan_id=scan_id,
                     start_id=start_id,
                     target_subtypes=target_subtypes,
                     limit=self.MAX_PATHS,
@@ -214,7 +231,7 @@ class Pathfinder:
             logger.error(f"APME Pathfinder: Query failed: {exc}")
         return results
 
-    def _get_internet_entry_points(self) -> List[str]:
+    def _get_internet_entry_points(self, scan_id: int) -> List[str]:
         """Returns node IDs for all internet-exposed entry-point assets."""
         if not self._driver:
             return []
@@ -222,10 +239,11 @@ class Pathfinder:
             result = session.run(
                 """
                 MATCH (n:APMENode)
-                WHERE n.subtype IN $subtypes
+                WHERE n.subtype IN $subtypes AND n.scan_id = $scan_id
                 RETURN n.apme_id AS id
                 """,
                 subtypes=list(INTERNET_ENTRY_SUBTYPES),
+                scan_id=scan_id,
             )
             return [r["id"] for r in result]
 

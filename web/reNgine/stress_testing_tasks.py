@@ -3,15 +3,17 @@ from django.conf import settings
 import subprocess
 import json
 import os
-import re
+import signal
 import redis
 import logging
+import time
 from startScan.models import ScanHistory, EndPoint, StressTestResult
 from targetApp.models import Domain
 from reNgine.graph_utils import Neo4jManager
 from django.utils import timezone
 from reNgine.celery_custom_task import RengineTask
-#from reNgine.utilities import send_notification
+from reNgine.parsers import K6Parser, WrkParser, Hping3Parser, LocustParser
+from reNgine.stress_telemetry import StressTelemetryPublisher
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +26,25 @@ except:
     redis_client = None
 
 
+class StressTestTask(RengineTask):
+    """Dedicated task class for stress testing with specialized cleanup and telemetry."""
+    def on_failure(self, exc, task_id, args, kwargs, einfo):
+        super().on_failure(exc, task_id, args, kwargs, einfo)
+        # Ensure any orphan sub-processes are killed
+        scan_id = getattr(self, 'scan_id', None)
+        if not scan_id and args:
+            scan_id = args[0]
+        
+        if scan_id:
+            self.terminate_processes(scan_id)
+
+    def terminate_processes(self, scan_id):
+        """Logic to kill all processes related to this scan."""
+        if redis_client:
+            redis_client.set(f"kill_switch_{scan_id}", "1", ex=3600)
+        logger.warning(f"Termination requested for stress test on scan {scan_id}")
+
+
 def is_kill_switch_active(scan_id):
     """Check if the kill switch for this scan has been flipped in Redis."""
     if redis_client:
@@ -31,35 +52,7 @@ def is_kill_switch_active(scan_id):
     return False
 
 
-def parse_k6_output(output_str):
-    metrics = {
-        "avg_latency": 0.0,
-        "p95_latency": 0.0,
-        "error_rate": 0.0,
-        "throughput_rps": 0.0,
-        "total_requests": 0,
-    }
-    avg_req_dur = re.search(r"http_req_duration\.*:\s+avg=([0-9.]+)", output_str)
-    if avg_req_dur:
-        metrics["avg_latency"] = float(avg_req_dur.group(1))
-
-    p95_req_dur = re.search(r"http_req_duration\.*:\s+.*p\(95\)=([0-9.]+)", output_str)
-    if p95_req_dur:
-        metrics["p95_latency"] = float(p95_req_dur.group(1))
-
-    reqs = re.search(r"http_reqs\.*:\s+([0-9]+)\s+([0-9.]+)/s", output_str)
-    if reqs:
-        metrics["total_requests"] = int(reqs.group(1))
-        metrics["throughput_rps"] = float(reqs.group(2))
-
-    failed = re.search(r"http_req_failed\.*:\s+([0-9.]+)%", output_str)
-    if failed:
-        metrics["error_rate"] = float(failed.group(1)) / 100.0
-
-    return metrics
-
-
-@shared_task(name='stress_testing', queue='main_scan_queue', bind=True, base=RengineTask)
+@shared_task(name='stress_testing', queue='main_scan_queue', bind=True, base=StressTestTask)
 def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config):
     # Extract config
     stress_config = yaml_config.get("stress_test", {})
@@ -69,6 +62,9 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config):
     concurrency = stress_config.get("concurrency", 50)
     duration = stress_config.get("duration", "30s")
     tools = stress_config.get("uses_tools", ["k6"])
+    
+    # Initialize Telemetry
+    publisher = StressTelemetryPublisher(scan_history_id)
 
     # Target Profiling
     try:
@@ -88,88 +84,128 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config):
     overall_result = StressTestResult.objects.create(
         scan_history=scan,
         target_domain=domain,
-        tool_used=tools[0],
+        tool_used=",".join(tools),
         concurrency_used=concurrency,
         duration=duration,
     )
 
-    total_reqs = 0
-
     for endpoint in endpoints:
         if is_kill_switch_active(scan_history_id):
-            logger.warning(
-                f"Kill switch activated for scan {scan_history_id}. Aborting stress test."
-            )
+            logger.warning(f"Kill switch activated for scan {scan_history_id}. Aborting.")
             overall_result.is_kill_switch_triggered = True
             overall_result.save()
             break
 
-        # Traffic Engine Orchestration
-        if "k6" in tools:
-            script_path = f"/tmp/k6_script_{scan_history_id}.js"
-            with open(script_path, "w") as f:
-                f.write(f"""
-                import http from 'k6/http';
-                import {{ sleep }} from 'k6';
-                export default function () {{
-                    http.get('{endpoint.http_url}');
-                    sleep(1);
-                }}
-                """)
+        for tool in tools:
+            parser = None
+            cmd = []
+            
+            if tool == "k6":
+                parser = K6Parser()
+                script_path = f"/tmp/k6_script_{scan_history_id}.js"
+                with open(script_path, "w") as f:
+                    f.write(f"""
+                    import http from 'k6/http';
+                    import {{ sleep }} from 'k6';
+                    export default function () {{
+                        http.get('{endpoint.http_url}');
+                        sleep(1);
+                    }}
+                    """)
+                cmd = ["k6", "run", "--vus", str(concurrency), "--duration", str(duration), script_path]
+            
+            elif tool == "wrk":
+                parser = WrkParser()
+                cmd = ["wrk", "-t", "2", "-c", str(concurrency), "-d", duration, endpoint.http_url]
+            
+            elif tool == "hping3":
+                parser = Hping3Parser()
+                # hping3 needs careful handling of parameters
+                cmd = ["hping3", "-S", "-p", "80", "-c", "10", target_domain_name]
+            
+            elif tool == "locust":
+                parser = LocustParser()
+                script_path = f"/tmp/locustfile_{scan_history_id}.py"
+                with open(script_path, "w") as f:
+                    f.write(f"""
+from locust import HttpUser, task, between
+import logging
 
-            cmd = [
-                "k6",
-                "run",
-                "--vus",
-                str(concurrency),
-                "--duration",
-                str(duration),
-                script_path,
-            ]
-            logger.info(f"Running stress test command: {' '.join(cmd)}")
+# Disable locust logging to stdout to keep telemetry clean
+logging.getLogger('locust').setLevel(logging.ERROR)
 
+class StressUser(HttpUser):
+    wait_time = between(0.1, 0.5)
+
+    @task
+    def test_target(self):
+        self.client.get("/")
+""")
+                # Locust needs a host. If endpoint is a full URL, we use it as host and get("/")
+                cmd = [
+                    "locust",
+                    "--headless",
+                    "-u", str(concurrency),
+                    "-r", str(max(1, int(concurrency) // 5)),
+                    "--run-time", duration,
+                    "--host", endpoint.http_url,
+                    "--locustfile", script_path,
+                    "--print-stats"
+                ]
+
+            if not cmd:
+                continue
+
+            logger.info(f"Executing {tool}: {' '.join(cmd)}")
+            
             try:
-                process = subprocess.run(
-                    cmd, capture_output=True, text=True, timeout=120
+                # Use start_new_session to ensure we can kill the whole process group
+                process = subprocess.Popen(
+                    cmd, 
+                    stdout=subprocess.PIPE, 
+                    stderr=subprocess.STDOUT, 
+                    text=True,
+                    start_new_session=True
                 )
-                output = process.stdout
+
+                while True:
+                    line = process.stdout.readline()
+                    if not line and process.poll() is not None:
+                        break
+                    
+                    if line:
+                        line = line.strip()
+                        # Parse metrics in real-time
+                        metrics = parser.parse_line(line)
+                        if metrics:
+                            # Add context to metrics
+                            metrics["tool"] = tool
+                            metrics["endpoint"] = endpoint.http_url
+                            metrics["timestamp"] = time.time()
+                            
+                            # Publish to Redis Stream
+                            publisher.publish(metrics)
+
+                    # Check kill switch during execution
+                    if is_kill_switch_active(scan_history_id):
+                        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                        break
+
+                process.wait()
+                
+                # Final aggregation for this tool/endpoint can be done here
+                # For now, we rely on the summary stored at the end of the line loop
+                
             except Exception as e:
-                output = ""
-                logger.error(f"k6 execution failed: {e}")
-
-            metrics = parse_k6_output(output)
-
-            # Neo4j Telemetry Ingestion
-            neo4j.ingest_stress_telemetry(
-                endpoint.http_url,
-                scan_history_id,
-                {
-                    "tool": "k6",
-                    "concurrent_users": concurrency,
-                    "avg_latency": metrics["avg_latency"],
-                    "p95_latency": metrics["p95_latency"],
-                    "error_rate": metrics["error_rate"],
-                    "total_requests": metrics["total_requests"],
-                    "throughput_rps": metrics["throughput_rps"],
-                },
-            )
-
-            total_reqs += metrics["total_requests"]
-
-            overall_result.total_requests += metrics["total_requests"]
-            overall_result.avg_latency_ms = max(
-                overall_result.avg_latency_ms, metrics["avg_latency"]
-            )
-            overall_result.p95_latency_ms = max(
-                overall_result.p95_latency_ms, metrics["p95_latency"]
-            )
-            overall_result.save()
+                logger.error(f"Execution of {tool} failed: {e}")
 
     neo4j.close()
 
-    notif.send_scan_status_notif(
-        f"Stress testing completed for {target_domain_name}. Total Requests: {total_reqs}",
-        scan_history_id,
+    # Final notification
+    from reNgine.tasks import send_scan_notif
+    send_scan_notif(
+        scan_history_id=scan_history_id,
+        status='COMPLETED'
     )
 
     return {"status": "success"}

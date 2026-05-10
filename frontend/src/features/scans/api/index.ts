@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { operations, components } from '@/types/api';
-import type { ScanHistory, ScheduledScan, SubScan } from '../types';
+import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, SecretLeak } from '../types';
 import type { Domain } from '../../targets/types';
 
 
@@ -33,7 +33,7 @@ export const useScans = (projectSlug: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json() as any;
+      const data = await response.json() as { results?: ScanHistory[] };
       return (data.results || []) as ScanHistory[];
     },
     enabled: !!projectSlug,
@@ -206,7 +206,7 @@ export const useScansHistory = (project: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json() as any;
+      const data = await response.json() as operations["listScans_list"]["responses"]["200"]["content"]["application/json"];
       return (data.results || []) as ScanHistory[];
     },
     enabled: !!project,
@@ -279,7 +279,7 @@ export const useBulkScanAction = (projectSlug: string) => {
 };
 
 export const useScanSummary = (projectSlug: string, scanId: number) => {
-  return useQuery({
+  return useQuery<ScanSummaryResponse>({
     queryKey: ['scan-summary', projectSlug, scanId],
     queryFn: async () => {
       const response = await fetch(`/api/scan-summary/${projectSlug}/${scanId}/`, {
@@ -291,7 +291,7 @@ export const useScanSummary = (projectSlug: string, scanId: number) => {
       return response.json();
     },
     enabled: !!projectSlug && !!scanId,
-    refetchInterval: (query: any) => {
+    refetchInterval: (query) => {
       const data = query.state.data;
       if (data && data.scan_info && data.scan_info.scan_status === 2) return false;
       return 5000;
@@ -300,7 +300,7 @@ export const useScanSummary = (projectSlug: string, scanId: number) => {
 };
 
 export const useSecretLeaks = (projectSlug: string, scanId: number) => {
-  return useQuery({
+  return useQuery<SecretLeak[]>({
     queryKey: ['secret-leaks', projectSlug, scanId],
     queryFn: async () => {
       const response = await fetch(`/api/scan-summary/${projectSlug}/${scanId}/`, {
@@ -309,7 +309,7 @@ export const useSecretLeaks = (projectSlug: string, scanId: number) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json();
+      const data = await response.json() as ScanSummaryResponse;
       return data.secret_leaks || [];
     },
     enabled: !!projectSlug && !!scanId,
@@ -427,5 +427,24 @@ export const useFetchWhois = (projectSlug: string, scanId: number) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scan-summary', projectSlug, scanId] });
     },
+  });
+};
+export const useScanLogs = (activityId: number | null, scanId: number | null) => {
+  return useQuery<Command[]>({
+    queryKey: ['scan-logs', activityId, scanId],
+    queryFn: async () => {
+      const endpoint = activityId 
+        ? `/api/listActivityLogs/?activity_id=${activityId}`
+        : `/api/listScanLogs/?scan_id=${scanId}`;
+      const response = await fetch(endpoint, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data : (data.results || []) as Command[];
+    },
+    enabled: !!activityId || !!scanId,
   });
 };

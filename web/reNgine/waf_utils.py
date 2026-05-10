@@ -3,6 +3,7 @@ import requests
 import socket
 import ssl
 from django.db.models import Q
+from django.utils import timezone
 from startScan.models import Subdomain, WafBypassFinding
 from dashboard.models import ShodanAPIKey, CensysAPIKey
 from reNgine.opsec_utils import OpSecManager
@@ -166,15 +167,30 @@ class WafBypassOrchestrator:
         }
         
         findings = []
+        # Get scan/activity context if possible
+        scan_history = self.subdomain.scan_history
+        # Try to find a relevant ScanActivity if none was passed (this is a bit hacky but works for timeline)
+        from startScan.models import ScanActivity, Command
+        activity = ScanActivity.objects.filter(scan_of=scan_history, name='waf_bypass').last()
+
         for header, value in bypass_headers.items():
             try:
                 # Send a "suspicious" payload with and without the header
                 payload = "/etc/passwd"
                 headers = {header: value}
+                url = f"{self.target_url}?file={payload}"
+                
+                # Record command for timeline
+                cmd_text = f"GET {url} [Header: {header}: {value}]"
+                Command.objects.create(
+                    command=cmd_text,
+                    time=timezone.now(),
+                    scan_history=scan_history,
+                    activity=activity
+                )
                 
                 # We check if the response status or body changes significantly
-                # This is a heuristic.
-                r = requests.get(f"{self.target_url}?file={payload}", headers=headers, timeout=10, verify=False)
+                r = requests.get(url, headers=headers, timeout=10, verify=False)
                 
                 # If we get a 200 or something that isn't a 403/406, it might be a bypass
                 if r.status_code not in [403, 406, 429]:

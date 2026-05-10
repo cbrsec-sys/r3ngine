@@ -148,12 +148,21 @@ export const ScanHistoryPage: React.FC = () => {
 
   const isSelected = (id: number) => selected.indexOf(id) !== -1;
 
-  const filteredScans = scans?.filter(scan =>
-    scan.domain?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    scan.engine_name?.toLowerCase().includes(searchQuery.toLowerCase())
-  ) || [];
+  const sortedScans = React.useMemo(() => {
+    if (!scans) return [];
+    return [...scans].sort((a, b) => (b.id || 0) - (a.id || 0));
+  }, [scans]);
 
-  const paginatedScans = filteredScans.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  const filteredScans = React.useMemo(() => {
+    return sortedScans.filter(scan =>
+      scan.domain?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      scan.engine_name?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [sortedScans, searchQuery]);
+
+  const paginatedScans = React.useMemo(() => {
+    return filteredScans.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
+  }, [filteredScans, page, rowsPerPage]);
 
   const getStatusChip = (status: number) => {
     switch (status) {

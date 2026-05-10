@@ -78,7 +78,8 @@ import {
   RefreshCw,
   GitBranch
 } from 'lucide-react';
-import { useScanSummary, useActivityLogs, useFetchWhois } from '../api';
+import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois } from '../api';
+import type { Command, SubScan, Vulnerability, ScanActivity, Subdomain, ScanSummaryResponse, TodoNote } from '../types';
 import Chart from 'react-apexcharts';
 import { GeoMap } from '../../dashboard/components/GeoMap';
 import { KpiCard } from '../../../components/KpiCard';
@@ -124,6 +125,37 @@ const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
       {config.label}
     </Box>
   );
+};
+
+const ENGINE_COLORS_MAP: Record<string, string> = {
+  'Subdomain discovery': '#06b6d4', // cyan
+  'Vulnerability scan': '#ef4444', // red
+  'OS Intelligence': '#a855f7', // purple
+  'OSINT': '#a855f7', // purple
+  'Fetch URL': '#3b82f6', // blue
+  'HTTP crawl': '#3b82f6', // blue
+  'WAF detection': '#d946ef', // magenta
+  'WAF bypass': '#d946ef', // magenta
+  'Port scan': '#22c55e', // green
+  'Web API Discovery': '#f97316', // orange
+  'Attack Path Modeling': '#eab308', // yellow
+  'Directories & files fuzz': '#f97316', // orange
+  'Firewall & VPN scan': '#22c55e', // green
+  'Screenshot': '#06b6d4', // cyan
+};
+
+const getFrontendEngineColor = (activityTitle: string) => {
+  if (!activityTitle) return '#fff';
+  // Try exact match first
+  if (ENGINE_COLORS_MAP[activityTitle]) return ENGINE_COLORS_MAP[activityTitle];
+  
+  // Try case-insensitive partial match
+  const lowerTitle = activityTitle.toLowerCase();
+  for (const [key, color] of Object.entries(ENGINE_COLORS_MAP)) {
+    if (lowerTitle.includes(key.toLowerCase())) return color as string;
+  }
+  
+  return '#fff';
 };
 
 const StatusBadge: React.FC<{ status: number }> = ({ status }) => {
@@ -177,15 +209,19 @@ const TaskOverlay: React.FC<{
   open: boolean;
   onClose: () => void;
   activityId: number | null;
+  scanId?: number | null;
   activityTitle: string;
-}> = ({ open, onClose, activityId, activityTitle }) => {
-  const { data: logs, isLoading } = useActivityLogs(activityId);
-  const [selectedLog, setSelectedLog] = useState<any>(null);
+}> = ({ open, onClose, activityId, scanId, activityTitle }) => {
+  const { data: logs, isLoading } = useScanLogs(activityId, scanId ?? null);
+
+  const [selectedLog, setSelectedLog] = useState<Command | null>(null);
 
   // Set first log as selected when logs load
   React.useEffect(() => {
-    if (logs && logs.length > 0 && !selectedLog) {
-      setSelectedLog(logs[0]);
+    if (logs && logs.length > 0) {
+      if (!selectedLog || !logs.find((l: Command) => l.id === selectedLog.id)) {
+        setSelectedLog(logs[0]);
+      }
     }
   }, [logs]);
 
@@ -211,7 +247,7 @@ const TaskOverlay: React.FC<{
       <DialogTitle sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
         <Stack direction="row" sx={{ spacing: 2, alignItems: "center" }}>
           <Terminal size={20} color="#00f3ff" />
-          <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: '1rem', letterSpacing: 1 }}>
+          <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: '1rem', letterSpacing: 1, ml: 2 }}>
             {activityTitle}
           </Typography>
         </Stack>
@@ -229,38 +265,48 @@ const TaskOverlay: React.FC<{
               </Box>
             ) : logs && logs.length > 0 ? (
               <List sx={{ p: 0 }}>
-                {logs.map((log: any) => (
-                  <ListItem
-                    key={log.id}
-                    component="div"
-                    onClick={() => setSelectedLog(log)}
-                    sx={{
-                      cursor: 'pointer',
-                      borderBottom: '1px solid rgba(255,255,255,0.03)',
-                      py: 2,
-                      bgcolor: selectedLog?.id === log.id ? 'rgba(0,243,255,0.05)' : 'transparent',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }
-                    }}
-                  >
-                    <ListItemText
-                      primary={
-                        <Typography sx={{ fontSize: '0.8rem', color: selectedLog?.id === log.id ? '#00f3ff' : '#fff', fontWeight: 700, mb: 0.5, fontFamily: 'monospace' }}>
-                          {log.command.split(' ')[0]}
-                        </Typography>
-                      }
-                      secondary={
-                        <Typography noWrap sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
-                          {log.command}
-                        </Typography>
-                      }
-                    />
-                    <ChevronRight size={14} color={selectedLog?.id === log.id ? '#00f3ff' : 'rgba(255,255,255,0.2)'} />
-                  </ListItem>
-                ))}
+                {logs.map((log: Command) => {
+                  const engineColor = getFrontendEngineColor(log.activity?.title || activityTitle);
+                  return (
+                    <ListItem
+                      key={log.id}
+                      component="div"
+                      onClick={() => setSelectedLog(log)}
+                      sx={{
+                        cursor: 'pointer',
+                        borderBottom: '1px solid rgba(255,255,255,0.03)',
+                        py: 2,
+                        bgcolor: selectedLog?.id === log.id ? 'rgba(0,243,255,0.05)' : 'transparent',
+                        '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }
+                      }}
+                    >
+                      <ListItemText
+                        primary={
+                          <Typography sx={{
+                            fontSize: '0.8rem',
+                            color: selectedLog?.id === log.id ? '#00f3ff' : engineColor,
+                            fontWeight: 700,
+                            mb: 0.5,
+                            fontFamily: 'monospace'
+                          }}>
+                            {log.activity?.title || activityTitle || "Tool Execution"}
+                          </Typography>
+                        }
+                        secondary={
+                          <Typography noWrap sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                            {log.command}
+                          </Typography>
+                        }
+                      />
+                    </ListItem>
+                  );
+                })}
               </List>
             ) : (
-              <Box sx={{ p: 4, textAlign: 'center', opacity: 0.5 }}>
-                <Typography sx={{ fontSize: '0.8rem' }}>No commands logged yet.</Typography>
+              <Box sx={{ p: 4, textAlign: 'center' }}>
+                <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>
+                  No commands found.
+                </Typography>
               </Box>
             )}
           </Grid>
@@ -269,11 +315,19 @@ const TaskOverlay: React.FC<{
             {selectedLog ? (
               <Box sx={{ p: 2 }}>
                 <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography sx={{ fontSize: '0.7rem', color: '#00f3ff', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1 }}>Command Execution Output</Typography>
+                  <Typography sx={{ 
+                    fontSize: '0.7rem', 
+                    color: getFrontendEngineColor(selectedLog.activity?.title || activityTitle), 
+                    fontWeight: 900, 
+                    textTransform: 'uppercase', 
+                    letterSpacing: 1 
+                  }}>
+                    {selectedLog.activity?.title || activityTitle} Output
+                  </Typography>
                   <Button
                     size="small"
                     startIcon={<Copy size={12} />}
-                    onClick={() => navigator.clipboard.writeText(selectedLog.output)}
+                    onClick={() => navigator.clipboard.writeText(selectedLog.output || '')}
                     sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: '#fff', border: '1px solid #00f3ff' } }}
                   >
                     Copy Output
@@ -306,8 +360,8 @@ const TaskOverlay: React.FC<{
   );
 };
 
-const TimelineItem: React.FC<{ activity: any, onClick?: () => void }> = ({ activity, onClick }) => {
-  const statusConfig: any = {
+const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> = ({ activity, onClick }) => {
+  const statusConfig: Record<string, { color: string, label: string }> = {
     'SUCCESS': { color: '#00ff62', label: 'Completed' },
     'RUNNING': { color: '#00f3ff', label: 'In Progress' },
     'FAILED': { color: '#ff003c', label: 'Failed' },
@@ -404,13 +458,13 @@ const TimelineItem: React.FC<{ activity: any, onClick?: () => void }> = ({ activ
   );
 };
 
-const SubScanWidget: React.FC<{ subscans: any[], targetName: string }> = ({ subscans, targetName }) => {
+const SubScanWidget: React.FC<{ subscans: SubScan[], targetName: string }> = ({ subscans, targetName }) => {
   return (
     <Stack spacing={1.5}>
       <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#ff00ff', mb: 1, textTransform: 'uppercase', letterSpacing: 1.5 }}>
         SUB SCAN HISTORY FOR <Box component="span" sx={{ px: 0.5, bgcolor: 'rgba(255,0,255,0.1)', border: '1px solid rgba(255,0,255,0.2)', borderRadius: 0.5, color: '#ff00ff' }}>{targetName}</Box>
       </Typography>
-      {subscans?.map((sub: any) => (
+      {subscans?.map((sub: SubScan) => (
         <Box key={sub.id} sx={{ p: 1.5, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
           <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, bgcolor: sub.status === 2 ? '#00ff62' : '#ffc107' }} />
           <Stack spacing={1}>
@@ -433,7 +487,7 @@ const SubScanWidget: React.FC<{ subscans: any[], targetName: string }> = ({ subs
   );
 };
 
-const VulnerabilityBreakdown: React.FC<{ counts: any, exploitable: number }> = ({ counts, exploitable }) => {
+const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploitable: number }> = ({ counts, exploitable }) => {
   const series = [counts.critical, counts.high, counts.medium, counts.low, counts.info, counts.unknown, exploitable];
   const labels = ['Critical', 'High', 'Medium', 'Low', 'Info', 'Unknown', 'Exploitable'];
   const colors = ['#ff003c', '#ff5722', '#ff9800', '#ffeb3b', '#2196f3', '#9e9e9e', '#00ff62'];
@@ -489,7 +543,7 @@ const VulnerabilityBreakdown: React.FC<{ counts: any, exploitable: number }> = (
   );
 };
 
-const VulnHighlights: React.FC<{ highlights: any[] }> = ({ highlights }) => (
+const VulnHighlights: React.FC<{ highlights: Vulnerability[] }> = ({ highlights }) => (
   <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
     <TableContainer sx={{ flex: 1, overflow: 'auto', maxHeight: 380 }}>
       <Table size="small" stickyHeader>
@@ -502,7 +556,7 @@ const VulnHighlights: React.FC<{ highlights: any[] }> = ({ highlights }) => (
           </TableRow>
         </TableHead>
         <TableBody>
-          {(highlights || []).map((v: any, idx: number) => (
+          {(highlights || []).map((v: Vulnerability, idx: number) => (
             <TableRow key={idx} sx={{ '& td': { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 2 } }}>
               <TableCell>
                 <Box sx={{
@@ -516,17 +570,17 @@ const VulnHighlights: React.FC<{ highlights: any[] }> = ({ highlights }) => (
                   display: 'inline-block',
                   textTransform: 'lowercase'
                 }}>
-                  {v.severity === 0 ? 'info' : 'vuln'}
+                  {Number(v.severity) === 0 ? 'info' : 'vuln'}
                 </Box>
               </TableCell>
               <TableCell>
                 <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff', mb: 0.5 }}>{v.name}</Typography>
                 <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>
-                  Discovered: {formatTimeAgo(v.discovered_date)}
+                  Discovered: {formatTimeAgo(v.discovered_date || '')}
                 </Typography>
               </TableCell>
               <TableCell>
-                <SeverityBadge severity={v.severity} />
+                <SeverityBadge severity={Number(v.severity)} />
               </TableCell>
               <TableCell>
                 <Typography sx={{
@@ -551,18 +605,18 @@ const VulnHighlights: React.FC<{ highlights: any[] }> = ({ highlights }) => (
   </TacticalPanel>
 );
 
-const MostVulnerableSubdomain: React.FC<{ vulnerabilities: any[], sx?: any }> = ({ vulnerabilities, sx = {} }) => {
+const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?: any }> = ({ vulnerabilities = [], sx = {} }) => {
   const [ignoreInfo, setIgnoreInfo] = useState(false);
 
-  const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => v.severity > 0) : vulnerabilities;
+  const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) > 0) : vulnerabilities;
 
-  const subdomainCounts = filteredVulns.reduce((acc: Record<string, number>, v: any) => {
-    const host = new URL(v.http_url).hostname;
+  const subdomainCounts = filteredVulns.reduce((acc: Record<string, number>, v: Vulnerability) => {
+    const host = new URL(v.http_url || '').hostname;
     acc[host] = (acc[host] || 0) + 1;
     return acc;
   }, {});
 
-  const sorted = Object.entries(subdomainCounts).sort((a: any, b: any) => b[1] - a[1]);
+  const sorted = Object.entries(subdomainCounts).sort((a: [string, number], b: [string, number]) => b[1] - a[1]);
   const mostVulnerable = sorted[0];
 
   return (
@@ -594,18 +648,18 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: any[], sx?: any }> = 
   );
 };
 
-const MostCommonVulnsWidget: React.FC<{ vulnerabilities: any[], sx?: any }> = ({ vulnerabilities = [], sx = {} }) => {
+const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], sx?: any }> = ({ vulnerabilities = [], sx = {} }) => {
   const [ignoreInfo, setIgnoreInfo] = useState(false);
-  const filtered = ignoreInfo ? vulnerabilities.filter(v => v.severity !== 0 && v.severity !== 'Info') : vulnerabilities;
+  const filtered = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) !== 0) : vulnerabilities;
 
   // Calculate common vulns from the full vulnerabilities list to ensure Info vulns are included
-  const commonMap = filtered.reduce((acc: any, v: any) => {
+  const commonMap = filtered.reduce((acc: Record<string, any>, v: Vulnerability) => {
     acc[v.name] = acc[v.name] || { name: v.name, count: 0, severity: v.severity };
     acc[v.name].count += 1;
     return acc;
   }, {});
 
-  const data = Object.values(commonMap).sort((a: any, b: any) => b.count - a.count).slice(0, 10);
+  const data = Object.values(commonMap).sort((a: { count: number }, b: { count: number }) => b.count - a.count).slice(0, 10);
 
   return (
     <TacticalPanel
@@ -629,7 +683,7 @@ const MostCommonVulnsWidget: React.FC<{ vulnerabilities: any[], sx?: any }> = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {data.map((v: any, i: number) => (
+            {data.map((v: { name: string; count: number; severity: string | number }, i: number) => (
               <TableRow key={i} sx={{ '& td': { borderBottom: '1px solid rgba(255,255,255,0.03)', py: 1 } }}>
                 <TableCell sx={{ color: '#ff00ff', fontSize: '0.7rem', fontWeight: 800 }}>{v.name}</TableCell>
                 <TableCell align="center">
@@ -654,12 +708,12 @@ const MostCommonVulnsWidget: React.FC<{ vulnerabilities: any[], sx?: any }> = ({
   );
 };
 
-const ImportantSubdomainsWidget: React.FC<{ subdomains: any[], sx?: any }> = ({ subdomains = [], sx = {} }) => (
+const ImportantSubdomainsWidget: React.FC<{ subdomains: Subdomain[], sx?: any }> = ({ subdomains = [], sx = {} }) => (
   <TacticalPanel title="IMPORTANT SUBDOMAINS" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#ff00ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{subdomains.length}</Box>} sx={{ height: '100%', ...sx }}>
     <Box sx={{ p: 2 }}>
       {subdomains.length > 0 ? (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-          {subdomains.map((s: any, i: number) => (
+          {subdomains.map((s: Subdomain, i: number) => (
             <Box key={i} sx={{ px: 1.5, py: 0.5, bgcolor: 'rgba(0,243,255,0.05)', border: '1px solid rgba(0,243,255,0.1)', borderRadius: 1, color: '#00f3ff', fontSize: '0.7rem', fontWeight: 700 }}>
               {s.name}
             </Box>
@@ -682,7 +736,7 @@ const ReconNotesWidget: React.FC<{ notes: any[], sx?: any }> = ({ notes = [], sx
     <Box sx={{ p: 2 }}>
       {notes.length > 0 ? (
         <Stack spacing={1}>
-          {notes.map((n: any) => (
+          {notes.map((n: TodoNote) => (
             <Box key={n.id} sx={{ p: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1, display: 'flex', gap: 1.5 }}>
               <Checkbox size="small" checked={n.is_done} sx={{ color: 'rgba(255,255,255,0.2)', p: 0 }} />
               <Box>
@@ -702,7 +756,7 @@ const ReconNotesWidget: React.FC<{ notes: any[], sx?: any }> = ({ notes = [], sx
   </TacticalPanel>
 );
 
-const IpAddressesWidget: React.FC<{ subdomains: any[], sx?: any }> = ({ subdomains = [], sx = {} }) => {
+const IpAddressesWidget: React.FC<{ subdomains: Partial<Subdomain>[], sx?: any }> = ({ subdomains = [], sx = {} }) => {
   const ips = Array.from(new Set(subdomains.map(s => s.origin_ip).filter(ip => ip && ip !== '0.0.0.0')));
   return (
     <TacticalPanel title="IP ADDRESSES" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ips.length}</Box>} sx={{ height: '100%', ...sx }}>
@@ -761,8 +815,19 @@ export const ScanDetailPage = () => {
   const [taskOverlayOpen, setTaskOverlayOpen] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<{ id: number; title: string } | null>(null);
 
-  const handleTimelineItemClick = (activity: any) => {
-    setSelectedActivity({ id: activity.id, title: activity.title });
+  const [selectedScanId, setSelectedScanId] = useState<number | null>(null);
+
+  const handleTimelineItemClick = (activity: ScanActivity) => {
+    if (activity.id === 'raw-scan-history') {
+      setSelectedScanId(scanId ? parseInt(scanId) : null);
+      setSelectedActivity(null);
+    } else {
+      setSelectedScanId(null);
+      setSelectedActivity({
+        id: Number(activity.id),
+        title: activity.title
+      });
+    }
     setTaskOverlayOpen(true);
   };
 
@@ -894,13 +959,33 @@ export const ScanDetailPage = () => {
         <Box sx={{ p: 1, maxHeight: 400, overflow: 'auto' }}>
           <Stack>
             <Box sx={{ position: 'relative' }}>
-              {data.timeline?.map((activity: any, idx: number) => (
+              {data.timeline?.map((activity: ScanActivity, idx: number) => (
                 <TimelineItem
                   key={idx}
                   activity={activity}
                   onClick={() => handleTimelineItemClick(activity)}
                 />
               ))}
+              {[2, 3, 4].includes(data.scan_info.scan_status) && (
+                <TimelineItem
+                  activity={{
+                    id: 'raw-scan-history',
+                    title: 'Raw Scan History',
+                    name: 'raw_scan_history',
+                    status: 'SUCCESS',
+                    time: new Date().toISOString(),
+                    has_commands: true
+                  }}
+                  onClick={() => handleTimelineItemClick({ 
+                    id: 'raw-scan-history',
+                    title: 'Raw Scan History',
+                    name: 'raw_scan_history',
+                    status: 'SUCCESS',
+                    time: new Date().toISOString(),
+                    has_commands: true
+                  })}
+                />
+              )}
             </Box>
             {(!data.timeline || data.timeline.length === 0) && (
               <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center', py: 4 }}>NO ACTIVITY LOGS</Typography>
@@ -1079,7 +1164,7 @@ export const ScanDetailPage = () => {
                 options={{
                   chart: { type: 'donut', background: 'transparent' },
                   theme: { mode: 'dark' as any },
-                  labels: (data?.http_status_breakdown || []).slice().sort((a: any, b: any) => a.http_status - b.http_status).map((s: any) => `HTTP ${s.http_status}`),
+                  labels: (data?.http_status_breakdown || []).slice().sort((a: { http_status: number }, b: { http_status: number }) => a.http_status - b.http_status).map((s: { http_status: number }) => `HTTP ${s.http_status}`),
                   colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00', '#ff8000', '#0080ff', '#8000ff'],
                   stroke: { show: false },
                   dataLabels: { enabled: false },
@@ -1487,7 +1572,8 @@ export const ScanDetailPage = () => {
         open={taskOverlayOpen}
         onClose={() => setTaskOverlayOpen(false)}
         activityId={selectedActivity?.id || null}
-        activityTitle={selectedActivity?.title || ''}
+        scanId={selectedScanId}
+        activityTitle={selectedActivity?.title || (selectedScanId ? 'Raw Scan History' : '')}
       />
 
       {startScanTargets && (

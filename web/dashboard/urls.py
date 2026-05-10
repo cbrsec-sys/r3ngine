@@ -5,9 +5,13 @@ from . import views
 
 urlpatterns = [
     path(
-        '',
+        'onboarding/',
         views.onboarding,
         name='onboarding'),
+    path(
+        '',
+        views.home_redirect,
+        name='home_redirect'),
     path(
         '<slug:slug>/dashboard/',
         views.index,

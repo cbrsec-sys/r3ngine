@@ -22,7 +22,8 @@ import {
   ListItemText,
   Checkbox,
   Select,
-  FormControl
+  FormControl,
+  TablePagination
 } from '@mui/material';
 import { 
   Search, 
@@ -53,6 +54,8 @@ export const TargetList: React.FC = () => {
   const [startScanTargets, setStartScanTargets] = React.useState<{ ids: number[]; names: string[] } | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
   const [resultsPerPage, setResultsPerPage] = React.useState(20);
+  const [page, setPage] = React.useState(0);
+  const [searchQuery, setSearchQuery] = React.useState('');
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [activeTarget, setActiveTarget] = React.useState<{ id: number; name: string } | null>(null);
 
@@ -66,9 +69,25 @@ export const TargetList: React.FC = () => {
     setActiveTarget(null);
   };
 
+  const sortedDomains = React.useMemo(() => {
+    if (!domains) return [];
+    return [...domains].sort((a, b) => (b.id || 0) - (a.id || 0));
+  }, [domains]);
+
+  const filteredDomains = React.useMemo(() => {
+    return sortedDomains.filter(domain =>
+      domain.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      domain.description?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [sortedDomains, searchQuery]);
+
+  const paginatedDomains = React.useMemo(() => {
+    return filteredDomains.slice(page * resultsPerPage, page * resultsPerPage + resultsPerPage);
+  }, [filteredDomains, page, resultsPerPage]);
+
   const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.checked && domains) {
-      setSelectedIds(domains.map(d => d.id!));
+    if (event.target.checked && filteredDomains) {
+      setSelectedIds(filteredDomains.map(d => d.id!));
     } else {
       setSelectedIds([]);
     }
@@ -199,6 +218,11 @@ export const TargetList: React.FC = () => {
             placeholder="Search..."
             variant="outlined"
             size="small"
+            value={searchQuery}
+            onChange={(e) => {
+              setSearchQuery(e.target.value);
+              setPage(0);
+            }}
             sx={{ 
               width: 280,
               '& .MuiOutlinedInput-root': {
@@ -221,7 +245,10 @@ export const TargetList: React.FC = () => {
             <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', fontFamily: 'Orbitron' }}>Results :</Typography>
             <Select
               value={resultsPerPage}
-              onChange={(e) => setResultsPerPage(Number(e.target.value))}
+              onChange={(e) => {
+                setResultsPerPage(Number(e.target.value));
+                setPage(0);
+              }}
               size="small"
               sx={{ 
                 color: '#fff',
@@ -260,7 +287,7 @@ export const TargetList: React.FC = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {domains?.map((domain) => (
+              {paginatedDomains.map((domain) => (
                 <TableRow 
                   key={domain.id!} 
                   selected={selectedIds.includes(domain.id!)}
@@ -392,6 +419,24 @@ export const TargetList: React.FC = () => {
             </TableBody>
           </Table>
         </TableContainer>
+        <TablePagination
+          component="div"
+          count={filteredDomains.length}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          rowsPerPage={resultsPerPage}
+          onRowsPerPageChange={(e) => {
+            setResultsPerPage(parseInt(e.target.value, 10));
+            setPage(0);
+          }}
+          sx={{
+            color: 'rgba(255,255,255,0.4)',
+            borderTop: '1px solid rgba(255,255,255,0.05)',
+            '.MuiTablePagination-selectIcon': { color: 'rgba(255,255,255,0.4)' },
+            '.MuiTablePagination-actions': { color: 'rgba(255,255,255,0.4)' },
+            '.MuiTablePagination-toolbar': { minHeight: 48 }
+          }}
+        />
       </Card>
 
       <Menu
