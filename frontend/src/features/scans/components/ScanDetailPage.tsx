@@ -372,16 +372,16 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
 
   return (
     <Box
-      onClick={activity.has_commands ? onClick : undefined}
+      onClick={onClick}
       sx={{
         position: 'relative',
         pl: 5,
         pb: 4,
         '&:last-child': { pb: 0 },
-        cursor: activity.has_commands ? 'pointer' : 'default',
-        '&:hover': activity.has_commands ? {
+        cursor: 'pointer',
+        '&:hover': {
           '& .timeline-content': { bgcolor: 'rgba(255,255,255,0.03)' }
-        } : {}
+        }
       }}
     >
       {/* Vertical Line */}
@@ -431,19 +431,17 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
             px: 1,
             py: 0.1,
             borderRadius: 1,
-            bgcolor: 'rgba(0,255,98,0.1)',
-            border: '1px solid rgba(0,255,98,0.2)',
-            color: '#00ff62',
+            bgcolor: `${config.color}20`,
+            border: `1px solid ${config.color}40`,
+            color: config.color,
             fontSize: '0.6rem',
             fontWeight: 800
           }}>
             {config.label}
           </Box>
-          {activity.has_commands && (
-            <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-              • Click to view details <ChevronRight size={10} />
-            </Typography>
-          )}
+          <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            • Click to view details <ChevronRight size={10} />
+          </Typography>
         </Stack>
         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
           {new Date(activity.time).toLocaleString()}
