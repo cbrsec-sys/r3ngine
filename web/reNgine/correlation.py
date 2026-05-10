@@ -59,7 +59,10 @@ class VulnerabilityCorrelationEngine:
         score += exploit_score * self.weights['exploitability']
         
         # 4. Asset Criticality
-        crit_score = (vuln.subdomain.criticality_level or 1) / 5.0
+        criticality = 1
+        if vuln.subdomain and vuln.subdomain.criticality_level:
+            criticality = vuln.subdomain.criticality_level
+        crit_score = criticality / 5.0
         score += crit_score * self.weights['asset_criticality']
         
         vuln.correlation_score = round(score * 100, 2)

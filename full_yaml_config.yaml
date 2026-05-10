@@ -169,7 +169,7 @@ web_api_discovery: {
   'scan_only_active': true,
   'threads': 30,
   'timeout': 5,
-  'kiterunner_wordlist': 'routes-small.kr'
+  'kr_wordlist': 'routes-small.kr'
 }
 stress_test: {
   'uses_tools': ['k6', 'wrk', 'hping3', 'locust'],

@@ -73,3 +73,37 @@ class AttackPathsAPIView(APIView):
             'total_paths': len(paths),
             'paths': paths,
         }, status=status.HTTP_200_OK)
+
+
+class TriggerLLMAPMEAPIView(APIView):
+    """
+    POST /api/apme/trigger/
+    Body: { "scan_id": <id> }
+
+    Triggers an on-demand LLM-assisted attack path modeling task.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        scan_id = request.data.get('scan_id')
+        if not scan_id:
+            return Response(
+                {'error': 'scan_id is required in request body'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from startScan.models import ScanHistory
+            scan = ScanHistory.objects.get(id=scan_id)
+        except ScanHistory.DoesNotExist:
+            return Response({'error': 'Scan not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        # Trigger Celery Task
+        from apme.apme_tasks import run_llm_apme
+        task = run_llm_apme.delay(scan_id)
+
+        return Response({
+            'status': 'triggered',
+            'task_id': task.id,
+            'message': 'AI Attack Path Modeling task has been initiated.'
+        }, status=status.HTTP_202_ACCEPTED)

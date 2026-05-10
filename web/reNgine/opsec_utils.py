@@ -4,6 +4,7 @@ import logging
 import re
 import tempfile
 import subprocess
+from django.conf import settings
 from scanEngine.models import OpSec, Proxy
 from reNgine.definitions import MEDUSA_EXEC_PATH, HYDRA_EXEC_PATH, PROXYCHAINS_EXEC_PATH
 

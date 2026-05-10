@@ -27,7 +27,7 @@ class GraphEnricher:
         self._builder = builder
         self._rules_engine = RulesEngine()
 
-    def enrich(self, nodes: List[Node]) -> List[Edge]:
+    def enrich(self, nodes: List[Node], scan_id: int) -> List[Edge]:
         """
         Apply rules to all nodes and return newly derived edges.
         Edges are also persisted to the graph.
@@ -40,6 +40,6 @@ class GraphEnricher:
 
         if derived_edges:
             logger.info(f"APME Enricher: Derived {len(derived_edges)} new edges from rules.")
-            self._builder.add_edges(derived_edges)
+            self._builder.add_edges(derived_edges, scan_id)
 
         return derived_edges

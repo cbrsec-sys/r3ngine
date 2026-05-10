@@ -228,7 +228,7 @@ class Subdomain(models.Model):
 	content_length = models.IntegerField(default=0, blank=True, null=True)
 	page_title = models.CharField(max_length=1000, blank=True, null=True)
 	technologies = models.ManyToManyField('Technology', related_name='technologies', blank=True)
-	ip_addresses = models.ManyToManyField('IPAddress', related_name='ip_addresses', blank=True)
+	ip_addresses = models.ManyToManyField('IpAddress', related_name='ip_addresses', blank=True)
 	directories = models.ManyToManyField('DirectoryScan', related_name='directories', blank=True)
 	waf = models.ManyToManyField('Waf', related_name='waf', blank=True)
 	origin_ip = models.CharField(max_length=45, null=True, blank=True)
@@ -552,6 +552,11 @@ class Vulnerability(models.Model):
 	validation_confidence = models.FloatField(null=True, blank=True, default=0.0)
 	correlation_score = models.FloatField(null=True, blank=True, default=0.0)
 	is_suppressed = models.BooleanField(default=False)
+
+	def get_path(self):
+		if self.http_url:
+			return urlparse(self.http_url).path
+		return "/"
 
 	def __str__(self):
 		cve_str = ', '.join(f'`{cve.name}`' for cve in self.cve_ids.all())

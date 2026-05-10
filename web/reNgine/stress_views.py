@@ -6,7 +6,6 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from startScan.models import ScanHistory
-from reNgine.stress_testing_tasks import run_stress_testing
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +42,7 @@ class StressTestControlAPI(APIView):
                 redis_client.delete(f"kill_switch_{scan_id}")
             
             # Trigger task
+            from reNgine.stress_testing_tasks import run_stress_testing
             run_stress_testing.delay(scan.id, scan.domain.name, {"stress_test": config})
             return Response({"status": "started"}, status=status.HTTP_200_OK)
         

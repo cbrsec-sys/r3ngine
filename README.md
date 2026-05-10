@@ -88,6 +88,7 @@ Aesthetic excellence is a core requirement of the v3 vision.
 *   **Cyberpunk V3 "Neon" Dashboard**: A premium glassmorphic theme with a unified dark/neon palette optimized for complex data visualization.
     *   **Interactive Subdomain Management**: Fully wired tactical interface for on-demand **LLM Attack Surface Analysis**, targeted **Subscans**, and reconnaissance **TODO/Note management** directly from the inventory.
     *   **Scan Detail Header Reorganization**: Improved the aesthetic layout of the Scan Detail page by repositioning navigation breadcrumbs below action buttons and right-aligned the control group.
+    *   **Chronological Ordering**: Standardized descending ID ordering across Scan History and Target Lists to ensure the most recent entries appear at the top.
     * 📊 **Enhanced Telemetry**: Fixed HTTP status breakdown logic to capture and visualize all response codes across assets. Resolved critical Scan Summary API stability issues by refactoring to target-wide cumulative data queries, ensuring full data visibility for rescans and historical targets.
 *   **Responsive Header & Mobile Menu**: Dynamic adaptation of header actions into a high-fidelity hamburger drawer for small viewports, preserving the glassmorphic aesthetic.
 *   **Multi-Tier Theme System**: Toggle between **Hacker (Cyberpunk)**, **Hybrid (Modern Dark)**, and **Enterprise (Professional Slate)** interfaces instantly.

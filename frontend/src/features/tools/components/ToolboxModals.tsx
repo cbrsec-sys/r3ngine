@@ -34,7 +34,7 @@ const ToolDialog: React.FC<{ open: boolean; onClose: () => void; title: string; 
           bgcolor: 'rgba(10, 10, 15, 0.95)',
           backdropFilter: 'blur(20px)',
           border: `1px solid ${color}44`,
-          borderRadius: '25px',
+          borderRadius: 4,
           backgroundImage: 'none',
           boxShadow: `0 0 40px ${color}11`,
           overflow: 'hidden'
@@ -42,8 +42,8 @@ const ToolDialog: React.FC<{ open: boolean; onClose: () => void; title: string; 
       }
     }}
   >
-    <Box sx={{ p: 0.5, background: `linear-gradient(90deg, ${color}, transparent)` }} />
-    <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+    <Box sx={{ p: 0.5, background: `linear-gradient(90deg, ${color}, transparent)`, borderRadius: '25px' }} />
+    <Box sx={{ borderRadius: '25px', p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
       <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
         <Box sx={{ color }}>{icon}</Box>
         <Typography variant="h6" sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.9rem', letterSpacing: 2, color }}>

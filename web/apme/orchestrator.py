@@ -85,8 +85,8 @@ class APMEOrchestrator:
         builder = GraphBuilder()
         try:
             builder.clear_scan(scan_history_id)
-            builder.add_nodes(all_nodes)
-            builder.add_edges(all_edges)
+            builder.add_nodes(all_nodes, scan_history_id)
+            builder.add_edges(all_edges, scan_history_id)
         except Exception as exc:
             logger.error(f"APME: Graph build failed: {exc}")
             builder.close()
@@ -95,14 +95,14 @@ class APMEOrchestrator:
         # ── Step 3: Enrich Graph ──────────────────────────────────────────────
         logger.info("APME [3/7] Enriching graph via rules engine...")
         enricher = GraphEnricher(builder)
-        derived_edges = enricher.enrich(all_nodes)
+        derived_edges = enricher.enrich(all_nodes, scan_history_id)
         logger.info(f"APME [3/7] Derived {len(derived_edges)} new edges from rules.")
 
         # ── Step 4 & 5: Pathfinding ───────────────────────────────────────────
         logger.info("APME [4/7] Running pathfinding algorithms...")
         pathfinder = Pathfinder()
         try:
-            paths = pathfinder.find_all_paths(top_n=self.top_n * 3)
+            paths = pathfinder.find_all_paths(scan_history_id, top_n=self.top_n * 3)
         except Exception as exc:
             logger.error(f"APME: Pathfinding failed: {exc}")
             paths = []

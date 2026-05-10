@@ -9,8 +9,6 @@ from reNgine.common_func import (fmt_traceback, get_output_file_name,
 								 get_task_cache_key, get_traceback_path)
 from reNgine.definitions import *
 from reNgine.settings import *
-from scanEngine.models import EngineType
-from startScan.models import ScanActivity, ScanHistory, SubScan
 
 logger = get_task_logger(__name__)
 
@@ -73,6 +71,10 @@ class RengineTask(Task):
 		self.yaml_configuration = ctx.get('yaml_configuration', {})
 		self.out_of_scope_subdomains = ctx.get('out_of_scope_subdomains', [])
 		self.history_file = f'{self.results_dir}/commands.txt'
+		
+		from startScan.models import ScanHistory, SubScan
+		from scanEngine.models import EngineType
+		
 		self.scan = ScanHistory.objects.filter(pk=self.scan_id).first()
 		self.subscan = SubScan.objects.filter(pk=self.subscan_id).first()
 		self.engine = EngineType.objects.filter(pk=self.engine_id).first()
@@ -130,11 +132,17 @@ class RengineTask(Task):
 					self.update_scan_activity()
 				return json.loads(result)
 
+		from celery.exceptions import Ignore
 		# Execute task, catch exceptions and update ScanActivity object after
 		# task has finished running.
 		try:
 			self.result = self.run(*args, **kwargs)
 			self.status = SUCCESS_TASK
+
+		except Ignore as exc:
+			# If the task is replaced, it's not a failure
+			self.status = SUCCESS_TASK
+			raise exc
 
 		except Exception as exc:
 			self.status = FAILED_TASK
@@ -186,6 +194,7 @@ class RengineTask(Task):
 	def create_scan_activity(self):
 		if not self.track:
 			return
+		from startScan.models import ScanActivity
 		celery_id = self.request.id
 		self.activity = ScanActivity(
 			name=self.task_name,
@@ -222,17 +231,19 @@ class RengineTask(Task):
 		self.activity.time = timezone.now()
 		self.activity.save()
 
-		# Update scan status if task failed
-		if self.status == FAILED_TASK:
-			if self.scan:
-				self.scan.scan_status = FAILED_TASK
-				# Prepend task name to error message for better visibility in ScanHistory
-				self.scan.error_message = f"[{self.task_name}] {error_message}"
-				self.scan.save()
-			if self.subscan:
-				self.subscan.status = FAILED_TASK
-				self.subscan.error_message = f"[{self.task_name}] {error_message}"
-				self.subscan.save()
+		# # Update scan status if task failed
+		# if self.status == FAILED_TASK:
+		# 	if self.scan:
+		# 		self.scan.scan_status = FAILED_TASK
+		# 		# Prepend task name to error message for better visibility in ScanHistory
+		# 		self.scan.error_message = f"[{self.task_name}] {error_message}"
+		# 		self.scan.save()
+		# 	if self.subscan:
+		# 		self.subscan.status = FAILED_TASK
+		# 		self.subscan.error_message = f"[{self.task_name}] {error_message}"
+		# 		self.subscan.save()
+
+		# Notify task status
 		self.notify()
 
 	def notify(self, name=None, severity=None, fields={}, add_meta_info=True):

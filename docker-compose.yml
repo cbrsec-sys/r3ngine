@@ -192,7 +192,7 @@ services:
     ports:
       - "11434:11434"
     networks:
-      - rengine_network
+      - r3ngine_network
     deploy:
       resources:
         limits:

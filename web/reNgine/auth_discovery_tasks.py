@@ -6,7 +6,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 from startScan.models import EndPoint, AuthCandidate, Subdomain
 from reNgine.celery import app
-from reNgine.tasks import RengineTask
+from reNgine.celery_custom_task import RengineTask
 from reNgine.utilities import save_auth_candidate
 from reNgine.common_func import get_random_proxy
 from celery.utils.log import get_task_logger

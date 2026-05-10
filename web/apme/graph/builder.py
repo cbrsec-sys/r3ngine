@@ -50,16 +50,16 @@ class GraphBuilder:
     # Public API
     # -------------------------------------------------------------------------
 
-    def add_nodes(self, nodes: List[Node]) -> None:
+    def add_nodes(self, nodes: List[Node], scan_id: int) -> None:
         """Persist a batch of nodes to Neo4j."""
         with self._driver.session() as session:
             for node in nodes:
                 try:
-                    session.execute_write(self._merge_node, node)
+                    session.execute_write(self._merge_node, node, scan_id)
                 except Exception as exc:
                     logger.warning(f"APME: Failed to merge node {node.id}: {exc}")
 
-    def add_edges(self, edges: List[Edge]) -> None:
+    def add_edges(self, edges: List[Edge], scan_id: int) -> None:
         """
         Persist a batch of directed edges.
         FAIL SAFE: if either endpoint node does not exist, the edge is skipped.
@@ -67,7 +67,7 @@ class GraphBuilder:
         with self._driver.session() as session:
             for edge in edges:
                 try:
-                    created = session.execute_write(self._merge_edge, edge)
+                    created = session.execute_write(self._merge_edge, edge, scan_id)
                     if not created:
                         logger.debug(
                             f"APME: Skipped edge {edge.from_id} -[{edge.type}]-> {edge.to_id} "
@@ -91,10 +91,10 @@ class GraphBuilder:
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def _merge_node(tx, node: Node) -> None:
+    def _merge_node(tx, node: Node, scan_id: int) -> None:
         tx.run(
             """
-            MERGE (n:APMENode {apme_id: $id})
+            MERGE (n:APMENode {apme_id: $id, scan_id: $scan_id})
             SET n.type       = $type,
                 n.subtype    = $subtype,
                 n.confidence = $confidence,
@@ -102,6 +102,7 @@ class GraphBuilder:
                 n.properties = $properties
             """,
             id=node.id,
+            scan_id=scan_id,
             type=node.type,
             subtype=node.subtype,
             confidence=node.confidence,
@@ -110,15 +111,15 @@ class GraphBuilder:
         )
 
     @staticmethod
-    def _merge_edge(tx, edge: Edge) -> bool:
+    def _merge_edge(tx, edge: Edge, scan_id: int) -> bool:
         """
         Create a directed edge between two existing APMENodes.
         Returns True if successfully created, False if endpoints not found.
         """
         result = tx.run(
             """
-            MATCH (a:APMENode {apme_id: $from_id})
-            MATCH (b:APMENode {apme_id: $to_id})
+            MATCH (a:APMENode {apme_id: $from_id, scan_id: $scan_id})
+            MATCH (b:APMENode {apme_id: $to_id, scan_id: $scan_id})
             MERGE (a)-[r:APME_EDGE {edge_type: $type}]->(b)
             SET r.confidence  = $confidence,
                 r.properties  = $properties
@@ -126,6 +127,7 @@ class GraphBuilder:
             """,
             from_id=edge.from_id,
             to_id=edge.to_id,
+            scan_id=scan_id,
             type=edge.type,
             confidence=edge.confidence,
             properties=str(edge.properties),
