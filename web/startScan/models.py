@@ -420,6 +420,7 @@ class EndPoint(models.Model):
 	response_time = models.FloatField(null=True, blank=True)
 	webserver = models.CharField(max_length=1000, blank=True, null=True)
 	is_default = models.BooleanField(null=True, blank=True, default=False)
+	is_redirect = models.BooleanField(default=False)
 	matched_gf_patterns = models.CharField(max_length=10000, null=True, blank=True)
 	techs = models.ManyToManyField('Technology', related_name='techs', blank=True)
 	# used for subscans

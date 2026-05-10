@@ -4,8 +4,11 @@ import csv
 import subprocess
 from celery.utils.log import get_task_logger
 from reNgine.celery import app
-from reNgine.task_utils import run_command, save_email, save_employee
-from reNgine.opsec_utils import OpSecManager
+from reNgine.common_func import (
+    get_random_proxy,
+)
+from reNgine.task_utils import save_email, save_employee
+from reNgine.opsec_utils import OpSecManager, ProxychainsWrapper
 from startScan.models import ScanHistory, Email, Employee
 from reNgine.definitions import *
 from reNgine.osint.linkedin_intelligence import LinkedInScraper
@@ -20,8 +23,7 @@ def run_holehe(self, email_address, scan_history_id):
     """
     try:
         scan_history = ScanHistory.objects.get(pk=scan_history_id)
-        opsec = OpSecManager()
-        proxy = opsec.get_random_proxy()
+        proxy = get_random_proxy()
         
         cmd = ['holehe', email_address, '--only-used']
         
@@ -68,8 +70,7 @@ def run_maigret(self, username, scan_history_id):
         
         output_file = f"{results_dir}/{username}.json"
         
-        opsec = OpSecManager()
-        proxy = opsec.get_random_proxy()
+        proxy = get_random_proxy()
         
         cmd = ['maigret', username, '--json', output_file]
         
