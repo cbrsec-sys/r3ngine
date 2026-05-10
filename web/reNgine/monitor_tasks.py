@@ -11,6 +11,7 @@ from reNgine.celery import app
 from reNgine.definitions import *
 from reNgine.settings import *
 from reNgine.common_func import *
+from reNgine.task_utils import save_subdomain
 from targetApp.models import Domain
 from startScan.models import ScanHistory, Subdomain, EndPoint, MonitoringDiscovery
 from scanEngine.models import EngineType
@@ -66,12 +67,12 @@ def monitor_target_task(domain_id):
 			
 			existing_subs = set(Subdomain.objects.filter(target_domain=domain).values_list('name', flat=True))
 			
-			for sub_name in discovered_subs:
-				if sub_name not in existing_subs:
-					# Save new subdomain
-					# Note: save_subdomain in tasks.py (imported via *)
-					from reNgine.tasks import save_subdomain
-					sub_obj, created = save_subdomain(sub_name, ctx=ctx)
+			# Check if subdomain discovery is enabled in tasks
+			if 'subdomain_discovery' in scan_history.tasks:
+				for sub_name in discovered_subs:
+					if sub_name not in existing_subs:
+						# Save new subdomain
+						sub_obj, created = save_subdomain(sub_name, ctx=ctx)
 					if created:
 						new_discoveries.append(f"Subdomain: {sub_name}")
 						MonitoringDiscovery.objects.create(
@@ -98,7 +99,7 @@ def monitor_target_task(domain_id):
 					# Detect login and status
 					status, title, is_login = detect_login_and_status(url)
 					
-					from reNgine.tasks import save_endpoint
+					from reNgine.task_utils import save_endpoint
 					endpoint_data = {
 						'http_status': status,
 						'page_title': title,
@@ -164,27 +165,30 @@ def monitor_target_task(domain_id):
 						logger.error(f"Error parsing ReconX findings: {str(e)}")
 
 		# 5. Attack Surface Intelligence (SpiderFoot)
-		sf_output = f"{results_dir}/spiderfoot_monitor.json"
-		sf_config_path = "/root/.config/spiderfoot.cfg"
-		if not os.path.exists(sf_config_path):
-			sf_config_path = f"{results_dir}/spiderfoot_monitor.cfg"
-			api_keys = get_spiderfoot_keys()
-			with open(sf_config_path, 'w') as f:
-				for module, key in api_keys.items():
-					f.write(f"module.{module}.api_key={key}\n")
+		if 'spiderfoot_scan' in scan_history.tasks:
+			sf_output = f"{results_dir}/spiderfoot_monitor.json"
+			sf_config_path = "/root/.config/spiderfoot.cfg"
+			if not os.path.exists(sf_config_path):
+				sf_config_path = f"{results_dir}/spiderfoot_monitor.cfg"
+				api_keys = get_spiderfoot_keys()
+				with open(sf_config_path, 'w') as f:
+					for module, key in api_keys.items():
+						f.write(f"module.{module}.api_key={key}\n")
+			
+			# Use a focused set of modules for monitoring efficiency
+			# Discovery modules + OSINT
+			sf_modules = "snovio,hunterio,emailrep,intelx,shodan,sublist3r,threatcrowd,crtsh"
+			sf_cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {domain.name} -m {sf_modules} -q -f -o json -c {sf_config_path} > {sf_output}"
+			
+			proxy = get_random_proxy()
+			if proxy:
+				sf_cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {sf_cmd}"
+			
+			os.system(sf_cmd)
+		else:
+			sf_output = None
 		
-		# Use a focused set of modules for monitoring efficiency
-		# Discovery modules + OSINT
-		sf_modules = "snovio,hunterio,emailrep,intelx,shodan,sublist3r,threatcrowd,crtsh"
-		sf_cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {domain.name} -m {sf_modules} -q -f -o json -c {sf_config_path} > {sf_output}"
-		
-		proxy = get_random_proxy()
-		if proxy:
-			sf_cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {sf_cmd}"
-		
-		os.system(sf_cmd)
-		
-		if os.path.exists(sf_output):
+		if sf_output and os.path.exists(sf_output):
 			try:
 				with open(sf_output, 'r') as f:
 					sf_data = json.load(f)

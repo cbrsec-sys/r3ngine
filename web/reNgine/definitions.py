@@ -14,6 +14,58 @@ logger = logging.getLogger('django')
 EMAIL_REGEX = re.compile(r'[\w\.-]+@[\w\.-]+')
 
 ###############################################################################
+# TOOL COLORS DEFINITIONS (ANSI Escape Codes)
+###############################################################################
+COLOR_RESET = "\033[0m"
+COLOR_WHITE = "\033[97m"
+COLOR_RED = "\033[91m"
+COLOR_GREEN = "\033[92m"
+COLOR_YELLOW = "\033[93m"
+COLOR_BLUE = "\033[94m"
+COLOR_MAGENTA = "\033[95m"
+COLOR_CYAN = "\033[96m"
+COLOR_ORANGE = "\033[38;5;208m"
+COLOR_PURPLE = "\033[38;5;135m"
+
+TOOL_COLORS = {
+    'httpx': COLOR_BLUE,
+    'nuclei': COLOR_MAGENTA,
+    'subfinder': COLOR_CYAN,
+    'amass': COLOR_YELLOW,
+    'naabu': COLOR_GREEN,
+    'dirsearch': COLOR_ORANGE,
+    'wpscan': COLOR_RED,
+    'gofuzz': COLOR_PURPLE,
+    'sublist3r': COLOR_CYAN,
+    'ctfr': COLOR_BLUE,
+    'ffuf': COLOR_YELLOW,
+    'nmap': COLOR_GREEN,
+    'dalfox': COLOR_MAGENTA,
+    's3scanner': COLOR_BLUE,
+    'crlfuzz': COLOR_RED,
+    'aquatone': COLOR_CYAN,
+    'arjun': COLOR_YELLOW,
+    'inql': COLOR_MAGENTA,
+    'netlas': COLOR_BLUE,
+    'holehe': COLOR_GREEN,
+    'maigret': COLOR_MAGENTA,
+    'retire': COLOR_YELLOW,
+    'gitleaks': COLOR_RED,
+    'trufflehog': COLOR_ORANGE,
+    'k6': COLOR_PURPLE,
+    'whatportis': COLOR_CYAN,
+    'cmseek': COLOR_MAGENTA,
+    'linkfinder': COLOR_BLUE,
+    'paramspider': COLOR_YELLOW,
+    'semgrep': COLOR_GREEN,
+    'oneforall': COLOR_CYAN,
+    'theharvester': COLOR_BLUE,
+    'spiderfoot': COLOR_MAGENTA,
+    'cpanel2shell-scanner': COLOR_RED,
+    'h8mail': COLOR_PURPLE,
+}
+
+###############################################################################
 # YAML CONFIG DEFINITIONS
 ###############################################################################
 

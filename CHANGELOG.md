@@ -1,6 +1,16 @@
 # Changelog
 
 **Official Repo location:** https://github.com/whiterabb17/r3ngine
+## [v3.0.0-beta] - 2026-05-10
+
+### Fixed
+- **EndPoint AttributeError**: Resolved `AttributeError: 'EndPoint' object has no attribute 'created_at'` in `http_crawl` task by standardizing the `endpoint_created` flag as a boolean and using `discovered_date` for timestamping.
+- **APME Pathfinding Stabilization**: Fixed critical pathfinding issues where results were returning zero by expanding `HIGH_VALUE_TARGET_SUBTYPES` to include `rce_execution`, `pivot`, and `authenticated_access`.
+- **Neo4j Scan Isolation**: Enforced strict `scan_id` isolation across the Attack Path Modeling Engine, ensuring concurrent scans do not bleed graph data or relationships.
+
+### Changed
+- **Concurrent Task Orchestration**: Refactored the scan execution pipeline into 6 concurrent execution tiers (Discovery, Enumeration, Analysis, etc.), significantly reducing total scan time while maintaining strict dependency resolution.
+
 ## [v3.0.0-beta] - 2026-05-09
 
 ### Added
@@ -16,6 +26,10 @@
 - **Engine Fixture Ingestion**: Plugins can now ship `*_engine.yaml` fixtures for automatic engine registration.
 - **Background Tool Installation**: Plugin tools are now installed/verified asynchronously via Celery on installation and system startup.
 - **Subprocess Execution Model**: Standardized local execution for plugins to enhance performance and simplify container orchestration.
+- **Chronological Table Ordering**: Standardized descending ID ordering across Scan History and Target Lists to ensure the most recent entries appear at the top.
+- **Enhanced Pagination & Filtering**:
+  - **Scan History**: Implemented memoized sorting and filtering logic in the frontend for consistent recency.
+  - **Target List**: Introduced frontend-driven pagination and functional search filtering to the target management interface.
 
 ### Exploit Readiness Layer (ERL) Hardening (v3-beta)
 - **Proxy Support**: Native integration with reNgine's proxy settings. Tools (`sqlmap`, `XSStrike`) now respect system-wide proxy rotation via proxychains or environmental injection.

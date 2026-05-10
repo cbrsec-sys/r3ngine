@@ -588,7 +588,7 @@ class QueryInterestingSubdomains(APIView):
 
 class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]
-	queryset = Domain.objects.all()
+	queryset = Domain.objects.all().order_by('-id')
 	serializer_class = DomainSerializer
 
 	def get_queryset(self):

@@ -9,10 +9,12 @@ os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
 logger = logging.getLogger(__name__)
 
-def take_screenshot_and_save(subdomain_id, scan_id, results_dir="/usr/src/scan_results"):
+def take_screenshot_and_save(subdomain_id, scan_id, results_dir="/usr/src/scan_results", activity_id=None):
     """
     Orchestrates the capture and database persistence for a single subdomain.
     """
+    from startScan.models import Command
+    from django.utils import timezone
     try:
         subdomain = Subdomain.objects.get(id=subdomain_id)
         scan = ScanHistory.objects.get(id=scan_id)
@@ -25,6 +27,14 @@ def take_screenshot_and_save(subdomain_id, scan_id, results_dir="/usr/src/scan_r
             
         logger.info(f"Processing screenshot for {url} (Subdomain ID: {subdomain_id})")
         
+        # Record command for timeline
+        Command.objects.create(
+            command=f"Playwright: screenshot {url}",
+            time=timezone.now(),
+            scan_history_id=scan_id,
+            activity_id=activity_id
+        )
+
         capture_result = run_capture(url, scan_id, results_dir)
         
         # Save to database if we got at least a screenshot or it was a success

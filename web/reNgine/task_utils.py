@@ -5,12 +5,32 @@ import validators
 from django.utils import timezone
 from celery.utils.log import get_task_logger
 
+from urllib.parse import urlparse
 from reNgine.celery import app
 from reNgine.opsec_utils import ProxychainsWrapper
-from startScan.models import ScanHistory, Email, Employee, Command
-from reNgine.common_func import remove_ansi_escape_sequences
+from startScan.models import ScanHistory, Email, Employee, Command, Subdomain, EndPoint
+from targetApp.models import Domain
+from reNgine.definitions import (
+    COLOR_RESET, COLOR_WHITE, COLOR_RED, TOOL_COLORS
+)
+from reNgine.common_func import remove_ansi_escape_sequences, sanitize_url
+from reNgine.utilities import SubdomainScopeChecker, replace_nulls
+from reNgine.settings import RENGINE_RESULTS
 
 logger = get_task_logger(__name__)
+
+def get_tool_color(cmd):
+    """Returns the ANSI color code for a given command based on the tool name."""
+    sanitized = sanitize_command_for_db(cmd)
+    if not sanitized:
+        return COLOR_RED
+    # Get the first part of the command (the binary)
+    binary = sanitized.split()[0]
+    # Strip path and extension
+    tool = os.path.basename(binary).lower()
+    if tool.endswith(('.py', '.sh', '.nse')):
+        tool = tool.rsplit('.', 1)[0]
+    return TOOL_COLORS.get(tool, COLOR_RED)
 
 def sanitize_command_for_db(cmd):
     """
@@ -49,8 +69,8 @@ def run_command(
     Returns:
         tuple: Tuple with return_code, output.
     """
-    logger.info(cmd)
-    logger.warning(activity_id)
+    color = get_tool_color(cmd)
+    logger.info(f"{color}{cmd}{COLOR_RESET}")
 
     conf_path = None
     if proxy:
@@ -78,7 +98,7 @@ def run_command(
         for stdout_line in iter(popen.stdout.readline, ""):
             item = stdout_line.strip()
             output += '\n' + item
-            logger.warning(item)
+            logger.info(f"{COLOR_WHITE}{item}{COLOR_RESET}")
         popen.stdout.close()
         try:
             popen.wait(timeout=7200)
@@ -137,3 +157,115 @@ def save_employee(name, designation='', scan_history=None):
         scan_history.save()
 
     return employee, created
+
+def save_subdomain(subdomain_name, ctx={}):
+    """Get or create Subdomain object."""
+    scan_id = ctx.get('scan_history_id')
+    subscan_id = ctx.get('subscan_id')
+    out_of_scope_subdomains = ctx.get('out_of_scope_subdomains', [])
+    subdomain_checker = SubdomainScopeChecker(out_of_scope_subdomains)
+    
+    valid_domain = (
+        validators.domain(subdomain_name) or
+        validators.ipv4(subdomain_name) or
+        validators.ipv6(subdomain_name)
+    )
+    if not valid_domain:
+        logger.error(f'{subdomain_name} is not a valid domain. Skipping.')
+        return None, False
+
+    if subdomain_checker.is_out_of_scope(subdomain_name):
+        logger.error(f'{subdomain_name} is out-of-scope. Skipping.')
+        return None, False
+
+    if ctx.get('domain_id'):
+        domain = Domain.objects.filter(id=ctx.get('domain_id')).first()
+        if domain and domain.name not in subdomain_name:
+            logger.error(f"{subdomain_name} is not a subdomain of domain {domain.name}. Skipping.")
+            return None, False
+
+    scan = ScanHistory.objects.filter(pk=scan_id).first()
+    domain = scan.domain if scan else Domain.objects.filter(id=ctx.get('domain_id')).first()
+    
+    subdomain, created = Subdomain.objects.get_or_create(
+        scan_history=scan,
+        target_domain=domain,
+        name=subdomain_name)
+    
+    if created:
+        subdomain.discovered_date = timezone.now()
+        if subscan_id:
+            subdomain.subdomain_subscan_ids.add(subscan_id)
+        subdomain.save()
+    return subdomain, created
+
+def save_endpoint(
+        http_url,
+        ctx={},
+        crawl=False,
+        is_default=False,
+        **endpoint_data):
+    """Get or create EndPoint object."""
+    endpoint_data = replace_nulls(endpoint_data)
+    scheme = urlparse(http_url).scheme
+    endpoint = None
+    created = False
+    
+    if ctx.get('domain_id'):
+        domain = Domain.objects.filter(id=ctx.get('domain_id')).first()
+        if domain and domain.name not in http_url:
+            logger.error(f"{http_url} is not a URL of domain {domain.name}. Skipping.")
+            return None, False
+            
+    if crawl:
+        # Avoid circular import by importing here
+        from reNgine.tasks import http_crawl
+        ctx['track'] = False
+        results = http_crawl(
+            urls=[http_url],
+            method='HEAD',
+            ctx=ctx)
+        if results and isinstance(results, list) and isinstance(results[0], dict):
+            endpoint_data = results[0]
+            if 'endpoint_id' in endpoint_data:
+                endpoint_id = endpoint_data['endpoint_id']
+                created = endpoint_data.get('endpoint_created', False)
+                endpoint = EndPoint.objects.get(pk=endpoint_id)
+    elif not scheme:
+        return None, False
+    else:
+        scan = ScanHistory.objects.filter(pk=ctx.get('scan_history_id')).first()
+        domain = Domain.objects.filter(pk=ctx.get('domain_id')).first()
+        if not validators.url(http_url):
+            return None, False
+        http_url = sanitize_url(http_url)
+
+        endpoints = EndPoint.objects.filter(
+            scan_history=scan,
+            target_domain=domain,
+            http_url=http_url,
+            **endpoint_data
+        )
+
+        if endpoints.exists():
+            endpoint = endpoints.first()
+            created = False
+        else:
+            endpoint = EndPoint.objects.create(
+                scan_history=scan,
+                target_domain=domain,
+                http_url=http_url,
+                **endpoint_data
+            )
+            created = True
+
+    if created:
+        endpoint.is_default = is_default
+        endpoint.discovered_date = timezone.now()
+        endpoint.save()
+        subscan_id = ctx.get('subscan_id')
+        if subscan_id:
+            endpoint.endpoint_subscan_ids.add(subscan_id)
+            endpoint.save()
+
+    return endpoint, created

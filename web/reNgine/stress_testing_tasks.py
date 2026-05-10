@@ -31,7 +31,10 @@ class StressTestTask(RengineTask):
     def on_failure(self, exc, task_id, args, kwargs, einfo):
         super().on_failure(exc, task_id, args, kwargs, einfo)
         # Ensure any orphan sub-processes are killed
-        scan_id = kwargs.get('ctx', {}).get('scan_history_id')
+        scan_id = getattr(self, 'scan_id', None)
+        if not scan_id and args:
+            scan_id = args[0]
+        
         if scan_id:
             self.terminate_processes(scan_id)
 

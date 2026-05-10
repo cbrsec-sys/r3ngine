@@ -45,7 +45,7 @@ python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.Inter
 python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
 
 # TEMPORARY FIX FOR langchain
-pip install urllib3<2.0.0
+pip install urllib3==2.0.0
 pip install tenacity==8.2.2
 
 # install firefox https://askubuntu.com/a/1404401
