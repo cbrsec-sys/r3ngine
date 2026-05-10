@@ -10,6 +10,7 @@ export default defineConfig(({ command }) => ({
   ],
   base: command === 'serve' ? '/' : '/staticfiles/',
   build: {
+    manifest: true,
     outDir: 'dist',
     emptyOutDir: true,
     chunkSizeWarningLimit: 1000,
