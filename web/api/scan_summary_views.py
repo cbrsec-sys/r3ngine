@@ -15,6 +15,7 @@ from startScan.models import (
     Dork, MetaFinderDocument, S3Bucket
 )
 from recon_note.models import TodoNote
+from reNgine.utilities import get_screenshot_path
 
 from api.target_summary_serializers import TargetSummarySerializer, TacticalScanHistorySerializer
 from api.serializers import (
@@ -175,7 +176,7 @@ class ScanSummaryAPIView(APIView):
                 'status': status_map.get(activity.status, 'UNKNOWN'),
                 'name': activity.name,
                 'error_message': activity.error_message if hasattr(activity, 'error_message') else None,
-                'has_commands': Command.objects.filter(activity=activity).exists()
+                'commands': list(Command.objects.filter(activity=activity).values('command', 'output', 'return_code'))
             })
 
         # OSINT - Cumulative for target
@@ -237,7 +238,9 @@ class ScanSummaryAPIView(APIView):
             'related_tlds': related_tlds,
             'scan_count': scan_count,
             'this_week_scan_count': this_week_scan_count,
-            'vulnerability_highlights': list(vulnerabilities.order_by('-severity', '-discovered_date')[:10].values('id', 'name', 'severity', 'http_url', 'discovered_date')),
+            'vulnerability_highlights': list(vulnerabilities.order_by('-severity', '-discovered_date')[:10].values(
+                'id', 'name', 'severity', 'http_url', 'discovered_date', 'description', 'impact', 'remediation', 'is_gpt_used'
+            )),
             'subdomains': [
                 {
                     'name': sub.name,
@@ -246,7 +249,7 @@ class ScanSummaryAPIView(APIView):
                     'http_url': sub.http_url,
                     'origin_ip': sub.origin_ip,
                     'response_time': sub.response_time,
-                    'screenshot_path': sub.screenshot_path,
+                    'screenshot_path': get_screenshot_path(sub),
                     'critical_count': sub.get_critical_count,
                     'high_count': sub.get_high_count,
                     'medium_count': sub.get_medium_count,
@@ -263,7 +266,21 @@ class ScanSummaryAPIView(APIView):
                 } for sub in subdomain_qs.order_by('name')[:100]
             ],
             'endpoints': list(endpoint_qs.order_by('http_url')[:100].values('id', 'http_url', 'http_status', 'content_type', 'techs__name')),
-            'vulnerabilities': list(vulnerabilities.order_by('-severity')[:100].values('id', 'name', 'severity', 'description', 'http_url')),
+            'vulnerabilities': [
+                {
+                    'id': v['id'],
+                    'name': v['name'],
+                    'severity': v['severity'],
+                    'description': v['description'],
+                    'impact': v['impact'],
+                    'remediation': v['remediation'],
+                    'url': v['http_url'],
+                    'matched_at': v['discovered_date'],
+                    'is_gpt_used': v['is_gpt_used']
+                } for v in vulnerabilities.order_by('-severity')[:100].values(
+                    'id', 'name', 'severity', 'description', 'impact', 'remediation', 'http_url', 'discovered_date', 'is_gpt_used'
+                )
+            ],
             'monitoring_discoveries': list(monitoring_discoveries.values('id', 'discovery_type', 'content')),
             'secret_leaks': SecretLeakSerializer(secret_leaks[:100], many=True).data,
             # Scan specific data

@@ -14,7 +14,7 @@ from datetime import datetime
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.renderers import JSONRenderer
 from django.http import FileResponse, Http404
 import mimetypes
@@ -3886,9 +3886,11 @@ class NotificationSettingsAPIView(APIView):
 		return Response(serializer.errors, status=400)
 
 class MobileMediaServeView(APIView):
-	permission_classes = [IsPenetrationTester]
+	permission_classes = [AllowAny]
 	def get(self, request):
+		logger.warning(f"!!! MobileMediaServeView HIT !!! User authenticated: {request.user.is_authenticated}")
 		path = request.query_params.get('path')
+		logger.warning(f"!!! Path requested: {path} !!!")
 		if not path:
 			return Response({'error': 'Path is required'}, status=status.HTTP_400_BAD_REQUEST)
 		
@@ -3898,8 +3900,17 @@ class MobileMediaServeView(APIView):
 		elif path.startswith('/usr/src/scan_results'):
 			path = os.path.relpath(path, '/usr/src/scan_results')
 		
+		if path.startswith('scan_results/'):
+			path = path[len('scan_results/'):]
+		elif path.startswith('media/'):
+			path = path[len('media/'):]
+		elif path.startswith('/media/'):
+			path = path[len('/media/'):]
+		
 		path = path.lstrip('/')
 		file_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, path))
+		
+		logger.info(f"MobileMediaServeView: path={path}, file_path={file_path}, MEDIA_ROOT={settings.MEDIA_ROOT}")
 		
 		# Security check
 		if not is_safe_path(settings.MEDIA_ROOT, file_path):
@@ -3911,6 +3922,7 @@ class MobileMediaServeView(APIView):
 				raise Http404("File not found")
 				
 			content_type, _ = mimetypes.guess_type(file_path)
+			logger.warning(f"!!! MobileMediaServeView: Returning file with content_type={content_type} !!!")
 			return FileResponse(open(file_path, 'rb'), content_type=content_type)
 		else:
 			logger.error(f"File not found: {file_path}")

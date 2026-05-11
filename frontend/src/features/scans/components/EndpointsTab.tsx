@@ -10,7 +10,8 @@ import {
   Stack,
   Tooltip,
   Menu,
-  MenuItem
+  MenuItem,
+  Chip
 } from '@mui/material';
 import {
   Search,
@@ -203,18 +204,18 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
           '&::-webkit-scrollbar': { height: '6px' },
           '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderRadius: '3px' }
         }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead>
               <tr style={{
                 textAlign: 'left',
                 borderBottom: '1px solid rgba(255,255,255,0.1)',
                 backgroundColor: 'rgba(255,255,255,0.02)'
               }}>
-                <th style={{ width: '40%', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>HTTP URL</th>
-                <th style={{ width: '10%', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</th>
-                <th style={{ width: '25%', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PAGE TITLE</th>
-                <th style={{ width: '15%', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>TAGS</th>
-                <th style={{ width: '10%', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>INFO</th>
+                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>HTTP URL</th>
+                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</th>
+                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PAGE TITLE</Box>
+                <Box component="th" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>TAGS</Box>
+                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>INFO</Box>
               </tr>
             </thead>
             <tbody>
@@ -277,41 +278,39 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                       </Typography>
                     </Box>
                   </td>
-                  <td style={{ padding: '16px', verticalAlign: 'top' }}>
-                    <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontWeight: 500, fontStyle: endpoint.page_title ? 'normal' : 'italic' }}>
-                      {endpoint.page_title || 'No Title'}
+                  <Box component="td" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '16px', verticalAlign: 'top' }}>
+                    <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 500, fontStyle: endpoint.page_title ? 'normal' : 'italic' }}>
+                      {endpoint.page_title || 'No Title Available'}
                     </Typography>
-                  </td>
-                  <td style={{ padding: '16px', verticalAlign: 'top' }}>
-                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                      {endpoint.matched_gf_patterns?.split(',').map((tag, idx) => (
-                        <Box key={idx} sx={{
-                          px: 1,
-                          py: 0.2,
-                          bgcolor: 'rgba(255, 0, 60, 0.1)',
-                          border: '1px solid rgba(255, 0, 60, 0.3)',
-                          borderRadius: 0.5,
-                          display: 'inline-block',
-                          width: 'fit-content'
-                        }}>
-                          <Typography sx={{ fontSize: '9px', fontWeight: 900, color: '#ff003c', letterSpacing: 0.5 }}>{tag.trim().toUpperCase()}</Typography>
-                        </Box>
+                  </Box>
+                  <Box component="td" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '16px', verticalAlign: 'top' }}>
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                      {endpoint.matched_gf_patterns && endpoint.matched_gf_patterns.split(',').map((tag) => (
+                        <Chip
+                          key={tag}
+                          label={tag.toUpperCase()}
+                          size="small"
+                          sx={{
+                            height: 16,
+                            fontSize: '8px',
+                            fontWeight: 900,
+                            bgcolor: 'rgba(0, 243, 255, 0.1)',
+                            color: '#00f3ff',
+                            border: '1px solid rgba(0, 243, 255, 0.2)',
+                            borderRadius: 0.5
+                          }}
+                        />
                       ))}
                     </Box>
-                  </td>
-                  <td style={{ padding: '16px', verticalAlign: 'top' }}>
+                  </Box>
+                  <Box component="td" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '16px', verticalAlign: 'top' }}>
                     <Stack spacing={0.5}>
                       <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
-                        TYPE: {endpoint.content_type?.split(';')[0] || 'N/A'}
-                      </Typography>
-                      <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
-                        SIZE: {(endpoint.content_length / 1024).toFixed(2)} KB
-                      </Typography>
-                      <Typography sx={{ fontSize: '10px', color: '#00f3ff', fontWeight: 700, fontFamily: 'monospace', mt: 1 }}>
-                        {endpoint.response_time ? `${endpoint.response_time.toFixed(3)}s` : ''}
+                        TIME: {endpoint.response_time ? `${endpoint.response_time.toFixed(3)}s` : 'N/A'}
                       </Typography>
                     </Stack>
-                  </td>
+                  </Box>
+
                 </tr>
               ))}
               {(!isLoading && data?.results.length === 0) && (

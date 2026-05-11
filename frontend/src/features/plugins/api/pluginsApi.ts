@@ -15,6 +15,16 @@ export interface Plugin {
   manifest: any;
 }
 
+export interface MarketplacePlugin {
+  name: string;
+  slug: string;
+  version: string;
+  description: string;
+  category?: string;
+  is_installed: boolean;
+}
+
+// --- CORE FETCHERS ---
 export const fetchPlugins = async (): Promise<Plugin[]> => {
   const { data } = await axios.get(API_URL);
   return Array.isArray(data) ? data : data.results || [];
@@ -44,6 +54,7 @@ export const deletePlugin = async (slug: string) => {
   return data;
 };
 
+// --- CORE HOOKS ---
 export const usePlugins = () => {
   return useQuery({ queryKey: ['plugins'], queryFn: fetchPlugins });
 };
@@ -77,5 +88,45 @@ export const useUpdatePluginWeight = () => {
   return useMutation({
     mutationFn: updatePluginWeight,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plugins'] }),
+  });
+};
+
+// --- MARKETPLACE FETCHERS ---
+export const fetchMarketplacePlugins = async (refresh = false): Promise<MarketplacePlugin[]> => {
+  const { data } = await axios.get(`${API_URL}marketplace/`, { params: { refresh } });
+  return data;
+};
+
+export const installMarketplacePlugin = async (slug: string) => {
+  const { data } = await axios.post(`${API_URL}marketplace/install/`, { slug });
+  return data;
+};
+
+// --- MARKETPLACE HOOKS ---
+export const useMarketplacePlugins = () => {
+  return useQuery({ 
+    queryKey: ['marketplace-plugins'], 
+    queryFn: () => fetchMarketplacePlugins() 
+  });
+};
+
+export const useInstallMarketplacePlugin = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: installMarketplacePlugin,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['plugins'] });
+      queryClient.invalidateQueries({ queryKey: ['marketplace-plugins'] });
+    },
+  });
+};
+
+export const useRefreshMarketplace = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => fetchMarketplacePlugins(true),
+    onSuccess: (data) => {
+      queryClient.setQueryData(['marketplace-plugins'], data);
+    },
   });
 };

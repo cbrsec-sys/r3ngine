@@ -91,9 +91,16 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   // Selected subdomain for single actions
   const [targetSubdomain, setTargetSubdomain] = useState<any>(null);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [lightboxLabel, setLightboxLabel] = useState<string>('');
   
-  const openLightbox = (src: string) => setLightboxSrc(src);
-  const closeLightbox = () => setLightboxSrc(null);
+  const openLightbox = (src: string, label: string = '') => {
+    setLightboxSrc(src);
+    setLightboxLabel(label);
+  };
+  const closeLightbox = () => {
+    setLightboxSrc(null);
+    setLightboxLabel('');
+  };
   
   // Confirmation state
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -447,7 +454,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           '&::-webkit-scrollbar': { height: '6px' },
           '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderRadius: '3px' }
         }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1200px', tableLayout: 'fixed' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead>
               <tr style={{
                 textAlign: 'left',
@@ -462,14 +469,14 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                     style={{ width: '14px', height: '14px', accentColor: '#00f3ff', cursor: 'pointer', opacity: 0.6 }}
                   />
                 </th>
-                <th style={{ width: '220px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SUBDOMAIN</th>
-                <th style={{ width: '100px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</th>
-                <th style={{ width: '150px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>IP</th>
-                <th style={{ width: '200px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PORTS</th>
-                <th style={{ width: '100px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>CONTENT</th>
-                <th style={{ width: '100px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>TIME</th>
-                <th style={{ width: '100px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SCREENSHOT</th>
-                <th style={{ width: '120px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>ACTION</th>
+                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SUBDOMAIN</th>
+                <Box component="th" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</Box>
+                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>IP</Box>
+                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PORTS</Box>
+                <Box component="th" sx={{ display: { xs: 'none', xl: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>CONTENT</Box>
+                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>TIME</Box>
+                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SCREENSHOT</Box>
+                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron', textAlign: 'right' }}>ACTION</th>
               </tr>
             </thead>
             <tbody>
@@ -557,7 +564,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                       </Box>
                     </Box>
                   </td>
-                  <td style={{ padding: '12px 16px' }}>
+                  <Box component="td" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '12px 16px' }}>
                     <Box sx={{
                       display: 'inline-flex',
                       px: 1.2,
@@ -570,8 +577,8 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                         {sub.http_status || '404'}
                       </Typography>
                     </Box>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
+                  </Box>
+                  <Box component="td" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       {sub.ip_addresses?.map(ip => (
                         <Typography
@@ -587,8 +594,8 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                         </Typography>
                       ))}
                     </Box>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
+                  </Box>
+                  <Box component="td" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px' }}>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                       {sub.ip_addresses?.flatMap(ip => ip.ports.map(port => ({ ...port, ipId: ip.id }))).map(port => (
                         <Box
@@ -598,55 +605,59 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                             py: 0.2,
                             borderRadius: 0.5,
                             bgcolor: port.is_uncommon ? 'rgba(255, 0, 60, 0.1)' : 'rgba(255,255,255,0.05)',
-                            border: '1px solid rgba(255,255,255,0.1)'
+                            border: `1px solid ${port.is_uncommon ? 'rgba(255, 0, 60, 0.2)' : 'rgba(255,255,255,0.1)'}`,
                           }}
                         >
-                          <Typography sx={{ fontSize: '9px', fontWeight: 800, color: port.is_uncommon ? '#ff003c' : 'rgba(255,255,255,0.6)' }}>
-                            {port.number}/{port.service_name}
+                          <Typography sx={{ fontSize: '9px', fontWeight: 800, color: port.is_uncommon ? '#ff003c' : 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
+                            {port.number}
                           </Typography>
                         </Box>
                       ))}
                     </Box>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace', fontWeight: 600 }}>
-                      {sub.content_length?.toLocaleString() || '0'}
+                  </Box>
+                  <Box component="td" sx={{ display: { xs: 'none', xl: 'table-cell' }, padding: '12px 16px' }}>
+                    <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                      {sub.content_length ? `${(sub.content_length / 1024).toFixed(1)} KB` : '0 KB'}
                     </Typography>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <Typography sx={{ fontSize: '11px', color: '#ff003c', fontFamily: 'monospace', fontWeight: 700 }}>
-                      {sub.response_time ? `${sub.response_time.toFixed(4)}s` : '-'}
+                  </Box>
+                  <Box component="td" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px' }}>
+                    <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                      {sub.response_time ? `${(sub.response_time * 1000).toFixed(0)}ms` : '-'}
                     </Typography>
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
+                  </Box>
+                  <Box component="td" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px' }}>
                     {sub.screenshot_path ? (
-                      <Box 
-                        onClick={() => openLightbox(`/media/${sub.screenshot_path}`)}
+                      <Box
+                        onClick={() => openLightbox(sub.screenshot_path!, sub.name)}
                         sx={{
-                          width: 50,
-                          height: 30,
+                          width: 60,
+                          height: 34,
                           borderRadius: 0.5,
                           overflow: 'hidden',
                           border: '1px solid rgba(255,255,255,0.1)',
                           cursor: 'pointer',
-                          '&:hover': { borderColor: '#00f3ff', transform: 'scale(1.5)', zIndex: 10 },
-                          transition: 'all 0.2s'
+                          transition: 'all 0.2s',
+                          position: 'relative',
+                          '&:hover': {
+                            borderColor: '#00f3ff',
+                            transform: 'scale(1.1)',
+                            zIndex: 10,
+                            boxShadow: '0 0 15px rgba(0, 243, 255, 0.3)'
+                          }
                         }}
                       >
                         <img
                           src={`/media/${sub.screenshot_path}`}
-                          alt="Visual"
+                          alt="preview"
                           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                         />
                       </Box>
                     ) : (
-                      <Box sx={{ width: 50, height: 30, borderRadius: 0.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Typography sx={{ fontSize: '6px', color: 'rgba(255,255,255,0.1)' }}>NULL</Typography>
-                      </Box>
+                      <Typography sx={{ fontSize: '9px', color: 'rgba(255,255,255,0.15)', fontWeight: 800 }}>NO DATA</Typography>
                     )}
-                  </td>
-                  <td style={{ padding: '12px 16px' }}>
-                    <Box sx={{ display: 'flex', gap: 0.5 }}>
+                  </Box>
+                  <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
                       <Tooltip title="Show Attack Surface">
                         <IconButton 
                           size="small" 
@@ -685,6 +696,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                       </IconButton>
                     </Box>
                   </td>
+
                 </tr>
               ))}
             </tbody>
@@ -1033,43 +1045,67 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         open={!!lightboxSrc}
         onClose={closeLightbox}
         closeAfterTransition
-        slots={{ backdrop: Backdrop }}
-        slotProps={{
-          backdrop: {
-            sx: { bgcolor: 'rgba(0, 0, 0, 0.92)', backdropFilter: 'blur(6px)', zIndex: 9999 },
-            timeout: 200,
-          },
+        sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 999999 // Extremely high to be sure
         }}
-        sx={{ zIndex: 10000 }}
       >
         <Fade in={!!lightboxSrc} timeout={200}>
           <Box
-            onClick={closeLightbox}
             sx={{
-              position: 'fixed',
-              inset: 0,
+              position: 'relative',
+              width: '100vw',
+              height: '100vh',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              p: 4,
               outline: 'none',
-              cursor: 'zoom-out'
             }}
           >
-            <IconButton
+            {/* Custom Backdrop - guaranteed to be behind since it's the first child */}
+            <Box 
               onClick={closeLightbox}
+              sx={{ 
+                position: 'absolute', 
+                inset: 0, 
+                bgcolor: 'rgba(0, 0, 0, 0.92)', 
+                backdropFilter: 'blur(8px)',
+                zIndex: 1,
+                cursor: 'zoom-out'
+              }} 
+            />
+            
+            {/* Content - guaranteed to be on top since it's after the backdrop and has higher zIndex */}
+            <Box
               sx={{
-                position: 'absolute',
-                top: 20,
-                right: 20,
-                color: 'rgba(255,255,255,0.5)',
-                bgcolor: 'rgba(0,0,0,0.5)',
-                '&:hover': { color: '#fff', bgcolor: 'rgba(0, 243, 255, 0.1)' }
+                position: 'relative',
+                zIndex: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                justifyContent: 'center',
+                p: 4,
+                maxWidth: '95vw',
+                maxHeight: '95vh',
               }}
             >
-              <X size={24} />
-            </IconButton>
+              <IconButton
+                onClick={closeLightbox}
+                sx={{
+                  position: 'absolute',
+                  top: -20,
+                  right: -20,
+                  color: 'rgba(255,255,255,0.8)',
+                  bgcolor: 'rgba(0,0,0,0.5)',
+                  zIndex: 3,
+                  '&:hover': { color: '#fff', bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                }}
+              >
+                <X size={20} />
+              </IconButton>
             
             <Box
               component="img"
@@ -1086,8 +1122,9 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 cursor: 'default'
               }}
             />
-          </Box>
-        </Fade>
+              </Box>
+            </Box>
+          </Fade>
       </Modal>
     </Box>
   );

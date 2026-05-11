@@ -65,11 +65,11 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
           <Table size="small">
             <TableHead>
               <TableRow sx={{ '& th': { borderBottom: '2px solid #7000ff', bgcolor: 'rgba(255,255,255,0.02)', color: '#00f3ff', fontSize: '0.7rem', fontWeight: 900, py: 2 } }}>
-                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>TOOL</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>TYPE</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>SOURCE</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>MATCH CONTENT</th>
-                <th style={{ padding: '12px 16px', textAlign: 'left', color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>STATUS</th>
+                <TableCell sx={{ color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>TOOL</TableCell>
+                <TableCell sx={{ color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>TYPE</TableCell>
+                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>SOURCE</TableCell>
+                <TableCell sx={{ color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>MATCH CONTENT</TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' }, color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>STATUS</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -93,7 +93,7 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
                       {leak.secret_type}
                     </Typography>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                     <Stack direction="row" sx={{ alignItems: 'center' }} spacing={1}>
                       <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {leak.source_url}
@@ -112,14 +112,15 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
-                      maxWidth: '300px'
+                      maxWidth: { xs: '150px', sm: '300px' }
                     }}>
                       <Typography sx={{ 
                         fontSize: '0.7rem', 
                         fontFamily: 'monospace', 
                         color: '#00ff62',
                         overflow: 'hidden',
-                        textOverflow: 'ellipsis'
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
                       }}>
                         {leak.match_content}
                       </Typography>
@@ -128,7 +129,7 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
                       </IconButton>
                     </Box>
                   </TableCell>
-                  <TableCell>
+                  <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                     <Box sx={{ 
                       display: 'inline-flex',
                       px: 1,

@@ -1,24 +1,17 @@
-# APME Attack Rules Configuration
-#
-# Rules define how discovered vulnerabilities and access translate into
-# attacker capabilities (new graph edges).
+# APME Attack Rules Configuration V2
 #
 # Rule format:
 #   name: unique identifier
+#   mitre_id: ATT&CK technique ID (optional)
 #   if:
 #     node.type: <Node type>
-#     node.subtype: <Node subtype>          # optional
-#     node.role: <role property value>      # optional
+#     node.subtype: <Node subtype>
+#     node.property: <key:value>
 #   then:
 #     create_edge:
-#       type: <EDGE_TYPE from edge.py>
-#       target_subtype: <subtype of target node to wire to>
-#       confidence: <float 0.0-1.0>         # default 0.7
-#
-# IMPORTANT:
-# - Rules derive edges dynamically from existing nodes in the graph.
-# - Virtual Goal nodes (Capabilities/Privileges) are injected by the Orchestrator.
-# - Rules support chaining: output of one rule can be input to another.
+#       type: <EDGE_TYPE>
+#       target_subtype: <subtype>
+#       confidence: <0.0-1.0>
 
 rules:
 
@@ -27,7 +20,7 @@ rules:
   # --------------------------------------------------------------------------
 
   - name: sqli_to_db_access
-    description: "SQL Injection gives attacker database access"
+    mitre_id: "T1190"
     if:
       node.type: Vulnerability
       node.subtype: sqli
@@ -38,7 +31,7 @@ rules:
         confidence: 0.90
 
   - name: rce_to_execution
-    description: "Remote Code Execution gives full command execution"
+    mitre_id: "T1190"
     if:
       node.type: Vulnerability
       node.subtype: rce
@@ -49,7 +42,7 @@ rules:
         confidence: 0.95
 
   - name: ssti_to_rce
-    description: "SSTI often leads to RCE capability"
+    mitre_id: "T1190"
     if:
       node.type: Vulnerability
       node.subtype: ssti
@@ -59,119 +52,54 @@ rules:
         target_subtype: rce_execution
         confidence: 0.85
 
-  - name: prototype_pollution_to_rce
-    description: "Prototype Pollution can escalate to RCE in many environments"
-    if:
-      node.type: Vulnerability
-      node.subtype: prototype_pollution
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: rce_execution
-        confidence: 0.75
-
   # --------------------------------------------------------------------------
-  # Information Disclosure / Data Exfiltration
+  # Sensitivity-Aware Rules (Targeting HVTs)
   # --------------------------------------------------------------------------
 
-  - name: xss_to_data_exfil
-    description: "XSS can be used for session theft or data exfiltration"
+  - name: any_vuln_on_hvt
+    description: "Any vulnerability on a High Value Target is a major risk"
     if:
       node.type: Vulnerability
-      node.subtype: xss
     then:
+      # This rule only triggers if the vulnerability is EXPOSED by a high-sensitivity asset
+      # We'll handle the logic for 'parent property' in the rules engine refactor
       create_edge:
         type: LEADS_TO
-        target_subtype: data_exfil
-        confidence: 0.65
-
-  - name: lfi_to_data_exfil
-    description: "LFI exposes sensitive files (credentials, configs)"
-    if:
-      node.type: Vulnerability
-      node.subtype: lfi
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: data_exfil
-        confidence: 0.70
-
-  - name: xxe_to_data_exfil
-    description: "XXE leads to local file read and data exfiltration"
-    if:
-      node.type: Vulnerability
-      node.subtype: xxe
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: data_exfil
-        confidence: 0.85
-
-  - name: cors_to_data_exfil
-    description: "CORS misconfiguration allows reading sensitive data via JS"
-    if:
-      node.type: Vulnerability
-      node.subtype: cors
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: data_exfil
-        confidence: 0.70
-
-  # --------------------------------------------------------------------------
-  # SSRF / Pivoting / Internal Access
-  # --------------------------------------------------------------------------
-
-  - name: ssrf_to_internal
-    description: "SSRF can reach internal services behind the firewall"
-    if:
-      node.type: Vulnerability
-      node.subtype: ssrf
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: pivot
-        confidence: 0.80
-
-  - name: xxe_to_pivot
-    description: "XXE can be used for SSRF/pivoting to internal metadata services"
-    if:
-      node.type: Vulnerability
-      node.subtype: xxe
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: pivot
-        confidence: 0.65
-
-  - name: rce_to_pivot
-    description: "RCE on a host enables network pivoting"
-    if:
-      node.type: Vulnerability
-      node.subtype: rce
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: pivot
-        confidence: 0.85
-
-  # --------------------------------------------------------------------------
-  # Authentication / Credential rules
-  # --------------------------------------------------------------------------
-
-  - name: open_redirect_to_auth_theft
-    description: "Open Redirect facilitates phishing for credentials"
-    if:
-      node.type: Vulnerability
-      node.subtype: open_redirect
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: authenticated_access
+        target_subtype: hvt_compromise
         confidence: 0.50
 
-  - name: misconfig_to_authenticated_access
-    description: "Misconfiguration (e.g. default creds) enables auth bypass"
+  # --------------------------------------------------------------------------
+  # Post-Exploitation / Pivoting
+  # --------------------------------------------------------------------------
+
+  - name: execution_to_pivot
+    mitre_id: "T1090"
+    if:
+      node.type: Capability
+      node.subtype: rce_execution
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: pivot
+        confidence: 0.85
+
+  - name: pivot_to_internal_discovery
+    mitre_id: "T1046"
+    if:
+      node.type: Capability
+      node.subtype: pivot
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: internal_discovery
+        confidence: 0.80
+
+  # --------------------------------------------------------------------------
+  # Authentication & Identity
+  # --------------------------------------------------------------------------
+
+  - name: bypass_to_auth_access
+    mitre_id: "T1548"
     if:
       node.type: Vulnerability
       node.subtype: misconfig
@@ -179,88 +107,14 @@ rules:
       create_edge:
         type: LEADS_TO
         target_subtype: authenticated_access
-        confidence: 0.80
+        confidence: 0.75
 
-  - name: creds_to_authenticated_access
-    description: "Any discovered credential unlocks authenticated access"
+  - name: creds_to_auth_access
+    mitre_id: "T1078"
     if:
       node.type: Credential
     then:
       create_edge:
         type: LEADS_TO
         target_subtype: authenticated_access
-        confidence: 0.90
-
-  - name: api_key_to_cloud_access
-    description: "Cloud API keys lead to cloud infrastructure access"
-    if:
-      node.type: Credential
-      node.subtype: api_key
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: cloud_access
-        confidence: 0.85
-
-  # --------------------------------------------------------------------------
-  # Supply Chain / Dependency rules
-  # --------------------------------------------------------------------------
-
-  - name: dependency_to_rce
-    description: "Critical dependency vulnerability (SCA) often leads to RCE"
-    if:
-      node.type: Vulnerability
-      node.subtype: dependency
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: rce_execution
-        confidence: 0.70
-
-  - name: dependency_to_data_exfil
-    description: "Vulnerable dependency may allow data exfiltration"
-    if:
-      node.type: Vulnerability
-      node.subtype: dependency
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: data_exfil
-        confidence: 0.60
-
-  # --------------------------------------------------------------------------
-  # Identity / Privilege escalation rules
-  # --------------------------------------------------------------------------
-
-  - name: admin_identity_to_high_privilege
-    description: "Admin identity can escalate to admin privilege"
-    if:
-      node.type: Identity
-      node.role: admin
-    then:
-      create_edge:
-        type: ESCALATES_TO
-        target_subtype: admin
         confidence: 0.95
-
-  - name: user_identity_to_user_privilege
-    description: "User identity maps to user-level privilege"
-    if:
-      node.type: Identity
-      node.role: user
-    then:
-      create_edge:
-        type: ESCALATES_TO
-        target_subtype: user
-        confidence: 0.85
-
-  - name: service_account_to_internal_pivot
-    description: "Service accounts can pivot to internal systems"
-    if:
-      node.type: Identity
-      node.role: service_account
-    then:
-      create_edge:
-        type: LEADS_TO
-        target_subtype: pivot
-        confidence: 0.75

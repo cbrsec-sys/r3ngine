@@ -67,6 +67,7 @@ class RulesEngine:
             edge_type = create_edge.get("type")
             target_subtype = create_edge.get("target_subtype")
             confidence = float(create_edge.get("confidence", 0.7))
+            mitre_id = rule.get("mitre_id")
 
             if not edge_type:
                 logger.debug(f"APME Rule '{rule.get('name')}': No edge type defined. Skipping.")
@@ -79,11 +80,6 @@ class RulesEngine:
             ]
 
             if not target_nodes:
-                # FAIL SAFE: if we can't find a target, do not create a fantasized edge
-                logger.debug(
-                    f"APME Rule '{rule.get('name')}': No target nodes with "
-                    f"subtype='{target_subtype}' found. Edge skipped."
-                )
                 continue
 
             for target_node in target_nodes:
@@ -93,13 +89,12 @@ class RulesEngine:
                         to_id=target_node.id,
                         type=edge_type,
                         confidence=confidence,
-                        properties={"rule": rule.get("name", "unknown")},
+                        properties={
+                            "rule": rule.get("name", "unknown"),
+                            "mitre_id": mitre_id or "unknown"
+                        },
                     )
                     derived_edges.append(edge)
-                    logger.debug(
-                        f"APME Rule '{rule.get('name')}': Created {edge_type} "
-                        f"{node.id} -> {target_node.id} (confidence={confidence})"
-                    )
                 except ValueError as exc:
                     logger.warning(f"APME Rule '{rule.get('name')}': Invalid edge type: {exc}")
 
@@ -109,20 +104,23 @@ class RulesEngine:
     def _matches(node: Node, condition: Dict[str, Any]) -> bool:
         """
         Check if a node satisfies the rule's 'if' conditions.
-        All conditions must match (AND logic).
+        Supports node.type, node.subtype, and property matching.
         """
         if not condition:
             return False
 
-        node_type = condition.get("node.type")
-        node_subtype = condition.get("node.subtype")
-        node_role = condition.get("node.role")
+        # Node basic attributes
+        if "node.type" in condition and node.type != condition["node.type"]:
+            return False
+        if "node.subtype" in condition and node.subtype != condition["node.subtype"]:
+            return False
 
-        if node_type and node.type != node_type:
-            return False
-        if node_subtype and node.subtype != node_subtype:
-            return False
-        if node_role and node.properties.get("role") != node_role:
-            return False
+        # Property matching (e.g. node.property: "sensitivity:high")
+        if "node.property" in condition:
+            prop_cond = condition["node.property"]
+            if isinstance(prop_cond, str) and ":" in prop_cond:
+                key, val = prop_cond.split(":", 1)
+                if node.properties.get(key) != val:
+                    return False
 
         return True

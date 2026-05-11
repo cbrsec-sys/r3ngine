@@ -192,7 +192,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
         </Box>
 
         <Box sx={{ overflowX: 'auto', width: '100%' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '1000px' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead>
               <tr style={{ 
                 textAlign: 'left', 
@@ -200,10 +200,10 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                 backgroundColor: 'rgba(255,255,255,0.02)'
               }}>
                 <th style={{ width: '40px', padding: '12px 16px' }}></th>
-                <th style={{ width: '80px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>VISUAL</th>
-                <th style={{ width: '250px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SUBDOMAIN</th>
-                <th style={{ width: '100px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</th>
-                <th style={{ width: '200px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PAGE TITLE</th>
+                <Box component="th" sx={{ display: { xs: 'none', sm: 'table-cell' }, width: '80px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>VISUAL</Box>
+                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SUBDOMAIN</th>
+                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</Box>
+                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PAGE TITLE</Box>
                 <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>DIRECTORIES DISCOVERED</th>
               </tr>
             </thead>
@@ -229,7 +229,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                       {expandedSubdomains[sub.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                     </IconButton>
                   </td>
-                  <td style={{ padding: '12px 16px', verticalAlign: 'top', textAlign: 'center' }}>
+                  <Box component="td" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '12px 16px', verticalAlign: 'top', textAlign: 'center' }}>
                     {sub.screenshot_path ? (
                       <IconButton 
                         size="small" 
@@ -246,7 +246,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                     ) : (
                       <Camera size={14} style={{ color: 'rgba(255,255,255,0.1)' }} />
                     )}
-                  </td>
+                  </Box>
                   <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -278,7 +278,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                       )}
                     </Box>
                   </td>
-                  <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
+                  <Box component="td" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', verticalAlign: 'top' }}>
                     <Box sx={{ 
                       display: 'inline-flex',
                       px: 1.2, 
@@ -291,12 +291,12 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                         {sub.http_status}
                       </Typography>
                     </Box>
-                  </td>
-                  <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
+                  </Box>
+                  <Box component="td" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', verticalAlign: 'top' }}>
                     <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.7)' }}>
                       {sub.page_title || '-'}
                     </Typography>
-                  </td>
+                  </Box>
                   <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
                     {sub.directories && sub.directories.length > 0 ? (
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>

@@ -265,8 +265,9 @@ const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId
       title="SCAN RESULT VISUALIZATION" 
       icon={<Maximize2 size={14} />}
       headerAction={
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: { xs: 1, sm: 2 }, justifyContent: 'flex-end' }}>
           <FormControlLabel
+            sx={{ m: 0 }}
             control={
               <Switch 
                 checked={expandAll} 

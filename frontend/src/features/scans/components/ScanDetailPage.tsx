@@ -1034,6 +1034,11 @@ export const ScanDetailPage = () => {
     );
   }
 
+  const scanStatus = data.scan_info.scan_status;
+  const isTerminal = [0, 2, 3, 4].includes(scanStatus);
+  const progressColor = scanStatus === 2 ? '#00ff62' : (scanStatus === 3 || scanStatus === 0) ? '#ff003c' : scanStatus === 4 ? '#fffc00' : '#00f3ff';
+  const progressValue = isTerminal ? 100 : data.scan_info.progress;
+
   const baseTabs = [
     { label: 'HOME', icon: Activity },
     { label: 'SUBDOMAINS', icon: Globe },
@@ -1104,17 +1109,20 @@ export const ScanDetailPage = () => {
                 <Box sx={{ flexGrow: 1, position: 'relative' }}>
                   <LinearProgress
                     variant="determinate"
-                    value={data.scan_info.scan_status === 2 ? 100 : data.scan_info.progress}
+                    value={progressValue}
                     sx={{
                       height: 6,
                       borderRadius: 3,
                       bgcolor: 'rgba(255,255,255,0.05)',
-                      '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff', boxShadow: '0 0 15px #00f3ff' }
+                      '& .MuiLinearProgress-bar': { 
+                        bgcolor: progressColor, 
+                        boxShadow: `0 0 15px ${progressColor}80` 
+                      }
                     }}
                   />
                 </Box>
-                <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#00f3ff', fontFamily: 'Orbitron' }}>
-                  {data.scan_info.scan_status === 2 ? '100' : data.scan_info.progress}%
+                <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: progressColor, fontFamily: 'Orbitron' }}>
+                  {progressValue}%
                 </Typography>
               </Box>
             </Box>
@@ -1560,13 +1568,27 @@ export const ScanDetailPage = () => {
     <Box sx={{ p: 2 }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Stack 
+          direction={{ xs: 'column', sm: 'row' }} 
+          sx={{ 
+            justifyContent: 'space-between', 
+            alignItems: { xs: 'flex-start', sm: 'flex-start' },
+            gap: 2
+          }}
+        >
           <Box sx={{ mt: 0.5 }}>
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN DETAIL</Typography>
             <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info?.name || 'N/A'}</Typography>
           </Box>
-          <Stack spacing={1} sx={{ alignItems: 'flex-end' }}>
-            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+          <Stack spacing={1} sx={{ alignItems: { xs: 'flex-start', sm: 'flex-end' }, width: { xs: '100%', sm: 'auto' } }}>
+            <Stack 
+              direction={{ xs: 'column', md: 'row' }} 
+              spacing={2} 
+              sx={{ 
+                alignItems: { xs: 'stretch', md: 'center' },
+                width: { xs: '100%', md: 'auto' }
+              }}
+            >
               <Button
                 variant="contained"
                 startIcon={<RefreshCw size={16} />}
@@ -1620,12 +1642,13 @@ export const ScanDetailPage = () => {
                 STRESS TEST
               </Button>
             </Stack>
-            <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+            <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', alignSelf: { xs: 'flex-start', sm: 'flex-end' } }}>
               <span>SCANS</span> / <span>DETAIL</span> / <span style={{ color: '#00f3ff' }}>{data.target_info.name}</span>
             </Stack>
           </Stack>
         </Stack>
       </Box>
+
 
       {/* Tab Bar Integration - Now spanning full width at the top */}
       <Box sx={{ mb: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', position: 'sticky', top: 0, bgcolor: 'rgba(10,10,15,0.9)', zIndex: 10, backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px' }}>

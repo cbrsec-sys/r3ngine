@@ -226,3 +226,68 @@ def save_auth_candidate(scan_history, target, protocol, port, source_tool=None, 
 			candidate.save()
 
 	return candidate
+
+
+def get_screenshot_path(subdomain):
+	"""
+	Returns a normalized relative path for a subdomain screenshot, 
+	ensuring it includes the scan results directory prefix.
+	Supports searching in subscan directories if the file is not found in the main directory.
+	"""
+	from django.conf import settings
+	from django.apps import apps
+	import os
+	import glob
+	
+	path = subdomain.screenshot_path
+	results_dir = subdomain.scan_history.results_dir if subdomain.scan_history else ""
+	
+	if not path:
+		# Fallback to the first available screenshot object
+		Screenshot = apps.get_model('startScan', 'Screenshot')
+		first_screenshot = Screenshot.objects.filter(subdomain=subdomain).first()
+		if first_screenshot:
+			path = first_screenshot.screenshot_path
+			if first_screenshot.scan_history:
+				results_dir = first_screenshot.scan_history.results_dir
+	
+	if not path:
+		return None
+	
+	# Strip media prefix if present
+	if path.startswith('/media/'):
+		path = path[len('/media/'):]
+	elif path.startswith('media/'):
+		path = path[len('media/'):]
+		
+	# If the path is already absolute (starts with /), try to make it relative to MEDIA_ROOT
+	if os.path.isabs(path) and path.startswith(settings.MEDIA_ROOT):
+		path = os.path.relpath(path, settings.MEDIA_ROOT)
+
+	# Normalize results_dir relative to MEDIA_ROOT if it's absolute
+	if results_dir and os.path.isabs(results_dir) and results_dir.startswith(settings.MEDIA_ROOT):
+		results_dir = os.path.relpath(results_dir, settings.MEDIA_ROOT)
+
+	# Construct full absolute path for existence check
+	full_results_dir = os.path.join(settings.MEDIA_ROOT, results_dir)
+	
+	# If the path doesn't contain the results_dir prefix, try to find it
+	final_path = path
+	if results_dir and not path.startswith(results_dir):
+		# Try main scan directory first
+		test_path = os.path.join(results_dir, path)
+		if os.path.exists(os.path.join(settings.MEDIA_ROOT, test_path)):
+			final_path = test_path
+		else:
+			# Not in main directory, check subscans directory
+			# Pattern: results_dir/subscans/*/path
+			subscan_pattern = os.path.join(full_results_dir, 'subscans', '*', path)
+			matches = glob.glob(subscan_pattern)
+			if matches:
+				# Use the first match and convert back to relative path
+				final_path = os.path.relpath(matches[0], settings.MEDIA_ROOT)
+			else:
+				# Fallback to default prepending if nothing found
+				final_path = test_path
+	
+	return final_path.replace('\\', '/')

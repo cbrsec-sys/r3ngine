@@ -133,6 +133,12 @@ class VulnerabilityCorrelationEngine:
         
         chain['steps'].append({'phase': 'Post-Exploitation', 'description': "Pivot to internal network or access sensitive data"})
         
+        # Check if an APME path already exists to avoid overwriting it with a generic heuristic
+        existing = ImpactAssessment.objects.filter(vulnerability=vuln).first()
+        if existing and existing.potential_attack_chain and 'apme_path_id' in existing.potential_attack_chain:
+            logger.info(f"Correlation: Skipping heuristic chain for vuln {vuln.id}, APME path already exists.")
+            return
+
         ImpactAssessment.objects.update_or_create(
             vulnerability=vuln,
             defaults={

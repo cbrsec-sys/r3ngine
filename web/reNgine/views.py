@@ -11,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def serve_protected_media(request, path):
+    logger.info(f"serve_protected_media hit for path: {path}")
+    logger.info(f"Headers: {request.headers}")
     # 1. Normalize path
     # If the path is already absolute, try to make it relative to MEDIA_ROOT
     if path.startswith(settings.MEDIA_ROOT):
