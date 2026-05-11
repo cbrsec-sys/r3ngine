@@ -19,7 +19,7 @@ class LinkedInScraper:
         self.password = password
         self.hunter_key = hunter_key
         # Default path within the container volume
-        self.context_path = context_path or "/usr/src/reNgine/scan_results/context/linkedin"
+        self.context_path = context_path or os.path.join(settings.RENGINE_RESULTS, "context/linkedin")
         os.makedirs(self.context_path, exist_ok=True)
         self.playwright = None
         self.context = None
