@@ -963,3 +963,19 @@ def update_github_tool(request, slug, id):
         run_command.apply_async(args=(update_command,))
         messages.add_message(request, messages.INFO, f'Update started for {tool.name}')
     return http.HttpResponseRedirect(reverse('tool_arsenal', kwargs={'slug': slug}))
+
+@has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def get_full_yaml_config(request, slug):
+    try:
+        # File is in the root of the project
+        # views.py is in web/scanEngine/
+        file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'full_yaml_config.yaml')
+        if not os.path.exists(file_path):
+             # Try absolute path in docker
+             file_path = '/usr/src/app/full_yaml_config.yaml'
+             
+        with open(file_path, 'r') as f:
+            content = f.read()
+        return http.JsonResponse({'status': 'success', 'content': content})
+    except Exception as e:
+        return http.JsonResponse({'status': 'error', 'message': str(e)}, status=500)

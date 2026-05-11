@@ -16,6 +16,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.renderers import JSONRenderer
+from django.http import FileResponse, Http404
+import mimetypes
+import os
 
 
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_204_NO_CONTENT, HTTP_202_ACCEPTED
@@ -3881,3 +3884,34 @@ class NotificationSettingsAPIView(APIView):
 				send_discord_message('**reNgine**\nCongratulations! your notification services are working.')
 			return Response({'status': True, 'message': 'Notification settings updated and test message sent.'})
 		return Response(serializer.errors, status=400)
+
+class MobileMediaServeView(APIView):
+	permission_classes = [IsPenetrationTester]
+	def get(self, request):
+		path = request.query_params.get('path')
+		if not path:
+			return Response({'error': 'Path is required'}, status=status.HTTP_400_BAD_REQUEST)
+		
+		# Normalize path
+		if path.startswith(settings.MEDIA_ROOT):
+			path = os.path.relpath(path, settings.MEDIA_ROOT)
+		elif path.startswith('/usr/src/scan_results'):
+			path = os.path.relpath(path, '/usr/src/scan_results')
+		
+		path = path.lstrip('/')
+		file_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, path))
+		
+		# Security check
+		if not is_safe_path(settings.MEDIA_ROOT, file_path):
+			logger.error(f"is_safe_path failed for {file_path}")
+			raise Http404("File not found")
+			
+		if os.path.exists(file_path):
+			if os.path.isdir(file_path):
+				raise Http404("File not found")
+				
+			content_type, _ = mimetypes.guess_type(file_path)
+			return FileResponse(open(file_path, 'rb'), content_type=content_type)
+		else:
+			logger.error(f"File not found: {file_path}")
+			raise Http404("File not found")

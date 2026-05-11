@@ -156,7 +156,8 @@ brute_force_scan: {
 }
 spiderfoot_scan: {
   'modules': 'all',               # SF modules to run
-  'use_api_keys': true,
+  'intensity': 'normal',
+  'threads': 10
 }
 screenshot: {
   'enable_http_crawl': true,

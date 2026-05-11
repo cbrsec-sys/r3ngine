@@ -242,4 +242,9 @@
     yaml_configuration: "attack_path_modeling: {\n  'enabled': true,\n  'top_n': 10\n}"
   model: scanEngine.enginetype
   pk: 10
-
+- fields:
+    default_engine: true
+    engine_name: SpiderFoot Scan
+    yaml_configuration: "spiderfoot_scan: {\n  'modules': 'all',\n  'intensity': 'normal',\n  'threads': 10\n}"
+  model: scanEngine.enginetype
+  pk: 11

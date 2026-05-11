@@ -325,6 +325,7 @@ const StatusBadge: React.FC<{ status: number, compact?: boolean }> = ({ status, 
     [1]: { label: 'PENDING', color: '#00f3ff', icon: Activity },
     [2]: { label: 'SUCCESS', color: '#00ff62', icon: Shield },
     [3]: { label: 'ABORTED', color: '#ff003c', icon: AlertTriangle },
+    [4]: { label: 'PARTIALLY COMPLETE', color: '#fffc00', icon: AlertTriangle },
   };
   const config = configs[status] || { label: 'UNKNOWN', color: '#fff', icon: Info };
   const Icon = config.icon;
@@ -704,7 +705,7 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
   );
 };
 
-const VulnHighlights: React.FC<{ highlights: Vulnerability[] }> = ({ highlights }) => (
+const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: any) => void }> = ({ highlights, onVulnClick }) => (
   <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
     <TableContainer sx={{ flex: 1, overflow: 'auto', maxHeight: 380 }}>
       <Table size="small" stickyHeader>
@@ -718,7 +719,19 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[] }> = ({ highlights 
         </TableHead>
         <TableBody>
           {(highlights || []).map((v: Vulnerability, idx: number) => (
-            <TableRow key={idx} sx={{ '& td': { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 2 } }}>
+            <TableRow 
+              key={idx} 
+              onClick={() => onVulnClick(v)}
+              sx={{ 
+                '& td': { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 2 },
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+                '&:hover': {
+                  bgcolor: 'rgba(255,255,255,0.03)',
+                  '& td:nth-of-type(2) p:first-of-type': { color: '#00f3ff' }
+                }
+              }}
+            >
               <TableCell>
                 <Box sx={{
                   bgcolor: 'rgba(33,150,243,0.1)',
@@ -1063,8 +1076,26 @@ export const ScanDetailPage = () => {
       <TacticalPanel title="Scan Status" icon={<Activity size={14} />}>
         <Box sx={{ p: 2 }}>
           <Stack spacing={4}>
-            <Box sx={{ textAlign: 'center' }}>
+            <Box sx={{ textAlign: 'center', position: 'relative' }}>
               <StatusBadge status={data.scan_info.scan_status} />
+              {data.timeline?.some((a: ScanActivity) => (a.name === 'spiderfoot_scan' || a.title?.toLowerCase().includes('spiderfoot')) && a.status === 'RUNNING') && (
+                <MuiTooltip title="Attack Surface Intelligence (SpiderFoot) is running in the background">
+                  <Box sx={{
+                    position: 'absolute',
+                    top: -10,
+                    right: -10,
+                    animation: 'pulse-spider 2s infinite ease-in-out',
+                    cursor: 'help',
+                    '@keyframes pulse-spider': {
+                      '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+                      '50%': { transform: 'scale(1.3)', filter: 'drop-shadow(0 0 15px #ff00ff)' },
+                      '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+                    }
+                  }}>
+                    <Bug size={24} color="#ff00ff" />
+                  </Box>
+                </MuiTooltip>
+              )}
             </Box>
 
             <Box>
@@ -1389,7 +1420,7 @@ export const ScanDetailPage = () => {
           }}
           exploitable={data.exploitable_count}
         />
-        <VulnHighlights highlights={data.vulnerability_highlights} />
+        <VulnHighlights highlights={data.vulnerability_highlights} onVulnClick={handleVulnClick} />
       </Box>
 
       {/* Row 4: Vulnerability Deep Dive */}

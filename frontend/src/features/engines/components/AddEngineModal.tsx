@@ -11,7 +11,7 @@ import {
   IconButton
 } from '@mui/material';
 import { X, Cpu } from 'lucide-react';
-import { useCreateEngine } from '../api';
+import { useCreateEngine, useFullYamlConfig } from '../api';
 
 interface AddEngineModalProps {
   open: boolean;
@@ -22,6 +22,13 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
   const [name, setName] = useState('');
   const [yaml, setYaml] = useState('');
   const createEngine = useCreateEngine();
+  const { data: fullConfig } = useFullYamlConfig();
+
+  React.useEffect(() => {
+    if (open && fullConfig?.content && !yaml) {
+      setYaml(fullConfig.content);
+    }
+  }, [open, fullConfig, yaml]);
 
   const handleSubmit = async () => {
     if (!name || !yaml) return;
