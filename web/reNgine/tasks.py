@@ -2188,7 +2188,7 @@ def nmap(
 			logger.warning(str(vuln))
 		
 		# Register Auth Candidates from vulnerability tags (like auth_portal)
-		if 'auth_portal' in vuln_data.get('tags', []):
+		if 'auth_portal' in (vuln_data.get('tags') or []):
 			from reNgine.utilities import save_auth_candidate
 			save_auth_candidate(
 				scan_history=self.scan,
@@ -2196,7 +2196,7 @@ def nmap(
 				protocol='http',
 				port=int(vuln_data['http_url'].split(':')[-1]) if ':' in vuln_data['http_url'] else 80,
 				source_tool='Nmap NSE',
-				metadata={'tags': vuln_data.get('tags'), 'nse_script': vuln_data.get('name')},
+				metadata={'tags': vuln_data.get('tags') or [], 'nse_script': vuln_data.get('name')},
 				subdomain=self.subdomain,
 				endpoint=endpoint
 			)
@@ -2236,7 +2236,7 @@ def nmap(
 	# Automatic Trigger for Brute Force Scan (Legacy Support for chaining)
 	auth_targets = []
 	for v in vulns:
-		if 'auth_portal' in v.get('tags', []):
+		if 'auth_portal' in (v.get('tags') or []):
 			auth_targets.append(v['http_url'])
 	
 	if auth_targets and self.scan.tasks and 'brute_force_scan' in self.scan.tasks:
@@ -3205,7 +3205,7 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 				endpoint.save()
 
 		# Register Auth Candidate if Nuclei flagged it as login or auth
-		tags = line.get('info', {}).get('tags', [])
+		tags = line.get('info', {}).get('tags', []) or []
 		if any(tag in tags for tag in ['login', 'auth', 'admin', 'default-login', 'bruteforce', 'panel']):
 			from reNgine.utilities import save_auth_candidate
 			save_auth_candidate(
@@ -4937,7 +4937,7 @@ def parse_nuclei_result(line):
 		'cve_ids': line['info'].get('classification', {}).get('cve_id', []) or [],
 		'cwe_ids': line['info'].get('classification', {}).get('cwe_id', []) or [],
 		'references': line['info'].get('reference', []) or [],
-		'tags': line['info'].get('tags', []),
+		'tags': line['info'].get('tags', []) or [],
 		'source': NUCLEI,
 	}
 
