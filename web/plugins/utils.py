@@ -10,10 +10,57 @@ from django.conf import settings
 from django.utils.text import slugify
 from django.db import transaction
 from django.core.management import call_command
+import requests
+from django.core.cache import cache
 import logging
 from .models import Plugin
 
 logger = logging.getLogger(__name__)
+
+class MarketplaceManager:
+    MARKETPLACE_YAML_URL = "https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/main/plugins.yaml"
+    CACHE_KEY = "marketplace_plugins"
+    CACHE_TIMEOUT = 3600  # 1 hour
+
+    @classmethod
+    def get_available_plugins(cls, force_refresh=False):
+        if not force_refresh:
+            cached_data = cache.get(cls.CACHE_KEY)
+            if cached_data:
+                return cached_data
+
+        try:
+            response = requests.get(cls.MARKETPLACE_YAML_URL, timeout=10)
+            if response.status_code == 200:
+                data = yaml.safe_load(response.text)
+                plugins = data.get('marketplace', [])
+                # Add installation status
+                installed_slugs = list(Plugin.objects.values_list('slug', flat=True))
+                for plugin in plugins:
+                    plugin['is_installed'] = plugin['slug'] in installed_slugs
+                
+                cache.set(cls.CACHE_KEY, plugins, cls.CACHE_TIMEOUT)
+                return plugins
+            else:
+                raise Exception(f"Marketplace unreachable: {response.status_code}")
+        except Exception as e:
+            logger.error(f"Failed to fetch marketplace: {str(e)}")
+            return []
+
+    @classmethod
+    def download_plugin(cls, slug):
+        download_url = f"https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/main/{slug}/{slug}.zip"
+        temp_zip_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, f"download_{slug}.zip")
+        PluginManager.ensure_dirs()
+        
+        response = requests.get(download_url, stream=True, timeout=30)
+        if response.status_code == 200:
+            with open(temp_zip_path, 'wb') as f:
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+            return temp_zip_path
+        else:
+            raise Exception(f"Failed to download plugin {slug}: {response.status_code}")
 
 class PluginManager:
     """Handles file operations for plugins: extraction, validation, and deletion."""

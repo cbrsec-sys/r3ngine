@@ -233,20 +233,20 @@ const AttackPathCard: React.FC<{ path: AttackPath; rank: number }> = ({ path, ra
         </Box>
 
         {/* Stats */}
-        <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexShrink: 0 }}>
+        <Stack direction="row" spacing={{ xs: 1, sm: 2 }} sx={{ alignItems: 'center', flexShrink: 0, ml: 'auto' }}>
           <Stack sx={{ alignItems: 'center' }}>
-            <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: riskColor, fontFamily: 'Orbitron' }}>
+            <Typography sx={{ fontSize: { xs: '0.8rem', sm: '1rem' }, fontWeight: 900, color: riskColor, fontFamily: 'Orbitron' }}>
               {path.score.toFixed(2)}
             </Typography>
             <Typography sx={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>SCORE</Typography>
           </Stack>
           <Stack sx={{ alignItems: 'center' }}>
-            <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#00f3ff', fontFamily: 'Orbitron' }}>
+            <Typography sx={{ fontSize: { xs: '0.8rem', sm: '1rem' }, fontWeight: 900, color: '#00f3ff', fontFamily: 'Orbitron' }}>
               {path.step_count}
             </Typography>
             <Typography sx={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>STEPS</Typography>
           </Stack>
-          <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.4)' }}>
+          <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.4)', display: { xs: 'none', sm: 'inline-flex' } }}>
             {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </IconButton>
         </Stack>
@@ -363,7 +363,7 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
       title="ATTACK PATH MODELING"
       icon={<ShieldAlert size={14} color="#ff003c" />}
       headerAction={
-        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1 }}>
           <Button
             size="small"
             variant="outlined"

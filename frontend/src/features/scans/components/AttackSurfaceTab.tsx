@@ -312,13 +312,14 @@ export const AttackSurfaceTab: React.FC<AttackSurfaceTabProps> = ({ projectSlug,
 
   return (
     <Box sx={{ width: '100%', mt: 2 }}>
-      <Box sx={{ mb: 4 }}>
+      <Box sx={{ mb: 4, px: { xs: 2, sm: 0 } }}>
         <Typography variant="h5" sx={{ 
           fontWeight: 900, 
           fontFamily: 'Orbitron', 
-          letterSpacing: 3, 
+          letterSpacing: { xs: 1, sm: 3 }, 
           color: '#fff',
-          textTransform: 'uppercase'
+          textTransform: 'uppercase',
+          fontSize: { xs: '1.1rem', sm: '1.5rem' }
         }}>
           Attack Surface Map {targetId ? `(Target Coverage)` : `(Scan #${scanId})`}
         </Typography>

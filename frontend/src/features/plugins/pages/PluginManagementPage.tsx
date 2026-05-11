@@ -18,9 +18,14 @@ import {
   AccountTree as PipelineIcon
 } from '@mui/icons-material';
 import { 
-  ShieldAlert
+  Shield
 } from 'lucide-react';
-import { usePlugins, useUploadPlugin } from '../api/pluginsApi';
+import { 
+  usePlugins, 
+  useUploadPlugin, 
+  useMarketplacePlugins, 
+  useRefreshMarketplace 
+} from '../api/pluginsApi';
 import PluginInventory from '../components/PluginInventory';
 import PipelineBuilder from '../components/PipelineBuilder';
 
@@ -32,8 +37,10 @@ const PluginManagementPage: React.FC = () => {
     severity: 'success'
   });
 
-  const { data: plugins, isLoading, error } = usePlugins();
+  const { data: plugins, isLoading: isPluginsLoading, error: pluginsError } = usePlugins();
+  const { data: marketplaceData, isLoading: isMarketplaceLoading } = useMarketplacePlugins();
   const uploadMutation = useUploadPlugin();
+  const refreshMarketplaceMutation = useRefreshMarketplace();
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -53,12 +60,29 @@ const PluginManagementPage: React.FC = () => {
     }
   };
 
+  const handleRefreshMarketplace = () => {
+    refreshMarketplaceMutation.mutate(undefined, {
+      onSuccess: () => {
+        setSnackbar({ open: true, message: 'Marketplace index refreshed.', severity: 'success' });
+      },
+      onError: (err: any) => {
+        setSnackbar({ 
+          open: true, 
+          message: `Refresh failed: ${err.message}`, 
+          severity: 'error' 
+        });
+      }
+    });
+  };
+
+  const isLoading = isPluginsLoading || (isMarketplaceLoading && !marketplaceData);
+
   if (isLoading) {
     return (
       <Box sx={{ display: "flex", flexDirection: 'column', alignItems: "center", justifyContent: 'center', height: '60vh', gap: 2 }}>
         <CircularProgress sx={{ color: '#00f3ff' }} />
         <Typography sx={{ fontFamily: 'Orbitron', color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', letterSpacing: 2 }}>
-          LOADING ORCHESTRATION LAYER...
+          BROWSING THE MARKETPLACE...
         </Typography>
       </Box>
     );
@@ -79,7 +103,7 @@ const PluginManagementPage: React.FC = () => {
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", mb: 6 }}>
         <Box>
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 1 }}>
-            <ShieldAlert size={32} color="#00f3ff" />
+            <Shield size={32} color="#00f3ff" />
             <Typography variant="h3" sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: -1, color: '#fff' }}>
               PLUGIN ORCHESTRATION
             </Typography>
@@ -110,7 +134,7 @@ const PluginManagementPage: React.FC = () => {
         </Button>
       </Box>
 
-      {error && (
+      {pluginsError && (
         <Alert 
           severity="error" 
           variant="outlined"
@@ -150,7 +174,12 @@ const PluginManagementPage: React.FC = () => {
 
         <Box sx={{ p: 4, minHeight: '400px' }}>
           {activeTab === 0 ? (
-            <PluginInventory plugins={plugins || []} />
+            <PluginInventory 
+              plugins={plugins || []} 
+              marketplacePlugins={marketplaceData}
+              onRefreshMarketplace={handleRefreshMarketplace}
+              isRefreshingMarketplace={refreshMarketplaceMutation.isPending}
+            />
           ) : (
             <PipelineBuilder plugins={plugins || []} />
           )}

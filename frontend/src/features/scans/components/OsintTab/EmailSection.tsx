@@ -46,7 +46,7 @@ export const EmailSection: React.FC<EmailSectionProps> = ({ emails }) => {
             <TableRow>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold' }}>ADDRESS</TableCell>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold' }}>CREDENTIALS</TableCell>
-              <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold' }}>SOCIAL FOOTPRINT</TableCell>
+              <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, color: 'text.secondary', fontWeight: 'bold' }}>SOCIAL FOOTPRINT</TableCell>
               <TableCell align="right" sx={{ color: 'text.secondary', fontWeight: 'bold' }}>ACTIONS</TableCell>
             </TableRow>
           </TableHead>
@@ -74,7 +74,7 @@ export const EmailSection: React.FC<EmailSectionProps> = ({ emails }) => {
                     </Typography>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {email.metadata?.holehe && email.metadata.holehe.length > 0 ? (
                       email.metadata.holehe.map((site, index) => (

@@ -14,8 +14,11 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         queryset = ScanHistory.objects.all().order_by('-id')
         project = self.request.query_params.get('project')
+        target_id = self.request.query_params.get('target_id')
         if project:
             queryset = queryset.filter(domain__project__slug=project)
+        if target_id:
+            queryset = queryset.filter(domain__id=target_id)
         return queryset
 
     @action(detail=True, methods=['post'])

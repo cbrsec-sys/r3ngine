@@ -7,30 +7,57 @@ import {
   Switch, 
   IconButton, 
   Chip,
-  Avatar
+  Avatar,
+  Button,
+  CircularProgress
 } from '@mui/material';
-import { Settings as SettingsIcon, Delete as DeleteIcon } from '@mui/icons-material';
-import type { Plugin } from '../api/pluginsApi';
-import { useTogglePlugin, useDeletePlugin } from '../api/pluginsApi';
+import { 
+  Settings as SettingsIcon, 
+  Delete as DeleteIcon,
+  Download as InstallIcon,
+  Check as InstalledIcon
+} from '@mui/icons-material';
+import type { Plugin, MarketplacePlugin } from '../api/pluginsApi';
+import { useTogglePlugin, useDeletePlugin, useInstallMarketplacePlugin } from '../api/pluginsApi';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface Props {
-  plugin: Plugin;
+  plugin?: Plugin;
+  marketplacePlugin?: MarketplacePlugin;
 }
 
-const PluginCard: React.FC<Props> = ({ plugin }) => {
+const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
   const toggleMutation = useTogglePlugin();
   const deleteMutation = useDeletePlugin();
+  const installMutation = useInstallMarketplacePlugin();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
 
+  // If we have an installed plugin, use its data
+  // Otherwise, if we have a marketplace plugin, use its data
+  const data = plugin || marketplacePlugin;
+  const isMarketplace = !!marketplacePlugin && !plugin;
+  const isInstalled = !!plugin || (marketplacePlugin?.is_installed);
+
+  if (!data) return null;
+
   const handleToggle = () => {
-    toggleMutation.mutate({ slug: plugin.slug, is_enabled: !plugin.is_enabled });
+    if (plugin) {
+      toggleMutation.mutate({ slug: plugin.slug, is_enabled: !plugin.is_enabled });
+    }
   };
 
   const handleDelete = () => {
-    deleteMutation.mutate(plugin.slug, {
-      onSuccess: () => setIsDeleteDialogOpen(false)
-    });
+    if (plugin) {
+      deleteMutation.mutate(plugin.slug, {
+        onSuccess: () => setIsDeleteDialogOpen(false)
+      });
+    }
+  };
+
+  const handleInstall = () => {
+    if (marketplacePlugin) {
+      installMutation.mutate(marketplacePlugin.slug);
+    }
   };
 
   return (
@@ -41,8 +68,8 @@ const PluginCard: React.FC<Props> = ({ plugin }) => {
         border: '1px solid rgba(255, 255, 255, 0.1)',
         transition: '0.3s',
         '&:hover': {
-          borderColor: '#0076FF',
-          boxShadow: '0 0 20px rgba(0, 118, 255, 0.2)'
+          borderColor: isMarketplace && !isInstalled ? '#00ffaa' : '#0076FF',
+          boxShadow: `0 0 20px ${isMarketplace && !isInstalled ? 'rgba(0, 255, 170, 0.2)' : 'rgba(0, 118, 255, 0.2)'}`
         }
       }}>
         <CardContent>
@@ -50,24 +77,55 @@ const PluginCard: React.FC<Props> = ({ plugin }) => {
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
               <Avatar 
                 variant="rounded" 
-                sx={{ bgcolor: '#0076FF', width: 48, height: 48 }}
+                sx={{ bgcolor: isMarketplace && !isInstalled ? '#00ffaa' : '#0076FF', width: 48, height: 48, color: '#000' }}
               >
-                {plugin.name[0]}
+                {data.name[0]}
               </Avatar>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: "bold" }}>{plugin.name}</Typography>
-                <Typography variant="caption" color="text.secondary">v{plugin.version}</Typography>
+                <Typography variant="h6" sx={{ fontWeight: "bold", color: '#fff' }}>{data.name}</Typography>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>v{data.version}</Typography>
               </Box>
             </Box>
-            <Switch 
-              checked={plugin.is_enabled} 
-              onChange={handleToggle}
-              color="primary" 
-              disabled={toggleMutation.isPending}
-            />
+            
+            {isMarketplace ? (
+              isInstalled ? (
+                <Chip 
+                  icon={<InstalledIcon sx={{ fontSize: '14px !important' }} />} 
+                  label="INSTALLED" 
+                  size="small"
+                  sx={{ bgcolor: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0, 255, 170, 0.2)', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}
+                />
+              ) : (
+                <Button 
+                  size="small" 
+                  variant="contained" 
+                  startIcon={installMutation.isPending ? <CircularProgress size={12} color="inherit" /> : <InstallIcon />}
+                  onClick={handleInstall}
+                  disabled={installMutation.isPending}
+                  sx={{ 
+                    bgcolor: '#00ffaa', 
+                    color: '#000', 
+                    fontFamily: 'Orbitron', 
+                    fontWeight: 900, 
+                    fontSize: '10px',
+                    '&:hover': { bgcolor: '#00d890' }
+                  }}
+                >
+                  INSTALL
+                </Button>
+              )
+            ) : (
+              <Switch 
+                checked={plugin?.is_enabled} 
+                onChange={handleToggle}
+                color="primary" 
+                disabled={toggleMutation.isPending}
+              />
+            )}
           </Box>
 
-          <Typography variant="body2" color="text.secondary" sx={{ 
+          <Typography variant="body2" sx={{ 
+            color: 'rgba(255,255,255,0.6)',
             height: '40px', 
             overflow: 'hidden', 
             textOverflow: 'ellipsis',
@@ -76,29 +134,31 @@ const PluginCard: React.FC<Props> = ({ plugin }) => {
             WebkitBoxOrient: 'vertical',
             mb: 2
           }}>
-            {plugin.description || 'No description provided.'}
+            {data.description || 'No description provided.'}
           </Typography>
 
           <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <Chip 
-              label={plugin.anchor_step} 
+              label={plugin?.anchor_step || marketplacePlugin?.category || 'General'} 
               size="small" 
               variant="outlined" 
-              sx={{ borderColor: 'rgba(255, 255, 255, 0.2)', color: 'text.secondary' }} 
+              sx={{ borderColor: 'rgba(255, 255, 255, 0.1)', color: 'rgba(255,255,255,0.4)', fontSize: '10px' }} 
             />
-            <Box>
-              <IconButton size="small" sx={{ color: 'text.secondary' }}>
-                <SettingsIcon fontSize="small" />
-              </IconButton>
-              <IconButton 
-                size="small" 
-                sx={{ color: 'error.main' }}
-                onClick={() => setIsDeleteDialogOpen(true)}
-                disabled={deleteMutation.isPending}
-              >
-                <DeleteIcon fontSize="small" />
-              </IconButton>
-            </Box>
+            {!isMarketplace && (
+              <Box>
+                <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                  <SettingsIcon fontSize="small" />
+                </IconButton>
+                <IconButton 
+                  size="small" 
+                  sx={{ color: '#ff003c' }}
+                  onClick={() => setIsDeleteDialogOpen(true)}
+                  disabled={deleteMutation.isPending}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            )}
           </Box>
         </CardContent>
       </Card>
@@ -108,7 +168,7 @@ const PluginCard: React.FC<Props> = ({ plugin }) => {
         onClose={() => setIsDeleteDialogOpen(false)}
         onConfirm={handleDelete}
         title="Delete Plugin"
-        message={`Are you sure you want to delete the plugin "${plugin.name}"? This action is irreversible and will remove all associated files and UI components.`}
+        message={`Are you sure you want to delete the plugin "${plugin?.name}"? This action is irreversible and will remove all associated files and UI components.`}
         confirmText="DELETE PLUGIN"
         isDestructive={true}
         isLoading={deleteMutation.isPending}

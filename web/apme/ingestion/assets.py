@@ -19,6 +19,31 @@ def _make_id(prefix: str, value: str) -> str:
     return f"{prefix}::{value}"
 
 
+def _infer_sensitivity(name: str) -> str:
+    """
+    Categorizes asset sensitivity based on keywords.
+    Returns: 'high', 'medium', or 'low'
+    """
+    name_lower = name.lower()
+    high_value_keywords = [
+        "admin", "vpn", "db", "database", "internal", "stg", "staging",
+        "prod", "production", "secure", "auth", "login", "sso", "identity",
+        "vault", "secret", "jenkins", "gitlab", "nexus", "artifactory",
+    ]
+    medium_value_keywords = [
+        "api", "dev", "test", "demo", "mail", "portal", "cloud", "aws",
+        "azure", "gcp", "storage", "bucket", "app", "mobile",
+    ]
+
+    for kw in high_value_keywords:
+        if kw in name_lower:
+            return "high"
+    for kw in medium_value_keywords:
+        if kw in name_lower:
+            return "medium"
+    return "low"
+
+
 def ingest_subdomains(target_id: int) -> Tuple[List[Node], List[Edge]]:
     """
     Ingests Subdomains and their IP addresses for a given target domain.
@@ -44,6 +69,7 @@ def ingest_subdomains(target_id: int) -> Tuple[List[Node], List[Edge]]:
                 "name": sub.name,
                 "http_status": sub.http_status,
                 "is_cdn": sub.is_cdn,
+                "sensitivity": _infer_sensitivity(sub.name),
             },
         )
         nodes.append(domain_node)
@@ -132,6 +158,7 @@ def ingest_endpoints(target_id: int) -> Tuple[List[Node], List[Edge]]:
                 "url": ep.http_url,
                 "http_status": ep.http_status,
                 "matched_gf_patterns": ep.matched_gf_patterns or "",
+                "sensitivity": _infer_sensitivity(ep.http_url),
             },
         )
         nodes.append(ep_node)

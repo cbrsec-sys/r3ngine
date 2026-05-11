@@ -40,8 +40,8 @@ export const DocumentSection: React.FC<DocumentSectionProps> = ({ documents }) =
             <TableRow>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold' }}>DOCUMENT / SOURCE</TableCell>
               <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold' }}>AUTHOR / CREATOR</TableCell>
-              <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold' }}>SOFTWARE / OS</TableCell>
-              <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold' }}>DATE</TableCell>
+              <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, color: 'text.secondary', fontWeight: 'bold' }}>SOFTWARE / OS</TableCell>
+              <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' }, color: 'text.secondary', fontWeight: 'bold' }}>DATE</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -78,7 +78,7 @@ export const DocumentSection: React.FC<DocumentSectionProps> = ({ documents }) =
                     )}
                   </Box>
                 </TableCell>
-                <TableCell>
+                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                     {doc.os && (
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -93,7 +93,7 @@ export const DocumentSection: React.FC<DocumentSectionProps> = ({ documents }) =
                     )}
                   </Box>
                 </TableCell>
-                <TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' } }}>
                   {doc.creation_date && (
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Calendar size={12} />
