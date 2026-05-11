@@ -110,9 +110,11 @@ INSTALLED_APPS = [
     'apme.apps.ApmeConfig',
     'channels',
     'rest_framework_simplejwt',
+    'corsheaders',
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -452,10 +454,13 @@ SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
 # Login required middleware configurations
 LOGIN_REQUIRED_IGNORE_PATHS = [
-    r'/api/auth/token/',
-    r'/api/auth/token/refresh/',
-    r'/swagger/',
-    r'/redoc/',
+    r'^/api/auth/token/',
+    r'^/api/auth/token/refresh/',
+    r'^/mapi/auth/token/',
+    r'^/mapi/auth/token/refresh/',
+    r'^/mapi/.*$',
+    r'^/swagger/',
+    r'^/redoc/',
 ]
 
 from datetime import timedelta
@@ -470,3 +475,6 @@ SIMPLE_JWT = {
     'USER_ID_FIELD': 'id',
     'USER_ID_CLAIM': 'user_id',
 }
+
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True

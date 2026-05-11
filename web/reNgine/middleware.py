@@ -8,3 +8,4 @@ class UserPreferencesMiddleware:
 		if request.user.is_authenticated:
 			request.user_preferences, created = UserPreferences.objects.get_or_create(user=request.user)
 		return self.get_response(request)
+

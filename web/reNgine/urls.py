@@ -30,6 +30,11 @@ urlpatterns = [
             'api.urls',
             'api')),
     path(
+        'mapi/',
+        include(
+            'api.urls',
+            'mapi')),
+    path(
         'target/',
         include('targetApp.urls')),
     path(
