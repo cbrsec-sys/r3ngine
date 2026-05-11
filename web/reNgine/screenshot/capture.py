@@ -1,6 +1,7 @@
 import hashlib
 import os
 import logging
+from django.conf import settings
 from .browser_manager import browser_manager
 
 logger = logging.getLogger(__name__)
@@ -19,10 +20,12 @@ def block_resources(route):
 
     route.continue_()
 
-def capture_url(url, scan_id, results_dir="/usr/src/scan_results"):
+def capture_url(url, scan_id, results_dir=None):
     """
     Core capture engine (Synchronous).
     """
+    if not results_dir:
+        results_dir = settings.RENGINE_RESULTS
     browser = browser_manager.get_browser()
     
     # Create unique context for this capture
@@ -107,6 +110,8 @@ def capture_url(url, scan_id, results_dir="/usr/src/scan_results"):
 
     return result
 
-def run_capture(url, scan_id, results_dir="/usr/src/scan_results"):
+def run_capture(url, scan_id, results_dir=None):
     """Wrapper for Celery tasks (already sync now)."""
+    if not results_dir:
+        results_dir = settings.RENGINE_RESULTS
     return capture_url(url, scan_id, results_dir)

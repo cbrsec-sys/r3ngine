@@ -1,6 +1,10 @@
 from django.conf.urls import include, url
 from django.urls import path
 from rest_framework import routers
+from rest_framework_simplejwt.views import (
+    TokenObtainPairView,
+    TokenRefreshView,
+)
 
 from .views import *
 from .dashboard_views import DashboardAPIView
@@ -13,6 +17,7 @@ from .scan_history import ScanHistoryViewSet
 from .users import UserManageViewSet
 from .stress_testing_views import StressTestingAPIView
 from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView
+from .scan_configuration import ScanConfigurationAPI
 
 
 app_name = 'api'
@@ -352,6 +357,21 @@ urlpatterns = [
         'apme/trigger/',
         TriggerLLMAPMEAPIView.as_view(),
         name='apme_trigger'
+    ),
+    path(
+        'auth/token/',
+        TokenObtainPairView.as_view(),
+        name='token_obtain_pair'
+    ),
+    path(
+        'auth/token/refresh/',
+        TokenRefreshView.as_view(),
+        name='token_refresh'
+    ),
+    path(
+        'scans/configuration/',
+        ScanConfigurationAPI.as_view(),
+        name='scan_configuration'
     ),
     path('plugins/', include('plugins.urls')),
 ]

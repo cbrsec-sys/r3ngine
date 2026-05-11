@@ -3,7 +3,7 @@ import socket
 import logging
 import requests
 import validators
-import requests
+from django.conf import settings
 
 from ipaddress import IPv4Network
 from django.db.models import CharField, Count, F, Q, Value
@@ -1533,7 +1533,7 @@ class InitiateScan(APIView):
 						'domain_id': domain.id,
 						'engine_id': engine_id,
 						'scan_type': LIVE_SCAN,
-						'results_dir': '/usr/src/scan_results',
+						'results_dir': settings.RENGINE_RESULTS,
 						'imported_subdomains': subdomains_in,
 						'out_of_scope_subdomains': subdomains_out,
 						'starting_point_path': starting_point_path,

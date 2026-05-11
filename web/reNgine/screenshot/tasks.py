@@ -9,10 +9,14 @@ os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
 logger = logging.getLogger(__name__)
 
-def take_screenshot_and_save(subdomain_id, scan_id, results_dir="/usr/src/scan_results", activity_id=None):
+from django.conf import settings
+
+def take_screenshot_and_save(subdomain_id, scan_id, results_dir=None, activity_id=None):
     """
     Orchestrates the capture and database persistence for a single subdomain.
     """
+    if not results_dir:
+        results_dir = settings.RENGINE_RESULTS
     from startScan.models import Command
     from django.utils import timezone
     try:

@@ -35,7 +35,9 @@ import {
   DialogTitle,
   DialogContent,
   Slide,
-  Backdrop
+  Backdrop,
+  DialogActions,
+  Link
 } from '@mui/material';
 import {
   Activity,
@@ -127,6 +129,164 @@ const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   );
 };
 
+const VulnerabilityInfoModal: React.FC<{
+  open: boolean;
+  onClose: () => void;
+  vulnerability: any;
+}> = ({ open, onClose, vulnerability }) => {
+  if (!vulnerability) return null;
+
+  const severityColor = Number(vulnerability.severity) === 4 ? '#ff003c' :
+    Number(vulnerability.severity) === 3 ? '#ff9f00' :
+      Number(vulnerability.severity) === 2 ? '#fffc00' :
+        Number(vulnerability.severity) === 1 ? '#00ff62' : '#00f3ff';
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: '#0a0a0a',
+            backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)',
+            backgroundSize: '20px 20px',
+            border: `1px solid ${severityColor}40`,
+            borderRadius: 2,
+            boxShadow: `0 0 30px ${severityColor}15`
+          }
+        }
+      }}
+    >
+      <DialogTitle sx={{ p: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <Stack direction="row" sx={{ spacing: '2', alignItems: "center" }}>
+          <Bug size={24} color={severityColor} />
+          <Box>
+            <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: '1.1rem', letterSpacing: 1, fontFamily: 'Orbitron' }}>
+              {vulnerability.name}
+            </Typography>
+            <SeverityBadge severity={Number(vulnerability.severity)} />
+          </Box>
+        </Stack>
+        <IconButton onClick={onClose} sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' } }}>
+          <X size={20} />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent sx={{ p: 3 }}>
+        <Stack spacing={4}>
+          {/* Classification Section */}
+          <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1 }}>
+            <Typography sx={{ color: severityColor, fontSize: '0.7rem', fontWeight: 900, mb: 2, letterSpacing: 1, textTransform: 'uppercase' }}>
+              Vulnerability Classification
+            </Typography>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS SCORE</Typography>
+                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 900 }}>{vulnerability.cvss_score || 'N/A'}</Typography>
+              </Grid>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS METRICS</Typography>
+                <Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>{vulnerability.cvss_metrics || 'N/A'}</Typography>
+              </Grid>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>SOURCE</Typography>
+                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 700 }}>{vulnerability.source || 'N/A'}</Typography>
+              </Grid>
+              <Grid size={{ xs: 6, md: 3 }}>
+                <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>TAGS</Typography>
+                <Stack direction="row" sx={{ spacing: 0.5, flexWrap: "wrap" }}>
+                  {vulnerability.tags?.map((tag: any, i: number) => (
+                    <Chip
+                      key={i}
+                      label={tag.name}
+                      size="small"
+                      sx={{
+                        height: 16,
+                        fontSize: '0.6rem',
+                        bgcolor: 'rgba(255,255,255,0.05)',
+                        color: 'rgba(255,255,255,0.6)',
+                        border: '1px solid rgba(255,255,255,0.1)'
+                      }}
+                    />
+                  )) || <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>N/A</Typography>}
+                </Stack>
+              </Grid>
+            </Grid>
+          </Box>
+
+          {/* Description Section */}
+          <Box>
+            <Typography sx={{ color: severityColor, fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
+              Description
+            </Typography>
+            <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+              {vulnerability.description || 'No description provided.'}
+            </Typography>
+          </Box>
+
+          {/* Remediation Section */}
+          {vulnerability.remediation && (
+            <Box>
+              <Typography sx={{ color: '#00ff62', fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Remediation
+              </Typography>
+              <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                {vulnerability.remediation}
+              </Typography>
+            </Box>
+          )}
+
+          {/* References Section */}
+          {vulnerability.references && (
+            <Box>
+              <Typography sx={{ color: '#00f3ff', fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
+                References
+              </Typography>
+              <Stack spacing={1}>
+                {vulnerability.references.split('\n').filter(Boolean).map((ref: string, i: number) => (
+                  <Link
+                    key={i}
+                    href={ref}
+                    target="_blank"
+                    sx={{
+                      color: 'rgba(255,255,255,0.6)',
+                      fontSize: '0.8rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 1,
+                      textDecoration: 'none',
+                      '&:hover': { color: '#00f3ff', textDecoration: 'underline' }
+                    }}
+                  >
+                    <ExternalLink size={12} />
+                    {ref}
+                  </Link>
+                ))}
+              </Stack>
+            </Box>
+          )}
+        </Stack>
+      </DialogContent>
+      <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <Button
+          onClick={onClose}
+          sx={{
+            color: 'rgba(255,255,255,0.5)',
+            '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' },
+            fontFamily: 'Orbitron',
+            fontSize: '0.75rem',
+            fontWeight: 900
+          }}
+        >
+          CLOSE
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 const ENGINE_COLORS_MAP: Record<string, string> = {
   'Subdomain discovery': '#06b6d4', // cyan
   'Vulnerability scan': '#ef4444', // red
@@ -148,17 +308,17 @@ const getFrontendEngineColor = (activityTitle: string) => {
   if (!activityTitle) return '#fff';
   // Try exact match first
   if (ENGINE_COLORS_MAP[activityTitle]) return ENGINE_COLORS_MAP[activityTitle];
-  
+
   // Try case-insensitive partial match
   const lowerTitle = activityTitle.toLowerCase();
   for (const [key, color] of Object.entries(ENGINE_COLORS_MAP)) {
     if (lowerTitle.includes(key.toLowerCase())) return color as string;
   }
-  
+
   return '#fff';
 };
 
-const StatusBadge: React.FC<{ status: number }> = ({ status }) => {
+const StatusBadge: React.FC<{ status: number, compact?: boolean }> = ({ status, compact = false }) => {
   const configs: any = {
     [-1]: { label: 'PENDING', color: '#ff9f00', icon: Clock },
     [0]: { label: 'FAILED', color: '#ff003c', icon: AlertTriangle },
@@ -174,10 +334,10 @@ const StatusBadge: React.FC<{ status: number }> = ({ status }) => {
       display: 'inline-flex',
       alignItems: 'center',
       gap: 1,
-      px: 3,
-      py: 1,
+      px: compact ? 2 : 3,
+      py: compact ? 0.4 : 1,
       borderRadius: '20px',
-      bgcolor: 'transparent',
+      bgcolor: compact ? 'transparent' : 'transparent',
       border: `1px solid ${config.color}40`,
       color: config.color,
       fontSize: '0.9rem',
@@ -186,7 +346,7 @@ const StatusBadge: React.FC<{ status: number }> = ({ status }) => {
       textShadow: `0 0 10px ${config.color}40`,
       boxShadow: `inset 0 0 10px ${config.color}10`
     }}>
-      <Icon size={18} />
+      <Icon size={compact ? 12 : 18} />
       {config.label}
     </Box>
   );
@@ -315,12 +475,12 @@ const TaskOverlay: React.FC<{
             {selectedLog ? (
               <Box sx={{ p: 2 }}>
                 <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                  <Typography sx={{ 
-                    fontSize: '0.7rem', 
-                    color: getFrontendEngineColor(selectedLog.activity?.title || activityTitle), 
-                    fontWeight: 900, 
-                    textTransform: 'uppercase', 
-                    letterSpacing: 1 
+                  <Typography sx={{
+                    fontSize: '0.7rem',
+                    color: getFrontendEngineColor(selectedLog.activity?.title || activityTitle),
+                    fontWeight: 900,
+                    textTransform: 'uppercase',
+                    letterSpacing: 1
                   }}>
                     {selectedLog.activity?.title || activityTitle} Output
                   </Typography>
@@ -459,22 +619,25 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
 const SubScanWidget: React.FC<{ subscans: SubScan[], targetName: string }> = ({ subscans, targetName }) => {
   return (
     <Stack spacing={1.5}>
-      <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#ff00ff', mb: 1, textTransform: 'uppercase', letterSpacing: 1.5 }}>
-        SUB SCAN HISTORY FOR <Box component="span" sx={{ px: 0.5, bgcolor: 'rgba(255,0,255,0.1)', border: '1px solid rgba(255,0,255,0.2)', borderRadius: 0.5, color: '#ff00ff' }}>{targetName}</Box>
+      <Typography sx={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', fontWeight: 900, color: '#ff00ff', mb: 1, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+        SUB SCAN HISTORY FOR &nbsp;
+        <Box component="span" sx={{ px: 2, py: 0.4, border: '1px solid #ff00ff', borderRadius: '20px', color: '#ff00ff', fontSize: '0.7rem', bgcolor: 'rgba(255,0,255,0.05)' }}>
+          {targetName}
+        </Box>
       </Typography>
       {subscans?.map((sub: SubScan) => (
-        <Box key={sub.id} sx={{ p: 1.5, borderRadius: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
-          <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 2, bgcolor: sub.status === 2 ? '#00ff62' : '#ffc107' }} />
-          <Stack spacing={1}>
-            <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#00f3ff', textTransform: 'uppercase' }}>
+        <Box key={sub.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
+          <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, bgcolor: sub.status === 2 ? '#00ff62' : '#ffc107', borderRadius: '4px 0 0 4px' }} />
+          <Stack spacing={1.5}>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: '#00f3ff', textTransform: 'uppercase', letterSpacing: 1 }}>
               {sub.engine} ON {sub.subdomain_name}
             </Typography>
-            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-              <StatusBadge status={sub.status} />
+            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600, maxWidth: '60%', lineHeight: 1.4 }}>
+                {sub.completed_ago} Took {sub.time_taken}
+              </Typography>
+              <StatusBadge status={sub.status} compact />
             </Stack>
-            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600 }}>
-              {sub.completed_ago} Took {sub.time_taken}
-            </Typography>
           </Stack>
         </Box>
       ))}
@@ -646,13 +809,13 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?:
   );
 };
 
-const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], sx?: any }> = ({ vulnerabilities = [], sx = {} }) => {
+const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], onVulnClick: (v: any) => void, sx?: any }> = ({ vulnerabilities = [], onVulnClick, sx = {} }) => {
   const [ignoreInfo, setIgnoreInfo] = useState(false);
   const filtered = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) !== 0) : vulnerabilities;
 
   // Calculate common vulns from the full vulnerabilities list to ensure Info vulns are included
   const commonMap = filtered.reduce((acc: Record<string, any>, v: Vulnerability) => {
-    acc[v.name] = acc[v.name] || { name: v.name, count: 0, severity: v.severity };
+    acc[v.name] = acc[v.name] || { name: v.name, count: 0, severity: v.severity, vulnerability: v };
     acc[v.name].count += 1;
     return acc;
   }, {});
@@ -681,11 +844,23 @@ const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], sx?: a
             </TableRow>
           </TableHead>
           <TableBody>
-            {data.map((v: { name: string; count: number; severity: string | number }, i: number) => (
-              <TableRow key={i} sx={{ '& td': { borderBottom: '1px solid rgba(255,255,255,0.03)', py: 1 } }}>
-                <TableCell sx={{ color: '#ff00ff', fontSize: '0.7rem', fontWeight: 800 }}>{v.name}</TableCell>
+            {data.map((v: { name: string; count: number; severity: string | number; vulnerability: any }, i: number) => (
+              <TableRow
+                key={i}
+                onClick={() => onVulnClick(v.vulnerability)}
+                sx={{
+                  '& td': { borderBottom: '1px solid rgba(255,255,255,0.03)', py: 1.5 },
+                  cursor: 'pointer',
+                  transition: 'background-color 0.2s',
+                  '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.03)',
+                    '& td:first-of-type': { color: '#00f3ff' }
+                  }
+                }}
+              >
+                <TableCell sx={{ color: '#e7e7e7ff', fontSize: '0.75rem', fontWeight: 800, transition: 'color 0.2s' }}>{v.name}</TableCell>
                 <TableCell align="center">
-                  <Box sx={{ display: 'inline-block', px: 1, border: '1px solid #ff003c', color: '#ff003c', borderRadius: 0.5, fontSize: '0.65rem', fontWeight: 900 }}>
+                  <Box sx={{ display: 'inline-block', px: 1.5, py: 0.5, border: '1px solid #ff003c', color: '#ff003c', borderRadius: 0.5, fontSize: '0.7rem', fontWeight: 900, bgcolor: 'rgba(255,0,60,0.05)' }}>
                     {v.count}
                   </Box>
                 </TableCell>
@@ -812,6 +987,15 @@ export const ScanDetailPage = () => {
   const [startScanTargets, setStartScanTargets] = useState<{ ids: number[]; names: string[] } | null>(null);
   const [taskOverlayOpen, setTaskOverlayOpen] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<{ id: number; title: string } | null>(null);
+
+  const [selectedVulnForInfo, setSelectedVulnForInfo] = useState<any | null>(null);
+  const [vulnInfoModalOpen, setVulnInfoModalOpen] = useState(false);
+
+  const handleVulnClick = (v: any) => {
+    setSelectedVulnForInfo(v);
+    setVulnInfoModalOpen(true);
+  };
+
 
   const [selectedScanId, setSelectedScanId] = useState<number | null>(null);
 
@@ -974,7 +1158,7 @@ export const ScanDetailPage = () => {
                     time: new Date().toISOString(),
                     has_commands: true
                   }}
-                  onClick={() => handleTimelineItemClick({ 
+                  onClick={() => handleTimelineItemClick({
                     id: 'raw-scan-history',
                     title: 'Raw Scan History',
                     name: 'raw_scan_history',
@@ -999,7 +1183,7 @@ export const ScanDetailPage = () => {
               <Box
                 key={scan.id}
                 component={RouterLink}
-                to={`/${projectSlug}/scans/detail/${scan.id}`}
+                to={`/${projectSlug}/scan/detail/${scan.id}`}
                 sx={{
                   p: 1.5,
                   borderRadius: 1,
@@ -1166,8 +1350,8 @@ export const ScanDetailPage = () => {
                   colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00', '#ff8000', '#0080ff', '#8000ff'],
                   stroke: { show: false },
                   dataLabels: { enabled: false },
-                  legend: { 
-                    position: 'right', 
+                  legend: {
+                    position: 'right',
                     horizontalAlign: 'left',
                     labels: { colors: 'rgba(255,255,255,0.7)' },
                     itemMargin: { vertical: 2 }
@@ -1214,9 +1398,15 @@ export const ScanDetailPage = () => {
           <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
         </Grid>
         <Grid size={{ xs: 12, md: 8 }}>
-          <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
+          <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} onVulnClick={handleVulnClick} sx={{ height: '100%' }} />
         </Grid>
       </Grid>
+
+      <VulnerabilityInfoModal
+        open={vulnInfoModalOpen}
+        onClose={() => setVulnInfoModalOpen(false)}
+        vulnerability={selectedVulnForInfo}
+      />
 
       {/* Row 5: Contextual Assets */}
       <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>
