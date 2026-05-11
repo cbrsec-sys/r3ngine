@@ -24,6 +24,18 @@ class ProjectSerializer(serializers.ModelSerializer):
 			return naturaltime(obj.insert_date).title()
 
 
+class EngineTypeSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = EngineType
+		fields = '__all__'
+
+
+class ConfigurationSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Configuration
+		fields = '__all__'
+
+
 class HackerOneProgramAttributesSerializer(serializers.Serializer):
 
 

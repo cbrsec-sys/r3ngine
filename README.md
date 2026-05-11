@@ -26,9 +26,9 @@
   <a href="https://www.youtube.com/watch?v=A1oNOIc0h5A" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--Europe-2020-blue.svg?&logo=none" alt="" /></a>&nbsp;
 </p>
 
-<p align="center">
+<!-- <p align="center">
 <a href="https://github.com/whiterabb17/r3ngine/actions/workflows/codeql-analysis.yml" target="_blank"><img src="https://github.com/whiterabb17/r3ngine/actions/workflows/codeql-analysis.yml/badge.svg" alt="" /></a>&nbsp;<a href="https://github.com/whiterabb17/r3ngine/actions/workflows/build.yml" target="_blank"><img src="https://github.com/whiterabb17/r3ngine/actions/workflows/build.yml/badge.svg" alt="" /></a>&nbsp;
-</p>
+</p> -->
 
 <p align="center">
 <a href="https://opensourcesecurityindex.io/" target="_blank" rel="noopener">

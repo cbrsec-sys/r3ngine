@@ -1,6 +1,7 @@
 import markdown
 import requests
 import logging
+from django.conf import settings
 
 from celery import group
 from weasyprint import HTML, CSS
@@ -307,7 +308,7 @@ def start_scan_ui(request, slug, domain_id):
             'domain_id': domain.id,
             'engine_id': engine_id,
             'scan_type': LIVE_SCAN,
-            'results_dir': '/usr/src/scan_results',
+            'results_dir': settings.RENGINE_RESULTS,
             'imported_subdomains': subdomains_in,
             'out_of_scope_subdomains': subdomains_out,
             'starting_point_path': starting_point_path,
@@ -404,7 +405,7 @@ def start_multiple_scan(request, slug):
                     'domain_id': domain_id,
                     'engine_id': engine_id,
                     'scan_type': LIVE_SCAN,
-                    'results_dir': '/usr/src/scan_results',
+                    'results_dir': settings.RENGINE_RESULTS,
                     'initiated_by_id': request.user.id,
                     'imported_subdomains': subdomains_in,
                     'out_of_scope_subdomains': subdomains_out,
@@ -835,7 +836,7 @@ def delete_all_scan_results(request):
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def delete_all_screenshots(request):
     if request.method == 'POST':
-        run_command.run('rm -rf /usr/src/scan_results/*', shell=True)
+        run_command.run(f'rm -rf {settings.RENGINE_RESULTS}/*', shell=True)
         messageData = {'status': 'true'}
         messages.add_message(
             request,
@@ -882,7 +883,7 @@ def start_organization_scan(request, id, slug):
                 'domain_id': domain.id,
                 'engine_id': engine_id,
                 'scan_type': LIVE_SCAN,
-                'results_dir': '/usr/src/scan_results',
+                'results_dir': settings.RENGINE_RESULTS,
                 'initiated_by_id': request.user.id,
                 'imported_subdomains': subdomains_in,
                 'out_of_scope_subdomains': subdomains_out,

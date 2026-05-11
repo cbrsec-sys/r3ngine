@@ -23,7 +23,7 @@ environ.Env.read_env(os.path.join(BASE_DIR, os.pardir, '.env'))
 
 # Root env vars
 RENGINE_HOME = env('RENGINE_HOME', default='/usr/src/app')
-RENGINE_RESULTS = env('RENGINE_RESULTS', default=f'{RENGINE_HOME}/scan_results')
+RENGINE_RESULTS = env('RENGINE_RESULTS', default='/usr/src/scan_results')
 RENGINE_CACHE_ENABLED = env.bool('RENGINE_CACHE_ENABLED', default=False)
 RENGINE_RECORD_ENABLED = env.bool('RENGINE_RECORD_ENABLED', default=True)
 RENGINE_RAISE_ON_ERROR = env.bool('RENGINE_RAISE_ON_ERROR', default=False)
@@ -109,9 +109,12 @@ INSTALLED_APPS = [
     'plugins.apps.PluginsConfig',
     'apme.apps.ApmeConfig',
     'channels',
+    'rest_framework_simplejwt',
+    'corsheaders',
 ]
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -166,6 +169,11 @@ REST_FRAMEWORK = {
         'anon': '20/min',
         'user': '200/min',
     },
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ),
 }
 
 SWAGGER_SETTINGS = {
@@ -214,7 +222,7 @@ USE_L10N = True
 USE_TZ = True
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = '/usr/src/scan_results/'
+MEDIA_ROOT = RENGINE_RESULTS
 FILE_UPLOAD_MAX_MEMORY_SIZE = 100000000
 FILE_UPLOAD_PERMISSIONS = 0o644
 STATIC_URL = '/staticfiles/'
@@ -443,3 +451,30 @@ X_FRAME_OPTIONS = 'DENY'
 
 # Referrer policy
 SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+
+# Login required middleware configurations
+LOGIN_REQUIRED_IGNORE_PATHS = [
+    r'^/api/auth/token/',
+    r'^/api/auth/token/refresh/',
+    r'^/mapi/auth/token/',
+    r'^/mapi/auth/token/refresh/',
+    r'^/mapi/.*$',
+    r'^/swagger/',
+    r'^/redoc/',
+]
+
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
+    'ROTATE_REFRESH_TOKENS': True,
+    'BLACKLIST_AFTER_ROTATION': False,
+    'ALGORITHM': 'HS256',
+    'SIGNING_KEY': SECRET_KEY,
+    'AUTH_HEADER_TYPES': ('Bearer',),
+    'USER_ID_FIELD': 'id',
+    'USER_ID_CLAIM': 'user_id',
+}
+
+CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_CREDENTIALS = True
