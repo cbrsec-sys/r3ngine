@@ -8,7 +8,7 @@ from celery.utils.log import get_task_logger
 from urllib.parse import urlparse
 from reNgine.celery import app
 from reNgine.opsec_utils import ProxychainsWrapper
-from startScan.models import ScanHistory, Email, Employee, Command, Subdomain, EndPoint
+from startScan.models import ScanHistory, Email, Employee, Command, Subdomain, EndPoint, Parameter
 from targetApp.models import Domain
 from reNgine.definitions import (
     COLOR_RESET, COLOR_WHITE, COLOR_RED, TOOL_COLORS
@@ -269,3 +269,18 @@ def save_endpoint(
             endpoint.save()
 
     return endpoint, created
+
+def save_parameter(endpoint, name, param_type='unknown', impact='none', value=None):
+    """Save a discovered parameter to the database."""
+    param, created = Parameter.objects.get_or_create(
+        endpoint=endpoint,
+        name=name,
+        defaults={'type': param_type, 'impact': impact, 'value': value}
+    )
+    if not created:
+        if param_type != 'unknown':
+            param.type = param_type
+        if value:
+            param.value = value
+        param.save()
+    return param, created

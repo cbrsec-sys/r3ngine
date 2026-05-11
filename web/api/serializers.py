@@ -1001,9 +1001,32 @@ class WafBypassFindingSerializer(serializers.ModelSerializer):
 
 
 class ScreenshotSerializer(serializers.ModelSerializer):
+	screenshot_path = serializers.SerializerMethodField('get_screenshot_path')
+
 	class Meta:
 		model = Screenshot
 		fields = '__all__'
+
+	def get_screenshot_path(self, screenshot):
+		path = screenshot.screenshot_path
+		if path:
+			from django.conf import settings
+			import os
+			# If the path is already absolute (starts with /), try to make it relative to MEDIA_ROOT
+			if os.path.isabs(path) and path.startswith(settings.MEDIA_ROOT):
+				path = os.path.relpath(path, settings.MEDIA_ROOT)
+
+			# If the path doesn't contain the results_dir prefix, add it
+			results_dir = screenshot.scan_history.results_dir if screenshot.scan_history else ""
+			if results_dir and results_dir.startswith(settings.MEDIA_ROOT):
+				rel_results_dir = os.path.relpath(results_dir, settings.MEDIA_ROOT)
+				# Check if rel_results_dir is already a prefix of path
+				if not path.startswith(rel_results_dir):
+					path = os.path.join(rel_results_dir, path)
+
+			return path.replace('\\', '/')
+		return None
+
 
 
 class SubdomainSerializer(serializers.ModelSerializer):
@@ -1035,13 +1058,33 @@ class SubdomainSerializer(serializers.ModelSerializer):
 		fields = '__all__'
 
 	def get_screenshot_path(self, subdomain):
+		path = None
 		if subdomain.screenshot_path:
-			return subdomain.screenshot_path
-		# Fallback to the first available screenshot object
-		first_screenshot = subdomain.screenshots.first()
-		if first_screenshot:
-			return first_screenshot.screenshot_path
+			path = subdomain.screenshot_path
+		else:
+			# Fallback to the first available screenshot object
+			first_screenshot = subdomain.screenshots.first()
+			if first_screenshot:
+				path = first_screenshot.screenshot_path
+
+		if path:
+			from django.conf import settings
+			import os
+			# If the path is already absolute (starts with /), try to make it relative to MEDIA_ROOT
+			if os.path.isabs(path) and path.startswith(settings.MEDIA_ROOT):
+				path = os.path.relpath(path, settings.MEDIA_ROOT)
+
+			# If the path doesn't contain the results_dir prefix, add it
+			results_dir = subdomain.scan_history.results_dir if subdomain.scan_history else ""
+			if results_dir and results_dir.startswith(settings.MEDIA_ROOT):
+				rel_results_dir = os.path.relpath(results_dir, settings.MEDIA_ROOT)
+				# Check if rel_results_dir is already a prefix of path
+				if not path.startswith(rel_results_dir):
+					path = os.path.join(rel_results_dir, path)
+
+			return path.replace('\\', '/')
 		return None
+
 
 	def get_is_interesting(self, subdomain):
 		scan_id = subdomain.scan_history.id if subdomain.scan_history else None

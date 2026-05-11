@@ -32,7 +32,10 @@ import {
   FormGroup,
   Divider,
   Alert,
-  Snackbar
+  Snackbar,
+  Modal,
+  Fade,
+  Backdrop
 } from '@mui/material';
 import {
   Search,
@@ -87,6 +90,10 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   
   // Selected subdomain for single actions
   const [targetSubdomain, setTargetSubdomain] = useState<any>(null);
+  const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  
+  const openLightbox = (src: string) => setLightboxSrc(src);
+  const closeLightbox = () => setLightboxSrc(null);
   
   // Confirmation state
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -613,16 +620,19 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     {sub.screenshot_path ? (
-                      <Box sx={{
-                        width: 50,
-                        height: 30,
-                        borderRadius: 0.5,
-                        overflow: 'hidden',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        cursor: 'pointer',
-                        '&:hover': { borderColor: '#00f3ff', transform: 'scale(1.5)', zIndex: 10 },
-                        transition: 'all 0.2s'
-                      }}>
+                      <Box 
+                        onClick={() => openLightbox(`/media/${sub.screenshot_path}`)}
+                        sx={{
+                          width: 50,
+                          height: 30,
+                          borderRadius: 0.5,
+                          overflow: 'hidden',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          cursor: 'pointer',
+                          '&:hover': { borderColor: '#00f3ff', transform: 'scale(1.5)', zIndex: 10 },
+                          transition: 'all 0.2s'
+                        }}
+                      >
                         <img
                           src={`/media/${sub.screenshot_path}`}
                           alt="Visual"
@@ -1017,6 +1027,68 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      {/* Lightbox Modal */}
+      <Modal
+        open={!!lightboxSrc}
+        onClose={closeLightbox}
+        closeAfterTransition
+        slots={{ backdrop: Backdrop }}
+        slotProps={{
+          backdrop: {
+            sx: { bgcolor: 'rgba(0, 0, 0, 0.92)', backdropFilter: 'blur(6px)', zIndex: 9999 },
+            timeout: 200,
+          },
+        }}
+        sx={{ zIndex: 10000 }}
+      >
+        <Fade in={!!lightboxSrc} timeout={200}>
+          <Box
+            onClick={closeLightbox}
+            sx={{
+              position: 'fixed',
+              inset: 0,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              p: 4,
+              outline: 'none',
+              cursor: 'zoom-out'
+            }}
+          >
+            <IconButton
+              onClick={closeLightbox}
+              sx={{
+                position: 'absolute',
+                top: 20,
+                right: 20,
+                color: 'rgba(255,255,255,0.5)',
+                bgcolor: 'rgba(0,0,0,0.5)',
+                '&:hover': { color: '#fff', bgcolor: 'rgba(0, 243, 255, 0.1)' }
+              }}
+            >
+              <X size={24} />
+            </IconButton>
+            
+            <Box
+              component="img"
+              src={lightboxSrc || ''}
+              alt="Screenshot Full View"
+              onClick={(e) => e.stopPropagation()}
+              sx={{
+                maxWidth: '95vw',
+                maxHeight: '85vh',
+                objectFit: 'contain',
+                borderRadius: 1,
+                border: '1px solid rgba(0, 243, 255, 0.2)',
+                boxShadow: '0 0 50px rgba(0, 243, 255, 0.15)',
+                cursor: 'default'
+              }}
+            />
+          </Box>
+        </Fade>
+      </Modal>
     </Box>
   );
 };

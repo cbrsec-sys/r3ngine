@@ -46,7 +46,7 @@ from reNgine.vulnerability_tasks import *
 from reNgine.stress_testing_tasks import run_stress_testing
 from reNgine.osint_tasks import *
 from reNgine.task_utils import (
-    run_command, save_email, save_employee, save_subdomain, save_endpoint,
+    run_command, save_email, save_employee, save_subdomain, save_endpoint, save_parameter,
     sanitize_command_for_db, get_tool_color
 )
 from reNgine.report_tasks import *
@@ -465,9 +465,14 @@ def initiate_scan(
 		t1_main_branch = chain(group(t1_blockers), t2_step) if t1_blockers else t2_step
 
 		t1_background = []
-		for t in ['osint', 'spiderfoot_scan']:
+		for t in ['osint']:
 			wrapped = get_wrapped(t)
 			if wrapped: t1_background.append(wrapped)
+
+		# Trigger SpiderFoot asynchronously if enabled (Tier 1 Non-Blocking)
+		if 'spiderfoot_scan' in engine.tasks or enable_spiderfoot_scan:
+			logger.warning(f"Triggering asynchronous SpiderFoot scan for {domain.name}")
+			spiderfoot_scan.apply_async(kwargs={'ctx': ctx, 'host': domain.name})
 
 		# Final Workflow construction
 		workflow_steps = []
@@ -695,20 +700,35 @@ def report(ctx={}, description=None):
 	tasks = ScanActivity.objects.filter(scan_of=scan).all()
 	if subscan:
 		tasks = tasks.filter(celery_id__in=subscan.celery_ids)
-	failed_tasks = tasks.filter(status=FAILED_TASK)
+	failed_tasks = tasks.filter(status__in=[FAILED_TASK, ABORTED_TASK])
 
 	# Get task status
 	failed_count = failed_tasks.count()
-	status = SUCCESS_TASK if failed_count == 0 else FAILED_TASK
-	status_h = 'SUCCESS' if failed_count == 0 else 'FAILED'
 
-	# Update scan / subscan status
 	if subscan:
+		status = SUCCESS_TASK if failed_count == 0 else FAILED_TASK
+		status_h = 'SUCCESS' if failed_count == 0 else 'FAILED'
 		subscan.stop_scan_date = timezone.now()
 		subscan.status = status
 		subscan.save()
 	else:
+		# Main scan completion
+		if failed_count == 0:
+			status = SUCCESS_TASK
+			status_h = 'SUCCESS'
+		else:
+			# If any subscans failed, mark as Partially Complete
+			has_failed_subscans = SubScan.objects.filter(scan_history=scan, status__in=[FAILED_TASK, ABORTED_TASK]).exists()
+
+			if has_failed_subscans:
+				status = PARTIALLY_COMPLETE_TASK
+				status_h = 'PARTIALLY COMPLETE'
+			else:
+				status = FAILED_TASK
+				status_h = 'FAILED'
+
 		scan.scan_status = status
+
 	scan.stop_scan_date = timezone.now()
 	scan.save()
 
@@ -1847,6 +1867,14 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 							url_data = event.get('data', '')
 							if url_data and is_valid_url(url_data):
 								save_endpoint(url_data, ctx=ctx)
+						# SF types for Emails
+						elif event.get('type') == 'EMAILADDR':
+							email_addr = event.get('data', '').lower()
+							save_email(email_addr, scan_history=self.scan)
+						# SF types for Users/Accounts
+						elif event.get('type') in ['USERNAME', 'ACCOUNT_EXTERNAL', 'HUMAN_NAME']:
+							user_data = event.get('data', '')
+							save_employee(user_data, scan_history=self.scan)
 			except Exception as e:
 				logger.error(f"Error parsing SpiderFoot results: {str(e)}")
 	except Exception as e:
@@ -2814,21 +2842,7 @@ def parse_curl_output(response):
 	return {
 		'http_status': http_status,
 	}
-def save_parameter(endpoint, name, param_type='unknown', impact='none', value=None):
-	"""Save a discovered parameter to the database."""
-	from startScan.models import Parameter
-	param, created = Parameter.objects.get_or_create(
-		endpoint=endpoint,
-		name=name,
-		defaults={'type': param_type, 'impact': impact, 'value': value}
-	)
-	if not created:
-		if param_type != 'unknown':
-			param.type = param_type
-		if value:
-			param.value = value
-		param.save()
-	return param, created
+
 
 
 @app.task(name='web_api_discovery', queue='main_scan_queue', base=RengineTask, bind=True)
@@ -2922,7 +2936,12 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 							if found_path:
 								parsed = urlparse(url)
 								full_url = f"{parsed.scheme}://{parsed.netloc}{found_path}"
-								save_endpoint(full_url, ctx=ctx, subdomain=subdomain, http_status=entry.get('status'))
+								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain, http_status=entry.get('status'))
+								# Extract parameters from Kiterunner path if any
+								if '?' in full_url:
+									params = extract_params_from_url(full_url)
+									for p in params:
+										save_parameter(endpoint, p['name'], param_type='Kiterunner', value=p['value'])
 				except Exception as e:
 					logger.error(f"Error parsing Kiterunner output for {url}: {e}")
 
@@ -2972,7 +2991,12 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 									full_url = f"{parsed.scheme}://{parsed.netloc}{line}"
 								else:
 									full_url = line
-								save_endpoint(full_url, ctx=ctx, subdomain=subdomain)
+								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain)
+								# Extract parameters from LinkFinder findings
+								if '?' in full_url:
+									params = extract_params_from_url(full_url)
+									for p in params:
+										save_parameter(endpoint, p['name'], param_type='LinkFinder', value=p['value'])
 				except Exception as e:
 					logger.error(f"Error parsing LinkFinder output for {url}: {e}")
 
@@ -2985,6 +3009,16 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			if proxy:
 				cmd += f" -p {proxy}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
+			# Parse InQL results
+			if os.path.exists(inql_output):
+				try:
+					inql_findings = parse_inql_results(inql_output)
+					for finding in inql_findings:
+						# InQL doesn't always give the full URL, but we know the base URL
+						# We can register the discovery of GraphQL
+						save_endpoint(url, ctx=ctx, subdomain=subdomain, source='InQL (GraphQL Found)')
+				except Exception as e:
+					logger.error(f"Error parsing InQL results for {url}: {e}")
 
 	# Semgrep - Post-discovery pattern matching
 	if 'semgrep' in uses_tools:
@@ -3037,6 +3071,48 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if proxy:
 			cmd += f" -proxy {proxy}"
 		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+
+		# Parse Aquatone results and link to database
+		aquatone_session = f"{aquatone_dir}/aquatone_session.json"
+		if os.path.exists(aquatone_session):
+			try:
+				from startScan.models import Screenshot
+				with open(aquatone_session, 'r') as f:
+					data = json.load(f)
+					# Aquatone session data contains 'pages' key
+					pages = data.get('pages', {})
+					for page_id, page_data in pages.items():
+						page_url = page_data.get('url')
+						if not page_url: continue
+						
+						subdomain_name = get_subdomain_from_url(page_url)
+						subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=self.scan).first()
+						if not subdomain: continue
+						
+						# Save to Screenshot model
+						screenshot_file = f"aquatone/screenshots/{page_id}.png"
+						html_file = f"aquatone/html/{page_id}.html"
+						
+						Screenshot.objects.get_or_create(
+							subdomain=subdomain,
+							scan_history=self.scan,
+							url=page_url,
+							defaults={
+								'title': page_data.get('title'),
+								'status_code': page_data.get('status_code'),
+								'screenshot_path': screenshot_file,
+								'html_path': html_file,
+								'technologies': page_data.get('tags', []), # Aquatone uses tags for tech
+							}
+						)
+						# Also update the subdomain's screenshot_path if not set
+						if not subdomain.screenshot_path:
+							subdomain.screenshot_path = screenshot_file
+							subdomain.save()
+							
+			except Exception as e:
+				logger.error(f"Error parsing Aquatone session for {self.scan}: {e}")
+
 
 	# Sync to Graph
 	if Neo4jManager:
@@ -3402,6 +3478,8 @@ def get_vulnerability_gpt_report(vuln):
 			ref, created = VulnerabilityReference.objects.get_or_create(url=url)
 			vuln.references.add(ref)
 			vuln.save()
+	
+	return response
 
 
 def add_gpt_description_db(title, path, description, impact, remediation, references):
@@ -4178,6 +4256,12 @@ def generate_inapp_notification(scan, subscan, status, engine, fields):
 		icon = "mdi-close-circle-outline"
 		notif_status = 'error'
 		duration_msg = f'Failed in {fields.get("Duration")}'
+	elif status == 'PARTIALLY COMPLETE':
+		title = f"{scan_type} Partially Completed"
+		description = f"{scan_type} has completed with some failures for {domain}"
+		icon = "mdi-alert-circle-outline"
+		notif_status = 'warning'
+		duration_msg = f'Partially completed in {fields.get("Duration")}'
 
 	description += f"<br>Engine: {engine.engine_name if engine else 'N/A'}"
 	slug = scan.domain.project.slug if scan else subscan.history.domain.project.slug
@@ -5952,63 +6036,12 @@ def llm_vulnerability_description(vulnerability_id):
 	logger.info('Getting GPT Vulnerability Description')
 	try:
 		lookup_vulnerability = Vulnerability.objects.get(id=vulnerability_id)
-		lookup_url = urlparse(lookup_vulnerability.http_url)
-		path = lookup_url.path
+		return get_vulnerability_gpt_report((lookup_vulnerability.name, lookup_vulnerability.get_path()))
 	except Exception as e:
 		return {
 			'status': False,
 			'error': str(e)
 		}
-
-	# check in db GPTVulnerabilityReport model if vulnerability description and path matches
-	if not path:
-		path = '/'
-	stored = GPTVulnerabilityReport.objects.filter(url_path=path).filter(title=lookup_vulnerability.name).first()
-	if stored and stored.description and stored.impact and stored.remediation:
-		logger.info('Found cached Vulnerability Description')
-		response = {
-			'status': True,
-			'description': stored.description,
-			'impact': stored.impact,
-			'remediation': stored.remediation,
-			'references': [url.url for url in stored.references.all()]
-		}
-	else:
-		logger.info('Fetching new Vulnerability Description')
-		vulnerability_description = get_gpt_vuln_input_description(
-			lookup_vulnerability.name,
-			path
-		)
-		# one can add more description here later
-
-		gpt_generator = LLMVulnerabilityReportGenerator(logger=logger)
-		response = gpt_generator.get_vulnerability_description(vulnerability_description)
-		logger.info(response)
-		add_gpt_description_db(
-			lookup_vulnerability.name,
-			path,
-			response.get('description'),
-			response.get('impact'),
-			response.get('remediation'),
-			response.get('references', [])
-		)
-
-	# for all vulnerabilities with the same vulnerability name this description has to be stored.
-	# also the condition is that the url must contain a part of this.
-
-	for vuln in Vulnerability.objects.filter(name=lookup_vulnerability.name, http_url__icontains=path):
-		vuln.description = response.get('description', vuln.description)
-		vuln.impact = response.get('impact')
-		vuln.remediation = response.get('remediation')
-		vuln.is_gpt_used = True
-		vuln.save()
-
-		for url in response.get('references', []):
-			ref, created = VulnerabilityReference.objects.get_or_create(url=url)
-			vuln.references.add(ref)
-			vuln.save()
-
-	return response
 
 
 @app.task(name='fetch_proxies_task', bind=True, queue='main_scan_queue')

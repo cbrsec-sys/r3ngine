@@ -237,10 +237,33 @@ class ScanSummaryAPIView(APIView):
             'related_tlds': related_tlds,
             'scan_count': scan_count,
             'this_week_scan_count': this_week_scan_count,
-            'vulnerability_highlights': list(vulnerabilities.order_by('-severity', '-discovered_date')[:10].values('name', 'severity', 'http_url', 'discovered_date')),
-            'subdomains': list(subdomain_qs.order_by('name')[:100].values('name', 'http_status', 'page_title', 'http_url', 'origin_ip')),
-            'endpoints': list(endpoint_qs.order_by('http_url')[:100].values('http_url', 'http_status', 'content_type', 'techs__name')),
-            'vulnerabilities': list(vulnerabilities.order_by('-severity')[:100].values('name', 'severity', 'description', 'http_url')),
+            'vulnerability_highlights': list(vulnerabilities.order_by('-severity', '-discovered_date')[:10].values('id', 'name', 'severity', 'http_url', 'discovered_date')),
+            'subdomains': [
+                {
+                    'name': sub.name,
+                    'http_status': sub.http_status,
+                    'page_title': sub.page_title,
+                    'http_url': sub.http_url,
+                    'origin_ip': sub.origin_ip,
+                    'response_time': sub.response_time,
+                    'screenshot_path': sub.screenshot_path,
+                    'critical_count': sub.get_critical_count,
+                    'high_count': sub.get_high_count,
+                    'medium_count': sub.get_medium_count,
+                    'low_count': sub.get_low_count,
+                    'info_count': sub.get_info_count,
+                    'content_length': sub.content_length,
+                    'ip_addresses': [
+                        {
+                            'address': ip.address,
+                            'is_cdn': ip.is_cdn,
+                            'ports': list(ip.ports.all().values('number', 'service_name', 'is_uncommon'))
+                        } for ip in sub.ip_addresses.all()
+                    ]
+                } for sub in subdomain_qs.order_by('name')[:100]
+            ],
+            'endpoints': list(endpoint_qs.order_by('http_url')[:100].values('id', 'http_url', 'http_status', 'content_type', 'techs__name')),
+            'vulnerabilities': list(vulnerabilities.order_by('-severity')[:100].values('id', 'name', 'severity', 'description', 'http_url')),
             'monitoring_discoveries': list(monitoring_discoveries.values('id', 'discovery_type', 'content')),
             'secret_leaks': SecretLeakSerializer(secret_leaks[:100], many=True).data,
             # Scan specific data
