@@ -51,7 +51,12 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [lightboxLabel, setLightboxLabel] = useState<string>('');
 
-  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, true, targetId);
+  const { data, isLoading, error } = useSubdomains(projectSlug, page, activeSearch, scanId, true, targetId);
+
+  console.log('DirectoriesTab:', { projectSlug, scanId, targetId, page, activeSearch });
+  console.log('DirectoriesTab Data:', data);
+  console.log('DirectoriesTab Loading:', isLoading);
+  console.log('DirectoriesTab Error:', error);
 
   const handleSearch = () => {
     setPage(1);

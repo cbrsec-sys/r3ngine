@@ -10,6 +10,7 @@
   <h3 align="center">Official v3 Rebirth: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
 </p>
 
+<h3>New V3 Dashboard</h3>
 <p align="center">
 <a href="https://rengine.wiki"><img src=".github/screenshots/r3ngine_dash.png" height="400px" width="520px" alt=""/></a>
 </p>
@@ -37,6 +38,11 @@
 <h4>r3ngine 3.0.0: The Phoenix Rebirth</h4>
 <p>
   r3ngine 3.0.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Interactive KPI Reports</b> with internal navigation, and <b>Scoped Attack Surface Visualization</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
+</p>
+
+<h4>Attack Path Modeling Engine<h4>
+<p align="center">
+<a href="https://rengine.wiki"><img src=".github/screenshots/apme.png" height="400px" width="520px" alt=""/></a>
 </p>
 
 <h6><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank"><img src="https://img.shields.io/badge/r3ngine--mobile-2.0.0-blue.svg?logo=none" alt="r3ngine Mobile SOC" />r3ngine Mobile SOC</a>: COMING SOON</h6>

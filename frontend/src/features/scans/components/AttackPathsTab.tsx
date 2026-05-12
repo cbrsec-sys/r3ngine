@@ -53,7 +53,7 @@ const RISK_LABEL: Record<string, string> = {
 // ─── Risk badge ───────────────────────────────────────────────────────────────
 const RiskBadge: React.FC<{ risk: string }> = ({ risk }) => {
   const color = RISK_COLOR[risk] ?? RISK_COLOR.unknown;
-  const label = RISK_LABEL[risk] ?? risk.toUpperCase();
+  const label = RISK_LABEL[risk] ?? risk?.toUpperCase() ?? 'UNKNOWN';
   return (
     <Box
       sx={{
@@ -157,7 +157,7 @@ const StepRow: React.FC<{ step: AttackStep; index: number }> = ({ step, index })
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexShrink: 0 }}>
           <StatusIcon size={12} color={color} />
           <Typography sx={{ fontSize: '0.6rem', color, fontWeight: 800, letterSpacing: 0.5 }}>
-            {step.status.toUpperCase()}
+            {step?.status?.toUpperCase() ?? 'INFERRED'}
           </Typography>
         </Stack>
       </Tooltip>

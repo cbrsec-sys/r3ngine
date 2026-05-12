@@ -39,6 +39,7 @@ class PIIGate:
     def deanonymize(self, text):
         """
         Restores original PII values from an anonymized string.
+        Handles both bracketed [TYPE_ID] and raw TYPE_ID if LLM stripped brackets.
         """
         if not text:
             return text
@@ -47,6 +48,12 @@ class PIIGate:
         # Replace masks starting from longest to avoid partial replacements
         masks = sorted(self.reverse_map.keys(), key=len, reverse=True)
         for mask in masks:
+            # 1. Try exact bracketed match: [HOSTNAME_1]
             processed_text = processed_text.replace(mask, self.reverse_map[mask])
+            
+            # 2. Try raw match if LLM stripped brackets: HOSTNAME_1
+            # We strip brackets from the mask stored in reverse_map
+            raw_mask = mask.strip("[]")
+            processed_text = processed_text.replace(raw_mask, self.reverse_map[mask])
         
         return processed_text

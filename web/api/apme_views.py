@@ -52,7 +52,7 @@ class AttackPathsAPIView(APIView):
             assessments
             .exclude(potential_attack_chain__isnull=True)
             .exclude(potential_attack_chain={})
-            .order_by('-remediation_priority', '-scan_history__start_date')
+            .order_by('-remediation_priority', '-scan_history__start_scan_date')
         )
 
         paths = []

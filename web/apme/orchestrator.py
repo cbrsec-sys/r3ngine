@@ -129,7 +129,8 @@ class APMEOrchestrator:
         # ── Step 7: Persist & Return ──────────────────────────────────────────
         logger.info(f"APME [6/7] Persisting top {self.top_n} paths...")
         top_paths = scored_paths[: self.top_n]
-        self._persist_paths(top_paths, scan_history_id)
+        node_index = {n.id: n for n in all_nodes}
+        self._persist_paths(top_paths, scan_history_id, node_index)
 
         builder.close()
 
@@ -229,7 +230,7 @@ class APMEOrchestrator:
 
         return goal_nodes
 
-    def _persist_paths(self, paths: List[AttackPath], scan_history_id: int) -> None:
+    def _persist_paths(self, paths: List[AttackPath], scan_history_id: int, node_index: Dict[str, Node]) -> None:
         """
         Persist attack paths to reNgine's ImpactAssessment model.
         Each top-level path is stored as a simulated_path JSON blob.
@@ -241,9 +242,6 @@ class APMEOrchestrator:
 
             from apme.output.llm_narrator import LLMNarrator
             narrator = LLMNarrator()
-
-            # We need a node index for the narrator
-            node_index = {n.id: n for n in graph.nodes}
 
             for path in paths:
                 path_dict = path.to_dict()
@@ -264,6 +262,7 @@ class APMEOrchestrator:
                             "score": path.score,
                             "steps": [s.to_dict() for s in path.steps],
                             "narrative": narrative,
+                            "metadata": self._build_path_metadata(path, node_index),
                         },
                         "potential_impact": narrative,
                         "remediation_priority": self._risk_to_priority(path.risk),

@@ -719,10 +719,10 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: a
         </TableHead>
         <TableBody>
           {(highlights || []).map((v: Vulnerability, idx: number) => (
-            <TableRow 
-              key={idx} 
+            <TableRow
+              key={idx}
               onClick={() => onVulnClick(v)}
-              sx={{ 
+              sx={{
                 '& td': { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 2 },
                 cursor: 'pointer',
                 transition: 'background-color 0.2s',
@@ -784,11 +784,29 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?:
 
   const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) > 0) : vulnerabilities;
 
-  const subdomainCounts = filteredVulns.reduce((acc: Record<string, number>, v: Vulnerability) => {
-    const host = new URL(v.http_url || '').hostname;
-    acc[host] = (acc[host] || 0) + 1;
-    return acc;
-  }, {});
+  const subdomainCounts = filteredVulns.reduce(
+    (acc: Record<string, number>, v: Vulnerability) => {
+      try {
+        if (!v.http_url) return acc;
+
+        // Ensure protocol exists
+        const normalizedUrl = v.http_url.match(/^https?:\/\//)
+          ? v.http_url
+          : `http://${v.http_url}`;
+
+        const host = new URL(normalizedUrl).hostname;
+
+        if (!host) return acc;
+
+        acc[host] = (acc[host] || 0) + 1;
+      } catch (err) {
+        console.warn('Invalid URL:', v.http_url);
+      }
+
+      return acc;
+    },
+    {}
+  );
 
   const sorted = Object.entries(subdomainCounts).sort((a: [string, number], b: [string, number]) => b[1] - a[1]);
   const mostVulnerable = sorted[0];
@@ -1114,9 +1132,9 @@ export const ScanDetailPage = () => {
                       height: 6,
                       borderRadius: 3,
                       bgcolor: 'rgba(255,255,255,0.05)',
-                      '& .MuiLinearProgress-bar': { 
-                        bgcolor: progressColor, 
-                        boxShadow: `0 0 15px ${progressColor}80` 
+                      '& .MuiLinearProgress-bar': {
+                        bgcolor: progressColor,
+                        boxShadow: `0 0 15px ${progressColor}80`
                       }
                     }}
                   />
@@ -1359,7 +1377,7 @@ export const ScanDetailPage = () => {
                 <Stack spacing={1}>
                   {data.domain_info?.dns_records?.map((r: any, idx: number) => (
                     <Stack key={idx} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                      <Chip label={r.type.toUpperCase()} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} />
+                      <Chip label={r.type?.toUpperCase() ?? 'DNS'} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} />
                       <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{r.name} {"->"} {r.value}</Typography>
                     </Stack>
                   ))}
@@ -1568,10 +1586,10 @@ export const ScanDetailPage = () => {
     <Box sx={{ p: 2 }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Stack 
-          direction={{ xs: 'column', sm: 'row' }} 
-          sx={{ 
-            justifyContent: 'space-between', 
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          sx={{
+            justifyContent: 'space-between',
             alignItems: { xs: 'flex-start', sm: 'flex-start' },
             gap: 2
           }}
@@ -1581,10 +1599,10 @@ export const ScanDetailPage = () => {
             <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info?.name || 'N/A'}</Typography>
           </Box>
           <Stack spacing={1} sx={{ alignItems: { xs: 'flex-start', sm: 'flex-end' }, width: { xs: '100%', sm: 'auto' } }}>
-            <Stack 
-              direction={{ xs: 'column', md: 'row' }} 
-              spacing={2} 
-              sx={{ 
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={2}
+              sx={{
                 alignItems: { xs: 'stretch', md: 'center' },
                 width: { xs: '100%', md: 'auto' }
               }}
