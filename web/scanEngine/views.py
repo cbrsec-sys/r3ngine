@@ -967,13 +967,9 @@ def update_github_tool(request, slug, id):
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def get_full_yaml_config(request, slug):
     try:
-        # File is in the root of the project
-        # views.py is in web/scanEngine/
-        file_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'full_yaml_config.yaml')
-        if not os.path.exists(file_path):
-             # Try absolute path in docker
-             file_path = '/usr/src/app/full_yaml_config.yaml'
-             
+        from django.conf import settings
+        file_path = os.path.join(settings.BASE_DIR, 'fixtures', 'full_yaml_config.yaml')
+        
         with open(file_path, 'r') as f:
             content = f.read()
         return http.JsonResponse({'status': 'success', 'content': content})
