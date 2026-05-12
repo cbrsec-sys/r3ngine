@@ -1560,8 +1560,8 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}
 	emails = data.get('emails', [])
 	for email_address in emails:
 		email, _ = save_email(email_address, scan_history=scan_history)
-		# if email:
-		# 	self.notify(fields={'Emails': f'• `{email.address}`'})
+		if email:
+			self.notify(fields={'Emails': f'• `{email.address}`'})
 
 	linkedin_people = data.get('linkedin_people', [])
 	for people in linkedin_people:
@@ -1569,8 +1569,8 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}
 			people,
 			designation='linkedin',
 			scan_history=scan_history)
-		# if employee:
-		# 	self.notify(fields={'LinkedIn people': f'• {employee.name}'})
+		if employee:
+			self.notify(fields={'LinkedIn people': f'• {employee.name}'})
 
 	twitter_people = data.get('twitter_people', [])
 	for people in twitter_people:
@@ -1578,8 +1578,8 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}
 			people,
 			designation='twitter',
 			scan_history=scan_history)
-		# if employee:
-		# 	self.notify(fields={'Twitter people': f'• {employee.name}'})
+		if employee:
+			self.notify(fields={'Twitter people': f'• {employee.name}'})
 
 	hosts = data.get('hosts', [])
 	urls = []
@@ -1593,9 +1593,9 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}
 			crawl=False,
 			ctx=ctx,
 			subdomain=subdomain)
-		# if endpoint:
-		# 	urls.append(endpoint.http_url)
-			# self.notify(fields={'Hosts': f'• {endpoint.http_url}'})
+		if endpoint:
+			urls.append(endpoint.http_url)
+			self.notify(fields={'Hosts': f'• {endpoint.http_url}'})
 
 	# if enable_http_crawl:
 	# 	ctx['track'] = False
@@ -1810,15 +1810,15 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	# fast: footprint, normal: investigate, deep: all
 	profile_cmd = ""
 	if intensity == 'fast':
-		profile_cmd = "-p footprint"
+		profile_cmd = "-u footprint"
 	elif intensity == 'deep':
-		profile_cmd = "-p all"
+		profile_cmd = "-u all"
 	# if modules is set to 'all' and intensity is provided, we can use profiles
 	# otherwise if specific modules are provided, they take precedence
 	if modules != 'all':
 		profile_cmd = f"-m {modules}"
 	elif not profile_cmd:
-		profile_cmd = "-p investigate"
+		profile_cmd = "-u investigate"
 	
 	# Use global SF config if it exists, otherwise generate from DB
 	sf_config_path = "/root/.config/spiderfoot.cfg"
@@ -1831,13 +1831,13 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	
 	output_file = f"{self.results_dir}/spiderfoot_results.json"
 	# Get proxy if enabled
-	proxy = get_random_proxy()
+	# proxy = get_random_proxy()
 
 	# Spiderfoot CLI usage
-	# -s target, -m modules, -f (output format json), -o (output file), -q (quiet)
-	cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {host} {profile_cmd} -max-threads {threads} -q -o json > {output_file}"
-	if proxy:
-		cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
+	# -s target, -u (profile) or -m (modules), -f (output format json), -o (output file)
+	cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {host} {profile_cmd} -max-threads {threads} -o json > {output_file}"
+	# if proxy:
+	#	 cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 	
 	try:
 		run_command(
@@ -1853,6 +1853,12 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 		
 		# Parse spiderfoot_results.json and save to reNgine DB
 		if os.path.exists(output_file):
+			# BUG: Spiderfoot scan crashing here [spiderfoot_scan                    | ERROR | Error parsing SpiderFoot results: Expecting value: line 1 column 1 (char 0)]
+			# Trying to parse results before the scan has even been initiated. 
+			# This needs to be fixed.
+			# Maybe have the spiderfoot scan as a task then a parse_spiderfoot_results function 
+			# as a task that runs after the spiderfoot scan is completed.
+			# This can be very long running task so needs to ensure proper logging and status updates.
 			try:
 				with open(output_file, 'r') as f:
 					sf_data = json.load(f)
@@ -4081,7 +4087,12 @@ def http_crawl(
 		if line.get('failed', False):
 			continue
 
-		endpoint, created = process_httpx_response(line, ctx=ctx, is_ran_from_subdomain_scan=is_ran_from_subdomain_scan)
+		httpx_result = process_httpx_response(line, ctx=ctx, is_ran_from_subdomain_scan=is_ran_from_subdomain_scan)
+		if not httpx_result:
+			continue
+
+		endpoint, created = httpx_result
+
 		if not endpoint:
 			continue
 
@@ -5510,9 +5521,9 @@ def stream_command(
 
 			# Log to console for visibility
 			if isinstance(item, str):
-				logger.info(f"{COLOR_WHITE}{item}{COLOR_RESET}")
+				logger.debug(f"{COLOR_WHITE}{item}{COLOR_RESET}")
 			else:
-				logger.info(f"{COLOR_WHITE}{json.dumps(item)}{COLOR_RESET}")
+				logger.debug(f"{COLOR_WHITE}{json.dumps(item)}{COLOR_RESET}")
 
 			# Yield the line
 			yield item
@@ -5550,11 +5561,11 @@ def stream_command(
 def process_httpx_response(line, ctx={}, is_ran_from_subdomain_scan=False):
 	"""Process a single line of httpx output and save to database."""
 	if not line or not isinstance(line, dict):
-		return None
+		return None, False
 
 	# No response from endpoint
 	if line.get('failed', False):
-		return None
+		return None, False
 
 	# Parse httpx output
 	http_status = line.get('status_code')
@@ -5576,7 +5587,7 @@ def process_httpx_response(line, ctx={}, is_ran_from_subdomain_scan=False):
 	subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
 
 	if not subdomain:
-		return None
+		return None, False
 
 	# Save default HTTP URL to endpoint object in DB
 	endpoint, created = save_endpoint(
@@ -5587,7 +5598,7 @@ def process_httpx_response(line, ctx={}, is_ran_from_subdomain_scan=False):
 		is_default=is_ran_from_subdomain_scan
 	)
 	if not endpoint:
-		return None
+		return None, False
 	
 	endpoint.http_status = http_status
 	endpoint.page_title = page_title

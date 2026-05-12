@@ -11,8 +11,8 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def serve_protected_media(request, path):
-    logger.info(f"serve_protected_media hit for path: {path}")
-    logger.info(f"Headers: {request.headers}")
+    # logger.info(f"serve_protected_media hit for path: {path}")
+    # logger.info(f"Headers: {request.headers}")
     # 1. Normalize path
     # If the path is already absolute, try to make it relative to MEDIA_ROOT
     if path.startswith(settings.MEDIA_ROOT):
@@ -26,7 +26,7 @@ def serve_protected_media(request, path):
     
     # Security check
     if not is_safe_path(settings.MEDIA_ROOT, file_path):
-        logger.error(f"is_safe_path failed for {file_path}")
+    #    logger.error(f"is_safe_path failed for {file_path}")
         raise Http404("File not found")
         
     if os.path.exists(file_path):
@@ -41,5 +41,5 @@ def serve_protected_media(request, path):
         # or via the Vite dev-server proxy.
         return FileResponse(open(file_path, 'rb'), content_type=content_type)
     else:
-        logger.error(f"File not found: {file_path}")
+    #    logger.error(f"File not found: {file_path}")
         raise Http404("File not found")

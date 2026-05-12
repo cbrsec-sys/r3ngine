@@ -3638,6 +3638,11 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		req = self.request
 		project = req.query_params.get('project')
 		target_id = req.query_params.get('target_id')
+		scan_id = req.query_params.get('scan_history')
+		domain = req.query_params.get('domain')
+		severity = req.query_params.get('severity')
+		subdomain_id = req.query_params.get('subdomain_id')
+		subdomain_name = req.query_params.get('subdomain')
 		vulnerability_name = req.query_params.get('vulnerability_name')
 		slug = self.request.GET.get('project', None)
 
@@ -3681,7 +3686,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 
 	def filter_queryset(self, qs):
 		qs = self.queryset.filter()
-		search_value = self.request.GET.get(u'search[value]', None)
+		search_value = self.request.GET.get(u'search[value]', '')
 		_order_col = self.request.GET.get(u'order[0][column]', None)
 		_order_direction = self.request.GET.get(u'order[0][dir]', None)
 		if search_value or _order_col or _order_direction:
@@ -3709,7 +3714,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 						if query.strip():
 							qs = qs & self.special_lookup(query.strip())
 				elif '|' in search_value:
-					qs = Subdomain.objects.none()
+					qs = Vulnerability.objects.none()
 					complex_query = search_value.split('|')
 					for query in complex_query:
 						if query.strip():
