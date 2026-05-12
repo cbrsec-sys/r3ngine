@@ -3549,17 +3549,13 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 
 class VulnerabilityViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]
-	queryset = Vulnerability.objects.none()
 	serializer_class = VulnerabilitySerializer
+	queryset = Vulnerability.objects.none()
 
 	def get_queryset(self):
 		req = self.request
-		scan_id = req.query_params.get('scan_history')
+		project = req.query_params.get('project')
 		target_id = req.query_params.get('target_id')
-		domain = req.query_params.get('domain')
-		severity = req.query_params.get('severity')
-		subdomain_id = req.query_params.get('subdomain_id')
-		subdomain_name = req.query_params.get('subdomain')
 		vulnerability_name = req.query_params.get('vulnerability_name')
 		slug = self.request.GET.get('project', None)
 

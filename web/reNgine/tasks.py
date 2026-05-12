@@ -3431,53 +3431,76 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 		return None
 
 
-def get_vulnerability_gpt_report(vuln):
+def get_vulnerability_gpt_report(vuln, vulnerability_id=None):
 	title = vuln[0]
 	path = vuln[1]
 	if not path:
 		path = '/'
 	logger.info(f'Getting GPT Report for {title}, PATH: {path}')
-	# check if in db already exists
+
+	# 1. Check if the specific vulnerability already has GPT info
+	if vulnerability_id:
+		try:
+			lookup_vulnerability = Vulnerability.objects.get(id=vulnerability_id)
+			if lookup_vulnerability.is_gpt_used and lookup_vulnerability.description and lookup_vulnerability.impact and lookup_vulnerability.remediation:
+				logger.info(f'Returning existing GPT report from Vulnerability ID {vulnerability_id}')
+				return {
+					'status': True,
+					'description': lookup_vulnerability.description,
+					'impact': lookup_vulnerability.impact,
+					'remediation': lookup_vulnerability.remediation,
+					'references': [url.url for url in lookup_vulnerability.references.all()]
+				}
+		except Vulnerability.DoesNotExist:
+			pass
+
+	# 2. Check if in global cache (GPTVulnerabilityReport) already exists
 	stored = GPTVulnerabilityReport.objects.filter(
-		url_path=path
-	).filter(
+		url_path=path,
 		title=title
 	).first()
+
 	if stored and stored.description and stored.impact and stored.remediation:
+		logger.info(f'Found GPT Report in global cache for {title}')
 		response = {
+			'status': True,
 			'description': stored.description,
 			'impact': stored.impact,
 			'remediation': stored.remediation,
 			'references': [url.url for url in stored.references.all()]
 		}
 	else:
+		# 3. Call LLM
 		report = LLMVulnerabilityReportGenerator(logger=logger)
 		vulnerability_description = get_gpt_vuln_input_description(
 			title,
 			path
 		)
 		response = report.get_vulnerability_description(vulnerability_description)
-		add_gpt_description_db(
-			title,
-			path,
-			response.get('description'),
-			response.get('impact'),
-			response.get('remediation'),
-			response.get('references', [])
-		)
+		if response.get('status'):
+			add_gpt_description_db(
+				title,
+				path,
+				response.get('description'),
+				response.get('impact'),
+				response.get('remediation'),
+				response.get('references', [])
+			)
 
+	# 4. Update all matching vulnerabilities that don't have GPT info yet, or at least the specific one
+	if response.get('status'):
+		# Update matching vulnerabilities
+		for v in Vulnerability.objects.filter(name=title, http_url__icontains=path):
+			v.description = response.get('description', v.description)
+			v.impact = response.get('impact', v.impact)
+			v.remediation = response.get('remediation', v.remediation)
+			v.is_gpt_used = True
+			v.save()
 
-	for vuln in Vulnerability.objects.filter(name=title, http_url__icontains=path):
-		vuln.description = response.get('description', vuln.description)
-		vuln.impact = response.get('impact')
-		vuln.remediation = response.get('remediation')
-		vuln.is_gpt_used = True
-		vuln.save()
-
-		for url in response.get('references', []):
-			ref, created = VulnerabilityReference.objects.get_or_create(url=url)
-			vuln.references.add(ref)
-			vuln.save()
+			for url in response.get('references', []):
+				ref, created = VulnerabilityReference.objects.get_or_create(url=url)
+				v.references.add(ref)
+			v.save()
 	
 	return response
 
@@ -3486,17 +3509,21 @@ def add_gpt_description_db(title, path, description, impact, remediation, refere
 	logger.info(f'Adding GPT Report to DB for {title}, PATH: {path}')
 	if not path:
 		path = '/'
-	gpt_report = GPTVulnerabilityReport()
-	gpt_report.url_path = path
-	gpt_report.title = title
-	gpt_report.description = description
-	gpt_report.impact = impact
-	gpt_report.remediation = remediation
-	gpt_report.save()
+	
+	gpt_report, created = GPTVulnerabilityReport.objects.update_or_create(
+		url_path=path,
+		title=title,
+		defaults={
+			'description': description,
+			'impact': impact,
+			'remediation': remediation
+		}
+	)
 
-	for url in references:
-		ref, created = VulnerabilityReference.objects.get_or_create(url=url)
-		gpt_report.references.add(ref)
+	if references:
+		for url in references:
+			ref, created = VulnerabilityReference.objects.get_or_create(url=url)
+			gpt_report.references.add(ref)
 		gpt_report.save()
 
 @app.task(name='nuclei_scan', queue='main_scan_queue', base=RengineTask, bind=True)
@@ -6036,7 +6063,7 @@ def llm_vulnerability_description(vulnerability_id):
 	logger.info('Getting GPT Vulnerability Description')
 	try:
 		lookup_vulnerability = Vulnerability.objects.get(id=vulnerability_id)
-		return get_vulnerability_gpt_report((lookup_vulnerability.name, lookup_vulnerability.get_path()))
+		return get_vulnerability_gpt_report((lookup_vulnerability.name, lookup_vulnerability.get_path()), vulnerability_id=vulnerability_id)
 	except Exception as e:
 		return {
 			'status': False,
