@@ -39,6 +39,8 @@
   r3ngine 3.0.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Interactive KPI Reports</b> with internal navigation, and <b>Scoped Attack Surface Visualization</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
 </p>
 
+<h6><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank"><img src="https://img.shields.io/badge/r3ngine--mobile-2.0.0-blue.svg?logo=none" alt="r3ngine Mobile SOC" />r3ngine Mobile SOC</a>: COMING SOON</h6>
+
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
 ## 🚀 The v3 Evolution: Comprehensive Enhancements (Since v2.2)
