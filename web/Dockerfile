@@ -227,11 +227,11 @@ RUN pip3 install -r /tmp/requirements.txt --no-cache-dir --ignore-installed blin
 RUN playwright install-deps chromium && playwright install chromium
 
 # Install Frontend Dependencies (for Dev mode)
-RUN mkdir -p /usr/src/app/frontend
-WORKDIR /usr/src/app/frontend
-COPY frontend/package*.json ./
-RUN npm install
-WORKDIR /usr/src/app
+# RUN mkdir -p /usr/src/app/frontend
+# WORKDIR /usr/src/app/frontend
+# COPY frontend/package*.json ./
+# RUN npm install
+# WORKDIR /usr/src/app
 
 # Copy source code
 COPY web/ /usr/src/app/

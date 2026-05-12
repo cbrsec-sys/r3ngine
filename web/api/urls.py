@@ -39,6 +39,7 @@ router.register(r'notifications', InAppNotificationManagerViewSet, basename='not
 router.register(r'hackerone-programs', HackerOneProgramViewSet, basename='hackerone_program')
 router.register(r'monitoring', MonitoringDiscoveryViewSet, basename='monitoring')
 router.register(r'projects', ProjectViewSet, basename='projects')
+router.register(r'secretLeaks', SecretLeakViewSet, basename='secret-leaks')
 router.register(r'scheduledScans', ScheduledScanViewSet, basename='scheduled-scans')
 router.register(r'subscans', SubScanViewSet, basename='subscans')
 router.register(r'listScans', ScanHistoryViewSet, basename='list-scans')
