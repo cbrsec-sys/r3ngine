@@ -163,7 +163,7 @@ def finish_nuclei_scan(results, scan_history_id):
 @app.task(name='finish_osint_discovery', queue='main_scan_queue')
 def finish_osint_discovery(results, results_dir):
     """Callback for OSINT discovery tasks. Strips metadata from results."""
-    from reNgine.common_func import OpSecManager
+    from reNgine.opsec_utils import OpSecManager
     opsec = OpSecManager()
     opsec.strip_directory(results_dir)
     logger.info(f"OSINT discovery completed and cleaned up in {results_dir}")
@@ -1182,7 +1182,7 @@ def osint_discovery(self, config, host, scan_history_id, activity_id, results_di
 		return self.replace(chord(grouped_tasks, finish_osint_discovery.s(results_dir=results_dir)))
 
 	# Strip metadata from OSINT results
-	from reNgine.common_func import OpSecManager
+	from reNgine.opsec_utils import OpSecManager
 	opsec = OpSecManager()
 	opsec.strip_directory(results_dir)
 

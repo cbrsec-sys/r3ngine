@@ -24,6 +24,14 @@ class ProjectSerializer(serializers.ModelSerializer):
 			return naturaltime(obj.insert_date).title()
 
 
+class ScreenshotSerializer(serializers.ModelSerializer):
+	subdomain_name = serializers.CharField(source='subdomain.name', read_only=True)
+	
+	class Meta:
+		model = Screenshot
+		fields = '__all__'
+
+
 class EngineTypeSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = EngineType
@@ -957,8 +965,8 @@ class PortSerializer(serializers.ModelSerializer):
 
 
 class IpSerializer(serializers.ModelSerializer):
-
 	ports = PortSerializer(many=True)
+	geo_iso_name = serializers.ReadOnlyField(source='geo_iso.name')
 
 	class Meta:
 		model = IpAddress

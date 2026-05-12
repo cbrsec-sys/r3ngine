@@ -2274,6 +2274,43 @@ class ListTodoNotes(APIView):
 		return Response({'notes': notes.data})
 
 
+class ToggleTodoStatus(APIView):
+	permission_classes = [IsPenetrationTester]
+	def post(self, request):
+		todo_id = request.data.get('id')
+		try:
+			note = TodoNote.objects.get(id=todo_id)
+			note.is_done = not note.is_done
+			note.save()
+			return Response({'status': True, 'is_done': note.is_done})
+		except TodoNote.DoesNotExist:
+			return Response({'status': False, 'message': 'Note not found'}, status=404)
+
+
+class ToggleNoteImportance(APIView):
+	permission_classes = [IsPenetrationTester]
+	def post(self, request):
+		todo_id = request.data.get('id')
+		try:
+			note = TodoNote.objects.get(id=todo_id)
+			note.is_important = not note.is_important
+			note.save()
+			return Response({'status': True, 'is_important': note.is_important})
+		except TodoNote.DoesNotExist:
+			return Response({'status': False, 'message': 'Note not found'}, status=404)
+
+
+class DeleteReconNote(APIView):
+	permission_classes = [IsPenetrationTester]
+	def post(self, request):
+		todo_id = request.data.get('id')
+		try:
+			TodoNote.objects.filter(id=todo_id).delete()
+			return Response({'status': True})
+		except Exception as e:
+			return Response({'status': False, 'message': str(e)}, status=400)
+
+
 class ListScanHistory(APIView):
 	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
@@ -3518,6 +3555,51 @@ class EndPointViewSet(viewsets.ModelViewSet):
 		return qs
 
 
+class SecretLeakViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
+	serializer_class = SecretLeakSerializer
+	queryset = SecretLeak.objects.none()
+
+	def get_queryset(self):
+		req = self.request
+		project = req.query_params.get('project')
+		target_id = req.query_params.get('target_id')
+		scan_id = req.query_params.get('scan_id')
+		
+		queryset = SecretLeak.objects.all()
+
+		if project:
+			queryset = queryset.filter(scan_history__domain__project__slug=project)
+		if target_id:
+			queryset = queryset.filter(scan_history__domain__id=target_id)
+		if scan_id:
+			queryset = queryset.filter(scan_history__id=scan_id)
+			
+		return queryset.order_by('-discovered_date')
+
+
+class ScreenshotViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
+	queryset = Screenshot.objects.all()
+	serializer_class = ScreenshotSerializer
+
+	def get_queryset(self):
+		req = self.request
+		project = req.query_params.get('project')
+		target_id = req.query_params.get('target_id')
+		scan_id = req.query_params.get('scan_id')
+
+		queryset = self.queryset
+		if project:
+			queryset = queryset.filter(scan_history__domain__project__slug=project)
+		if target_id:
+			queryset = queryset.filter(scan_history__domain__id=target_id)
+		if scan_id:
+			queryset = queryset.filter(scan_history__id=scan_id)
+		
+		return queryset.order_by('-created_at')
+
+
 class DirectoryViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]
 	queryset = DirectoryFile.objects.none()
@@ -3923,3 +4005,66 @@ class MobileMediaServeView(APIView):
 		else:
 			logger.error(f"File not found: {file_path}")
 			raise Http404("File not found")
+
+
+class SystemHealthAPIView(APIView):
+	permission_classes = [IsPenetrationTester]
+
+	def get(self, request):
+		import shutil
+		import os
+		import time
+		from django.db import connection
+		from reNgine.celery import app
+
+		# 1. Database Health
+		db_start = time.time()
+		db_up = True
+		try:
+			with connection.cursor() as cursor:
+				cursor.execute("SELECT 1")
+		except Exception:
+			db_up = False
+		db_latency = int((time.time() - db_start) * 1000)
+
+		# 2. Worker Status
+		try:
+			inspect = app.control.inspect()
+			active_workers = inspect.active()
+			worker_count = len(active_workers) if active_workers else 0
+			workers_online = worker_count > 0
+		except Exception:
+			workers_online = False
+			worker_count = 0
+
+		# 3. Disk Usage
+		try:
+			total, used, free = shutil.disk_usage("/")
+			disk_used_percent = int(100 * used / total)
+		except Exception:
+			disk_used_percent = 0
+			free = 0
+
+		# 4. System Load
+		try:
+			load_avg = os.getloadavg()
+		except AttributeError:
+			load_avg = (0.0, 0.0, 0.0)
+
+		return Response({
+			"status": "online" if db_up and workers_online else "degraded",
+			"database": {
+				"status": "up" if db_up else "down",
+				"latency_ms": db_latency
+			},
+			"workers": {
+				"status": "online" if workers_online else "offline",
+				"count": worker_count
+			},
+			"disk": {
+				"used_percent": disk_used_percent,
+				"free_gb": free // (2**30)
+			},
+			"load": load_avg[0],
+			"timestamp": time.time()
+		})
