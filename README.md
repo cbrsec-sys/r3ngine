@@ -1,6 +1,6 @@
-<div style="background:#e74c3c;color:#fff;border-color:#c0392b; text-align:center; top:0; z-index:9999; padding:12px 16px; font-size:13px; line-height:1.2; border-bottom:3px solid transparent;">
-  <em>THIS IS AN <strong>ALPHA</strong> RELEASE AND MAY CONTAIN BUGS</em>
-</div>
+<p align="center">
+  <em>V3 Beta Release is now operational!</em>
+</p>
 <p align="center">
 <a href="https://rengine.wiki"><img src="frontend/public/img/banner.png" height="400px" width="520px" alt=""/></a>
 </p>
@@ -12,7 +12,7 @@
 
 <h3>New V3 Dashboard</h3>
 <p align="center">
-<a href="https://rengine.wiki"><img src=".github/screenshots/r3ngine_dash.png" height="400px" width="520px" alt=""/></a>
+<img src=".github/screenshots/r3ngine_dash.png" height="400px" width="520px" alt=""/>
 </p>
 
 <p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
@@ -42,10 +42,11 @@
 
 <h4>Attack Path Modeling Engine<h4>
 <p align="center">
-<a href="https://rengine.wiki"><img src=".github/screenshots/apme.png" height="400px" width="520px" alt=""/></a>
+<img src=".github/screenshots/apme.png" height="400px" width="520px" alt=""/>
 </p>
 
-<h6><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank"><img src="https://img.shields.io/badge/r3ngine--mobile-2.0.0-blue.svg?logo=none" alt="r3ngine Mobile SOC" />r3ngine Mobile SOC</a>: COMING SOON</h6>
+<img src="https://img.shields.io/badge/r3ngine--mobile-1.0.0-orange.svg?logo=none" alt="r3ngine Mobile SOC" />
+<h6><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3ngine Mobile SOC</a>: COMING SOON</h6>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
