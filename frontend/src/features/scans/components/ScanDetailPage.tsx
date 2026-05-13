@@ -1561,8 +1561,9 @@ export const ScanDetailPage = () => {
   );
 
   const renderSubdomains = () => (
-    <SubdomainsTab projectSlug={projectSlug} scanId={parseInt(scanId)} />
+    <SubdomainsTab projectSlug={projectSlug} scanId={parseInt(scanId)} onTabChange={setActiveTab} />
   );
+
 
   const renderEndpoints = () => (
     <EndpointsTab projectSlug={projectSlug} scanId={parseInt(scanId)} matchedGfCounts={data.matched_gf_count} />
@@ -1570,8 +1571,9 @@ export const ScanDetailPage = () => {
 
   // TODO NEEDS TO BE FIXED AS WELL TO ENSURE THE DIRECTORIES TAB PROPERLY RENDERS DATA
   const renderDirectories = () => (
-    <DirectoriesTab projectSlug={projectSlug} scanId={parseInt(scanId)} subdomainId={data.target_info?.id || 0} subdomainName={data.target_info?.name || ''} targetId={data.target_info?.id || 0} />
+    <DirectoriesTab projectSlug={projectSlug} scanId={parseInt(scanId)} subdomainId={0} subdomainName={data.target_info?.name || ''} targetId={data.target_info?.id || 0} />
   );
+
 
   const renderVulnerabilities = () => (
     <TacticalPanel title="VULNERABILITY INTELLIGENCE" icon={<ShieldAlert size={18} color="#00f3ff" />}>

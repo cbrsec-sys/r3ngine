@@ -51,8 +51,10 @@ import {
   Copy,
   FileText,
   Shield,
-  X
+  X,
+  Folder
 } from 'lucide-react';
+
 
 import { 
   useSubdomains, 
@@ -70,9 +72,11 @@ interface SubdomainsTabProps {
   projectSlug: string;
   scanId?: number;
   targetId?: number;
+  onTabChange?: (index: number) => void;
 }
 
-export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId, targetId }) => {
+export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId, targetId, onTabChange }) => {
+
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
@@ -558,6 +562,14 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                             </Typography>
                           </Tooltip>
                         </Box>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Tooltip title="Directories Discovered">
+                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'help' }}>
+                              <Folder size={10} style={{ color: '#fffc00' }} /> {sub.directories_count || 0}
+                            </Typography>
+                          </Tooltip>
+                        </Box>
+
                         {sub.info_count > 0 && (
                           <Chip label={`${sub.info_count} Info`} size="small" sx={{ height: 14, fontSize: '7px', fontWeight: 900, bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', borderRadius: 0.5 }} />
                         )}

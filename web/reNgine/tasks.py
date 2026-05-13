@@ -11,6 +11,9 @@ import yaml
 import tldextract
 import concurrent.futures
 import base64
+import io
+from redis import Redis
+
 
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
@@ -18,6 +21,7 @@ from api.serializers import SubdomainSerializer
 from celery import chain, chord, group
 from celery.result import allow_join_result
 from celery.utils.log import get_task_logger
+from django.db import transaction
 from django.db.models import Count
 from dotted_dict import DottedDict
 from django.utils import timezone
@@ -46,7 +50,7 @@ from reNgine.vulnerability_tasks import *
 from reNgine.stress_testing_tasks import run_stress_testing
 from reNgine.osint_tasks import *
 from reNgine.task_utils import (
-    run_command, save_email, save_employee, save_subdomain, save_endpoint, save_parameter,
+    run_command, stream_command, save_email, save_employee, save_subdomain, save_endpoint, save_parameter,
     sanitize_command_for_db, get_tool_color
 )
 from reNgine.report_tasks import *
@@ -1733,7 +1737,7 @@ def leaklookup(self, host=None, ctx=None, **kwargs):
 			if response.status_code == 200:
 				data = response.json()
 				if data.get('error') == 'false':
-					leaks = data.get('message', {})
+					leaks = data.get('message') or {}
 					leak_count = 0
 					for db_name, contents in leaks.items():
 						for match in contents:
@@ -1763,7 +1767,7 @@ def leaklookup(self, host=None, ctx=None, **kwargs):
 			response = requests.get(pd_url, headers=headers, timeout=30)
 			if response.status_code == 200:
 				data = response.json()
-				leaks = data.get('data', [])
+				leaks = data.get('data') or []
 				leak_count = 0
 				for match in leaks:
 					source_url = match.get('url') or match.get('url_domain') or 'Unknown'
@@ -1880,7 +1884,7 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 
 @app.task(name='spiderfoot_scan', queue='spiderfoot_queue', base=RengineTask, bind=True)
 def spiderfoot_scan(self, host=None, ctx={}, description=None):
-	"""Run SpiderFoot scan on selected domain.
+	"""Run SpiderFoot scan on selected domain with real-time batch parsing.
 	"""
 	if not host:
 		host = self.domain.name
@@ -1891,14 +1895,12 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	intensity = config.get('intensity', 'normal') # normal, fast, deep
 
 	# Spiderfoot CLI intensity mapping (profiles)
-	# fast: footprint, normal: investigate, deep: all
 	profile_cmd = ""
 	if intensity == 'fast':
 		profile_cmd = "-u footprint"
 	elif intensity == 'deep':
 		profile_cmd = "-u all"
-	# if modules is set to 'all' and intensity is provided, we can use profiles
-	# otherwise if specific modules are provided, they take precedence
+	
 	if modules != 'all':
 		profile_cmd = f"-m {modules}"
 	elif not profile_cmd:
@@ -1913,62 +1915,85 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 			for module, key in api_keys.items():
 				f.write(f"module.{module}.api_key={key}\n")
 	
-	output_file = f"{self.results_dir}/spiderfoot_results.json"
-	# Get proxy if enabled
-	# proxy = get_random_proxy()
-
-	# Spiderfoot CLI usage
-	# -s target, -u (profile) or -m (modules), -f (output format json), -o (output file)
-	cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {host} {profile_cmd} -max-threads {threads} -o json > {output_file}"
-	# if proxy:
-	#	 cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
+	# Use CSV output for streaming. -r includes source data, -n strips newlines.
+	cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {host} {profile_cmd} -max-threads {threads} -o csv -r -n -c {sf_config_path}"
 	
+	batch = []
+	batch_size = 50
+	header = None
+	
+	for line in stream_command(
+		cmd,
+		shell=True,
+		scan_id=self.scan_id,
+		activity_id=self.activity_id):
+		
+		if not isinstance(line, str) or not line.strip():
+			continue
+			
+		# Parse CSV line
+		f = io.StringIO(line)
+		reader = csv.reader(f)
+		try:
+			row = next(reader)
+		except StopIteration:
+			continue
+			
+		if not header:
+			# First line should be header
+			if "Data" in row and "Type" in row:
+				header = row
+				continue
+			else:
+				# Skip if not a header and we haven't seen one yet
+				continue
+		
+		# Map row to dict
+		event = dict(zip(header, row))
+		batch.append(event)
+		
+		if len(batch) >= batch_size:
+			_process_spiderfoot_batch(self, batch, ctx, host)
+			batch = []
+	
+	# Process remaining
+	if batch:
+		_process_spiderfoot_batch(self, batch, ctx, host)
+		
+	# Sync to Neo4j
+	graph = Neo4jManager()
+	graph.sync_scan_results(self.scan_id)
+	graph.close()
+
+def _process_spiderfoot_batch(self, batch, ctx, host):
+	"""Internal helper to process a batch of SpiderFoot findings."""
 	try:
-		run_command(
-			cmd,
-			shell=True,
-			scan_id=self.scan_id,
-			activity_id=self.activity_id)
-		
-		# Sync to Neo4j
-		graph = Neo4jManager()
-		graph.sync_scan_results(self.scan_id)
-		graph.close()
-		
-		# Parse spiderfoot_results.json and save to reNgine DB
-		if os.path.exists(output_file):
-			# BUG: Spiderfoot scan crashing here [spiderfoot_scan                    | ERROR | Error parsing SpiderFoot results: Expecting value: line 1 column 1 (char 0)]
-			# Trying to parse results before the scan has even been initiated. 
-			# This needs to be fixed.
-			# Maybe have the spiderfoot scan as a task then a parse_spiderfoot_results function 
-			# as a task that runs after the spiderfoot scan is completed.
-			# This can be very long running task so needs to ensure proper logging and status updates.
-			try:
-				with open(output_file, 'r') as f:
-					sf_data = json.load(f)
-					for event in sf_data:
-						# SF types for hostnames/subdomains
-						if event.get('type') in ['DNS_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME']:
-							sub_name = event.get('data', '').lower()
-							if sub_name and sub_name.endswith(host):
-								save_subdomain(sub_name, ctx=ctx)
-						# SF types for URLs
-						elif event.get('type') in ['WEB_RESOURCE', 'URL_ALL', 'LINKED_URL_INTERNAL']:
-							url_data = event.get('data', '')
-							if url_data and is_valid_url(url_data):
-								save_endpoint(url_data, ctx=ctx)
-						# SF types for Emails
-						elif event.get('type') == 'EMAILADDR':
-							email_addr = event.get('data', '').lower()
-							save_email(email_addr, scan_history=self.scan)
-						# SF types for Users/Accounts
-						elif event.get('type') in ['USERNAME', 'ACCOUNT_EXTERNAL', 'HUMAN_NAME']:
-							user_data = event.get('data', '')
-							save_employee(user_data, scan_history=self.scan)
-			except Exception as e:
-				logger.error(f"Error parsing SpiderFoot results: {str(e)}")
+		with transaction.atomic():
+			for event in batch:
+				e_type = event.get('Type')
+				e_data = event.get('Data')
+				
+				if not e_type or not e_data:
+					continue
+				
+				# SF types for hostnames/subdomains
+				if e_type in ['DNS_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME']:
+					sub_name = e_data.lower()
+					if sub_name and sub_name.endswith(host):
+						save_subdomain(sub_name, ctx=ctx)
+				# SF types for URLs
+				elif e_type in ['WEB_RESOURCE', 'URL_ALL', 'LINKED_URL_INTERNAL']:
+					if e_data and is_valid_url(e_data):
+						save_endpoint(e_data, ctx=ctx)
+				# SF types for Emails
+				elif e_type == 'EMAILADDR':
+					save_email(e_data.lower(), scan_history=self.scan)
+				# SF types for Users/Accounts
+				elif e_type in ['USERNAME', 'ACCOUNT_EXTERNAL', 'HUMAN_NAME']:
+					save_employee(e_data, scan_history=self.scan)
+		logger.info(f"Processed batch of {len(batch)} SpiderFoot findings.")
 	except Exception as e:
-		logger.error(f"SpiderFoot scan failed: {e}")
+		logger.error(f"Error processing SpiderFoot batch: {str(e)}")
 
 
 @app.task(name='screenshot', queue='main_scan_queue', base=RengineTask, bind=True)
@@ -2557,114 +2582,112 @@ def dir_file_fuzz(self, ctx={}, description=None):
 
 	# Loop through URLs and run command
 	results = []
+	
+	# Global lock for ffuf to ensure strictly sequential execution across all workers
+	redis_client = Redis.from_url(os.environ.get('CELERY_BROKER', 'redis://redis:6379/0'))
+
 	for url in urls:
-		'''
-			Above while fetching urls, we are not ignoring files, because some
-			default urls may redirect to https://example.com/login.php
-			so, ignore_files is set to False
-			but, during fuzzing, we will only need part of the path, in above example
-			it is still a good idea to ffuf base url https://example.com
-			so files from base url
-		'''
 		url_parse = urlparse(url)
-		url = url_parse.scheme + '://' + url_parse.netloc
-		url += '/FUZZ' # TODO: fuzz not only URL but also POST / PUT / headers
+		base_url = url_parse.scheme + '://' + url_parse.netloc
+		fuzz_url = base_url + '/FUZZ'
 		proxy = get_random_proxy()
 
 		# Build final cmd
 		fcmd = cmd
 		fcmd += f' -x {proxy}' if proxy else ''
-		fcmd += f' -u {url} -json'
+		fcmd += f' -u {fuzz_url} -json -s' # Added -s for silent mode to help stream_command
 
 		# Apply OpSec stealth
 		opsec = OpSecManager()
 		fcmd = opsec.apply_stealth('ffuf', fcmd)
 
-		# Initialize DirectoryScan object
-		dirscan = DirectoryScan()
-		dirscan.scanned_date = timezone.now()
-		dirscan.command_line = fcmd
-		dirscan.save()
+		# Use a global lock to ensure only one ffuf runs at a time
+		with redis_client.lock("ffuf_execution_lock", timeout=14400):
 
-		# Loop through results and populate EndPoint and DirectoryFile in DB
-		results = []
-		for line in stream_command(
-				fcmd,
-				shell=True,
-				history_file=self.history_file,
-				scan_id=self.scan_id,
-				activity_id=self.activity_id):
+			# Initialize DirectoryScan object
+			dirscan = DirectoryScan.objects.create(
+				scanned_date=timezone.now(),
+				command_line=fcmd
+			)
 
-			# Empty line, continue to the next record
-			if not isinstance(line, dict):
-				continue
+			# Associate with subdomain even if no results found
+			subdomain_name = get_subdomain_from_url(base_url)
+			subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=self.scan).first()
+			
+			if not subdomain and ctx.get('subdomain_id', 0) > 0:
+				subdomain = Subdomain.objects.filter(id=ctx['subdomain_id']).first()
+			
+			if subdomain:
+				subdomain.directories.add(dirscan)
 
-			# Append line to results
-			results.append(line)
+			# Loop through results and populate EndPoint and DirectoryFile in DB
+			for line in stream_command(
+					fcmd,
+					shell=True,
+					history_file=self.history_file,
+					scan_id=self.scan_id,
+					activity_id=self.activity_id):
 
-			# Retrieve FFUF output
-			url = line['url']
-			# Extract path and convert to base64 (need byte string encode & decode)
-			name = base64.b64encode(extract_path_from_url(url).encode()).decode()
-			length = line['length']
-			status = line['status']
-			words = line['words']
-			lines = line['lines']
-			content_type = line['content-type']
-			duration = line['duration']
+				if not isinstance(line, dict):
+					continue
 
-			# If name empty log error and continue
-			if not name:
-				logger.error(f'FUZZ not found for "{url}"')
-				continue
+				# Append line to results
+				results.append(line)
 
-			# Get or create endpoint from URL
-			endpoint, created = save_endpoint(url, crawl=False, ctx=ctx)
+				# Retrieve FFUF output
+				res_url = line.get('url')
+				if not res_url:
+					continue
 
-			# Continue to next line if endpoint returned is None
-			if endpoint == None:
-				continue
+				# Extract path and convert to base64
+				name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
+				length = line.get('length', 0)
+				status = line.get('status', 0)
+				words = line.get('words', 0)
+				lines = line.get('lines', 0)
+				content_type = line.get('content-type', '')
+				duration = line.get('duration', 0)
 
-			# Save endpoint data from FFUF output
-			endpoint.http_status = status
-			endpoint.content_length = length
-			endpoint.response_time = duration / 1000000000
-			endpoint.content_type = content_type
-			endpoint.content_length = length
-			endpoint.save()
+				if not name:
+					continue
 
-			# Save directory file output from FFUF output
-			dfile, created = DirectoryFile.objects.get_or_create(
-				name=name,
-				length=length,
-				words=words,
-				lines=lines,
-				content_type=content_type,
-				url=url,
-				http_status=status)
+				# Get or create endpoint from URL
+				endpoint, created = save_endpoint(res_url, crawl=False, ctx=ctx)
 
-			# Log newly created file or directory if debug activated
-			if created and DEBUG:
-				logger.warning(f'Found new directory or file {url}')
+				d_created = False
+				if endpoint:
+					endpoint.http_status = status
+					endpoint.content_length = length
+					endpoint.response_time = duration / 1000000000
+					endpoint.content_type = content_type
+					endpoint.save()
 
-			# Add file to current dirscan
-			dirscan.directory_files.add(dfile)
 
-			# Add subscan relation to dirscan if exists
-			if self.subscan:
-				dirscan.dir_subscan_ids.add(self.subscan)
+					# Save directory file
+					dfile, d_created = DirectoryFile.objects.get_or_create(
+						name=name,
+						length=length,
+						words=words,
+						lines=lines,
+						content_type=content_type,
+						url=res_url,
+						http_status=status)
 
-			# Save dirscan datas
+					# Add file to current dirscan
+					dirscan.directory_files.add(dfile)
+
+					# Add subscan relation if exists
+					if self.subscan:
+						dirscan.dir_subscan_ids.add(self.subscan)
+
+				# Log newly created file or directory if debug activated
+				if d_created:
+					logger.info(f'Found new directory or file {res_url}')
+
+			# Final save for dirscan to ensure any metadata is persisted
 			dirscan.save()
 
-			# Get subdomain and add dirscan
-			if ctx.get('subdomain_id', 0) > 0:
-				subdomain = Subdomain.objects.get(id=ctx['subdomain_id'])
-			else:
-				subdomain_name = get_subdomain_from_url(endpoint.http_url)
-				subdomain = Subdomain.objects.get(name=subdomain_name, scan_history=self.scan)
-			subdomain.directories.add(dirscan)
-			subdomain.save()
+
 
 	# Crawl discovered URLs
 	if enable_http_crawl:
@@ -5525,125 +5548,12 @@ def remove_duplicate_endpoints(
 					ep.delete()
 				logger.warning(msg)
 
-# run_command and sanitize_command_for_db moved to task_utils.py
+# run_command, sanitize_command_for_db and stream_command moved to task_utils.py
 
 
 #-------------#
 # Other utils #
 #-------------#
-def stream_command(
-		cmd, 
-		cwd=None, 
-		shell=False, 
-		history_file=None, 
-		encoding='utf-8', 
-		scan_id=None, 
-		activity_id=None, 
-		trunc_char=None,
-		proxy=None
-	):
-	"""Run a command and yield output line by line.
-
-	Args:
-		cmd (str): Command to run.
-		cwd (str): Current working directory.
-		shell (bool): Run within separate shell if True.
-		history_file (str): Write command + output to history file.
-		encoding (str): Output encoding.
-		scan_id (int): Scan ID.
-		activity_id (int): Activity ID.
-		trunc_char (str): Character used to truncate the output line.
-		proxy (str): If provided, may be used for proxychains wrapping.
-	Yields:
-		str/dict: Output line.
-	"""
-	color = get_tool_color(cmd)
-	logger.debug(f"{color}{cmd}{COLOR_RESET}")
-
-	conf_path = None
-	if proxy:
-		proxy_manager = ProxychainsWrapper()
-		if proxy_manager.should_wrap():
-			cmd, conf_path = proxy_manager.wrap_command(cmd, proxy=proxy)
-
-	# Create a command record in the database
-	command_obj = Command.objects.create(
-		command=sanitize_command_for_db(cmd),
-		time=timezone.now(),
-		scan_history_id=scan_id,
-		activity_id=activity_id)
-
-	# Sanitize the cmd
-	command = cmd if shell else cmd.split()
-
-	# Run the command using subprocess
-	process = subprocess.Popen(
-		command,
-		stdout=subprocess.PIPE,
-		stderr=subprocess.STDOUT,
-		universal_newlines=True,
-		shell=shell)
-
-	# Log the output in real-time to the database
-	output = ""
-
-	# Process the output
-	line_count = 0
-	try:
-		for line in iter(lambda: process.stdout.readline(), b''):
-			if not line:
-				break
-			line = line.strip()
-			ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-			line = ansi_escape.sub('', line)
-			line = line.replace('\\x0d\\x0a', '\n')
-			if trunc_char and line.endswith(trunc_char):
-				line = line[:-1]
-			item = line
-
-			# Try to parse the line as JSON
-			try:
-				item = json.loads(line)
-			except json.JSONDecodeError:
-				pass
-
-			# Log to console for visibility
-			if isinstance(item, str):
-				logger.debug(f"{COLOR_WHITE}{item}{COLOR_RESET}")
-			else:
-				logger.debug(f"{COLOR_WHITE}{json.dumps(item)}{COLOR_RESET}")
-
-			# Yield the line
-			yield item
-
-			# Add the log line to the output
-			output += line + "\n"
-			line_count += 1
-
-			# Update the command record in the database every 20 lines
-			if line_count % 20 == 0:
-				command_obj.output = output
-				command_obj.save()
-
-		# Final save after loop
-		command_obj.output = output
-		command_obj.save()
-	finally:
-		if conf_path and os.path.exists(conf_path):
-			os.remove(conf_path)
-
-	# Retrieve the return code and output
-	process.wait()
-	return_code = process.returncode
-
-	# Update the return code and final output in the database
-	command_obj.return_code = return_code
-	command_obj.save()
-
-	# Append the command, return code and output to the history file
-	if history_file is not None:
-		with open(history_file, "a") as f:
-			f.write(f"{cmd}\n{return_code}\n{output}\n")
 
 
 def process_httpx_response(line, ctx={}, is_ran_from_subdomain_scan=False):
