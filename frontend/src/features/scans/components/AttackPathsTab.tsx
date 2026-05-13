@@ -53,7 +53,7 @@ const RISK_LABEL: Record<string, string> = {
 // ─── Risk badge ───────────────────────────────────────────────────────────────
 const RiskBadge: React.FC<{ risk: string }> = ({ risk }) => {
   const color = RISK_COLOR[risk] ?? RISK_COLOR.unknown;
-  const label = RISK_LABEL[risk] ?? risk.toUpperCase();
+  const label = RISK_LABEL[risk] ?? risk?.toUpperCase() ?? 'UNKNOWN';
   return (
     <Box
       sx={{
@@ -157,7 +157,7 @@ const StepRow: React.FC<{ step: AttackStep; index: number }> = ({ step, index })
         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexShrink: 0 }}>
           <StatusIcon size={12} color={color} />
           <Typography sx={{ fontSize: '0.6rem', color, fontWeight: 800, letterSpacing: 0.5 }}>
-            {step.status.toUpperCase()}
+            {step?.status?.toUpperCase() ?? 'INFERRED'}
           </Typography>
         </Stack>
       </Tooltip>
@@ -233,20 +233,20 @@ const AttackPathCard: React.FC<{ path: AttackPath; rank: number }> = ({ path, ra
         </Box>
 
         {/* Stats */}
-        <Stack direction="row" spacing={2} sx={{ alignItems: 'center', flexShrink: 0 }}>
+        <Stack direction="row" spacing={{ xs: 1, sm: 2 }} sx={{ alignItems: 'center', flexShrink: 0, ml: 'auto' }}>
           <Stack sx={{ alignItems: 'center' }}>
-            <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: riskColor, fontFamily: 'Orbitron' }}>
+            <Typography sx={{ fontSize: { xs: '0.8rem', sm: '1rem' }, fontWeight: 900, color: riskColor, fontFamily: 'Orbitron' }}>
               {path.score.toFixed(2)}
             </Typography>
             <Typography sx={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>SCORE</Typography>
           </Stack>
           <Stack sx={{ alignItems: 'center' }}>
-            <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#00f3ff', fontFamily: 'Orbitron' }}>
+            <Typography sx={{ fontSize: { xs: '0.8rem', sm: '1rem' }, fontWeight: 900, color: '#00f3ff', fontFamily: 'Orbitron' }}>
               {path.step_count}
             </Typography>
             <Typography sx={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>STEPS</Typography>
           </Stack>
-          <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.4)' }}>
+          <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.4)', display: { xs: 'none', sm: 'inline-flex' } }}>
             {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </IconButton>
         </Stack>
@@ -363,7 +363,7 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
       title="ATTACK PATH MODELING"
       icon={<ShieldAlert size={14} color="#ff003c" />}
       headerAction={
-        <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1 }}>
           <Button
             size="small"
             variant="outlined"

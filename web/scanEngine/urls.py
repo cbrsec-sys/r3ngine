@@ -106,6 +106,10 @@ urlpatterns = [
         views.fetch_proxies,
         name='fetch_proxies'),
     path(
+        '<slug:slug>/get_full_yaml_config/',
+        views.get_full_yaml_config,
+        name='get_full_yaml_config'),
+    path(
         '<slug:slug>/task_status/<str:task_id>',
         views.get_proxy_task_status,
         name='get_proxy_task_status'),

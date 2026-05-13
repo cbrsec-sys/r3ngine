@@ -155,6 +155,7 @@ SCAN_ONLY_ACTIVE = 'scan_only_active'
 ARJUN_METHODS = 'arjun_methods'
 LEAKS_AND_SECRETS = 'leaks_and_secrets'
 LEAKLOOKUP = 'leaklookup'
+PROJECTDISCOVERY = 'projectdiscovery'
 GITLEAKS = 'gitleaks'
 TRUFFLEHOG = 'trufflehog'
 RUN_CPANEL2SHELL = 'run_cpanel2shell'
@@ -330,7 +331,8 @@ STATUS_TO_SEVERITIES = {
     'RUNNING': 'info',
     'SUCCESS': 'success',
     'FAILED': 'error',
-    'ABORTED': 'error'
+    'ABORTED': 'error',
+    'PARTIALLY COMPLETE': 'warning'
 }
 
 ###############################################################################
@@ -347,13 +349,15 @@ FAILED_TASK = 0
 RUNNING_TASK = 1
 SUCCESS_TASK = 2
 ABORTED_TASK = 3
+PARTIALLY_COMPLETE_TASK = 4
 
 CELERY_TASK_STATUS_MAP = {
     INITIATED_TASK: 'INITITATED',
     FAILED_TASK: 'FAILED',
     RUNNING_TASK: 'RUNNING',
     SUCCESS_TASK: 'SUCCESS',
-    ABORTED_TASK: 'ABORTED'
+    ABORTED_TASK: 'ABORTED',
+    PARTIALLY_COMPLETE_TASK: 'PARTIALLY COMPLETE'
 }
 
 CELERY_TASK_STATUSES = (
@@ -361,7 +365,8 @@ CELERY_TASK_STATUSES = (
     (FAILED_TASK, FAILED_TASK),
     (RUNNING_TASK, RUNNING_TASK),
     (SUCCESS_TASK, SUCCESS_TASK),
-    (ABORTED_TASK, ABORTED_TASK)
+    (ABORTED_TASK, ABORTED_TASK),
+    (PARTIALLY_COMPLETE_TASK, PARTIALLY_COMPLETE_TASK)
 )
 DYNAMIC_ID = -1
 

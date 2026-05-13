@@ -196,3 +196,17 @@ export const useUpdateEngine = () => {
     },
   });
 };
+export const useFullYamlConfig = () => {
+  return useQuery({
+    queryKey: ['fullYamlConfig'],
+    queryFn: async () => {
+      const response = await fetch('/scanEngine/default/get_full_yaml_config/', {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch full YAML config');
+      }
+      return response.json();
+    },
+  });
+};

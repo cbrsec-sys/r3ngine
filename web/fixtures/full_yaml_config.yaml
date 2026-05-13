@@ -119,7 +119,7 @@ vulnerability_scan: {
     # 'templates': [],            # Nuclei templates (https://github.com/projectdiscovery/nuclei-templates)
     # 'custom_templates': []      # Nuclei custom templates uploaded in reNgine
   },
-  cpanel_scanner: {
+  'cpanel_scanner': {
     'run_cpanel2shell': true,
     'cpanel_user_wordlist': '/usr/src/app/wordlist/cpanel_users.txt',
     'proxy_type': 'rotating'
@@ -156,7 +156,8 @@ brute_force_scan: {
 }
 spiderfoot_scan: {
   'modules': 'all',               # SF modules to run
-  'use_api_keys': true,
+  'intensity': 'normal',
+  'threads': 10
 }
 screenshot: {
   'enable_http_crawl': true,

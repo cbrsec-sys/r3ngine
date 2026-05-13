@@ -375,22 +375,14 @@ export const StressTestingPage: React.FC = () => {
           </Grid>
         </Grid>
 
-        {/* Charts Row */}
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <TacticalPanel title="LATENCY_METRICS" icon={<Activity size={18} color={theme.palette.primary.main} />}>
-            <ReactECharts option={getLatencyOption()} style={{ height: '320px' }} theme="dark" />
-          </TacticalPanel>
-        </Grid>
+        {/* Metrics, Logs & Throughput Row */}
         <Grid size={{ xs: 12, lg: 4 }}>
-          <TacticalPanel title="THROUGHPUT_LOAD" icon={<Zap size={18} color="#6be6c1" />}>
-            <ReactECharts option={getRpsOption()} style={{ height: '320px' }} theme="dark" />
-          </TacticalPanel>
-        </Grid>
-
-        {/* Heatmap & Logs Row */}
-        <Grid size={{ xs: 12, lg: 8 }}>
-          <TacticalPanel title="ENDPOINT_SATURATION_HEATMAP" icon={<Server size={18} color="#facc15" />}>
-            <ReactECharts option={getHeatmapOption()} style={{ height: '400px' }} theme="dark" />
+          <TacticalPanel 
+            title="LATENCY_METRICS" 
+            icon={<Activity size={18} color={theme.palette.primary.main} />}
+            sx={{ height: '100%' }}
+          >
+            <ReactECharts option={getLatencyOption()} style={{ height: '400px' }} theme="dark" />
           </TacticalPanel>
         </Grid>
         <Grid size={{ xs: 12, lg: 4 }}>
@@ -399,7 +391,7 @@ export const StressTestingPage: React.FC = () => {
             icon={<Terminal size={18} color={theme.palette.primary.main} />}
             sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}
           >
-            <Box sx={{ flexGrow: 1, overflowY: 'auto', bgcolor: 'rgba(0,0,0,0.3)', p: 1, borderRadius: 2, maxHeight: '410px' }}>
+            <Box sx={{ flexGrow: 1, overflowY: 'auto', bgcolor: 'rgba(0,0,0,0.3)', p: 1, borderRadius: 2, height: '400px' }}>
               <List dense>
                 {telemetryData.slice(-100).reverse().map((p, i) => (
                   <ListItem key={i} sx={{ borderBottom: `1px solid ${alpha(theme.palette.text.primary, 0.05)}` }}>
@@ -426,6 +418,22 @@ export const StressTestingPage: React.FC = () => {
                 )}
               </List>
             </Box>
+          </TacticalPanel>
+        </Grid>
+        <Grid size={{ xs: 12, lg: 4 }}>
+          <TacticalPanel 
+            title="THROUGHPUT_LOAD" 
+            icon={<Zap size={18} color="#6be6c1" />}
+            sx={{ height: '100%' }}
+          >
+            <ReactECharts option={getRpsOption()} style={{ height: '400px' }} theme="dark" />
+          </TacticalPanel>
+        </Grid>
+
+        {/* Heatmap Row */}
+        <Grid size={{ xs: 12 }}>
+          <TacticalPanel title="ENDPOINT_SATURATION_HEATMAP" icon={<Server size={18} color="#facc15" />}>
+            <ReactECharts option={getHeatmapOption()} style={{ height: '450px' }} theme="dark" />
           </TacticalPanel>
         </Grid>
       </Grid>

@@ -1,9 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { operations, components } from '@/types/api';
-import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, SecretLeak } from '../types';
+import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, SecretLeak, DirectoryFile } from '../types';
 import type { Domain } from '../../targets/types';
 
-
+export const useDirectories = (params: { scan_id?: string | number, subdomain_id?: string | number, page?: number }) => {
+  return useQuery<{ count: number, next: string | null, previous: string | null, results: DirectoryFile[] }>({
+    queryKey: ['directories', params],
+    queryFn: async () => {
+      const searchParams = new URLSearchParams();
+      if (params.scan_id) searchParams.append('scan_history', params.scan_id.toString());
+      if (params.subdomain_id) searchParams.append('subdomain_id', params.subdomain_id.toString());
+      if (params.page) searchParams.append('page', params.page.toString());
+      
+      const response = await fetch(`/api/listDirectories/?${searchParams.toString()}&format=json`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return await response.json();
+    },
+    enabled: !!(params.scan_id || params.subdomain_id),
+  });
+};
 
 export const useDomains = (projectSlug: string) => {
   return useQuery<Domain[]>({
@@ -15,7 +34,7 @@ export const useDomains = (projectSlug: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json() as operations["listTargets_list"]["responses"]["200"]["content"]["application/json"];
+      const data = await response.json() as operations["api_listTargets_list"]["responses"]["200"]["content"]["application/json"];
       return data.results || [];
     },
     enabled: !!projectSlug,
@@ -37,6 +56,7 @@ export const useScans = (projectSlug: string) => {
       return (data.results || []) as ScanHistory[];
     },
     enabled: !!projectSlug,
+    refetchInterval: 5000,
   });
 };
 
@@ -151,6 +171,7 @@ export const useSubScans = (projectSlug: string) => {
       return Array.isArray(data) ? data : data.results || [];
     },
     enabled: !!projectSlug,
+    refetchInterval: 5000,
   });
 };
 
@@ -206,10 +227,11 @@ export const useScansHistory = (project: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json() as operations["listScans_list"]["responses"]["200"]["content"]["application/json"];
+      const data = await response.json() as operations["api_listScans_list"]["responses"]["200"]["content"]["application/json"];
       return (data.results || []) as ScanHistory[];
     },
     enabled: !!project,
+    refetchInterval: 5000,
   });
 };
 
@@ -260,7 +282,7 @@ export const useBulkScanAction = (projectSlug: string) => {
     mutationFn: async ({ action, ids }: { action: 'bulk_stop' | 'bulk_delete', ids: number[] }) => {
       const url = action === 'bulk_stop' ? '/api/action/stop/scan/' : `/api/listScans/${action}/`;
       const body = action === 'bulk_stop' ? { scan_ids: ids } : { ids };
-      
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -433,7 +455,7 @@ export const useScanLogs = (activityId: number | null, scanId: number | null) =>
   return useQuery<Command[]>({
     queryKey: ['scan-logs', activityId, scanId],
     queryFn: async () => {
-      const endpoint = activityId 
+      const endpoint = activityId
         ? `/api/listActivityLogs/?activity_id=${activityId}`
         : `/api/listScanLogs/?scan_id=${scanId}`;
       const response = await fetch(endpoint, {

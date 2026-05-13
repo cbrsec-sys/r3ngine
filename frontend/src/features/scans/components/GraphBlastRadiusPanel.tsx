@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Box, Typography, Stack, CircularProgress, Button } from '@mui/material';
 import { useGraphStore } from '../../../store/useGraphStore';
 import { ArrowLeft, Crosshair } from 'lucide-react';
-import axios from 'axios';
+import { useGraphBlastRadius } from '../api/graphApi';
 
 interface Props {
   projectSlug: string;
@@ -10,26 +10,11 @@ interface Props {
 
 export const GraphBlastRadiusPanel: React.FC<Props> = ({ projectSlug }) => {
   const { selectedNodeId, selectedNodeData, activePanel, setActivePanel } = useGraphStore();
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
-
-  useEffect(() => {
-    if (selectedNodeId && activePanel === 'blastRadius') {
-      fetchBlastRadius(selectedNodeId);
-    }
-  }, [selectedNodeId, activePanel]);
-
-  const fetchBlastRadius = async (id: string) => {
-    setLoading(true);
-    try {
-      const res = await axios.get(`/${projectSlug}/api/graph/blast-radius/${id}/`);
-      setData(res.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
+  
+  const { data, isLoading } = useGraphBlastRadius(
+    projectSlug, 
+    activePanel === 'blastRadius' ? selectedNodeId : null
+  );
 
   if (!selectedNodeId || activePanel !== 'blastRadius') return null;
 
@@ -58,7 +43,7 @@ export const GraphBlastRadiusPanel: React.FC<Props> = ({ projectSlug }) => {
         </Typography>
       </Box>
 
-      {loading ? (
+      {isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <CircularProgress size={24} sx={{ color: '#00f3ff' }} />
         </Box>

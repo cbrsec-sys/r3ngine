@@ -321,13 +321,13 @@ export const SubScansPage: React.FC = () => {
                   </td>
                   <td style={{ padding: '12px 16px', textAlign: 'center' }}>
                     <Chip 
-                      label={scan.status === 2 ? 'SUCCESSFUL' : scan.status === 3 ? 'ABORTED' : 'RUNNING'} 
+                      label={scan.status === 2 ? 'SUCCESSFUL' : scan.status === 3 ? 'ABORTED' : scan.status === 0 ? 'FAILED' : 'RUNNING'} 
                       size="small" 
                       sx={{ 
-                        bgcolor: scan.status === 2 ? 'rgba(0, 255, 157, 0.1)' : scan.status === 3 ? 'rgba(255, 0, 60, 0.1)' : 'rgba(255, 183, 77, 0.1)', 
-                        color: scan.status === 2 ? '#00ff9d' : scan.status === 3 ? '#ff003c' : '#ffb74d', 
+                        bgcolor: scan.status === 2 ? 'rgba(0, 255, 157, 0.1)' : scan.status === 3 ? 'rgba(255, 0, 60, 0.1)' : scan.status === 0 ? 'rgba(255, 0, 60, 0.1)' : 'rgba(255, 183, 77, 0.1)', 
+                        color: scan.status === 2 ? '#00ff9d' : scan.status === 3 ? '#ff003c' : scan.status === 0 ? '#ff003c' : '#ffb74d', 
                         border: '1px solid',
-                        borderColor: scan.status === 2 ? 'rgba(0, 255, 157, 0.3)' : scan.status === 3 ? 'rgba(255, 0, 60, 0.3)' : 'rgba(255, 183, 77, 0.3)',
+                        borderColor: scan.status === 2 ? 'rgba(0, 255, 157, 0.3)' : scan.status === 3 ? 'rgba(255, 0, 60, 0.3)' : scan.status === 0 ? 'rgba(255, 0, 60, 0.3)' : 'rgba(255, 183, 77, 0.3)',
                         fontSize: '10px',
                         fontWeight: 900,
                         letterSpacing: 1

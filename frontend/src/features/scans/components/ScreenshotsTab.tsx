@@ -13,12 +13,21 @@ import {
 import { X, ExternalLink, Camera } from 'lucide-react';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 
+interface ScreenshotEntry {
+  id: number | string;
+  screenshot_path: string;
+  url: string;
+  title: string | null;
+  status_code: number | null;
+}
+
 interface ScreenshotSubdomain {
   id: number;
   name: string;
   http_url: string | null;
   screenshot_path: string;
   http_status: number | null;
+  screenshots: ScreenshotEntry[];
 }
 
 interface ScreenshotsTabProps {
@@ -32,8 +41,8 @@ const useScreenshots = (scanId: number) => {
     queryFn: async () => {
       const url = new URL(`${window.location.origin}/api/listSubdomains/`);
       url.searchParams.append('scan_id', scanId.toString());
-      url.searchParams.append('only_screenshot', '');
-      url.searchParams.append('no_page', '');
+      // Fetch ALL subdomains to ensure we don't miss any due to server-side filter bugs
+      url.searchParams.append('no_page', '1');
       url.searchParams.append('format', 'json');
 
       const response = await fetch(url.toString(), {
@@ -56,9 +65,41 @@ const useScreenshots = (scanId: number) => {
 };
 
 export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
-  const { data: screenshots, isLoading, isError } = useScreenshots(scanId);
+  const { data: subdomainData, isLoading, isError } = useScreenshots(scanId);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [lightboxLabel, setLightboxLabel] = useState<string>('');
+
+  // Flatten all screenshots from all subdomains
+  const screenshots = React.useMemo(() => {
+    if (!subdomainData) return [];
+    
+    const flattened: (ScreenshotEntry & { subdomain_name: string })[] = [];
+    
+    subdomainData.forEach(sub => {
+      if (sub.screenshots && sub.screenshots.length > 0) {
+        sub.screenshots.forEach(s => {
+          flattened.push({
+            ...s,
+            subdomain_name: sub.name,
+            // Fallback to subdomain status if not present in screenshot
+            status_code: s.status_code || sub.http_status
+          });
+        });
+      } else if (sub.screenshot_path) {
+        // Fallback for cases where screenshots array might be empty but screenshot_path exists
+        flattened.push({
+          id: `legacy-${sub.id}`,
+          screenshot_path: sub.screenshot_path,
+          url: sub.http_url || `http://${sub.name}`,
+          title: sub.name,
+          status_code: sub.http_status,
+          subdomain_name: sub.name
+        });
+      }
+    });
+    
+    return flattened;
+  }, [subdomainData]);
 
   const openLightbox = (path: string, label: string) => {
     setLightboxSrc(`/media/${path}`);
@@ -73,21 +114,24 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
   return (
     <Box sx={{ width: '100%' }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 4, mt: 2 }}>
-        <Camera size={20} color="#00f3ff" />
-        <Box>
-          <Typography variant="h5" sx={{
-            fontWeight: 900,
-            fontFamily: 'Orbitron',
-            letterSpacing: 3,
-            color: '#fff',
-            textTransform: 'uppercase',
-          }}>
-            Visual Intelligence
-          </Typography>
-          <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
-            EYEWITNESS CAPTURE RESULTS
-          </Typography>
+      <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1.5, mb: 4, mt: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Camera size={20} color="#00f3ff" />
+          <Box>
+            <Typography variant="h5" sx={{
+              fontWeight: 900,
+              fontFamily: 'Orbitron',
+              letterSpacing: { xs: 1, sm: 3 },
+              color: '#fff',
+              textTransform: 'uppercase',
+              fontSize: { xs: '1.2rem', sm: '1.5rem' }
+            }}>
+              Visual Intelligence
+            </Typography>
+            <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
+              EYEWITNESS CAPTURE RESULTS
+            </Typography>
+          </Box>
         </Box>
       </Box>
 
@@ -96,18 +140,25 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
         <Box sx={{
           p: 2,
           display: 'flex',
-          alignItems: 'center',
+          flexDirection: { xs: 'column', md: 'row' },
+          alignItems: { xs: 'flex-start', md: 'center' },
           justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
           bgcolor: 'rgba(255,255,255,0.01)',
+          gap: 2
         }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>
-              Captured:
-            </Typography>
-            <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(0, 243, 255, 0.08)', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1 }}>
-              <Typography sx={{ fontSize: '11px', color: '#00f3ff', fontWeight: 700 }}>
-                {isLoading ? '...' : (screenshots?.length ?? 0)} targets
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>
+                Captured:
+              </Typography>
+              <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(0, 243, 255, 0.08)', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1 }}>
+                <Typography sx={{ fontSize: '11px', color: '#00f3ff', fontWeight: 700 }}>
+                  {isLoading ? '...' : (screenshots?.length ?? 0)} screenshots
+                </Typography>
+              </Box>
+              <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>
+                ({subdomainData?.length ?? 0} targets)
               </Typography>
             </Box>
           </Box>
@@ -171,13 +222,13 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
 
           {!isLoading && !isError && screenshots && screenshots.length > 0 && (
             <Grid container spacing={2}>
-              {screenshots.map((sub) => (
+              {screenshots.map((item) => (
                 <Grid
-                  key={sub.id}
+                  key={item.id}
                   size={{ xs: 12, sm: 6, md: 4, lg: 3 }}
                 >
                   <Box
-                    onClick={() => openLightbox(sub.screenshot_path, sub.name)}
+                    onClick={() => openLightbox(item.screenshot_path, item.subdomain_name)}
                     sx={{
                       position: 'relative',
                       borderRadius: 1,
@@ -197,8 +248,8 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                     {/* Thumbnail */}
                     <Box sx={{ aspectRatio: '16/9', overflow: 'hidden', bgcolor: 'rgba(0,0,0,0.6)' }}>
                       <img
-                        src={`/media/${sub.screenshot_path}`}
-                        alt={`Screenshot of ${sub.name}`}
+                        src={`/media/${item.screenshot_path}`}
+                        alt={`Screenshot of ${item.subdomain_name}`}
                         loading="lazy"
                         style={{
                           width: '100%',
@@ -253,16 +304,16 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
                       }}>
-                        {sub.name}
+                        {item.subdomain_name}
                       </Typography>
-                      {sub.http_status && (
+                      {item.status_code && (
                         <Typography sx={{
                           fontSize: '9px',
-                          color: sub.http_status < 400 ? '#00ffaa' : '#ff003c',
+                          color: item.status_code < 400 ? '#00ffaa' : '#ff003c',
                           fontWeight: 700,
                           fontFamily: 'monospace',
                         }}>
-                          HTTP {sub.http_status}
+                          HTTP {item.status_code}
                         </Typography>
                       )}
                     </Box>
@@ -279,54 +330,68 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
         open={!!lightboxSrc}
         onClose={closeLightbox}
         closeAfterTransition
-        slots={{ backdrop: Backdrop }}
-        slotProps={{
-          backdrop: {
-            sx: { bgcolor: 'rgba(0, 0, 0, 0.92)', backdropFilter: 'blur(6px)' },
-            timeout: 200,
-          },
+        sx={{ 
+          display: 'flex', 
+          alignItems: 'center', 
+          justifyContent: 'center',
+          zIndex: 999999
         }}
       >
         <Fade in={!!lightboxSrc} timeout={200}>
           <Box
-            onClick={closeLightbox}
             sx={{
-              position: 'fixed',
-              inset: 0,
+              position: 'relative',
+              width: '100vw',
+              height: '100vh',
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               justifyContent: 'center',
-              p: 4,
               outline: 'none',
             }}
           >
+            {/* Custom Backdrop */}
+            <Box 
+              onClick={closeLightbox}
+              sx={{ 
+                position: 'absolute', 
+                inset: 0, 
+                bgcolor: 'rgba(0, 0, 0, 0.95)', 
+                backdropFilter: 'blur(12px)', // Increased blur
+                zIndex: 1,
+                cursor: 'zoom-out'
+              }} 
+            />
+
             {/* Controls bar */}
             <Box
               onClick={(e) => e.stopPropagation()}
               sx={{
+                position: 'relative',
+                zIndex: 3,
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'space-between',
                 width: '100%',
                 maxWidth: '90vw',
-                mb: 1.5,
+                mb: 2,
               }}
             >
               <Typography sx={{
                 color: '#00f3ff',
                 fontFamily: 'Orbitron',
-                fontSize: '12px',
+                fontSize: '13px',
                 fontWeight: 700,
-                letterSpacing: 1,
+                letterSpacing: 1.5,
+                textShadow: '0 0 10px rgba(0, 243, 255, 0.5)',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
-                maxWidth: 'calc(100% - 80px)',
+                maxWidth: 'calc(100% - 120px)',
               }}>
                 {lightboxLabel}
               </Typography>
-              <Box sx={{ display: 'flex', gap: 1 }}>
+              <Box sx={{ display: 'flex', gap: 1.5 }}>
                 <IconButton
                   component="a"
                   href={lightboxSrc ?? '#'}
@@ -335,39 +400,42 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                   onClick={(e) => e.stopPropagation()}
                   size="small"
                   sx={{
-                    color: 'rgba(255,255,255,0.6)',
-                    bgcolor: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    '&:hover': { color: '#00f3ff', borderColor: 'rgba(0,243,255,0.4)' },
+                    color: 'rgba(255,255,255,0.8)',
+                    bgcolor: 'rgba(255,255,255,0.1)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    '&:hover': { color: '#00f3ff', borderColor: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' },
                   }}
                 >
-                  <ExternalLink size={14} />
+                  <ExternalLink size={16} />
                 </IconButton>
                 <IconButton
                   onClick={closeLightbox}
                   size="small"
                   sx={{
-                    color: 'rgba(255,255,255,0.6)',
-                    bgcolor: 'rgba(255,255,255,0.05)',
-                    border: '1px solid rgba(255,255,255,0.1)',
-                    '&:hover': { color: '#ff003c', borderColor: 'rgba(255,0,60,0.4)' },
+                    color: 'rgba(255,255,255,0.8)',
+                    bgcolor: 'rgba(255,255,255,0.1)',
+                    border: '1px solid rgba(255,255,255,0.2)',
+                    '&:hover': { color: '#ff003c', borderColor: '#ff003c', bgcolor: 'rgba(255, 0, 60, 0.1)' },
                   }}
                 >
-                  <X size={14} />
+                  <X size={16} />
                 </IconButton>
               </Box>
             </Box>
 
-            {/* Image */}
+            {/* Image Container */}
             <Box
               onClick={(e) => e.stopPropagation()}
               sx={{
-                maxWidth: '90vw',
-                maxHeight: '80vh',
-                border: '1px solid rgba(0, 243, 255, 0.2)',
+                position: 'relative',
+                zIndex: 2,
+                maxWidth: '92vw',
+                maxHeight: '82vh',
+                border: '2px solid rgba(0, 243, 255, 0.4)',
                 borderRadius: 1,
                 overflow: 'hidden',
-                boxShadow: '0 0 60px rgba(0, 243, 255, 0.1)',
+                boxShadow: '0 0 100px rgba(0, 243, 255, 0.3)',
+                bgcolor: '#000'
               }}
             >
               {lightboxSrc && (
@@ -376,8 +444,8 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                   alt={lightboxLabel}
                   style={{
                     display: 'block',
-                    maxWidth: '90vw',
-                    maxHeight: '80vh',
+                    maxWidth: '100%',
+                    maxHeight: '82vh',
                     objectFit: 'contain',
                   }}
                 />
@@ -388,13 +456,16 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
             <Typography
               onClick={closeLightbox}
               sx={{
-                mt: 2,
-                fontSize: '10px',
-                color: 'rgba(255,255,255,0.2)',
+                position: 'relative',
+                zIndex: 3,
+                mt: 3,
+                fontSize: '11px',
+                color: 'rgba(255,255,255,0.4)',
                 fontFamily: 'Orbitron',
-                letterSpacing: 1,
+                letterSpacing: 2,
                 cursor: 'pointer',
                 userSelect: 'none',
+                '&:hover': { color: '#00f3ff' }
               }}
             >
               CLICK ANYWHERE TO CLOSE

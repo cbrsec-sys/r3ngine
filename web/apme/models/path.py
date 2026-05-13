@@ -19,6 +19,7 @@ class PathStep:
             "action": self.action,
             "confidence": self.confidence,
             "validated": self.validated,
+            "status": "validated" if self.validated else "inferred",
             "edge_type": self.edge_type,
         }
 
