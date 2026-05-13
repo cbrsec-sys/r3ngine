@@ -110,6 +110,7 @@ class RengineTask(Task):
 					's3scanner': 'vulnerability_scan',
 					'cpanel_scan': 'vulnerability_scan',
 					'wpscan_scan': 'vulnerability_scan',
+					'acunetix_scan': 'vulnerability_scan',
 					'stress_testing': 'stress_test',
 				}
 				# Tasks that are post-processing and don't require engine validation

@@ -329,7 +329,11 @@ def initiate_scan(
 			subdomain.save()
 
 
-		# Build Celery tasks sequentially based on engine config order
+		# Build Celery tasks, crafted according to the dependency graph below:
+		# subdomain_discovery --> port_scan --> fetch_url --> dir_file_fuzz
+		# osint								             	  vulnerability_scan
+		# osint								             	  dalfox xss scan
+		#						 	   		         	  	  screenshot
 		tasks = engine.tasks
 		logger.warning(f"Engine tasks for {engine.engine_name}: {tasks}")
 		
@@ -645,10 +649,44 @@ def initiate_subscan(
 
 	# If this is a vulnerability scan, we need to run correlation
 	if scan_type == 'vulnerability_scan':
-		workflow_steps.append(correlate_vulnerabilities.si(scan_history_id=scan.id))
-		workflow_steps.append(calculate_risk_scores.si(scan_history_id=scan.id))
+		# Run Acunetix if enabled in config and credentials are present.
+		# We must check here (not rely on vulnerability_scan parent task) because
+		# initiate_subscan invokes acunetix_scan directly, bypassing vulnerability_scan.
+		should_run_acunetix = config.get(RUN_ACUNETIX, False)
+		if should_run_acunetix:
+			acunetix_creds = AcunetixAPIKey.objects.first()
+			if acunetix_creds and acunetix_creds.server_url and acunetix_creds.api_key:
+				logger.info('Acunetix is configured. Adding to subscan workflow...')
+				workflow_steps.append(acunetix_scan.si(
+					domain_id=domain.id,
+					scan_history_id=scan.id,
+					ctx=ctx
+				))
+			else:
+				logger.warning("Acunetix is enabled in engine config but not configured in vault. Skipping.")
+
+		# WPScan: must pass ctx so RengineTask can resolve self.scan and self.yaml_configuration.
+		# Previously called with scan_history_id= which is not a recognised task parameter.
+		workflow_steps.append(wpscan_scan.si(
+			ctx=ctx,
+			description='WPScan'
+		))
+
+		# cPanel scanner: same ctx requirement as WPScan above.
+		workflow_steps.append(cpanel_scan.si(
+			ctx=ctx,
+			description='cPanel Vulnerability Scan'
+		))
+
+
 		# Run ERL validation if plugin is installed
 		workflow_steps.append(PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx))
+
+		# Run correlation
+		workflow_steps.append(correlate_vulnerabilities.si(scan_history_id=scan.id))
+
+		# Run risk score calculation
+		workflow_steps.append(calculate_risk_scores.si(scan_history_id=scan.id))
 
 	# Attack Path Modeling Engine (APME)
 	apme_config = config.get(ATTACK_PATH_MODELING, {})
@@ -1673,41 +1711,87 @@ def h8mail(self, config, host, scan_history_id, activity_id, results_dir, ctx={}
 
 @app.task(name='leaklookup', queue='main_scan_queue', base=RengineTask, bind=True)
 def leaklookup(self, host=None, ctx=None, **kwargs):
-	"""Run LeakLookup query."""
-	api_key = get_leaklookup_key()
-	if not api_key:
-		return "LeakLookup API key not found. Skipping."
+	"""Run LeakLookup and ProjectDiscovery query."""
+	leaklookup_api_key = get_leaklookup_key()
+	chaos_api_key = get_chaos_api_key()
 
-	try:
-		url = "https://leak-lookup.com/api/search"
-		params = {
-			'key': api_key,
-			'type': 'domain',
-			'query': host
-		}
-		response = requests.post(url, data=params, timeout=30)
-		if response.status_code == 200:
-			data = response.json()
-			if data.get('error') == 'false':
-				leaks = data.get('message', {})
+	if not leaklookup_api_key and not chaos_api_key:
+		return "LeakLookup and ProjectDiscovery API keys not found. Skipping."
+
+	results_summary = []
+
+	# LeakLookup
+	if leaklookup_api_key:
+		try:
+			url = "https://leak-lookup.com/api/search"
+			params = {
+				'key': leaklookup_api_key,
+				'type': 'domain',
+				'query': host
+			}
+			response = requests.post(url, data=params, timeout=30)
+			if response.status_code == 200:
+				data = response.json()
+				if data.get('error') == 'false':
+					leaks = data.get('message', {})
+					leak_count = 0
+					for db_name, contents in leaks.items():
+						for match in contents:
+							save_secret_leak(
+								scan_history=self.scan,
+								tool_name=LEAKLOOKUP,
+								secret_type="Data Leak",
+								source_url=db_name,
+								match_content=match,
+								status='unverified'
+							)
+							leak_count += 1
+					results_summary.append(f"LeakLookup: Found {leak_count} leaks in {len(leaks)} databases")
+				else:
+					results_summary.append(f"LeakLookup error: {data.get('message')}")
+			else:
+				results_summary.append(f"LeakLookup HTTP error: {response.status_code}")
+		except Exception as e:
+			logger.error(f"Error in LeakLookup: {e}")
+			results_summary.append(f"LeakLookup error: {e}")
+
+	# ProjectDiscovery
+	if chaos_api_key:
+		try:
+			pd_url = f"https://api.projectdiscovery.io/v1/leaks?type=all&time_range=all_time&domain={host}"
+			headers = {"X-API-Key": chaos_api_key}
+			response = requests.get(pd_url, headers=headers, timeout=30)
+			if response.status_code == 200:
+				data = response.json()
+				leaks = data.get('data', [])
 				leak_count = 0
-				for db_name, contents in leaks.items():
-					for match in contents:
-						save_secret_leak(
-							scan_history=self.scan,
-							tool_name=LEAKLOOKUP,
-							secret_type="Data Leak",
-							source_url=db_name,
-							match_content=match,
-							status='unverified'
-						)
-						leak_count += 1
-				return f"Found {leak_count} leaks in {len(leaks)} databases."
-			return f"LeakLookup error: {data.get('message')}"
-		return f"LeakLookup HTTP error: {response.status_code}"
-	except Exception as e:
-		logger.error(f"Error in LeakLookup: {e}")
-		raise e
+				for match in leaks:
+					source_url = match.get('url') or match.get('url_domain') or 'Unknown'
+					match_content = ""
+					if match.get('username'):
+						match_content += f"Username: {match.get('username')} "
+					if match.get('password'):
+						match_content += f"Password: {match.get('password')} "
+					if match.get('device_ip'):
+						match_content += f"IP: {match.get('device_ip')} "
+					
+					save_secret_leak(
+						scan_history=self.scan,
+						tool_name=PROJECTDISCOVERY,
+						secret_type="Data Leak",
+						source_url=source_url,
+						match_content=match_content.strip(),
+						status='unverified'
+					)
+					leak_count += 1
+				results_summary.append(f"ProjectDiscovery: Found {leak_count} leaks")
+			else:
+				results_summary.append(f"ProjectDiscovery HTTP error: {response.status_code}")
+		except Exception as e:
+			logger.error(f"Error in ProjectDiscovery: {e}")
+			results_summary.append(f"ProjectDiscovery error: {e}")
+
+	return " | ".join(results_summary)
 
 
 @app.task(name='secret_scanning', queue='main_scan_queue', base=RengineTask, bind=True)
@@ -3157,9 +3241,11 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 		grouped_tasks.append(_task)
 
 	if should_run_acunetix:
+		logger.info('Running Acunetix Scan')
 		# Double check if acunetix is configured
 		creds = AcunetixAPIKey.objects.first()
 		if creds and creds.server_url and creds.api_key:
+			logger.info('Acunetix is configured. Running scan...')
 			_task = acunetix_scan.si(
 				domain_id=ctx.get('domain_id'),
 				scan_history_id=ctx.get('scan_history_id'),
@@ -3194,6 +3280,7 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 
 	# Run cPanel Scanner
 	if should_run_cpanel:
+		logger.info('Running cPanel Scanner...')
 		_task = cpanel_scan.si(
 			ctx=ctx,
 			description=f'cPanel Vulnerability Scan'
@@ -3202,6 +3289,7 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 
 	# Run WPScan
 	if should_run_wpscan:
+		logger.info('Running WPScan...')
 		_task = wpscan_scan.si(
 			urls=urls,
 			ctx=ctx,
@@ -3602,7 +3690,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 		input_path = unfurl_filter
 
 	# Build templates
-	# logger.info('Updating Nuclei templates ...')
+	logger.info('Updating Nuclei templates ...')
 	run_command(
 		'nuclei -update-templates',
 		shell=True,
@@ -6454,7 +6542,7 @@ def map_acunetix_severity(severity):
 	return mapping.get(severity, 0)
 
 
-@app.task(name='run_acunetix', queue='main_scan_queue', base=RengineTask, bind=True)
+@app.task(name='acunetix_scan', queue='main_scan_queue', base=RengineTask, bind=True)
 def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 	"""
 	Run Acunetix (AWVS) scan for the given domain.
@@ -6462,7 +6550,7 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 	if not Acunetix:
 		logger.error("Acunetix library not found. Skipping Acunetix scan.")
 		return False
-
+	logger.info(f"Starting Acunetix scan for domain ID: {domain_id}")
 	scan_history = ScanHistory.objects.get(pk=scan_history_id) if scan_history_id else None
 	domain = Domain.objects.get(pk=domain_id)
 	
@@ -6471,11 +6559,12 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 	if not (creds and creds.server_url and creds.api_key):
 		logger.error("Acunetix API keys not fully configured in vault. Skipping.")
 		return False
-
+	logger.info(f"Acunetix API keys found: {creds.server_url}, {creds.api_key}")
 	try:
 		acunetix = Acunetix(host=creds.server_url, api=creds.api_key)
+		logger.info(f"Acunetix instance created: {acunetix}")
 		
-		target_url = f"http://{domain.name}"
+		target_url = f"https://{domain.name}"
 		logger.info(f"Starting Acunetix scan for {target_url}")
 		
 		# Use the library's start_scan which typically adds target and starts scan
@@ -6488,7 +6577,7 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 			'X-Auth': creds.api_key,
 			'Content-Type': 'application/json'
 		}
-		base_url = creds.server_url if creds.server_url.startswith('http') else f"https://{creds.server_url}"
+		base_url = f"{creds.server_url}"
 		
 		# If target_id wasn't in scan_info, try to find it
 		if not target_id:

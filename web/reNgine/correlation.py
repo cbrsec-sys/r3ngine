@@ -133,18 +133,37 @@ class VulnerabilityCorrelationEngine:
         
         chain['steps'].append({'phase': 'Post-Exploitation', 'description': "Pivot to internal network or access sensitive data"})
         
-        # Check if an APME path already exists to avoid overwriting it with a generic heuristic
-        existing = ImpactAssessment.objects.filter(vulnerability=vuln).first()
+        # Check if an APME path already exists to avoid overwriting it with a generic heuristic.
+        # Use filter() instead of get() to safely handle the case where multiple ImpactAssessment
+        # rows exist for the same vulnerability (can occur when APME and correlation both create rows).
+        existing_qs = ImpactAssessment.objects.filter(vulnerability=vuln)
+        existing = existing_qs.order_by('-updated_at').first()
         if existing and existing.potential_attack_chain and 'apme_path_id' in existing.potential_attack_chain:
             logger.info(f"Correlation: Skipping heuristic chain for vuln {vuln.id}, APME path already exists.")
             return
 
-        ImpactAssessment.objects.update_or_create(
-            vulnerability=vuln,
-            defaults={
-                'potential_attack_chain': chain,
-                'scan_history': self.scan_history,
-                'subdomain': vuln.subdomain
-            }
-        )
+        # Deduplicate: if more than one row exists for this vulnerability, delete the extras
+        # keeping only the most recent. This handles pre-existing duplicates without crashing.
+        if existing_qs.count() > 1:
+            logger.warning(
+                f"Correlation: Found {existing_qs.count()} ImpactAssessment rows for vuln {vuln.id}. "
+                f"Deduplicating — keeping most recent record."
+            )
+            # Keep the most recent record, delete all others
+            ids_to_delete = existing_qs.order_by('-updated_at').values_list('id', flat=True)[1:]
+            ImpactAssessment.objects.filter(id__in=list(ids_to_delete)).delete()
+
+        # Now safely perform an update-or-create using the single canonical record
+        if existing:
+            existing.potential_attack_chain = chain
+            existing.scan_history = self.scan_history
+            existing.subdomain = vuln.subdomain
+            existing.save()
+        else:
+            ImpactAssessment.objects.create(
+                vulnerability=vuln,
+                potential_attack_chain=chain,
+                scan_history=self.scan_history,
+                subdomain=vuln.subdomain
+            )
 

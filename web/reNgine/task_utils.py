@@ -70,7 +70,7 @@ def run_command(
         tuple: Tuple with return_code, output.
     """
     color = get_tool_color(cmd)
-    logger.info(f"{color}{cmd}{COLOR_RESET}")
+    logger.debug(f"{color}{cmd}{COLOR_RESET}")
 
     conf_path = None
     if proxy:
