@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Box, Typography, Stack, CircularProgress, Chip, Button } from '@mui/material';
 import { useGraphStore } from '../../../store/useGraphStore';
 import { ShieldAlert, Activity } from 'lucide-react';
-import axios from 'axios';
+import { useGraphNodeDetails, useCreateTicket } from '../api/graphApi';
 
 interface Props {
   projectSlug: string;
@@ -10,35 +10,20 @@ interface Props {
 
 export const GraphNodeDetailPanel: React.FC<Props> = ({ projectSlug }) => {
   const { selectedNodeId, selectedNodeData, activePanel, setActivePanel } = useGraphStore();
-  const [details, setDetails] = useState<any>(null);
-  const [loading, setLoading] = useState(false);
+  
+  const { data: details, isLoading } = useGraphNodeDetails(
+    projectSlug, 
+    activePanel === 'details' ? selectedNodeId : null
+  );
+  
+  const { mutate: createTicket } = useCreateTicket(projectSlug);
 
-  useEffect(() => {
-    if (selectedNodeId && activePanel === 'details') {
-      fetchDetails(selectedNodeId);
-    }
-  }, [selectedNodeId, activePanel]);
-
-  const fetchDetails = async (id: string) => {
-    setLoading(true);
-    try {
-      const res = await axios.get(`/${projectSlug}/api/graph/node/${id}/details/`);
-      setDetails(res.data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCreateTicket = async () => {
+  const handleCreateTicket = () => {
     if (!selectedNodeId) return;
-    try {
-      const res = await axios.post(`/${projectSlug}/api/graph/node/${selectedNodeId}/ticket/`);
-      alert(res.data.message);
-    } catch (e) {
-      console.error(e);
-    }
+    createTicket(selectedNodeId, {
+      onSuccess: (res) => alert(res.message || 'Ticket created'),
+      onError: (e) => console.error(e)
+    });
   };
 
   if (!selectedNodeId || activePanel !== 'details') return null;
@@ -62,7 +47,7 @@ export const GraphNodeDetailPanel: React.FC<Props> = ({ projectSlug }) => {
         <Chip label={selectedNodeData?.type} size="small" sx={{ bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff', fontSize: '10px' }} />
       </Box>
 
-      {loading ? (
+      {isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
           <CircularProgress size={24} sx={{ color: '#00f3ff' }} />
         </Box>

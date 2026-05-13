@@ -2,9 +2,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { paths, operations, components } from '@/types/api';
 import type { Domain, Organization, Engine } from '../types';
 
-
-
-
 export const useDomains = (projectSlug: string) => {
   return useQuery<Domain[]>({
     queryKey: ['domains', projectSlug],
@@ -15,7 +12,7 @@ export const useDomains = (projectSlug: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json() as operations["listTargets_list"]["responses"]["200"]["content"]["application/json"];
+      const data = await response.json() as operations["api_listTargets_list"]["responses"]["200"]["content"]["application/json"];
       return data.results || [];
     },
     enabled: !!projectSlug,

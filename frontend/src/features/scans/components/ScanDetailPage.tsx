@@ -1567,8 +1567,10 @@ export const ScanDetailPage = () => {
   const renderEndpoints = () => (
     <EndpointsTab projectSlug={projectSlug} scanId={parseInt(scanId)} matchedGfCounts={data.matched_gf_count} />
   );
+
+  // TODO NEEDS TO BE FIXED AS WELL TO ENSURE THE DIRECTORIES TAB PROPERLY RENDERS DATA
   const renderDirectories = () => (
-    <DirectoriesTab projectSlug={projectSlug} scanId={parseInt(scanId)} />
+    <DirectoriesTab projectSlug={projectSlug} scanId={parseInt(scanId)} subdomainId={data.target_info?.id || 0} subdomainName={data.target_info?.name || ''} targetId={data.target_info?.id || 0} />
   );
 
   const renderVulnerabilities = () => (

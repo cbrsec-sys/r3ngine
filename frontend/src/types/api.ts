@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/action/create/project": {
+    "/api/action/create/project": {
         parameters: {
             query?: never;
             header?: never;
@@ -13,14 +13,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["action_create_project_create"];
+        post: operations["api_action_create_project_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/action/engine/create/": {
+    "/api/action/engine/create/": {
         parameters: {
             query?: never;
             header?: never;
@@ -29,21 +29,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["action_engine_create_create"];
+        post: operations["api_action_engine_create_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/action/engine/get/": {
+    "/api/action/engine/get/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["action_engine_get_list"];
+        get: operations["api_action_engine_get_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -52,7 +52,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/action/engine/update/": {
+    "/api/action/engine/update/": {
         parameters: {
             query?: never;
             header?: never;
@@ -61,14 +61,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["action_engine_update_create"];
+        post: operations["api_action_engine_update_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/action/initiate/scan/": {
+    "/api/action/initiate/scan/": {
         parameters: {
             query?: never;
             header?: never;
@@ -77,14 +77,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["action_initiate_scan_create"];
+        post: operations["api_action_initiate_scan_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/action/initiate/subtask/": {
+    "/api/action/initiate/subtask/": {
         parameters: {
             query?: never;
             header?: never;
@@ -93,14 +93,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["action_initiate_subtask_create"];
+        post: operations["api_action_initiate_subtask_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/action/rows/delete/": {
+    "/api/action/rows/delete/": {
         parameters: {
             query?: never;
             header?: never;
@@ -109,14 +109,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["action_rows_delete_create"];
+        post: operations["api_action_rows_delete_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/action/stop/scan/": {
+    "/api/action/stop/scan/": {
         parameters: {
             query?: never;
             header?: never;
@@ -125,14 +125,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["action_stop_scan_create"];
+        post: operations["api_action_stop_scan_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/action/subdomain/delete/": {
+    "/api/action/subdomain/delete/": {
         parameters: {
             query?: never;
             header?: never;
@@ -141,14 +141,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["action_subdomain_delete_create"];
+        post: operations["api_action_subdomain_delete_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/action/vulnerability/delete/": {
+    "/api/action/vulnerability/delete/": {
         parameters: {
             query?: never;
             header?: never;
@@ -157,21 +157,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["action_vulnerability_delete_create"];
+        post: operations["api_action_vulnerability_delete_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/action/wordlist/read/": {
+    "/api/action/wordlist/read/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["action_wordlist_read_list"];
+        get: operations["api_action_wordlist_read_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -180,7 +180,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/action/wordlist/upload/": {
+    "/api/action/wordlist/upload/": {
         parameters: {
             query?: never;
             header?: never;
@@ -189,14 +189,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["action_wordlist_upload_create"];
+        post: operations["api_action_wordlist_upload_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/add/recon_note/": {
+    "/api/add/recon_note/": {
         parameters: {
             query?: never;
             header?: never;
@@ -205,14 +205,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["add_recon_note_create"];
+        post: operations["api_add_recon_note_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/add/target/": {
+    "/api/add/target/": {
         parameters: {
             query?: never;
             header?: never;
@@ -221,14 +221,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["add_target_create"];
+        post: operations["api_add_target_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/apme/paths/": {
+    "/api/apme/paths/": {
         parameters: {
             query?: never;
             header?: never;
@@ -241,7 +241,7 @@ export interface paths {
          *     Paths are ordered by score descending (highest risk first).
          *     Each step is tagged as 'validated' or 'inferred'.
          */
-        get: operations["apme_paths_list"];
+        get: operations["api_apme_paths_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -250,7 +250,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/createOrganization/": {
+    "/api/apme/trigger/": {
         parameters: {
             query?: never;
             header?: never;
@@ -259,14 +259,71 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["createOrganization_create"];
+        /** @description POST /api/apme/trigger/ */
+        post: operations["api_apme_trigger_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/dashboard/{slug}/": {
+    "/api/auth/token/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Takes a set of user credentials and returns an access and refresh JSON web
+         *     token pair to prove the authentication of those credentials.
+         */
+        post: operations["api_auth_token_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/token/refresh/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Takes a refresh type JSON web token and returns an access type JSON web
+         *     token if the refresh token is valid.
+         */
+        post: operations["api_auth_token_refresh_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/createOrganization/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_createOrganization_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/dashboard/{slug}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -275,7 +332,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["dashboard_read"];
+        get: operations["api_dashboard_read"];
         put?: never;
         post?: never;
         delete?: never;
@@ -284,14 +341,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/external/tool/get_current_release/": {
+    "/api/external/tool/get_current_release/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["external_tool_get_current_release_list"];
+        get: operations["api_external_tool_get_current_release_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -300,7 +357,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/fetch/most_common_vulnerability/": {
+    "/api/fetch/most_common_vulnerability/": {
         parameters: {
             query?: never;
             header?: never;
@@ -309,14 +366,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["fetch_most_common_vulnerability_create"];
+        post: operations["api_fetch_most_common_vulnerability_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/fetch/most_vulnerable/": {
+    "/api/fetch/most_vulnerable/": {
         parameters: {
             query?: never;
             header?: never;
@@ -325,21 +382,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["fetch_most_vulnerable_create"];
+        post: operations["api_fetch_most_vulnerable_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/fetch/results/subscan/": {
+    "/api/fetch/results/subscan/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["fetch_results_subscan_list"];
+        get: operations["api_fetch_results_subscan_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -348,14 +405,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/getFileContents/": {
+    "/api/getFileContents/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["getFileContents_list"];
+        get: operations["api_getFileContents_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -364,14 +421,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/github/tool/get_latest_releases/": {
+    "/api/github/tool/get_latest_releases/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["github_tool_get_latest_releases_list"];
+        get: operations["api_github_tool_get_latest_releases_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -380,14 +437,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/hackerone-programs/": {
+    "/api/hackerone-programs/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["hackerone-programs_list"];
+        get: operations["api_hackerone-programs_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -396,14 +453,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/hackerone-programs/bookmarked_programs/": {
+    "/api/hackerone-programs/bookmarked_programs/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["hackerone-programs_bookmarked_programs"];
+        get: operations["api_hackerone-programs_bookmarked_programs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -412,14 +469,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/hackerone-programs/bounty_programs/": {
+    "/api/hackerone-programs/bounty_programs/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["hackerone-programs_bounty_programs"];
+        get: operations["api_hackerone-programs_bounty_programs"];
         put?: never;
         post?: never;
         delete?: never;
@@ -428,7 +485,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/hackerone-programs/import_programs/": {
+    "/api/hackerone-programs/import_programs/": {
         parameters: {
             query?: never;
             header?: never;
@@ -437,14 +494,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["hackerone-programs_import_programs"];
+        post: operations["api_hackerone-programs_import_programs"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/hackerone-programs/refresh_cache/": {
+    "/api/hackerone-programs/refresh_cache/": {
         parameters: {
             query?: never;
             header?: never;
@@ -453,21 +510,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["hackerone-programs_refresh_cache"];
+        post: operations["api_hackerone-programs_refresh_cache"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/hackerone-programs/sync_bookmarked/": {
+    "/api/hackerone-programs/sync_bookmarked/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["hackerone-programs_sync_bookmarked"];
+        get: operations["api_hackerone-programs_sync_bookmarked"];
         put?: never;
         post?: never;
         delete?: never;
@@ -476,7 +533,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/hackerone-programs/{id}/program_details/": {
+    "/api/hackerone-programs/{id}/program_details/": {
         parameters: {
             query?: never;
             header?: never;
@@ -485,7 +542,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["hackerone-programs_program_details"];
+        get: operations["api_hackerone-programs_program_details"];
         put?: never;
         post?: never;
         delete?: never;
@@ -494,23 +551,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/listActivityLogs/": {
+    "/api/listActivityLogs/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listActivityLogs_list"];
+        get: operations["api_listActivityLogs_list"];
         put?: never;
-        post: operations["listActivityLogs_create"];
+        post: operations["api_listActivityLogs_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listActivityLogs/{id}/": {
+    "/api/listActivityLogs/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -520,23 +577,23 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listActivityLogs_read"];
-        put: operations["listActivityLogs_update"];
+        get: operations["api_listActivityLogs_read"];
+        put: operations["api_listActivityLogs_update"];
         post?: never;
-        delete: operations["listActivityLogs_delete"];
+        delete: operations["api_listActivityLogs_delete"];
         options?: never;
         head?: never;
-        patch: operations["listActivityLogs_partial_update"];
+        patch: operations["api_listActivityLogs_partial_update"];
         trace?: never;
     };
-    "/listConfigurations/": {
+    "/api/listConfigurations/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listConfigurations_list"];
+        get: operations["api_listConfigurations_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -545,23 +602,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/listDatatableSubdomain/": {
+    "/api/listDatatableSubdomain/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listDatatableSubdomain_list"];
+        get: operations["api_listDatatableSubdomain_list"];
         put?: never;
-        post: operations["listDatatableSubdomain_create"];
+        post: operations["api_listDatatableSubdomain_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listDatatableSubdomain/{id}/": {
+    "/api/listDatatableSubdomain/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -571,32 +628,32 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listDatatableSubdomain_read"];
-        put: operations["listDatatableSubdomain_update"];
+        get: operations["api_listDatatableSubdomain_read"];
+        put: operations["api_listDatatableSubdomain_update"];
         post?: never;
-        delete: operations["listDatatableSubdomain_delete"];
+        delete: operations["api_listDatatableSubdomain_delete"];
         options?: never;
         head?: never;
-        patch: operations["listDatatableSubdomain_partial_update"];
+        patch: operations["api_listDatatableSubdomain_partial_update"];
         trace?: never;
     };
-    "/listDirectories/": {
+    "/api/listDirectories/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listDirectories_list"];
+        get: operations["api_listDirectories_list"];
         put?: never;
-        post: operations["listDirectories_create"];
+        post: operations["api_listDirectories_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listDirectories/{id}/": {
+    "/api/listDirectories/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -606,32 +663,32 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listDirectories_read"];
-        put: operations["listDirectories_update"];
+        get: operations["api_listDirectories_read"];
+        put: operations["api_listDirectories_update"];
         post?: never;
-        delete: operations["listDirectories_delete"];
+        delete: operations["api_listDirectories_delete"];
         options?: never;
         head?: never;
-        patch: operations["listDirectories_partial_update"];
+        patch: operations["api_listDirectories_partial_update"];
         trace?: never;
     };
-    "/listEndPointChanges/": {
+    "/api/listEndPointChanges/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listEndPointChanges_list"];
+        get: operations["api_listEndPointChanges_list"];
         put?: never;
-        post: operations["listEndPointChanges_create"];
+        post: operations["api_listEndPointChanges_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listEndPointChanges/{id}/": {
+    "/api/listEndPointChanges/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -641,32 +698,32 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listEndPointChanges_read"];
-        put: operations["listEndPointChanges_update"];
+        get: operations["api_listEndPointChanges_read"];
+        put: operations["api_listEndPointChanges_update"];
         post?: never;
-        delete: operations["listEndPointChanges_delete"];
+        delete: operations["api_listEndPointChanges_delete"];
         options?: never;
         head?: never;
-        patch: operations["listEndPointChanges_partial_update"];
+        patch: operations["api_listEndPointChanges_partial_update"];
         trace?: never;
     };
-    "/listEndpoints/": {
+    "/api/listEndpoints/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listEndpoints_list"];
+        get: operations["api_listEndpoints_list"];
         put?: never;
-        post: operations["listEndpoints_create"];
+        post: operations["api_listEndpoints_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listEndpoints/{id}/": {
+    "/api/listEndpoints/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -676,23 +733,23 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listEndpoints_read"];
-        put: operations["listEndpoints_update"];
+        get: operations["api_listEndpoints_read"];
+        put: operations["api_listEndpoints_update"];
         post?: never;
-        delete: operations["listEndpoints_delete"];
+        delete: operations["api_listEndpoints_delete"];
         options?: never;
         head?: never;
-        patch: operations["listEndpoints_partial_update"];
+        patch: operations["api_listEndpoints_partial_update"];
         trace?: never;
     };
-    "/listEngines/": {
+    "/api/listEngines/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listEngines_list"];
+        get: operations["api_listEngines_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -701,23 +758,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/listInterestingEndpoints/": {
+    "/api/listInterestingEndpoints/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listInterestingEndpoints_list"];
+        get: operations["api_listInterestingEndpoints_list"];
         put?: never;
-        post: operations["listInterestingEndpoints_create"];
+        post: operations["api_listInterestingEndpoints_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listInterestingEndpoints/{id}/": {
+    "/api/listInterestingEndpoints/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -727,23 +784,23 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listInterestingEndpoints_read"];
-        put: operations["listInterestingEndpoints_update"];
+        get: operations["api_listInterestingEndpoints_read"];
+        put: operations["api_listInterestingEndpoints_update"];
         post?: never;
-        delete: operations["listInterestingEndpoints_delete"];
+        delete: operations["api_listInterestingEndpoints_delete"];
         options?: never;
         head?: never;
-        patch: operations["listInterestingEndpoints_partial_update"];
+        patch: operations["api_listInterestingEndpoints_partial_update"];
         trace?: never;
     };
-    "/listInterestingKeywords/": {
+    "/api/listInterestingKeywords/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listInterestingKeywords_list"];
+        get: operations["api_listInterestingKeywords_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -752,23 +809,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/listInterestingSubdomains/": {
+    "/api/listInterestingSubdomains/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listInterestingSubdomains_list"];
+        get: operations["api_listInterestingSubdomains_list"];
         put?: never;
-        post: operations["listInterestingSubdomains_create"];
+        post: operations["api_listInterestingSubdomains_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listInterestingSubdomains/{id}/": {
+    "/api/listInterestingSubdomains/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -778,32 +835,32 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listInterestingSubdomains_read"];
-        put: operations["listInterestingSubdomains_update"];
+        get: operations["api_listInterestingSubdomains_read"];
+        put: operations["api_listInterestingSubdomains_update"];
         post?: never;
-        delete: operations["listInterestingSubdomains_delete"];
+        delete: operations["api_listInterestingSubdomains_delete"];
         options?: never;
         head?: never;
-        patch: operations["listInterestingSubdomains_partial_update"];
+        patch: operations["api_listInterestingSubdomains_partial_update"];
         trace?: never;
     };
-    "/listIps/": {
+    "/api/listIps/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listIps_list"];
+        get: operations["api_listIps_list"];
         put?: never;
-        post: operations["listIps_create"];
+        post: operations["api_listIps_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listIps/{id}/": {
+    "/api/listIps/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -813,23 +870,23 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listIps_read"];
-        put: operations["listIps_update"];
+        get: operations["api_listIps_read"];
+        put: operations["api_listIps_update"];
         post?: never;
-        delete: operations["listIps_delete"];
+        delete: operations["api_listIps_delete"];
         options?: never;
         head?: never;
-        patch: operations["listIps_partial_update"];
+        patch: operations["api_listIps_partial_update"];
         trace?: never;
     };
-    "/listOrganizations/": {
+    "/api/listOrganizations/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listOrganizations_list"];
+        get: operations["api_listOrganizations_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -838,14 +895,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/listScanHistory/": {
+    "/api/listScanHistory/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listScanHistory_list"];
+        get: operations["api_listScanHistory_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -854,23 +911,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/listScanLogs/": {
+    "/api/listScanLogs/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listScanLogs_list"];
+        get: operations["api_listScanLogs_list"];
         put?: never;
-        post: operations["listScanLogs_create"];
+        post: operations["api_listScanLogs_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listScanLogs/{id}/": {
+    "/api/listScanLogs/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -880,48 +937,32 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listScanLogs_read"];
-        put: operations["listScanLogs_update"];
+        get: operations["api_listScanLogs_read"];
+        put: operations["api_listScanLogs_update"];
         post?: never;
-        delete: operations["listScanLogs_delete"];
+        delete: operations["api_listScanLogs_delete"];
         options?: never;
         head?: never;
-        patch: operations["listScanLogs_partial_update"];
+        patch: operations["api_listScanLogs_partial_update"];
         trace?: never;
     };
-    "/listScans/": {
+    "/api/listScans/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listScans_list"];
+        get: operations["api_listScans_list"];
         put?: never;
-        post: operations["listScans_create"];
+        post: operations["api_listScans_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listScans/bulk_delete/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["listScans_bulk_delete"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/listScans/bulk_stop/": {
+    "/api/listScans/bulk_delete/": {
         parameters: {
             query?: never;
             header?: never;
@@ -930,14 +971,30 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["listScans_bulk_stop"];
+        post: operations["api_listScans_bulk_delete"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listScans/{id}/": {
+    "/api/listScans/bulk_stop/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_listScans_bulk_stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/listScans/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -946,16 +1003,16 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listScans_read"];
-        put: operations["listScans_update"];
+        get: operations["api_listScans_read"];
+        put: operations["api_listScans_update"];
         post?: never;
-        delete: operations["listScans_delete"];
+        delete: operations["api_listScans_delete"];
         options?: never;
         head?: never;
-        patch: operations["listScans_partial_update"];
+        patch: operations["api_listScans_partial_update"];
         trace?: never;
     };
-    "/listScans/{id}/delete_scan/": {
+    "/api/listScans/{id}/delete_scan/": {
         parameters: {
             query?: never;
             header?: never;
@@ -966,14 +1023,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["listScans_delete_scan"];
+        post: operations["api_listScans_delete_scan"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listScans/{id}/stop_scan/": {
+    "/api/listScans/{id}/stop_scan/": {
         parameters: {
             query?: never;
             header?: never;
@@ -984,14 +1041,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["listScans_stop_scan"];
+        post: operations["api_listScans_stop_scan"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listSubScans/": {
+    "/api/listSubScans/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1000,30 +1057,30 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["listSubScans_create"];
+        post: operations["api_listSubScans_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listSubdomainChanges/": {
+    "/api/listSubdomainChanges/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listSubdomainChanges_list"];
+        get: operations["api_listSubdomainChanges_list"];
         put?: never;
-        post: operations["listSubdomainChanges_create"];
+        post: operations["api_listSubdomainChanges_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listSubdomainChanges/{id}/": {
+    "/api/listSubdomainChanges/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1033,32 +1090,32 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listSubdomainChanges_read"];
-        put: operations["listSubdomainChanges_update"];
+        get: operations["api_listSubdomainChanges_read"];
+        put: operations["api_listSubdomainChanges_update"];
         post?: never;
-        delete: operations["listSubdomainChanges_delete"];
+        delete: operations["api_listSubdomainChanges_delete"];
         options?: never;
         head?: never;
-        patch: operations["listSubdomainChanges_partial_update"];
+        patch: operations["api_listSubdomainChanges_partial_update"];
         trace?: never;
     };
-    "/listSubdomains/": {
+    "/api/listSubdomains/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listSubdomains_list"];
+        get: operations["api_listSubdomains_list"];
         put?: never;
-        post: operations["listSubdomains_create"];
+        post: operations["api_listSubdomains_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listSubdomains/{id}/": {
+    "/api/listSubdomains/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1068,32 +1125,32 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listSubdomains_read"];
-        put: operations["listSubdomains_update"];
+        get: operations["api_listSubdomains_read"];
+        put: operations["api_listSubdomains_update"];
         post?: never;
-        delete: operations["listSubdomains_delete"];
+        delete: operations["api_listSubdomains_delete"];
         options?: never;
         head?: never;
-        patch: operations["listSubdomains_partial_update"];
+        patch: operations["api_listSubdomains_partial_update"];
         trace?: never;
     };
-    "/listTargets/": {
+    "/api/listTargets/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listTargets_list"];
+        get: operations["api_listTargets_list"];
         put?: never;
-        post: operations["listTargets_create"];
+        post: operations["api_listTargets_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listTargets/{id}/": {
+    "/api/listTargets/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1103,23 +1160,23 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listTargets_read"];
-        put: operations["listTargets_update"];
+        get: operations["api_listTargets_read"];
+        put: operations["api_listTargets_update"];
         post?: never;
-        delete: operations["listTargets_delete"];
+        delete: operations["api_listTargets_delete"];
         options?: never;
         head?: never;
-        patch: operations["listTargets_partial_update"];
+        patch: operations["api_listTargets_partial_update"];
         trace?: never;
     };
-    "/listTodoNotes/": {
+    "/api/listTodoNotes/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listTodoNotes_list"];
+        get: operations["api_listTodoNotes_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1128,23 +1185,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/listVulnerability/": {
+    "/api/listVulnerability/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listVulnerability_list"];
+        get: operations["api_listVulnerability_list"];
         put?: never;
-        post: operations["listVulnerability_create"];
+        post: operations["api_listVulnerability_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/listVulnerability/{id}/": {
+    "/api/listVulnerability/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1154,23 +1211,23 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["listVulnerability_read"];
-        put: operations["listVulnerability_update"];
+        get: operations["api_listVulnerability_read"];
+        put: operations["api_listVulnerability_update"];
         post?: never;
-        delete: operations["listVulnerability_delete"];
+        delete: operations["api_listVulnerability_delete"];
         options?: never;
         head?: never;
-        patch: operations["listVulnerability_partial_update"];
+        patch: operations["api_listVulnerability_partial_update"];
         trace?: never;
     };
-    "/listWordlists/": {
+    "/api/listWordlists/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["listWordlists_list"];
+        get: operations["api_listWordlists_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1179,30 +1236,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/monitoring/": {
+    "/api/monitoring/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["monitoring_list"];
+        get: operations["api_monitoring_list"];
         put?: never;
-        post: operations["monitoring_create"];
+        post: operations["api_monitoring_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/monitoring/statistics/": {
+    "/api/monitoring/statistics/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["monitoring_statistics"];
+        get: operations["api_monitoring_statistics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1211,7 +1268,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/monitoring/{id}/": {
+    "/api/monitoring/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1221,48 +1278,48 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["monitoring_read"];
-        put: operations["monitoring_update"];
+        get: operations["api_monitoring_read"];
+        put: operations["api_monitoring_update"];
         post?: never;
-        delete: operations["monitoring_delete"];
+        delete: operations["api_monitoring_delete"];
         options?: never;
         head?: never;
-        patch: operations["monitoring_partial_update"];
+        patch: operations["api_monitoring_partial_update"];
         trace?: never;
     };
-    "/notification-settings/": {
+    "/api/notification-settings/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["notification-settings_list"];
+        get: operations["api_notification-settings_list"];
         put?: never;
-        post: operations["notification-settings_create"];
+        post: operations["api_notification-settings_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/notifications/": {
+    "/api/notifications/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["notifications_list"];
+        get: operations["api_notifications_list"];
         put?: never;
-        post: operations["notifications_create"];
+        post: operations["api_notifications_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/notifications/clear_all/": {
+    "/api/notifications/clear_all/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1271,14 +1328,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["notifications_clear_all"];
+        post: operations["api_notifications_clear_all"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/notifications/mark_all_read/": {
+    "/api/notifications/mark_all_read/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1287,21 +1344,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["notifications_mark_all_read"];
+        post: operations["api_notifications_mark_all_read"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/notifications/unread_count/": {
+    "/api/notifications/unread_count/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["notifications_unread_count"];
+        get: operations["api_notifications_unread_count"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1310,7 +1367,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/notifications/{id}/": {
+    "/api/notifications/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1319,16 +1376,16 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["notifications_read"];
-        put: operations["notifications_update"];
+        get: operations["api_notifications_read"];
+        put: operations["api_notifications_update"];
         post?: never;
-        delete: operations["notifications_delete"];
+        delete: operations["api_notifications_delete"];
         options?: never;
         head?: never;
-        patch: operations["notifications_partial_update"];
+        patch: operations["api_notifications_partial_update"];
         trace?: never;
     };
-    "/notifications/{id}/mark_read/": {
+    "/api/notifications/{id}/mark_read/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1339,30 +1396,30 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["notifications_mark_read"];
+        post: operations["api_notifications_mark_read"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/plugins/": {
+    "/api/plugins/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["plugins_list"];
+        get: operations["api_plugins_list"];
         put?: never;
-        post: operations["plugins_create"];
+        post: operations["api_plugins_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/plugins/registry/": {
+    "/api/plugins/registry/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1370,7 +1427,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description Returns the UI component registry for the frontend. */
-        get: operations["plugins_registry"];
+        get: operations["api_plugins_registry"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1379,7 +1436,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/plugins/upload/": {
+    "/api/plugins/upload/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1388,14 +1445,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["plugins_upload_plugin"];
+        post: operations["api_plugins_upload_plugin"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/plugins/{slug}/": {
+    "/api/plugins/{slug}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1404,32 +1461,32 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["plugins_read"];
-        put: operations["plugins_update"];
+        get: operations["api_plugins_read"];
+        put: operations["api_plugins_update"];
         post?: never;
-        delete: operations["plugins_delete"];
+        delete: operations["api_plugins_delete"];
         options?: never;
         head?: never;
-        patch: operations["plugins_partial_update"];
+        patch: operations["api_plugins_partial_update"];
         trace?: never;
     };
-    "/projects/": {
+    "/api/projects/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["projects_list"];
+        get: operations["api_projects_list"];
         put?: never;
-        post: operations["projects_create"];
+        post: operations["api_projects_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/projects/{id}/": {
+    "/api/projects/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1439,16 +1496,16 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["projects_read"];
-        put: operations["projects_update"];
+        get: operations["api_projects_read"];
+        put: operations["api_projects_update"];
         post?: never;
-        delete: operations["projects_delete"];
+        delete: operations["api_projects_delete"];
         options?: never;
         head?: never;
-        patch: operations["projects_partial_update"];
+        patch: operations["api_projects_partial_update"];
         trace?: never;
     };
-    "/projects/{id}/delete_project/": {
+    "/api/projects/{id}/delete_project/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1460,21 +1517,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["projects_delete_project"];
+        post: operations["api_projects_delete_project"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/queryAllScanResultVisualise/": {
+    "/api/queryAllScanResultVisualise/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryAllScanResultVisualise_list"];
+        get: operations["api_queryAllScanResultVisualise_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1483,14 +1540,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/queryDorkTypes/": {
+    "/api/queryDorkTypes/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryDorkTypes_list"];
+        get: operations["api_queryDorkTypes_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1499,14 +1556,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/queryDorks/": {
+    "/api/queryDorks/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryDorks_list"];
+        get: operations["api_queryDorks_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1515,14 +1572,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/queryEmails/": {
+    "/api/queryEmails/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryEmails_list"];
+        get: operations["api_queryEmails_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1531,14 +1588,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/queryEmployees/": {
+    "/api/queryEmployees/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryEmployees_list"];
+        get: operations["api_queryEmployees_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1547,14 +1604,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/queryEndpoints/": {
+    "/api/queryEndpoints/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryEndpoints_list"];
+        get: operations["api_queryEndpoints_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1563,14 +1620,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/queryInterestingSubdomains/": {
+    "/api/queryInterestingSubdomains/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryInterestingSubdomains_list"];
+        get: operations["api_queryInterestingSubdomains_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1579,14 +1636,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/queryIps/": {
+    "/api/queryIps/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryIps_list"];
+        get: operations["api_queryIps_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1595,14 +1652,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/queryMetadata/": {
+    "/api/queryMetadata/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryMetadata_list"];
+        get: operations["api_queryMetadata_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1611,14 +1668,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/queryOsintUsers/": {
+    "/api/queryOsintUsers/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryOsintUsers_list"];
+        get: operations["api_queryOsintUsers_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1627,14 +1684,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/queryPorts/": {
+    "/api/queryPorts/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryPorts_list"];
+        get: operations["api_queryPorts_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1643,46 +1700,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/querySubdomains/": {
+    "/api/querySubdomains/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["querySubdomains_list"];
+        get: operations["api_querySubdomains_list"];
         put?: never;
-        post: operations["querySubdomains_create"];
+        post: operations["api_querySubdomains_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/queryTargetsInOrganization/": {
+    "/api/queryTargetsInOrganization/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryTargetsInOrganization_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/queryTargetsWithoutOrganization/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["queryTargetsWithoutOrganization_list"];
+        get: operations["api_queryTargetsInOrganization_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1691,14 +1732,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/queryTechnologies/": {
+    "/api/queryTargetsWithoutOrganization/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["queryTechnologies_list"];
+        get: operations["api_queryTargetsWithoutOrganization_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1707,14 +1748,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/rengine/system-settings/": {
+    "/api/queryTechnologies/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["rengine_system-settings_list"];
+        get: operations["api_queryTechnologies_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1723,14 +1764,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/rengine/update/": {
+    "/api/rengine/system-settings/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["rengine_update_list"];
+        get: operations["api_rengine_system-settings_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1739,23 +1780,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/report-settings/": {
+    "/api/rengine/update/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["report-settings_list"];
+        get: operations["api_rengine_update_list"];
         put?: never;
-        post: operations["report-settings_create"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/scan-summary/{slug}/{id}/": {
+    "/api/report-settings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_report-settings_list"];
+        put?: never;
+        post: operations["api_report-settings_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scan-summary/{slug}/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1765,7 +1822,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["scan-summary_read"];
+        get: operations["api_scan-summary_read"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1774,14 +1831,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/scan_status/": {
+    "/api/scan_status/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["scan_status_list"];
+        get: operations["api_scan_status_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1790,23 +1847,39 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/scheduledScans/": {
+    "/api/scans/configuration/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["scheduledScans_list"];
+        get: operations["api_scans_configuration_list"];
         put?: never;
-        post: operations["scheduledScans_create"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/scheduledScans/bulk_delete/": {
+    "/api/scheduledScans/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_scheduledScans_list"];
+        put?: never;
+        post: operations["api_scheduledScans_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/scheduledScans/bulk_delete/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1815,14 +1888,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["scheduledScans_bulk_delete"];
+        post: operations["api_scheduledScans_bulk_delete"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/scheduledScans/{id}/": {
+    "/api/scheduledScans/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1832,16 +1905,16 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["scheduledScans_read"];
-        put: operations["scheduledScans_update"];
+        get: operations["api_scheduledScans_read"];
+        put: operations["api_scheduledScans_update"];
         post?: never;
-        delete: operations["scheduledScans_delete"];
+        delete: operations["api_scheduledScans_delete"];
         options?: never;
         head?: never;
-        patch: operations["scheduledScans_partial_update"];
+        patch: operations["api_scheduledScans_partial_update"];
         trace?: never;
     };
-    "/scheduledScans/{id}/toggle/": {
+    "/api/scheduledScans/{id}/toggle/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1853,21 +1926,21 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["scheduledScans_toggle"];
+        post: operations["api_scheduledScans_toggle"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/search/": {
+    "/api/search/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["search_list"];
+        get: operations["api_search_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1876,14 +1949,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/search/history/": {
+    "/api/search/history/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["search_history_list"];
+        get: operations["api_search_history_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1892,7 +1965,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/stress-testing/{id}/": {
+    "/api/stress-testing/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1901,7 +1974,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["stress-testing_read"];
+        get: operations["api_stress-testing_read"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1910,23 +1983,61 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/subscans/": {
+    "/api/stress/{scan_id}/control/": {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                scan_id: string;
+            };
             cookie?: never;
         };
-        get: operations["subscans_list"];
+        get?: never;
         put?: never;
-        post: operations["subscans_create"];
+        /** @description Start or Stop a stress test. */
+        post: operations["api_stress_control_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/subscans/bulk_delete/": {
+    "/api/stress/{scan_id}/status/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scan_id: string;
+            };
+            cookie?: never;
+        };
+        /** @description Get the current status of the stress test (e.g., if kill switch is active). */
+        get: operations["api_stress_status_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscans/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["api_subscans_list"];
+        put?: never;
+        post: operations["api_subscans_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/subscans/bulk_delete/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1935,14 +2046,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["subscans_bulk_delete"];
+        post: operations["api_subscans_bulk_delete"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/subscans/bulk_stop/": {
+    "/api/subscans/bulk_stop/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1951,14 +2062,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["subscans_bulk_stop"];
+        post: operations["api_subscans_bulk_stop"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/subscans/{id}/": {
+    "/api/subscans/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1968,16 +2079,16 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["subscans_read"];
-        put: operations["subscans_update"];
+        get: operations["api_subscans_read"];
+        put: operations["api_subscans_update"];
         post?: never;
-        delete: operations["subscans_delete"];
+        delete: operations["api_subscans_delete"];
         options?: never;
         head?: never;
-        patch: operations["subscans_partial_update"];
+        patch: operations["api_subscans_partial_update"];
         trace?: never;
     };
-    "/target-summary/{slug}/{id}/": {
+    "/api/target-summary/{slug}/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -1987,7 +2098,7 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["target-summary_read"];
+        get: operations["api_target-summary_read"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1996,7 +2107,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/toggle-bug-bounty-mode/": {
+    "/api/toggle-bug-bounty-mode/": {
         parameters: {
             query?: never;
             header?: never;
@@ -2005,14 +2116,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["toggle-bug-bounty-mode_create"];
+        post: operations["api_toggle-bug-bounty-mode_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/toggle/subdomain/important/": {
+    "/api/toggle/subdomain/important/": {
         parameters: {
             query?: never;
             header?: never;
@@ -2021,14 +2132,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["toggle_subdomain_important_create"];
+        post: operations["api_toggle_subdomain_important_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/tool/ollama/": {
+    "/api/tool/ollama/": {
         parameters: {
             query?: never;
             header?: never;
@@ -2039,23 +2150,23 @@ export interface paths {
          * @description API to download Ollama Models
          *     sends a POST request to download the model
          */
-        get: operations["tool_ollama_list"];
-        put: operations["tool_ollama_update"];
+        get: operations["api_tool_ollama_list"];
+        put: operations["api_tool_ollama_update"];
         post?: never;
-        delete: operations["tool_ollama_delete"];
+        delete: operations["api_tool_ollama_delete"];
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/tool/uninstall/": {
+    "/api/tool/uninstall/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["tool_uninstall_list"];
+        get: operations["api_tool_uninstall_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2064,14 +2175,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tool/update/": {
+    "/api/tool/update/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["tool_update_list"];
+        get: operations["api_tool_update_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2080,14 +2191,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tools/cms_detector/": {
+    "/api/tools/cms_detector/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["tools_cms_detector_list"];
+        get: operations["api_tools_cms_detector_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2096,14 +2207,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tools/cve_details/": {
+    "/api/tools/cve_details/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["tools_cve_details_list"];
+        get: operations["api_tools_cve_details_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2112,14 +2223,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tools/domain_ip_history": {
+    "/api/tools/domain_ip_history": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["tools_domain_ip_history_list"];
+        get: operations["api_tools_domain_ip_history_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2128,14 +2239,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tools/gpt_get_possible_attacks/": {
+    "/api/tools/gpt_get_possible_attacks/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["tools_gpt_get_possible_attacks_list"];
+        get: operations["api_tools_gpt_get_possible_attacks_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2144,14 +2255,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tools/gpt_vulnerability_report/": {
+    "/api/tools/gpt_vulnerability_report/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["tools_gpt_vulnerability_report_list"];
+        get: operations["api_tools_gpt_vulnerability_report_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2160,14 +2271,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tools/ip_to_domain/": {
+    "/api/tools/ip_to_domain/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["tools_ip_to_domain_list"];
+        get: operations["api_tools_ip_to_domain_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2176,14 +2287,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tools/reverse/whois/": {
+    "/api/tools/reverse/whois/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["tools_reverse_whois_list"];
+        get: operations["api_tools_reverse_whois_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2192,14 +2303,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tools/waf_detector/": {
+    "/api/tools/waf_detector/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["tools_waf_detector_list"];
+        get: operations["api_tools_waf_detector_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2208,14 +2319,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/tools/whois/": {
+    "/api/tools/whois/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["tools_whois_list"];
+        get: operations["api_tools_whois_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2224,7 +2335,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/update-theme/": {
+    "/api/update-theme/": {
         parameters: {
             query?: never;
             header?: never;
@@ -2233,14 +2344,14 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["update-theme_create"];
+        post: operations["api_update-theme_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/updateOrganization/": {
+    "/api/updateOrganization/": {
         parameters: {
             query?: never;
             header?: never;
@@ -2249,37 +2360,37 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["updateOrganization_create"];
+        post: operations["api_updateOrganization_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/users/": {
+    "/api/users/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["users_list"];
+        get: operations["api_users_list"];
         put?: never;
-        post: operations["users_create"];
+        post: operations["api_users_create"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/users/me/": {
+    "/api/users/me/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["users_me"];
+        get: operations["api_users_me"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2288,7 +2399,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/users/{id}/": {
+    "/api/users/{id}/": {
         parameters: {
             query?: never;
             header?: never;
@@ -2298,35 +2409,16 @@ export interface paths {
             };
             cookie?: never;
         };
-        get: operations["users_read"];
-        put: operations["users_update"];
+        get: operations["api_users_read"];
+        put: operations["api_users_update"];
         post?: never;
-        delete: operations["users_delete"];
+        delete: operations["api_users_delete"];
         options?: never;
         head?: never;
-        patch: operations["users_partial_update"];
+        patch: operations["api_users_partial_update"];
         trace?: never;
     };
-    "/users/{id}/toggle_status/": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description A unique integer value identifying this user. */
-                id: number;
-            };
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["users_toggle_status"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/users/{id}/update_user/": {
+    "/api/users/{id}/toggle_status/": {
         parameters: {
             query?: never;
             header?: never;
@@ -2338,21 +2430,2470 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["users_update_user"];
+        post: operations["api_users_toggle_status"];
         delete?: never;
         options?: never;
         head?: never;
         patch?: never;
         trace?: never;
     };
-    "/vulnerability/report/": {
+    "/api/users/{id}/update_user/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["api_users_update_user"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/vulnerability/report/": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["vulnerability_report_list"];
+        get: operations["api_vulnerability_report_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/create/project": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_action_create_project_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/engine/create/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_action_engine_create_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/engine/get/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_action_engine_get_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/engine/update/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_action_engine_update_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/initiate/scan/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_action_initiate_scan_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/initiate/subtask/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_action_initiate_subtask_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/rows/delete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_action_rows_delete_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/stop/scan/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_action_stop_scan_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/subdomain/delete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_action_subdomain_delete_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/vulnerability/delete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_action_vulnerability_delete_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/wordlist/read/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_action_wordlist_read_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/action/wordlist/upload/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_action_wordlist_upload_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/add/recon_note/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_add_recon_note_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/add/target/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_add_target_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/apme/paths/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /api/apme/paths/?scan_id=<id>
+         * @description Returns top attack paths computed by the APME for a given scan.
+         *     Paths are ordered by score descending (highest risk first).
+         *     Each step is tagged as 'validated' or 'inferred'.
+         */
+        get: operations["mapi_apme_paths_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/apme/trigger/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description POST /api/apme/trigger/ */
+        post: operations["mapi_apme_trigger_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/auth/token/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Takes a set of user credentials and returns an access and refresh JSON web
+         *     token pair to prove the authentication of those credentials.
+         */
+        post: operations["mapi_auth_token_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/auth/token/refresh/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * @description Takes a refresh type JSON web token and returns an access type JSON web
+         *     token if the refresh token is valid.
+         */
+        post: operations["mapi_auth_token_refresh_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/createOrganization/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_createOrganization_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/dashboard/{slug}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_dashboard_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/external/tool/get_current_release/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_external_tool_get_current_release_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/fetch/most_common_vulnerability/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_fetch_most_common_vulnerability_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/fetch/most_vulnerable/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_fetch_most_vulnerable_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/fetch/results/subscan/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_fetch_results_subscan_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/getFileContents/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_getFileContents_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/github/tool/get_latest_releases/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_github_tool_get_latest_releases_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/hackerone-programs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_hackerone-programs_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/hackerone-programs/bookmarked_programs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_hackerone-programs_bookmarked_programs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/hackerone-programs/bounty_programs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_hackerone-programs_bounty_programs"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/hackerone-programs/import_programs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_hackerone-programs_import_programs"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/hackerone-programs/refresh_cache/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_hackerone-programs_refresh_cache"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/hackerone-programs/sync_bookmarked/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_hackerone-programs_sync_bookmarked"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/hackerone-programs/{id}/program_details/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_hackerone-programs_program_details"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listActivityLogs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listActivityLogs_list"];
+        put?: never;
+        post: operations["mapi_listActivityLogs_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listActivityLogs/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this command. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listActivityLogs_read"];
+        put: operations["mapi_listActivityLogs_update"];
+        post?: never;
+        delete: operations["mapi_listActivityLogs_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listActivityLogs_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listConfigurations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listConfigurations_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listDatatableSubdomain/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listDatatableSubdomain_list"];
+        put?: never;
+        post: operations["mapi_listDatatableSubdomain_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listDatatableSubdomain/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listDatatableSubdomain_read"];
+        put: operations["mapi_listDatatableSubdomain_update"];
+        post?: never;
+        delete: operations["mapi_listDatatableSubdomain_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listDatatableSubdomain_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listDirectories/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listDirectories_list"];
+        put?: never;
+        post: operations["mapi_listDirectories_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listDirectories/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this directory file. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listDirectories_read"];
+        put: operations["mapi_listDirectories_update"];
+        post?: never;
+        delete: operations["mapi_listDirectories_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listDirectories_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listEndPointChanges/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listEndPointChanges_list"];
+        put?: never;
+        post: operations["mapi_listEndPointChanges_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listEndPointChanges/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listEndPointChanges_read"];
+        put: operations["mapi_listEndPointChanges_update"];
+        post?: never;
+        delete: operations["mapi_listEndPointChanges_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listEndPointChanges_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listEndpoints/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listEndpoints_list"];
+        put?: never;
+        post: operations["mapi_listEndpoints_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listEndpoints/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listEndpoints_read"];
+        put: operations["mapi_listEndpoints_update"];
+        post?: never;
+        delete: operations["mapi_listEndpoints_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listEndpoints_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listEngines/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listEngines_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listInterestingEndpoints/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listInterestingEndpoints_list"];
+        put?: never;
+        post: operations["mapi_listInterestingEndpoints_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listInterestingEndpoints/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listInterestingEndpoints_read"];
+        put: operations["mapi_listInterestingEndpoints_update"];
+        post?: never;
+        delete: operations["mapi_listInterestingEndpoints_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listInterestingEndpoints_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listInterestingKeywords/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listInterestingKeywords_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listInterestingSubdomains/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listInterestingSubdomains_list"];
+        put?: never;
+        post: operations["mapi_listInterestingSubdomains_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listInterestingSubdomains/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listInterestingSubdomains_read"];
+        put: operations["mapi_listInterestingSubdomains_update"];
+        post?: never;
+        delete: operations["mapi_listInterestingSubdomains_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listInterestingSubdomains_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listIps/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listIps_list"];
+        put?: never;
+        post: operations["mapi_listIps_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listIps/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listIps_read"];
+        put: operations["mapi_listIps_update"];
+        post?: never;
+        delete: operations["mapi_listIps_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listIps_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listOrganizations/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listOrganizations_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listScanHistory/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listScanHistory_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listScanLogs/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listScanLogs_list"];
+        put?: never;
+        post: operations["mapi_listScanLogs_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listScanLogs/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this command. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listScanLogs_read"];
+        put: operations["mapi_listScanLogs_update"];
+        post?: never;
+        delete: operations["mapi_listScanLogs_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listScanLogs_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listScans/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listScans_list"];
+        put?: never;
+        post: operations["mapi_listScans_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listScans/bulk_delete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_listScans_bulk_delete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listScans/bulk_stop/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_listScans_bulk_stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listScans/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listScans_read"];
+        put: operations["mapi_listScans_update"];
+        post?: never;
+        delete: operations["mapi_listScans_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listScans_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listScans/{id}/delete_scan/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_listScans_delete_scan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listScans/{id}/stop_scan/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_listScans_stop_scan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listSubScans/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_listSubScans_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listSubdomainChanges/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listSubdomainChanges_list"];
+        put?: never;
+        post: operations["mapi_listSubdomainChanges_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listSubdomainChanges/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listSubdomainChanges_read"];
+        put: operations["mapi_listSubdomainChanges_update"];
+        post?: never;
+        delete: operations["mapi_listSubdomainChanges_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listSubdomainChanges_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listSubdomains/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listSubdomains_list"];
+        put?: never;
+        post: operations["mapi_listSubdomains_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listSubdomains/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listSubdomains_read"];
+        put: operations["mapi_listSubdomains_update"];
+        post?: never;
+        delete: operations["mapi_listSubdomains_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listSubdomains_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listTargets/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listTargets_list"];
+        put?: never;
+        post: operations["mapi_listTargets_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listTargets/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this domain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listTargets_read"];
+        put: operations["mapi_listTargets_update"];
+        post?: never;
+        delete: operations["mapi_listTargets_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listTargets_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listTodoNotes/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listTodoNotes_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listVulnerability/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listVulnerability_list"];
+        put?: never;
+        post: operations["mapi_listVulnerability_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/listVulnerability/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this vulnerability. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_listVulnerability_read"];
+        put: operations["mapi_listVulnerability_update"];
+        post?: never;
+        delete: operations["mapi_listVulnerability_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_listVulnerability_partial_update"];
+        trace?: never;
+    };
+    "/mapi/listWordlists/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_listWordlists_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/monitoring/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_monitoring_list"];
+        put?: never;
+        post: operations["mapi_monitoring_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/monitoring/statistics/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_monitoring_statistics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/monitoring/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this monitoring discovery. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_monitoring_read"];
+        put: operations["mapi_monitoring_update"];
+        post?: never;
+        delete: operations["mapi_monitoring_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_monitoring_partial_update"];
+        trace?: never;
+    };
+    "/mapi/notification-settings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_notification-settings_list"];
+        put?: never;
+        post: operations["mapi_notification-settings_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/notifications/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_notifications_list"];
+        put?: never;
+        post: operations["mapi_notifications_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/notifications/clear_all/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_notifications_clear_all"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/notifications/mark_all_read/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_notifications_mark_all_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/notifications/unread_count/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_notifications_unread_count"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/notifications/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_notifications_read"];
+        put: operations["mapi_notifications_update"];
+        post?: never;
+        delete: operations["mapi_notifications_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_notifications_partial_update"];
+        trace?: never;
+    };
+    "/mapi/notifications/{id}/mark_read/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_notifications_mark_read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/plugins/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_plugins_list"];
+        put?: never;
+        post: operations["mapi_plugins_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/plugins/registry/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Returns the UI component registry for the frontend. */
+        get: operations["mapi_plugins_registry"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/plugins/upload/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_plugins_upload_plugin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/plugins/{slug}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_plugins_read"];
+        put: operations["mapi_plugins_update"];
+        post?: never;
+        delete: operations["mapi_plugins_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_plugins_partial_update"];
+        trace?: never;
+    };
+    "/mapi/projects/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_projects_list"];
+        put?: never;
+        post: operations["mapi_projects_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/projects/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this project. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_projects_read"];
+        put: operations["mapi_projects_update"];
+        post?: never;
+        delete: operations["mapi_projects_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_projects_partial_update"];
+        trace?: never;
+    };
+    "/mapi/projects/{id}/delete_project/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this project. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_projects_delete_project"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryAllScanResultVisualise/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryAllScanResultVisualise_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryDorkTypes/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryDorkTypes_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryDorks/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryDorks_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryEmails/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryEmails_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryEmployees/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryEmployees_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryEndpoints/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryEndpoints_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryInterestingSubdomains/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryInterestingSubdomains_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryIps/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryIps_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryMetadata/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryMetadata_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryOsintUsers/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryOsintUsers_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryPorts/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryPorts_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/querySubdomains/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_querySubdomains_list"];
+        put?: never;
+        post: operations["mapi_querySubdomains_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryTargetsInOrganization/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryTargetsInOrganization_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryTargetsWithoutOrganization/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryTargetsWithoutOrganization_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/queryTechnologies/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_queryTechnologies_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/rengine/system-settings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_rengine_system-settings_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/rengine/update/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_rengine_update_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/report-settings/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_report-settings_list"];
+        put?: never;
+        post: operations["mapi_report-settings_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/scan-summary/{slug}/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_scan-summary_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/scan_status/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_scan_status_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/scans/configuration/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_scans_configuration_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/scheduledScans/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_scheduledScans_list"];
+        put?: never;
+        post: operations["mapi_scheduledScans_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/scheduledScans/bulk_delete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_scheduledScans_bulk_delete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/scheduledScans/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this periodic task. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_scheduledScans_read"];
+        put: operations["mapi_scheduledScans_update"];
+        post?: never;
+        delete: operations["mapi_scheduledScans_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_scheduledScans_partial_update"];
+        trace?: never;
+    };
+    "/mapi/scheduledScans/{id}/toggle/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this periodic task. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_scheduledScans_toggle"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/search/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_search_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/search/history/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_search_history_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/stress-testing/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_stress-testing_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/subscans/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_subscans_list"];
+        put?: never;
+        post: operations["mapi_subscans_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/subscans/bulk_delete/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_subscans_bulk_delete"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/subscans/bulk_stop/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_subscans_bulk_stop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/subscans/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this sub scan. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_subscans_read"];
+        put: operations["mapi_subscans_update"];
+        post?: never;
+        delete: operations["mapi_subscans_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_subscans_partial_update"];
+        trace?: never;
+    };
+    "/mapi/target-summary/{slug}/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_target-summary_read"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/toggle-bug-bounty-mode/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_toggle-bug-bounty-mode_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/toggle/subdomain/important/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_toggle_subdomain_important_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tool/ollama/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * @description API to download Ollama Models
+         *     sends a POST request to download the model
+         */
+        get: operations["mapi_tool_ollama_list"];
+        put: operations["mapi_tool_ollama_update"];
+        post?: never;
+        delete: operations["mapi_tool_ollama_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tool/uninstall/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_tool_uninstall_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tool/update/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_tool_update_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tools/cms_detector/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_tools_cms_detector_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tools/cve_details/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_tools_cve_details_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tools/domain_ip_history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_tools_domain_ip_history_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tools/gpt_get_possible_attacks/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_tools_gpt_get_possible_attacks_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tools/gpt_vulnerability_report/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_tools_gpt_vulnerability_report_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tools/ip_to_domain/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_tools_ip_to_domain_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tools/reverse/whois/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_tools_reverse_whois_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tools/waf_detector/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_tools_waf_detector_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/tools/whois/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_tools_whois_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/update-theme/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_update-theme_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/updateOrganization/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_updateOrganization_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/users/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_users_list"];
+        put?: never;
+        post: operations["mapi_users_create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/users/me/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_users_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/users/{id}/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get: operations["mapi_users_read"];
+        put: operations["mapi_users_update"];
+        post?: never;
+        delete: operations["mapi_users_delete"];
+        options?: never;
+        head?: never;
+        patch: operations["mapi_users_partial_update"];
+        trace?: never;
+    };
+    "/mapi/users/{id}/toggle_status/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_users_toggle_status"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/users/{id}/update_user/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["mapi_users_update_user"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/mapi/vulnerability/report/": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["mapi_vulnerability_report_list"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2365,6 +4906,18 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        TokenObtainPair: {
+            /** Username */
+            username: string;
+            /** Password */
+            password: string;
+        };
+        TokenRefresh: {
+            /** Refresh */
+            refresh: string;
+            /** Access */
+            readonly access?: string;
+        };
         Command: {
             /** Id */
             readonly id?: number;
@@ -2391,7 +4944,7 @@ export interface components {
                  * Scan status
                  * @enum {integer}
                  */
-                scan_status?: -1 | 0 | 1 | 2 | 3;
+                scan_status?: -1 | 0 | 1 | 2 | 3 | 4;
                 /** Results dir */
                 results_dir?: string;
                 celery_ids?: string[];
@@ -2543,6 +5096,8 @@ export interface components {
         Screenshot: {
             /** ID */
             readonly id?: number;
+            /** Screenshot path */
+            readonly screenshot_path?: string;
             /**
              * Url
              * Format: uri
@@ -2552,8 +5107,6 @@ export interface components {
             title?: string | null;
             /** Status code */
             status_code?: number | null;
-            /** Screenshot path */
-            screenshot_path: string;
             /** Html path */
             html_path?: string | null;
             /** Favicon hash */
@@ -2605,6 +5158,8 @@ export interface components {
             directories: components["schemas"]["DirectoryScan"][];
             readonly waf_bypass_findings?: components["schemas"]["WafBypassFinding"][];
             readonly screenshots?: components["schemas"]["Screenshot"][];
+            /** Screenshot path */
+            readonly screenshot_path?: string;
             /** Name */
             name: string;
             /** Is imported subdomain */
@@ -2613,8 +5168,6 @@ export interface components {
             is_important?: boolean | null;
             /** Http url */
             http_url?: string | null;
-            /** Screenshot path */
-            screenshot_path?: string | null;
             /** Http header path */
             http_header_path?: string | null;
             /**
@@ -2681,6 +5234,8 @@ export interface components {
             webserver?: string | null;
             /** Is default */
             is_default?: boolean | null;
+            /** Is redirect */
+            is_redirect?: boolean;
             /** Matched gf patterns */
             matched_gf_patterns?: string | null;
             /** Scan history */
@@ -2728,6 +5283,8 @@ export interface components {
             webserver?: string | null;
             /** Is default */
             is_default?: boolean | null;
+            /** Is redirect */
+            is_redirect?: boolean;
             /** Matched gf patterns */
             matched_gf_patterns?: string | null;
             /** Scan history */
@@ -2795,7 +5352,7 @@ export interface components {
              * Scan status
              * @enum {integer}
              */
-            scan_status?: -1 | 0 | 1 | 2 | 3;
+            scan_status?: -1 | 0 | 1 | 2 | 3 | 4;
             /** Results dir */
             results_dir?: string;
             celery_ids?: string[];
@@ -3321,7 +5878,7 @@ export interface components {
                      * @description Timezone to Run the Cron Schedule on. Default is UTC.
                      * @enum {string}
                      */
-                    timezone?: "Pacific/Pohnpei" | "Australia/Melbourne" | "Australia/West" | "Hongkong" | "Europe/Kiev" | "America/Matamoros" | "Etc/GMT-4" | "Pacific/Pago_Pago" | "W-SU" | "Europe/Amsterdam" | "Asia/Karachi" | "Asia/Colombo" | "Indian/Cocos" | "America/Argentina/Cordoba" | "America/Argentina/San_Luis" | "Brazil/DeNoronha" | "GB-Eire" | "Asia/Thimbu" | "Pacific/Galapagos" | "Africa/Malabo" | "Etc/GMT" | "Asia/Jayapura" | "Pacific/Johnston" | "Europe/Jersey" | "Europe/Tirane" | "Asia/Harbin" | "Iceland" | "America/Rosario" | "Brazil/East" | "Pacific/Niue" | "Asia/Khandyga" | "America/St_Kitts" | "America/Boise" | "Asia/Macao" | "Europe/Berlin" | "America/Dominica" | "Asia/Beirut" | "Asia/Manila" | "Pacific/Chuuk" | "Europe/Skopje" | "UCT" | "America/Pangnirtung" | "America/Cayenne" | "Asia/Pontianak" | "GMT+0" | "Asia/Aden" | "EST" | "America/Thunder_Bay" | "Pacific/Kosrae" | "America/Araguaina" | "America/Chicago" | "MST" | "America/Atikokan" | "Etc/GMT-9" | "Greenwich" | "Etc/GMT+10" | "Africa/Monrovia" | "Asia/Bahrain" | "America/Argentina/Mendoza" | "Atlantic/Faroe" | "Antarctica/Davis" | "Pacific/Tarawa" | "Indian/Kerguelen" | "America/Indiana/Marengo" | "Africa/Nouakchott" | "MET" | "America/Montreal" | "Asia/Urumqi" | "America/Argentina/Ushuaia" | "Asia/Singapore" | "America/Kralendijk" | "Asia/Jakarta" | "America/Indiana/Vevay" | "Etc/Zulu" | "Asia/Aqtobe" | "America/Guadeloupe" | "Etc/GMT-13" | "Japan" | "Etc/GMT-11" | "Pacific/Nauru" | "Africa/Lome" | "GMT0" | "Atlantic/Faeroe" | "America/Metlakatla" | "Europe/Luxembourg" | "America/Fort_Nelson" | "Australia/Broken_Hill" | "Europe/Vilnius" | "Australia/Hobart" | "Australia/ACT" | "Etc/GMT-6" | "Asia/Qatar" | "Asia/Novokuznetsk" | "Asia/Samarkand" | "Atlantic/St_Helena" | "Etc/GMT-12" | "America/Tijuana" | "Europe/Sofia" | "Australia/Lord_Howe" | "EET" | "Asia/Dhaka" | "America/Marigot" | "America/St_Lucia" | "America/Guyana" | "Europe/Saratov" | "America/Adak" | "Asia/Yakutsk" | "Brazil/Acre" | "America/Cuiaba" | "America/Godthab" | "Africa/Juba" | "Asia/Gaza" | "Asia/Brunei" | "America/Thule" | "Europe/Madrid" | "America/Montserrat" | "Canada/Saskatchewan" | "Africa/Ndjamena" | "Asia/Phnom_Penh" | "America/Yakutat" | "America/Mendoza" | "Etc/GMT-10" | "WET" | "America/St_Vincent" | "Etc/GMT+5" | "Africa/Johannesburg" | "America/Argentina/Catamarca" | "America/Dawson_Creek" | "America/Rankin_Inlet" | "Etc/GMT+3" | "Arctic/Longyearbyen" | "Australia/South" | "Etc/GMT+9" | "ROK" | "America/Detroit" | "Pacific/Apia" | "Asia/Taipei" | "Asia/Kuching" | "America/Anguilla" | "America/Chihuahua" | "Pacific/Ponape" | "America/Yellowknife" | "Europe/Minsk" | "Canada/Eastern" | "Portugal" | "Africa/Abidjan" | "Pacific/Kiritimati" | "Asia/Sakhalin" | "America/Knox_IN" | "America/Tortola" | "Asia/Bishkek" | "Asia/Barnaul" | "Asia/Kolkata" | "Asia/Kuala_Lumpur" | "Asia/Chita" | "Asia/Nicosia" | "America/Argentina/Tucuman" | "Antarctica/Rothera" | "Asia/Qostanay" | "Asia/Shanghai" | "Europe/Tallinn" | "Africa/Lusaka" | "America/Cayman" | "Indian/Mahe" | "America/Mazatlan" | "America/Recife" | "Asia/Novosibirsk" | "Europe/Istanbul" | "Antarctica/Syowa" | "America/Argentina/Rio_Gallegos" | "America/Argentina/Buenos_Aires" | "Europe/Oslo" | "America/Winnipeg" | "Europe/Monaco" | "America/Maceio" | "Pacific/Fakaofo" | "Asia/Ashgabat" | "America/Louisville" | "Australia/Perth" | "Atlantic/Canary" | "Europe/Kaliningrad" | "America/Sitka" | "America/Curacao" | "Poland" | "Singapore" | "Africa/Casablanca" | "Europe/Athens" | "Pacific/Auckland" | "Asia/Ust-Nera" | "Africa/Asmara" | "Indian/Reunion" | "Europe/Podgorica" | "Asia/Krasnoyarsk" | "Antarctica/Casey" | "Asia/Almaty" | "Atlantic/Stanley" | "Australia/LHI" | "Pacific/Tahiti" | "Pacific/Gambier" | "America/Glace_Bay" | "Australia/Adelaide" | "US/Pacific" | "Africa/Djibouti" | "Indian/Chagos" | "Africa/Banjul" | "Europe/Copenhagen" | "Europe/Ljubljana" | "America/Kentucky/Monticello" | "Indian/Antananarivo" | "Egypt" | "US/East-Indiana" | "Europe/Sarajevo" | "America/Edmonton" | "America/Dawson" | "US/Central" | "MST7MDT" | "America/Manaus" | "Etc/Greenwich" | "America/Havana" | "Africa/Ceuta" | "Etc/GMT-3" | "Etc/GMT+0" | "Europe/Budapest" | "NZ-CHAT" | "Etc/GMT0" | "Europe/Samara" | "Etc/GMT+8" | "Asia/Thimphu" | "Europe/Warsaw" | "Asia/Tel_Aviv" | "America/Juneau" | "Pacific/Majuro" | "Australia/Eucla" | "Africa/Addis_Ababa" | "Pacific/Honolulu" | "America/Rainy_River" | "Asia/Dacca" | "America/Bogota" | "Asia/Magadan" | "America/Ensenada" | "America/Santiago" | "Atlantic/Bermuda" | "America/Nome" | "Asia/Chongqing" | "Asia/Aqtau" | "America/Merida" | "Pacific/Wallis" | "Europe/Malta" | "Chile/EasterIsland" | "Europe/Paris" | "Antarctica/Troll" | "Europe/Helsinki" | "Africa/Gaborone" | "America/Indiana/Petersburg" | "Antarctica/Mawson" | "Asia/Tbilisi" | "Australia/Canberra" | "Turkey" | "Europe/Kyiv" | "US/Mountain" | "America/Eirunepe" | "Africa/Brazzaville" | "CST6CDT" | "Africa/Dakar" | "Europe/Prague" | "Europe/Zaporozhye" | "Asia/Damascus" | "Asia/Ulaanbaatar" | "Australia/Currie" | "Africa/Douala" | "America/Indiana/Indianapolis" | "America/Argentina/San_Juan" | "Etc/GMT-8" | "Canada/Yukon" | "Europe/Mariehamn" | "Africa/Cairo" | "America/Moncton" | "Asia/Anadyr" | "Africa/Bujumbura" | "America/Fort_Wayne" | "Asia/Srednekolymsk" | "America/La_Paz" | "Pacific/Samoa" | "Navajo" | "Eire" | "America/Argentina/Salta" | "America/Ciudad_Juarez" | "Asia/Pyongyang" | "Australia/NSW" | "US/Arizona" | "US/Eastern" | "Asia/Tomsk" | "Asia/Dubai" | "Asia/Muscat" | "Canada/Atlantic" | "America/Cancun" | "Africa/Bangui" | "America/Toronto" | "Etc/GMT+6" | "Zulu" | "Africa/Asmera" | "America/Nuuk" | "Australia/North" | "America/North_Dakota/New_Salem" | "Africa/Accra" | "America/Coral_Harbour" | "America/New_York" | "Europe/Lisbon" | "Asia/Hovd" | "Europe/Stockholm" | "America/Port_of_Spain" | "Asia/Saigon" | "America/Whitehorse" | "Indian/Mayotte" | "America/Santa_Isabel" | "America/Panama" | "Asia/Tokyo" | "Indian/Mauritius" | "Africa/Kinshasa" | "Africa/Ouagadougou" | "Atlantic/Madeira" | "Universal" | "Pacific/Saipan" | "Asia/Hong_Kong" | "Europe/Tiraspol" | "Europe/Andorra" | "Chile/Continental" | "Etc/UCT" | "Pacific/Enderbury" | "Pacific/Rarotonga" | "Europe/Brussels" | "America/Santarem" | "America/St_Johns" | "Pacific/Fiji" | "Africa/Luanda" | "Asia/Famagusta" | "Asia/Rangoon" | "Europe/London" | "Etc/UTC" | "Europe/Volgograd" | "America/Porto_Velho" | "US/Hawaii" | "Europe/Zurich" | "Europe/Bucharest" | "Asia/Yangon" | "Asia/Atyrau" | "Etc/GMT-1" | "Europe/Bratislava" | "PRC" | "Asia/Tehran" | "Antarctica/Macquarie" | "Cuba" | "Etc/GMT+12" | "Iran" | "US/Indiana-Starke" | "Asia/Ho_Chi_Minh" | "Europe/Ulyanovsk" | "Africa/El_Aaiun" | "Africa/Harare" | "America/Paramaribo" | "Pacific/Guadalcanal" | "Asia/Oral" | "Mexico/BajaSur" | "EST5EDT" | "Asia/Baghdad" | "Asia/Baku" | "Australia/Queensland" | "Asia/Chungking" | "Australia/Sydney" | "Africa/Maputo" | "Asia/Macau" | "America/Porto_Acre" | "America/Sao_Paulo" | "Africa/Kampala" | "Africa/Porto-Novo" | "Africa/Maseru" | "America/Puerto_Rico" | "Europe/Simferopol" | "Mexico/BajaNorte" | "Pacific/Midway" | "America/Los_Angeles" | "America/Aruba" | "Asia/Dili" | "America/Argentina/La_Rioja" | "Asia/Calcutta" | "GMT-0" | "Etc/GMT+7" | "America/Campo_Grande" | "Africa/Bissau" | "America/Blanc-Sablon" | "Pacific/Guam" | "America/Swift_Current" | "Pacific/Marquesas" | "Etc/GMT-14" | "Africa/Niamey" | "NZ" | "Canada/Central" | "America/Cordoba" | "America/Lower_Princes" | "America/Cambridge_Bay" | "ROC" | "Europe/Nicosia" | "Asia/Jerusalem" | "Pacific/Pitcairn" | "Asia/Choibalsan" | "America/Martinique" | "America/Guatemala" | "Etc/GMT-5" | "Asia/Vientiane" | "Canada/Newfoundland" | "America/Grand_Turk" | "America/Boa_Vista" | "Etc/GMT-0" | "America/Indiana/Knox" | "Europe/Uzhgorod" | "America/Barbados" | "America/Resolute" | "Brazil/West" | "Europe/Guernsey" | "Asia/Tashkent" | "Atlantic/Reykjavik" | "Pacific/Truk" | "America/Belize" | "America/Miquelon" | "Africa/Freetown" | "America/Costa_Rica" | "Israel" | "America/Guayaquil" | "Africa/Tripoli" | "Pacific/Kanton" | "CET" | "Asia/Ulan_Bator" | "Etc/GMT+1" | "Africa/Libreville" | "Pacific/Kwajalein" | "Africa/Bamako" | "Asia/Dushanbe" | "America/Iqaluit" | "Etc/GMT-2" | "Pacific/Chatham" | "Etc/GMT+11" | "Asia/Yekaterinburg" | "Africa/Timbuktu" | "Mexico/General" | "Asia/Istanbul" | "America/Buenos_Aires" | "America/Vancouver" | "America/St_Barthelemy" | "Asia/Kuwait" | "Atlantic/South_Georgia" | "Etc/GMT-7" | "America/Virgin" | "Europe/Isle_of_Man" | "Europe/Belfast" | "America/Halifax" | "America/Punta_Arenas" | "Antarctica/McMurdo" | "localtime" | "Antarctica/Palmer" | "America/Regina" | "America/Danmarkshavn" | "US/Aleutian" | "Asia/Seoul" | "Asia/Kabul" | "Europe/Vaduz" | "Etc/GMT+4" | "America/Scoresbysund" | "Atlantic/Jan_Mayen" | "America/Monterrey" | "Canada/Mountain" | "Etc/GMT+2" | "UTC" | "America/Argentina/Jujuy" | "Pacific/Yap" | "Europe/San_Marino" | "America/Coyhaique" | "America/Hermosillo" | "Pacific/Bougainville" | "America/Goose_Bay" | "America/Indianapolis" | "Indian/Comoro" | "Asia/Kathmandu" | "US/Alaska" | "Africa/Blantyre" | "Antarctica/DumontDUrville" | "America/St_Thomas" | "America/Argentina/ComodRivadavia" | "Asia/Qyzylorda" | "America/Jamaica" | "Pacific/Noumea" | "America/Managua" | "Australia/Darwin" | "America/Belem" | "Europe/Chisinau" | "Asia/Bangkok" | "Pacific/Port_Moresby" | "America/Noronha" | "Europe/Kirov" | "Europe/Zagreb" | "Europe/Busingen" | "Europe/Moscow" | "Pacific/Norfolk" | "Asia/Yerevan" | "America/Menominee" | "Pacific/Easter" | "Europe/Vatican" | "America/Bahia_Banderas" | "America/Ojinaga" | "Africa/Kigali" | "HST" | "America/El_Salvador" | "America/Jujuy" | "Asia/Katmandu" | "Asia/Ashkhabad" | "Pacific/Wake" | "GB" | "Africa/Lubumbashi" | "America/Nipigon" | "Antarctica/Vostok" | "Asia/Vladivostok" | "Asia/Riyadh" | "Libya" | "Jamaica" | "Asia/Kamchatka" | "Asia/Irkutsk" | "Africa/Algiers" | "Australia/Brisbane" | "America/Mexico_City" | "Africa/Mogadishu" | "Europe/Belgrade" | "America/Caracas" | "America/Rio_Branco" | "America/Asuncion" | "Asia/Amman" | "Asia/Makassar" | "Europe/Vienna" | "America/Catamarca" | "Europe/Rome" | "America/Indiana/Vincennes" | "Pacific/Palau" | "Europe/Gibraltar" | "Asia/Kashgar" | "Asia/Hebron" | "PST8PDT" | "GMT" | "Indian/Maldives" | "Etc/Universal" | "America/Anchorage" | "America/Port-au-Prince" | "Pacific/Efate" | "America/Santo_Domingo" | "Africa/Lagos" | "Europe/Astrakhan" | "America/Creston" | "Canada/Pacific" | "America/Phoenix" | "Asia/Omsk" | "America/Kentucky/Louisville" | "Africa/Nairobi" | "Africa/Windhoek" | "America/Denver" | "Africa/Mbabane" | "Europe/Riga" | "America/Nassau" | "Australia/Victoria" | "America/Indiana/Tell_City" | "America/Antigua" | "Atlantic/Cape_Verde" | "Africa/Conakry" | "Asia/Ujung_Pandang" | "Africa/Tunis" | "Australia/Lindeman" | "Kwajalein" | "Africa/Sao_Tome" | "Australia/Yancowinna" | "America/Montevideo" | "US/Michigan" | "America/Fortaleza" | "America/Shiprock" | "America/North_Dakota/Beulah" | "America/Grenada" | "Australia/Tasmania" | "Antarctica/South_Pole" | "US/Samoa" | "Europe/Dublin" | "America/Lima" | "America/Inuvik" | "Africa/Dar_es_Salaam" | "Indian/Christmas" | "America/Indiana/Winamac" | "Atlantic/Azores" | "Pacific/Funafuti" | "America/Tegucigalpa" | "America/Atka" | "Africa/Khartoum" | "Pacific/Tongatapu" | "America/North_Dakota/Center" | "America/Bahia";
+                    timezone?: "Asia/Macau" | "America/Recife" | "Africa/Bissau" | "America/Mendoza" | "GMT0" | "America/St_Vincent" | "Australia/Broken_Hill" | "America/Ensenada" | "Asia/Kolkata" | "Europe/San_Marino" | "US/Mountain" | "Pacific/Johnston" | "America/Thule" | "America/Bogota" | "America/Porto_Velho" | "Asia/Hong_Kong" | "Antarctica/Rothera" | "Asia/Tbilisi" | "Indian/Cocos" | "Asia/Urumqi" | "America/Belize" | "Indian/Chagos" | "EET" | "Pacific/Norfolk" | "America/Indiana/Petersburg" | "Europe/Kaliningrad" | "America/Cordoba" | "Pacific/Guam" | "Canada/Mountain" | "Africa/Abidjan" | "America/Rainy_River" | "Asia/Thimbu" | "America/Caracas" | "America/Denver" | "Asia/Kuching" | "Asia/Magadan" | "Asia/Manila" | "Pacific/Marquesas" | "Israel" | "Etc/GMT+6" | "Africa/Asmera" | "Africa/Mbabane" | "Asia/Yangon" | "Europe/London" | "Atlantic/Bermuda" | "America/Ojinaga" | "Asia/Barnaul" | "America/Monterrey" | "America/Fort_Nelson" | "Europe/Saratov" | "America/St_Kitts" | "Asia/Jayapura" | "America/Moncton" | "America/Miquelon" | "Asia/Yekaterinburg" | "Asia/Dacca" | "Pacific/Wake" | "Etc/GMT-10" | "Europe/Bucharest" | "Etc/GMT+7" | "Eire" | "America/Buenos_Aires" | "Asia/Kuala_Lumpur" | "Europe/Busingen" | "Australia/Adelaide" | "Indian/Christmas" | "America/Boise" | "Pacific/Honolulu" | "Indian/Mauritius" | "Etc/GMT" | "Australia/Perth" | "Pacific/Samoa" | "America/Halifax" | "Europe/Helsinki" | "Antarctica/McMurdo" | "Asia/Damascus" | "Asia/Oral" | "Canada/Pacific" | "Europe/Athens" | "Africa/Kigali" | "US/Indiana-Starke" | "Asia/Bishkek" | "Asia/Colombo" | "Asia/Kashgar" | "America/Chihuahua" | "Asia/Tokyo" | "America/Port-au-Prince" | "Pacific/Tahiti" | "America/Anguilla" | "Asia/Harbin" | "America/Rio_Branco" | "Asia/Gaza" | "Atlantic/Cape_Verde" | "Asia/Vladivostok" | "America/Resolute" | "Africa/Mogadishu" | "Chile/Continental" | "Europe/Malta" | "Asia/Ho_Chi_Minh" | "Canada/Newfoundland" | "Asia/Choibalsan" | "America/Whitehorse" | "America/Cancun" | "Asia/Pontianak" | "Europe/Ljubljana" | "America/Grenada" | "America/Santa_Isabel" | "Arctic/Longyearbyen" | "Pacific/Yap" | "America/Swift_Current" | "US/Alaska" | "Asia/Kuwait" | "Europe/Warsaw" | "America/Phoenix" | "America/Porto_Acre" | "America/Kentucky/Louisville" | "Africa/Freetown" | "GMT" | "US/Pacific" | "Australia/Hobart" | "Africa/Bujumbura" | "Etc/GMT-14" | "America/Creston" | "Pacific/Majuro" | "Asia/Chita" | "Australia/LHI" | "America/Lower_Princes" | "Asia/Ujung_Pandang" | "America/Cayman" | "Pacific/Ponape" | "Europe/Budapest" | "America/Los_Angeles" | "Asia/Khandyga" | "Asia/Yakutsk" | "Africa/Dakar" | "America/Noronha" | "Cuba" | "America/Paramaribo" | "America/Nipigon" | "Etc/GMT0" | "America/Rosario" | "America/Indiana/Marengo" | "America/Grand_Turk" | "Europe/Zurich" | "Europe/Minsk" | "America/Cuiaba" | "Africa/Maputo" | "America/Vancouver" | "EST" | "Etc/GMT-9" | "Australia/Brisbane" | "Etc/GMT-8" | "America/Menominee" | "Etc/GMT-1" | "Africa/Harare" | "Africa/Lagos" | "America/Regina" | "Etc/GMT-4" | "Portugal" | "Pacific/Pitcairn" | "Brazil/Acre" | "MST7MDT" | "America/Cambridge_Bay" | "America/Argentina/Salta" | "America/Barbados" | "America/Santiago" | "Australia/Tasmania" | "US/Michigan" | "America/Nome" | "America/Eirunepe" | "Etc/UCT" | "Asia/Istanbul" | "Africa/El_Aaiun" | "UTC" | "America/Panama" | "Europe/Chisinau" | "Asia/Makassar" | "America/Punta_Arenas" | "Europe/Rome" | "Etc/GMT+12" | "Atlantic/South_Georgia" | "America/Sao_Paulo" | "Asia/Rangoon" | "America/Manaus" | "America/Argentina/Jujuy" | "Brazil/East" | "EST5EDT" | "Asia/Chungking" | "America/Louisville" | "Africa/Gaborone" | "Asia/Taipei" | "GMT+0" | "Antarctica/Syowa" | "Australia/Sydney" | "Europe/Lisbon" | "Canada/Central" | "Iran" | "Africa/Libreville" | "Asia/Shanghai" | "Asia/Pyongyang" | "Atlantic/Stanley" | "America/Belem" | "Europe/Sofia" | "America/Mazatlan" | "Etc/GMT-12" | "Pacific/Palau" | "Europe/Guernsey" | "Australia/Eucla" | "Australia/Darwin" | "Etc/Zulu" | "Africa/Banjul" | "Atlantic/Reykjavik" | "Europe/Tiraspol" | "America/Asuncion" | "Europe/Riga" | "Brazil/West" | "Indian/Antananarivo" | "America/Nassau" | "Africa/Ndjamena" | "America/Atikokan" | "Antarctica/Vostok" | "Europe/Brussels" | "America/Argentina/San_Luis" | "America/Indiana/Tell_City" | "Europe/Prague" | "Pacific/Port_Moresby" | "America/Aruba" | "America/Montserrat" | "Europe/Isle_of_Man" | "America/Guatemala" | "Etc/GMT-2" | "America/Yakutat" | "Antarctica/Macquarie" | "America/Argentina/Tucuman" | "Pacific/Kiritimati" | "Africa/Timbuktu" | "Asia/Beirut" | "US/Central" | "Etc/GMT-5" | "America/Indiana/Vevay" | "America/Mexico_City" | "Asia/Baku" | "Europe/Paris" | "US/Eastern" | "Asia/Aden" | "Africa/Dar_es_Salaam" | "Asia/Tomsk" | "America/Tegucigalpa" | "America/St_Thomas" | "Africa/Niamey" | "America/Tijuana" | "Asia/Dili" | "America/Fort_Wayne" | "Asia/Dubai" | "Asia/Tel_Aviv" | "Africa/Algiers" | "Pacific/Enderbury" | "Asia/Atyrau" | "America/Jamaica" | "Asia/Dushanbe" | "Africa/Addis_Ababa" | "Australia/NSW" | "Africa/Cairo" | "Asia/Brunei" | "America/Puerto_Rico" | "Asia/Riyadh" | "Africa/Lubumbashi" | "Asia/Almaty" | "America/Rankin_Inlet" | "Canada/Atlantic" | "Poland" | "Indian/Maldives" | "WET" | "Antarctica/Casey" | "Europe/Berlin" | "Pacific/Pohnpei" | "America/Lima" | "Etc/GMT-7" | "America/Nuuk" | "Pacific/Bougainville" | "Europe/Samara" | "Africa/Casablanca" | "Europe/Podgorica" | "Asia/Hebron" | "America/Argentina/San_Juan" | "Pacific/Tongatapu" | "Australia/Melbourne" | "Asia/Karachi" | "America/Dominica" | "America/Glace_Bay" | "America/Danmarkshavn" | "Atlantic/St_Helena" | "Asia/Krasnoyarsk" | "Europe/Simferopol" | "Europe/Sarajevo" | "Etc/GMT+1" | "Atlantic/Canary" | "GB-Eire" | "Japan" | "Europe/Kiev" | "Etc/UTC" | "America/Sitka" | "Europe/Kyiv" | "Asia/Nicosia" | "Australia/South" | "Pacific/Pago_Pago" | "US/East-Indiana" | "Etc/GMT-11" | "Pacific/Gambier" | "Africa/Lusaka" | "America/Guadeloupe" | "Europe/Oslo" | "America/Goose_Bay" | "Africa/Sao_Tome" | "Asia/Kathmandu" | "Africa/Conakry" | "Asia/Baghdad" | "Antarctica/Davis" | "Singapore" | "Navajo" | "Europe/Vienna" | "ROK" | "Pacific/Nauru" | "Greenwich" | "PST8PDT" | "Etc/GMT+3" | "America/Yellowknife" | "America/Thunder_Bay" | "Europe/Istanbul" | "Pacific/Guadalcanal" | "Etc/Universal" | "Africa/Bangui" | "Europe/Ulyanovsk" | "Australia/ACT" | "Antarctica/Mawson" | "America/Bahia_Banderas" | "Libya" | "America/Matamoros" | "Asia/Ashkhabad" | "Asia/Sakhalin" | "America/Toronto" | "Pacific/Midway" | "Pacific/Galapagos" | "Pacific/Kwajalein" | "NZ-CHAT" | "America/Indianapolis" | "America/Virgin" | "America/Martinique" | "Asia/Muscat" | "Asia/Hovd" | "US/Samoa" | "CET" | "America/Indiana/Knox" | "Canada/Yukon" | "Asia/Kabul" | "Pacific/Funafuti" | "America/St_Barthelemy" | "Asia/Jerusalem" | "America/Santo_Domingo" | "America/Coyhaique" | "Asia/Chongqing" | "Africa/Accra" | "Asia/Omsk" | "US/Arizona" | "Australia/Lord_Howe" | "Indian/Reunion" | "Indian/Kerguelen" | "Africa/Lome" | "America/New_York" | "Africa/Bamako" | "Jamaica" | "Asia/Anadyr" | "Pacific/Apia" | "Africa/Porto-Novo" | "America/Araguaina" | "Pacific/Niue" | "Europe/Dublin" | "Etc/GMT+10" | "Etc/GMT+5" | "Europe/Skopje" | "America/North_Dakota/New_Salem" | "Asia/Ulan_Bator" | "Zulu" | "UCT" | "Indian/Comoro" | "America/Hermosillo" | "Etc/Greenwich" | "America/Indiana/Winamac" | "Pacific/Kosrae" | "Africa/Ouagadougou" | "America/Atka" | "Pacific/Tarawa" | "Mexico/BajaSur" | "America/Merida" | "Asia/Aqtobe" | "Europe/Nicosia" | "Pacific/Auckland" | "America/Bahia" | "NZ" | "Africa/Malabo" | "GMT-0" | "Europe/Bratislava" | "America/Catamarca" | "America/North_Dakota/Center" | "Europe/Volgograd" | "Asia/Srednekolymsk" | "Asia/Aqtau" | "Etc/GMT-0" | "America/Ciudad_Juarez" | "Africa/Douala" | "America/St_Johns" | "Canada/Eastern" | "Asia/Qyzylorda" | "America/Boa_Vista" | "Pacific/Wallis" | "Asia/Amman" | "Europe/Madrid" | "America/Maceio" | "America/Jujuy" | "Asia/Yerevan" | "America/Pangnirtung" | "Atlantic/Faroe" | "Asia/Samarkand" | "Etc/GMT+0" | "Europe/Gibraltar" | "America/Indiana/Indianapolis" | "Egypt" | "Australia/Victoria" | "Europe/Vaduz" | "America/Kentucky/Monticello" | "Asia/Singapore" | "Africa/Blantyre" | "Chile/EasterIsland" | "America/Costa_Rica" | "Europe/Moscow" | "America/Havana" | "Asia/Bahrain" | "America/Indiana/Vincennes" | "Canada/Saskatchewan" | "Europe/Belgrade" | "Europe/Amsterdam" | "GB" | "America/Argentina/Cordoba" | "Africa/Windhoek" | "Asia/Qatar" | "Mexico/General" | "Africa/Brazzaville" | "Africa/Luanda" | "Pacific/Chatham" | "Australia/Queensland" | "HST" | "Africa/Maseru" | "Asia/Novokuznetsk" | "Asia/Qostanay" | "Europe/Copenhagen" | "PRC" | "Antarctica/DumontDUrville" | "Etc/GMT+8" | "Europe/Vilnius" | "America/Godthab" | "Atlantic/Faeroe" | "America/Edmonton" | "America/Fortaleza" | "Asia/Bangkok" | "Pacific/Rarotonga" | "America/Argentina/ComodRivadavia" | "America/Argentina/Catamarca" | "Africa/Nairobi" | "Asia/Thimphu" | "Asia/Ulaanbaatar" | "Australia/Yancowinna" | "Africa/Djibouti" | "Europe/Tallinn" | "Indian/Mayotte" | "America/Cayenne" | "Asia/Ust-Nera" | "Europe/Stockholm" | "Pacific/Saipan" | "Africa/Monrovia" | "Antarctica/Palmer" | "America/Detroit" | "Africa/Nouakchott" | "Europe/Zagreb" | "Europe/Mariehamn" | "America/North_Dakota/Beulah" | "Europe/Belfast" | "Australia/West" | "CST6CDT" | "US/Hawaii" | "Etc/GMT-13" | "America/Chicago" | "Europe/Andorra" | "America/Iqaluit" | "Australia/Currie" | "Asia/Ashgabat" | "Antarctica/South_Pole" | "Pacific/Fakaofo" | "America/Adak" | "America/La_Paz" | "Europe/Kirov" | "America/Argentina/La_Rioja" | "Pacific/Chuuk" | "Pacific/Easter" | "Africa/Tripoli" | "Pacific/Kanton" | "America/Santarem" | "Atlantic/Jan_Mayen" | "America/Blanc-Sablon" | "Pacific/Noumea" | "Europe/Astrakhan" | "America/Shiprock" | "Africa/Asmara" | "Asia/Dhaka" | "Africa/Khartoum" | "ROC" | "Africa/Kinshasa" | "Australia/North" | "Etc/GMT+11" | "Etc/GMT-3" | "Atlantic/Azores" | "Asia/Tashkent" | "America/Coral_Harbour" | "Asia/Vientiane" | "Universal" | "Europe/Uzhgorod" | "Iceland" | "Asia/Calcutta" | "Turkey" | "America/Dawson_Creek" | "Europe/Monaco" | "MST" | "America/Port_of_Spain" | "Asia/Irkutsk" | "Asia/Kamchatka" | "Mexico/BajaNorte" | "America/Tortola" | "Asia/Phnom_Penh" | "Australia/Lindeman" | "America/Dawson" | "Etc/GMT+2" | "Africa/Kampala" | "Europe/Luxembourg" | "America/El_Salvador" | "Asia/Famagusta" | "Asia/Tehran" | "America/Guayaquil" | "America/Argentina/Rio_Gallegos" | "America/Curacao" | "America/Kralendijk" | "Asia/Novosibirsk" | "W-SU" | "Africa/Ceuta" | "US/Aleutian" | "Indian/Mahe" | "America/Argentina/Mendoza" | "Asia/Jakarta" | "MET" | "Asia/Macao" | "Africa/Johannesburg" | "America/Metlakatla" | "Brazil/DeNoronha" | "Europe/Zaporozhye" | "America/Scoresbysund" | "Asia/Katmandu" | "Etc/GMT+9" | "Pacific/Efate" | "Pacific/Fiji" | "America/Montevideo" | "Europe/Tirane" | "Antarctica/Troll" | "Asia/Saigon" | "Africa/Juba" | "America/Argentina/Buenos_Aires" | "Africa/Tunis" | "Etc/GMT-6" | "Kwajalein" | "America/Knox_IN" | "America/Inuvik" | "America/Juneau" | "America/Argentina/Ushuaia" | "Hongkong" | "America/Guyana" | "America/Montreal" | "Europe/Jersey" | "America/Campo_Grande" | "Europe/Vatican" | "Australia/Canberra" | "Pacific/Truk" | "America/St_Lucia" | "Etc/GMT+4" | "America/Marigot" | "localtime" | "America/Managua" | "Asia/Seoul" | "America/Antigua" | "America/Winnipeg" | "America/Anchorage" | "Atlantic/Madeira";
                 };
                 readonly solar?: {
                     /** ID */
@@ -3500,7 +6057,7 @@ export interface components {
                      * Scan status
                      * @enum {integer}
                      */
-                    scan_status?: -1 | 0 | 1 | 2 | 3;
+                    scan_status?: -1 | 0 | 1 | 2 | 3 | 4;
                     /** Results dir */
                     results_dir?: string;
                     celery_ids?: string[];
@@ -3659,6 +6216,8 @@ export interface components {
                 webserver?: string | null;
                 /** Is default */
                 is_default?: boolean | null;
+                /** Is redirect */
+                is_redirect?: boolean;
                 /** Matched gf patterns */
                 matched_gf_patterns?: string | null;
                 readonly scan_history?: {
@@ -3673,7 +6232,7 @@ export interface components {
                      * Scan status
                      * @enum {integer}
                      */
-                    scan_status?: -1 | 0 | 1 | 2 | 3;
+                    scan_status?: -1 | 0 | 1 | 2 | 3 | 4;
                     /** Results dir */
                     results_dir?: string;
                     celery_ids?: string[];
@@ -4137,7 +6696,7 @@ export interface components {
                      * Scan status
                      * @enum {integer}
                      */
-                    scan_status?: -1 | 0 | 1 | 2 | 3;
+                    scan_status?: -1 | 0 | 1 | 2 | 3 | 4;
                     /** Results dir */
                     results_dir?: string;
                     celery_ids?: string[];
@@ -4587,6 +7146,16 @@ export interface components {
                 "application/json": components["schemas"]["Subdomain"];
             };
         };
+        TokenObtainPair: {
+            content: {
+                "application/json": components["schemas"]["TokenObtainPair"];
+            };
+        };
+        TokenRefresh: {
+            content: {
+                "application/json": components["schemas"]["TokenRefresh"];
+            };
+        };
         DirectoryFile: {
             content: {
                 "application/json": components["schemas"]["DirectoryFile"];
@@ -4638,7 +7207,7 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    action_create_project_create: {
+    api_action_create_project_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4655,7 +7224,7 @@ export interface operations {
             };
         };
     };
-    action_engine_create_create: {
+    api_action_engine_create_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4672,7 +7241,7 @@ export interface operations {
             };
         };
     };
-    action_engine_get_list: {
+    api_action_engine_get_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -4689,7 +7258,7 @@ export interface operations {
             };
         };
     };
-    action_engine_update_create: {
+    api_action_engine_update_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4706,7 +7275,7 @@ export interface operations {
             };
         };
     };
-    action_initiate_scan_create: {
+    api_action_initiate_scan_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4723,7 +7292,7 @@ export interface operations {
             };
         };
     };
-    action_initiate_subtask_create: {
+    api_action_initiate_subtask_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4740,7 +7309,7 @@ export interface operations {
             };
         };
     };
-    action_rows_delete_create: {
+    api_action_rows_delete_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4757,7 +7326,7 @@ export interface operations {
             };
         };
     };
-    action_stop_scan_create: {
+    api_action_stop_scan_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4774,7 +7343,7 @@ export interface operations {
             };
         };
     };
-    action_subdomain_delete_create: {
+    api_action_subdomain_delete_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4791,7 +7360,7 @@ export interface operations {
             };
         };
     };
-    action_vulnerability_delete_create: {
+    api_action_vulnerability_delete_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4808,7 +7377,7 @@ export interface operations {
             };
         };
     };
-    action_wordlist_read_list: {
+    api_action_wordlist_read_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -4825,7 +7394,7 @@ export interface operations {
             };
         };
     };
-    action_wordlist_upload_create: {
+    api_action_wordlist_upload_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4842,7 +7411,7 @@ export interface operations {
             };
         };
     };
-    add_recon_note_create: {
+    api_add_recon_note_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4859,7 +7428,7 @@ export interface operations {
             };
         };
     };
-    add_target_create: {
+    api_add_target_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4876,7 +7445,7 @@ export interface operations {
             };
         };
     };
-    apme_paths_list: {
+    api_apme_paths_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -4893,7 +7462,7 @@ export interface operations {
             };
         };
     };
-    createOrganization_create: {
+    api_apme_trigger_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4910,7 +7479,62 @@ export interface operations {
             };
         };
     };
-    dashboard_read: {
+    api_auth_token_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["TokenObtainPair"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenObtainPair"];
+                };
+            };
+        };
+    };
+    api_auth_token_refresh_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["TokenRefresh"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenRefresh"];
+                };
+            };
+        };
+    };
+    api_createOrganization_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_dashboard_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -4929,7 +7553,7 @@ export interface operations {
             };
         };
     };
-    external_tool_get_current_release_list: {
+    api_external_tool_get_current_release_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -4946,7 +7570,7 @@ export interface operations {
             };
         };
     };
-    fetch_most_common_vulnerability_create: {
+    api_fetch_most_common_vulnerability_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4963,7 +7587,7 @@ export interface operations {
             };
         };
     };
-    fetch_most_vulnerable_create: {
+    api_fetch_most_vulnerable_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -4980,7 +7604,7 @@ export interface operations {
             };
         };
     };
-    fetch_results_subscan_list: {
+    api_fetch_results_subscan_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -4997,7 +7621,7 @@ export interface operations {
             };
         };
     };
-    getFileContents_list: {
+    api_getFileContents_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -5014,7 +7638,7 @@ export interface operations {
             };
         };
     };
-    github_tool_get_latest_releases_list: {
+    api_github_tool_get_latest_releases_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -5031,7 +7655,7 @@ export interface operations {
             };
         };
     };
-    "hackerone-programs_list": {
+    "api_hackerone-programs_list": {
         parameters: {
             query?: never;
             header?: never;
@@ -5048,7 +7672,7 @@ export interface operations {
             };
         };
     };
-    "hackerone-programs_bookmarked_programs": {
+    "api_hackerone-programs_bookmarked_programs": {
         parameters: {
             query?: never;
             header?: never;
@@ -5065,7 +7689,7 @@ export interface operations {
             };
         };
     };
-    "hackerone-programs_bounty_programs": {
+    "api_hackerone-programs_bounty_programs": {
         parameters: {
             query?: never;
             header?: never;
@@ -5082,7 +7706,7 @@ export interface operations {
             };
         };
     };
-    "hackerone-programs_import_programs": {
+    "api_hackerone-programs_import_programs": {
         parameters: {
             query?: never;
             header?: never;
@@ -5099,7 +7723,7 @@ export interface operations {
             };
         };
     };
-    "hackerone-programs_refresh_cache": {
+    "api_hackerone-programs_refresh_cache": {
         parameters: {
             query?: never;
             header?: never;
@@ -5116,7 +7740,7 @@ export interface operations {
             };
         };
     };
-    "hackerone-programs_sync_bookmarked": {
+    "api_hackerone-programs_sync_bookmarked": {
         parameters: {
             query?: never;
             header?: never;
@@ -5133,7 +7757,7 @@ export interface operations {
             };
         };
     };
-    "hackerone-programs_program_details": {
+    "api_hackerone-programs_program_details": {
         parameters: {
             query?: never;
             header?: never;
@@ -5152,7 +7776,7 @@ export interface operations {
             };
         };
     };
-    listActivityLogs_list: {
+    api_listActivityLogs_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -5181,7 +7805,7 @@ export interface operations {
             };
         };
     };
-    listActivityLogs_create: {
+    api_listActivityLogs_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -5200,7 +7824,7 @@ export interface operations {
             };
         };
     };
-    listActivityLogs_read: {
+    api_listActivityLogs_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -5222,7 +7846,7 @@ export interface operations {
             };
         };
     };
-    listActivityLogs_update: {
+    api_listActivityLogs_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5244,7 +7868,7 @@ export interface operations {
             };
         };
     };
-    listActivityLogs_delete: {
+    api_listActivityLogs_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -5264,7 +7888,7 @@ export interface operations {
             };
         };
     };
-    listActivityLogs_partial_update: {
+    api_listActivityLogs_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5286,7 +7910,7 @@ export interface operations {
             };
         };
     };
-    listConfigurations_list: {
+    api_listConfigurations_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -5303,7 +7927,7 @@ export interface operations {
             };
         };
     };
-    listDatatableSubdomain_list: {
+    api_listDatatableSubdomain_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -5332,7 +7956,7 @@ export interface operations {
             };
         };
     };
-    listDatatableSubdomain_create: {
+    api_listDatatableSubdomain_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -5351,7 +7975,7 @@ export interface operations {
             };
         };
     };
-    listDatatableSubdomain_read: {
+    api_listDatatableSubdomain_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -5373,7 +7997,7 @@ export interface operations {
             };
         };
     };
-    listDatatableSubdomain_update: {
+    api_listDatatableSubdomain_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5395,7 +8019,7 @@ export interface operations {
             };
         };
     };
-    listDatatableSubdomain_delete: {
+    api_listDatatableSubdomain_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -5415,7 +8039,7 @@ export interface operations {
             };
         };
     };
-    listDatatableSubdomain_partial_update: {
+    api_listDatatableSubdomain_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5437,7 +8061,7 @@ export interface operations {
             };
         };
     };
-    listDirectories_list: {
+    api_listDirectories_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -5466,7 +8090,7 @@ export interface operations {
             };
         };
     };
-    listDirectories_create: {
+    api_listDirectories_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -5485,7 +8109,7 @@ export interface operations {
             };
         };
     };
-    listDirectories_read: {
+    api_listDirectories_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -5507,7 +8131,7 @@ export interface operations {
             };
         };
     };
-    listDirectories_update: {
+    api_listDirectories_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5529,7 +8153,7 @@ export interface operations {
             };
         };
     };
-    listDirectories_delete: {
+    api_listDirectories_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -5549,7 +8173,7 @@ export interface operations {
             };
         };
     };
-    listDirectories_partial_update: {
+    api_listDirectories_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5571,7 +8195,7 @@ export interface operations {
             };
         };
     };
-    listEndPointChanges_list: {
+    api_listEndPointChanges_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -5600,7 +8224,7 @@ export interface operations {
             };
         };
     };
-    listEndPointChanges_create: {
+    api_listEndPointChanges_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -5619,7 +8243,7 @@ export interface operations {
             };
         };
     };
-    listEndPointChanges_read: {
+    api_listEndPointChanges_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -5641,7 +8265,7 @@ export interface operations {
             };
         };
     };
-    listEndPointChanges_update: {
+    api_listEndPointChanges_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5663,7 +8287,7 @@ export interface operations {
             };
         };
     };
-    listEndPointChanges_delete: {
+    api_listEndPointChanges_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -5683,7 +8307,7 @@ export interface operations {
             };
         };
     };
-    listEndPointChanges_partial_update: {
+    api_listEndPointChanges_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5705,7 +8329,7 @@ export interface operations {
             };
         };
     };
-    listEndpoints_list: {
+    api_listEndpoints_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -5734,7 +8358,7 @@ export interface operations {
             };
         };
     };
-    listEndpoints_create: {
+    api_listEndpoints_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -5753,7 +8377,7 @@ export interface operations {
             };
         };
     };
-    listEndpoints_read: {
+    api_listEndpoints_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -5775,7 +8399,7 @@ export interface operations {
             };
         };
     };
-    listEndpoints_update: {
+    api_listEndpoints_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5797,7 +8421,7 @@ export interface operations {
             };
         };
     };
-    listEndpoints_delete: {
+    api_listEndpoints_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -5817,7 +8441,7 @@ export interface operations {
             };
         };
     };
-    listEndpoints_partial_update: {
+    api_listEndpoints_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5839,7 +8463,7 @@ export interface operations {
             };
         };
     };
-    listEngines_list: {
+    api_listEngines_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -5856,7 +8480,7 @@ export interface operations {
             };
         };
     };
-    listInterestingEndpoints_list: {
+    api_listInterestingEndpoints_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -5885,7 +8509,7 @@ export interface operations {
             };
         };
     };
-    listInterestingEndpoints_create: {
+    api_listInterestingEndpoints_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -5904,7 +8528,7 @@ export interface operations {
             };
         };
     };
-    listInterestingEndpoints_read: {
+    api_listInterestingEndpoints_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -5926,7 +8550,7 @@ export interface operations {
             };
         };
     };
-    listInterestingEndpoints_update: {
+    api_listInterestingEndpoints_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5948,7 +8572,7 @@ export interface operations {
             };
         };
     };
-    listInterestingEndpoints_delete: {
+    api_listInterestingEndpoints_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -5968,7 +8592,7 @@ export interface operations {
             };
         };
     };
-    listInterestingEndpoints_partial_update: {
+    api_listInterestingEndpoints_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -5990,7 +8614,7 @@ export interface operations {
             };
         };
     };
-    listInterestingKeywords_list: {
+    api_listInterestingKeywords_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -6007,7 +8631,7 @@ export interface operations {
             };
         };
     };
-    listInterestingSubdomains_list: {
+    api_listInterestingSubdomains_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -6036,7 +8660,7 @@ export interface operations {
             };
         };
     };
-    listInterestingSubdomains_create: {
+    api_listInterestingSubdomains_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -6055,7 +8679,7 @@ export interface operations {
             };
         };
     };
-    listInterestingSubdomains_read: {
+    api_listInterestingSubdomains_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -6077,7 +8701,7 @@ export interface operations {
             };
         };
     };
-    listInterestingSubdomains_update: {
+    api_listInterestingSubdomains_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6099,7 +8723,7 @@ export interface operations {
             };
         };
     };
-    listInterestingSubdomains_delete: {
+    api_listInterestingSubdomains_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -6119,7 +8743,7 @@ export interface operations {
             };
         };
     };
-    listInterestingSubdomains_partial_update: {
+    api_listInterestingSubdomains_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6141,7 +8765,7 @@ export interface operations {
             };
         };
     };
-    listIps_list: {
+    api_listIps_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -6170,7 +8794,7 @@ export interface operations {
             };
         };
     };
-    listIps_create: {
+    api_listIps_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -6189,7 +8813,7 @@ export interface operations {
             };
         };
     };
-    listIps_read: {
+    api_listIps_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -6211,7 +8835,7 @@ export interface operations {
             };
         };
     };
-    listIps_update: {
+    api_listIps_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6233,7 +8857,7 @@ export interface operations {
             };
         };
     };
-    listIps_delete: {
+    api_listIps_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -6253,7 +8877,7 @@ export interface operations {
             };
         };
     };
-    listIps_partial_update: {
+    api_listIps_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6275,7 +8899,7 @@ export interface operations {
             };
         };
     };
-    listOrganizations_list: {
+    api_listOrganizations_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -6292,7 +8916,7 @@ export interface operations {
             };
         };
     };
-    listScanHistory_list: {
+    api_listScanHistory_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -6309,7 +8933,7 @@ export interface operations {
             };
         };
     };
-    listScanLogs_list: {
+    api_listScanLogs_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -6338,7 +8962,7 @@ export interface operations {
             };
         };
     };
-    listScanLogs_create: {
+    api_listScanLogs_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -6357,7 +8981,7 @@ export interface operations {
             };
         };
     };
-    listScanLogs_read: {
+    api_listScanLogs_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -6379,7 +9003,7 @@ export interface operations {
             };
         };
     };
-    listScanLogs_update: {
+    api_listScanLogs_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6401,7 +9025,7 @@ export interface operations {
             };
         };
     };
-    listScanLogs_delete: {
+    api_listScanLogs_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -6421,7 +9045,7 @@ export interface operations {
             };
         };
     };
-    listScanLogs_partial_update: {
+    api_listScanLogs_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6443,7 +9067,7 @@ export interface operations {
             };
         };
     };
-    listScans_list: {
+    api_listScans_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -6472,7 +9096,7 @@ export interface operations {
             };
         };
     };
-    listScans_create: {
+    api_listScans_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -6491,7 +9115,7 @@ export interface operations {
             };
         };
     };
-    listScans_bulk_delete: {
+    api_listScans_bulk_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -6510,7 +9134,7 @@ export interface operations {
             };
         };
     };
-    listScans_bulk_stop: {
+    api_listScans_bulk_stop: {
         parameters: {
             query?: never;
             header?: never;
@@ -6529,7 +9153,7 @@ export interface operations {
             };
         };
     };
-    listScans_read: {
+    api_listScans_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -6550,7 +9174,7 @@ export interface operations {
             };
         };
     };
-    listScans_update: {
+    api_listScans_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6571,7 +9195,7 @@ export interface operations {
             };
         };
     };
-    listScans_delete: {
+    api_listScans_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -6590,7 +9214,7 @@ export interface operations {
             };
         };
     };
-    listScans_partial_update: {
+    api_listScans_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6611,7 +9235,7 @@ export interface operations {
             };
         };
     };
-    listScans_delete_scan: {
+    api_listScans_delete_scan: {
         parameters: {
             query?: never;
             header?: never;
@@ -6632,7 +9256,7 @@ export interface operations {
             };
         };
     };
-    listScans_stop_scan: {
+    api_listScans_stop_scan: {
         parameters: {
             query?: never;
             header?: never;
@@ -6653,7 +9277,7 @@ export interface operations {
             };
         };
     };
-    listSubScans_create: {
+    api_listSubScans_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -6670,7 +9294,7 @@ export interface operations {
             };
         };
     };
-    listSubdomainChanges_list: {
+    api_listSubdomainChanges_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -6699,7 +9323,7 @@ export interface operations {
             };
         };
     };
-    listSubdomainChanges_create: {
+    api_listSubdomainChanges_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -6718,7 +9342,7 @@ export interface operations {
             };
         };
     };
-    listSubdomainChanges_read: {
+    api_listSubdomainChanges_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -6740,7 +9364,7 @@ export interface operations {
             };
         };
     };
-    listSubdomainChanges_update: {
+    api_listSubdomainChanges_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6762,7 +9386,7 @@ export interface operations {
             };
         };
     };
-    listSubdomainChanges_delete: {
+    api_listSubdomainChanges_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -6782,7 +9406,7 @@ export interface operations {
             };
         };
     };
-    listSubdomainChanges_partial_update: {
+    api_listSubdomainChanges_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6804,7 +9428,7 @@ export interface operations {
             };
         };
     };
-    listSubdomains_list: {
+    api_listSubdomains_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -6833,7 +9457,7 @@ export interface operations {
             };
         };
     };
-    listSubdomains_create: {
+    api_listSubdomains_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -6852,7 +9476,7 @@ export interface operations {
             };
         };
     };
-    listSubdomains_read: {
+    api_listSubdomains_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -6874,7 +9498,7 @@ export interface operations {
             };
         };
     };
-    listSubdomains_update: {
+    api_listSubdomains_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6896,7 +9520,7 @@ export interface operations {
             };
         };
     };
-    listSubdomains_delete: {
+    api_listSubdomains_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -6916,7 +9540,7 @@ export interface operations {
             };
         };
     };
-    listSubdomains_partial_update: {
+    api_listSubdomains_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -6938,7 +9562,7 @@ export interface operations {
             };
         };
     };
-    listTargets_list: {
+    api_listTargets_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -6967,7 +9591,7 @@ export interface operations {
             };
         };
     };
-    listTargets_create: {
+    api_listTargets_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -6986,7 +9610,7 @@ export interface operations {
             };
         };
     };
-    listTargets_read: {
+    api_listTargets_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -7008,7 +9632,7 @@ export interface operations {
             };
         };
     };
-    listTargets_update: {
+    api_listTargets_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7030,7 +9654,7 @@ export interface operations {
             };
         };
     };
-    listTargets_delete: {
+    api_listTargets_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -7050,7 +9674,7 @@ export interface operations {
             };
         };
     };
-    listTargets_partial_update: {
+    api_listTargets_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7072,7 +9696,7 @@ export interface operations {
             };
         };
     };
-    listTodoNotes_list: {
+    api_listTodoNotes_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -7089,7 +9713,7 @@ export interface operations {
             };
         };
     };
-    listVulnerability_list: {
+    api_listVulnerability_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -7118,7 +9742,7 @@ export interface operations {
             };
         };
     };
-    listVulnerability_create: {
+    api_listVulnerability_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -7137,7 +9761,7 @@ export interface operations {
             };
         };
     };
-    listVulnerability_read: {
+    api_listVulnerability_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -7159,7 +9783,7 @@ export interface operations {
             };
         };
     };
-    listVulnerability_update: {
+    api_listVulnerability_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7181,7 +9805,7 @@ export interface operations {
             };
         };
     };
-    listVulnerability_delete: {
+    api_listVulnerability_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -7201,7 +9825,7 @@ export interface operations {
             };
         };
     };
-    listVulnerability_partial_update: {
+    api_listVulnerability_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7223,7 +9847,7 @@ export interface operations {
             };
         };
     };
-    listWordlists_list: {
+    api_listWordlists_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -7240,7 +9864,7 @@ export interface operations {
             };
         };
     };
-    monitoring_list: {
+    api_monitoring_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -7269,7 +9893,7 @@ export interface operations {
             };
         };
     };
-    monitoring_create: {
+    api_monitoring_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -7288,7 +9912,7 @@ export interface operations {
             };
         };
     };
-    monitoring_statistics: {
+    api_monitoring_statistics: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -7317,7 +9941,7 @@ export interface operations {
             };
         };
     };
-    monitoring_read: {
+    api_monitoring_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -7339,7 +9963,7 @@ export interface operations {
             };
         };
     };
-    monitoring_update: {
+    api_monitoring_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7361,7 +9985,7 @@ export interface operations {
             };
         };
     };
-    monitoring_delete: {
+    api_monitoring_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -7381,7 +10005,7 @@ export interface operations {
             };
         };
     };
-    monitoring_partial_update: {
+    api_monitoring_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7403,7 +10027,7 @@ export interface operations {
             };
         };
     };
-    "notification-settings_list": {
+    "api_notification-settings_list": {
         parameters: {
             query?: never;
             header?: never;
@@ -7420,7 +10044,7 @@ export interface operations {
             };
         };
     };
-    "notification-settings_create": {
+    "api_notification-settings_create": {
         parameters: {
             query?: never;
             header?: never;
@@ -7437,7 +10061,7 @@ export interface operations {
             };
         };
     };
-    notifications_list: {
+    api_notifications_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -7456,7 +10080,7 @@ export interface operations {
             };
         };
     };
-    notifications_create: {
+    api_notifications_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -7475,7 +10099,7 @@ export interface operations {
             };
         };
     };
-    notifications_clear_all: {
+    api_notifications_clear_all: {
         parameters: {
             query?: never;
             header?: never;
@@ -7494,7 +10118,7 @@ export interface operations {
             };
         };
     };
-    notifications_mark_all_read: {
+    api_notifications_mark_all_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -7513,7 +10137,7 @@ export interface operations {
             };
         };
     };
-    notifications_unread_count: {
+    api_notifications_unread_count: {
         parameters: {
             query?: never;
             header?: never;
@@ -7532,7 +10156,7 @@ export interface operations {
             };
         };
     };
-    notifications_read: {
+    api_notifications_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -7553,7 +10177,7 @@ export interface operations {
             };
         };
     };
-    notifications_update: {
+    api_notifications_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7574,7 +10198,7 @@ export interface operations {
             };
         };
     };
-    notifications_delete: {
+    api_notifications_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -7593,7 +10217,7 @@ export interface operations {
             };
         };
     };
-    notifications_partial_update: {
+    api_notifications_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7614,7 +10238,7 @@ export interface operations {
             };
         };
     };
-    notifications_mark_read: {
+    api_notifications_mark_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -7635,7 +10259,7 @@ export interface operations {
             };
         };
     };
-    plugins_list: {
+    api_plugins_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -7654,7 +10278,7 @@ export interface operations {
             };
         };
     };
-    plugins_create: {
+    api_plugins_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -7673,7 +10297,7 @@ export interface operations {
             };
         };
     };
-    plugins_registry: {
+    api_plugins_registry: {
         parameters: {
             query?: never;
             header?: never;
@@ -7692,7 +10316,7 @@ export interface operations {
             };
         };
     };
-    plugins_upload_plugin: {
+    api_plugins_upload_plugin: {
         parameters: {
             query?: never;
             header?: never;
@@ -7711,7 +10335,7 @@ export interface operations {
             };
         };
     };
-    plugins_read: {
+    api_plugins_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -7732,7 +10356,7 @@ export interface operations {
             };
         };
     };
-    plugins_update: {
+    api_plugins_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7753,7 +10377,7 @@ export interface operations {
             };
         };
     };
-    plugins_delete: {
+    api_plugins_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -7772,7 +10396,7 @@ export interface operations {
             };
         };
     };
-    plugins_partial_update: {
+    api_plugins_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7793,7 +10417,7 @@ export interface operations {
             };
         };
     };
-    projects_list: {
+    api_projects_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -7822,7 +10446,7 @@ export interface operations {
             };
         };
     };
-    projects_create: {
+    api_projects_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -7841,7 +10465,7 @@ export interface operations {
             };
         };
     };
-    projects_read: {
+    api_projects_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -7863,7 +10487,7 @@ export interface operations {
             };
         };
     };
-    projects_update: {
+    api_projects_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7885,7 +10509,7 @@ export interface operations {
             };
         };
     };
-    projects_delete: {
+    api_projects_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -7905,7 +10529,7 @@ export interface operations {
             };
         };
     };
-    projects_partial_update: {
+    api_projects_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -7927,7 +10551,7 @@ export interface operations {
             };
         };
     };
-    projects_delete_project: {
+    api_projects_delete_project: {
         parameters: {
             query?: never;
             header?: never;
@@ -7949,7 +10573,7 @@ export interface operations {
             };
         };
     };
-    queryAllScanResultVisualise_list: {
+    api_queryAllScanResultVisualise_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -7966,7 +10590,7 @@ export interface operations {
             };
         };
     };
-    queryDorkTypes_list: {
+    api_queryDorkTypes_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -7983,7 +10607,7 @@ export interface operations {
             };
         };
     };
-    queryDorks_list: {
+    api_queryDorks_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8000,7 +10624,7 @@ export interface operations {
             };
         };
     };
-    queryEmails_list: {
+    api_queryEmails_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8017,7 +10641,7 @@ export interface operations {
             };
         };
     };
-    queryEmployees_list: {
+    api_queryEmployees_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8034,7 +10658,7 @@ export interface operations {
             };
         };
     };
-    queryEndpoints_list: {
+    api_queryEndpoints_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8051,7 +10675,7 @@ export interface operations {
             };
         };
     };
-    queryInterestingSubdomains_list: {
+    api_queryInterestingSubdomains_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8068,7 +10692,7 @@ export interface operations {
             };
         };
     };
-    queryIps_list: {
+    api_queryIps_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8085,7 +10709,7 @@ export interface operations {
             };
         };
     };
-    queryMetadata_list: {
+    api_queryMetadata_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8102,7 +10726,7 @@ export interface operations {
             };
         };
     };
-    queryOsintUsers_list: {
+    api_queryOsintUsers_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8119,7 +10743,7 @@ export interface operations {
             };
         };
     };
-    queryPorts_list: {
+    api_queryPorts_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8136,7 +10760,7 @@ export interface operations {
             };
         };
     };
-    querySubdomains_list: {
+    api_querySubdomains_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8153,7 +10777,7 @@ export interface operations {
             };
         };
     };
-    querySubdomains_create: {
+    api_querySubdomains_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -8170,7 +10794,7 @@ export interface operations {
             };
         };
     };
-    queryTargetsInOrganization_list: {
+    api_queryTargetsInOrganization_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8187,7 +10811,7 @@ export interface operations {
             };
         };
     };
-    queryTargetsWithoutOrganization_list: {
+    api_queryTargetsWithoutOrganization_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8204,7 +10828,7 @@ export interface operations {
             };
         };
     };
-    queryTechnologies_list: {
+    api_queryTechnologies_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8221,7 +10845,7 @@ export interface operations {
             };
         };
     };
-    "rengine_system-settings_list": {
+    "api_rengine_system-settings_list": {
         parameters: {
             query?: never;
             header?: never;
@@ -8238,7 +10862,7 @@ export interface operations {
             };
         };
     };
-    rengine_update_list: {
+    api_rengine_update_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8255,7 +10879,7 @@ export interface operations {
             };
         };
     };
-    "report-settings_list": {
+    "api_report-settings_list": {
         parameters: {
             query?: never;
             header?: never;
@@ -8272,7 +10896,7 @@ export interface operations {
             };
         };
     };
-    "report-settings_create": {
+    "api_report-settings_create": {
         parameters: {
             query?: never;
             header?: never;
@@ -8289,7 +10913,7 @@ export interface operations {
             };
         };
     };
-    "scan-summary_read": {
+    "api_scan-summary_read": {
         parameters: {
             query?: never;
             header?: never;
@@ -8309,7 +10933,7 @@ export interface operations {
             };
         };
     };
-    scan_status_list: {
+    api_scan_status_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8326,7 +10950,24 @@ export interface operations {
             };
         };
     };
-    scheduledScans_list: {
+    api_scans_configuration_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_scheduledScans_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -8355,7 +10996,7 @@ export interface operations {
             };
         };
     };
-    scheduledScans_create: {
+    api_scheduledScans_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -8374,7 +11015,7 @@ export interface operations {
             };
         };
     };
-    scheduledScans_bulk_delete: {
+    api_scheduledScans_bulk_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -8393,7 +11034,7 @@ export interface operations {
             };
         };
     };
-    scheduledScans_read: {
+    api_scheduledScans_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -8415,7 +11056,7 @@ export interface operations {
             };
         };
     };
-    scheduledScans_update: {
+    api_scheduledScans_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -8437,7 +11078,7 @@ export interface operations {
             };
         };
     };
-    scheduledScans_delete: {
+    api_scheduledScans_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -8457,7 +11098,7 @@ export interface operations {
             };
         };
     };
-    scheduledScans_partial_update: {
+    api_scheduledScans_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -8479,7 +11120,7 @@ export interface operations {
             };
         };
     };
-    scheduledScans_toggle: {
+    api_scheduledScans_toggle: {
         parameters: {
             query?: never;
             header?: never;
@@ -8501,7 +11142,7 @@ export interface operations {
             };
         };
     };
-    search_list: {
+    api_search_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8518,7 +11159,7 @@ export interface operations {
             };
         };
     };
-    search_history_list: {
+    api_search_history_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8535,7 +11176,7 @@ export interface operations {
             };
         };
     };
-    "stress-testing_read": {
+    "api_stress-testing_read": {
         parameters: {
             query?: never;
             header?: never;
@@ -8554,7 +11195,45 @@ export interface operations {
             };
         };
     };
-    subscans_list: {
+    api_stress_control_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_stress_status_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                scan_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    api_subscans_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -8583,7 +11262,7 @@ export interface operations {
             };
         };
     };
-    subscans_create: {
+    api_subscans_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -8602,7 +11281,7 @@ export interface operations {
             };
         };
     };
-    subscans_bulk_delete: {
+    api_subscans_bulk_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -8621,7 +11300,7 @@ export interface operations {
             };
         };
     };
-    subscans_bulk_stop: {
+    api_subscans_bulk_stop: {
         parameters: {
             query?: never;
             header?: never;
@@ -8640,7 +11319,7 @@ export interface operations {
             };
         };
     };
-    subscans_read: {
+    api_subscans_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -8662,7 +11341,7 @@ export interface operations {
             };
         };
     };
-    subscans_update: {
+    api_subscans_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -8684,7 +11363,7 @@ export interface operations {
             };
         };
     };
-    subscans_delete: {
+    api_subscans_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -8704,7 +11383,7 @@ export interface operations {
             };
         };
     };
-    subscans_partial_update: {
+    api_subscans_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -8726,7 +11405,7 @@ export interface operations {
             };
         };
     };
-    "target-summary_read": {
+    "api_target-summary_read": {
         parameters: {
             query?: never;
             header?: never;
@@ -8746,7 +11425,7 @@ export interface operations {
             };
         };
     };
-    "toggle-bug-bounty-mode_create": {
+    "api_toggle-bug-bounty-mode_create": {
         parameters: {
             query?: never;
             header?: never;
@@ -8763,7 +11442,7 @@ export interface operations {
             };
         };
     };
-    toggle_subdomain_important_create: {
+    api_toggle_subdomain_important_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -8780,7 +11459,7 @@ export interface operations {
             };
         };
     };
-    tool_ollama_list: {
+    api_tool_ollama_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8797,7 +11476,7 @@ export interface operations {
             };
         };
     };
-    tool_ollama_update: {
+    api_tool_ollama_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -8814,7 +11493,7 @@ export interface operations {
             };
         };
     };
-    tool_ollama_delete: {
+    api_tool_ollama_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -8831,7 +11510,7 @@ export interface operations {
             };
         };
     };
-    tool_uninstall_list: {
+    api_tool_uninstall_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8848,7 +11527,7 @@ export interface operations {
             };
         };
     };
-    tool_update_list: {
+    api_tool_update_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8865,7 +11544,7 @@ export interface operations {
             };
         };
     };
-    tools_cms_detector_list: {
+    api_tools_cms_detector_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8882,7 +11561,7 @@ export interface operations {
             };
         };
     };
-    tools_cve_details_list: {
+    api_tools_cve_details_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8899,7 +11578,7 @@ export interface operations {
             };
         };
     };
-    tools_domain_ip_history_list: {
+    api_tools_domain_ip_history_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8916,7 +11595,7 @@ export interface operations {
             };
         };
     };
-    tools_gpt_get_possible_attacks_list: {
+    api_tools_gpt_get_possible_attacks_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8933,7 +11612,7 @@ export interface operations {
             };
         };
     };
-    tools_gpt_vulnerability_report_list: {
+    api_tools_gpt_vulnerability_report_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8950,7 +11629,7 @@ export interface operations {
             };
         };
     };
-    tools_ip_to_domain_list: {
+    api_tools_ip_to_domain_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8967,7 +11646,7 @@ export interface operations {
             };
         };
     };
-    tools_reverse_whois_list: {
+    api_tools_reverse_whois_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -8984,7 +11663,7 @@ export interface operations {
             };
         };
     };
-    tools_waf_detector_list: {
+    api_tools_waf_detector_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -9001,7 +11680,7 @@ export interface operations {
             };
         };
     };
-    tools_whois_list: {
+    api_tools_whois_list: {
         parameters: {
             query?: never;
             header?: never;
@@ -9018,7 +11697,7 @@ export interface operations {
             };
         };
     };
-    "update-theme_create": {
+    "api_update-theme_create": {
         parameters: {
             query?: never;
             header?: never;
@@ -9035,7 +11714,7 @@ export interface operations {
             };
         };
     };
-    updateOrganization_create: {
+    api_updateOrganization_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -9052,7 +11731,7 @@ export interface operations {
             };
         };
     };
-    users_list: {
+    api_users_list: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -9081,7 +11760,7 @@ export interface operations {
             };
         };
     };
-    users_create: {
+    api_users_create: {
         parameters: {
             query?: never;
             header?: never;
@@ -9100,7 +11779,7 @@ export interface operations {
             };
         };
     };
-    users_me: {
+    api_users_me: {
         parameters: {
             query?: {
                 /** @description A page number within the paginated result set. */
@@ -9129,7 +11808,7 @@ export interface operations {
             };
         };
     };
-    users_read: {
+    api_users_read: {
         parameters: {
             query?: never;
             header?: never;
@@ -9151,7 +11830,7 @@ export interface operations {
             };
         };
     };
-    users_update: {
+    api_users_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -9173,7 +11852,7 @@ export interface operations {
             };
         };
     };
-    users_delete: {
+    api_users_delete: {
         parameters: {
             query?: never;
             header?: never;
@@ -9193,7 +11872,7 @@ export interface operations {
             };
         };
     };
-    users_partial_update: {
+    api_users_partial_update: {
         parameters: {
             query?: never;
             header?: never;
@@ -9215,7 +11894,7 @@ export interface operations {
             };
         };
     };
-    users_toggle_status: {
+    api_users_toggle_status: {
         parameters: {
             query?: never;
             header?: never;
@@ -9237,7 +11916,7 @@ export interface operations {
             };
         };
     };
-    users_update_user: {
+    api_users_update_user: {
         parameters: {
             query?: never;
             header?: never;
@@ -9259,7 +11938,4717 @@ export interface operations {
             };
         };
     };
-    vulnerability_report_list: {
+    api_vulnerability_report_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_create_project_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_engine_create_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_engine_get_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_engine_update_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_initiate_scan_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_initiate_subtask_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_rows_delete_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_stop_scan_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_subdomain_delete_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_vulnerability_delete_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_wordlist_read_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_action_wordlist_upload_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_add_recon_note_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_add_target_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_apme_paths_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_apme_trigger_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_auth_token_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["TokenObtainPair"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenObtainPair"];
+                };
+            };
+        };
+    };
+    mapi_auth_token_refresh_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["TokenRefresh"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TokenRefresh"];
+                };
+            };
+        };
+    };
+    mapi_createOrganization_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_dashboard_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_external_tool_get_current_release_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_fetch_most_common_vulnerability_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_fetch_most_vulnerable_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_fetch_results_subscan_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_getFileContents_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_github_tool_get_latest_releases_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_hackerone-programs_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_hackerone-programs_bookmarked_programs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_hackerone-programs_bounty_programs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_hackerone-programs_import_programs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_hackerone-programs_refresh_cache": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_hackerone-programs_sync_bookmarked": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_hackerone-programs_program_details": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listActivityLogs_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Command"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listActivityLogs_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Command"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Command"];
+                };
+            };
+        };
+    };
+    mapi_listActivityLogs_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this command. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Command"];
+                };
+            };
+        };
+    };
+    mapi_listActivityLogs_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this command. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Command"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Command"];
+                };
+            };
+        };
+    };
+    mapi_listActivityLogs_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this command. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listActivityLogs_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this command. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Command"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Command"];
+                };
+            };
+        };
+    };
+    mapi_listConfigurations_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listDatatableSubdomain_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Subdomain"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listDatatableSubdomain_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Subdomain"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listDatatableSubdomain_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listDatatableSubdomain_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Subdomain"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listDatatableSubdomain_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listDatatableSubdomain_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Subdomain"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listDirectories_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["DirectoryFile"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listDirectories_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DirectoryFile"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryFile"];
+                };
+            };
+        };
+    };
+    mapi_listDirectories_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this directory file. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryFile"];
+                };
+            };
+        };
+    };
+    mapi_listDirectories_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this directory file. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DirectoryFile"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryFile"];
+                };
+            };
+        };
+    };
+    mapi_listDirectories_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this directory file. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listDirectories_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this directory file. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["DirectoryFile"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DirectoryFile"];
+                };
+            };
+        };
+    };
+    mapi_listEndPointChanges_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["EndPointChanges"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listEndPointChanges_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["EndPointChanges"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndPointChanges"];
+                };
+            };
+        };
+    };
+    mapi_listEndPointChanges_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndPointChanges"];
+                };
+            };
+        };
+    };
+    mapi_listEndPointChanges_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["EndPointChanges"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndPointChanges"];
+                };
+            };
+        };
+    };
+    mapi_listEndPointChanges_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listEndPointChanges_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["EndPointChanges"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["EndPointChanges"];
+                };
+            };
+        };
+    };
+    mapi_listEndpoints_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Endpoint"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listEndpoints_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Endpoint"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Endpoint"];
+                };
+            };
+        };
+    };
+    mapi_listEndpoints_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Endpoint"];
+                };
+            };
+        };
+    };
+    mapi_listEndpoints_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Endpoint"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Endpoint"];
+                };
+            };
+        };
+    };
+    mapi_listEndpoints_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listEndpoints_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Endpoint"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Endpoint"];
+                };
+            };
+        };
+    };
+    mapi_listEngines_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listInterestingEndpoints_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Endpoint"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listInterestingEndpoints_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Endpoint"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Endpoint"];
+                };
+            };
+        };
+    };
+    mapi_listInterestingEndpoints_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Endpoint"];
+                };
+            };
+        };
+    };
+    mapi_listInterestingEndpoints_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Endpoint"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Endpoint"];
+                };
+            };
+        };
+    };
+    mapi_listInterestingEndpoints_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listInterestingEndpoints_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this end point. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Endpoint"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Endpoint"];
+                };
+            };
+        };
+    };
+    mapi_listInterestingKeywords_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listInterestingSubdomains_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Subdomain"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listInterestingSubdomains_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Subdomain"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listInterestingSubdomains_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listInterestingSubdomains_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Subdomain"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listInterestingSubdomains_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listInterestingSubdomains_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Subdomain"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listIps_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["IpSubdomain"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listIps_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["IpSubdomain"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IpSubdomain"];
+                };
+            };
+        };
+    };
+    mapi_listIps_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IpSubdomain"];
+                };
+            };
+        };
+    };
+    mapi_listIps_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["IpSubdomain"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IpSubdomain"];
+                };
+            };
+        };
+    };
+    mapi_listIps_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listIps_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["IpSubdomain"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IpSubdomain"];
+                };
+            };
+        };
+    };
+    mapi_listOrganizations_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listScanHistory_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listScanLogs_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Command"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listScanLogs_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Command"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Command"];
+                };
+            };
+        };
+    };
+    mapi_listScanLogs_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this command. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Command"];
+                };
+            };
+        };
+    };
+    mapi_listScanLogs_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this command. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Command"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Command"];
+                };
+            };
+        };
+    };
+    mapi_listScanLogs_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this command. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listScanLogs_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this command. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Command"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Command"];
+                };
+            };
+        };
+    };
+    mapi_listScans_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["ScanHistory"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listScans_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ScanHistory"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanHistory"];
+                };
+            };
+        };
+    };
+    mapi_listScans_bulk_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ScanHistory"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanHistory"];
+                };
+            };
+        };
+    };
+    mapi_listScans_bulk_stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ScanHistory"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanHistory"];
+                };
+            };
+        };
+    };
+    mapi_listScans_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanHistory"];
+                };
+            };
+        };
+    };
+    mapi_listScans_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ScanHistory"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanHistory"];
+                };
+            };
+        };
+    };
+    mapi_listScans_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listScans_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ScanHistory"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanHistory"];
+                };
+            };
+        };
+    };
+    mapi_listScans_delete_scan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ScanHistory"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanHistory"];
+                };
+            };
+        };
+    };
+    mapi_listScans_stop_scan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["ScanHistory"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ScanHistory"];
+                };
+            };
+        };
+    };
+    mapi_listSubScans_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listSubdomainChanges_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["SubdomainChanges"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listSubdomainChanges_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["SubdomainChanges"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubdomainChanges"];
+                };
+            };
+        };
+    };
+    mapi_listSubdomainChanges_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubdomainChanges"];
+                };
+            };
+        };
+    };
+    mapi_listSubdomainChanges_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["SubdomainChanges"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubdomainChanges"];
+                };
+            };
+        };
+    };
+    mapi_listSubdomainChanges_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listSubdomainChanges_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["SubdomainChanges"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubdomainChanges"];
+                };
+            };
+        };
+    };
+    mapi_listSubdomains_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Subdomain"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listSubdomains_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Subdomain"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listSubdomains_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listSubdomains_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Subdomain"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listSubdomains_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listSubdomains_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this subdomain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Subdomain"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Subdomain"];
+                };
+            };
+        };
+    };
+    mapi_listTargets_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Domain"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listTargets_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Domain"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Domain"];
+                };
+            };
+        };
+    };
+    mapi_listTargets_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this domain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Domain"];
+                };
+            };
+        };
+    };
+    mapi_listTargets_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this domain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Domain"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Domain"];
+                };
+            };
+        };
+    };
+    mapi_listTargets_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this domain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listTargets_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this domain. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Domain"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Domain"];
+                };
+            };
+        };
+    };
+    mapi_listTodoNotes_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listVulnerability_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Vulnerability"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_listVulnerability_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Vulnerability"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Vulnerability"];
+                };
+            };
+        };
+    };
+    mapi_listVulnerability_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this vulnerability. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Vulnerability"];
+                };
+            };
+        };
+    };
+    mapi_listVulnerability_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this vulnerability. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Vulnerability"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Vulnerability"];
+                };
+            };
+        };
+    };
+    mapi_listVulnerability_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this vulnerability. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_listVulnerability_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this vulnerability. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Vulnerability"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Vulnerability"];
+                };
+            };
+        };
+    };
+    mapi_listWordlists_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_monitoring_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["MonitoringDiscovery"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_monitoring_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["MonitoringDiscovery"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitoringDiscovery"];
+                };
+            };
+        };
+    };
+    mapi_monitoring_statistics: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["MonitoringDiscovery"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_monitoring_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this monitoring discovery. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitoringDiscovery"];
+                };
+            };
+        };
+    };
+    mapi_monitoring_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this monitoring discovery. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["MonitoringDiscovery"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitoringDiscovery"];
+                };
+            };
+        };
+    };
+    mapi_monitoring_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this monitoring discovery. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_monitoring_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this monitoring discovery. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["MonitoringDiscovery"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonitoringDiscovery"];
+                };
+            };
+        };
+    };
+    "mapi_notification-settings_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_notification-settings_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_notifications_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InAppNotification"][];
+                };
+            };
+        };
+    };
+    mapi_notifications_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["InAppNotification"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InAppNotification"];
+                };
+            };
+        };
+    };
+    mapi_notifications_clear_all: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["InAppNotification"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InAppNotification"];
+                };
+            };
+        };
+    };
+    mapi_notifications_mark_all_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["InAppNotification"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InAppNotification"];
+                };
+            };
+        };
+    };
+    mapi_notifications_unread_count: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InAppNotification"][];
+                };
+            };
+        };
+    };
+    mapi_notifications_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InAppNotification"];
+                };
+            };
+        };
+    };
+    mapi_notifications_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["InAppNotification"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InAppNotification"];
+                };
+            };
+        };
+    };
+    mapi_notifications_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_notifications_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["InAppNotification"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InAppNotification"];
+                };
+            };
+        };
+    };
+    mapi_notifications_mark_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["InAppNotification"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InAppNotification"];
+                };
+            };
+        };
+    };
+    mapi_plugins_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plugin"][];
+                };
+            };
+        };
+    };
+    mapi_plugins_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Plugin"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plugin"];
+                };
+            };
+        };
+    };
+    mapi_plugins_registry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plugin"][];
+                };
+            };
+        };
+    };
+    mapi_plugins_upload_plugin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Plugin"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plugin"];
+                };
+            };
+        };
+    };
+    mapi_plugins_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plugin"];
+                };
+            };
+        };
+    };
+    mapi_plugins_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Plugin"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plugin"];
+                };
+            };
+        };
+    };
+    mapi_plugins_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_plugins_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Plugin"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Plugin"];
+                };
+            };
+        };
+    };
+    mapi_projects_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["Project"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_projects_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Project"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+        };
+    };
+    mapi_projects_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this project. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+        };
+    };
+    mapi_projects_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this project. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Project"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+        };
+    };
+    mapi_projects_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this project. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_projects_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this project. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Project"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+        };
+    };
+    mapi_projects_delete_project: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this project. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["Project"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Project"];
+                };
+            };
+        };
+    };
+    mapi_queryAllScanResultVisualise_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryDorkTypes_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryDorks_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryEmails_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryEmployees_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryEndpoints_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryInterestingSubdomains_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryIps_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryMetadata_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryOsintUsers_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryPorts_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_querySubdomains_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_querySubdomains_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryTargetsInOrganization_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryTargetsWithoutOrganization_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_queryTechnologies_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_rengine_system-settings_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_rengine_update_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_report-settings_list": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_report-settings_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_scan-summary_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_scan_status_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_scans_configuration_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_scheduledScans_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["PeriodicTask"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_scheduledScans_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["PeriodicTask"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodicTask"];
+                };
+            };
+        };
+    };
+    mapi_scheduledScans_bulk_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["PeriodicTask"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodicTask"];
+                };
+            };
+        };
+    };
+    mapi_scheduledScans_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this periodic task. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodicTask"];
+                };
+            };
+        };
+    };
+    mapi_scheduledScans_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this periodic task. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["PeriodicTask"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodicTask"];
+                };
+            };
+        };
+    };
+    mapi_scheduledScans_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this periodic task. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_scheduledScans_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this periodic task. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["PeriodicTask"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodicTask"];
+                };
+            };
+        };
+    };
+    mapi_scheduledScans_toggle: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this periodic task. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["PeriodicTask"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PeriodicTask"];
+                };
+            };
+        };
+    };
+    mapi_search_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_search_history_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_stress-testing_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_subscans_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["SubScan"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_subscans_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["SubScan"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubScan"];
+                };
+            };
+        };
+    };
+    mapi_subscans_bulk_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["SubScan"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubScan"];
+                };
+            };
+        };
+    };
+    mapi_subscans_bulk_stop: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["SubScan"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubScan"];
+                };
+            };
+        };
+    };
+    mapi_subscans_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this sub scan. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubScan"];
+                };
+            };
+        };
+    };
+    mapi_subscans_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this sub scan. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["SubScan"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubScan"];
+                };
+            };
+        };
+    };
+    mapi_subscans_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this sub scan. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_subscans_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this sub scan. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["SubScan"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubScan"];
+                };
+            };
+        };
+    };
+    "mapi_target-summary_read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_toggle-bug-bounty-mode_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_toggle_subdomain_important_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tool_ollama_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tool_ollama_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tool_ollama_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tool_uninstall_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tool_update_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tools_cms_detector_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tools_cve_details_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tools_domain_ip_history_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tools_gpt_get_possible_attacks_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tools_gpt_vulnerability_report_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tools_ip_to_domain_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tools_reverse_whois_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tools_waf_detector_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_tools_whois_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    "mapi_update-theme_create": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_updateOrganization_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_users_list: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["User"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_users_create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["User"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+        };
+    };
+    mapi_users_me: {
+        parameters: {
+            query?: {
+                /** @description A page number within the paginated result set. */
+                page?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        count: number;
+                        /** Format: uri */
+                        next?: string | null;
+                        /** Format: uri */
+                        previous?: string | null;
+                        results: components["schemas"]["User"][];
+                    };
+                };
+            };
+        };
+    };
+    mapi_users_read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+        };
+    };
+    mapi_users_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["User"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+        };
+    };
+    mapi_users_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    mapi_users_partial_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["User"];
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+        };
+    };
+    mapi_users_toggle_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["User"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+        };
+    };
+    mapi_users_update_user: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description A unique integer value identifying this user. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: components["requestBodies"]["User"];
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["User"];
+                };
+            };
+        };
+    };
+    mapi_vulnerability_report_list: {
         parameters: {
             query?: never;
             header?: never;

@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { 
-  Box, 
-  Typography, 
-  IconButton, 
+import {
+  Box,
+  Typography,
+  IconButton,
   Tooltip,
   CircularProgress,
   Pagination,
@@ -15,9 +15,9 @@ import {
   Backdrop,
   Fade
 } from '@mui/material';
-import { 
-  Search, 
-  ChevronRight, 
+import {
+  Search,
+  ChevronRight,
   ChevronDown,
   Folder,
   FolderPlus,
@@ -39,10 +39,12 @@ import type { DirectoryScan, DirectoryFile } from '../../subdomains/types';
 interface DirectoriesTabProps {
   projectSlug: string;
   scanId?: number;
+  subdomainId?: number;
+  subdomainName?: string;
   targetId?: number;
 }
 
-export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, scanId, targetId }) => {
+export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, scanId, subdomainId, subdomainName, targetId }) => {
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
@@ -52,6 +54,8 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
   const [lightboxLabel, setLightboxLabel] = useState<string>('');
 
   const { data, isLoading, error } = useSubdomains(projectSlug, page, activeSearch, scanId, true, targetId);
+
+  // TODO Wire up to the listDirectories api endpoint and display data from that instead of the subdomains api endpoint
 
   console.log('DirectoriesTab:', { projectSlug, scanId, targetId, page, activeSearch });
   console.log('DirectoriesTab Data:', data);
@@ -102,10 +106,10 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
       {/* Tactical Header */}
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 4, mt: 2 }}>
         <Box>
-          <Typography variant="h5" sx={{ 
-            fontWeight: 900, 
-            fontFamily: 'Orbitron', 
-            letterSpacing: 3, 
+          <Typography variant="h5" sx={{
+            fontWeight: 900,
+            fontFamily: 'Orbitron',
+            letterSpacing: 3,
             color: '#fff',
             textTransform: 'uppercase'
           }}>
@@ -118,10 +122,10 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
       </Box>
 
       {/* Enterprise-Grade Search Bar */}
-      <Box sx={{ 
-        display: 'flex', 
-        bgcolor: 'rgba(255,255,255,0.03)', 
-        borderRadius: '4px', 
+      <Box sx={{
+        display: 'flex',
+        bgcolor: 'rgba(255,255,255,0.03)',
+        borderRadius: '4px',
         overflow: 'hidden',
         mb: 3,
         border: '1px solid rgba(0, 243, 255, 0.1)',
@@ -134,25 +138,25 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
         <Box sx={{ display: 'flex', alignItems: 'center', pl: 2, color: 'rgba(255,255,255,0.3)' }}>
           <Search size={18} />
         </Box>
-        <InputBase 
+        <InputBase
           placeholder="Filter Directories (e.g. name=admin, status=200)"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-          sx={{ 
-            flex: 1, 
-            px: 2, 
-            py: 1, 
+          sx={{
+            flex: 1,
+            px: 2,
+            py: 1,
             fontSize: '0.9rem',
             color: '#fff',
             '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 }
           }}
         />
-        <Button 
+        <Button
           onClick={handleSearch}
-          sx={{ 
-            bgcolor: 'rgba(0, 243, 255, 0.1)', 
-            color: '#00f3ff', 
+          sx={{
+            bgcolor: 'rgba(0, 243, 255, 0.1)',
+            color: '#00f3ff',
             px: 4,
             borderRadius: 0,
             fontWeight: 700,
@@ -168,11 +172,11 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
 
       {/* Tactical Panel */}
       <TacticalPanel>
-        <Box sx={{ 
-          p: 2, 
-          display: 'flex', 
-          alignItems: 'center', 
-          justifyContent: 'space-between', 
+        <Box sx={{
+          p: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
           borderBottom: '1px solid rgba(255,255,255,0.05)',
           bgcolor: 'rgba(255,255,255,0.01)'
         }}>
@@ -199,8 +203,8 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
         <Box sx={{ overflowX: 'auto', width: '100%' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead>
-              <tr style={{ 
-                textAlign: 'left', 
+              <tr style={{
+                textAlign: 'left',
                 borderBottom: '1px solid rgba(255,255,255,0.1)',
                 backgroundColor: 'rgba(255,255,255,0.02)'
               }}>
@@ -225,7 +229,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                   </td>
                 </tr>
               ) : data?.results.map((sub) => (
-                <tr key={sub.id} style={{ 
+                <tr key={sub.id} style={{
                   borderBottom: '1px solid rgba(255,255,255,0.05)',
                   backgroundColor: 'transparent'
                 }}>
@@ -236,11 +240,11 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                   </td>
                   <Box component="td" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '12px 16px', verticalAlign: 'top', textAlign: 'center' }}>
                     {sub.screenshot_path ? (
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         onClick={() => openLightbox(sub.screenshot_path!, sub.name)}
-                        sx={{ 
-                          color: '#00f3ff', 
+                        sx={{
+                          color: '#00f3ff',
                           bgcolor: 'rgba(0, 243, 255, 0.05)',
                           border: '1px solid rgba(0, 243, 255, 0.2)',
                           '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)', borderColor: '#00f3ff' }
@@ -266,29 +270,29 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                         </IconButton>
                       </Box>
                       {sub.is_interesting && (
-                        <Chip 
-                          label="INTERESTING" 
-                          size="small" 
-                          sx={{ 
-                            height: 16, 
-                            fontSize: '8px', 
-                            fontWeight: 900, 
-                            bgcolor: 'rgba(255, 0, 60, 0.1)', 
-                            color: '#ff003c', 
+                        <Chip
+                          label="INTERESTING"
+                          size="small"
+                          sx={{
+                            height: 16,
+                            fontSize: '8px',
+                            fontWeight: 900,
+                            bgcolor: 'rgba(255, 0, 60, 0.1)',
+                            color: '#ff003c',
                             borderRadius: 0.5,
                             border: '1px solid rgba(255, 0, 60, 0.2)',
                             boxShadow: '0 0 5px rgba(255, 0, 60, 0.2)'
-                          }} 
+                          }}
                         />
                       )}
                     </Box>
                   </td>
                   <Box component="td" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', verticalAlign: 'top' }}>
-                    <Box sx={{ 
+                    <Box sx={{
                       display: 'inline-flex',
-                      px: 1.2, 
-                      py: 0.4, 
-                      borderRadius: 0.5, 
+                      px: 1.2,
+                      py: 0.4,
+                      borderRadius: 0.5,
                       bgcolor: `${getStatusColor(sub.http_status)}20`,
                       border: `1px solid ${getStatusColor(sub.http_status)}40`,
                     }}>
@@ -313,12 +317,12 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                         <Stack spacing={1}>
                           {[...sub.directories].reverse().map((scan, idx) => (
                             <Box key={scan.id}>
-                              <Box 
+                              <Box
                                 onClick={() => toggleScan(`${sub.id}-${scan.id}`)}
-                                sx={{ 
-                                  display: 'flex', 
-                                  alignItems: 'center', 
-                                  gap: 1, 
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 1,
                                   cursor: 'pointer',
                                   '&:hover': { color: '#00f3ff' },
                                   color: 'rgba(255,255,255,0.8)',
@@ -334,16 +338,16 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                                   Directories found on {scan.scanned_date}
                                 </Typography>
                               </Box>
-                              
+
                               <Collapse in={expandedScans[`${sub.id}-${scan.id}`]}>
                                 <Box sx={{ ml: 4, mt: 1, borderLeft: '1px dashed rgba(255,255,255,0.1)', pl: 2 }}>
                                   <Stack spacing={1}>
                                     {scan.directory_files.map((file, fIdx) => (
-                                      <Box 
+                                      <Box
                                         key={`${scan.id}-${fIdx}`}
-                                        sx={{ 
-                                          display: 'flex', 
-                                          alignItems: 'center', 
+                                        sx={{
+                                          display: 'flex',
+                                          alignItems: 'center',
                                           justifyContent: 'space-between',
                                           p: 1,
                                           bgcolor: 'rgba(255,255,255,0.02)',
@@ -352,19 +356,19 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                                         }}
                                       >
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
-                                          <Typography sx={{ 
-                                            fontSize: '12px', 
-                                            fontWeight: 700, 
+                                          <Typography sx={{
+                                            fontSize: '12px',
+                                            fontWeight: 700,
                                             color: '#fff',
                                             textDecoration: 'none',
                                             '&:hover': { color: '#00f3ff' }
                                           }} component="a" href={file.url} target="_blank">
                                             {decodeBase64(file.name)}
                                           </Typography>
-                                          <Box sx={{ 
-                                            px: 0.8, 
-                                            py: 0.1, 
-                                            borderRadius: 0.5, 
+                                          <Box sx={{
+                                            px: 0.8,
+                                            py: 0.1,
+                                            borderRadius: 0.5,
                                             bgcolor: `${getStatusColor(file.http_status)}20`,
                                             border: `1px solid ${getStatusColor(file.http_status)}40`,
                                           }}>
@@ -372,10 +376,10 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                                               {file.http_status}
                                             </Typography>
                                           </Box>
-                                          <Chip 
-                                            label={file.content_type} 
-                                            size="small" 
-                                            sx={{ height: 14, fontSize: '8px', bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', borderRadius: 0.5 }} 
+                                          <Chip
+                                            label={file.content_type}
+                                            size="small"
+                                            sx={{ height: 14, fontSize: '8px', bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', borderRadius: 0.5 }}
                                           />
                                         </Box>
                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
@@ -415,9 +419,9 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
         {/* Tactical Pagination */}
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <Stack spacing={2}>
-            <Pagination 
-              count={Math.ceil((data?.count || 0) / 50)} 
-              page={page} 
+            <Pagination
+              count={Math.ceil((data?.count || 0) / 50)}
+              page={page}
               onChange={(_, v) => setPage(v)}
               size="small"
               sx={{

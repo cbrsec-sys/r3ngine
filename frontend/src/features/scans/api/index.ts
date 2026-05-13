@@ -1,9 +1,53 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import type { operations, components } from '@/types/api';
-import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, SecretLeak } from '../types';
+import type { ScanHistory, ScheduledScan, SubScan, Command, ScanSummaryResponse, SecretLeak, DirectoryFile } from '../types';
 import type { Domain } from '../../targets/types';
 
+// TODO: NEEDS TO BE IMPLEMENTED PROPERLY RENDER DATA IN THE FRONTEND
+// Currently the request is going to 
+// https://127.0.0.1/api/listDatatableSubdomain/?project=default&page=1&search%5Bvalue%5D=&scan_id=63&only_directory=true&format=json
+// which is not returning the data required for rendering in the frontend.
+// the listDirectories endpoint should be used instead
+// Unsure if the below will actually provide the results Im looking for.
+// The old implementation that worked when still using the django templates is as follows
+// reference: line 1020 in static\startScan\js\detail_scan.js (function get_directory_modal)
+// function get_directory_modal(scan_id=null, subdomain_id=null, subdomain_name=null){
+// 	// This function will display a xl modal with datatable for displaying endpoints
+// 	// associated with the subdomain
+// 	$('#xl-modal-title').empty();
+// 	$('#xl-modal-content').empty();
+// 	$('#xl-modal-footer').empty();
 
+// 	if (scan_id) {
+// 		url = `/api/listDirectories/?scan_id=${scan_id}&subdomain_id=${subdomain_id}&format=json`
+// 	}
+// 	else{
+// 		url = `/api/listDirectories/?subdomain_id=${subdomain_id}&format=json`
+// 	}
+
+// 	Swal.fire({
+// 		title: `Fetching Directories for ${subdomain_name}...`
+// 	});
+// 	swal.showLoading();
+
+// 	fetch(url, {
+// 		method: 'GET',
+// 		credentials: "same-origin",
+// 		headers: {
+// 			"X-CSRFToken": getCookie("csrftoken"),
+// 			'Content-Type': 'application/json'
+// 		},
+// 	}).then(response => response.json()).then(function(response) {
+// 		console.log(response);
+// 		swal.close();
+// 		$('#xl-modal_title').html(`${subdomain_name}`);
+// 		render_directories_in_xl_modal(response['count'], subdomain_name, response['results'])
+// 	});
+// 	$('#modal_xl_scroll_dialog').modal('show');
+// 	$("body").tooltip({
+// 		selector: '[data-toggle=tooltip]'
+// 	});
+// }
 
 export const useDomains = (projectSlug: string) => {
   return useQuery<Domain[]>({
@@ -15,7 +59,7 @@ export const useDomains = (projectSlug: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json() as operations["listTargets_list"]["responses"]["200"]["content"]["application/json"];
+      const data = await response.json() as operations["api_listTargets_list"]["responses"]["200"]["content"]["application/json"];
       return data.results || [];
     },
     enabled: !!projectSlug,
@@ -37,6 +81,7 @@ export const useScans = (projectSlug: string) => {
       return (data.results || []) as ScanHistory[];
     },
     enabled: !!projectSlug,
+    refetchInterval: 5000,
   });
 };
 
@@ -151,6 +196,7 @@ export const useSubScans = (projectSlug: string) => {
       return Array.isArray(data) ? data : data.results || [];
     },
     enabled: !!projectSlug,
+    refetchInterval: 5000,
   });
 };
 
@@ -206,10 +252,11 @@ export const useScansHistory = (project: string) => {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      const data = await response.json() as operations["listScans_list"]["responses"]["200"]["content"]["application/json"];
+      const data = await response.json() as operations["api_listScans_list"]["responses"]["200"]["content"]["application/json"];
       return (data.results || []) as ScanHistory[];
     },
     enabled: !!project,
+    refetchInterval: 5000,
   });
 };
 
@@ -260,7 +307,7 @@ export const useBulkScanAction = (projectSlug: string) => {
     mutationFn: async ({ action, ids }: { action: 'bulk_stop' | 'bulk_delete', ids: number[] }) => {
       const url = action === 'bulk_stop' ? '/api/action/stop/scan/' : `/api/listScans/${action}/`;
       const body = action === 'bulk_stop' ? { scan_ids: ids } : { ids };
-      
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -433,7 +480,7 @@ export const useScanLogs = (activityId: number | null, scanId: number | null) =>
   return useQuery<Command[]>({
     queryKey: ['scan-logs', activityId, scanId],
     queryFn: async () => {
-      const endpoint = activityId 
+      const endpoint = activityId
         ? `/api/listActivityLogs/?activity_id=${activityId}`
         : `/api/listScanLogs/?scan_id=${scanId}`;
       const response = await fetch(endpoint, {
