@@ -1,5 +1,5 @@
 <p align="center">
-  <em>THIS IS AN <strong>ALPHA</strong> RELEASE AND MAY CONTAIN BUGS</em>
+  <em>V3 Beta Release is now operational!</em>
 </p>
 <p align="center">
 <a href="https://rengine.wiki"><img src="frontend/public/img/banner.png" height="400px" width="520px" alt=""/></a>
