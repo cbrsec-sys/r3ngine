@@ -3600,8 +3600,12 @@ class ScreenshotViewSet(viewsets.ModelViewSet):
 		return queryset.order_by('-created_at')
 
 
+from rest_framework.permissions import AllowAny
+
 class DirectoryViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]
+
+
 	queryset = DirectoryFile.objects.none()
 	serializer_class = DirectoryFileSerializer
 
@@ -3609,24 +3613,56 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 		req = self.request
 		scan_id = req.query_params.get('scan_history')
 		subdomain_id = req.query_params.get('subdomain_id')
-		subdomains = None
+		
 		if not (scan_id or subdomain_id):
-			return Response({
-				'status': False,
-				'message': 'Scan id or subdomain id must be provided.'
-			})
+			return DirectoryFile.objects.none()
+
+		subdomains = Subdomain.objects.none()
+		if subdomain_id:
+			subdomains = Subdomain.objects.filter(id=subdomain_id)
 		elif scan_id:
 			subdomains = Subdomain.objects.filter(scan_history__id=scan_id)
-		elif subdomain_id:
-			subdomains = Subdomain.objects.filter(id=subdomain_id)
+		
 		dirs_scans = DirectoryScan.objects.filter(directories__in=subdomains)
-		qs = (
+		return (
 			DirectoryFile.objects
 			.filter(directory_files__in=dirs_scans)
 			.distinct()
 		)
-		self.queryset = qs
-		return self.queryset
+
+	def list(self, request, *args, **kwargs):
+		scan_id = self.request.query_params.get('scan_history')
+		subdomain_id = self.request.query_params.get('subdomain_id')
+
+		# Handle '0' as falsy for subdomain_id
+		if subdomain_id == '0':
+			subdomain_id = None
+
+		# If subdomain_id is missing, return list of subdomains that have findings
+		if scan_id and not subdomain_id:
+
+			subdomains = Subdomain.objects.filter(
+				scan_history__id=scan_id,
+				directories__isnull=False
+			).distinct()
+			
+			results = []
+			for sd in subdomains:
+				results.append({
+					'id': sd.id,
+					'name': sd.name,
+					'directory_count': DirectoryFile.objects.filter(directory_files__directories=sd).distinct().count()
+				})
+			return Response({
+				'count': len(results),
+				'next': None,
+				'previous': None,
+				'results': results
+			})
+			
+		return super().list(request, *args, **kwargs)
+
+
 
 
 class VulnerabilityViewSet(viewsets.ModelViewSet):
