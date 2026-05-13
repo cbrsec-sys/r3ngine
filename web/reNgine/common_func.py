@@ -673,6 +673,16 @@ def get_leaklookup_key():
 	return key_obj.key if key_obj else ''
 
 
+def get_chaos_api_key():
+	"""Get Chaos API key from DB (used for ProjectDiscovery).
+
+	Returns:
+		str: Chaos API key or ''.
+	"""
+	key_obj = ChaosAPIKey.objects.first()
+	return key_obj.key if key_obj else ''
+
+
 def get_random_proxy():
 	"""Get a random proxy from the list of proxies input by user in the UI.
 

@@ -133,7 +133,7 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
         # Full scan on all subdomains
         subdomains = Subdomain.objects.filter(scan_history=self.scan)
         for subdomain in subdomains:
-            targets.append((f"http://{subdomain.name}", subdomain))
+            targets.append((f"https://{subdomain.name}/", subdomain))
 
     if not targets:
         logger.info("No targets found for WPScan.")
@@ -151,13 +151,16 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
         output_file = f"{results_dir}/{target_name}_wpscan.json"
         
         # Command construction
-        cmd = f"wpscan --url {target_url} --format json --output {output_file} --enumerate {enumeration} --detection-mode {detection_mode} --no-banner"
-        
+        cmd = f"wpscan --url {target_url} --format json --random-user-agent --output {output_file} --enumerate {enumeration} --detection-mode {detection_mode} --no-banner --ignore-main-redirect"
+        proxy = get_random_proxy()
+        if proxy:
+            cmd += f" --proxy {proxy}"
         if api_key:
             cmd += f" --api-token {api_key}"
             
-        # Execute tool
-        stream_command(cmd, scan_id=self.scan_id, activity_id=self.activity_id)
+        # Execute tool — stream_command is a generator; must be consumed to run the subprocess.
+        for _ in stream_command(cmd, scan_id=self.scan_id, activity_id=self.activity_id):
+            pass
 
         # Parse and save
         parse_wpscan_results(self, output_file, subdomain)
