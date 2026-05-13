@@ -2,6 +2,8 @@ import os
 import requests
 import json
 import validators
+import csv
+import io
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from django.utils import timezone
@@ -11,12 +13,44 @@ from reNgine.celery import app
 from reNgine.definitions import *
 from reNgine.settings import *
 from reNgine.common_func import *
-from reNgine.task_utils import save_subdomain
+from django.db import transaction
+from reNgine.task_utils import save_subdomain, stream_command
 from targetApp.models import Domain
 from startScan.models import ScanHistory, Subdomain, EndPoint, MonitoringDiscovery
 from scanEngine.models import EngineType
 
 logger = get_task_logger(__name__)
+
+
+def _process_monitor_spiderfoot_batch(batch, domain, scan_history, ctx, new_discoveries, existing_subs):
+	"""Internal helper to process a batch of SpiderFoot findings for monitoring."""
+	try:
+		with transaction.atomic():
+			for event in batch:
+				e_type = event.get('Type')
+				e_data = event.get('Data')
+				
+				if not e_type or not e_data:
+					continue
+				
+				# SF types for hostnames/subdomains
+				if e_type in ['DNS_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME']:
+					sub_name = e_data.lower()
+					if sub_name and sub_name.endswith(domain.name) and sub_name not in existing_subs:
+						sub_obj, created = save_subdomain(sub_name, ctx=ctx)
+						if created:
+							new_discoveries.append(f"Subdomain (SpiderFoot): {sub_name}")
+							existing_subs.add(sub_name)
+							MonitoringDiscovery.objects.create(
+								domain=domain,
+								discovery_type='subdomain',
+								content={'name': sub_name, 'source': 'SpiderFoot'},
+								scan_history=scan_history
+							)
+		logger.info(f"Processed monitoring batch of {len(batch)} SpiderFoot findings.")
+	except Exception as e:
+		logger.error(f"Error processing SpiderFoot monitoring batch: {str(e)}")
+
 
 @app.task(name='monitor_target_task', queue='main_scan_queue')
 def monitor_target_task(domain_id):
@@ -178,40 +212,49 @@ def monitor_target_task(domain_id):
 			# Use a focused set of modules for monitoring efficiency
 			# Discovery modules + OSINT
 			sf_modules = "snovio,hunterio,emailrep,intelx,shodan,sublist3r,threatcrowd,crtsh"
-			sf_cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {domain.name} -m {sf_modules} -q -f -o json -c {sf_config_path} > {sf_output}"
+			# Use CSV output for streaming. -r includes source data, -n strips newlines.
+			sf_cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {domain.name} -m {sf_modules} -q -o csv -r -n -c {sf_config_path}"
 			
 			proxy = get_random_proxy()
 			if proxy:
 				sf_cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {sf_cmd}"
 			
-			os.system(sf_cmd)
-		else:
-			sf_output = None
-		
-		if sf_output and os.path.exists(sf_output):
+			batch = []
+			batch_size = 50
+			header = None
+			
 			try:
-				with open(sf_output, 'r') as f:
-					sf_data = json.load(f)
-					# Refresh existing subs to avoid duplicates from subfinder run
-					existing_subs = set(Subdomain.objects.filter(target_domain=domain).values_list('name', flat=True))
-					for event in sf_data:
-						# SF types for hostnames/subdomains
-						if event.get('type') in ['DNS_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME']:
-							sub_name = event.get('data', '').lower()
-							if sub_name and sub_name.endswith(domain.name) and sub_name not in existing_subs:
-								from reNgine.tasks import save_subdomain
-								sub_obj, created = save_subdomain(sub_name, ctx=ctx)
-								if created:
-									new_discoveries.append(f"Subdomain (SpiderFoot): {sub_name}")
-									existing_subs.add(sub_name)
-									MonitoringDiscovery.objects.create(
-										domain=domain,
-										discovery_type='subdomain',
-										content={'name': sub_name, 'source': 'SpiderFoot'},
-										scan_history=scan_history
-									)
+				for line in stream_command(sf_cmd, shell=True):
+					if not isinstance(line, str) or not line.strip():
+						continue
+					
+					f = io.StringIO(line)
+					reader = csv.reader(f)
+					try:
+						row = next(reader)
+					except StopIteration:
+						continue
+					
+					if not header:
+						if "Data" in row and "Type" in row:
+							header = row
+							continue
+						else:
+							continue
+					
+					event = dict(zip(header, row))
+					batch.append(event)
+					
+					if len(batch) >= batch_size:
+						_process_monitor_spiderfoot_batch(batch, domain, scan_history, ctx, new_discoveries, existing_subs)
+						batch = []
+				
+				if batch:
+					_process_monitor_spiderfoot_batch(batch, domain, scan_history, ctx, new_discoveries, existing_subs)
+					
 			except Exception as e:
-				logger.error(f"Error parsing SpiderFoot monitoring results: {str(e)}")
+				logger.error(f"SpiderFoot monitoring failed: {e}")
+
 
 		# 5. Notifications
 		if new_discoveries:

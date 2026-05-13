@@ -39,6 +39,8 @@ router.register(r'notifications', InAppNotificationManagerViewSet, basename='not
 router.register(r'hackerone-programs', HackerOneProgramViewSet, basename='hackerone_program')
 router.register(r'monitoring', MonitoringDiscoveryViewSet, basename='monitoring')
 router.register(r'projects', ProjectViewSet, basename='projects')
+router.register(r'secretLeaks', SecretLeakViewSet, basename='secret-leaks')
+router.register(r'screenshots', ScreenshotViewSet, basename='screenshots')
 router.register(r'scheduledScans', ScheduledScanViewSet, basename='scheduled-scans')
 router.register(r'subscans', SubScanViewSet, basename='subscans')
 router.register(r'listScans', ScanHistoryViewSet, basename='list-scans')
@@ -155,6 +157,18 @@ urlpatterns = [
         'listTodoNotes/',
         ListTodoNotes.as_view(),
         name='listTodoNotes'),
+    path(
+        'toggle/note/status/',
+        ToggleTodoStatus.as_view(),
+        name='toggle_note_status'),
+    path(
+        'toggle/note/importance/',
+        ToggleNoteImportance.as_view(),
+        name='toggle_note_importance'),
+    path(
+        'action/note/delete/',
+        DeleteReconNote.as_view(),
+        name='delete_note'),
     path(
         'listInterestingKeywords/',
         ListInterestingKeywords.as_view(),
@@ -329,6 +343,11 @@ urlpatterns = [
         name='dashboard_api'
     ),
     path(
+        'system/health/',
+        SystemHealthAPIView.as_view(),
+        name='system_health_api'
+    ),
+    path(
         'target-summary/<slug:slug>/<int:id>/',
         TargetSummaryAPIView.as_view(),
         name='target_summary_api'
@@ -342,6 +361,11 @@ urlpatterns = [
         'notification-settings/',
         NotificationSettingsAPIView.as_view(),
         name='notification_settings_api'
+    ),
+    path(
+        'media/',
+        MobileMediaServeView.as_view(),
+        name='mobile_media_serve'
     ),
     path(
         'stress-testing/<int:id>/',

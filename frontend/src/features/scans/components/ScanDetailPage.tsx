@@ -325,6 +325,7 @@ const StatusBadge: React.FC<{ status: number, compact?: boolean }> = ({ status, 
     [1]: { label: 'PENDING', color: '#00f3ff', icon: Activity },
     [2]: { label: 'SUCCESS', color: '#00ff62', icon: Shield },
     [3]: { label: 'ABORTED', color: '#ff003c', icon: AlertTriangle },
+    [4]: { label: 'PARTIALLY COMPLETE', color: '#fffc00', icon: AlertTriangle },
   };
   const config = configs[status] || { label: 'UNKNOWN', color: '#fff', icon: Info };
   const Icon = config.icon;
@@ -704,7 +705,7 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
   );
 };
 
-const VulnHighlights: React.FC<{ highlights: Vulnerability[] }> = ({ highlights }) => (
+const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: any) => void }> = ({ highlights, onVulnClick }) => (
   <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
     <TableContainer sx={{ flex: 1, overflow: 'auto', maxHeight: 380 }}>
       <Table size="small" stickyHeader>
@@ -718,7 +719,19 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[] }> = ({ highlights 
         </TableHead>
         <TableBody>
           {(highlights || []).map((v: Vulnerability, idx: number) => (
-            <TableRow key={idx} sx={{ '& td': { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 2 } }}>
+            <TableRow
+              key={idx}
+              onClick={() => onVulnClick(v)}
+              sx={{
+                '& td': { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 2 },
+                cursor: 'pointer',
+                transition: 'background-color 0.2s',
+                '&:hover': {
+                  bgcolor: 'rgba(255,255,255,0.03)',
+                  '& td:nth-of-type(2) p:first-of-type': { color: '#00f3ff' }
+                }
+              }}
+            >
               <TableCell>
                 <Box sx={{
                   bgcolor: 'rgba(33,150,243,0.1)',
@@ -771,11 +784,29 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?:
 
   const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) > 0) : vulnerabilities;
 
-  const subdomainCounts = filteredVulns.reduce((acc: Record<string, number>, v: Vulnerability) => {
-    const host = new URL(v.http_url || '').hostname;
-    acc[host] = (acc[host] || 0) + 1;
-    return acc;
-  }, {});
+  const subdomainCounts = filteredVulns.reduce(
+    (acc: Record<string, number>, v: Vulnerability) => {
+      try {
+        if (!v.http_url) return acc;
+
+        // Ensure protocol exists
+        const normalizedUrl = v.http_url.match(/^https?:\/\//)
+          ? v.http_url
+          : `http://${v.http_url}`;
+
+        const host = new URL(normalizedUrl).hostname;
+
+        if (!host) return acc;
+
+        acc[host] = (acc[host] || 0) + 1;
+      } catch (err) {
+        console.warn('Invalid URL:', v.http_url);
+      }
+
+      return acc;
+    },
+    {}
+  );
 
   const sorted = Object.entries(subdomainCounts).sort((a: [string, number], b: [string, number]) => b[1] - a[1]);
   const mostVulnerable = sorted[0];
@@ -1021,6 +1052,11 @@ export const ScanDetailPage = () => {
     );
   }
 
+  const scanStatus = data.scan_info.scan_status;
+  const isTerminal = [0, 2, 3, 4].includes(scanStatus);
+  const progressColor = scanStatus === 2 ? '#00ff62' : (scanStatus === 3 || scanStatus === 0) ? '#ff003c' : scanStatus === 4 ? '#fffc00' : '#00f3ff';
+  const progressValue = isTerminal ? 100 : data.scan_info.progress;
+
   const baseTabs = [
     { label: 'HOME', icon: Activity },
     { label: 'SUBDOMAINS', icon: Globe },
@@ -1063,8 +1099,26 @@ export const ScanDetailPage = () => {
       <TacticalPanel title="Scan Status" icon={<Activity size={14} />}>
         <Box sx={{ p: 2 }}>
           <Stack spacing={4}>
-            <Box sx={{ textAlign: 'center' }}>
+            <Box sx={{ textAlign: 'center', position: 'relative' }}>
               <StatusBadge status={data.scan_info.scan_status} />
+              {data.timeline?.some((a: ScanActivity) => (a.name === 'spiderfoot_scan' || a.title?.toLowerCase().includes('spiderfoot')) && a.status === 'RUNNING') && (
+                <MuiTooltip title="Attack Surface Intelligence (SpiderFoot) is running in the background">
+                  <Box sx={{
+                    position: 'absolute',
+                    top: -10,
+                    right: -10,
+                    animation: 'pulse-spider 2s infinite ease-in-out',
+                    cursor: 'help',
+                    '@keyframes pulse-spider': {
+                      '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+                      '50%': { transform: 'scale(1.3)', filter: 'drop-shadow(0 0 15px #ff00ff)' },
+                      '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+                    }
+                  }}>
+                    <Bug size={24} color="#ff00ff" />
+                  </Box>
+                </MuiTooltip>
+              )}
             </Box>
 
             <Box>
@@ -1073,17 +1127,20 @@ export const ScanDetailPage = () => {
                 <Box sx={{ flexGrow: 1, position: 'relative' }}>
                   <LinearProgress
                     variant="determinate"
-                    value={data.scan_info.scan_status === 2 ? 100 : data.scan_info.progress}
+                    value={progressValue}
                     sx={{
                       height: 6,
                       borderRadius: 3,
                       bgcolor: 'rgba(255,255,255,0.05)',
-                      '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff', boxShadow: '0 0 15px #00f3ff' }
+                      '& .MuiLinearProgress-bar': {
+                        bgcolor: progressColor,
+                        boxShadow: `0 0 15px ${progressColor}80`
+                      }
                     }}
                   />
                 </Box>
-                <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#00f3ff', fontFamily: 'Orbitron' }}>
-                  {data.scan_info.scan_status === 2 ? '100' : data.scan_info.progress}%
+                <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: progressColor, fontFamily: 'Orbitron' }}>
+                  {progressValue}%
                 </Typography>
               </Box>
             </Box>
@@ -1320,7 +1377,7 @@ export const ScanDetailPage = () => {
                 <Stack spacing={1}>
                   {data.domain_info?.dns_records?.map((r: any, idx: number) => (
                     <Stack key={idx} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                      <Chip label={r.type.toUpperCase()} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} />
+                      <Chip label={r.type?.toUpperCase() ?? 'DNS'} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} />
                       <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{r.name} {"->"} {r.value}</Typography>
                     </Stack>
                   ))}
@@ -1389,7 +1446,7 @@ export const ScanDetailPage = () => {
           }}
           exploitable={data.exploitable_count}
         />
-        <VulnHighlights highlights={data.vulnerability_highlights} />
+        <VulnHighlights highlights={data.vulnerability_highlights} onVulnClick={handleVulnClick} />
       </Box>
 
       {/* Row 4: Vulnerability Deep Dive */}
@@ -1504,15 +1561,19 @@ export const ScanDetailPage = () => {
   );
 
   const renderSubdomains = () => (
-    <SubdomainsTab projectSlug={projectSlug} scanId={parseInt(scanId)} />
+    <SubdomainsTab projectSlug={projectSlug} scanId={parseInt(scanId)} onTabChange={setActiveTab} />
   );
+
 
   const renderEndpoints = () => (
     <EndpointsTab projectSlug={projectSlug} scanId={parseInt(scanId)} matchedGfCounts={data.matched_gf_count} />
   );
+
+  // TODO NEEDS TO BE FIXED AS WELL TO ENSURE THE DIRECTORIES TAB PROPERLY RENDERS DATA
   const renderDirectories = () => (
-    <DirectoriesTab projectSlug={projectSlug} scanId={parseInt(scanId)} />
+    <DirectoriesTab projectSlug={projectSlug} scanId={parseInt(scanId)} subdomainId={0} subdomainName={data.target_info?.name || ''} targetId={data.target_info?.id || 0} />
   );
+
 
   const renderVulnerabilities = () => (
     <TacticalPanel title="VULNERABILITY INTELLIGENCE" icon={<ShieldAlert size={18} color="#00f3ff" />}>
@@ -1529,13 +1590,27 @@ export const ScanDetailPage = () => {
     <Box sx={{ p: 2 }}>
       {/* Header */}
       <Box sx={{ mb: 3 }}>
-        <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          sx={{
+            justifyContent: 'space-between',
+            alignItems: { xs: 'flex-start', sm: 'flex-start' },
+            gap: 2
+          }}
+        >
           <Box sx={{ mt: 0.5 }}>
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN DETAIL</Typography>
             <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info?.name || 'N/A'}</Typography>
           </Box>
-          <Stack spacing={1} sx={{ alignItems: 'flex-end' }}>
-            <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+          <Stack spacing={1} sx={{ alignItems: { xs: 'flex-start', sm: 'flex-end' }, width: { xs: '100%', sm: 'auto' } }}>
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={2}
+              sx={{
+                alignItems: { xs: 'stretch', md: 'center' },
+                width: { xs: '100%', md: 'auto' }
+              }}
+            >
               <Button
                 variant="contained"
                 startIcon={<RefreshCw size={16} />}
@@ -1589,12 +1664,13 @@ export const ScanDetailPage = () => {
                 STRESS TEST
               </Button>
             </Stack>
-            <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+            <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', alignSelf: { xs: 'flex-start', sm: 'flex-end' } }}>
               <span>SCANS</span> / <span>DETAIL</span> / <span style={{ color: '#00f3ff' }}>{data.target_info.name}</span>
             </Stack>
           </Stack>
         </Stack>
       </Box>
+
 
       {/* Tab Bar Integration - Now spanning full width at the top */}
       <Box sx={{ mb: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', position: 'sticky', top: 0, bgcolor: 'rgba(10,10,15,0.9)', zIndex: 10, backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px' }}>

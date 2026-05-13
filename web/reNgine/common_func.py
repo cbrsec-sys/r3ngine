@@ -673,6 +673,16 @@ def get_leaklookup_key():
 	return key_obj.key if key_obj else ''
 
 
+def get_chaos_api_key():
+	"""Get Chaos API key from DB (used for ProjectDiscovery).
+
+	Returns:
+		str: Chaos API key or ''.
+	"""
+	key_obj = ChaosAPIKey.objects.first()
+	return key_obj.key if key_obj else ''
+
+
 def get_random_proxy():
 	"""Get a random proxy from the list of proxies input by user in the UI.
 
@@ -1910,7 +1920,6 @@ def parse_semgrep_result(result):
 	}
 
 
-
 def parse_retire_result(result):
 	"""Parses a single Retire.js vulnerability into reNgine vulnerability format."""
 	return {
@@ -1920,3 +1929,51 @@ def parse_retire_result(result):
 		'http_url': result.get('file', ''),
 		'type': 'SCA',
 	}
+
+
+def parse_inql_results(directory_path):
+	"""
+	Parses InQL output directory for discovered GraphQL endpoints.
+	InQL creates a directory structure like:
+	target_domain/
+		queries/
+		schema.json
+		...
+	"""
+	endpoints = []
+	if not os.path.exists(directory_path):
+		return endpoints
+
+	# InQL often identifies the GraphQL endpoint by its structure
+	# We look for files or directories that indicate a successful discovery
+	for root, dirs, files in os.walk(directory_path):
+		for file in files:
+			if file == 'schema.json' or file.endswith('.graphql'):
+				# The parent directory or the root might be the endpoint path
+				# This is a heuristic. In reNgine, we often know the base URL.
+				# We return the "fact" that GraphQL was found.
+				endpoints.append({
+					'type': 'GraphQL',
+					'discovered_file': os.path.join(root, file)
+				})
+	return endpoints
+
+
+def extract_params_from_url(url):
+	"""
+	Extracts query parameters from a URL and returns a list of dicts.
+	"""
+	params = []
+	try:
+		parsed = urlparse(url)
+		query_dict = parse_qs(parsed.query)
+		for key, values in query_dict.items():
+			for value in values:
+				params.append({
+					'name': key,
+					'value': value,
+					'type': 'URL Query'
+				})
+	except Exception as e:
+		logger.error(f"Error extracting parameters from URL {url}: {e}")
+	return params

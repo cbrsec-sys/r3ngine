@@ -8,6 +8,8 @@ export type Vulnerability = components["schemas"]["Vulnerability"];
 export type Subdomain = components["schemas"]["Subdomain"];
 export type Domain = components["schemas"]["Domain"];
 
+export type DirectoryFile = components["schemas"]["DirectoryFile"];
+
 export interface TodoNote {
   id: number;
   title: string;

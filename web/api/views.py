@@ -14,8 +14,11 @@ from datetime import datetime
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.renderers import JSONRenderer
+from django.http import FileResponse, Http404
+import mimetypes
+import os
 
 
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_204_NO_CONTENT, HTTP_202_ACCEPTED
@@ -2271,6 +2274,43 @@ class ListTodoNotes(APIView):
 		return Response({'notes': notes.data})
 
 
+class ToggleTodoStatus(APIView):
+	permission_classes = [IsPenetrationTester]
+	def post(self, request):
+		todo_id = request.data.get('id')
+		try:
+			note = TodoNote.objects.get(id=todo_id)
+			note.is_done = not note.is_done
+			note.save()
+			return Response({'status': True, 'is_done': note.is_done})
+		except TodoNote.DoesNotExist:
+			return Response({'status': False, 'message': 'Note not found'}, status=404)
+
+
+class ToggleNoteImportance(APIView):
+	permission_classes = [IsPenetrationTester]
+	def post(self, request):
+		todo_id = request.data.get('id')
+		try:
+			note = TodoNote.objects.get(id=todo_id)
+			note.is_important = not note.is_important
+			note.save()
+			return Response({'status': True, 'is_important': note.is_important})
+		except TodoNote.DoesNotExist:
+			return Response({'status': False, 'message': 'Note not found'}, status=404)
+
+
+class DeleteReconNote(APIView):
+	permission_classes = [IsPenetrationTester]
+	def post(self, request):
+		todo_id = request.data.get('id')
+		try:
+			TodoNote.objects.filter(id=todo_id).delete()
+			return Response({'status': True})
+		except Exception as e:
+			return Response({'status': False, 'message': str(e)}, status=400)
+
+
 class ListScanHistory(APIView):
 	permission_classes = [IsAuditor]
 	def get(self, request, format=None):
@@ -3515,8 +3555,57 @@ class EndPointViewSet(viewsets.ModelViewSet):
 		return qs
 
 
+class SecretLeakViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
+	serializer_class = SecretLeakSerializer
+	queryset = SecretLeak.objects.none()
+
+	def get_queryset(self):
+		req = self.request
+		project = req.query_params.get('project')
+		target_id = req.query_params.get('target_id')
+		scan_id = req.query_params.get('scan_id')
+		
+		queryset = SecretLeak.objects.all()
+
+		if project:
+			queryset = queryset.filter(scan_history__domain__project__slug=project)
+		if target_id:
+			queryset = queryset.filter(scan_history__domain__id=target_id)
+		if scan_id:
+			queryset = queryset.filter(scan_history__id=scan_id)
+			
+		return queryset.order_by('-discovered_date')
+
+
+class ScreenshotViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
+	queryset = Screenshot.objects.all()
+	serializer_class = ScreenshotSerializer
+
+	def get_queryset(self):
+		req = self.request
+		project = req.query_params.get('project')
+		target_id = req.query_params.get('target_id')
+		scan_id = req.query_params.get('scan_id')
+
+		queryset = self.queryset
+		if project:
+			queryset = queryset.filter(scan_history__domain__project__slug=project)
+		if target_id:
+			queryset = queryset.filter(scan_history__domain__id=target_id)
+		if scan_id:
+			queryset = queryset.filter(scan_history__id=scan_id)
+		
+		return queryset.order_by('-created_at')
+
+
+from rest_framework.permissions import AllowAny
+
 class DirectoryViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]
+
+
 	queryset = DirectoryFile.objects.none()
 	serializer_class = DirectoryFileSerializer
 
@@ -3524,35 +3613,68 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 		req = self.request
 		scan_id = req.query_params.get('scan_history')
 		subdomain_id = req.query_params.get('subdomain_id')
-		subdomains = None
+		
 		if not (scan_id or subdomain_id):
-			return Response({
-				'status': False,
-				'message': 'Scan id or subdomain id must be provided.'
-			})
+			return DirectoryFile.objects.none()
+
+		subdomains = Subdomain.objects.none()
+		if subdomain_id:
+			subdomains = Subdomain.objects.filter(id=subdomain_id)
 		elif scan_id:
 			subdomains = Subdomain.objects.filter(scan_history__id=scan_id)
-		elif subdomain_id:
-			subdomains = Subdomain.objects.filter(id=subdomain_id)
+		
 		dirs_scans = DirectoryScan.objects.filter(directories__in=subdomains)
-		qs = (
+		return (
 			DirectoryFile.objects
 			.filter(directory_files__in=dirs_scans)
 			.distinct()
 		)
-		self.queryset = qs
-		return self.queryset
+
+	def list(self, request, *args, **kwargs):
+		scan_id = self.request.query_params.get('scan_history')
+		subdomain_id = self.request.query_params.get('subdomain_id')
+
+		# Handle '0' as falsy for subdomain_id
+		if subdomain_id == '0':
+			subdomain_id = None
+
+		# If subdomain_id is missing, return list of subdomains that have findings
+		if scan_id and not subdomain_id:
+
+			subdomains = Subdomain.objects.filter(
+				scan_history__id=scan_id,
+				directories__isnull=False
+			).distinct()
+			
+			results = []
+			for sd in subdomains:
+				results.append({
+					'id': sd.id,
+					'name': sd.name,
+					'directory_count': DirectoryFile.objects.filter(directory_files__directories=sd).distinct().count()
+				})
+			return Response({
+				'count': len(results),
+				'next': None,
+				'previous': None,
+				'results': results
+			})
+			
+		return super().list(request, *args, **kwargs)
+
+
 
 
 class VulnerabilityViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]
-	queryset = Vulnerability.objects.none()
 	serializer_class = VulnerabilitySerializer
+	queryset = Vulnerability.objects.none()
 
 	def get_queryset(self):
 		req = self.request
-		scan_id = req.query_params.get('scan_history')
+		project = req.query_params.get('project')
 		target_id = req.query_params.get('target_id')
+		scan_id = req.query_params.get('scan_history')
 		domain = req.query_params.get('domain')
 		severity = req.query_params.get('severity')
 		subdomain_id = req.query_params.get('subdomain_id')
@@ -3600,7 +3722,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 
 	def filter_queryset(self, qs):
 		qs = self.queryset.filter()
-		search_value = self.request.GET.get(u'search[value]', None)
+		search_value = self.request.GET.get(u'search[value]', '')
 		_order_col = self.request.GET.get(u'order[0][column]', None)
 		_order_direction = self.request.GET.get(u'order[0][dir]', None)
 		if search_value or _order_col or _order_direction:
@@ -3628,7 +3750,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 						if query.strip():
 							qs = qs & self.special_lookup(query.strip())
 				elif '|' in search_value:
-					qs = Subdomain.objects.none()
+					qs = Vulnerability.objects.none()
 					complex_query = search_value.split('|')
 					for query in complex_query:
 						if query.strip():
@@ -3881,3 +4003,109 @@ class NotificationSettingsAPIView(APIView):
 				send_discord_message('**reNgine**\nCongratulations! your notification services are working.')
 			return Response({'status': True, 'message': 'Notification settings updated and test message sent.'})
 		return Response(serializer.errors, status=400)
+
+class MobileMediaServeView(APIView):
+	permission_classes = [AllowAny]
+	def get(self, request):
+		logger.warning(f"!!! MobileMediaServeView HIT !!! User authenticated: {request.user.is_authenticated}")
+		path = request.query_params.get('path')
+		logger.warning(f"!!! Path requested: {path} !!!")
+		if not path:
+			return Response({'error': 'Path is required'}, status=status.HTTP_400_BAD_REQUEST)
+		
+		# Normalize path
+		if path.startswith(settings.MEDIA_ROOT):
+			path = os.path.relpath(path, settings.MEDIA_ROOT)
+		elif path.startswith('/usr/src/scan_results'):
+			path = os.path.relpath(path, '/usr/src/scan_results')
+		
+		if path.startswith('scan_results/'):
+			path = path[len('scan_results/'):]
+		elif path.startswith('media/'):
+			path = path[len('media/'):]
+		elif path.startswith('/media/'):
+			path = path[len('/media/'):]
+		
+		path = path.lstrip('/')
+		file_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, path))
+		
+		logger.info(f"MobileMediaServeView: path={path}, file_path={file_path}, MEDIA_ROOT={settings.MEDIA_ROOT}")
+		
+		# Security check
+		if not is_safe_path(settings.MEDIA_ROOT, file_path):
+			logger.error(f"is_safe_path failed for {file_path}")
+			raise Http404("File not found")
+			
+		if os.path.exists(file_path):
+			if os.path.isdir(file_path):
+				raise Http404("File not found")
+				
+			content_type, _ = mimetypes.guess_type(file_path)
+			logger.warning(f"!!! MobileMediaServeView: Returning file with content_type={content_type} !!!")
+			return FileResponse(open(file_path, 'rb'), content_type=content_type)
+		else:
+			logger.error(f"File not found: {file_path}")
+			raise Http404("File not found")
+
+
+class SystemHealthAPIView(APIView):
+	permission_classes = [IsPenetrationTester]
+
+	def get(self, request):
+		import shutil
+		import os
+		import time
+		from django.db import connection
+		from reNgine.celery import app
+
+		# 1. Database Health
+		db_start = time.time()
+		db_up = True
+		try:
+			with connection.cursor() as cursor:
+				cursor.execute("SELECT 1")
+		except Exception:
+			db_up = False
+		db_latency = int((time.time() - db_start) * 1000)
+
+		# 2. Worker Status
+		try:
+			inspect = app.control.inspect()
+			active_workers = inspect.active()
+			worker_count = len(active_workers) if active_workers else 0
+			workers_online = worker_count > 0
+		except Exception:
+			workers_online = False
+			worker_count = 0
+
+		# 3. Disk Usage
+		try:
+			total, used, free = shutil.disk_usage("/")
+			disk_used_percent = int(100 * used / total)
+		except Exception:
+			disk_used_percent = 0
+			free = 0
+
+		# 4. System Load
+		try:
+			load_avg = os.getloadavg()
+		except AttributeError:
+			load_avg = (0.0, 0.0, 0.0)
+
+		return Response({
+			"status": "online" if db_up and workers_online else "degraded",
+			"database": {
+				"status": "up" if db_up else "down",
+				"latency_ms": db_latency
+			},
+			"workers": {
+				"status": "online" if workers_online else "offline",
+				"count": worker_count
+			},
+			"disk": {
+				"used_percent": disk_used_percent,
+				"free_gb": free // (2**30)
+			},
+			"load": load_avg[0],
+			"timestamp": time.time()
+		})

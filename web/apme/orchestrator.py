@@ -129,7 +129,8 @@ class APMEOrchestrator:
         # ── Step 7: Persist & Return ──────────────────────────────────────────
         logger.info(f"APME [6/7] Persisting top {self.top_n} paths...")
         top_paths = scored_paths[: self.top_n]
-        self._persist_paths(top_paths, scan_history_id)
+        node_index = {n.id: n for n in all_nodes}
+        self._persist_paths(top_paths, scan_history_id, node_index)
 
         builder.close()
 
@@ -170,11 +171,30 @@ class APMEOrchestrator:
                 elif to_node.type == "Privilege":
                     privilege_gained = to_node.subtype
 
+        # Target node sensitivity (final node in path)
+        target_sensitivity = "low"
+        last_step_node = node_index.get(path.end)
+        if last_step_node:
+            target_sensitivity = last_step_node.properties.get("sensitivity", "low")
+
+        # Simplified Blast Radius based on target capability
+        blast_radius = 1
+        if path.end.startswith("goal::capability::"):
+            cap = path.end.split("::")[-1]
+            if cap in {"pivot", "rce_execution"}:
+                blast_radius = 20
+            elif cap in {"db_access", "data_exfil"}:
+                blast_radius = 10
+            elif cap == "internal_discovery":
+                blast_radius = 15
+
         return {
             "severity": max_severity,
             "cvss_score": max_cvss,
             "privilege_gained": privilege_gained,
             "validated_steps": validated_steps,
+            "target_sensitivity": target_sensitivity,
+            "blast_radius": blast_radius,
         }
 
     def _generate_virtual_goal_nodes(self, scan_history_id: int) -> List[Node]:
@@ -210,7 +230,7 @@ class APMEOrchestrator:
 
         return goal_nodes
 
-    def _persist_paths(self, paths: List[AttackPath], scan_history_id: int) -> None:
+    def _persist_paths(self, paths: List[AttackPath], scan_history_id: int, node_index: Dict[str, Node]) -> None:
         """
         Persist attack paths to reNgine's ImpactAssessment model.
         Each top-level path is stored as a simulated_path JSON blob.
@@ -220,8 +240,12 @@ class APMEOrchestrator:
 
             scan_history = ScanHistory.objects.get(id=scan_history_id)
 
+            from apme.output.llm_narrator import LLMNarrator
+            narrator = LLMNarrator()
+
             for path in paths:
                 path_dict = path.to_dict()
+                narrative = narrator.narrate(path, node_index)
 
                 # Try to link to the most impactful vulnerability in the path
                 vuln = self._find_representative_vuln(path, scan_history_id)
@@ -229,6 +253,7 @@ class APMEOrchestrator:
                 ImpactAssessment.objects.update_or_create(
                     scan_history=scan_history,
                     vulnerability=vuln,
+                    potential_attack_chain__apme_path_id=path.id,
                     defaults={
                         "simulated_path": path_dict,
                         "potential_attack_chain": {
@@ -236,17 +261,15 @@ class APMEOrchestrator:
                             "risk": path.risk,
                             "score": path.score,
                             "steps": [s.to_dict() for s in path.steps],
+                            "narrative": narrative,
+                            "metadata": self._build_path_metadata(path, node_index),
                         },
-                        "potential_impact": (
-                            f"Attack path '{path.id}' risk={path.risk.upper()} "
-                            f"score={path.score:.2f}. "
-                            f"{len(path.steps)} steps from {path.start} to {path.end}."
-                        ),
+                        "potential_impact": narrative,
                         "remediation_priority": self._risk_to_priority(path.risk),
                         "is_ai_generated": False,
                     },
                 )
-                logger.debug(f"APME: Persisted path {path.id} (risk={path.risk})")
+                logger.debug(f"APME: Persisted path {path.id} with narrative.")
 
         except Exception as exc:
             logger.error(f"APME: Failed to persist paths: {exc}")

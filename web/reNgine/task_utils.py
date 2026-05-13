@@ -2,13 +2,14 @@ import os
 import re
 import subprocess
 import validators
+import json
 from django.utils import timezone
 from celery.utils.log import get_task_logger
 
 from urllib.parse import urlparse
 from reNgine.celery import app
 from reNgine.opsec_utils import ProxychainsWrapper
-from startScan.models import ScanHistory, Email, Employee, Command, Subdomain, EndPoint
+from startScan.models import ScanHistory, Email, Employee, Command, Subdomain, EndPoint, Parameter
 from targetApp.models import Domain
 from reNgine.definitions import (
     COLOR_RESET, COLOR_WHITE, COLOR_RED, TOOL_COLORS
@@ -70,7 +71,7 @@ def run_command(
         tuple: Tuple with return_code, output.
     """
     color = get_tool_color(cmd)
-    logger.info(f"{color}{cmd}{COLOR_RESET}")
+    logger.debug(f"{color}{cmd}{COLOR_RESET}")
 
     conf_path = None
     if proxy:
@@ -269,3 +270,123 @@ def save_endpoint(
             endpoint.save()
 
     return endpoint, created
+
+def save_parameter(endpoint, name, param_type='unknown', impact='none', value=None):
+    """Save a discovered parameter to the database."""
+    param, created = Parameter.objects.get_or_create(
+        endpoint=endpoint,
+        name=name,
+        defaults={'type': param_type, 'impact': impact, 'value': value}
+    )
+    if not created:
+        if param_type != 'unknown':
+            param.type = param_type
+        if value:
+            param.value = value
+        param.save()
+    return param, created
+
+def stream_command(
+		cmd, 
+		cwd=None, 
+		shell=False, 
+		history_file=None, 
+		encoding='utf-8', 
+		scan_id=None, 
+		activity_id=None, 
+		trunc_char=None,
+		proxy=None
+	):
+	"""Run a command and yield output line by line.
+
+	Args:
+		cmd (str): Command to run.
+		cwd (str): Current working directory.
+		shell (bool): Run within separate shell if True.
+		history_file (str): Write command + output to history file.
+		encoding (str): Output encoding.
+		scan_id (int): Scan ID.
+		activity_id (int): Activity ID.
+		trunc_char (str): Character used to truncate the output line.
+		proxy (str): If provided, may be used for proxychains wrapping.
+	Yields:
+		str/dict: Output line.
+	"""
+	color = get_tool_color(cmd)
+	logger.debug(f"{color}{cmd}{COLOR_RESET}")
+
+	conf_path = None
+	if proxy:
+		proxy_manager = ProxychainsWrapper()
+		if proxy_manager.should_wrap():
+			cmd, conf_path = proxy_manager.wrap_command(cmd, proxy=proxy)
+
+	# Create a command record in the database
+	command_obj = Command.objects.create(
+		command=sanitize_command_for_db(cmd),
+		time=timezone.now(),
+		scan_history_id=scan_id,
+		activity_id=activity_id)
+
+	# Sanitize the cmd
+	command = cmd if shell else cmd.split()
+
+	# Run the command using subprocess
+	process = subprocess.Popen(
+		command,
+		stdout=subprocess.PIPE,
+		stderr=subprocess.STDOUT,
+		universal_newlines=True,
+		shell=shell)
+
+	# Log the output in real-time to the database
+	output = ""
+
+	# Process the output
+	line_count = 0
+	try:
+		for line in iter(lambda: process.stdout.readline(), ''):
+			if not line:
+				break
+			line = line.strip()
+			ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+			line = ansi_escape.sub('', line)
+			line = line.replace('\\x0d\\x0a', '\n')
+			if trunc_char and line.endswith(trunc_char):
+				line = line[:-1]
+			item = line
+
+			# Try to parse the line as JSON
+			try:
+				item = json.loads(line)
+			except json.JSONDecodeError:
+				pass
+
+			# Log to console for visibility
+			if isinstance(item, str):
+				logger.debug(f"{COLOR_WHITE}{item}{COLOR_RESET}")
+			else:
+				logger.debug(f"{COLOR_WHITE}{json.dumps(item)}{COLOR_RESET}")
+
+			# Yield the line
+			yield item
+			
+			# Update output
+			output += '\n' + line
+			line_count += 1
+			if line_count % 10 == 0:
+				command_obj.output = output
+				command_obj.save()
+
+		process.wait()
+		command_obj.output = output
+		command_obj.return_code = process.returncode
+		command_obj.save()
+
+	except Exception as e:
+		logger.error(f"Error in stream_command: {str(e)}")
+		if process:
+			process.kill()
+	finally:
+		if conf_path and os.path.exists(conf_path):
+			os.remove(conf_path)

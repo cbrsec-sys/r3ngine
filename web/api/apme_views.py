@@ -25,31 +25,34 @@ class AttackPathsAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        from startScan.models import ImpactAssessment
         scan_id = request.query_params.get('scan_id')
-        if not scan_id:
+        project_slug = request.query_params.get('project')
+
+        if not scan_id and not project_slug:
             return Response(
-                {'error': 'scan_id query parameter is required'},
+                {'error': 'scan_id or project query parameter is required'},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
-        try:
-            scan_id = int(scan_id)
-        except (ValueError, TypeError):
-            return Response({'error': 'scan_id must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+        assessments = ImpactAssessment.objects.all()
 
-        try:
-            from startScan.models import ImpactAssessment, ScanHistory
-            scan = ScanHistory.objects.get(id=scan_id)
-        except Exception:
-            return Response({'error': 'Scan not found'}, status=status.HTTP_404_NOT_FOUND)
+        if scan_id:
+            try:
+                scan_id = int(scan_id)
+                assessments = assessments.filter(scan_history_id=scan_id)
+            except (ValueError, TypeError):
+                return Response({'error': 'scan_id must be an integer'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if project_slug:
+            assessments = assessments.filter(scan_history__domain__project__slug=project_slug)
 
         # Fetch ImpactAssessments that have APME path data
         assessments = (
-            ImpactAssessment.objects
-            .filter(scan_history=scan)
+            assessments
             .exclude(potential_attack_chain__isnull=True)
             .exclude(potential_attack_chain={})
-            .order_by('-remediation_priority')
+            .order_by('-remediation_priority', '-scan_history__start_scan_date')
         )
 
         paths = []
