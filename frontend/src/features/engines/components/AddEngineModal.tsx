@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -11,7 +11,7 @@ import {
   IconButton
 } from '@mui/material';
 import { X, Cpu } from 'lucide-react';
-import { useCreateEngine } from '../api';
+import { useCreateEngine, useFullYamlConfig } from '../api';
 
 interface AddEngineModalProps {
   open: boolean;
@@ -22,6 +22,13 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
   const [name, setName] = useState('');
   const [yaml, setYaml] = useState('');
   const createEngine = useCreateEngine();
+  const { data: fullConfig } = useFullYamlConfig();
+
+  useEffect(() => {
+    if (fullConfig) {
+      setYaml(fullConfig);
+    }
+  }, [fullConfig]);
 
   const handleSubmit = async () => {
     if (!name || !yaml) return;

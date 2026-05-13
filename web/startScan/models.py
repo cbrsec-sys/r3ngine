@@ -613,6 +613,19 @@ class ImpactAssessment(models.Model):
 	created_at = models.DateTimeField(auto_now_add=True)
 	updated_at = models.DateTimeField(auto_now=True)
 
+	class Meta:
+		# Enforce one ImpactAssessment per Vulnerability to prevent
+		# MultipleObjectsReturned errors in correlation.py's _generate_attack_chain.
+		# APME and the correlation engine could previously both create rows for the
+		# same vulnerability, breaking the update_or_create lookup.
+		constraints = [
+			models.UniqueConstraint(
+				fields=['vulnerability'],
+				condition=models.Q(vulnerability__isnull=False),
+				name='unique_impact_assessment_per_vulnerability'
+			)
+		]
+
 	def __str__(self):
 		return f"Impact Assessment for {self.vulnerability.name if self.vulnerability else 'General'}"
 

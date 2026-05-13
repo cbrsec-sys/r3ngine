@@ -32,7 +32,7 @@ export const useVulnerabilities = (projectSlug: string, page = 1, searchQuery = 
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      return await response.json() as operations["listVulnerability_list"]["responses"]["200"]["content"]["application/json"];
+      return await response.json() as operations["api_listVulnerability_list"]["responses"]["200"]["content"]["application/json"];
     },
 
     enabled: !!projectSlug,
