@@ -25,7 +25,7 @@ function check_rengine_update() {
     window.localStorage.getItem("update_available") === "true"
   ) {
     // redirect to the link provided by api or default to releases
-    const redirectLink = window.localStorage.getItem("update_redirect_link") || "https://github.com/whiterabb17/rengine/releases";
+    const redirectLink = window.localStorage.getItem("update_redirect_link") || "https://github.com/whiterabb17/r3ngine/releases";
     window.open(redirectLink, "_blank");
   } else {
     Swal.fire({
@@ -134,7 +134,7 @@ function update_available(latest_version_number, changelog, redirect_link) {
       },
     }).then((result) => {
       if (result.isConfirmed) {
-        window.open(redirect_link || "https://github.com/whiterabb17/rengine/releases", "_blank");
+        window.open(redirect_link || "https://github.com/whiterabb17/r3ngine/releases", "_blank");
       }
     });
   });
@@ -190,8 +190,8 @@ function showAfterUpdatePopup() {
 }
 
 $(document).ready(function () {
-    // show popup after update
-    showAfterUpdatePopup();
+  // show popup after update
+  showAfterUpdatePopup();
   // hide badge if update does not exists
   if (
     window.localStorage.getItem("update_available") &&

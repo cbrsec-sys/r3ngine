@@ -1631,14 +1631,14 @@ class RengineUpdateCheck(APIView):
 	def get(self, request):
 		req = self.request
 		github_api = \
-			'https://api.github.com/repos/whiterabb17/rengine/releases'
+			'https://api.github.com/repos/whiterabb17/r3ngine/releases'
 		
 		return_response = {
 			'status': False,
 			'update_available': False,
 			'latest_version': None,
 			'current_version': RENGINE_CURRENT_VERSION,
-			'redirect_link': 'https://github.com/whiterabb17/rengine/releases'
+			'redirect_link': 'https://github.com/whiterabb17/r3ngine/releases'
 		}
 
 		try:
@@ -1657,7 +1657,7 @@ class RengineUpdateCheck(APIView):
 			logger.error(f"Error fetching GitHub releases: {str(e)}")
 
 		# Fallback: check .version file in master branch
-		version_url = 'https://raw.githubusercontent.com/whiterabb17/rengine/master/web/.version'
+		version_url = 'https://raw.githubusercontent.com/whiterabb17/r3ngine/main/web/.version'
 		try:
 			raw_version_response = requests.get(version_url)
 			if raw_version_response.status_code == 200:
@@ -1665,8 +1665,8 @@ class RengineUpdateCheck(APIView):
 				# If raw_version is higher than latest release or no release found
 				if not return_response['latest_version'] or version.parse(raw_version) > version.parse(return_response['latest_version']):
 					return_response['latest_version'] = raw_version
-					return_response['redirect_link'] = 'https://github.com/whiterabb17/rengine'
-					return_response['changelog'] = 'A new update is available in the repository. Please pull the latest changes from the master branch.'
+					return_response['redirect_link'] = 'https://github.com/whiterabb17/r3ngine'
+					return_response['changelog'] = 'A new update is available in the repository. Please pull the latest changes from the main branch.'
 					return_response['status'] = True
 		except Exception as e:
 			logger.error(f"Error fetching raw .version: {str(e)}")
@@ -1677,7 +1677,7 @@ class RengineUpdateCheck(APIView):
 
 			if is_version_update_available:
 				create_inappnotification(
-					title='reNgine Update Available',
+					title='r3ngine Update Available',
 					description=f'Update to version {return_response["latest_version"]} is available',
 					notification_type=SYSTEM_LEVEL_NOTIFICATION,
 					project_slug=None,
@@ -1707,6 +1707,39 @@ class RengineSystemSettingsAPIView(APIView):
 			'free': free_gb,
 			'consumed_percent': consumed_percent
 		})
+
+
+class ProxySettingsAPIView(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def get(self, request):
+		proxy = Proxy.objects.first()
+		serializer = ProxySerializer(proxy)
+		return Response(serializer.data)
+
+	def post(self, request):
+		proxy = Proxy.objects.first()
+		if not proxy:
+			proxy = Proxy.objects.create()
+		serializer = ProxySerializer(proxy, data=request.data, partial=True)
+		if serializer.is_valid():
+			serializer.save()
+			return Response({'status': True, 'message': 'Proxies updated successfully'})
+		return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProxyFetchAPIView(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def post(self, request):
+		try:
+			from reNgine.tasks import fetch_proxies_task
+			task = fetch_proxies_task.delay()
+			return Response({'status': True, 'task_id': task.id})
+		except Exception as e:
+			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UninstallTool(APIView):

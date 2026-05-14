@@ -246,6 +246,14 @@ urlpatterns = [
         RengineSystemSettingsAPIView.as_view(),
         name='rengine_system_settings'),
     path(
+        'rengine/proxy-settings/',
+        ProxySettingsAPIView.as_view(),
+        name='rengine_proxy_settings'),
+    path(
+        'rengine/fetch-proxies/',
+        ProxyFetchAPIView.as_view(),
+        name='rengine_fetch_proxies'),
+    path(
         'action/subdomain/delete/',
         DeleteSubdomain.as_view(),
         name='delete_subdomain'),

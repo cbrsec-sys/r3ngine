@@ -269,7 +269,7 @@ ring:
 - **Automated Auth Triggering**: New logic to automatically trigger brute-force scans when an authentication portal or VPN gateway is detected, provided the brute-force module is enabled in the selected scan engine.
 - **Curated Auth Wordlists**: Added specially curated "top/default" and "most common" wordlists for authentication testing, persisted in the `/usr/src/wordlist/auth/` volume.
 - **Nmap Vuln Script Support**: Added comprehensive parsing for Nmap `vuln` script outputs, integrating them directly into the vulnerability dashboard.
-- **Repository Migration**: Formally transitioned the project to `whiterabb17/rengine` as an unofficial fork.
+- **Repository Migration**: Formally transitioned the project to `whiterabb17/r3ngine` as an unofficial fork.
 - **Enhanced Update Check**: Implemented a fallback mechanism that checks both GitHub Releases and the raw `.version` file in the master branch. If a newer version is detected in the repository root, the system directs users to the main repo instead of the releases page.
 
 ## v2.4.0
