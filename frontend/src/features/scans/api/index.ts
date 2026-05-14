@@ -315,7 +315,7 @@ export const useScanSummary = (projectSlug: string, scanId: number) => {
     enabled: !!projectSlug && !!scanId,
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (data && data.scan_info && data.scan_info.scan_status === 2) return false;
+      if (data && data.scan_info && data.scan_info.scan_status === 2 && !data.scan_info.is_spiderfoot_running) return false;
       return 5000;
     }
   });

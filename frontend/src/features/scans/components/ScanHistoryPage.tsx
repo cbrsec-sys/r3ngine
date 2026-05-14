@@ -63,6 +63,7 @@ import { StartScanModal } from './StartScanModal';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 import { timeout } from 'd3';
+import type { ScanHistory } from '../types';
 
 export const ScanHistoryPage: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
@@ -164,7 +165,33 @@ export const ScanHistoryPage: React.FC = () => {
     return filteredScans.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
   }, [filteredScans, page, rowsPerPage]);
 
-  const getStatusChip = (status: number) => {
+  const getStatusChip = (scan: ScanHistory) => {
+    const status = scan.scan_status;
+    if (scan.is_spiderfoot_running) {
+      return (
+        <Tooltip title="SpiderFoot OSINT Scan is running in the background">
+          <Chip
+            label="SPIDERFOOT ACTIVE"
+            size="small"
+            sx={{
+              bgcolor: 'rgba(255, 0, 255, 0.1)',
+              color: '#ff00ff',
+              border: '1px solid rgba(255, 0, 255, 0.4)',
+              fontSize: '0.65rem',
+              fontWeight: 900,
+              fontFamily: 'Orbitron',
+              animation: 'pulse-spider 2s infinite ease-in-out',
+              '@keyframes pulse-spider': {
+                '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+                '50%': { transform: 'scale(1.05)', filter: 'drop-shadow(0 0 8px #ff00ff)' },
+                '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+              }
+            }}
+            icon={<Bug size={12} color="#ff00ff" />}
+          />
+        </Tooltip>
+      );
+    }
     switch (status) {
       case 2: // Success
         return <Chip label="SUCCESS" size="small" sx={{ bgcolor: 'rgba(0, 255, 98, 0.1)', color: '#00ff62', border: '1px solid rgba(0, 255, 98, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<CheckCircle2 size={12} />} />;
@@ -350,7 +377,7 @@ export const ScanHistoryPage: React.FC = () => {
                       />
                     </TableCell>
                     <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      {getStatusChip(scan.scan_status!)}
+                      {getStatusChip(scan)}
                     </TableCell>
                     <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', minWidth: 120 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>

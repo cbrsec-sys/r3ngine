@@ -2199,7 +2199,7 @@ class GetFileContents(APIView):
 			return Response(response)
 
 		if 'spiderfoot_config' in req.query_params:
-			path = "/root/.config/spiderfoot.cfg"
+			path = "/usr/src/github/spiderfoot/spiderfoot.cfg"
 			if not os.path.exists(path):
 				# Create a default config or just touch
 				pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)

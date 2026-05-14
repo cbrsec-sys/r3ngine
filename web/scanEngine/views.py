@@ -260,8 +260,10 @@ def tool_specific_settings(request, slug):
             return http.HttpResponseRedirect(reverse('tool_settings', kwargs={'slug': slug}))
 
         elif 'spiderfoot_config_text_area' in request.POST:
-            # Use /root/.config/spiderfoot.cfg as persistent config
-            with open('/root/.config/spiderfoot.cfg', "w") as fhandle:
+            # Use /usr/src/github/spiderfoot/spiderfoot.cfg as persistent config
+            sf_config_path = '/usr/src/github/spiderfoot/spiderfoot.cfg'
+            os.makedirs(os.path.dirname(sf_config_path), exist_ok=True)
+            with open(sf_config_path, "w") as fhandle:
                 fhandle.write(request.POST.get('spiderfoot_config_text_area'))
             if request.headers.get('Accept') == 'application/json':
                 return http.JsonResponse({'status': 'success', 'message': 'SpiderFoot config updated!'})
