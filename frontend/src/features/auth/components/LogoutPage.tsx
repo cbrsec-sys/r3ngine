@@ -100,7 +100,7 @@ export const LogoutPage: React.FC = () => {
             variant="outlined"
             startIcon={<Globe size={18} />}
             component={Link}
-            href="https://github.com/whiterabb17/rengine/issues"
+            href="https://github.com/whiterabb17/r3ngine/issues"
             target="_blank"
             sx={{ 
               py: 1.5,

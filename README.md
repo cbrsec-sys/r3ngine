@@ -123,7 +123,7 @@ Aesthetic excellence is a core requirement of the v3 vision.
 * [Installation Video](#installation-video-tutorial)
 * [Community-Curated Videos](#community-curated-videos)
 * [Screenshots](#screenshots)
-* [What's new in reNgine](https://github.com/whiterabb17/rengine/releases)
+* [What's new in reNgine](https://github.com/whiterabb17/r3ngine/releases)
 * [Contributing](#contributing)
 * [r3ngine Support](#r3ngine-support)
 * [Support and Sponsoring](#support-and-sponsoring)
@@ -163,7 +163,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 
 ## Workflow
 
-<img src="https://github.com/whiterabb17/rengine/assets/17223002/10c475b8-b4a8-440d-9126-77fe2038a386">
+<img src="https://github.com/whiterabb17/r3ngine/assets/17223002/10c475b8-b4a8-440d-9126-77fe2038a386">
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -410,7 +410,7 @@ How you can contribute:
 To get started:
 
   1. Check our [Contributing Guide](.github/CONTRIBUTING.md)
-  2. Pick an [open issue](https://github.com/whiterabb17/rengine/issues) or propose a new one
+  2. Pick an [open issue](https://github.com/whiterabb17/r3ngine/issues) or propose a new one
   3. Fork the repository and create your branch
   4. Make your changes and submit a pull request
 
@@ -466,7 +466,7 @@ By providing this detailed information, you significantly help developers identi
 reNgine is an open-source project that welcomes contributors of all experience levels, including beginners. If you've never contributed to open source before, we encourage you to start here!
 
 * We're proud to support your first Pull Request (PR)
-* Check our [open issues](https://github.com/whiterabb17/rengine/issues) for starter-friendly tasks
+* Check our [open issues](https://github.com/whiterabb17/r3ngine/issues) for starter-friendly tasks
 * Don't hesitate to ask questions in our community channels
 
 Your contribution, no matter how small, is valuable to us.
@@ -497,7 +497,7 @@ Please note:
 
 reNgine is a passion project developed in my free time, alongside my day job. Your support helps keep this project alive and growing. Here's how you can contribute:
 
-* Add a [GitHub Star](https://github.com/whiterabb17/rengine) to the project.
+* Add a [GitHub Star](https://github.com/whiterabb17/r3ngine) to the project.
 * Share about reNgine on social media or in blog posts
 * Nominate me for [GitHub Stars?](https://stars.github.com/nominate/)
 * Use my [DigitalOcean referral link](https://m.do.co/c/e353502d19fc) to get $100 credit (I receive $25)
@@ -516,7 +516,7 @@ To report a security vulnerability, please follow these steps:
 
 1. **Do Not** disclose the vulnerability publicly on GitHub issues or any other public forum.
 
-2. Go to the [Security tab](https://github.com/whiterabb17/rengine/security) of the reNgine repository.
+2. Go to the [Security tab](https://github.com/whiterabb17/r3ngine/security) of the reNgine repository.
 
 3. Click on "Report a vulnerability" to open GitHub's private vulnerability reporting form.
 

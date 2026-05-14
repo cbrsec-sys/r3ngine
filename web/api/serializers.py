@@ -43,6 +43,12 @@ class EngineTypeSerializer(serializers.ModelSerializer):
 		fields = '__all__'
 
 
+class ProxySerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Proxy
+		fields = '__all__'
+
+
 class ConfigurationSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = Configuration
