@@ -1,6 +1,7 @@
 import re
 import json
 import logging
+from typing import Optional, List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -102,3 +103,126 @@ class LocustParser(BaseParser):
                 except (ValueError, IndexError):
                     pass
         return metrics
+
+class SpiderFootBatchParser(BaseParser):
+    """
+    Robust stateful SpiderFoot CSV parser.
+    Supports streaming, batching, and Redis-backed deduplication.
+    """
+    
+    REQUIRED_COLUMNS = ["Source", "Type", "Source Data", "Data"]
+    
+    IOC_REGEX = {
+        "ipv4": re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
+        "domain": re.compile(r"\b(?:[a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}\b"),
+        "email": re.compile(r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b"),
+        "url": re.compile(r"https?://[^\s]+"),
+        "hash": re.compile(r"\b[a-fA-F0-9]{32,64}\b"),
+    }
+
+    def __init__(self, dedup_backend=None, scan_id=None):
+        self.dedup_backend = dedup_backend or set()
+        self.scan_id = scan_id
+        self.stats = {
+            "processed": 0,
+            "duplicates": 0,
+            "valid": 0,
+            "invalid": 0,
+        }
+        self.header = None
+
+    def parse_line(self, line: str) -> Optional[dict]:
+        """Parses a single line of SpiderFoot CSV output."""
+        if not line or not line.strip():
+            return None
+            
+        self.stats["processed"] += 1
+        
+        # Strip null bytes to prevent _csv.Error
+        line = line.replace('\0', '')
+        
+        import io
+        import csv
+        
+        f = io.StringIO(line)
+        reader = csv.reader(f)
+        try:
+            row = next(reader)
+        except (StopIteration, csv.Error):
+            self.stats["invalid"] += 1
+            return None
+
+        if not self.header:
+            if "Data" in row and "Type" in row:
+                self.header = row
+                return None
+            else:
+                self.stats["invalid"] += 1
+                return None
+
+        # Map row to dict
+        event = dict(zip(self.header, row))
+        
+        parsed = self._normalize_event(event)
+        if not parsed:
+            self.stats["invalid"] += 1
+            return None
+            
+        # Deduplication
+        fingerprint = self._fingerprint(parsed)
+        if self._is_duplicate(fingerprint):
+            self.stats["duplicates"] += 1
+            return None
+            
+        self._store_fingerprint(fingerprint)
+        self.stats["valid"] += 1
+        
+        # Add IOCs
+        parsed["iocs"] = self._extract_iocs(parsed["data"])
+        
+        return parsed
+
+    def _normalize_event(self, event: dict) -> Optional[dict]:
+        e_type = event.get("Type", "").strip().upper().replace(" ", "_")
+        e_data = event.get("Data", "").strip()
+        
+        if not e_type or not e_data:
+            return None
+            
+        return {
+            "source": event.get("Source", "").strip(),
+            "type": e_type,
+            "source_data": event.get("Source Data", "").strip(),
+            "data": e_data,
+        }
+
+    def _fingerprint(self, event: dict) -> str:
+        import hashlib
+        raw = "|".join([
+            event.get("source", ""),
+            event.get("type", ""),
+            event.get("source_data", ""),
+            event.get("data", ""),
+        ])
+        return hashlib.sha256(raw.encode()).hexdigest()
+
+    def _is_duplicate(self, fingerprint: str) -> bool:
+        if hasattr(self.dedup_backend, "sismember"):
+            key = f"spiderfoot:dedup:{self.scan_id}" if self.scan_id else "spiderfoot:dedup"
+            return self.dedup_backend.sismember(key, fingerprint)
+        return fingerprint in self.dedup_backend
+
+    def _store_fingerprint(self, fingerprint: str):
+        if hasattr(self.dedup_backend, "sadd"):
+            key = f"spiderfoot:dedup:{self.scan_id}" if self.scan_id else "spiderfoot:dedup"
+            self.dedup_backend.sadd(key, fingerprint)
+            return
+        self.dedup_backend.add(fingerprint)
+
+    def _extract_iocs(self, text: str) -> dict:
+        results = {}
+        for name, regex in self.IOC_REGEX.items():
+            matches = regex.findall(text)
+            if matches:
+                results[name] = list(sorted(set(matches)))
+        return results

@@ -13,6 +13,9 @@ class HasPermission(BasePermission):
 	"""
 
 	def has_permission(self, request, view):
+		if not request.user or not request.user.is_authenticated:
+			return False
+
 		permission_code = getattr(view, 'permission_required', None)
 		if not permission_code:
 			raise PermissionDenied(detail="Permission is not specified for this view.")
