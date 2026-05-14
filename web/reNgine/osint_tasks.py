@@ -2,6 +2,8 @@ import os
 import json
 import csv
 import subprocess
+import shutil
+import re
 from celery.utils.log import get_task_logger
 from reNgine.celery import app
 from reNgine.common_func import (
@@ -179,14 +181,16 @@ def enrich_identities_task(self, identity, identity_type, scan_history_id, ctx={
     logger.info(f"Enriching identity: {full_name} ({identity_type})")
     
     # 1. Generate Top 5 usernames using username-anarchy
-    # Command: ruby username-anarchy "First Last"
+    # Command: username-anarchy "First Last"
     # We'll take the top 5 results
-    ua_path = '/usr/src/github/username-anarchy/username-anarchy'
-    if not os.path.exists(ua_path):
-        logger.error(f"username-anarchy not found at {ua_path}")
-        return
+    ua_cmd = 'username-anarchy'
+    if not shutil.which(ua_cmd):
+        ua_cmd = '/usr/src/github/username-anarchy/username-anarchy'
+        if not os.path.exists(ua_cmd):
+            logger.error(f"username-anarchy not found")
+            return
         
-    cmd_ua = ['ruby', ua_path, full_name]
+    cmd_ua = [ua_cmd, full_name]
     process_ua = subprocess.Popen(cmd_ua, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     stdout_ua, _ = process_ua.communicate()
     

@@ -237,11 +237,14 @@ if [ ! -f '/usr/local/bin/betterleaks' ]; then
 fi
 
 # Setup username-anarchy
-if [ ! -d '/usr/src/github/username-anarchy' ]; then
+if [ ! -f '/usr/local/bin/username-anarchy' ]; then
   echo "Cloning username-anarchy..."
-  mkdir -p /usr/src/github
   git clone https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy
+  ln -sf /usr/src/github/username-anarchy/username-anarchy /usr/local/bin/username-anarchy
 fi
+
+# install baddns
+pipx install git+https://github.com/blacklanternsecurity/baddns
 
 cd /usr/src/app
 # install h8mail

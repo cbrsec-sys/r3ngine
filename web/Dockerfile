@@ -141,8 +141,7 @@ WORKDIR /usr/src/app
 
 ENV GO111MODULE=on 
 RUN printf "\
-    github.com/projectdiscovery/baddns/cmd/baddns@latest\n\
-    github.com/prov3rbs/gosearch/cmd/gosearch@latest\n\
+    github.com/ibnaleem/gosearch@latest\n\
     github.com/jaeles-project/gospider@latest\n\
     github.com/tomnomnom/gf@latest\n\
     github.com/tomnomnom/unfurl@latest\n\
@@ -230,6 +229,10 @@ RUN mkdir -p /usr/src/wordlist/kr && \
 
 # Install WPScan
 RUN gem install wpscan --no-document
+
+# Install baddns
+RUN python3 -m pip install pipx && \
+    pipx install git+https://github.com/blacklanternsecurity/baddns
 
 # Copy requirements
 COPY web/requirements.txt /tmp/requirements.txt
