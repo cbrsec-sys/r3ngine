@@ -184,3 +184,16 @@ class WpScanAPIKey(models.Model):
 
 	def __str__(self):
 		return self.key
+
+
+class SOCConfiguration(models.Model):
+	"""Global configuration for Mobile SOC features."""
+	enable_live_log_streaming = models.BooleanField(default=False)
+	log_retention_count = models.IntegerField(default=1000)
+	
+	def __str__(self):
+		return "Global SOC Configuration"
+	
+	class Meta:
+		verbose_name = "SOC Configuration"
+		verbose_name_plural = "SOC Configurations"

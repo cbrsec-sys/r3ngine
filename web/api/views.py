@@ -21,6 +21,7 @@ import mimetypes
 import os
 
 
+from django.shortcuts import get_object_or_404
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_204_NO_CONTENT, HTTP_202_ACCEPTED
 from rest_framework.decorators import action
 from django.core.exceptions import ObjectDoesNotExist
@@ -51,6 +52,7 @@ from targetApp.models import *
 from api.shared_api_tasks import import_hackerone_programs_task, sync_bookmarked_programs_task
 from api.permissions import *
 from api.serializers import *
+from reNgine.graph_utils import Neo4jManager
 
 
 logger = logging.getLogger(__name__)
@@ -88,6 +90,32 @@ class UpdateThemeView(APIView):
 			'status': True,
 			'ui_version': user_preferences.ui_version,
 			'v3_intensity': user_preferences.v3_intensity
+		}, status=status.HTTP_200_OK)
+
+
+class SOCSettingsViewSet(viewsets.ModelViewSet):
+	"""ViewSet for managing global SOC configuration."""
+	permission_classes = [IsAuthenticated, HasPermission]
+	required_permission = PERM_MODIFY_SCAN_CONFIGURATIONS
+	serializer_class = SOCConfigurationSerializer
+	queryset = SOCConfiguration.objects.all()
+
+	def get_queryset(self):
+		return SOCConfiguration.objects.all()
+
+	def list(self, request, *args, **kwargs):
+		# Ensure at least one config exists
+		config, created = SOCConfiguration.objects.get_or_create(id=1)
+		serializer = self.get_serializer(config)
+		return Response(serializer.data)
+
+	@action(detail=False, methods=['post'])
+	def toggle_streaming(self, request):
+		config, created = SOCConfiguration.objects.get_or_create(id=1)
+		config.enable_live_log_streaming = not config.enable_live_log_streaming
+		config.save()
+		return Response({
+			'enable_live_log_streaming': config.enable_live_log_streaming
 		}, status=status.HTTP_200_OK)
 
 
@@ -635,6 +663,7 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 		return qs
 
 
+
 class MonitoringDiscoveryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsPenetrationTester]
     queryset = MonitoringDiscovery.objects.all()
@@ -662,6 +691,57 @@ class MonitoringDiscoveryViewSet(viewsets.ModelViewSet):
             'login_discoveries': discoveries.filter(discovery_type='login').count(),
         }
         return Response(stats)
+
+
+class OsintStagingViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
+	queryset = OsintStaging.objects.all().order_by('-confidence', '-discovered_date')
+	serializer_class = OsintStagingSerializer
+
+	def get_queryset(self):
+		queryset = self.queryset
+		scan_id = self.request.query_params.get('scan_id')
+		target_id = self.request.query_params.get('target_id')
+		osint_type = self.request.query_params.get('osint_type')
+		status = self.request.query_params.get('status')
+		
+		if scan_id:
+			queryset = queryset.filter(scan_history_id=scan_id)
+		if target_id:
+			queryset = queryset.filter(target_domain_id=target_id)
+		if osint_type:
+			queryset = queryset.filter(osint_type=osint_type)
+		if status:
+			queryset = queryset.filter(status=status)
+			
+		# Universal Search for Staging
+		search = self.request.query_params.get('search')
+		if search:
+			queryset = queryset.filter(
+				Q(content__icontains=search) |
+				Q(source__icontains=search) |
+				Q(metadata__icontains=search) |
+				Q(osint_type__icontains=search)
+			)
+			
+		return queryset
+
+	@action(detail=False, methods=['post'])
+	def bulk_discard(self, request):
+		"""Bulk delete staging items."""
+		ids = request.data.get('ids', [])
+		if not ids:
+			return Response({'error': 'No IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
+		
+		OsintStaging.objects.filter(id__in=ids).delete()
+		return Response({'status': 'success', 'message': f'Deleted {len(ids)} items'})
+
+	@action(detail=True, methods=['post'])
+	def discard(self, request, pk=None):
+		"""Individual discard."""
+		item = self.get_object()
+		item.delete()
+		return Response({'status': 'success'})
 
 
 
@@ -4169,3 +4249,62 @@ class SystemHealthAPIView(APIView):
 			"load": load_avg[0],
 			"timestamp": time.time()
 		})
+
+
+class GetScanGraphData(APIView):
+	"""Fetch Cytoscape-compatible graph data for a specific scan."""
+	permission_classes = [IsAuditor]
+	def get(self, request, scan_id):
+		graph = Neo4jManager()
+		data = graph.get_cytoscape_json(scan_id)
+		graph.close()
+		return Response(data)
+
+class GetTargetGraphData(APIView):
+	"""Fetch Cytoscape-compatible graph data for an entire target."""
+	permission_classes = [IsAuditor]
+	def get(self, request, target_id):
+		target = get_object_or_404(Domain, id=target_id)
+		graph = Neo4jManager()
+		data = graph.get_target_graph_data(target.name)
+		graph.close()
+		return Response(data)
+
+class GetNodeDetails(APIView):
+	"""Fetch detailed metadata for a specific graph node."""
+	permission_classes = [IsAuditor]
+	def get(self, request, node_id):
+		graph = Neo4jManager()
+		data = graph.get_node_details(node_id)
+		graph.close()
+		return Response(data)
+
+class GetSystemLogs(APIView):
+	"""Fetch the tail of the system logs. Restricted to SysAdmins."""
+	permission_classes = [IsSysAdmin]
+	def get(self, request):
+		# SECURITY: Path is hardcoded and validated to prevent directory traversal
+		log_file = os.path.normpath(os.path.join(settings.BASE_DIR, 'celery.log'))
+		
+		# Ensure we only read from the allowed directory
+		if not log_file.startswith(os.path.normpath(settings.BASE_DIR)):
+			return Response({'status': False, 'message': 'Forbidden log path'}, status=403)
+
+		if not os.path.exists(log_file):
+			return Response({'status': False, 'message': 'Log file not found'}, status=404)
+		
+		try:
+			with open(log_file, 'r') as f:
+				# Efficiently read last ~50KB (~500 lines)
+				f.seek(0, os.SEEK_END)
+				filesize = f.tell()
+				offset = min(filesize, 50000)
+				f.seek(filesize - offset)
+				# read() then splitlines() to handle partial first line
+				data = f.read()
+				lines = data.splitlines()
+				# Return at most 500 lines
+				return Response({'status': True, 'logs': lines[-500:]})
+		except Exception as e:
+			logger.error(f"Error reading system logs: {str(e)}")
+			return Response({'status': False, 'message': 'Internal error reading logs'}, status=500)

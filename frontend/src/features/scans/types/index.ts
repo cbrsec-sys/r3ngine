@@ -100,9 +100,23 @@ export interface ScanSummaryResponse {
   timeline: ScanActivity[];
 }
 
+
 export interface SecretLeak {
   id: number;
   leak_type: string;
   leak_content: string;
   found_in: string;
+}
+
+export interface OsintStaging {
+  id: number;
+  osint_type: string;
+  content: string;
+  source: string;
+  confidence: number;
+  metadata: string;
+  discovered_date: string;
+  discovered_date_humanized: string;
+  target_domain_name: string;
+  scan_history_id: number;
 }

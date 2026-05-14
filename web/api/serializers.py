@@ -37,10 +37,24 @@ class ScreenshotSerializer(serializers.ModelSerializer):
 		fields = '__all__'
 
 
+
 class EngineTypeSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = EngineType
 		fields = '__all__'
+
+
+class OsintStagingSerializer(serializers.ModelSerializer):
+	discovered_date_humanized = serializers.SerializerMethodField()
+	target_domain_name = serializers.CharField(source='target_domain.name', read_only=True)
+	scan_history_id = serializers.IntegerField(source='scan_history.id', read_only=True)
+
+	class Meta:
+		model = OsintStaging
+		fields = '__all__'
+
+	def get_discovered_date_humanized(self, obj):
+		return naturaltime(obj.discovered_date)
 
 
 class ProxySerializer(serializers.ModelSerializer):
@@ -52,6 +66,12 @@ class ProxySerializer(serializers.ModelSerializer):
 class ConfigurationSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = Configuration
+		fields = '__all__'
+
+
+class SOCConfigurationSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = SOCConfiguration
 		fields = '__all__'
 
 

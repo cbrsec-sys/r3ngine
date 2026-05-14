@@ -104,6 +104,7 @@ class LocustParser(BaseParser):
                     pass
         return metrics
 
+
 class SpiderFootBatchParser(BaseParser):
     """
     Robust stateful SpiderFoot CSV parser.
@@ -120,9 +121,51 @@ class SpiderFootBatchParser(BaseParser):
         "hash": re.compile(r"\b[a-fA-F0-9]{32,64}\b"),
     }
 
-    def __init__(self, dedup_backend=None, scan_id=None):
+
+
+    # Maps SF Type strings (from CSV) to internal OSINT types and confidence weights
+    SF_TYPE_MAPPING = {
+        'EMAIL_ADDRESS': {'osint_type': 'Email', 'weight': 90},
+        'EMAILADDR': {'osint_type': 'Email', 'weight': 90},
+        'HUMAN_NAME': {'osint_type': 'Employee', 'weight': 70},
+        'USERNAME': {'osint_type': 'Employee', 'weight': 80},
+        'LINKEDIN_NAME': {'osint_type': 'Employee', 'weight': 85},
+        'PHONE_NUMBER': {'osint_type': 'Phone', 'weight': 85},
+        'INTERNET_NAME': {'osint_type': 'Subdomain', 'weight': 100},
+        'DOMAIN_NAME': {'osint_type': 'Subdomain', 'weight': 100},
+        'AFFILIATE_DOMAIN_NAME': {'osint_type': 'Subdomain', 'weight': 60},
+        'IP_ADDRESS': {'osint_type': 'IP', 'weight': 100},
+        'IPV4_ADDRESS': {'osint_type': 'IP', 'weight': 100},
+        'TCP_PORT_OPEN': {'osint_type': 'Port', 'weight': 100},
+        'UDP_PORT_OPEN': {'osint_type': 'Port', 'weight': 100},
+        'SOCIAL_MEDIA': {'osint_type': 'Social', 'weight': 80},
+        'ACCOUNT_EXTERNAL': {'osint_type': 'Social', 'weight': 75},
+        'BITCOIN_ADDRESS': {'osint_type': 'Crypto', 'weight': 90},
+        'WEB_RESOURCE': {'osint_type': 'URL', 'weight': 100},
+        'URL_ALL': {'osint_type': 'URL', 'weight': 100},
+        'LEAKSITE_CONTENT': {'osint_type': 'Leak', 'weight': 85},
+        'ACCOUNT_EXTERNAL_OWNED_PARTIAL': {'osint_type': 'Social', 'weight': 60},
+        # Infrastructure & Tech
+        'WEB_SERVER': {'osint_type': 'Tech', 'weight': 90},
+        'SOFTWARE_USED': {'osint_type': 'Tech', 'weight': 85},
+        'OPERATING_SYSTEM': {'osint_type': 'OS', 'weight': 85},
+        # DNS & Infrastructure (Staging)
+        'DNS_TXT_RECORD': {'osint_type': 'DNS', 'weight': 60},
+        'DNS_MX_RECORD': {'osint_type': 'DNS', 'weight': 60},
+        'DNS_NS_RECORD': {'osint_type': 'DNS', 'weight': 60},
+        'NAME_SERVER_(DNS_NS_RECORDS)': {'osint_type': 'DNS', 'weight': 60},
+        'EMAIL_GATEWAY_(DNS_MX_RECORDS)': {'osint_type': 'DNS', 'weight': 60},
+        'RAW_DNS_RECORDS': {'osint_type': 'DNS', 'weight': 50},
+        'PROVIDER_DNS': {'osint_type': 'DNS', 'weight': 50},
+        'SSL_CERTIFICATE_ISSUED_TO': {'osint_type': 'SSL', 'weight': 70},
+        'SSL_CERTIFICATE_RAW': {'osint_type': 'SSL', 'weight': 50},
+        'CO-HOSTED_SITE': {'osint_type': 'Hosting', 'weight': 60},
+    }
+
+    def __init__(self, dedup_backend=None, scan_id=None, target_domain=None):
         self.dedup_backend = dedup_backend or set()
         self.scan_id = scan_id
+        self.target_domain = target_domain
         self.stats = {
             "processed": 0,
             "duplicates": 0,
@@ -177,6 +220,11 @@ class SpiderFootBatchParser(BaseParser):
         self._store_fingerprint(fingerprint)
         self.stats["valid"] += 1
         
+        # Confidence & Relevance Calculation
+        mapping = self.SF_TYPE_MAPPING.get(parsed["type"], {'osint_type': 'Other', 'weight': 50})
+        parsed["osint_type"] = mapping['osint_type']
+        parsed["confidence"] = self._calculate_confidence(parsed, mapping['weight'])
+        
         # Add IOCs
         parsed["iocs"] = self._extract_iocs(parsed["data"])
         
@@ -195,6 +243,42 @@ class SpiderFootBatchParser(BaseParser):
             "source_data": event.get("Source Data", "").strip(),
             "data": e_data,
         }
+
+    def _calculate_confidence(self, event: dict, base_weight: int) -> int:
+        """
+        Calculates confidence score (0-100) based on relevance to target_domain.
+        """
+        score = base_weight
+        data = event["data"].lower()
+        
+        if not self.target_domain:
+            return score
+
+        target = self.target_domain.lower()
+        
+        # Relevance adjustments
+        if event["osint_type"] == "Email":
+            if data.endswith(f"@{target}"):
+                score = min(100, score + 10)
+            elif any(domain in data for domain in ["gmail.com", "outlook.com", "yahoo.com"]):
+                score = max(0, score - 20) # Personal emails are lower confidence for company
+        
+        elif event["osint_type"] == "Subdomain":
+            if data.endswith(f".{target}") or data == target:
+                score = 100
+            else:
+                score = max(0, score - 30) # Unrelated domain
+                
+        elif event["osint_type"] == "IP":
+            # Hard to judge without WHOIS/ASN check here, keep base weight
+            pass
+            
+        elif event["osint_type"] == "Employee":
+            # If source data contains the target domain, boost it
+            if target in event["source_data"].lower():
+                score = min(100, score + 15)
+
+        return score
 
     def _fingerprint(self, event: dict) -> str:
         import hashlib

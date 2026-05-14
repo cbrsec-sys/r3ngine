@@ -1900,7 +1900,7 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	
 	# Initialize stateful parser with Redis dedup
 	redis_client = Redis(host="redis", port=6379, decode_responses=True)
-	parser = SpiderFootBatchParser(dedup_backend=redis_client, scan_id=self.scan_id)
+	parser = SpiderFootBatchParser(dedup_backend=redis_client, scan_id=self.scan_id, target_domain=self.domain.name)
 	
 	batch = []
 	batch_size = 100
@@ -1931,36 +1931,86 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	graph.close()
 
 def _process_spiderfoot_batch(self, batch, ctx, host):
-	"""Internal helper to process a batch of SpiderFoot findings."""
+	"""Internal helper to process a batch of SpiderFoot findings with tiered validation."""
 	try:
 		with transaction.atomic():
 			for event in batch:
 				e_type = event.get('type')
 				e_data = event.get('data')
+				osint_type = event.get('osint_type')
+				confidence = event.get('confidence', 0)
 				
 				if not e_type or not e_data:
 					continue
+
+
+				# Automated Persistence (High Confidence)
+				if confidence > 80:
+					if osint_type == 'Subdomain':
+						sub_name = e_data.lower()
+						if sub_name.endswith(host):
+							save_subdomain(sub_name, ctx=ctx)
+					elif osint_type == 'Email':
+						save_email(e_data.lower(), scan_history=self.scan)
+					elif osint_type == 'Employee':
+						save_employee(e_data, scan_history=self.scan)
+					elif osint_type == 'URL':
+						if is_valid_url(e_data):
+							save_endpoint(e_data, ctx=ctx)
+					elif osint_type == 'IP':
+						save_ip_address(e_data, scan_id=self.scan_id, activity_id=self.activity_id)
+					elif osint_type == 'Port':
+						# Data format for ports in SF can be "IP:Port" or just "Port"
+						if ':' in e_data:
+							ip_part, port_part = e_data.split(':', 1)
+							if port_part.isdigit():
+								port_num = int(port_part)
+								res = get_port_service_description(port_num)
+								port_obj, _ = update_or_create_port(port_num, service_name=res.get('service_name'), description=res.get('description'))
+								ip_obj, _ = save_ip_address(ip_part, scan_id=self.scan_id, activity_id=self.activity_id)
+								if ip_obj:
+									ip_obj.ports.add(port_obj)
+						elif e_data.isdigit():
+							port_num = int(e_data)
+							update_or_create_port(port_num)
+					elif osint_type == 'Tech':
+						tech_obj, _ = Technology.objects.get_or_create(name=e_data)
+						# If source data is a subdomain, link it
+						src_data = event.get('source_data', '')
+						subdomain = Subdomain.objects.filter(name=src_data, scan_history=self.scan).first()
+						if subdomain:
+							subdomain.technologies.add(tech_obj)
+					elif osint_type == 'Leak':
+						save_secret_leak(
+							scan_history=self.scan,
+							tool_name='SpiderFoot',
+							secret_type=event.get('type', 'Sensitive Data'),
+							source_url=event.get('source_data', 'SpiderFoot Findings'),
+							match_content=e_data
+						)
 				
-				# SF types for hostnames/subdomains
-				if e_type in ['DNS_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME']:
-					sub_name = e_data.lower()
-					if sub_name and sub_name.endswith(host):
-						logger.warning(f"[SPIDERFOOT] Ingesting SUBDOMAIN: {sub_name}")
-						save_subdomain(sub_name, ctx=ctx)
-				# SF types for URLs
-				elif e_type in ['WEB_RESOURCE', 'URL_ALL', 'LINKED_URL_INTERNAL']:
-					if e_data and is_valid_url(e_data):
-						logger.warning(f"[SPIDERFOOT] Ingesting ENDPOINT: {e_data}")
-						save_endpoint(e_data, ctx=ctx)
-				# SF types for Emails
-				elif e_type == 'EMAILADDR':
-					logger.warning(f"[SPIDERFOOT] Ingesting EMAIL: {e_data.lower()}")
-					save_email(e_data.lower(), scan_history=self.scan)
-				# SF types for Users/Accounts
-				elif e_type in ['USERNAME', 'ACCOUNT_EXTERNAL', 'HUMAN_NAME']:
-					logger.warning(f"[SPIDERFOOT] Ingesting EMPLOYEE/USER: {e_data}")
-					save_employee(e_data, scan_history=self.scan)
-		logger.warning(f"Processed batch of {len(batch)} SpiderFoot findings.")
+				# Staging Area (Moderate Confidence: 50% -> 80%)
+				elif 50 <= confidence <= 80:
+					OsintStaging.objects.update_or_create(
+						scan_history=self.scan,
+						target_domain=self.domain,
+						content=e_data,
+						osint_type=osint_type,
+						defaults={
+							'source': event.get('source', 'SpiderFoot'),
+							'confidence': confidence,
+							'metadata': {
+								'sf_type': e_type,
+								'source_data': event.get('source_data'),
+								'iocs': event.get('iocs')
+							}
+						}
+					)
+				else:
+					# Discard low confidence noise
+					logger.debug(f"[SPIDERFOOT] Discarding low confidence finding: {osint_type} - {e_data} ({confidence}%)")
+
+		logger.warning(f"Processed batch of {len(batch)} SpiderFoot findings with validation.")
 	except Exception as e:
 		logger.error(f"Error processing SpiderFoot batch: {str(e)}")
 
