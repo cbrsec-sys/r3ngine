@@ -21,6 +21,8 @@ from reNgine.task_utils import save_subdomain, stream_command
 from targetApp.models import Domain
 from startScan.models import ScanHistory, Subdomain, EndPoint, MonitoringDiscovery
 from scanEngine.models import EngineType
+from reNgine.parsers import SpiderFootBatchParser
+from redis import Redis
 
 logger = get_task_logger(__name__)
 
@@ -80,8 +82,8 @@ def _process_monitor_spiderfoot_batch(batch, domain, scan_history, ctx, new_disc
 	try:
 		with transaction.atomic():
 			for event in batch:
-				e_type = event.get('Type')
-				e_data = event.get('Data')
+				e_type = event.get('type')
+				e_data = event.get('data')
 				
 				if not e_type or not e_data:
 					continue
@@ -278,31 +280,19 @@ def monitor_target_task(domain_id):
 			if proxy:
 				sf_cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {sf_cmd}"
 			
+			# Initialize stateful parser with Redis dedup
+			redis_client = Redis(host="redis", port=6379, decode_responses=True)
+			parser = SpiderFootBatchParser(dedup_backend=redis_client, scan_id=scan_history.id)
+			
 			batch = []
-			batch_size = 50
-			header = None
+			batch_size = 100
 			
 			try:
 				for line in stream_command(sf_cmd, shell=True):
-					if not isinstance(line, str) or not line.strip():
+					event = parser.parse_line(line)
+					if not event:
 						continue
-					
-					line = line.replace('\0', '')
-					f = io.StringIO(line)
-					reader = csv.reader(f)
-					try:
-						row = next(reader)
-					except StopIteration:
-						continue
-					
-					if not header:
-						if "Data" in row and "Type" in row:
-							header = row
-							continue
-						else:
-							continue
-					
-					event = dict(zip(header, row))
+						
 					batch.append(event)
 					
 					if len(batch) >= batch_size:

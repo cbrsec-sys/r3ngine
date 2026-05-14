@@ -55,6 +55,7 @@ from reNgine.task_utils import (
 )
 from reNgine.report_tasks import *
 from reNgine.wpscan_tasks import wpscan_scan
+from reNgine.parsers import SpiderFootBatchParser
 try:
 	from acunetix import Acunetix
 except ImportError:
@@ -1897,10 +1898,12 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	cmd = f"python3 {sf_exec_path} -s {host} {profile_cmd} -max-threads {threads} -o csv -r -n"
 	logger.warning(f"[SPIDERFOOT] Executing command: {cmd}")
 	
+	# Initialize stateful parser with Redis dedup
+	redis_client = Redis(host="redis", port=6379, decode_responses=True)
+	parser = SpiderFootBatchParser(dedup_backend=redis_client, scan_id=self.scan_id)
+	
 	batch = []
-	batch_size = 50
-	header = None
-	line_count = 0
+	batch_size = 100
 	
 	for line in stream_command(
 		cmd,
@@ -1908,33 +1911,10 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 		scan_id=self.scan_id,
 		activity_id=self.activity_id):
 		
-		line_count += 1
-		if line_count == 1:
-			logger.warning(f"[SPIDERFOOT] Received first line of output: {line[:100]}...")
-		
-		if not isinstance(line, str) or not line.strip():
+		event = parser.parse_line(line)
+		if not event:
 			continue
 			
-		# Strip null bytes to prevent _csv.Error: line contains NUL
-		line = line.replace('\0', '')
-		f = io.StringIO(line)
-		reader = csv.reader(f)
-		try:
-			row = next(reader)
-		except StopIteration:
-			continue
-			
-		if not header:
-			# First line should be header
-			if "Data" in row and "Type" in row:
-				header = row
-				continue
-			else:
-				# Skip if not a header and we haven't seen one yet
-				continue
-		
-		# Map row to dict
-		event = dict(zip(header, row))
 		batch.append(event)
 		
 		if len(batch) >= batch_size:
@@ -1955,8 +1935,8 @@ def _process_spiderfoot_batch(self, batch, ctx, host):
 	try:
 		with transaction.atomic():
 			for event in batch:
-				e_type = event.get('Type')
-				e_data = event.get('Data')
+				e_type = event.get('type')
+				e_data = event.get('data')
 				
 				if not e_type or not e_data:
 					continue

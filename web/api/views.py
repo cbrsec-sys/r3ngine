@@ -599,7 +599,12 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 		slug = self.request.GET.get('slug', None)
 		if slug:
 			queryset = queryset.filter(project__slug=slug)
-		return queryset
+		
+		org_id = self.request.GET.get('organization_id', None)
+		if org_id:
+			queryset = queryset.filter(domains__id=org_id)
+			
+		return queryset.order_by('-id')
 
 	def filter_queryset(self, qs):
 		search_value = self.request.GET.get(u'search[value]', None)
@@ -1596,6 +1601,28 @@ class InitiateSubTask(APIView):
 		return Response({'status': True})
 
 
+class ToggleMonitoringAPIView(APIView):
+	permission_classes = [IsAuthenticated, HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		domain_id = request.data.get('domain_id')
+		try:
+			from targetApp.models import Domain
+			domain = Domain.objects.get(id=domain_id)
+			domain.is_monitored = not domain.is_monitored
+			domain.save()
+			from targetApp.views import manage_monitoring_task
+			manage_monitoring_task(domain)
+			return Response({
+				'status': True,
+				'is_monitored': domain.is_monitored,
+				'message': f'Monitoring {"enabled" if domain.is_monitored else "disabled"} for {domain.name}'
+			})
+		except Exception as e:
+			return Response({'status': False, 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class DeleteSubdomain(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_SCAN_RESULTS
@@ -1690,7 +1717,7 @@ class RengineUpdateCheck(APIView):
 
 
 class RengineSystemSettingsAPIView(APIView):
-	permission_classes = [HasPermission]
+	permission_classes = [IsAuthenticated, HasPermission]
 	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
 
 	def get(self, request):
@@ -1710,7 +1737,7 @@ class RengineSystemSettingsAPIView(APIView):
 
 
 class ProxySettingsAPIView(APIView):
-	permission_classes = [HasPermission]
+	permission_classes = [IsAuthenticated, HasPermission]
 	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
 
 	def get(self, request):
@@ -1730,7 +1757,7 @@ class ProxySettingsAPIView(APIView):
 
 
 class ProxyFetchAPIView(APIView):
-	permission_classes = [HasPermission]
+	permission_classes = [IsAuthenticated, HasPermission]
 	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
 
 	def post(self, request):
@@ -2366,7 +2393,7 @@ class ListEngines(APIView):
 
 
 class ListOrganizations(APIView):
-	permission_classes = [IsAuditor]
+	permission_classes = [IsAuthenticated, HasPermission]
 	def get(self, request, format=None):
 		req = self.request
 		organizations = Organization.objects.all()
@@ -2452,7 +2479,7 @@ class ListConfigurations(APIView):
 
 
 class ListTargetsInOrganization(APIView):
-	permission_classes = [IsAuditor]
+	permission_classes = [IsAuthenticated, HasPermission]
 	def get(self, request, format=None):
 		req = self.request
 		organization_id = req.query_params.get('organization_id')
@@ -3636,7 +3663,7 @@ class ScreenshotViewSet(viewsets.ModelViewSet):
 from rest_framework.permissions import AllowAny
 
 class DirectoryViewSet(viewsets.ModelViewSet):
-	permission_classes = [IsPenetrationTester]
+	permission_classes = [IsAuthenticated, HasPermission]
 
 
 	queryset = DirectoryFile.objects.none()

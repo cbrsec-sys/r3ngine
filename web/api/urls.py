@@ -15,7 +15,7 @@ from .scheduled_scans import ScheduledScanViewSet
 from .subscans import SubScanViewSet
 from .scan_history import ScanHistoryViewSet
 from .users import UserManageViewSet
-from .stress_testing_views import StressTestingAPIView
+from .stress_testing_views import StressTestingAPIView, StressTestingHistoryAPIView
 from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView
 from .scan_configuration import ScanConfigurationAPI
 
@@ -286,6 +286,10 @@ urlpatterns = [
         UpdateEngine.as_view(),
         name='update_engine'),
     path(
+        'toggle/monitoring/',
+        ToggleMonitoringAPIView.as_view(),
+        name='toggle_monitoring'),
+    path(
         'toggle/subdomain/important/',
         ToggleSubdomainImportantStatus.as_view(),
         name='toggle_subdomain'),
@@ -374,6 +378,11 @@ urlpatterns = [
         'media/',
         MobileMediaServeView.as_view(),
         name='mobile_media_serve'
+    ),
+    path(
+        'stress-testing/history/',
+        StressTestingHistoryAPIView.as_view(),
+        name='stress_testing_history_api'
     ),
     path(
         'stress-testing/<int:id>/',

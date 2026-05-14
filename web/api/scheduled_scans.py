@@ -2,6 +2,7 @@ from rest_framework import serializers, viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_celery_beat.models import PeriodicTask, IntervalSchedule, ClockedSchedule
+from rest_framework.permissions import IsAuthenticated
 from .permissions import HasPermission
 from reNgine.definitions import PERM_INITATE_SCANS_SUBSCANS, PERM_MODIFY_SCAN_RESULTS
 import json
@@ -35,7 +36,7 @@ class PeriodicTaskSerializer(serializers.ModelSerializer):
 class ScheduledScanViewSet(viewsets.ModelViewSet):
     queryset = PeriodicTask.objects.all().exclude(name='celery.backend_cleanup').order_by('-date_changed')
     serializer_class = PeriodicTaskSerializer
-    permission_classes = [HasPermission]
+    permission_classes = [IsAuthenticated, HasPermission]
     permission_required = PERM_INITATE_SCANS_SUBSCANS
 
     @action(detail=True, methods=['post'])
