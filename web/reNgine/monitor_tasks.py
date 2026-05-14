@@ -14,12 +14,65 @@ from reNgine.definitions import *
 from reNgine.settings import *
 from reNgine.common_func import *
 from django.db import transaction
+import yaml
+import subprocess
+import signal
 from reNgine.task_utils import save_subdomain, stream_command
 from targetApp.models import Domain
 from startScan.models import ScanHistory, Subdomain, EndPoint, MonitoringDiscovery
 from scanEngine.models import EngineType
 
 logger = get_task_logger(__name__)
+
+
+def generate_reconx_config(domain_name, reconx_dir):
+	"""Generates a structured YAML configuration for ReconX."""
+	targets_file = os.path.join(reconx_dir, "targets.txt")
+	with open(targets_file, 'w') as f:
+		f.write(domain_name)
+	
+	config = {
+		'targets_file': targets_file,
+		'data_dir': os.path.join(reconx_dir, "data"),
+		'output_dir': os.path.join(reconx_dir, "output"),
+		'findings_dir': os.path.join(reconx_dir, "findings"),
+		'logs_dir': os.path.join(reconx_dir, "logs"),
+		'recon': {
+			'parallel_targets': 5,
+			'subfinder_threads': 100
+		},
+		'pipeline': {
+			'parallel_scans': 5,
+			'cycle_delay': 60
+		},
+		'logging': {
+			'level': 'info',
+			'file': os.path.join(reconx_dir, "logs", "reconx.log")
+		}
+	}
+	
+	# Create directories
+	for key in ['data_dir', 'output_dir', 'findings_dir', 'logs_dir']:
+		os.makedirs(config[key], exist_ok=True)
+		
+	config_path = os.path.join(reconx_dir, "config.yaml")
+	with open(config_path, 'w') as f:
+		yaml.dump(config, f)
+		
+	return config_path, config['findings_dir']
+
+
+def is_reconx_running(pid_file):
+	"""Checks if a ReconX process is already running using a PID file."""
+	if os.path.exists(pid_file):
+		try:
+			with open(pid_file, 'r') as f:
+				pid = int(f.read().strip())
+			os.kill(pid, 0)
+			return True
+		except (OSError, ValueError, ProcessLookupError):
+			return False
+	return False
 
 
 def _process_monitor_spiderfoot_batch(batch, domain, scan_history, ctx, new_discoveries, existing_subs):
@@ -150,37 +203,47 @@ def monitor_target_task(domain_id):
 							scan_history=scan_history
 						)
 
-		# 4. ReconX Discovery
-		reconx_results = f"{results_dir}/reconx_findings"
-		os.makedirs(reconx_results, exist_ok=True)
+		# 4. ReconX Discovery (24/7 Monitoring)
+		reconx_dir = os.path.join(RENGINE_RESULTS, f"{domain.name}_reconx")
+		os.makedirs(reconx_dir, exist_ok=True)
+		pid_file = os.path.join(reconx_dir, "reconx.pid")
 		
-		# Create a temporary targets file for reconx
-		reconx_targets = f"{results_dir}/reconx_targets.txt"
-		with open(reconx_targets, 'w') as f:
-			f.write(domain.name)
+		# Generate/Update Config
+		config_path, findings_dir = generate_reconx_config(domain.name, reconx_dir)
 		
-		# Run reconx
-		# reconx run uses targets from config, but we can override or use a specific config
-		# For simplicity, we'll use a direct command if supported, or create a minimal config
-		reconx_cmd = f"reconx run --targets {reconx_targets} --output {reconx_results}"
-		os.system(reconx_cmd)
+		# Initiate 24/7 Monitoring if not already running
+		if not is_reconx_running(pid_file):
+			logger.info(f"Initiating 24/7 ReconX monitoring for {domain.name}")
+			# Start reconx run in the background
+			try:
+				# Use nohup or setsid to ensure it stays alive. 
+				# In Docker, we just need to detach it from the current shell.
+				process = subprocess.Popen(
+					["reconx", "run", "-config", config_path],
+					stdout=subprocess.DEVNULL,
+					stderr=subprocess.DEVNULL,
+					start_new_session=True
+				)
+				with open(pid_file, 'w') as f:
+					f.write(str(process.pid))
+				logger.info(f"ReconX started with PID {process.pid} for {domain.name}")
+			except Exception as e:
+				logger.error(f"Failed to start ReconX for {domain.name}: {str(e)}")
+		else:
+			logger.info(f"ReconX is already running for {domain.name}")
 		
-		# Parse reconx findings (JSONL format in findings directory)
-		# Findings are usually in ~/.local/share/reconx/findings/ but we try to direct output if possible
-		# If not, we'll check the default location
-		reconx_default_findings = os.path.expanduser("~/.local/share/reconx/findings/")
-		if os.path.exists(reconx_default_findings):
-			for file in os.listdir(reconx_default_findings):
+		# Parse findings from the domain-specific findings directory
+		if os.path.exists(findings_dir):
+			for file in os.listdir(findings_dir):
 				if file.endswith(".jsonl"):
 					try:
-						with open(os.path.join(reconx_default_findings, file), 'r') as f:
+						file_path = os.path.join(findings_dir, file)
+						with open(file_path, 'r') as f:
 							for line in f:
 								finding = json.loads(line)
-								# ReconX findings can be subdomains or vulnerabilities
 								if finding.get('type') == 'subdomain':
 									sub_name = finding.get('data', {}).get('subdomain')
 									if sub_name and sub_name.endswith(domain.name) and sub_name not in existing_subs:
-										from reNgine.tasks import save_subdomain
 										sub_obj, created = save_subdomain(sub_name, ctx=ctx)
 										if created:
 											new_discoveries.append(f"Subdomain (ReconX): {sub_name}")
@@ -192,11 +255,12 @@ def monitor_target_task(domain_id):
 												scan_history=scan_history
 											)
 								elif finding.get('type') == 'vulnerability':
-									# If reconx found a vulnerability, we can also log it
 									vuln_info = finding.get('data', {})
 									new_discoveries.append(f"Vulnerability (ReconX): {vuln_info.get('template-id')}")
+						# Optionally move or delete processed findings to avoid re-parsing
+						# os.rename(file_path, file_path + ".processed")
 					except Exception as e:
-						logger.error(f"Error parsing ReconX findings: {str(e)}")
+						logger.error(f"Error parsing ReconX findings for {domain.name}: {str(e)}")
 
 		# 5. Attack Surface Intelligence (SpiderFoot)
 		if 'spiderfoot_scan' in scan_history.tasks:
