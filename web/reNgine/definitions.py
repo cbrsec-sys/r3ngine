@@ -63,6 +63,10 @@ TOOL_COLORS = {
     'spiderfoot': COLOR_MAGENTA,
     'cpanel2shell-scanner': COLOR_RED,
     'h8mail': COLOR_PURPLE,
+    'baddns': COLOR_CYAN,
+    'betterleaks': COLOR_RED,
+    'gosearch': COLOR_GREEN,
+    'username-anarchy': COLOR_YELLOW,
 }
 
 ###############################################################################
@@ -162,6 +166,11 @@ RUN_CPANEL2SHELL = 'run_cpanel2shell'
 CPANEL_USER_WORDLIST = 'cpanel_user_wordlist'
 CPANEL_SCANNER_PROXY_TYPE = 'proxy_type'
 CPANEL_SCANNER_DEFAULT_WORDLIST = '/usr/src/app/wordlist/auth/cpanel_users.txt'
+
+BADDNS = 'baddns'
+BETTERLEAKS = 'betterleaks'
+GOSEARCH = 'gosearch'
+USERNAME_ANARCHY = 'username-anarchy'
 
 RUN_WPSCAN = 'run_wpscan'
 WPSCAN_ENUMERATION = 'wpscan_enumeration'
@@ -292,7 +301,7 @@ OSINT_DEFAULT_CONFIG = {
 }
 
 # subdomain scan
-SUBDOMAIN_SCAN_DEFAULT_TOOLS = ['subfinder', 'ctfr', 'sublist3r', 'tlsx']
+SUBDOMAIN_SCAN_DEFAULT_TOOLS = ['subfinder', 'ctfr', 'sublist3r', 'tlsx', 'baddns']
 
 # endpoints scan
 ENDPOINT_SCAN_DEFAULT_TOOLS = ['gospider']

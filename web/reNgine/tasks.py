@@ -371,6 +371,7 @@ def initiate_scan(
 			'screenshot': screenshot.si(ctx=ctx, description='Screenshot'),
 			'waf_detection': waf_detection.si(ctx=ctx, description='WAF detection'),
 			'waf_bypass': waf_bypass.si(ctx=ctx, description='WAF bypass'),
+			'secret_scanning': secret_scanning.si(ctx=ctx, description='Secrets & Leaks Scan'),
 			'firewall_vpn_scan': firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan'),
 			'brute_force_scan': brute_force_scan.si(ctx=ctx, description='Brute force scan'),
 			'correlate_vulnerabilities': correlate_vulnerabilities.si(scan_history_id=scan_history_id),
@@ -388,7 +389,7 @@ def initiate_scan(
 		def is_task_enabled(task_name):
 			if task_name in ['subdomain_discovery', 'osint', 'spiderfoot_scan', 'http_crawl', 'port_scan', 'screenshot', 
 							'dir_file_fuzz', 'fetch_url', 'web_api_discovery', 'waf_detection', 'waf_bypass', 
-							'vulnerability_scan', 'brute_force_scan', 'firewall_vpn_scan']:
+							'vulnerability_scan', 'brute_force_scan', 'firewall_vpn_scan', 'secret_scanning']:
 				return task_name in tasks
 			
 			if task_name in ['correlate_vulnerabilities', 'calculate_risk_scores']:
@@ -434,7 +435,7 @@ def initiate_scan(
 
 		# Tier 5: Blockers for Tier 6
 		t5_tasks = []
-		for t in ['web_api_discovery', 'waf_detection']:
+		for t in ['web_api_discovery', 'waf_detection', 'secret_scanning']:
 			wrapped = get_wrapped(t)
 			if wrapped: t5_tasks.append(wrapped)
 		t5_step = group(t5_tasks) if t5_tasks else None
@@ -909,6 +910,11 @@ def subdomain_discovery(
 				results_file = self.results_dir + '/subdomains_chaos.txt'
 				cmd = f'chaos -d {host} -silent -key {chaos_key} -o {results_file}'
 
+			elif tool == 'baddns':
+				results_file = self.results_dir + '/subdomains_baddns.txt'
+				# baddns -d domain -o output
+				cmd = f'baddns -d {host} -o {results_file}'
+
 
 		elif tool in custom_subdomain_tools:
 			tool_query = InstalledExternalTool.objects.filter(name__icontains=tool.lower())
@@ -995,9 +1001,29 @@ def subdomain_discovery(
 			continue
 
 		# Add subdomain
-		subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
+		subdomain, created = save_subdomain(subdomain_name, ctx=ctx)
 		if subdomain:
 			subdomain_count += 1
+			# Special handling for baddns findings (if it was a takeover)
+			# We'll check the baddns report file specifically for this subdomain
+			baddns_report = f'{self.results_dir}/subdomains_baddns.txt'
+			if os.path.exists(baddns_report):
+				with open(baddns_report, 'r') as f:
+					for b_line in f:
+						if subdomain_name in b_line and '[takeover]' in b_line.lower():
+							subdomain.is_important = True
+							subdomain.save()
+							# Create Critical Vulnerability
+							save_vulnerability(
+								name=f"Subdomain Takeover on {subdomain_name}",
+								description=f"baddns detected a potential subdomain takeover on {subdomain_name}. Line: {b_line.strip()}",
+								severity='critical',
+								type='Subdomain Takeover',
+								subdomain=subdomain,
+								scan_history=self.scan,
+								target_domain=self.domain,
+								validation_status='unverified'
+							)
 			subdomains.append(subdomain)
 			urls.append(subdomain.name)
 
@@ -1773,16 +1799,18 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 		return "No scan history found."
 
 	endpoints = EndPoint.objects.filter(scan_history=self.scan)
-	js_endpoints = [e for e in endpoints if e.http_url.endswith('.js')]
+	# Sensitive extensions to scan
+	SENSITIVE_EXTENSIONS = ('.js', '.env', '.php', '.asp', '.aspx', '.jsp', '.jspx', '.txt', '.log', '.conf', '.config', '.bak', '.old', '.json', '.yaml', '.yml')
+	target_endpoints = [e for e in endpoints if e.http_url.lower().endswith(SENSITIVE_EXTENSIONS)]
 
-	if not js_endpoints:
-		return "No JS files found to scan."
+	if not target_endpoints:
+		return "No sensitive files found to scan."
 
 	temp_dir = f"{self.results_dir}/secrets_temp"
 	os.makedirs(temp_dir, exist_ok=True)
 
-	# Download JS files
-	for js in js_endpoints:
+	# Download sensitive files
+	for js in target_endpoints:
 		try:
 			filename = "".join([c if c.isalnum() else "_" for c in js.http_url]) + ".js"
 			filepath = os.path.join(temp_dir, filename)
@@ -1843,6 +1871,31 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 				findings_count += 1
 			except Exception as e:
 				logger.error(f"Error parsing Trufflehog finding: {e}")
+
+	# Run Betterleaks
+	if config.get(BETTERLEAKS):
+		# Betterleaks is typically run against files or a directory
+		# It's good for finding secrets like API keys, passwords, etc.
+		# Command: betterleaks -p {temp_dir}
+		cmd = f"betterleaks -p {temp_dir}"
+		# Since betterleaks output format might vary, we'll try to parse stdout
+		process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+		stdout, stderr = process.communicate()
+		
+		for line in stdout.splitlines():
+			if line.strip():
+				# Assuming betterleaks outputs findings in a recognizable format
+				# For now, let's just log it and save if it looks like a finding
+				if any(keyword in line.lower() for keyword in ['key', 'password', 'secret', 'token', 'found']):
+					save_secret_leak(
+						scan_history=self.scan,
+						tool_name=BETTERLEAKS,
+						secret_type='Potential Secret',
+						source_url='Discovered Files',
+						match_content=line.strip(),
+						status='unverified'
+					)
+					findings_count += 1
 
 	# Cleanup
 	shutil.rmtree(temp_dir, ignore_errors=True)
@@ -1930,6 +1983,52 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	graph.sync_scan_results(self.scan_id)
 	graph.close()
 
+
+def persist_osint_item(scan_history, domain, osint_type, e_data, confidence, source_data=None, event_type=None, ctx=None, activity_id=None):
+	"""
+	Core logic to persist an OSINT item into primary tables.
+	Separated from tasks to allow manual promotion from UI.
+	"""
+	if osint_type == 'Subdomain':
+		sub_name = e_data.lower()
+		save_subdomain(sub_name, ctx=ctx)
+	elif osint_type == 'Email':
+		save_email(e_data.lower(), scan_history=scan_history)
+	elif osint_type == 'Employee':
+		save_employee(e_data, scan_history=scan_history)
+	elif osint_type == 'URL':
+		if is_valid_url(e_data):
+			save_endpoint(e_data, ctx=ctx)
+	elif osint_type == 'IP':
+		save_ip_address(e_data, scan_id=scan_history.id, activity_id=activity_id)
+	elif osint_type == 'Port':
+		if ':' in e_data:
+			ip_part, port_part = e_data.split(':', 1)
+			if port_part.isdigit():
+				port_num = int(port_part)
+				res = get_port_service_description(port_num)
+				port_obj, _ = update_or_create_port(port_num, service_name=res.get('service_name'), description=res.get('description'))
+				ip_obj, _ = save_ip_address(ip_part, scan_id=scan_history.id, activity_id=activity_id)
+				if ip_obj:
+					ip_obj.ports.add(port_obj)
+		elif e_data.isdigit():
+			port_num = int(e_data)
+			update_or_create_port(port_num)
+	elif osint_type == 'Tech':
+		tech_obj, _ = Technology.objects.get_or_create(name=e_data)
+		if source_data:
+			subdomain = Subdomain.objects.filter(name=source_data, scan_history=scan_history).first()
+			if subdomain:
+				subdomain.technologies.add(tech_obj)
+	elif osint_type == 'Leak':
+		save_secret_leak(
+			scan_history=scan_history,
+			tool_name='SpiderFoot',
+			secret_type=event_type or 'Sensitive Data',
+			source_url=source_data or 'SpiderFoot Findings',
+			match_content=e_data
+		)
+
 def _process_spiderfoot_batch(self, batch, ctx, host):
 	"""Internal helper to process a batch of SpiderFoot findings with tiered validation."""
 	try:
@@ -1940,54 +2039,22 @@ def _process_spiderfoot_batch(self, batch, ctx, host):
 				osint_type = event.get('osint_type')
 				confidence = event.get('confidence', 0)
 				
-				if not e_type or not e_data:
+				if not osint_type or not e_data:
 					continue
-
 
 				# Automated Persistence (High Confidence)
 				if confidence > 80:
-					if osint_type == 'Subdomain':
-						sub_name = e_data.lower()
-						if sub_name.endswith(host):
-							save_subdomain(sub_name, ctx=ctx)
-					elif osint_type == 'Email':
-						save_email(e_data.lower(), scan_history=self.scan)
-					elif osint_type == 'Employee':
-						save_employee(e_data, scan_history=self.scan)
-					elif osint_type == 'URL':
-						if is_valid_url(e_data):
-							save_endpoint(e_data, ctx=ctx)
-					elif osint_type == 'IP':
-						save_ip_address(e_data, scan_id=self.scan_id, activity_id=self.activity_id)
-					elif osint_type == 'Port':
-						# Data format for ports in SF can be "IP:Port" or just "Port"
-						if ':' in e_data:
-							ip_part, port_part = e_data.split(':', 1)
-							if port_part.isdigit():
-								port_num = int(port_part)
-								res = get_port_service_description(port_num)
-								port_obj, _ = update_or_create_port(port_num, service_name=res.get('service_name'), description=res.get('description'))
-								ip_obj, _ = save_ip_address(ip_part, scan_id=self.scan_id, activity_id=self.activity_id)
-								if ip_obj:
-									ip_obj.ports.add(port_obj)
-						elif e_data.isdigit():
-							port_num = int(e_data)
-							update_or_create_port(port_num)
-					elif osint_type == 'Tech':
-						tech_obj, _ = Technology.objects.get_or_create(name=e_data)
-						# If source data is a subdomain, link it
-						src_data = event.get('source_data', '')
-						subdomain = Subdomain.objects.filter(name=src_data, scan_history=self.scan).first()
-						if subdomain:
-							subdomain.technologies.add(tech_obj)
-					elif osint_type == 'Leak':
-						save_secret_leak(
-							scan_history=self.scan,
-							tool_name='SpiderFoot',
-							secret_type=event.get('type', 'Sensitive Data'),
-							source_url=event.get('source_data', 'SpiderFoot Findings'),
-							match_content=e_data
-						)
+					persist_osint_item(
+						scan_history=self.scan,
+						domain=self.domain,
+						osint_type=osint_type,
+						e_data=e_data,
+						confidence=confidence,
+						source_data=event.get('source_data'),
+						event_type=e_type,
+						ctx=ctx,
+						activity_id=self.activity_id
+					)
 				
 				# Staging Area (Moderate Confidence: 50% -> 80%)
 				elif 50 <= confidence <= 80:
@@ -2003,7 +2070,8 @@ def _process_spiderfoot_batch(self, batch, ctx, host):
 								'sf_type': e_type,
 								'source_data': event.get('source_data'),
 								'iocs': event.get('iocs')
-							}
+							},
+							'status': 'pending'
 						}
 					)
 				else:

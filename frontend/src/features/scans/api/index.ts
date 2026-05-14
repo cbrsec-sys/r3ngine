@@ -498,6 +498,7 @@ export const useOsintStaging = (params: { scan_id?: number | string, search?: st
   });
 };
 
+
 export const useBulkDiscardOsint = () => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -515,6 +516,53 @@ export const useBulkDiscardOsint = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['osint-staging'] });
+    },
+  });
+};
+
+export const useBulkPromoteOsint = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: number[]) => {
+      const response = await fetch('/api/osintStaging/bulk_promote/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ ids }),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['osint-staging'] });
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['subdomains'] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+  });
+};
+
+export const usePromoteOsint = (id: number) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/osintStaging/${id}/promote/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['osint-staging'] });
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['subdomains'] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
     },
   });
 };

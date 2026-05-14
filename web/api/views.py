@@ -693,9 +693,10 @@ class MonitoringDiscoveryViewSet(viewsets.ModelViewSet):
         return Response(stats)
 
 
+
 class OsintStagingViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]
-	queryset = OsintStaging.objects.all().order_by('-confidence', '-discovered_date')
+	queryset = OsintStaging.objects.filter(status='pending').order_by('-confidence', '-discovered_date')
 	serializer_class = OsintStagingSerializer
 
 	def get_queryset(self):
@@ -703,7 +704,7 @@ class OsintStagingViewSet(viewsets.ModelViewSet):
 		scan_id = self.request.query_params.get('scan_id')
 		target_id = self.request.query_params.get('target_id')
 		osint_type = self.request.query_params.get('osint_type')
-		status = self.request.query_params.get('status')
+		status_param = self.request.query_params.get('status')
 		
 		if scan_id:
 			queryset = queryset.filter(scan_history_id=scan_id)
@@ -711,9 +712,9 @@ class OsintStagingViewSet(viewsets.ModelViewSet):
 			queryset = queryset.filter(target_domain_id=target_id)
 		if osint_type:
 			queryset = queryset.filter(osint_type=osint_type)
-		if status:
-			queryset = queryset.filter(status=status)
-			
+		if status_param:
+			queryset = OsintStaging.objects.filter(status=status_param) # Allow override to see validated/ignored
+		
 		# Universal Search for Staging
 		search = self.request.query_params.get('search')
 		if search:
@@ -735,6 +736,60 @@ class OsintStagingViewSet(viewsets.ModelViewSet):
 		
 		OsintStaging.objects.filter(id__in=ids).delete()
 		return Response({'status': 'success', 'message': f'Deleted {len(ids)} items'})
+
+	@action(detail=False, methods=['post'])
+	def bulk_promote(self, request):
+		"""Bulk promote staging items to primary tables."""
+		from reNgine.tasks import persist_osint_item
+		ids = request.data.get('ids', [])
+		if not ids:
+			return Response({'error': 'No IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
+		
+		items = OsintStaging.objects.filter(id__in=ids)
+		count = 0
+		for item in items:
+			ctx = {
+				'scan_history_id': item.scan_history.id,
+				'domain_id': item.target_domain.id
+			}
+			persist_osint_item(
+				scan_history=item.scan_history,
+				domain=item.target_domain,
+				osint_type=item.osint_type,
+				e_data=item.content,
+				confidence=item.confidence,
+				source_data=item.metadata.get('source_data'),
+				event_type=item.metadata.get('sf_type'),
+				ctx=ctx
+			)
+			item.status = 'validated'
+			item.save()
+			count += 1
+			
+		return Response({'status': 'success', 'message': f'Promoted {count} items'})
+
+	@action(detail=True, methods=['post'])
+	def promote(self, request, pk=None):
+		"""Individual promote."""
+		from reNgine.tasks import persist_osint_item
+		item = self.get_object()
+		ctx = {
+			'scan_history_id': item.scan_history.id,
+			'domain_id': item.target_domain.id
+		}
+		persist_osint_item(
+			scan_history=item.scan_history,
+			domain=item.target_domain,
+			osint_type=item.osint_type,
+			e_data=item.content,
+			confidence=item.confidence,
+			source_data=item.metadata.get('source_data'),
+			event_type=item.metadata.get('sf_type'),
+			ctx=ctx
+		)
+		item.status = 'validated'
+		item.save()
+		return Response({'status': 'success'})
 
 	@action(detail=True, methods=['post'])
 	def discard(self, request, pk=None):

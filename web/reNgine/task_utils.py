@@ -147,6 +147,9 @@ def save_email(email_address, scan_history=None):
     if scan_history:
         scan_history.emails.add(email)
         scan_history.save()
+        # Trigger identity enrichment
+        from reNgine.osint_tasks import enrich_identities_task
+        enrich_identities_task.delay(email_address, 'email', scan_history.id)
 
     return email, created
 
@@ -159,6 +162,9 @@ def save_employee(name, designation='', scan_history=None):
     if scan_history:
         scan_history.employees.add(employee)
         scan_history.save()
+        # Trigger identity enrichment
+        from reNgine.osint_tasks import enrich_identities_task
+        enrich_identities_task.delay(name, 'employee', scan_history.id)
 
     return employee, created
 
