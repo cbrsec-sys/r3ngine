@@ -15,7 +15,7 @@
 <img src=".github/screenshots/r3ngine_dash.png" height="400px" width="520px" alt=""/>
 </p>
 
-<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
+<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.2.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=Xk_YH83IQgg" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--Asia-2023-blue.svg?logo=none" alt="" /></a>&nbsp;
@@ -37,7 +37,7 @@
 </p>
 <h4>r3ngine 3.0.0: The Phoenix Rebirth</h4>
 <p>
-  r3ngine 3.0.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Interactive KPI Reports</b> with internal navigation, and <b>Scoped Attack Surface Visualization</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
+  r3ngine 3.0.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Human-in-the-Loop OSINT Staging</b>, and <b>Reinforced Security Discovery Stack</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
 </p>
 
 <h4>Attack Path Modeling Engine<h4>
@@ -105,7 +105,7 @@ Aesthetic excellence is a core requirement of the v3 vision.
     * 📊 **Enhanced Telemetry**: Fixed HTTP status breakdown logic to capture and visualize all response codes across assets. Resolved critical Scan Summary API stability issues by refactoring to target-wide cumulative data queries, ensuring full data visibility for rescans and historical targets.
 *   **Responsive Header & Mobile Menu**: Dynamic adaptation of header actions into a high-fidelity hamburger drawer for small viewports, preserving the glassmorphic aesthetic.
 *   **Multi-Tier Theme System**: Toggle between **Hacker (Cyberpunk)**, **Hybrid (Modern Dark)**, and **Enterprise (Professional Slate)** interfaces instantly.
-*   **Attack Surface Map v4.0**: Advanced node analytics scaling by degree centrality, blast radius computation, and AI-driven graph search.
+*   **Attack Surface Map v4.0**: High-performance infrastructure visualization with **Hierarchical Asset Clustering** (Domains > Subdomains > Endpoints). Features advanced **fCoSE** and **KLay** layouts, semantic cluster management, and AI-driven graph search.
 *   **Tactical GeoMap Visualization**: Custom high-performance CSS-animated markers and tooltip interactions for global asset positioning.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
@@ -187,12 +187,14 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 
 ### 🕵️ Surgical Reconnaissance
 *   **Advanced Web API Discovery**: Dedicated pipeline featuring Kiterunner, Arjun, ParamSpider, LinkFinder, and InQL.
-*   **Deep OSINT 2.0**: A modular, internal intelligence pipeline featuring automated email pivoting, social profile mapping, and a **Custom Playwright-driven Social Intelligence Engine** that mimics human behavior to discover corporate personnel while maintaining high OpSec.
-*   **ReconX Auxiliary Discovery**: Integrated third-party asset discovery and monitoring.
+*   **Deep OSINT 2.0**: A modular, internal intelligence pipeline featuring automated email pivoting, social profile mapping, **gosearch** for social presence discovery, **username-anarchy** for tactical identity permutation, and a **Custom Playwright-driven Social Intelligence Engine** that mimics human behavior to discover corporate personnel while maintaining high OpSec.
+*   **ReconX 24/7 Monitoring**: Dedicated, domain-specific background monitoring engine for continuous asset tracking and automated findings ingestion.
 *   **Vulnerability Scanning**:
     *   **Nuclei**: Specialized templates and rate-limited execution.
     *   **Semgrep**: Automated static analysis for JS and GraphQL.
     *   **WPScan**: Automated WordPress reconnaissance and vulnerability identification.
+    *   **baddns**: Automated subdomain takeover detection with critical severity mapping.
+    *   **betterleaks**: High-precision secret and leak identification in discovered assets.
     *   **Dalfox**: Advanced XSS discovery.
     *   **CRLFuzzer, S3Scanner, Gitleaks, Retire.js**.
 *   **WHOIS, WAF Detection, and IP Geolocation**.
@@ -215,8 +217,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **HackerOne Integration**: Direct reporting of vulnerabilities to bug bounty platforms.
 *   **Screenshot Gallery**: Automated visual captures with advanced filtering and tagging.
 *   **Export/Import**: Interoperable with other tools via JSON, CSV, and TXT.
--optimizer
-* integrated tools: Chaos, TLSX, CTFR, Netlas, Katana, Medusa.
+*   **Integrated Tools**: Chaos, TLSX, CTFR, Netlas, Katana, Medusa, baddns, betterleaks, gosearch, username-anarchy.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
