@@ -141,6 +141,8 @@ WORKDIR /usr/src/app
 
 ENV GO111MODULE=on 
 RUN printf "\
+    github.com/projectdiscovery/baddns/cmd/baddns@latest\n\
+    github.com/prov3rbs/gosearch/cmd/gosearch@latest\n\
     github.com/jaeles-project/gospider@latest\n\
     github.com/tomnomnom/gf@latest\n\
     github.com/tomnomnom/unfurl@latest\n\
@@ -180,6 +182,15 @@ RUN ARCH=$(dpkg --print-architecture) \
     && tar -xvf k6-v${K6_VERSION}-linux-${K6_ARCH}.tar.gz \
     && mv k6-v${K6_VERSION}-linux-${K6_ARCH}/k6 /usr/local/bin/ \
     && rm -rf k6-v${K6_VERSION}-linux-${K6_ARCH}*
+
+# Install BetterLeaks
+RUN git clone https://github.com/betterleaks/betterleaks /usr/src/github/betterleaks && \
+    cd /usr/src/github/betterleaks && make build && \
+    ln -sf /usr/src/github/betterleaks/betterleaks /usr/local/bin/betterleaks
+
+# Install Username Anarchy
+RUN git clone https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy && \
+    ln -sf /usr/src/github/username-anarchy/username-anarchy /usr/local/bin/username-anarchy
 
 # Install Aquatone
 RUN ARCH=$(dpkg --print-architecture) \

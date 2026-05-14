@@ -151,10 +151,102 @@ def run_linkedint(self, company_name, scan_history_id):
         return []
 
 
+    # 3. LinkedInt for the domain/company
+    company_name = domain.split('.')[0]
+    run_linkedint.delay(company_name, scan_history_id)
+
+@app.task(name='enrich_identities_task', queue='osint_queue', base=RengineTask, bind=True)
+def enrich_identities_task(self, identity, identity_type, scan_history_id, ctx={}):
+    """
+    Enrich identities using username-anarchy and gosearch.
+    identity: Email or Name
+    identity_type: 'email' or 'employee'
+    """
+    from startScan.models import OsintStaging, Domain
+    scan_history = ScanHistory.objects.get(pk=scan_history_id)
+    domain = scan_history.domain
+    
+    full_name = identity
+    if identity_type == 'email':
+        # Logic: mark.person@email.com -> Mark Person
+        user_part = identity.split('@')[0]
+        if '.' in user_part:
+            full_name = ' '.join([p.capitalize() for p in user_part.split('.')])
+        else:
+            # If no dot, just use the username part
+            full_name = user_part
+            
+    logger.info(f"Enriching identity: {full_name} ({identity_type})")
+    
+    # 1. Generate Top 5 usernames using username-anarchy
+    # Command: ruby username-anarchy "First Last"
+    # We'll take the top 5 results
+    ua_path = '/usr/src/github/username-anarchy/username-anarchy'
+    if not os.path.exists(ua_path):
+        logger.error(f"username-anarchy not found at {ua_path}")
+        return
+        
+    cmd_ua = ['ruby', ua_path, full_name]
+    process_ua = subprocess.Popen(cmd_ua, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    stdout_ua, _ = process_ua.communicate()
+    
+    usernames = [line.strip() for line in stdout_ua.splitlines() if line.strip()][:5]
+    
+    if not usernames and identity_type == 'email':
+        # Fallback to the actual username from email
+        usernames = [identity.split('@')[0]]
+
+    logger.info(f"Generated usernames for {full_name}: {usernames}")
+    
+    # 2. Run gosearch for each username
+    for username in usernames:
+        if not username: continue
+        
+        # gosearch -u <username> --no-false-positives
+        # We'll run it and parse output. gosearch output can be noisy.
+        # It usually outputs discovered URLs.
+        
+        cmd_gs = ['gosearch', '-u', username, '--no-false-positives']
+        
+        # Check for proxy in ctx or global
+        proxy = get_random_proxy()
+        if proxy:
+            cmd_gs = ['proxychains4', '-q'] + cmd_gs
+            
+        process_gs = subprocess.Popen(cmd_gs, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout_gs, _ = process_gs.communicate()
+        
+        findings = []
+        for line in stdout_gs.splitlines():
+            if 'http' in line:
+                # Extract URL
+                urls = re.findall(r'(https?://[^\s]+)', line)
+                findings.extend(urls)
+        
+        if findings:
+            for url in set(findings):
+                OsintStaging.objects.get_or_create(
+                    scan_history=scan_history,
+                    target_domain=domain,
+                    osint_type='Social/Web Presence',
+                    content=url,
+                    defaults={
+                        'source': 'gosearch',
+                        'confidence': 80,
+                        'metadata': {
+                            'username': username,
+                            'identity': full_name,
+                            'original_identity': identity
+                        }
+                    }
+                )
+    
+    return f"Enrichment completed for {full_name}"
+
 @app.task(name='osint_orchestrator', queue='main_scan_queue', base=RengineTask, bind=True)
 def osint_orchestrator(self, scan_history_id):
     """
-    Orchestrate the new OSINT pipeline.
+    Orchestrate the OSINT pipeline.
     """
     scan_history = ScanHistory.objects.get(pk=scan_history_id)
     domain = scan_history.domain.name
@@ -163,13 +255,17 @@ def osint_orchestrator(self, scan_history_id):
     emails = scan_history.emails.all()
     for email in emails:
         run_holehe.delay(email.address, scan_history_id)
+        # New: Trigger identity enrichment
+        enrich_identities_task.delay(email.address, 'email', scan_history_id)
         
     # 2. Get already discovered employees/usernames
     employees = scan_history.employees.all()
     for employee in employees:
-        # Use name as username for maigret as a guess, or if it looks like a username
-        if employee.name and ' ' not in employee.name:
-            run_maigret.delay(employee.name, scan_history_id)
+        if employee.name:
+            if ' ' not in employee.name:
+                run_maigret.delay(employee.name, scan_history_id)
+            # New: Trigger identity enrichment for all employees
+            enrich_identities_task.delay(employee.name, 'employee', scan_history_id)
             
     # 3. LinkedInt for the domain/company
     company_name = domain.split('.')[0]

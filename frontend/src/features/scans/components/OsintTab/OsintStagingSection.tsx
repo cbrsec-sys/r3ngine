@@ -37,7 +37,11 @@ import {
 } from 'lucide-react';
 
 import { TacticalPanel } from '../../../../components/TacticalPanel';
-import { useOsintStaging, useBulkDiscardOsint } from '../../api';
+import { 
+  useOsintStaging, 
+  useBulkDiscardOsint, 
+  useBulkPromoteOsint
+} from '../../api';
 import type { OsintStaging } from '../../types';
 
 interface OsintStagingSectionProps {
@@ -58,6 +62,7 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
   });
 
   const discardMutation = useBulkDiscardOsint();
+  const promoteMutation = useBulkPromoteOsint();
 
   const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.checked && data) {
@@ -85,6 +90,20 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
 
   const handleIndividualDiscard = async (id: number) => {
     await discardMutation.mutateAsync([id]);
+    setSelected(selected.filter(i => i !== id));
+    refetch();
+  };
+
+  const handleBulkPromote = async () => {
+    if (window.confirm(`Promote ${selected.length} items to primary tables?`)) {
+      await promoteMutation.mutateAsync(selected);
+      setSelected([]);
+      refetch();
+    }
+  };
+
+  const handleIndividualPromote = async (id: number) => {
+    await promoteMutation.mutateAsync([id]);
     setSelected(selected.filter(i => i !== id));
     refetch();
   };
@@ -134,23 +153,42 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
             sx={{ width: 250 }}
           />
           {selected.length > 0 && (
-            <Button
-              size="small"
-              variant="outlined"
-              color="error"
-              startIcon={<Trash2 size={14} />}
-              onClick={handleBulkDiscard}
-              sx={{ 
-                fontFamily: 'Orbitron', 
-                fontSize: '0.65rem', 
-                fontWeight: 900,
-                bgcolor: 'rgba(255, 0, 60, 0.05)',
-                border: '1px solid #ff003c40',
-                '&:hover': { bgcolor: 'rgba(255, 0, 60, 0.1)', border: '1px solid #ff003c' }
-              }}
-            >
-              DISCARD {selected.length} ITEMS
-            </Button>
+            <Stack direction="row" spacing={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                color="success"
+                startIcon={<Check size={14} />}
+                onClick={handleBulkPromote}
+                sx={{ 
+                  fontFamily: 'Orbitron', 
+                  fontSize: '0.65rem', 
+                  fontWeight: 900,
+                  bgcolor: 'rgba(0, 255, 98, 0.05)',
+                  border: '1px solid #00ff6240',
+                  '&:hover': { bgcolor: 'rgba(0, 255, 98, 0.1)', border: '1px solid #00ff62' }
+                }}
+              >
+                VALIDATE {selected.length} ITEMS
+              </Button>
+              <Button
+                size="small"
+                variant="outlined"
+                color="error"
+                startIcon={<Trash2 size={14} />}
+                onClick={handleBulkDiscard}
+                sx={{ 
+                  fontFamily: 'Orbitron', 
+                  fontSize: '0.65rem', 
+                  fontWeight: 900,
+                  bgcolor: 'rgba(255, 0, 60, 0.05)',
+                  border: '1px solid #ff003c40',
+                  '&:hover': { bgcolor: 'rgba(255, 0, 60, 0.1)', border: '1px solid #ff003c' }
+                }}
+              >
+                DISCARD {selected.length} ITEMS
+              </Button>
+            </Stack>
           )}
         </Box>
       }
@@ -250,6 +288,15 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
                       </TableCell>
                       <TableCell align="right">
                         <Stack direction="row" sx={{ justifyContent: 'flex-end', gap: 0.5 }}>
+                          <Tooltip title="Validate / Promote">
+                            <IconButton 
+                              size="small" 
+                              onClick={() => handleIndividualPromote(item.id)}
+                              sx={{ color: 'success.main', opacity: 0.7, '&:hover': { opacity: 1 } }}
+                            >
+                              <Check size={14} />
+                            </IconButton>
+                          </Tooltip>
                           <Tooltip title="View Metadata">
                             <IconButton 
                               size="small" 

@@ -228,6 +228,21 @@ if [ ! -f '/usr/src/wordlist/cpanel_users.txt' ]; then
   sort -u /usr/src/wordlist/cpanel_users.txt -o /usr/src/wordlist/cpanel_users.txt
 fi
 
+# Setup betterleaks
+if [ ! -f '/usr/local/bin/betterleaks' ]; then
+  echo "Setting up betterleaks..."
+  git clone https://github.com/betterleaks/betterleaks /usr/src/github/betterleaks
+  cd /usr/src/github/betterleaks && make build
+  ln -sf /usr/src/github/betterleaks/betterleaks /usr/local/bin/betterleaks
+fi
+
+# Setup username-anarchy
+if [ ! -d '/usr/src/github/username-anarchy' ]; then
+  echo "Cloning username-anarchy..."
+  mkdir -p /usr/src/github
+  git clone https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy
+fi
+
 cd /usr/src/app
 # install h8mail
 python3 -m pip install h8mail
