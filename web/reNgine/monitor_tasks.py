@@ -287,6 +287,7 @@ def monitor_target_task(domain_id):
 					if not isinstance(line, str) or not line.strip():
 						continue
 					
+					line = line.replace('\0', '')
 					f = io.StringIO(line)
 					reader = csv.reader(f)
 					try:

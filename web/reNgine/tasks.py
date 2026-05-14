@@ -1915,7 +1915,8 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 		if not isinstance(line, str) or not line.strip():
 			continue
 			
-		# Parse CSV line
+		# Strip null bytes to prevent _csv.Error: line contains NUL
+		line = line.replace('\0', '')
 		f = io.StringIO(line)
 		reader = csv.reader(f)
 		try:
