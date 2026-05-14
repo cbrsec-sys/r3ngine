@@ -908,17 +908,6 @@ def subdomain_discovery(
 				results_file = self.results_dir + '/subdomains_chaos.txt'
 				cmd = f'chaos -d {host} -silent -key {chaos_key} -o {results_file}'
 
-			elif tool == 'reconx':
-				reconx_results = f"{self.results_dir}/reconx_findings"
-				os.makedirs(reconx_results, exist_ok=True)
-				
-				# Create a temporary targets file for reconx
-				reconx_targets = f"{self.results_dir}/reconx_targets.txt"
-				with open(reconx_targets, 'w') as f:
-					f.write(self.domain.name)
-				
-				# Run reconx
-				cmd = f"reconx run --targets {reconx_targets} --output {reconx_results}"
 
 		elif tool in custom_subdomain_tools:
 			tool_query = InstalledExternalTool.objects.filter(name__icontains=tool.lower())
@@ -956,30 +945,6 @@ def subdomain_discovery(
 				activity_id=self.activity_id,
 				proxy=proxy if tool not in ['amass-passive', 'amass-active', 'subfinder'] else None)
 			
-			# Parse reconx findings if tool was reconx
-			if tool == 'reconx':
-				reconx_default_findings = os.path.expanduser("~/.local/share/reconx/findings/")
-				if os.path.exists(reconx_default_findings):
-					for file in os.listdir(reconx_default_findings):
-						if file.endswith(".jsonl"):
-							try:
-								with open(os.path.join(reconx_default_findings, file), 'r') as f:
-									for line in f:
-										finding = json.loads(line)
-										if finding.get('type') == 'subdomain':
-											sub_name = finding.get('data', {}).get('subdomain')
-											if sub_name and sub_name.endswith(self.domain.name) and sub_name not in existing_subs:
-												sub_obj, created = save_subdomain(sub_name, ctx=ctx)
-												if created:
-													existing_subs.add(sub_name)
-													MonitoringDiscovery.objects.create(
-														domain=self.domain,
-														discovery_type='subdomain',
-														content={'name': sub_name, 'source': 'ReconX'},
-														scan_history=self.scan
-													)
-							except Exception as e:
-								logger.error(f"Error parsing ReconX findings: {str(e)}")
 		except Exception as e:
 			logger.error(
 				f'Subdomain discovery tool "{tool}" raised an exception')

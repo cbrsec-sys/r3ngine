@@ -3,7 +3,7 @@
     engine_name: Full Scan
     yaml_configuration: |
       subdomain_discovery: {
-        'uses_tools': ['subfinder', 'amass-passive', 'amass-active', 'chaos', 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'reconx'],
+        'uses_tools': ['subfinder', 'amass-passive', 'amass-active', 'chaos', 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas'],
         'enable_http_crawl': true,
         'threads': 30,
         'timeout': 5,
@@ -36,7 +36,7 @@
         'rate_limit': 150,
         'extensions': ['html', 'php','git','yaml','conf','cnf','config','gz','env','log','db','mysql','bak','asp','aspx','txt','conf','sql','json','yml','pdf'],
         'follow_redirect': false,
-        'max_time': 0,
+        'max_time': 300,
         'match_http_status': [200, 204],
         'recursive_level': 2,
         'stop_on_error': false,
@@ -60,9 +60,6 @@
         'run_acunetix': true,
         'run_wpscan': true,
         'run_s3scanner': true,
-        'cpanel_scanner': {
-          'run_cpanel2shell': true
-        },
         'enable_http_crawl': true,
         'concurrency': 50,
         'intensity': 'normal',
@@ -73,6 +70,11 @@
         'nuclei': {
           'use_nuclei_config': false,
           'severities': ['unknown', 'info', 'low', 'medium', 'high', 'critical']
+        },
+        'cpanel_scanner': {
+          'run_cpanel2shell': true,
+          'cpanel_user_wordlist': '/usr/src/app/wordlist/cpanel_users.txt',
+          'proxy_type': 'rotating'
         }
       }
       attack_path_modeling: {
@@ -128,7 +130,7 @@
     default_engine: true
     engine_name: Subdomain Scan
     yaml_configuration: "subdomain_discovery: {\n  'uses_tools': ['subfinder', 'ctfr',\n\
-      \  'sublist3r', 'tlsx', 'oneforall', 'netlas', 'chaos', 'reconx'],\n\
+      \  'sublist3r', 'tlsx', 'oneforall', 'netlas', 'chaos'],\n\
       \  'enable_http_crawl': true,\n  'threads': 30,\n  'timeout': 5,\n}\n\
       http_crawl: {}\nspiderfoot_scan: {\n  'modules': 'all'\n}"
   model: scanEngine.enginetype
@@ -149,7 +151,7 @@
     default_engine: true
     engine_name: Vulnerability Scan
     yaml_configuration: "subdomain_discovery: {\n  'uses_tools': ['subfinder', 'chaos',\n\
-      \  'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'reconx'],\n\
+      \  'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas'],\n\
       \  'enable_http_crawl': true,\n  'threads': 30,\n  'timeout': 5,\n}\n\
       http_crawl: {}\nosint: {\n  'discover': ['emails', 'metainfo', 'employees'],\n\
       \  'dorks': ['login_pages', 'admin_panels', 'dashboard_pages', 'stackoverflow',\n\
@@ -177,7 +179,7 @@
     default_engine: true
     engine_name: reNgine Recommended
     yaml_configuration: "subdomain_discovery: {\n  'uses_tools': ['subfinder', 'chaos',\n\
-      \  'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'reconx'],\n\
+      \  'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas'],\n\
       \  'enable_http_crawl': true,\n  'threads': 30,\n  'timeout': 5,\n}\n\
       http_crawl: {}\nosint: {\n  'discover': ['emails', 'metainfo'],\n\
       \  'dorks': ['login_pages', 'admin_panels', 'dashboard_pages', 'config_files',\n\
