@@ -1,5 +1,8 @@
 import yaml
+import logging
 from django.db import models
+
+logger = logging.getLogger('django')
 
 
 class hybrid_property:
@@ -41,7 +44,7 @@ class EngineType(models.Model):
             if isinstance(config, dict):
                 return list(config.keys())
         except Exception:
-            return []
+            pass
         return []
 
     def has_task(self, task_name):

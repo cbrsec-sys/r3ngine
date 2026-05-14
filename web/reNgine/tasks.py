@@ -479,8 +479,10 @@ def initiate_scan(
 
 		# Trigger SpiderFoot asynchronously if enabled (Tier 1 Non-Blocking)
 		if 'spiderfoot_scan' in engine.tasks or enable_spiderfoot_scan:
+			logger.warning(f"[DEBUG] Reached SpiderFoot trigger for {domain.name}. enable_spiderfoot_scan={enable_spiderfoot_scan}, tasks={engine.tasks}")
 			logger.warning(f"Triggering asynchronous SpiderFoot scan for {domain.name}")
-			spiderfoot_scan.apply_async(kwargs={'ctx': ctx, 'host': domain.name})
+			# Pass host=None for main scan to allow the task to fetch subdomains if needed
+			spiderfoot_scan.apply_async(kwargs={'ctx': ctx, 'host': None})
 
 		# Final Workflow construction
 		workflow_steps = []
@@ -649,7 +651,7 @@ def initiate_subscan(
 		subdomain.save()
 
 	# Build workflow steps
-	workflow_steps = [method.si(ctx=ctx)]
+	workflow_steps = [method.si(ctx=ctx, host=subdomain.name)]
 
 	# If this is a vulnerability scan, we need to run correlation
 	if scan_type == 'vulnerability_scan':
@@ -1886,8 +1888,17 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	"""Run SpiderFoot scan on selected domain with real-time batch parsing.
 	"""
+	# host selection logic based on user rules
 	if not host:
-		host = self.domain.name
+		if self.subscan_id and self.subdomain:
+			host = self.subdomain.name
+		else:
+			host = self.domain.name
+	
+	logger.warning(f"[SPIDERFOOT] Starting scan for target: {host} (Scan ID: {self.scan_id}, Subscan ID: {self.subscan_id})")
+	
+	if not self.yaml_configuration:
+		logger.error("[SPIDERFOOT] yaml_configuration is empty! Check engine config.")
 	
 	config = self.yaml_configuration.get(SPIDERFOOT_SCAN) or {}
 	modules = config.get('modules', 'all')
@@ -1906,27 +1917,35 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	elif not profile_cmd:
 		profile_cmd = "-u investigate"
 	
-	# Use global SF config if it exists, otherwise generate from DB
-	sf_config_path = "/root/.config/spiderfoot.cfg"
+	# Use global SF config
+	sf_config_path = "/usr/src/github/spiderfoot/spiderfoot.cfg"
+	sf_exec_path = "/usr/src/github/spiderfoot/sf.py"
+	
+	if not os.path.exists(sf_exec_path):
+		logger.error(f"[SPIDERFOOT] SpiderFoot executable not found at {sf_exec_path}!")
+		return
+		
 	if not os.path.exists(sf_config_path):
-		sf_config_path = f"{self.results_dir}/spiderfoot.cfg"
-		api_keys = get_spiderfoot_keys()
-		with open(sf_config_path, 'w') as f:
-			for module, key in api_keys.items():
-				f.write(f"module.{module}.api_key={key}\n")
+		logger.error(f"[SPIDERFOOT] SpiderFoot config not found at {sf_config_path}. Task may fail or use defaults.")
 	
 	# Use CSV output for streaming. -r includes source data, -n strips newlines.
-	cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {host} {profile_cmd} -max-threads {threads} -o csv -r -n -c {sf_config_path}"
+	cmd = f"python3 {sf_exec_path} -s {host} {profile_cmd} -max-threads {threads} -o csv -r -n"
+	logger.warning(f"[SPIDERFOOT] Executing command: {cmd}")
 	
 	batch = []
 	batch_size = 50
 	header = None
+	line_count = 0
 	
 	for line in stream_command(
 		cmd,
 		shell=True,
 		scan_id=self.scan_id,
 		activity_id=self.activity_id):
+		
+		line_count += 1
+		if line_count == 1:
+			logger.warning(f"[SPIDERFOOT] Received first line of output: {line[:100]}...")
 		
 		if not isinstance(line, str) or not line.strip():
 			continue
@@ -1980,18 +1999,22 @@ def _process_spiderfoot_batch(self, batch, ctx, host):
 				if e_type in ['DNS_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME']:
 					sub_name = e_data.lower()
 					if sub_name and sub_name.endswith(host):
+						logger.warning(f"[SPIDERFOOT] Ingesting SUBDOMAIN: {sub_name}")
 						save_subdomain(sub_name, ctx=ctx)
 				# SF types for URLs
 				elif e_type in ['WEB_RESOURCE', 'URL_ALL', 'LINKED_URL_INTERNAL']:
 					if e_data and is_valid_url(e_data):
+						logger.warning(f"[SPIDERFOOT] Ingesting ENDPOINT: {e_data}")
 						save_endpoint(e_data, ctx=ctx)
 				# SF types for Emails
 				elif e_type == 'EMAILADDR':
+					logger.warning(f"[SPIDERFOOT] Ingesting EMAIL: {e_data.lower()}")
 					save_email(e_data.lower(), scan_history=self.scan)
 				# SF types for Users/Accounts
 				elif e_type in ['USERNAME', 'ACCOUNT_EXTERNAL', 'HUMAN_NAME']:
+					logger.warning(f"[SPIDERFOOT] Ingesting EMPLOYEE/USER: {e_data}")
 					save_employee(e_data, scan_history=self.scan)
-		logger.info(f"Processed batch of {len(batch)} SpiderFoot findings.")
+		logger.warning(f"Processed batch of {len(batch)} SpiderFoot findings.")
 	except Exception as e:
 		logger.error(f"Error processing SpiderFoot batch: {str(e)}")
 
