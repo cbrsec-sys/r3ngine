@@ -954,3 +954,25 @@ class ScanReport(models.Model):
 
 	def __str__(self):
 		return f"Report for {self.scan_history.domain.name} ({self.report_type})"
+
+class OsintStaging(models.Model):
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE)
+	target_domain = models.ForeignKey(Domain, on_delete=models.CASCADE)
+	osint_type = models.CharField(max_length=100) # Email, Employee, Phone, etc.
+	content = models.TextField()
+	source = models.CharField(max_length=200)
+	confidence = models.IntegerField(default=0)
+	metadata = models.JSONField(default=dict, blank=True)
+	status = models.CharField(max_length=20, choices=(
+		('pending', 'Pending'),
+		('validated', 'Validated'),
+		('ignored', 'Ignored'),
+	), default='pending')
+	discovered_date = models.DateTimeField(auto_now_add=True)
+
+	class Meta:
+		verbose_name_plural = "OSINT Staging"
+
+	def __str__(self):
+		return f"{self.osint_type}: {self.content[:50]}"

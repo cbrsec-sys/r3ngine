@@ -1538,8 +1538,9 @@ export const ScanDetailPage = () => {
     </TacticalPanel>
   );
 
+
   const renderOSINT = () => (
-    <OsintTab data={data} />
+    <OsintTab data={data} scanId={parseInt(scanId)} />
   );
 
   const renderLeaks = () => (
