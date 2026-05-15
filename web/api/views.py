@@ -21,6 +21,7 @@ import mimetypes
 import os
 
 
+from django.shortcuts import get_object_or_404
 from rest_framework.status import HTTP_400_BAD_REQUEST, HTTP_204_NO_CONTENT, HTTP_202_ACCEPTED
 from rest_framework.decorators import action
 from django.core.exceptions import ObjectDoesNotExist
@@ -51,6 +52,7 @@ from targetApp.models import *
 from api.shared_api_tasks import import_hackerone_programs_task, sync_bookmarked_programs_task
 from api.permissions import *
 from api.serializers import *
+from reNgine.graph_utils import Neo4jManager
 
 
 logger = logging.getLogger(__name__)
@@ -88,6 +90,32 @@ class UpdateThemeView(APIView):
 			'status': True,
 			'ui_version': user_preferences.ui_version,
 			'v3_intensity': user_preferences.v3_intensity
+		}, status=status.HTTP_200_OK)
+
+
+class SOCSettingsViewSet(viewsets.ModelViewSet):
+	"""ViewSet for managing global SOC configuration."""
+	permission_classes = [IsAuthenticated, HasPermission]
+	required_permission = PERM_MODIFY_SCAN_CONFIGURATIONS
+	serializer_class = SOCConfigurationSerializer
+	queryset = SOCConfiguration.objects.all()
+
+	def get_queryset(self):
+		return SOCConfiguration.objects.all()
+
+	def list(self, request, *args, **kwargs):
+		# Ensure at least one config exists
+		config, created = SOCConfiguration.objects.get_or_create(id=1)
+		serializer = self.get_serializer(config)
+		return Response(serializer.data)
+
+	@action(detail=False, methods=['post'])
+	def toggle_streaming(self, request):
+		config, created = SOCConfiguration.objects.get_or_create(id=1)
+		config.enable_live_log_streaming = not config.enable_live_log_streaming
+		config.save()
+		return Response({
+			'enable_live_log_streaming': config.enable_live_log_streaming
 		}, status=status.HTTP_200_OK)
 
 
@@ -599,7 +627,12 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 		slug = self.request.GET.get('slug', None)
 		if slug:
 			queryset = queryset.filter(project__slug=slug)
-		return queryset
+		
+		org_id = self.request.GET.get('organization_id', None)
+		if org_id:
+			queryset = queryset.filter(domains__id=org_id)
+			
+		return queryset.order_by('-id')
 
 	def filter_queryset(self, qs):
 		search_value = self.request.GET.get(u'search[value]', None)
@@ -630,6 +663,7 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 		return qs
 
 
+
 class MonitoringDiscoveryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsPenetrationTester]
     queryset = MonitoringDiscovery.objects.all()
@@ -657,6 +691,112 @@ class MonitoringDiscoveryViewSet(viewsets.ModelViewSet):
             'login_discoveries': discoveries.filter(discovery_type='login').count(),
         }
         return Response(stats)
+
+
+
+class OsintStagingViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
+	queryset = OsintStaging.objects.filter(status='pending').order_by('-confidence', '-discovered_date')
+	serializer_class = OsintStagingSerializer
+
+	def get_queryset(self):
+		queryset = self.queryset
+		scan_id = self.request.query_params.get('scan_id')
+		target_id = self.request.query_params.get('target_id')
+		osint_type = self.request.query_params.get('osint_type')
+		status_param = self.request.query_params.get('status')
+		
+		if scan_id:
+			queryset = queryset.filter(scan_history_id=scan_id)
+		if target_id:
+			queryset = queryset.filter(target_domain_id=target_id)
+		if osint_type:
+			queryset = queryset.filter(osint_type=osint_type)
+		if status_param:
+			queryset = OsintStaging.objects.filter(status=status_param) # Allow override to see validated/ignored
+		
+		# Universal Search for Staging
+		search = self.request.query_params.get('search')
+		if search:
+			queryset = queryset.filter(
+				Q(content__icontains=search) |
+				Q(source__icontains=search) |
+				Q(metadata__icontains=search) |
+				Q(osint_type__icontains=search)
+			)
+			
+		return queryset
+
+	@action(detail=False, methods=['post'])
+	def bulk_discard(self, request):
+		"""Bulk delete staging items."""
+		ids = request.data.get('ids', [])
+		if not ids:
+			return Response({'error': 'No IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
+		
+		OsintStaging.objects.filter(id__in=ids).delete()
+		return Response({'status': 'success', 'message': f'Deleted {len(ids)} items'})
+
+	@action(detail=False, methods=['post'])
+	def bulk_promote(self, request):
+		"""Bulk promote staging items to primary tables."""
+		from reNgine.tasks import persist_osint_item
+		ids = request.data.get('ids', [])
+		if not ids:
+			return Response({'error': 'No IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
+		
+		items = OsintStaging.objects.filter(id__in=ids)
+		count = 0
+		for item in items:
+			ctx = {
+				'scan_history_id': item.scan_history.id,
+				'domain_id': item.target_domain.id
+			}
+			persist_osint_item(
+				scan_history=item.scan_history,
+				domain=item.target_domain,
+				osint_type=item.osint_type,
+				e_data=item.content,
+				confidence=item.confidence,
+				source_data=item.metadata.get('source_data'),
+				event_type=item.metadata.get('sf_type'),
+				ctx=ctx
+			)
+			item.status = 'validated'
+			item.save()
+			count += 1
+			
+		return Response({'status': 'success', 'message': f'Promoted {count} items'})
+
+	@action(detail=True, methods=['post'])
+	def promote(self, request, pk=None):
+		"""Individual promote."""
+		from reNgine.tasks import persist_osint_item
+		item = self.get_object()
+		ctx = {
+			'scan_history_id': item.scan_history.id,
+			'domain_id': item.target_domain.id
+		}
+		persist_osint_item(
+			scan_history=item.scan_history,
+			domain=item.target_domain,
+			osint_type=item.osint_type,
+			e_data=item.content,
+			confidence=item.confidence,
+			source_data=item.metadata.get('source_data'),
+			event_type=item.metadata.get('sf_type'),
+			ctx=ctx
+		)
+		item.status = 'validated'
+		item.save()
+		return Response({'status': 'success'})
+
+	@action(detail=True, methods=['post'])
+	def discard(self, request, pk=None):
+		"""Individual discard."""
+		item = self.get_object()
+		item.delete()
+		return Response({'status': 'success'})
 
 
 
@@ -1596,6 +1736,28 @@ class InitiateSubTask(APIView):
 		return Response({'status': True})
 
 
+class ToggleMonitoringAPIView(APIView):
+	permission_classes = [IsAuthenticated, HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		domain_id = request.data.get('domain_id')
+		try:
+			from targetApp.models import Domain
+			domain = Domain.objects.get(id=domain_id)
+			domain.is_monitored = not domain.is_monitored
+			domain.save()
+			from targetApp.views import manage_monitoring_task
+			manage_monitoring_task(domain)
+			return Response({
+				'status': True,
+				'is_monitored': domain.is_monitored,
+				'message': f'Monitoring {"enabled" if domain.is_monitored else "disabled"} for {domain.name}'
+			})
+		except Exception as e:
+			return Response({'status': False, 'message': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
 class DeleteSubdomain(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_SCAN_RESULTS
@@ -1631,14 +1793,14 @@ class RengineUpdateCheck(APIView):
 	def get(self, request):
 		req = self.request
 		github_api = \
-			'https://api.github.com/repos/whiterabb17/rengine/releases'
+			'https://api.github.com/repos/whiterabb17/r3ngine/releases'
 		
 		return_response = {
 			'status': False,
 			'update_available': False,
 			'latest_version': None,
 			'current_version': RENGINE_CURRENT_VERSION,
-			'redirect_link': 'https://github.com/whiterabb17/rengine/releases'
+			'redirect_link': 'https://github.com/whiterabb17/r3ngine/releases'
 		}
 
 		try:
@@ -1657,7 +1819,7 @@ class RengineUpdateCheck(APIView):
 			logger.error(f"Error fetching GitHub releases: {str(e)}")
 
 		# Fallback: check .version file in master branch
-		version_url = 'https://raw.githubusercontent.com/whiterabb17/rengine/master/web/.version'
+		version_url = 'https://raw.githubusercontent.com/whiterabb17/r3ngine/main/web/.version'
 		try:
 			raw_version_response = requests.get(version_url)
 			if raw_version_response.status_code == 200:
@@ -1665,8 +1827,8 @@ class RengineUpdateCheck(APIView):
 				# If raw_version is higher than latest release or no release found
 				if not return_response['latest_version'] or version.parse(raw_version) > version.parse(return_response['latest_version']):
 					return_response['latest_version'] = raw_version
-					return_response['redirect_link'] = 'https://github.com/whiterabb17/rengine'
-					return_response['changelog'] = 'A new update is available in the repository. Please pull the latest changes from the master branch.'
+					return_response['redirect_link'] = 'https://github.com/whiterabb17/r3ngine'
+					return_response['changelog'] = 'A new update is available in the repository. Please pull the latest changes from the main branch.'
 					return_response['status'] = True
 		except Exception as e:
 			logger.error(f"Error fetching raw .version: {str(e)}")
@@ -1677,7 +1839,7 @@ class RengineUpdateCheck(APIView):
 
 			if is_version_update_available:
 				create_inappnotification(
-					title='reNgine Update Available',
+					title='r3ngine Update Available',
 					description=f'Update to version {return_response["latest_version"]} is available',
 					notification_type=SYSTEM_LEVEL_NOTIFICATION,
 					project_slug=None,
@@ -1690,7 +1852,7 @@ class RengineUpdateCheck(APIView):
 
 
 class RengineSystemSettingsAPIView(APIView):
-	permission_classes = [HasPermission]
+	permission_classes = [IsAuthenticated, HasPermission]
 	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
 
 	def get(self, request):
@@ -1707,6 +1869,39 @@ class RengineSystemSettingsAPIView(APIView):
 			'free': free_gb,
 			'consumed_percent': consumed_percent
 		})
+
+
+class ProxySettingsAPIView(APIView):
+	permission_classes = [IsAuthenticated, HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def get(self, request):
+		proxy = Proxy.objects.first()
+		serializer = ProxySerializer(proxy)
+		return Response(serializer.data)
+
+	def post(self, request):
+		proxy = Proxy.objects.first()
+		if not proxy:
+			proxy = Proxy.objects.create()
+		serializer = ProxySerializer(proxy, data=request.data, partial=True)
+		if serializer.is_valid():
+			serializer.save()
+			return Response({'status': True, 'message': 'Proxies updated successfully'})
+		return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ProxyFetchAPIView(APIView):
+	permission_classes = [IsAuthenticated, HasPermission]
+	permission_required = PERM_MODIFY_SCAN_CONFIGURATIONS
+
+	def post(self, request):
+		try:
+			from reNgine.tasks import fetch_proxies_task
+			task = fetch_proxies_task.delay()
+			return Response({'status': True, 'task_id': task.id})
+		except Exception as e:
+			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UninstallTool(APIView):
@@ -2199,7 +2394,7 @@ class GetFileContents(APIView):
 			return Response(response)
 
 		if 'spiderfoot_config' in req.query_params:
-			path = "/root/.config/spiderfoot.cfg"
+			path = "/usr/src/github/spiderfoot/spiderfoot.cfg"
 			if not os.path.exists(path):
 				# Create a default config or just touch
 				pathlib.Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -2333,7 +2528,7 @@ class ListEngines(APIView):
 
 
 class ListOrganizations(APIView):
-	permission_classes = [IsAuditor]
+	permission_classes = [IsAuthenticated, IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		organizations = Organization.objects.all()
@@ -2419,7 +2614,7 @@ class ListConfigurations(APIView):
 
 
 class ListTargetsInOrganization(APIView):
-	permission_classes = [IsAuditor]
+	permission_classes = [IsAuthenticated, HasPermission]
 	def get(self, request, format=None):
 		req = self.request
 		organization_id = req.query_params.get('organization_id')
@@ -3603,7 +3798,7 @@ class ScreenshotViewSet(viewsets.ModelViewSet):
 from rest_framework.permissions import AllowAny
 
 class DirectoryViewSet(viewsets.ModelViewSet):
-	permission_classes = [IsPenetrationTester]
+	permission_classes = [IsAuthenticated, HasPermission]
 
 
 	queryset = DirectoryFile.objects.none()
@@ -4109,3 +4304,62 @@ class SystemHealthAPIView(APIView):
 			"load": load_avg[0],
 			"timestamp": time.time()
 		})
+
+
+class GetScanGraphData(APIView):
+	"""Fetch Cytoscape-compatible graph data for a specific scan."""
+	permission_classes = [IsAuditor]
+	def get(self, request, scan_id):
+		graph = Neo4jManager()
+		data = graph.get_cytoscape_json(scan_id)
+		graph.close()
+		return Response(data)
+
+class GetTargetGraphData(APIView):
+	"""Fetch Cytoscape-compatible graph data for an entire target."""
+	permission_classes = [IsAuditor]
+	def get(self, request, target_id):
+		target = get_object_or_404(Domain, id=target_id)
+		graph = Neo4jManager()
+		data = graph.get_target_graph_data(target.name)
+		graph.close()
+		return Response(data)
+
+class GetNodeDetails(APIView):
+	"""Fetch detailed metadata for a specific graph node."""
+	permission_classes = [IsAuditor]
+	def get(self, request, node_id):
+		graph = Neo4jManager()
+		data = graph.get_node_details(node_id)
+		graph.close()
+		return Response(data)
+
+class GetSystemLogs(APIView):
+	"""Fetch the tail of the system logs. Restricted to SysAdmins."""
+	permission_classes = [IsSysAdmin]
+	def get(self, request):
+		# SECURITY: Path is hardcoded and validated to prevent directory traversal
+		log_file = os.path.normpath(os.path.join(settings.BASE_DIR, 'celery.log'))
+		
+		# Ensure we only read from the allowed directory
+		if not log_file.startswith(os.path.normpath(settings.BASE_DIR)):
+			return Response({'status': False, 'message': 'Forbidden log path'}, status=403)
+
+		if not os.path.exists(log_file):
+			return Response({'status': False, 'message': 'Log file not found'}, status=404)
+		
+		try:
+			with open(log_file, 'r') as f:
+				# Efficiently read last ~50KB (~500 lines)
+				f.seek(0, os.SEEK_END)
+				filesize = f.tell()
+				offset = min(filesize, 50000)
+				f.seek(filesize - offset)
+				# read() then splitlines() to handle partial first line
+				data = f.read()
+				lines = data.splitlines()
+				# Return at most 500 lines
+				return Response({'status': True, 'logs': lines[-500:]})
+		except Exception as e:
+			logger.error(f"Error reading system logs: {str(e)}")
+			return Response({'status': False, 'message': 'Internal error reading logs'}, status=500)

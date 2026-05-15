@@ -141,6 +141,7 @@ WORKDIR /usr/src/app
 
 ENV GO111MODULE=on 
 RUN printf "\
+    github.com/ibnaleem/gosearch@latest\n\
     github.com/jaeles-project/gospider@latest\n\
     github.com/tomnomnom/gf@latest\n\
     github.com/tomnomnom/unfurl@latest\n\
@@ -181,6 +182,15 @@ RUN ARCH=$(dpkg --print-architecture) \
     && mv k6-v${K6_VERSION}-linux-${K6_ARCH}/k6 /usr/local/bin/ \
     && rm -rf k6-v${K6_VERSION}-linux-${K6_ARCH}*
 
+# Install BetterLeaks
+RUN git clone https://github.com/betterleaks/betterleaks /usr/src/github/betterleaks && \
+    cd /usr/src/github/betterleaks && make build && \
+    ln -sf /usr/src/github/betterleaks/betterleaks /usr/local/bin/betterleaks
+
+# Install Username Anarchy
+RUN git clone https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy && \
+    ln -sf /usr/src/github/username-anarchy/username-anarchy /usr/local/bin/username-anarchy
+
 # Install Aquatone
 RUN ARCH=$(dpkg --print-architecture) \
     && wget https://github.com/michenriksen/aquatone/releases/download/v1.7.0/aquatone_linux_${ARCH}_1.7.0.zip \
@@ -220,6 +230,10 @@ RUN mkdir -p /usr/src/wordlist/kr && \
 # Install WPScan
 RUN gem install wpscan --no-document
 
+# Install baddns
+RUN python3 -m pip install pipx && \
+    pipx install git+https://github.com/blacklanternsecurity/baddns
+
 # Copy requirements
 COPY web/requirements.txt /tmp/requirements.txt
 RUN pip3 install --upgrade pip setuptools wheel
@@ -239,8 +253,5 @@ COPY web/ /usr/src/app/
 
 # Copy built frontend
 COPY --from=frontend-builder /app/frontend/dist /usr/src/frontend/dist
-COPY frontend/templates /usr/src/frontend/templates
-
 # Ensure SPA index.html is available as a Django template
-RUN mkdir -p /usr/src/frontend/templates/dashboard && \
-    cp /usr/src/frontend/dist/index.html /usr/src/frontend/templates/dashboard/v3_index.html
+

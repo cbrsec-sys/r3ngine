@@ -315,7 +315,7 @@ export const useScanSummary = (projectSlug: string, scanId: number) => {
     enabled: !!projectSlug && !!scanId,
     refetchInterval: (query) => {
       const data = query.state.data;
-      if (data && data.scan_info && data.scan_info.scan_status === 2) return false;
+      if (data && data.scan_info && data.scan_info.scan_status === 2 && !data.scan_info.is_spiderfoot_running) return false;
       return 5000;
     }
   });
@@ -451,6 +451,7 @@ export const useFetchWhois = (projectSlug: string, scanId: number) => {
     },
   });
 };
+
 export const useScanLogs = (activityId: number | null, scanId: number | null) => {
   return useQuery<Command[]>({
     queryKey: ['scan-logs', activityId, scanId],
@@ -468,5 +469,100 @@ export const useScanLogs = (activityId: number | null, scanId: number | null) =>
       return Array.isArray(data) ? data : (data.results || []) as Command[];
     },
     enabled: !!activityId || !!scanId,
+  });
+};
+
+export const useOsintStaging = (params: { scan_id?: number | string, search?: string, osint_type?: string, page?: number }) => {
+  return useQuery({
+    queryKey: ['osint-staging', params],
+    queryFn: async () => {
+      const searchParams = new URLSearchParams();
+      if (params.scan_id) searchParams.append('scan_id', params.scan_id.toString());
+      if (params.search) searchParams.append('search', params.search);
+      if (params.osint_type) searchParams.append('osint_type', params.osint_type);
+      if (params.page) searchParams.append('page', params.page.toString());
+      
+      const response = await fetch(`/api/osintStaging/?${searchParams.toString()}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      return {
+        results: data.results || [],
+        count: data.count || 0
+      };
+    },
+    enabled: !!params.scan_id,
+  });
+};
+
+
+export const useBulkDiscardOsint = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: number[]) => {
+      const response = await fetch('/api/osintStaging/bulk_discard/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ ids }),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['osint-staging'] });
+    },
+  });
+};
+
+export const useBulkPromoteOsint = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (ids: number[]) => {
+      const response = await fetch('/api/osintStaging/bulk_promote/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ ids }),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['osint-staging'] });
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['subdomains'] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+  });
+};
+
+export const usePromoteOsint = (id: number) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await fetch(`/api/osintStaging/${id}/promote/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['osint-staging'] });
+      queryClient.invalidateQueries({ queryKey: ['emails'] });
+      queryClient.invalidateQueries({ queryKey: ['subdomains'] });
+      queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
   });
 };

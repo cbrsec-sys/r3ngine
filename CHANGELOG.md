@@ -1,6 +1,60 @@
 # Changelog
 
-**Official Repo location:** https://github.com/whiterabb17/r3ngine
+**Official Repo location:** <p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
+
+### [v3.0.0-rc4] - 2026-05-15
+
+### Fixed
+- **Report Generation Pipeline**: Resolved a critical `'NoneType' object has no attribute 'replace'` error occurring when the executive summary description was left empty in report settings.
+- **Model Resilience**: Added default empty string values to report configuration fields to prevent future serialization and string replacement failures.
+
+## [v3.0.0-rc3] - 2026-05-15
+
+### Added
+- **Human-in-the-Loop OSINT Validation Pipeline**:
+  - **OSINT Staging Engine**: Introduced a middle-tier validation layer for moderate-confidence findings (50%-80%), preventing data pollution while ensuring maximum coverage.
+  - **Interactive Audit Dashboard**: Premium staging interface with multi-select support, bulk validation (promotion to primary assets), and safe discarding of false positives.
+  - **Centralized Persistence Architecture**: Refactored the core ingestion pipeline into a unified `persist_osint_item` engine to ensure consistent asset creation and enrichment rules.
+  - **Metadata Exploration**: Collapsible detail views for OSINT staging items, providing raw module findings and source context for informed decision-making.
+  - **Confidence-Based Asset Routing**: Enhanced the OSINT task chain to automatically route high-confidence findings to primary tables while staging moderate-confidence findings for human review.
+- **Enhanced Security Discovery Stack**:
+  - **baddns Integration**: Automated subdomain takeover detection integrated into the core discovery pipeline with automatic critical vulnerability mapping.
+  - **BetterLeaks Integration**: High-precision secret and leak identification in discovered assets, integrated into the Tier 5 scanning phase.
+  - **Advanced Personnel Discovery**: Fully integrated **username-anarchy** and **GoSearch** for social presence mapping and identity enrichment.
+  - **Expanded Secret Scanning**: Added support for 15+ sensitive file extensions (`.env`, `.conf`, `.bak`, `.old`, etc.) discovered during reconnaissance.
+
+## [v3.0.0-rc2] - 2026-05-14
+
+### Added
+- **Dedicated 24/7 Monitoring Engine (ReconX Integration)**:
+  - Transitioned ReconX into a persistent background monitoring service.
+  - **Parallel Execution Support**: Implemented domain-specific data directories and PID-based process tracking, allowing simultaneous monitoring of multiple targets.
+  - **Dynamic Configuration**: Automated generation of target-specific YAML configs for isolated monitoring cycles.
+  - **Background Orchestration**: ReconX now runs as a detached background process, decoupled from the main scan pipeline.
+  - **Deduplicated Result Ingestion**: Enhanced the parsing logic to target domain-specific findings, ensuring data integrity during parallel monitoring.
+  - **Engine Optimization**: Removed ReconX from regular scan engines to strictly enforce its role as a 24/7 monitoring tool.
+- **Attack Surface Visualization Redesign (v4.0)**:
+  - **Hierarchical Asset Clustering**: Implemented automated grouping of infrastructure (Domains > Subdomains > Endpoints) using compound nodes.
+  - **Advanced Layout Orchestration**: Added support for **fCoSE** (force-directed) and **KLay** (hierarchical) layouts for multi-perspective analysis.
+  - **Interactive Intelligence Map**: Integrated high-performance **Cytoscape.js** canvas with semantic expansion/collapse and neighborhood highlighting.
+  - **Tactical Context Menus**: Unified right-click actions for immediate intelligence lookups, blast radius calculation, and targeted scan initiation.
+  - **Enterprise Performance**: Optimized rendering pipeline to handle 10k+ nodes with 60FPS interaction via viewport culling and edge-hiding.
+
+## [v3.0.0-rc1] - 2026-05-14
+
+### Added
+- **Integrated Identity Enrichment Pipeline**: Automated OSINT enrichment for discovered personnel.
+  - **username-anarchy**: Integrated for intelligent username permutation generation based on full names.
+  - **gosearch**: Integrated for cross-platform social and web presence discovery using generated usernames.
+  - **Automated Triggers**: OSINT enrichment now triggers automatically upon discovery of new emails or employee records.
+- **Subdomain Takeover Detection (baddns)**:
+  - Integrated `baddns` into the core subdomain discovery pipeline.
+  - **Automated Vulnerability Scoring**: Takeovers detected by `baddns` are automatically promoted to "Critical" vulnerabilities and marked as important assets.
+- **Enhanced Secrets & Leaks Pipeline**:
+  - **betterleaks**: Integrated as a primary secret discovery tool for high-precision leak identification.
+  - **Sequential Orchestration**: Refactored the scan pipeline to ensure secret scanning runs strictly after URL extraction and directory fuzzing (Tier 5).
+  - **Multi-Extension Support**: Expanded scanning to include all sensitive file types (`.env`, `.conf`, `.bak`, etc.) discovered during reconnaissance.
+
 ## [v3.0.0-beta] - 2026-05-09
 
 ### Added
@@ -269,7 +323,7 @@ ring:
 - **Automated Auth Triggering**: New logic to automatically trigger brute-force scans when an authentication portal or VPN gateway is detected, provided the brute-force module is enabled in the selected scan engine.
 - **Curated Auth Wordlists**: Added specially curated "top/default" and "most common" wordlists for authentication testing, persisted in the `/usr/src/wordlist/auth/` volume.
 - **Nmap Vuln Script Support**: Added comprehensive parsing for Nmap `vuln` script outputs, integrating them directly into the vulnerability dashboard.
-- **Repository Migration**: Formally transitioned the project to `whiterabb17/rengine` as an unofficial fork.
+- **Repository Migration**: Formally transitioned the project to `whiterabb17/r3ngine` as an unofficial fork.
 - **Enhanced Update Check**: Implemented a fallback mechanism that checks both GitHub Releases and the raw `.version` file in the master branch. If a newer version is detected in the repository root, the system directs users to the main repo instead of the releases page.
 
 ## v2.4.0

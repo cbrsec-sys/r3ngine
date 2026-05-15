@@ -71,3 +71,71 @@ class StressTelemetryConsumer(AsyncWebsocketConsumer):
     async def stress_message(self, event):
         """Receive message from group (e.g., system alerts, control signals)."""
         await self.send(text_data=json.dumps(event))
+
+
+class ScanLogConsumer(AsyncWebsocketConsumer):
+    """WebSocket consumer for real-time scan logs."""
+    async def connect(self):
+        self.scan_id = self.scope['url_route']['kwargs']['scan_id']
+        self.stream_key = f"scan:logs:{self.scan_id}"
+        self.group_name = f"scan_logs_{self.scan_id}"
+
+        # Join group
+        await self.channel_layer.group_add(
+            self.group_name,
+            self.channel_name
+        )
+
+        await self.accept()
+        logger.info(f"ScanLog WebSocket connected for scan {self.scan_id}")
+
+        # Start background task to tail Redis Stream
+        self.keep_running = True
+        self.tail_task = asyncio.create_task(self.tail_redis_stream())
+
+    async def disconnect(self, close_code):
+        self.keep_running = False
+        if hasattr(self, 'tail_task'):
+            self.tail_task.cancel()
+        
+        # Leave group
+        await self.channel_layer.group_discard(
+            self.group_name,
+            self.channel_name
+        )
+        logger.info(f"ScanLog WebSocket disconnected for scan {self.scan_id}")
+
+    async def tail_redis_stream(self):
+        """Tails the Redis stream and sends updates to the client."""
+        r = redis.StrictRedis(
+            host=settings.REDIS_HOST, 
+            port=settings.REDIS_PORT, 
+            db=0,
+            decode_responses=True
+        )
+        
+        last_id = '$' # Start from now
+        
+        while self.keep_running:
+            try:
+                # Use XREAD to block and wait for new data
+                streams = r.xread({self.stream_key: last_id}, count=50, block=5000)
+                if streams:
+                    for stream_name, messages in streams:
+                        for msg_id, data in messages:
+                            last_id = msg_id
+                            # The data['data'] is a JSON string from stream_command
+                            payload = json.loads(data['data'])
+                            await self.send(text_data=json.dumps({
+                                'type': 'log_update',
+                                'data': payload
+                            }))
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Error tailing scan log Redis stream: {e}")
+                await asyncio.sleep(1)
+
+    async def log_message(self, event):
+        """Receive message from group."""
+        await self.send(text_data=json.dumps(event))

@@ -9,7 +9,10 @@ from celery.utils.log import get_task_logger
 from urllib.parse import urlparse
 from reNgine.celery import app
 from reNgine.opsec_utils import ProxychainsWrapper
+import redis
+from django.conf import settings
 from startScan.models import ScanHistory, Email, Employee, Command, Subdomain, EndPoint, Parameter
+from dashboard.models import SOCConfiguration
 from targetApp.models import Domain
 from reNgine.definitions import (
     COLOR_RESET, COLOR_WHITE, COLOR_RED, TOOL_COLORS
@@ -144,6 +147,9 @@ def save_email(email_address, scan_history=None):
     if scan_history:
         scan_history.emails.add(email)
         scan_history.save()
+        # Trigger identity enrichment
+        from reNgine.osint_tasks import enrich_identities_task
+        enrich_identities_task.delay(email_address, 'email', scan_history.id)
 
     return email, created
 
@@ -156,6 +162,9 @@ def save_employee(name, designation='', scan_history=None):
     if scan_history:
         scan_history.employees.add(employee)
         scan_history.save()
+        # Trigger identity enrichment
+        from reNgine.osint_tasks import enrich_identities_task
+        enrich_identities_task.delay(name, 'employee', scan_history.id)
 
     return employee, created
 
@@ -371,6 +380,30 @@ def stream_command(
 			# Yield the line
 			yield item
 			
+			# Real-time log streaming to Redis if enabled
+			try:
+				soc_config = SOCConfiguration.objects.get_or_create(id=1)[0]
+				if soc_config.enable_live_log_streaming and scan_id:
+					r = redis.StrictRedis(
+						host=settings.REDIS_HOST, 
+						port=settings.REDIS_PORT, 
+						db=0
+					)
+					stream_key = f"scan:logs:{scan_id}"
+					log_payload = {
+						"data": json.dumps({
+							"line": line,
+							"timestamp": str(timezone.now()),
+							"command_id": command_obj.id
+						})
+					}
+					r.xadd(stream_key, log_payload)
+					# Limit stream length
+					r.xtrim(stream_key, maxlen=soc_config.log_retention_count, approximate=True)
+			except Exception as e:
+				# Log but don't fail the command if streaming fails
+				logger.error(f"Failed to publish log to Redis: {e}")
+
 			# Update output
 			output += '\n' + line
 			line_count += 1

@@ -157,3 +157,36 @@ h6 {
   animation: progress-flow 2s linear infinite !important;
 }
 
+
+/* Cytoscape Context Menu */
+.custom-context-menu {
+  background: rgba(15, 23, 42, 0.95) !important;
+  backdrop-filter: blur(12px) !important;
+  border: 1px solid rgba(0, 243, 255, 0.3) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 10px rgba(0, 243, 255, 0.2) !important;
+  padding: 4px 0 !important;
+  border-radius: 8px !important;
+  min-width: 200px !important;
+}
+
+.custom-context-menu-item {
+  color: #e2e8f0 !important;
+  font-family: 'Orbitron', sans-serif !important;
+  font-size: 10px !important;
+  padding: 8px 16px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  transition: all 0.2s ease !important;
+}
+
+.custom-context-menu-item:hover {
+  background: rgba(0, 243, 255, 0.15) !important;
+  color: #00f3ff !important;
+}
+
+.custom-context-menu-item.cy-context-menu-item-separator {
+  height: 1px !important;
+  background: rgba(255, 255, 255, 0.05) !important;
+  margin: 4px 0 !important;
+  padding: 0 !important;
+}

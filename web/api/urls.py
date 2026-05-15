@@ -15,7 +15,7 @@ from .scheduled_scans import ScheduledScanViewSet
 from .subscans import SubScanViewSet
 from .scan_history import ScanHistoryViewSet
 from .users import UserManageViewSet
-from .stress_testing_views import StressTestingAPIView
+from .stress_testing_views import StressTestingAPIView, StressTestingHistoryAPIView
 from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView
 from .scan_configuration import ScanConfigurationAPI
 
@@ -40,9 +40,12 @@ router.register(r'hackerone-programs', HackerOneProgramViewSet, basename='hacker
 router.register(r'monitoring', MonitoringDiscoveryViewSet, basename='monitoring')
 router.register(r'projects', ProjectViewSet, basename='projects')
 router.register(r'secretLeaks', SecretLeakViewSet, basename='secret-leaks')
+
 router.register(r'screenshots', ScreenshotViewSet, basename='screenshots')
+router.register(r'osintStaging', OsintStagingViewSet, basename='osint-staging')
 router.register(r'scheduledScans', ScheduledScanViewSet, basename='scheduled-scans')
 router.register(r'subscans', SubScanViewSet, basename='subscans')
+router.register(r'soc-settings', SOCSettingsViewSet, basename='soc-settings')
 router.register(r'listScans', ScanHistoryViewSet, basename='list-scans')
 router.register(r'users', UserManageViewSet, basename='users')
 
@@ -246,6 +249,14 @@ urlpatterns = [
         RengineSystemSettingsAPIView.as_view(),
         name='rengine_system_settings'),
     path(
+        'rengine/proxy-settings/',
+        ProxySettingsAPIView.as_view(),
+        name='rengine_proxy_settings'),
+    path(
+        'rengine/fetch-proxies/',
+        ProxyFetchAPIView.as_view(),
+        name='rengine_fetch_proxies'),
+    path(
         'action/subdomain/delete/',
         DeleteSubdomain.as_view(),
         name='delete_subdomain'),
@@ -277,6 +288,10 @@ urlpatterns = [
         'action/engine/update/',
         UpdateEngine.as_view(),
         name='update_engine'),
+    path(
+        'toggle/monitoring/',
+        ToggleMonitoringAPIView.as_view(),
+        name='toggle_monitoring'),
     path(
         'toggle/subdomain/important/',
         ToggleSubdomainImportantStatus.as_view(),
@@ -368,6 +383,11 @@ urlpatterns = [
         name='mobile_media_serve'
     ),
     path(
+        'stress-testing/history/',
+        StressTestingHistoryAPIView.as_view(),
+        name='stress_testing_history_api'
+    ),
+    path(
         'stress-testing/<int:id>/',
         StressTestingAPIView.as_view(),
         name='stress_testing_api'
@@ -396,6 +416,27 @@ urlpatterns = [
         'scans/configuration/',
         ScanConfigurationAPI.as_view(),
         name='scan_configuration'
+    ),
+    # Graph and Observability (Phase 7)
+    path(
+        'graph/scan/<int:scan_id>/',
+        GetScanGraphData.as_view(),
+        name='get_scan_graph_data'
+    ),
+    path(
+        'graph/target/<int:target_id>/',
+        GetTargetGraphData.as_view(),
+        name='get_target_graph_data'
+    ),
+    path(
+        'graph/node/<str:node_id>/',
+        GetNodeDetails.as_view(),
+        name='get_node_details'
+    ),
+    path(
+        'system/logs/',
+        GetSystemLogs.as_view(),
+        name='get_system_logs'
     ),
     path('plugins/', include('plugins.urls')),
 ]

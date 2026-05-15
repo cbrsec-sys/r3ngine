@@ -156,10 +156,10 @@ def generate_report_task(self, report_id):
             data['show_executive_summary'] = report_setting.show_executive_summary
 
             # Replace executive_summary_description with template syntax
-            description = report_setting.executive_summary_description
+            description = report_setting.executive_summary_description or ''
             description = description.replace('{scan_date}', scan.start_scan_date.strftime('%d %B, %Y'))
-            description = description.replace('{company_name}', report_setting.company_name)
-            description = description.replace('{target_name}', scan.domain.name)
+            description = description.replace('{company_name}', str(report_setting.company_name or ''))
+            description = description.replace('{target_name}', str(scan.domain.name or ''))
             description = description.replace('{subdomain_count}', str(subdomains.count()))
             description = description.replace('{vulnerability_count}', str(vulns.count()))
             description = description.replace('{critical_count}', str(vulns.filter(severity=4).count()))
@@ -169,9 +169,9 @@ def generate_report_task(self, report_id):
             description = description.replace('{info_count}', str(vulns.filter(severity=0).count()))
             description = description.replace('{unknown_count}', str(vulns.filter(severity=-1).count()))
             if scan.domain.description:
-                description = description.replace('{target_description}', scan.domain.description)
+                description = description.replace('{target_description}', str(scan.domain.description or ''))
 
-            data['executive_summary_description'] = markdown.markdown(description)
+            data['executive_summary_description'] = markdown.markdown(description, extensions=['extra', 'nl2br', 'sane_lists'])
 
             # LLM Generated Sections
             if report_setting.enable_llm_report_generation:
