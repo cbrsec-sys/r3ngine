@@ -1,9 +1,14 @@
 from dashboard.models import *
 from django.contrib.humanize.templatetags.humanize import (naturalday, naturaltime)
-from django.db.models import F, JSONField, Value
+from django.db.models import F, JSONField, Value, Q
 from django.forms.models import model_to_dict
 from recon_note.models import *
 from reNgine.common_func import *
+from reNgine.definitions import (
+	ABORTED_TASK,
+	RUNNING_TASK,
+	SUCCESS_TASK
+)
 from rest_framework import serializers
 from scanEngine.models import *
 from startScan.models import *
@@ -32,15 +37,41 @@ class ScreenshotSerializer(serializers.ModelSerializer):
 		fields = '__all__'
 
 
+
 class EngineTypeSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = EngineType
 		fields = '__all__'
 
 
+class OsintStagingSerializer(serializers.ModelSerializer):
+	discovered_date_humanized = serializers.SerializerMethodField()
+	target_domain_name = serializers.CharField(source='target_domain.name', read_only=True)
+	scan_history_id = serializers.IntegerField(source='scan_history.id', read_only=True)
+
+	class Meta:
+		model = OsintStaging
+		fields = '__all__'
+
+	def get_discovered_date_humanized(self, obj):
+		return naturaltime(obj.discovered_date)
+
+
+class ProxySerializer(serializers.ModelSerializer):
+	class Meta:
+		model = Proxy
+		fields = '__all__'
+
+
 class ConfigurationSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = Configuration
+		fields = '__all__'
+
+
+class SOCConfigurationSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = SOCConfiguration
 		fields = '__all__'
 
 
@@ -323,6 +354,7 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 	initiated_by = MinimalUserSerializer(read_only=True)
 	max_severity = serializers.SerializerMethodField('get_max_severity')
 	engine_name = serializers.SerializerMethodField('get_engine_name')
+	is_spiderfoot_running = serializers.SerializerMethodField()
 
 	class Meta:
 		model = ScanHistory
@@ -348,9 +380,16 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			'initiated_by',
 			'max_severity',
 			'engine_name',
-			'cfg_starting_point_path'
+			'cfg_starting_point_path',
+			'is_spiderfoot_running'
 		]
 		depth = 1
+
+	def get_is_spiderfoot_running(self, obj):
+		return obj.scanactivity_set.filter(
+			Q(name='spiderfoot_scan') | Q(title__icontains='spiderfoot'),
+			status=RUNNING_TASK
+		).exists()
 
 	def get_max_severity(self, scan_history):
 		from startScan.models import Vulnerability

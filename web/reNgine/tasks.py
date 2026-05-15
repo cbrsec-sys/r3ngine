@@ -55,6 +55,7 @@ from reNgine.task_utils import (
 )
 from reNgine.report_tasks import *
 from reNgine.wpscan_tasks import wpscan_scan
+from reNgine.parsers import SpiderFootBatchParser
 try:
 	from acunetix import Acunetix
 except ImportError:
@@ -370,6 +371,7 @@ def initiate_scan(
 			'screenshot': screenshot.si(ctx=ctx, description='Screenshot'),
 			'waf_detection': waf_detection.si(ctx=ctx, description='WAF detection'),
 			'waf_bypass': waf_bypass.si(ctx=ctx, description='WAF bypass'),
+			'secret_scanning': secret_scanning.si(ctx=ctx, description='Secrets & Leaks Scan'),
 			'firewall_vpn_scan': firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan'),
 			'brute_force_scan': brute_force_scan.si(ctx=ctx, description='Brute force scan'),
 			'correlate_vulnerabilities': correlate_vulnerabilities.si(scan_history_id=scan_history_id),
@@ -387,7 +389,7 @@ def initiate_scan(
 		def is_task_enabled(task_name):
 			if task_name in ['subdomain_discovery', 'osint', 'spiderfoot_scan', 'http_crawl', 'port_scan', 'screenshot', 
 							'dir_file_fuzz', 'fetch_url', 'web_api_discovery', 'waf_detection', 'waf_bypass', 
-							'vulnerability_scan', 'brute_force_scan', 'firewall_vpn_scan']:
+							'vulnerability_scan', 'brute_force_scan', 'firewall_vpn_scan', 'secret_scanning']:
 				return task_name in tasks
 			
 			if task_name in ['correlate_vulnerabilities', 'calculate_risk_scores']:
@@ -433,7 +435,7 @@ def initiate_scan(
 
 		# Tier 5: Blockers for Tier 6
 		t5_tasks = []
-		for t in ['web_api_discovery', 'waf_detection']:
+		for t in ['web_api_discovery', 'waf_detection', 'secret_scanning']:
 			wrapped = get_wrapped(t)
 			if wrapped: t5_tasks.append(wrapped)
 		t5_step = group(t5_tasks) if t5_tasks else None
@@ -479,8 +481,10 @@ def initiate_scan(
 
 		# Trigger SpiderFoot asynchronously if enabled (Tier 1 Non-Blocking)
 		if 'spiderfoot_scan' in engine.tasks or enable_spiderfoot_scan:
+			logger.warning(f"[DEBUG] Reached SpiderFoot trigger for {domain.name}. enable_spiderfoot_scan={enable_spiderfoot_scan}, tasks={engine.tasks}")
 			logger.warning(f"Triggering asynchronous SpiderFoot scan for {domain.name}")
-			spiderfoot_scan.apply_async(kwargs={'ctx': ctx, 'host': domain.name})
+			# Pass host=None for main scan to allow the task to fetch subdomains if needed
+			spiderfoot_scan.apply_async(kwargs={'ctx': ctx, 'host': None})
 
 		# Final Workflow construction
 		workflow_steps = []
@@ -649,7 +653,7 @@ def initiate_subscan(
 		subdomain.save()
 
 	# Build workflow steps
-	workflow_steps = [method.si(ctx=ctx)]
+	workflow_steps = [method.si(ctx=ctx, host=subdomain.name)]
 
 	# If this is a vulnerability scan, we need to run correlation
 	if scan_type == 'vulnerability_scan':
@@ -906,17 +910,11 @@ def subdomain_discovery(
 				results_file = self.results_dir + '/subdomains_chaos.txt'
 				cmd = f'chaos -d {host} -silent -key {chaos_key} -o {results_file}'
 
-			elif tool == 'reconx':
-				reconx_results = f"{self.results_dir}/reconx_findings"
-				os.makedirs(reconx_results, exist_ok=True)
-				
-				# Create a temporary targets file for reconx
-				reconx_targets = f"{self.results_dir}/reconx_targets.txt"
-				with open(reconx_targets, 'w') as f:
-					f.write(self.domain.name)
-				
-				# Run reconx
-				cmd = f"reconx run --targets {reconx_targets} --output {reconx_results}"
+			elif tool == 'baddns':
+				results_file = self.results_dir + '/subdomains_baddns.txt'
+				# baddns -d domain -o output
+				cmd = f'baddns -d {host} -o {results_file}'
+
 
 		elif tool in custom_subdomain_tools:
 			tool_query = InstalledExternalTool.objects.filter(name__icontains=tool.lower())
@@ -954,30 +952,6 @@ def subdomain_discovery(
 				activity_id=self.activity_id,
 				proxy=proxy if tool not in ['amass-passive', 'amass-active', 'subfinder'] else None)
 			
-			# Parse reconx findings if tool was reconx
-			if tool == 'reconx':
-				reconx_default_findings = os.path.expanduser("~/.local/share/reconx/findings/")
-				if os.path.exists(reconx_default_findings):
-					for file in os.listdir(reconx_default_findings):
-						if file.endswith(".jsonl"):
-							try:
-								with open(os.path.join(reconx_default_findings, file), 'r') as f:
-									for line in f:
-										finding = json.loads(line)
-										if finding.get('type') == 'subdomain':
-											sub_name = finding.get('data', {}).get('subdomain')
-											if sub_name and sub_name.endswith(self.domain.name) and sub_name not in existing_subs:
-												sub_obj, created = save_subdomain(sub_name, ctx=ctx)
-												if created:
-													existing_subs.add(sub_name)
-													MonitoringDiscovery.objects.create(
-														domain=self.domain,
-														discovery_type='subdomain',
-														content={'name': sub_name, 'source': 'ReconX'},
-														scan_history=self.scan
-													)
-							except Exception as e:
-								logger.error(f"Error parsing ReconX findings: {str(e)}")
 		except Exception as e:
 			logger.error(
 				f'Subdomain discovery tool "{tool}" raised an exception')
@@ -1027,9 +1001,29 @@ def subdomain_discovery(
 			continue
 
 		# Add subdomain
-		subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
+		subdomain, created = save_subdomain(subdomain_name, ctx=ctx)
 		if subdomain:
 			subdomain_count += 1
+			# Special handling for baddns findings (if it was a takeover)
+			# We'll check the baddns report file specifically for this subdomain
+			baddns_report = f'{self.results_dir}/subdomains_baddns.txt'
+			if os.path.exists(baddns_report):
+				with open(baddns_report, 'r') as f:
+					for b_line in f:
+						if subdomain_name in b_line and '[takeover]' in b_line.lower():
+							subdomain.is_important = True
+							subdomain.save()
+							# Create Critical Vulnerability
+							save_vulnerability(
+								name=f"Subdomain Takeover on {subdomain_name}",
+								description=f"baddns detected a potential subdomain takeover on {subdomain_name}. Line: {b_line.strip()}",
+								severity='critical',
+								type='Subdomain Takeover',
+								subdomain=subdomain,
+								scan_history=self.scan,
+								target_domain=self.domain,
+								validation_status='unverified'
+							)
 			subdomains.append(subdomain)
 			urls.append(subdomain.name)
 
@@ -1805,16 +1799,18 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 		return "No scan history found."
 
 	endpoints = EndPoint.objects.filter(scan_history=self.scan)
-	js_endpoints = [e for e in endpoints if e.http_url.endswith('.js')]
+	# Sensitive extensions to scan
+	SENSITIVE_EXTENSIONS = ('.js', '.env', '.php', '.asp', '.aspx', '.jsp', '.jspx', '.txt', '.log', '.conf', '.config', '.bak', '.old', '.json', '.yaml', '.yml')
+	target_endpoints = [e for e in endpoints if e.http_url.lower().endswith(SENSITIVE_EXTENSIONS)]
 
-	if not js_endpoints:
-		return "No JS files found to scan."
+	if not target_endpoints:
+		return "No sensitive files found to scan."
 
 	temp_dir = f"{self.results_dir}/secrets_temp"
 	os.makedirs(temp_dir, exist_ok=True)
 
-	# Download JS files
-	for js in js_endpoints:
+	# Download sensitive files
+	for js in target_endpoints:
 		try:
 			filename = "".join([c if c.isalnum() else "_" for c in js.http_url]) + ".js"
 			filepath = os.path.join(temp_dir, filename)
@@ -1876,6 +1872,31 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 			except Exception as e:
 				logger.error(f"Error parsing Trufflehog finding: {e}")
 
+	# Run Betterleaks
+	if config.get(BETTERLEAKS):
+		# Betterleaks is typically run against files or a directory
+		# It's good for finding secrets like API keys, passwords, etc.
+		# Command: betterleaks -p {temp_dir}
+		cmd = f"betterleaks -p {temp_dir}"
+		# Since betterleaks output format might vary, we'll try to parse stdout
+		process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+		stdout, stderr = process.communicate()
+		
+		for line in stdout.splitlines():
+			if line.strip():
+				# Assuming betterleaks outputs findings in a recognizable format
+				# For now, let's just log it and save if it looks like a finding
+				if any(keyword in line.lower() for keyword in ['key', 'password', 'secret', 'token', 'found']):
+					save_secret_leak(
+						scan_history=self.scan,
+						tool_name=BETTERLEAKS,
+						secret_type='Potential Secret',
+						source_url='Discovered Files',
+						match_content=line.strip(),
+						status='unverified'
+					)
+					findings_count += 1
+
 	# Cleanup
 	shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -1886,8 +1907,17 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	"""Run SpiderFoot scan on selected domain with real-time batch parsing.
 	"""
+	# host selection logic based on user rules
 	if not host:
-		host = self.domain.name
+		if self.subscan_id and self.subdomain:
+			host = self.subdomain.name
+		else:
+			host = self.domain.name
+	
+	logger.warning(f"[SPIDERFOOT] Starting scan for target: {host} (Scan ID: {self.scan_id}, Subscan ID: {self.subscan_id})")
+	
+	if not self.yaml_configuration:
+		logger.error("[SPIDERFOOT] yaml_configuration is empty! Check engine config.")
 	
 	config = self.yaml_configuration.get(SPIDERFOOT_SCAN) or {}
 	modules = config.get('modules', 'all')
@@ -1906,21 +1936,27 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	elif not profile_cmd:
 		profile_cmd = "-u investigate"
 	
-	# Use global SF config if it exists, otherwise generate from DB
-	sf_config_path = "/root/.config/spiderfoot.cfg"
+	# Use global SF config
+	sf_config_path = "/usr/src/github/spiderfoot/spiderfoot.cfg"
+	sf_exec_path = "/usr/src/github/spiderfoot/sf.py"
+	
+	if not os.path.exists(sf_exec_path):
+		logger.error(f"[SPIDERFOOT] SpiderFoot executable not found at {sf_exec_path}!")
+		return
+		
 	if not os.path.exists(sf_config_path):
-		sf_config_path = f"{self.results_dir}/spiderfoot.cfg"
-		api_keys = get_spiderfoot_keys()
-		with open(sf_config_path, 'w') as f:
-			for module, key in api_keys.items():
-				f.write(f"module.{module}.api_key={key}\n")
+		logger.error(f"[SPIDERFOOT] SpiderFoot config not found at {sf_config_path}. Task may fail or use defaults.")
 	
 	# Use CSV output for streaming. -r includes source data, -n strips newlines.
-	cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {host} {profile_cmd} -max-threads {threads} -o csv -r -n -c {sf_config_path}"
+	cmd = f"python3 {sf_exec_path} -s {host} {profile_cmd} -max-threads {threads} -o csv -r -n"
+	logger.warning(f"[SPIDERFOOT] Executing command: {cmd}")
+	
+	# Initialize stateful parser with Redis dedup
+	redis_client = Redis(host="redis", port=6379, decode_responses=True)
+	parser = SpiderFootBatchParser(dedup_backend=redis_client, scan_id=self.scan_id, target_domain=self.domain.name)
 	
 	batch = []
-	batch_size = 50
-	header = None
+	batch_size = 100
 	
 	for line in stream_command(
 		cmd,
@@ -1928,28 +1964,10 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 		scan_id=self.scan_id,
 		activity_id=self.activity_id):
 		
-		if not isinstance(line, str) or not line.strip():
+		event = parser.parse_line(line)
+		if not event:
 			continue
 			
-		# Parse CSV line
-		f = io.StringIO(line)
-		reader = csv.reader(f)
-		try:
-			row = next(reader)
-		except StopIteration:
-			continue
-			
-		if not header:
-			# First line should be header
-			if "Data" in row and "Type" in row:
-				header = row
-				continue
-			else:
-				# Skip if not a header and we haven't seen one yet
-				continue
-		
-		# Map row to dict
-		event = dict(zip(header, row))
 		batch.append(event)
 		
 		if len(batch) >= batch_size:
@@ -1965,33 +1983,102 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	graph.sync_scan_results(self.scan_id)
 	graph.close()
 
+
+def persist_osint_item(scan_history, domain, osint_type, e_data, confidence, source_data=None, event_type=None, ctx=None, activity_id=None):
+	"""
+	Core logic to persist an OSINT item into primary tables.
+	Separated from tasks to allow manual promotion from UI.
+	"""
+	if osint_type == 'Subdomain':
+		sub_name = e_data.lower()
+		save_subdomain(sub_name, ctx=ctx)
+	elif osint_type == 'Email':
+		save_email(e_data.lower(), scan_history=scan_history)
+	elif osint_type == 'Employee':
+		save_employee(e_data, scan_history=scan_history)
+	elif osint_type == 'URL':
+		if is_valid_url(e_data):
+			save_endpoint(e_data, ctx=ctx)
+	elif osint_type == 'IP':
+		save_ip_address(e_data, scan_id=scan_history.id, activity_id=activity_id)
+	elif osint_type == 'Port':
+		if ':' in e_data:
+			ip_part, port_part = e_data.split(':', 1)
+			if port_part.isdigit():
+				port_num = int(port_part)
+				res = get_port_service_description(port_num)
+				port_obj, _ = update_or_create_port(port_num, service_name=res.get('service_name'), description=res.get('description'))
+				ip_obj, _ = save_ip_address(ip_part, scan_id=scan_history.id, activity_id=activity_id)
+				if ip_obj:
+					ip_obj.ports.add(port_obj)
+		elif e_data.isdigit():
+			port_num = int(e_data)
+			update_or_create_port(port_num)
+	elif osint_type == 'Tech':
+		tech_obj, _ = Technology.objects.get_or_create(name=e_data)
+		if source_data:
+			subdomain = Subdomain.objects.filter(name=source_data, scan_history=scan_history).first()
+			if subdomain:
+				subdomain.technologies.add(tech_obj)
+	elif osint_type == 'Leak':
+		save_secret_leak(
+			scan_history=scan_history,
+			tool_name='SpiderFoot',
+			secret_type=event_type or 'Sensitive Data',
+			source_url=source_data or 'SpiderFoot Findings',
+			match_content=e_data
+		)
+
 def _process_spiderfoot_batch(self, batch, ctx, host):
-	"""Internal helper to process a batch of SpiderFoot findings."""
+	"""Internal helper to process a batch of SpiderFoot findings with tiered validation."""
 	try:
 		with transaction.atomic():
 			for event in batch:
-				e_type = event.get('Type')
-				e_data = event.get('Data')
+				e_type = event.get('type')
+				e_data = event.get('data')
+				osint_type = event.get('osint_type')
+				confidence = event.get('confidence', 0)
 				
-				if not e_type or not e_data:
+				if not osint_type or not e_data:
 					continue
+
+				# Automated Persistence (High Confidence)
+				if confidence > 80:
+					persist_osint_item(
+						scan_history=self.scan,
+						domain=self.domain,
+						osint_type=osint_type,
+						e_data=e_data,
+						confidence=confidence,
+						source_data=event.get('source_data'),
+						event_type=e_type,
+						ctx=ctx,
+						activity_id=self.activity_id
+					)
 				
-				# SF types for hostnames/subdomains
-				if e_type in ['DNS_NAME', 'INTERNET_NAME', 'AFFILIATE_INTERNET_NAME']:
-					sub_name = e_data.lower()
-					if sub_name and sub_name.endswith(host):
-						save_subdomain(sub_name, ctx=ctx)
-				# SF types for URLs
-				elif e_type in ['WEB_RESOURCE', 'URL_ALL', 'LINKED_URL_INTERNAL']:
-					if e_data and is_valid_url(e_data):
-						save_endpoint(e_data, ctx=ctx)
-				# SF types for Emails
-				elif e_type == 'EMAILADDR':
-					save_email(e_data.lower(), scan_history=self.scan)
-				# SF types for Users/Accounts
-				elif e_type in ['USERNAME', 'ACCOUNT_EXTERNAL', 'HUMAN_NAME']:
-					save_employee(e_data, scan_history=self.scan)
-		logger.info(f"Processed batch of {len(batch)} SpiderFoot findings.")
+				# Staging Area (Moderate Confidence: 50% -> 80%)
+				elif 50 <= confidence <= 80:
+					OsintStaging.objects.update_or_create(
+						scan_history=self.scan,
+						target_domain=self.domain,
+						content=e_data,
+						osint_type=osint_type,
+						defaults={
+							'source': event.get('source', 'SpiderFoot'),
+							'confidence': confidence,
+							'metadata': {
+								'sf_type': e_type,
+								'source_data': event.get('source_data'),
+								'iocs': event.get('iocs')
+							},
+							'status': 'pending'
+						}
+					)
+				else:
+					# Discard low confidence noise
+					logger.debug(f"[SPIDERFOOT] Discarding low confidence finding: {osint_type} - {e_data} ({confidence}%)")
+
+		logger.warning(f"Processed batch of {len(batch)} SpiderFoot findings with validation.")
 	except Exception as e:
 		logger.error(f"Error processing SpiderFoot batch: {str(e)}")
 

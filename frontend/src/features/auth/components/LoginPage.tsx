@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
-import { 
-  Box, 
-  Paper, 
-  Typography, 
-  TextField, 
-  Button, 
-  IconButton, 
+import {
+  Box,
+  Paper,
+  Typography,
+  TextField,
+  Button,
+  IconButton,
   InputAdornment,
   Alert,
   Link
@@ -20,7 +20,7 @@ export const LoginPage: React.FC = () => {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
+
   const loginMutation = useLogin();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -44,7 +44,7 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       minHeight: '100vh',
       display: 'flex',
       alignItems: 'center',
@@ -65,7 +65,7 @@ export const LoginPage: React.FC = () => {
         backdropFilter: 'blur(4px)'
       }
     }}>
-      <Paper elevation={24} sx={{ 
+      <Paper elevation={24} sx={{
         position: 'relative',
         zIndex: 1,
         width: '100%',
@@ -87,10 +87,10 @@ export const LoginPage: React.FC = () => {
       }}>
         <Box sx={{ mb: 3, textAlign: 'center' }}>
           <img src="/staticfiles/img/r3ngine_logo.png" alt="reNgine Logo" style={{ height: 80, marginBottom: 16 }} />
-          <Typography variant="h5" sx={{ 
-            fontFamily: 'Orbitron', 
-            fontWeight: 900, 
-            letterSpacing: 2, 
+          <Typography variant="h5" sx={{
+            fontFamily: 'Orbitron',
+            fontWeight: 900,
+            letterSpacing: 2,
             color: '#00f3ff',
             textShadow: '0 0 10px rgba(0, 243, 255, 0.5)'
           }}>
@@ -101,10 +101,10 @@ export const LoginPage: React.FC = () => {
           </Typography>
         </Box>
 
-        <Alert severity="info" sx={{ 
-          width: '100%', 
-          mb: 3, 
-          bgcolor: 'rgba(0, 243, 255, 0.05)', 
+        <Alert severity="info" sx={{
+          width: '100%',
+          mb: 3,
+          bgcolor: 'rgba(0, 243, 255, 0.05)',
           color: '#00f3ff',
           border: '1px solid rgba(0, 243, 255, 0.15)',
           borderRadius: 2,
@@ -195,7 +195,7 @@ export const LoginPage: React.FC = () => {
             fullWidth
             variant="contained"
             disabled={loginMutation.isPending}
-            sx={{ 
+            sx={{
               py: 1.5,
               background: 'linear-gradient(135deg, #00f3ff 0%, #7000ff 100%)',
               color: '#fff',
@@ -204,13 +204,13 @@ export const LoginPage: React.FC = () => {
               letterSpacing: 2,
               clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)',
               transition: 'all 0.3s ease',
-              '&:hover': { 
+              '&:hover': {
                 background: 'linear-gradient(135deg, #00f3ff 20%, #7000ff 80%)',
                 filter: 'drop-shadow(0 0 10px rgba(0, 243, 255, 0.5))',
                 transform: 'translateY(-2px)'
               },
-              '&.Mui-disabled': { 
-                background: 'rgba(0, 243, 255, 0.1)', 
+              '&.Mui-disabled': {
+                background: 'rgba(0, 243, 255, 0.1)',
                 color: 'rgba(255, 255, 255, 0.3)',
                 clipPath: 'polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px)'
               }
@@ -222,7 +222,7 @@ export const LoginPage: React.FC = () => {
 
         <Box sx={{ mt: 4, textAlign: 'center' }}>
           <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.4)' }}>
-            Issues or feature requests? <Link href="https://github.com/whiterabb17/rengine/issues" target="_blank" sx={{ color: '#00f3ff' }}>Raise issue on Github.</Link>
+            Issues or feature requests? <Link href="https://github.com/whiterabb17/r3ngine/issues" target="_blank" sx={{ color: '#00f3ff' }}>Raise issue on Github.</Link>
           </Typography>
         </Box>
       </Paper>

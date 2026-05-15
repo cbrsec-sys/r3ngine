@@ -564,7 +564,7 @@
     install_command: go install -v github.com/xalgord/reconx/cmd/reconx@latest
     version_match_regex: (?i:v)?\d+\.\d+(?:\.\d+)*
     is_default: true
-    is_subdomain_gathering: true
+    is_subdomain_gathering: false
     is_github_cloned: false
     github_clone_path: null
     subdomain_gathering_command: null

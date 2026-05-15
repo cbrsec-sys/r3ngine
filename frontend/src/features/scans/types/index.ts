@@ -1,6 +1,8 @@
 import type { components } from '@/types/api';
 
-export type ScanHistory = components["schemas"]["ScanHistory"];
+export type ScanHistory = components["schemas"]["ScanHistory"] & {
+  is_spiderfoot_running?: boolean;
+};
 export type ScheduledScan = components["schemas"]["PeriodicTask"];
 export type SubScan = components["schemas"]["SubScan"];
 export type Command = components["schemas"]["Command"];
@@ -93,13 +95,28 @@ export interface ScanSummaryResponse {
     cfg_excluded_paths: string[];
     tasks: string[];
     used_gf_patterns: string[];
+    is_spiderfoot_running: boolean;
   };
   timeline: ScanActivity[];
 }
+
 
 export interface SecretLeak {
   id: number;
   leak_type: string;
   leak_content: string;
   found_in: string;
+}
+
+export interface OsintStaging {
+  id: number;
+  osint_type: string;
+  content: string;
+  source: string;
+  confidence: number;
+  metadata: string;
+  discovered_date: string;
+  discovered_date_humanized: string;
+  target_domain_name: string;
+  scan_history_id: number;
 }

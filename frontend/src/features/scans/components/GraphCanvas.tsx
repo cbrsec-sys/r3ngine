@@ -6,6 +6,9 @@ import fcose from 'cytoscape-fcose';
 import klay from 'cytoscape-klay';
 // @ts-ignore
 import expandCollapse from 'cytoscape-expand-collapse';
+// @ts-ignore
+import contextMenus from 'cytoscape-context-menus';
+import 'cytoscape-context-menus/cytoscape-context-menus.css';
 
 import type { GraphData } from '../api/graphApi';
 import { useGraphStore } from '../../../store/useGraphStore';
@@ -13,6 +16,7 @@ import { useGraphStore } from '../../../store/useGraphStore';
 cytoscape.use(fcose);
 cytoscape.use(klay);
 cytoscape.use(expandCollapse);
+cytoscape.use(contextMenus);
 
 interface GraphCanvasProps {
   data: GraphData;
@@ -70,6 +74,9 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
       },
       boxSelectionEnabled: false,
       autounselectify: true,
+      hideEdgesOnViewport: true,
+      textureOnViewport: true,
+      pixelRatio: 'auto',
       style: [
         {
           selector: 'node',
@@ -85,69 +92,82 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
             'width': (ele: any) => Math.min(80, 30 + (ele.data('degree_centrality') || 0) * 5),
             'height': (ele: any) => Math.min(80, 30 + (ele.data('degree_centrality') || 0) * 5),
             'border-width': (ele: any) => (ele.data('criticalVulnCount') || 0) > 0 ? 4 : 1,
-            'border-color': (ele: any) => (ele.data('criticalVulnCount') || 0) > 0 ? '#ef4444' : 'data(color)',
+            'border-color': (ele: any) => (ele.data('criticalVulnCount') || 0) > 0 ? '#ef4444' : 'rgba(255,255,255,0.1)',
             'overlay-padding': 6,
-            'z-index': '1' as any
-          }
+            'z-index': 1,
+            'shadow-blur': 10,
+            'shadow-color': 'data(color)',
+            'shadow-opacity': 0.2
+          } as any
         },
         {
           selector: 'node:parent',
           style: {
-            'background-opacity': 0.05,
+            'background-opacity': 0.03,
+            'background-color': '#00f3ff',
             'border-width': 1,
-            'border-style': 'dashed',
-            'border-color': '#00f3ff',
-            'padding': '20px',
+            'border-style': 'solid',
+            'border-color': 'rgba(0, 243, 255, 0.2)',
+            'padding': 30,
             'text-valign': 'top',
-            'text-margin-y': -5,
-            'font-size': '14px',
+            'text-margin-y': -10,
+            'font-size': '12px',
             'font-weight': 'bold',
-            'text-opacity': 0.8,
-            'shape': 'roundrectangle'
-          }
+            'text-opacity': 0.6,
+            'text-transform': 'uppercase',
+            'shape': 'roundrectangle',
+            'corner-radius': 12
+          } as any
         },
         {
           selector: 'node[type = "Domain"]',
           style: {
-            'width': 60,
-            'height': 60,
+            'width': 70,
+            'height': 70,
             'font-size': '14px',
             'font-weight': 'bold',
             'text-opacity': 1,
             'shape': 'hexagon',
-            'border-width': 2,
-            'border-color': '#fff'
-          }
+            'border-width': 3,
+            'border-color': '#fff',
+            'shadow-opacity': 0.8,
+            'shadow-blur': 20
+          } as any
         },
         {
           selector: 'node[type = "Vulnerability"]',
           style: {
             'shape': 'diamond',
-            'width': 40,
-            'height': 40,
-          }
+            'width': 45,
+            'height': 45,
+            'background-color': '#ef4444',
+            'shadow-color': '#ef4444'
+          } as any
         },
         {
           selector: 'node.cy-expand-collapse-collapsed-node',
           style: {
             'background-color': '#1e293b',
+            'background-opacity': 0.8,
             'border-width': 2,
             'border-color': '#00f3ff',
             'shape': 'roundrectangle',
             'text-opacity': 1,
-            'label': (ele: any) => `${ele.data('label')} (${ele.data('collapsedChildren').length})`
+            'label': (ele: any) => `${ele.data('label')} (${ele.data('collapsedChildren')?.length || 0})`
           }
         },
         {
           selector: 'edge',
           style: {
-            'width': 1.5,
-            'line-color': 'rgba(148, 163, 184, 0.2)',
-            'target-arrow-color': 'rgba(148, 163, 184, 0.2)',
+            'width': 1,
+            'line-color': 'rgba(148, 163, 184, 0.1)',
+            'target-arrow-color': 'rgba(148, 163, 184, 0.1)',
             'target-arrow-shape': 'triangle',
-            'curve-style': 'bezier',
-            'opacity': 0.4
-          }
+            'curve-style': 'unbundled-bezier',
+            'control-point-distances': [20, -20],
+            'control-point-weights': [0.25, 0.75],
+            'opacity': 0.3
+          } as any
         },
         {
             selector: 'node.hover',
@@ -155,34 +175,36 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
                 'text-opacity': 1,
                 'border-width': 4,
                 'border-color': '#fff',
-                'z-index': '999' as any,
-                'text-background-opacity': 0.8,
+                'z-index': 999,
+                'text-background-opacity': 0.9,
                 'text-background-color': '#0f172a',
-                'text-background-padding': '3px',
-                'text-background-shape': 'roundrectangle'
-            }
+                'text-background-padding': 4,
+                'text-background-shape': 'roundrectangle',
+                'shadow-opacity': 1,
+                'shadow-blur': 30
+            } as any
         },
         {
             selector: 'node.highlighted',
-            style: { 'opacity': 1, 'z-index': '100' as any }
+            style: { 'opacity': 1, 'z-index': 100, 'shadow-opacity': 0.6 } as any
         },
         {
             selector: 'node.faded',
-            style: { 'opacity': 0.1, 'text-opacity': 0 }
+            style: { 'opacity': 0.05, 'text-opacity': 0 }
         },
         {
             selector: 'edge.highlighted',
-            style: { 'line-color': '#00f3ff', 'target-arrow-color': '#00f3ff', 'width': 3, 'opacity': 1 }
+            style: { 'line-color': '#00f3ff', 'target-arrow-color': '#00f3ff', 'width': 2, 'opacity': 1, 'z-index': 50 } as any
         },
         {
             selector: 'edge.faded',
-            style: { 'opacity': 0.05 }
+            style: { 'opacity': 0.02 }
         }
       ]
     });
 
     // Initialize expand-collapse API
-    const api = (cy as any).expandCollapse({
+    const expandCollapseApi = (cy as any).expandCollapse({
       layoutBy: {
         name: layoutName,
         animate: true,
@@ -193,15 +215,53 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
       animate: true,
       undoable: false,
       expandCollapseCuePosition: 'top-left',
-      expandCollapseCueSize: 12,
-      expandCollapseCueLineSize: 8,
+      expandCollapseCueSize: 16,
+      expandCollapseCueLineSize: 10,
       expandCueImage: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2300f3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>',
       collapseCueImage: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="%2300f3ff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="8" y1="12" x2="16" y2="12"></line></svg>'
     });
 
-    // Initial collapse of everything except root domain
-    // api.collapseAll();
-    
+    // Initialize Context Menus
+    (cy as any).contextMenus({
+      menuItems: [
+        {
+          id: 'view-details',
+          content: 'View Intelligence Details',
+          selector: 'node',
+          onClickFunction: (event: any) => {
+            const node = event.target;
+            setSelectedNode(node.id(), node.data());
+          }
+        },
+        {
+          id: 'blast-radius',
+          content: 'Calculate Blast Radius',
+          selector: 'node',
+          onClickFunction: (event: any) => {
+             // Logic to switch panel to blast radius
+             const node = event.target;
+             useGraphStore.getState().setActivePanel('blastRadius');
+             setSelectedNode(node.id(), node.data());
+          }
+        },
+        {
+          id: 'separator',
+          content: '----',
+          selector: 'node'
+        },
+        {
+          id: 'run-scan',
+          content: 'Initiate Targeted Scan',
+          selector: 'node[type="Subdomain"]',
+          onClickFunction: (event: any) => {
+            alert(`Initiating scan for ${event.target.data('label')}...`);
+          }
+        }
+      ],
+      menuItemClasses: ['custom-context-menu-item'],
+      contextMenuClasses: ['custom-context-menu']
+    });
+
     // Initial Layout
     cy.layout({ 
       name: layoutName,

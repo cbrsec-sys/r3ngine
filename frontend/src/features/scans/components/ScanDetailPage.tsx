@@ -318,7 +318,37 @@ const getFrontendEngineColor = (activityTitle: string) => {
   return '#fff';
 };
 
-const StatusBadge: React.FC<{ status: number, compact?: boolean }> = ({ status, compact = false }) => {
+const StatusBadge: React.FC<{ status: number, compact?: boolean, isSpiderFootRunning?: boolean }> = ({ status, compact = false, isSpiderFootRunning = false }) => {
+    if (isSpiderFootRunning) {
+      return (
+        <MuiTooltip title="SpiderFoot OSINT Scan is running in the background">
+          <Box sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 1,
+            px: compact ? 2 : 3,
+            py: compact ? 0.4 : 1,
+            borderRadius: '20px',
+            border: `1px solid #ff00ff40`,
+            color: '#ff00ff',
+            fontSize: '0.9rem',
+            fontWeight: 900,
+            fontFamily: 'Orbitron',
+            animation: 'pulse-spider 2s infinite ease-in-out',
+            textShadow: `0 0 10px #ff00ff40`,
+            boxShadow: `inset 0 0 10px #ff00ff10`,
+            '@keyframes pulse-spider': {
+              '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+              '50%': { transform: 'scale(1.05)', filter: 'drop-shadow(0 0 8px #ff00ff)' },
+              '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+            }
+          }}>
+            <Bug size={compact ? 12 : 18} />
+            {compact ? 'SF ACTIVE' : 'SPIDERFOOT ACTIVE'}
+          </Box>
+        </MuiTooltip>
+      );
+    }
   const configs: any = {
     [-1]: { label: 'PENDING', color: '#ff9f00', icon: Clock },
     [0]: { label: 'FAILED', color: '#ff003c', icon: AlertTriangle },
@@ -1100,25 +1130,10 @@ export const ScanDetailPage = () => {
         <Box sx={{ p: 2 }}>
           <Stack spacing={4}>
             <Box sx={{ textAlign: 'center', position: 'relative' }}>
-              <StatusBadge status={data.scan_info.scan_status} />
-              {data.timeline?.some((a: ScanActivity) => (a.name === 'spiderfoot_scan' || a.title?.toLowerCase().includes('spiderfoot')) && a.status === 'RUNNING') && (
-                <MuiTooltip title="Attack Surface Intelligence (SpiderFoot) is running in the background">
-                  <Box sx={{
-                    position: 'absolute',
-                    top: -10,
-                    right: -10,
-                    animation: 'pulse-spider 2s infinite ease-in-out',
-                    cursor: 'help',
-                    '@keyframes pulse-spider': {
-                      '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
-                      '50%': { transform: 'scale(1.3)', filter: 'drop-shadow(0 0 15px #ff00ff)' },
-                      '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
-                    }
-                  }}>
-                    <Bug size={24} color="#ff00ff" />
-                  </Box>
-                </MuiTooltip>
-              )}
+              <StatusBadge 
+                status={data.scan_info.scan_status} 
+                isSpiderFootRunning={data.scan_info.is_spiderfoot_running} 
+              />
             </Box>
 
             <Box>
@@ -1523,8 +1538,9 @@ export const ScanDetailPage = () => {
     </TacticalPanel>
   );
 
+
   const renderOSINT = () => (
-    <OsintTab data={data} />
+    <OsintTab data={data} scanId={parseInt(scanId)} />
   );
 
   const renderLeaks = () => (

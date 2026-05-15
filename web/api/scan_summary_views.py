@@ -298,6 +298,10 @@ class ScanSummaryAPIView(APIView):
                 'cfg_excluded_paths': scan.cfg_excluded_paths or [],
                 'tasks': scan.tasks or [],
                 'used_gf_patterns': scan.used_gf_patterns.split(',') if scan.used_gf_patterns else [],
+                'is_spiderfoot_running': scan.scanactivity_set.filter(
+                    Q(name='spiderfoot_scan') | Q(title__icontains='spiderfoot'),
+                    status=1
+                ).exists()
             },
             'exposed_count': exposed_count,
             'secret_leaks_count': secret_leaks_count,

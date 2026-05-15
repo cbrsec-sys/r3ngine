@@ -117,7 +117,7 @@ class RengineTask(Task):
 				post_processing_tasks = ['correlate_vulnerabilities', 'calculate_risk_scores', 'run_apme', 'generate_impact_assessment', 'report']
 				
 				if self.track and self.task_name not in self.engine.tasks and dependent_tasks.get(self.task_name) not in self.engine.tasks and self.task_name not in post_processing_tasks:
-					logger.debug(f'Task {self.name} is not part of engine "{self.engine.engine_name}" tasks. Skipping.')
+					logger.warning(f'[DEBUG] Skipping task {self.task_name} because it is not in engine tasks: {self.engine.tasks}')
 					return
 
 			# Create ScanActivity for this task and send start scan notifs
