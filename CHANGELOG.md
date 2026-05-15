@@ -2,6 +2,12 @@
 
 **Official Repo location:** <p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
+### [v3.0.0-rc4] - 2026-05-15
+
+### Fixed
+- **Report Generation Pipeline**: Resolved a critical `'NoneType' object has no attribute 'replace'` error occurring when the executive summary description was left empty in report settings.
+- **Model Resilience**: Added default empty string values to report configuration fields to prevent future serialization and string replacement failures.
+
 ## [v3.0.0-rc3] - 2026-05-15
 
 ### Added

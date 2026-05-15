@@ -335,14 +335,15 @@ fi
 
 echo "Starting Consolidated Celery Workers..."
 
-# 1. Main Scan Worker (Prefork pool for CPU-intensive tasks)
-# Listens to: main_scan_queue
-echo "Starting Core Scan Worker..."
-celery -A reNgine.tasks worker --loglevel=$loglevel --optimization=fair --autoscale=$MAX_CONCURRENCY,$MIN_CONCURRENCY -Q main_scan_queue -n core_scan_worker &
+# 1. Main Scan & Tool Worker (Prefork pool for stoppable tasks)
+# Listens to: main_scan_queue, initiate_scan_queue, subscan_queue, run_command_queue, osint_queue, spiderfoot_queue
+echo "Starting Core Scan & Tool Worker..."
+STOPPABLE_QUEUES="main_scan_queue,initiate_scan_queue,subscan_queue,run_command_queue,osint_queue,spiderfoot_queue"
+celery -A reNgine.tasks worker --loglevel=$loglevel --optimization=fair --autoscale=$MAX_CONCURRENCY,$MIN_CONCURRENCY -Q $STOPPABLE_QUEUES -n core_scan_worker &
 
-# 2. Service Worker (Gevent pool for I/O bound tasks)
-# Listens to: api_queue, initiate_scan_queue, subscan_queue, report_queue, send_notif_queue, etc.
-SERVICE_QUEUES="api_queue,initiate_scan_queue,subscan_queue,report_queue,send_notif_queue,send_task_notif_queue,send_file_to_discord_queue,send_hackerone_report_queue,parse_nmap_results_queue,geo_localize_queue,query_whois_queue,remove_duplicate_endpoints_queue,run_command_queue,query_reverse_whois_queue,query_ip_history_queue,send_scan_notif_queue"
+# 2. Service Worker (Gevent pool for high-concurrency I/O tasks)
+# Listens to: api_queue, report_queue, send_notif_queue, etc.
+SERVICE_QUEUES="api_queue,report_queue,send_notif_queue,send_task_notif_queue,send_file_to_discord_queue,send_hackerone_report_queue,parse_nmap_results_queue,geo_localize_queue,query_whois_queue,remove_duplicate_endpoints_queue,query_reverse_whois_queue,query_ip_history_queue,send_scan_notif_queue"
 echo "Starting Service Worker Group..."
 celery -A reNgine worker --pool=gevent --concurrency=100 --optimization=fair --loglevel=$loglevel -Q $SERVICE_QUEUES -n service_worker &
 
@@ -350,10 +351,5 @@ celery -A reNgine worker --pool=gevent --concurrency=100 --optimization=fair --l
 # Listens to: llm_queue
 echo "Starting LLM Worker..."
 celery -A reNgine.tasks worker --pool=gevent --concurrency=20 --optimization=fair --loglevel=$loglevel -Q llm_queue -n llm_worker &
-
-# 4. OSINT Worker (Gevent pool for OSINT/Spiderfoot tasks)
-# Listens to: osint_queue, spiderfoot_queue
-echo "Starting OSINT Worker..."
-celery -A reNgine.tasks worker --pool=gevent --concurrency=10 --optimization=fair --loglevel=$loglevel -Q osint_queue,spiderfoot_queue -n osint_worker &
 
 wait
