@@ -276,3 +276,70 @@ def generate_attack_surface_map(graph_data):
     except Exception as e:
         print(f"Error generating graph image: {e}")
         return None
+
+
+def generate_stress_latency_chart(results):
+    """
+    Generates a bar chart for stress test latency (Avg, P95, P99).
+    """
+    labels = []
+    avg_latency = []
+    p95_latency = []
+    p99_latency = []
+    
+    for res in results:
+        labels.append(f"{res.tool_used}")
+        avg_latency.append(res.avg_latency_ms)
+        p95_latency.append(res.p95_latency_ms)
+        p99_latency.append(res.p99_latency_ms)
+
+    fig = go.Figure(data=[
+        go.Bar(name='Average', x=labels, y=avg_latency, marker_color='#4ECDC4'),
+        go.Bar(name='P95', x=labels, y=p95_latency, marker_color='#FF9F43'),
+        go.Bar(name='P99', x=labels, y=p99_latency, marker_color='#FF4D6A')
+    ])
+
+    fig.update_layout(
+        barmode='group',
+        title="Latency Analysis (ms)",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(size=14),
+        margin=dict(t=60, b=60, l=60, r=60),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+    )
+
+    img_bytes = to_image(fig, format="png")
+    return base64.b64encode(img_bytes).decode('utf-8')
+
+
+def generate_stress_success_rate_chart(results):
+    """
+    Generates a donut chart for stress test success vs failure.
+    """
+    total_success = sum(r.successful_requests for r in results)
+    total_failed = sum(r.failed_requests for r in results)
+    
+    labels = ['Success', 'Failed']
+    values = [total_success, total_failed]
+    colors = ['#4ADE80', '#FF4D6A']
+
+    fig = go.Figure(data=[go.Pie(
+        labels=labels,
+        values=values,
+        marker=dict(colors=colors),
+        hole=0.4,
+        textinfo='percent+label',
+        textfont=dict(size=14)
+    )])
+
+    fig.update_layout(
+        title="Overall Success Rate",
+        showlegend=True,
+        margin=dict(t=60, b=60, l=60, r=60),
+        width=600,
+        height=600
+    )
+
+    img_bytes = to_image(fig, format="png")
+    return base64.b64encode(img_bytes).decode('utf-8')

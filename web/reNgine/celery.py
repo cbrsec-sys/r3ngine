@@ -68,6 +68,15 @@ def setup_startup_sync(sender, **kwargs):
             sync_cisa_kev_catalog.delay()
         else:
             startup_logger.debug(">>> [STARTUP] CISA KEV sync already triggered or lock active.")
+
+        # 3. Semgrep Rule Synchronization
+        semgrep_lock_key = "rengine:startup_semgrep_sync_lock"
+        if r.set(semgrep_lock_key, "locked", nx=True, ex=3600):
+            startup_logger.info(">>> [STARTUP] Triggering Semgrep rule synchronization...")
+            from reNgine.tasks import sync_semgrep_rules
+            sync_semgrep_rules.delay()
+        else:
+            startup_logger.debug(">>> [STARTUP] Semgrep rule sync already triggered or lock active.")
             
     except Exception as e:
         # Avoid crashing startup if Redis or task dispatch fails

@@ -37,7 +37,7 @@
 </p>
 <h4>r3ngine 3.0.0: The Phoenix Rebirth</h4>
 <p>
-  r3ngine 3.0.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Human-in-the-Loop OSINT Staging</b>, and <b>Reinforced Security Discovery Stack</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
+  r3ngine 3.0.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity - and for those a little less excentric there is a more toned-down theme as well. Also we have introduced <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
 </p>
 
 <h4>Attack Path Modeling Engine<h4>
@@ -46,7 +46,7 @@
 </p>
 
 <img src="https://img.shields.io/badge/r3ngine--mobile-1.0.0-orange.svg?logo=none" alt="r3ngine Mobile SOC" />
-<h6><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3ngine Mobile SOC</a>: COMING SOON</h6>
+<h5><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3ngine Mobile SOC</a>: Alpha Release Out Now</h5>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -71,6 +71,7 @@ reNgine now features a high-performance stress testing suite, enabling users to 
 *   **Real-Time Telemetry Dashboard**: A premium monitoring interface featuring synchronized **ECharts** for Latency, RPS, and Throughput, powered by low-latency **Redis Streams** and **WebSockets**.
 *   **Scenario-Based Testing**: Support for headless Locust execution with dynamic scenario generation and aggregated stats parsing.
 *   **Infrastructure Safety**: Integrated safety guardrails and Redis-backed kill-switch mechanisms for instant termination of high-load tests.
+*   **Specialized Intelligence Reports**: High-fidelity PDF reports with performance-focused aesthetics (`stress_cyber_pro` and `stress_modern`). Includes LLM-powered bottleneck analysis, latency heatmaps, and success-rate stability charts.
 *   **Vulnerability Correlation Engine**: Unifies findings from **Nuclei, Semgrep, Gitleaks, Acunetix, and Retire.js** into a prioritized threat landscape.
 *   **Persistent Vulnerability State Tracking**: Automated lifecycle management that identifies vulnerabilities and their status over time.
 *   **Centralized Brute-Force Orchestration**: A multi-tiered authentication attack pipeline that supports **multi-service targeting (SSH, FTP, HTTP, SMB, RDP, Telnet)**. Centralizes targets from Nmap, Nuclei, and intelligent form extraction into a unified `AuthCandidate` queue, orchestrated via **Hydra** with full OpSec controls.
@@ -191,7 +192,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **ReconX 24/7 Monitoring**: Dedicated, domain-specific background monitoring engine for continuous asset tracking and automated findings ingestion.
 *   **Vulnerability Scanning**:
     *   **Nuclei**: Specialized templates and rate-limited execution.
-    *   **Semgrep**: Automated static analysis for JS and GraphQL.
+    *   **Semgrep**: Automated static analysis for discovered endpoints (JS, PHP, Env, etc.) with automated rule synchronization (OWASP Top 10, Secrets).
     *   **WPScan**: Automated WordPress reconnaissance and vulnerability identification.
     *   **baddns**: Automated subdomain takeover detection with critical severity mapping.
     *   **betterleaks**: High-precision secret and leak identification in discovered assets.

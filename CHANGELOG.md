@@ -2,7 +2,25 @@
 
 **Official Repo location:** <p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
+### [v3.0.0-rc5] - 2026-05-15
+
+### Added
+- **Semgrep Static Analysis Integration**:
+  - **Automated Rule Synchronization**: Introduced a startup sync routine that downloads and bundles high-impact Semgrep rules (OWASP Top 10, Secrets, etc.).
+  - **Unified SAST Task**: Developed a robust `semgrep_scan` task that automatically downloads relevant files (JS, PHP, etc.) from discovered endpoints for analysis.
+  - **Secrets Discovery**: Integrated Semgrep into the Tier 5 secret scanning phase to complement Gitleaks and Trufflehog.
+  - **Vulnerability Assessment**: Integrated Semgrep as a default, always-run tool in the vulnerability scan pipeline to identify code-based flaws.
+  - **Intelligent Finding Persistence**: Automated mapping of Semgrep results to `SecretLeak` and `Vulnerability` database models with context-aware severity mapping.
+
 ### [v3.0.0-rc4] - 2026-05-15
+
+### Added
+- **Stress Test Intelligence Reports**:
+  - **Specialized Reporting Engine**: Introduced professional-grade performance reports for the Adaptive Stress & Resilience Engine (ASRE).
+  - **Dynamic Templates**: Created `stress_cyber_pro` (high-contrast) and `stress_modern` (minimalist) templates with performance-focused aesthetics.
+  - **Automated Performance Insights**: Integrated LLM-generated executive summaries for stress test results, covering bottleneck analysis and resilience scoring.
+  - **Advanced Visualizations**: Added dedicated PDF charts for latency distribution, throughput stability, and endpoint saturation.
+  - **Dashboard Integration**: Added on-demand report generation directly from the Stress Testing dashboard.
 
 ### Fixed
 - **Report Generation Pipeline**: Resolved a critical `'NoneType' object has no attribute 'replace'` error occurring when the executive summary description was left empty in report settings.
