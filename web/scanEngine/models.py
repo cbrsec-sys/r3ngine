@@ -147,7 +147,7 @@ class VulnerabilityReportSetting(models.Model):
     company_website = models.CharField(max_length=100, null=True, blank=True)
     show_rengine_banner = models.BooleanField(default=True)
     show_executive_summary = models.BooleanField(default=True)
-    executive_summary_description = models.TextField(blank=True, null=True)
+    executive_summary_description = models.TextField(blank=True, null=True, default='')
     enable_llm_report_generation = models.BooleanField(default=False)
     show_footer = models.BooleanField(default=False)
     footer_text = models.CharField(max_length=200, null=True, blank=True)

@@ -2528,7 +2528,7 @@ class ListEngines(APIView):
 
 
 class ListOrganizations(APIView):
-	permission_classes = [IsAuthenticated, HasPermission]
+	permission_classes = [IsAuthenticated, IsAuditor]
 	def get(self, request, format=None):
 		req = self.request
 		organizations = Organization.objects.all()
