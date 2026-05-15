@@ -35,7 +35,9 @@ import {
   ArrowLeft,
   Server,
   Terminal,
-  Clock
+  Clock,
+  FileText,
+  Download
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 import { useStressStore } from '../store/stressStore';
@@ -63,6 +65,9 @@ export const StressTestingPage: React.FC = () => {
     duration: "30s",
     uses_tools: ["k6"]
   });
+  const [reportTemplate, setReportTemplate] = useState('modern');
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [openReportDialog, setOpenReportDialog] = useState(false);
 
   const handleStart = async () => {
     clearTelemetry();
@@ -86,6 +91,26 @@ export const StressTestingPage: React.FC = () => {
       console.error("Failed to stop stress test", error);
     } finally {
       setIsStopping(false);
+    }
+  };
+  
+  const handleGenerateReport = async () => {
+    setIsGeneratingReport(true);
+    try {
+      const response = await axios.get(`/startScan/create_report/${scanId}`, {
+        params: {
+          report_type: 'stress_test',
+          report_template: reportTemplate === 'cyber_pro' ? 'stress_cyber_pro' : 'stress_modern'
+        }
+      });
+      if (response.data.status) {
+        alert("Stress Test Report generation started!");
+      }
+    } catch (error) {
+      console.error("Failed to generate report", error);
+    } finally {
+      setIsGeneratingReport(false);
+      setOpenReportDialog(false);
     }
   };
 
@@ -315,6 +340,24 @@ export const StressTestingPage: React.FC = () => {
           <Button 
             variant="contained" 
             sx={{ 
+              background: `linear-gradient(45deg, ${theme.palette.secondary.main}, ${theme.palette.secondary.dark})`,
+              fontFamily: 'Orbitron',
+              fontSize: '0.75rem',
+              fontWeight: 900,
+              px: 3,
+              boxShadow: `0 0 20px ${alpha(theme.palette.secondary.main, 0.2)}`,
+              '&:hover': {
+                boxShadow: `0 0 30px ${alpha(theme.palette.secondary.main, 0.4)}`,
+              }
+            }}
+            startIcon={<FileText size={18} />}
+            onClick={() => setOpenReportDialog(true)}
+          >
+            GENERATE_REPORT
+          </Button>
+          <Button 
+            variant="contained" 
+            sx={{ 
               background: '#ff003c', 
               fontFamily: 'Orbitron',
               fontSize: '0.75rem',
@@ -486,6 +529,42 @@ export const StressTestingPage: React.FC = () => {
         <DialogActions sx={{ p: 3 }}>
           <Button onClick={() => setOpenSettings(false)} sx={{ color: 'rgba(255,255,255,0.5)' }}>CANCEL</Button>
           <Button onClick={() => setOpenSettings(false)} variant="contained" sx={{ bgcolor: '#00f3ff', color: '#000', fontWeight: 'bold' }}>APPLY</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Report Generation Dialog */}
+      <Dialog open={openReportDialog} onClose={() => setOpenReportDialog(false)} slotProps={{ paper: { sx: { bgcolor: '#1a1a1a', color: '#fff', minWidth: '400px' } } }}>
+        <DialogTitle sx={{ fontFamily: 'Orbitron', color: '#00f3ff' }}>GENERATE_PERFORMANCE_REPORT</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 2 }}>
+            <Typography variant="body2" sx={{ opacity: 0.7 }}>
+              Select a visual template for your stress test intelligence report.
+            </Typography>
+            <FormControl fullWidth>
+              <InputLabel sx={{ color: 'rgba(255,255,255,0.5)' }}>Template</InputLabel>
+              <Select
+                value={reportTemplate}
+                onChange={(e) => setReportTemplate(e.target.value)}
+                input={<OutlinedInput label="Template" />}
+                sx={{ color: '#fff', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' } }}
+              >
+                <MenuItem value="modern">Modern Clean (Minimalist)</MenuItem>
+                <MenuItem value="cyber_pro">Cyber Pro (High-Contrast)</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
+        </DialogContent>
+        <DialogActions sx={{ p: 3 }}>
+          <Button onClick={() => setOpenReportDialog(false)} sx={{ color: 'rgba(255,255,255,0.5)' }}>CANCEL</Button>
+          <Button 
+            onClick={handleGenerateReport} 
+            variant="contained" 
+            disabled={isGeneratingReport}
+            sx={{ bgcolor: '#00f3ff', color: '#000', fontWeight: 'bold' }}
+            startIcon={isGeneratingReport ? <CircularProgress size={16} color="inherit" /> : <Download size={16} />}
+          >
+            {isGeneratingReport ? 'GENERATING...' : 'GENERATE_PDF'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

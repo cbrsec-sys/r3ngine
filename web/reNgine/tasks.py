@@ -12,6 +12,7 @@ import tldextract
 import concurrent.futures
 import base64
 import io
+import shutil
 from redis import Redis
 
 
@@ -1897,6 +1898,13 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 					)
 					findings_count += 1
 
+	# Run Semgrep Secret Scan (Default)
+	try:
+		logger.info('Running Semgrep Secret Scan...')
+		semgrep_scan.apply(args=(ctx,), kwargs={'mode': 'secret', 'description': 'Semgrep Secret Scan'})
+	except Exception as e:
+		logger.error(f"Semgrep secret scan failed: {e}")
+
 	# Cleanup
 	shutil.rmtree(temp_dir, ignore_errors=True)
 
@@ -3397,7 +3405,6 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 		)
 		grouped_tasks.append(_task)
 
-	# Run WPScan
 	if should_run_wpscan:
 		logger.info('Running WPScan...')
 		_task = wpscan_scan.si(
@@ -3406,6 +3413,15 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 			description=f'WPScan'
 		)
 		grouped_tasks.append(_task)
+
+	# Run Semgrep Vulnerability Scan (Default)
+	logger.info('Running Semgrep Vulnerability Scan...')
+	_semgrep_task = semgrep_scan.si(
+		ctx=ctx,
+		mode='vulnerability',
+		description='Semgrep Vulnerability Scan'
+	)
+	grouped_tasks.append(_semgrep_task)
 
 	if grouped_tasks:
 		return self.replace(chord(grouped_tasks, finish_vulnerability_scan.s(scan_history_id=ctx.get('scan_history_id'))))
@@ -6776,6 +6792,173 @@ def sync_cisa_kev_catalog():
 				logger.info(f"Successfully synced CISA KEV catalog. Updated {len(cve_list)} records.")
 	except Exception as e:
 		logger.error(f"Error syncing CISA KEV catalog: {e}")
+
+
+@app.task(name='sync_semgrep_rules', queue='main_scan_queue', bind=False)
+def sync_semgrep_rules():
+	"""
+	Synchronizes Semgrep rules from the public registry to the local filesystem.
+	Runs at system startup and can be triggered manually.
+	"""
+	rules_dir = "/usr/src/github/semgrep_rules"
+	if not os.path.exists(rules_dir):
+		os.makedirs(rules_dir, exist_ok=True)
+	
+	# Rule sets to sync
+	rule_sets = {
+		"p/secrets": "secrets.yaml",
+		"p/owasp-top-10": "owasp-top-10.yaml",
+		"p/ci": "ci.yaml",
+		"p/javascript": "javascript.yaml",
+		"p/python": "python.yaml"
+	}
+	
+	for config, filename in rule_sets.items():
+		target_path = os.path.join(rules_dir, filename)
+		# We use --generate-config to download and bundle the rules into a single file
+		cmd = f"semgrep --config {config} --generate-config > {target_path}"
+		try:
+			logger.info(f"Syncing Semgrep rule set: {config} -> {filename}")
+			subprocess.run(cmd, shell=True, check=True)
+		except Exception as e:
+			logger.error(f"Failed to sync Semgrep rule set {config}: {e}")
+
+
+@app.task(name='semgrep_scan', queue='main_scan_queue', bind=True, base=RengineTask)
+def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
+	"""
+	Runs Semgrep static analysis on fetched files.
+	mode: 'secret' or 'vulnerability'
+	"""
+	scan_id = ctx.get('scan_history_id')
+	results_dir = ctx.get('results_dir')
+	
+	if not results_dir:
+		logger.error("Results directory not provided. Semgrep scan aborted.")
+		return
+	
+	# Create a directory for Semgrep to scan
+	semgrep_dir = os.path.join(results_dir, f'semgrep_{mode}_temp')
+	os.makedirs(semgrep_dir, exist_ok=True)
+
+	# In secret mode, we might already have files in secrets_temp if called from secret_scanning
+	# But to be robust, we'll download files ourselves if the directory is empty
+	# We'll target JS and other sensitive files found in EndPoint
+	
+	SENSITIVE_EXTENSIONS = ('.js', '.env', '.php', '.asp', '.aspx', '.jsp', '.jspx', '.txt', '.log', '.conf', '.config', '.bak', '.old', '.json', '.yaml', '.yml')
+	
+	endpoints = EndPoint.objects.filter(scan_history_id=scan_id)
+	target_urls = [e.http_url for e in endpoints if e.http_url.lower().endswith(SENSITIVE_EXTENSIONS)]
+	
+	if not target_urls:
+		logger.info(f"No target files found for Semgrep {mode} scan.")
+		return
+
+	# Download files
+	downloaded_count = 0
+	for url in target_urls:
+		try:
+			# Create a safe filename from URL
+			safe_name = "".join([c if c.isalnum() else "_" for c in url])
+			# Preserve extension if possible
+			ext = os.path.splitext(urlparse(url).path)[1]
+			if not ext: ext = ".js"
+			filename = f"{safe_name}{ext}"
+			filepath = os.path.join(semgrep_dir, filename)
+			
+			if os.path.exists(filepath): continue # Skip if already exists
+			
+			resp = requests.get(url, timeout=10, verify=False)
+			if resp.status_code == 200:
+				with open(filepath, 'w', encoding='utf-8') as f:
+					f.write(resp.text)
+				downloaded_count += 1
+		except Exception as e:
+			logger.debug(f"Semgrep downloader failed for {url}: {e}")
+
+	if downloaded_count == 0:
+		logger.warning("No files could be downloaded for Semgrep scan.")
+		shutil.rmtree(semgrep_dir, ignore_errors=True)
+		return
+
+	rules_dir = "/usr/src/github/semgrep_rules"
+	config_file = "owasp-top-10.yaml" if mode == 'vulnerability' else "secrets.yaml"
+	rules_path = os.path.join(rules_dir, config_file)
+	
+	# Fallback if local sync failed
+	if not os.path.exists(rules_path):
+		rules_path = "p/owasp-top-10" if mode == 'vulnerability' else "p/secrets"
+
+	output_json = os.path.join(results_dir, f'semgrep_{mode}_{int(time.time())}.json')
+	
+	# Run Semgrep
+	cmd = f"semgrep scan --config {rules_path} {semgrep_dir} --json --output {output_json} --timeout 600"
+	return_code, output = run_command(cmd, scan_id=scan_id)
+	
+	if os.path.exists(output_json):
+		try:
+			with open(output_json, 'r') as f:
+				data = json.load(f)
+				results = data.get('results', [])
+				
+				for result in results:
+					if mode == 'secret':
+						save_semgrep_secret_finding(result, ctx, semgrep_dir)
+					else:
+						save_semgrep_vulnerability_finding(result, ctx, semgrep_dir)
+						
+			logger.info(f"Semgrep {mode} scan completed. Found {len(results)} matches.")
+		except Exception as e:
+			logger.error(f"Error parsing Semgrep output: {e}")
+	
+	# Cleanup
+	shutil.rmtree(semgrep_dir, ignore_errors=True)
+	
+	return return_code
+
+
+def save_semgrep_vulnerability_finding(result, ctx, base_dir):
+	"""Saves a Semgrep finding as a Vulnerability."""
+	extra = result.get('extra', {})
+	path = result.get('path', '')
+	
+	try:
+		scan = ScanHistory.objects.get(id=ctx.get('scan_history_id'))
+		domain = Domain.objects.get(id=ctx.get('domain_id'))
+		
+		vuln_data = {
+			'name': f"Semgrep: {result.get('check_id')}",
+			'description': extra.get('message', ''),
+			'severity': SEMGREP_SEVERITY_MAP.get(extra.get('severity', 'INFO'), 0),
+			'http_url': path.replace(base_dir, '').lstrip('/'),
+			'type': 'SAST',
+			'request': f"File: {path}\nLine: {result.get('start', {}).get('line')}",
+			'response': extra.get('lines', ''),
+		}
+		save_vulnerability(vuln_data, scan_history=scan, target_domain=domain)
+	except Exception as e:
+		logger.error(f"Error saving Semgrep vulnerability: {e}")
+
+
+def save_semgrep_secret_finding(result, ctx, base_dir):
+	"""Saves a Semgrep finding as a SecretLeak."""
+	extra = result.get('extra', {})
+	path = result.get('path', '')
+	
+	try:
+		scan = ScanHistory.objects.get(id=ctx.get('scan_history_id'))
+		
+		leak_data = {
+			'scan_history': scan,
+			'tool_name': 'Semgrep',
+			'secret_type': result.get('check_id', 'Secret'),
+			'source_url': path.replace(base_dir, '').lstrip('/'),
+			'match_content': extra.get('lines', '').strip(),
+			'status': 'unverified'
+		}
+		save_secret_leak(**leak_data)
+	except Exception as e:
+		logger.error(f"Error saving Semgrep secret: {e}")
 
 
 @app.task(name='run_apme', queue='main_scan_queue', base=RengineTask, bind=True)

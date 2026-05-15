@@ -199,6 +199,7 @@ RUN ARCH=$(dpkg --print-architecture) \
     && rm -rf aquatone_linux_${ARCH}_1.7.0.zip README.md LICENSE.txt
 
 # Install Arjun, InQL, Netlas, holehe, maigret (needs newer meson for pycairo)
+RUN pip3 install semgrep --break-system-packages
 RUN pip3 install --upgrade meson ninja && pip3 install --upgrade arjun inql netlas holehe maigret
 
 # Install Node.js 20 and Retire.js
