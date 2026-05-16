@@ -314,13 +314,67 @@ def initiate_scan(
 		# If enable_http_crawl is set, create an initial root HTTP endpoint so that
 		# HTTP crawling can start somewhere
 		http_url = f'{domain.name}{starting_point_path}' if starting_point_path else domain.name
-		endpoint, _ = save_endpoint(
-			http_url,
-			ctx=ctx,
-			crawl=enable_http_crawl,
-			is_default=True,
-			subdomain=subdomain
-		)
+		# Check if we should use a simplified alive check for stress tests
+		stress_config = self.yaml_configuration.get('stress_test', {})
+		is_stress_only = 'stress_test' in self.tasks and len(self.tasks) == 1
+		
+		should_crawl = enable_http_crawl
+		endpoint = None
+		
+		if is_stress_only and not stress_config.get('crawl_targets', False):
+			# The user wants ONLY the provided target and NO heavy discovery (like httpx)
+			# but still wants an alive check.
+			should_crawl = False
+			# Perform a very basic alive check using requests
+			try:
+				import requests
+				import urllib3
+				urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+				
+				check_url = http_url if '://' in http_url else f'http://{http_url}'
+				logger.info(f"Performing simplified alive check for stress test on {check_url}")
+				
+				response = requests.get(
+					check_url, 
+					timeout=10, 
+					verify=False, 
+					allow_redirects=True,
+					headers={'User-Agent': 'reNgine-Stress-Check'}
+				)
+				
+				endpoint_data = {
+					'http_status': response.status_code,
+					'content_length': len(response.content),
+					'response_time': response.elapsed.total_seconds(),
+				}
+				# Overwrite http_url with the final URL after redirects
+				http_url = response.url
+				endpoint, _ = save_endpoint(
+					http_url,
+					ctx=ctx,
+					crawl=False,
+					is_default=True,
+					subdomain=subdomain,
+					**endpoint_data
+				)
+			except Exception as e:
+				logger.error(f"Simplified alive check failed: {e}")
+				# Fallback to saving without check
+				endpoint, _ = save_endpoint(
+					http_url,
+					ctx=ctx,
+					crawl=False,
+					is_default=True,
+					subdomain=subdomain
+				)
+		else:
+			endpoint, _ = save_endpoint(
+				http_url,
+				ctx=ctx,
+				crawl=should_crawl,
+				is_default=True,
+				subdomain=subdomain
+			)
 		if endpoint and endpoint.is_alive:
 			# TODO: add `root_endpoint` property to subdomain and simply do
 			# subdomain.root_endpoint = endpoint instead
@@ -361,6 +415,7 @@ def initiate_scan(
 
 		# Map YAML keys to their respective Celery tasks
 		task_map = {
+			'amass_intel_discovery': amass_intel_discovery.si(host=domain.name, ctx=ctx, description='Infrastructure Discovery'),
 			'subdomain_discovery': subdomain_discovery.si(ctx=ctx, description='Subdomain discovery'),
 			'osint': osint.si(ctx=ctx, description='OS Intelligence'),
 			'spiderfoot_scan': spiderfoot_scan.si(ctx=ctx, description='Attack Surface Intelligence'),
@@ -391,7 +446,7 @@ def initiate_scan(
 		def is_task_enabled(task_name):
 			if task_name in ['subdomain_discovery', 'osint', 'spiderfoot_scan', 'http_crawl', 'port_scan', 'screenshot', 
 							'dir_file_fuzz', 'fetch_url', 'web_api_discovery', 'waf_detection', 'waf_bypass', 
-							'vulnerability_scan', 'brute_force_scan', 'firewall_vpn_scan', 'secret_scanning']:
+							'vulnerability_scan', 'brute_force_scan', 'firewall_vpn_scan', 'secret_scanning', 'stress_test']:
 				return task_name in tasks
 			
 			if task_name in ['correlate_vulnerabilities', 'calculate_risk_scores']:
@@ -401,9 +456,6 @@ def initiate_scan(
 			if task_name == 'generate_impact_assessment':
 				return config.get('enable_ai_impact_analysis', False)
 			
-			if task_name == 'stress_test':
-				stress_test_config = config.get('stress_test', {})
-				return 'stress_test' in tasks and stress_test_config.get('enabled', False)
 			
 			if task_name == 'run_apme':
 				apme_config = config.get(ATTACK_PATH_MODELING, {})
@@ -470,7 +522,7 @@ def initiate_scan(
 
 		# Tier 1: Branching logic
 		t1_blockers = []
-		for t in ['subdomain_discovery', 'firewall_vpn_scan']:
+		for t in ['amass_intel_discovery', 'subdomain_discovery', 'firewall_vpn_scan']:
 			wrapped = get_wrapped(t)
 			if wrapped: t1_blockers.append(wrapped)
 		
