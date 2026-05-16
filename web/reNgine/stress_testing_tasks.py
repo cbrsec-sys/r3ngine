@@ -74,7 +74,20 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, *
         logger.error(f"Stress test error: {e}")
         return {"status": "failed"}
 
-    endpoints = EndPoint.objects.filter(scan_history_id=scan_history_id)[:5]
+    crawl_targets = yaml_config.get('crawl_targets', False)
+    
+    if not crawl_targets:
+        # Only take the root target.
+        endpoints = EndPoint.objects.filter(
+            scan_history_id=scan_history_id, 
+            subdomain__name=target_domain_name
+        ).order_by('id')[:1]
+    else:
+        # Take up to 5 endpoints on the target domain
+        endpoints = EndPoint.objects.filter(
+            scan_history_id=scan_history_id, 
+            subdomain__name=target_domain_name
+        )[:5]
     if not endpoints:
         logger.warning(f"No endpoints found for scan {scan_history_id} to stress test.")
         return {"status": "success", "message": "No endpoints to stress test"}

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ensure OpenSSL compatibility before running any management commands
-pip3 install --upgrade --no-cache-dir pyOpenSSL>=24.0.0
+pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
 
 # Collect static files
 echo "Collecting static files..."

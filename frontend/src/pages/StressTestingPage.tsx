@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, Link as RouterLink } from '@tanstack/react-router';
 import { 
   Box, 
@@ -23,7 +23,8 @@ import {
   OutlinedInput,
   Chip,
   useTheme,
-  alpha
+  alpha,
+  Tooltip
 } from '@mui/material';
 import { 
   Play, 
@@ -37,7 +38,9 @@ import {
   Terminal,
   Clock,
   FileText,
-  Download
+  Download,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import ReactECharts from 'echarts-for-react';
 import { useStressStore } from '../store/stressStore';
@@ -51,6 +54,7 @@ export const StressTestingPage: React.FC = () => {
   const { projectSlug, scanId } = useParams({ from: '/$projectSlug/stress_testing/$scanId' });
   const { 
     isScanning, 
+    wsStatus,
     telemetryData, 
     setScanning,
     clearTelemetry
@@ -114,10 +118,14 @@ export const StressTestingPage: React.FC = () => {
     }
   };
 
-  const getLatencyOption = () => {
-    const data = telemetryData.filter(p => p.avg_latency || p.latency);
+  const latencyOption = useMemo(() => {
+    const data = telemetryData
+      .filter(p => (p.avg_latency || p.latency) && p.timestamp)
+      .map(p => [p.timestamp * 1000, p.avg_latency || p.latency]);
+
     return {
       backgroundColor: 'transparent',
+      animation: false,
       title: { 
         text: 'REAL-TIME LATENCY (ms)', 
         textStyle: { 
@@ -154,7 +162,7 @@ export const StressTestingPage: React.FC = () => {
         type: 'line',
         smooth: true,
         showSymbol: false,
-        data: data.map(p => [p.timestamp * 1000, p.avg_latency || p.latency]),
+        data: data,
         itemStyle: { color: theme.palette.primary.main },
         lineStyle: { width: 3, shadowBlur: 10, shadowColor: alpha(theme.palette.primary.main, 0.5) },
         areaStyle: {
@@ -169,12 +177,16 @@ export const StressTestingPage: React.FC = () => {
         }
       }]
     };
-  };
+  }, [telemetryData, theme.palette.primary.main]);
 
-  const getRpsOption = () => {
-    const data = telemetryData.filter(p => p.throughput_rps);
+  const rpsOption = useMemo(() => {
+    const data = telemetryData
+      .filter(p => p.throughput_rps && p.timestamp)
+      .map(p => [p.timestamp * 1000, p.throughput_rps]);
+
     return {
       backgroundColor: 'transparent',
+      animation: false,
       title: { 
         text: 'THROUGHPUT (RPS)', 
         textStyle: { 
@@ -209,7 +221,7 @@ export const StressTestingPage: React.FC = () => {
         type: 'line',
         smooth: true,
         showSymbol: false,
-        data: data.map(p => [p.timestamp * 1000, p.throughput_rps]),
+        data: data,
         itemStyle: { color: '#6be6c1' },
         lineStyle: { width: 3 },
         areaStyle: {
@@ -224,25 +236,32 @@ export const StressTestingPage: React.FC = () => {
         }
       }]
     };
-  };
+  }, [telemetryData]);
 
-  const getHeatmapOption = () => {
-    const endpoints = Array.from(new Set(telemetryData.map(p => p.endpoint)));
-    const timestamps = Array.from(new Set(telemetryData.map(p => Math.floor(p.timestamp / 5) * 5))); // 5s buckets
+  const heatmapOption = useMemo(() => {
+    if (telemetryData.length === 0) return { backgroundColor: 'transparent' };
+
+    const validPoints = telemetryData.filter(p => p.endpoint && p.timestamp);
+    const endpoints = Array.from(new Set(validPoints.map(p => p.endpoint)));
+    const timestamps = Array.from(new Set(validPoints.map(p => Math.floor(p.timestamp / 5) * 5))).sort(); // 5s buckets
     
-    const heatmapData = telemetryData.map(p => [
+    const heatmapData = validPoints.map(p => [
       timestamps.indexOf(Math.floor(p.timestamp / 5) * 5),
       endpoints.indexOf(p.endpoint),
       p.avg_latency || p.latency || 0
-    ]);
+    ]).filter(d => d[0] !== -1 && d[1] !== -1);
 
     return {
       backgroundColor: 'transparent',
+      animation: false,
       tooltip: { position: 'top' },
       grid: { height: '80%', top: '10%', right: '10%' },
       xAxis: { 
         type: 'category', 
-        data: timestamps.map(t => new Date(t * 1000).toLocaleTimeString()),
+        data: timestamps.map(t => {
+          const date = new Date(t * 1000);
+          return isNaN(date.getTime()) ? '??' : date.toLocaleTimeString();
+        }),
         splitArea: { show: true }
       },
       yAxis: { 
@@ -267,7 +286,18 @@ export const StressTestingPage: React.FC = () => {
         emphasis: { itemStyle: { shadowBlur: 10, shadowColor: 'rgba(0, 0, 0, 0.5)' } }
       }]
     };
+  }, [telemetryData]);
+
+  const getStatusConfig = () => {
+    switch (wsStatus) {
+      case 'connected': return { label: 'PIPELINE_READY', color: '#10b981', icon: <Wifi size={14} />, pulse: true };
+      case 'connecting': return { label: 'ESTABLISHING_LINK...', color: '#facc15', icon: <Wifi size={14} />, pulse: true };
+      case 'error': return { label: 'SIGNAL_ERROR', color: '#ef4444', icon: <WifiOff size={14} />, pulse: false };
+      default: return { label: 'PIPELINE_OFFLINE', color: alpha('#fff', 0.3), icon: <WifiOff size={14} />, pulse: false };
+    }
   };
+
+  const statusConfig = getStatusConfig();
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
@@ -302,7 +332,44 @@ export const StressTestingPage: React.FC = () => {
           </Box>
         </Box>
         
-        <Box sx={{ display: 'flex', gap: 2 }}>
+        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+          <Tooltip title={wsStatus === 'error' ? 'WebSocket connection failed. Retrying...' : 'Telemetry Pipeline Status'}>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1.5, 
+              mr: 2, 
+              px: 2, 
+              py: 0.8,
+              borderRadius: '20px',
+              bgcolor: alpha(statusConfig.color, 0.1),
+              border: `1px solid ${alpha(statusConfig.color, 0.2)}`,
+              transition: 'all 0.3s ease'
+            }}>
+              <Box sx={{ 
+                display: 'flex', 
+                color: statusConfig.color,
+                animation: statusConfig.pulse ? 'pulse 2s infinite' : 'none',
+                '@keyframes pulse': {
+                  '0%': { opacity: 1, transform: 'scale(1)' },
+                  '50%': { opacity: 0.5, transform: 'scale(0.9)' },
+                  '100%': { opacity: 1, transform: 'scale(1)' }
+                }
+              }}>
+                {statusConfig.icon}
+              </Box>
+              <Typography sx={{ 
+                fontFamily: 'Orbitron', 
+                fontSize: 9, 
+                fontWeight: 900, 
+                color: statusConfig.color,
+                letterSpacing: 1
+              }}>
+                {statusConfig.label}
+              </Typography>
+            </Box>
+          </Tooltip>
+
           <Button 
             variant="outlined" 
             sx={{ 
@@ -425,7 +492,7 @@ export const StressTestingPage: React.FC = () => {
             icon={<Activity size={18} color={theme.palette.primary.main} />}
             sx={{ height: '100%' }}
           >
-            <ReactECharts option={getLatencyOption()} style={{ height: '400px' }} theme="dark" />
+            <ReactECharts key={`latency-${scanId}`} option={latencyOption} style={{ height: '400px' }} theme="dark" notMerge={true} />
           </TacticalPanel>
         </Grid>
         <Grid size={{ xs: 12, lg: 4 }}>
@@ -469,14 +536,14 @@ export const StressTestingPage: React.FC = () => {
             icon={<Zap size={18} color="#6be6c1" />}
             sx={{ height: '100%' }}
           >
-            <ReactECharts option={getRpsOption()} style={{ height: '400px' }} theme="dark" />
+            <ReactECharts key={`rps-${scanId}`} option={rpsOption} style={{ height: '400px' }} theme="dark" notMerge={true} />
           </TacticalPanel>
         </Grid>
 
         {/* Heatmap Row */}
         <Grid size={{ xs: 12 }}>
           <TacticalPanel title="ENDPOINT_SATURATION_HEATMAP" icon={<Server size={18} color="#facc15" />}>
-            <ReactECharts option={getHeatmapOption()} style={{ height: '450px' }} theme="dark" />
+            <ReactECharts key={`heatmap-${scanId}`} option={heatmapOption} style={{ height: '450px' }} theme="dark" notMerge={true} />
           </TacticalPanel>
         </Grid>
       </Grid>

@@ -233,7 +233,7 @@
 - fields:
     default_engine: true
     engine_name: Adaptive Stress & Resilience Engine
-    yaml_configuration: "stress_test: {\n  'uses_tools': ['k6', 'wrk', 'hping3', 'locust'],\n\
+    yaml_configuration: "stress_test: {\n  'crawl_targets': false,\n  'uses_tools': ['k6', 'wrk', 'hping3', 'locust'],\n\
       \  'concurrency': 100,\n  'duration': '30s',\n  'rate_limit': 150,\n\
       \  'kill_switch': true,\n  'intensity': 'normal'\n}"
   model: scanEngine.enginetype
