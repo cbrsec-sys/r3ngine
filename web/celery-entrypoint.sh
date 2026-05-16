@@ -1,6 +1,6 @@
 #!/bin/bash
 # Ensure OpenSSL compatibility before running any management commands
-pip3 install --upgrade --no-cache-dir pyOpenSSL>=24.0.0
+pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
 
 # apply existing migrations
 python3 manage.py migrate
@@ -193,7 +193,6 @@ fi
 #   git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python
 # fi
 # pip3 install /usr/src/github/acunetix-python
-# pip3 install -r /usr/src/github/acunetix-python/requirements.txt
 
 # if [ ! -d '/usr/src/github/goofuzz' ];
 # then
