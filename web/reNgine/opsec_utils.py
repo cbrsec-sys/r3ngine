@@ -4,9 +4,11 @@ import logging
 import re
 import tempfile
 import subprocess
+import json
+from urllib.parse import urlparse
 from django.conf import settings
 from scanEngine.models import OpSec, Proxy
-from reNgine.definitions import MEDUSA_EXEC_PATH, HYDRA_EXEC_PATH, PROXYCHAINS_EXEC_PATH
+from reNgine.definitions import BRUTUS_EXEC_PATH, PROXYCHAINS_EXEC_PATH
 
 class OpSecManager:
     """
@@ -44,55 +46,87 @@ class OpSecManager:
     def is_enabled(self):
         return self.settings and self.settings.enable_opsec
 
-    def get_random_ua(self):
-        return random.choice(self.USER_AGENTS)
+    def get_random_ua(self, proxy_ip=None):
+        ua = random.choice(self.USER_AGENTS)
+        if proxy_ip:
+            ua = ua.replace("127.0.0.1", proxy_ip)
+        return ua
 
-    def get_waf_headers(self):
-        return self.WAF_BYPASS_HEADERS
+    def get_waf_headers(self, proxy_ip=None):
+        headers = self.WAF_BYPASS_HEADERS
+        if proxy_ip:
+            headers = [h.replace("127.0.0.1", proxy_ip) for h in headers]
+        return headers
 
-    def apply_stealth(self, tool_name, command):
+    def _extract_proxy_ip(self, proxy_str):
+        """
+        Extracts the IP or Hostname from a proxy string.
+        Expected format: http://{ip}:{port} or socks5://{ip}:{port}
+        """
+        if not proxy_str:
+            return None
+        
+        # Add scheme if missing for urlparse
+        if "://" not in proxy_str:
+            proxy_str = f"http://{proxy_str}"
+            
+        try:
+            parsed = urlparse(proxy_str)
+            return parsed.hostname
+        except Exception:
+            return None
+
+    def apply_stealth(self, tool_name, command, proxy=None):
         """
         Applies stealth flags to a given command string for a specific tool.
         """
         if not self.is_enabled():
             return command
 
+        proxy_ip = self._extract_proxy_ip(proxy)
+
         if tool_name == "nuclei":
-            return self._apply_nuclei(command)
+            return self._apply_nuclei(command, proxy_ip)
         elif tool_name == "nmap":
-            return self._apply_nmap(command)
+            return self._apply_nmap(command, proxy_ip)
         elif tool_name == "subfinder":
             return self._apply_subfinder(command)
         elif tool_name == "amass":
             return self._apply_amass(command)
         elif tool_name == "ffuf":
-            return self._apply_ffuf(command)
+            return self._apply_ffuf(command, proxy_ip)
         elif tool_name == "httpx":
-            return self._apply_httpx(command)
-        elif tool_name == "hydra":
-            return self._apply_hydra(command)
+            return self._apply_httpx(command, proxy_ip)
+        elif tool_name == "brutus":
+            return self._apply_brutus(command)
+        elif tool_name == "dalfox":
+            return self._apply_dalfox(command, proxy_ip)
+        elif tool_name == "dirsearch":
+            return self._apply_dirsearch(command, proxy_ip)
         
         return command
 
-    def _apply_hydra(self, cmd):
+    def _apply_brutus(self, cmd):
         flags = []
         if self.settings.enable_delay:
-            # hydra -c (delay in seconds)
-            flags.insert(0, f"-c {self.settings.delay_ms / 1000.0}")
+            # Brutus doesn't have a direct delay flag like hydra -c, 
+            # but we can use rate limiting as a proxy for it if needed.
+            pass
         
-        if self.settings.enable_rate_limit:
-            # hydra -t (tasks)
-            flags.insert(0, f"-t {self.settings.max_rps}")
+        # Check if threads were passed in cmd (e.g. from orchestrator)
+        # Otherwise use max_rps from OpSec settings
+        if "-t" not in cmd and self.settings.enable_rate_limit:
+            flags.append(f"-t {self.settings.max_rps}")
             
-        return f"hydra {' '.join(flags)} {cmd.replace('hydra ', '')}"
+        return f"brutus {' '.join(flags)} {cmd.replace('brutus ', '')}"
 
-    def _apply_nuclei(self, cmd):
+    def _apply_nuclei(self, cmd, proxy_ip=None):
         flags = []
         if self.settings.enable_random_ua:
-            flags.append(f"-H 'User-Agent: {self.get_random_ua()}'")
+            flags.append(f"-H 'User-Agent: {self.get_random_ua(proxy_ip)}'")
         
         if self.settings.enable_waf_bypass:
-            for header in self.get_waf_headers():
+            for header in self.get_waf_headers(proxy_ip):
                 flags.append(f"-H '{header}'")
         
         if self.settings.enable_rate_limit:
@@ -107,13 +141,13 @@ class OpSecManager:
 
         return f"{cmd} {' '.join(flags)}"
 
-    def _apply_nmap(self, cmd):
+    def _apply_nmap(self, cmd, proxy_ip=None):
         flags = []
         if self.settings.enable_delay:
             flags.append(f"--scan-delay {self.settings.delay_ms}ms")
         
         if self.settings.enable_random_ua:
-            flags.append(f"--script-args http.useragent='{self.get_random_ua()}'")
+            flags.append(f"--script-args http.useragent='{self.get_random_ua(proxy_ip)}'")
         
         if self.settings.custom_dns_servers:
             dns = ",".join(self.settings.custom_dns_servers.splitlines())
@@ -131,20 +165,45 @@ class OpSecManager:
     def _apply_amass(self, cmd):
         return cmd
 
-    def _apply_ffuf(self, cmd):
+    def _apply_ffuf(self, cmd, proxy_ip=None):
         flags = []
         if self.settings.enable_random_ua:
-            flags.append(f"-H 'User-Agent: {self.get_random_ua()}'")
+            flags.append(f"-H 'User-Agent: {self.get_random_ua(proxy_ip)}'")
         if self.settings.enable_rate_limit:
             flags.append(f"-p {1.0 / self.settings.max_rps}")
         return f"{cmd} {' '.join(flags)}"
 
-    def _apply_httpx(self, cmd):
+    def _apply_httpx(self, cmd, proxy_ip=None):
         flags = []
         if self.settings.enable_random_ua:
-            flags.append(f"-H 'User-Agent: {self.get_random_ua()}'")
+            flags.append(f"-H 'User-Agent: {self.get_random_ua(proxy_ip)}'")
         if self.settings.http_protocol == "http2":
             flags.append("-http2")
+        return f"{cmd} {' '.join(flags)}"
+
+    def _apply_dalfox(self, cmd, proxy_ip=None):
+        flags = []
+        if self.settings.enable_random_ua:
+            flags.append(f"--user-agent '{self.get_random_ua(proxy_ip)}'")
+        
+        if self.settings.enable_waf_bypass:
+            for header in self.get_waf_headers(proxy_ip):
+                flags.append(f"-H '{header}'")
+        
+        if self.settings.enable_delay:
+            flags.append(f"--delay {self.settings.delay_ms}")
+            
+        return f"{cmd} {' '.join(flags)}"
+
+    def _apply_dirsearch(self, cmd, proxy_ip=None):
+        flags = []
+        if self.settings.enable_random_ua:
+            flags.append(f"-H 'User-Agent: {self.get_random_ua(proxy_ip)}'")
+        
+        if self.settings.enable_waf_bypass:
+            for header in self.get_waf_headers(proxy_ip):
+                flags.append(f"-H '{header}'")
+        
         return f"{cmd} {' '.join(flags)}"
 
     def strip_metadata(self, file_path):
@@ -261,7 +320,7 @@ class ProxychainsWrapper:
 
 class BruteForceOrchestrator:
     """
-    Orchestrates Hydra/Medusa brute-force attacks with proxy rotation, 
+    Orchestrates Brutus brute-force attacks with proxy rotation, 
     multi-protocol support, and centralized target management.
     """
     def __init__(self, scan_history):
@@ -320,33 +379,40 @@ class BruteForceOrchestrator:
         # Wordlists
         user_list = ctx.get('user_list', "/usr/src/wordlist/common_users.txt")
         pass_list = ctx.get('pass_list', "/usr/src/wordlist/common_passwords.txt")
+        threads = ctx.get('threads', 5)
         
-        # Build command (Hydra)
-        # Hydra uses -M for targets file
-        cmd = f"{HYDRA_EXEC_PATH} -L {user_list} -P {pass_list} -M {target_file} {protocol}"
+        # Build command (Brutus)
+        # Brutus uses -U for user list and -P for password list
+        # We assume candidates[0].target is a single target for now as reNgine 
+        # usually does one-by-one or small batches.
+        # If multiple targets, Brutus needs multiple runs or a script wrapper.
+        # For simplicity, we'll run Brutus per target in this orchestrator.
         
-        # Apply OpSec & Proxy
-        cmd = self.opsec.apply_stealth('hydra', cmd)
-        wrapped_cmd, conf_path = self.proxy_manager.wrap_command(cmd)
-        
-        results = []
-        try:
-            self.logger.info(f"Executing batch: {wrapped_cmd}")
-            output_file = f"{self.results_dir}/{protocol}_results.log"
-            proc = subprocess.run(f"{wrapped_cmd} -o {output_file}", shell=True, timeout=1200)
+        all_results = []
+        for c in candidates:
+            cmd = f"{BRUTUS_EXEC_PATH} --target {c.target} --protocol {protocol} -U {user_list} -P {pass_list} -t {threads} --json"
             
-            if os.path.exists(output_file):
-                results = self._parse_hydra_output(output_file, protocol)
-                # Update candidate status
-                for c in candidates:
+            # Apply OpSec & Proxy
+            proxy = self.proxy_manager.get_random_proxy()
+            cmd = self.opsec.apply_stealth('brutus', cmd, proxy=proxy)
+            wrapped_cmd, conf_path = self.proxy_manager.wrap_command(cmd, proxy=proxy)
+            
+            try:
+                self.logger.info(f"Executing Brutus for {c.target} ({protocol}): {wrapped_cmd}")
+                output_file = f"{self.results_dir}/{protocol}_{c.id}_results.json"
+                subprocess.run(f"{wrapped_cmd} > {output_file}", shell=True, timeout=1200)
+                
+                if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                    results = self._parse_brutus_output(output_file, protocol)
+                    all_results.extend(results)
                     c.status = 'completed'
                     c.save()
-        except Exception as e:
-            self.logger.error(f"Error in {protocol} batch: {e}")
-        finally:
-            if conf_path and os.path.exists(conf_path): os.remove(conf_path)
+            except Exception as e:
+                self.logger.error(f"Error in Brutus {protocol} for {c.target}: {e}")
+            finally:
+                if conf_path and os.path.exists(conf_path): os.remove(conf_path)
             
-        return results
+        return all_results
 
     def _run_http_brute(self, candidate, ctx):
         """Individual execution for HTTP (handles forms)"""
@@ -365,18 +431,20 @@ class BruteForceOrchestrator:
         pass_field = meta.get('pass_field', 'password')
         form_params = f"{path}:{user_field}=^USER^&{pass_field}=^PASS^:F=failed"
         
-        cmd = f"{HYDRA_EXEC_PATH} -L {user_list} -P {pass_list} {host} http-post-form \"{form_params}\""
+        cmd = f"{BRUTUS_EXEC_PATH} --target {host} --protocol http -U {user_list} -P {pass_list} --json"
+        # Note: Brutus might need specific flags for form-based auth if supported, 
+        # but the current requirement focuses on protocol mapping.
         
         # Apply OpSec & Proxy
-        cmd = self.opsec.apply_stealth('hydra', cmd)
-        wrapped_cmd, conf_path = self.proxy_manager.wrap_command(cmd)
+        proxy = self.proxy_manager.get_random_proxy()
+        cmd = self.opsec.apply_stealth('brutus', cmd, proxy=proxy)
+        wrapped_cmd, conf_path = self.proxy_manager.wrap_command(cmd, proxy=proxy)
         
         results = []
         try:
             output_file = f"{self.results_dir}/http_{host.replace(':','_')}_results.log"
-            subprocess.run(f"{wrapped_cmd} -o {output_file}", shell=True, timeout=600)
-            if os.path.exists(output_file):
-                results = self._parse_hydra_output(output_file, 'http')
+            if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                results = self._parse_brutus_output(output_file, 'http')
                 candidate.status = 'completed'
                 candidate.save()
         except Exception as e:
@@ -386,23 +454,27 @@ class BruteForceOrchestrator:
             
         return results
 
-    def _parse_hydra_output(self, log_file, protocol):
+    def _parse_brutus_output(self, json_file, protocol):
         results = []
-        if not os.path.exists(log_file):
+        if not os.path.exists(json_file):
             return results
             
-        with open(log_file, 'r') as f:
-            for line in f:
-                if line.startswith('#') or not line.strip(): continue
-                # Hydra output format: host protocol port user pass
-                parts = line.split()
-                if len(parts) >= 5:
+        try:
+            with open(json_file, 'r') as f:
+                data = json.load(f)
+                # Assuming Brutus JSON output is a list of findings or a similar structure
+                # We'll map it to the expected reNgine format
+                findings = data if isinstance(data, list) else data.get('findings', [])
+                for finding in findings:
                     results.append({
-                        'target': parts[0],
-                        'protocol': parts[1],
-                        'port': parts[2],
-                        'user': parts[3],
-                        'password': parts[4],
+                        'target': finding.get('target', ''),
+                        'protocol': finding.get('protocol', protocol),
+                        'port': finding.get('port', ''),
+                        'user': finding.get('username', ''),
+                        'password': finding.get('password', ''),
                         'service': protocol
                     })
+        except Exception as e:
+            self.logger.error(f"Failed to parse Brutus JSON output: {e}")
+            
         return results

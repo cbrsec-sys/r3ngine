@@ -33,7 +33,6 @@ requests==2.32.3
 urllib3>=1.26.0,<3.0.0
 charset-normalizer>=3.0.0,<4.0.0
 chardet>=5.0.0,<6.0.0
-scapy==2.4.3
 sqlalchemy==1.4.52
 tldextract==3.5.0
 uro==1.0.0
@@ -50,6 +49,7 @@ shodan==1.31.0
 censys-platform>=0.13.5
 neo4j==5.23.1
 cryptography==46.0.5
+pyOpenSSL>=24.0.0
 locust==2.32.8
 docker>=7.1.0
 playwright==1.42.0
@@ -59,3 +59,6 @@ channels==3.0.5
 channels-redis==3.4.1
 daphne==3.0.2
 django-cors-headers==4.3.1
+h2
+priority
+service_identity

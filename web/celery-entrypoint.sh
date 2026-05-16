@@ -1,4 +1,6 @@
 #!/bin/bash
+# Ensure OpenSSL compatibility before running any management commands
+pip3 install --upgrade --no-cache-dir pyOpenSSL>=24.0.0
 
 # apply existing migrations
 python3 manage.py migrate
@@ -119,106 +121,113 @@ then
 fi
 
 # Install CMSeeK
-if [ ! -d '/usr/src/github/CMSeeK' ];
-then
-  echo "Cloning CMSeeK"
-  git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK
-fi
-pip3 install -r /usr/src/github/CMSeeK/requirements.txt
+# if [ ! -d '/usr/src/github/CMSeeK' ];
+# then
+#   echo "Cloning CMSeeK"
+#   git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK
+# fi
+# pip3 install -r /usr/src/github/CMSeeK/requirements.txt
 
 # Install LinkFinder
-if [ ! -d '/usr/src/github/LinkFinder' ];
-then
-  echo "Cloning LinkFinder"
-  git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder
-fi
-pip3 install -r /usr/src/github/LinkFinder/requirements.txt
-cd /usr/src/github/LinkFinder
-python3 setup.py install
-cd /usr/src/app
+# if [ ! -d '/usr/src/github/LinkFinder' ];
+# then
+#   echo "Cloning LinkFinder"
+#   git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder
+# fi
+# pip3 install -r /usr/src/github/LinkFinder/requirements.txt
+# cd /usr/src/github/LinkFinder
+# python3 setup.py install
+# cd /usr/src/app
 
 # Install ParamSpider
-if [ ! -d '/usr/src/github/ParamSpider' ];
-then
-  echo "Cloning ParamSpider"
-  git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider
-fi
-cd /usr/src/github/ParamSpider && pip3 install . && python3 setup.py install
-cd /usr/src/app
+# if [ ! -d '/usr/src/github/ParamSpider' ];
+# then
+#   echo "Cloning ParamSpider"
+#   git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider
+# fi
+# cd /usr/src/github/ParamSpider && pip3 install . && python3 setup.py install
+# cd /usr/src/app
 
 # Install Semgrep
-if [ ! -d '/usr/src/github/semgrep' ];
-then
-  echo "Cloning Semgrep"
-  git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep
-fi
-cd /usr/src/github/semgrep
-pip3 install .
-cd /usr/src/app
+# if [ ! -d '/usr/src/github/semgrep' ];
+# then
+#   echo "Cloning Semgrep"
+#   git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep
+# fi
+# cd /usr/src/github/semgrep
+# pip3 install .
+# cd /usr/src/app
 
-if [ ! -d '/usr/src/github/Sublist3r' ];
-then
-  echo "Cloning Sublist3r"
-  git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r
-fi
-pip3 install -r /usr/src/github/Sublist3r/requirements.txt
+# if [ ! -d '/usr/src/github/Sublist3r' ];
+# then
+#   echo "Cloning Sublist3r"
+#   git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r
+# fi
+# pip3 install -r /usr/src/github/Sublist3r/requirements.txt
 
-if [ ! -d '/usr/src/github/OneForAll' ];
-then
-  echo "Cloning OneForAll"
-  git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll
-fi
-pip3 install -r /usr/src/github/OneForAll/requirements.txt
+# if [ ! -d '/usr/src/github/OneForAll' ];
+# then
+#   echo "Cloning OneForAll"
+#   git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll
+# fi
+# pip3 install -r /usr/src/github/OneForAll/requirements.txt
 
-if [ ! -d '/usr/src/github/theHarvester' ];
-then
-  echo "Cloning theHarvester"
-  git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester
-fi
-cd /usr/src/github/theHarvester && uv sync
-cd /usr/src/app
+# if [ ! -d '/usr/src/github/theHarvester' ];
+# then
+#   echo "Cloning theHarvester"
+#   git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester
+# fi
+# cd /usr/src/github/theHarvester && uv sync
+# cd /usr/src/app
 
-if [ ! -d '/usr/src/github/ctfr' ];
-then
-  echo "Cloning ctfr"
-  git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr
-fi
-pip3 install -r /usr/src/github/ctfr/requirements.txt
+# if [ ! -d '/usr/src/github/ctfr' ];
+# then
+#   echo "Cloning ctfr"
+#   git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr
+# fi
+# pip3 install -r /usr/src/github/ctfr/requirements.txt
 
-if [ ! -d '/usr/src/github/acunetix-python' ];
-then
-  echo "Cloning acunetix-python"
-  git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python
-fi
-pip3 install /usr/src/github/acunetix-python
-pip3 install -r /usr/src/github/acunetix-python/requirements.txt
+# if [ ! -d '/usr/src/github/acunetix-python' ];
+# then
+#   echo "Cloning acunetix-python"
+#   git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python
+# fi
+# pip3 install /usr/src/github/acunetix-python
+# pip3 install -r /usr/src/github/acunetix-python/requirements.txt
 
-if [ ! -d '/usr/src/github/goofuzz' ];
-then
-  echo "Cloning GooFuzz"
-  DIR=$(pwd)
-  cd /usr/src/github
-  wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip
-  unzip GooFuzz.v.1.2.6.zip
-  mv GooFuzz.v.1.2.6 goofuzz
-  chmod +x goofuzz/GooFuzz
-  rm GooFuzz.v.1.2.6.zip
-  cd $DIR
-fi
+# if [ ! -d '/usr/src/github/goofuzz' ];
+# then
+#   echo "Cloning GooFuzz"
+#   DIR=$(pwd)
+#   cd /usr/src/github
+#   wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip
+#   unzip GooFuzz.v.1.2.6.zip
+#   mv GooFuzz.v.1.2.6 goofuzz
+#   chmod +x goofuzz/GooFuzz
+#   rm GooFuzz.v.1.2.6.zip
+#   cd $DIR
+# fi
 
-if [ ! -d '/usr/src/github/spiderfoot' ];
-then
-  echo "Cloning spiderfoot"
-  git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
-fi
-pip3 install -r /usr/src/github/spiderfoot/requirements.txt
+# if [ ! -d '/usr/src/github/spiderfoot' ];
+# then
+#   echo "Cloning spiderfoot"
+#   git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot
+# fi
+# pip3 install -r /usr/src/github/spiderfoot/requirements.txt
 
-if [ ! -d '/usr/src/github/cpanel2shell-scanner' ];
-then
-  echo "Cloning cpanel2shell-scanner"
-  git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner
-fi
-pip3 install -r /usr/src/github/cpanel2shell-scanner/requirements.txt
+# if [ ! -d '/usr/src/github/cpanel2shell-scanner' ];
+# then
+#   echo "Cloning cpanel2shell-scanner"
+#   git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner
+# fi
+# pip3 install -r /usr/src/github/cpanel2shell-scanner/requirements.txt
+
+# if [ ! -d '/usr/src/github/react2shell-scanner' ];
+# then
+#   echo "Cloning react2shell-scanner"
+#   git clone https://github.com/assetnote/react2shell-scanner /usr/src/github/react2shell-scanner
+# fi
+# pip3 install -r /usr/src/github/react2shell-scanner/requirements.txt
 
 # Create a robust cPanel username wordlist
 if [ ! -f '/usr/src/wordlist/cpanel_users.txt' ]; then
@@ -229,26 +238,27 @@ if [ ! -f '/usr/src/wordlist/cpanel_users.txt' ]; then
 fi
 
 # Setup betterleaks
-if [ ! -f '/usr/local/bin/betterleaks' ]; then
-  echo "Setting up betterleaks..."
-  git clone https://github.com/betterleaks/betterleaks /usr/src/github/betterleaks
-  cd /usr/src/github/betterleaks && make build
-  ln -sf /usr/src/github/betterleaks/betterleaks /usr/local/bin/betterleaks
-fi
+# if [ ! -f '/usr/local/bin/betterleaks' ]; then
+#   echo "Setting up betterleaks..."
+#   if [ ! -d '/usr/src/github/betterleaks' ]; then
+#     git clone https://github.com/betterleaks/betterleaks /usr/src/github/betterleaks
+#   fi
+#   cd /usr/src/github/betterleaks && make build
+#   ln -sf /usr/src/github/betterleaks/betterleaks /usr/local/bin/betterleaks
+# fi
 
 # Setup username-anarchy
-if [ ! -f '/usr/local/bin/username-anarchy' ]; then
-  echo "Cloning username-anarchy..."
-  git clone https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy
-  ln -sf /usr/src/github/username-anarchy/username-anarchy /usr/local/bin/username-anarchy
-fi
-
-# install baddns
-pipx install git+https://github.com/blacklanternsecurity/baddns
+# if [ ! -f '/usr/local/bin/username-anarchy' ]; then
+#   echo "Cloning username-anarchy..."
+#   if [ ! -d '/usr/src/github/username-anarchy' ]; then
+#     git clone https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy
+#   fi
+#   ln -sf /usr/src/github/username-anarchy/username-anarchy /usr/local/bin/username-anarchy
+# fi
 
 cd /usr/src/app
 # install h8mail
-python3 -m pip install h8mail
+# python3 -m pip install h8mail
 
 # install gf patterns
 if [ ! -d "/root/Gf-Patterns" ];

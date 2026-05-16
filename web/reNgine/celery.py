@@ -5,12 +5,19 @@ from celery import Celery
 from celery.signals import setup_logging
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'reNgine.settings')
-django.setup()
 
 # Celery app
 app = Celery('reNgine')
 app.config_from_object('django.conf:settings', namespace='CELERY')
-app.autodiscover_tasks()
+
+# Only initialize Django and autodiscover tasks if we're running a Celery/Beat process
+# This prevents circular imports when manage.py or gunicorn imports reNgine.settings
+import sys
+from django.apps import apps
+if any(x in sys.argv[0] for x in ['celery', 'beat']):
+    if not apps.ready:
+        django.setup()
+    app.autodiscover_tasks()
 
 
 @setup_logging.connect()

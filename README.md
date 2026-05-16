@@ -191,7 +191,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **Deep OSINT 2.0**: A modular, internal intelligence pipeline featuring automated email pivoting, social profile mapping, **gosearch** for social presence discovery, **username-anarchy** for tactical identity permutation, and a **Custom Playwright-driven Social Intelligence Engine** that mimics human behavior to discover corporate personnel while maintaining high OpSec.
 *   **ReconX 24/7 Monitoring**: Dedicated, domain-specific background monitoring engine for continuous asset tracking and automated findings ingestion.
 *   **Vulnerability Scanning**:
-    *   **Nuclei**: Specialized templates and rate-limited execution.
+    *   **Nuclei**: Specialized templates and intelligence-driven targeted scanning.
     *   **Semgrep**: Automated static analysis for discovered endpoints (JS, PHP, Env, etc.) with automated rule synchronization (OWASP Top 10, Secrets).
     *   **WPScan**: Automated WordPress reconnaissance and vulnerability identification.
     *   **baddns**: Automated subdomain takeover detection with critical severity mapping.
