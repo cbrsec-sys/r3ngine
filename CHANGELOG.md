@@ -2,6 +2,24 @@
 
 **Official Repo location:** <p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
+### [v3.0.0-rc6] - 2026-05-16
+
+### Added
+- **Mobile Companion Documentation**: Integrated high-fidelity visual documentation into the `r3ngine-mobile` repository, including a functional interface walkthrough and core UI screenshots.
+
+### Fixed
+- **Static Asset Management Optimization**:
+  - **Deduplicated Static Sources**: Refactored `STATICFILES_DIRS` to prevent "Found another file" warnings during container startup by prioritizing image-internal assets.
+  - **Automated Cache Busting**: Implemented version-based query parameters (`?v=...`) for all frontend JavaScript and CSS assets, ensuring clients always load the latest versions after updates.
+  - **Clean Static Collection**: Added the `--clear` flag to the `collectstatic` process in the container entrypoint to ensure stale or orphaned assets are removed before deployment.
+  - **Fixed Circular Imports**: Resolved a critical startup failure in Celery and management commands by conditionally initializing Django in `celery.py`, preventing recursion during settings loading.
+  - **PyOpenSSL Compatibility**: Fixed `TypeError: deprecated() got an unexpected keyword argument 'name'` by enforcing `pyOpenSSL>=24.0.0` in `requirements.txt`, resolving conflicts with newer `cryptography` versions.
+  - **Daphne HTTP/2 Support**: Enabled HTTP/2 and TLS support in Daphne by adding `h2`, `priority`, and `service_identity` to `requirements.txt`.
+- **Semgrep Rule Synchronization Fix**:
+  - Replaced deprecated `semgrep --generate-config` flag with a robust `requests`-based sync engine that downloads YAML rules directly from the official registry.
+  - Corrected registry naming for OWASP Top 10 (`p/owasp-top-ten`) and verified successful synchronization for `secrets`, `ci`, `javascript`, and `python` rulesets.
+  - Improved local rule persistence to `/usr/src/github/semgrep_rules/` to ensure scanning stability in containerized environments.
+
 ### [v3.0.0-rc5] - 2026-05-15
 
 ### Added
@@ -10,7 +28,13 @@
   - **Unified SAST Task**: Developed a robust `semgrep_scan` task that automatically downloads relevant files (JS, PHP, etc.) from discovered endpoints for analysis.
   - **Secrets Discovery**: Integrated Semgrep into the Tier 5 secret scanning phase to complement Gitleaks and Trufflehog.
   - **Vulnerability Assessment**: Integrated Semgrep as a default, always-run tool in the vulnerability scan pipeline to identify code-based flaws.
-  - **Intelligent Finding Persistence**: Automated mapping of Semgrep results to `SecretLeak` and `Vulnerability` database models with context-aware severity mapping.
+  - **Intelligence-Driven Finding Persistence**: Automated mapping of Semgrep results to `SecretLeak` and `Vulnerability` database models with context-aware severity mapping.
+- **Backend Security Toolchain Optimization**:
+  - **Infrastructure Hardening**: Streamlined Docker environment by removing legacy browser dependencies (Firefox/Gecko) and reducing container bloat.
+  - **Integrated Fuzzing Engine**: Refactored `dir_file_fuzz` to operate a concurrent pipeline utilizing both `ffuf` and `dirsearch`, with automated result deduplication.
+  - **Discovery Pipeline Upgrades**: Implemented `amass intel` for infrastructure mapping and enabled `subfinder` exhaustive mode (`-all`).
+  - **Intelligence-Driven Scanning**: Developed a technology mapping engine to automatically inject relevant tags into `nuclei` scans, ensuring high-impact vulnerability coverage.
+  - **System Reliability**: Finalized cleanup of redundant packages (`scapy`) and validated end-to-end performance of the refactored security pipeline.
 
 ### [v3.0.0-rc4] - 2026-05-15
 

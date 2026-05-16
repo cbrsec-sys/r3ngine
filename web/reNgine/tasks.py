@@ -57,6 +57,7 @@ from reNgine.task_utils import (
 from reNgine.report_tasks import *
 from reNgine.wpscan_tasks import wpscan_scan
 from reNgine.parsers import SpiderFootBatchParser
+from reNgine.tech_mapping import get_nuclei_tags_from_techs
 try:
 	from acunetix import Acunetix
 except ImportError:
@@ -76,7 +77,7 @@ SCAN_PIPELINE_DEFINITION = [
         'tier': 1,
         'name': 'Discovery',
         'type': 'CONCURRENT',
-        'tasks': ['subdomain_discovery', 'osint', 'spiderfoot_scan', 'firewall_vpn_scan']
+        'tasks': ['amass_intel_discovery', 'subdomain_discovery', 'osint', 'spiderfoot_scan', 'firewall_vpn_scan']
     },
     {
         'tier': 2,
@@ -791,6 +792,52 @@ def report(ctx={}, description=None):
 # Tracked reNgine tasks    #
 #--------------------------#
 
+@app.task(name='amass_intel_discovery', queue='main_scan_queue', base=RengineTask, bind=True)
+def amass_intel_discovery(self, host, ctx={}, description=None):
+	"""Infrastructure discovery using Amass Intel.
+	
+	Args:
+		host (str): Target domain to run intel on.
+	"""
+	config = self.yaml_configuration.get(SUBDOMAIN_DISCOVERY) or {}
+	use_amass_config = config.get(USE_AMASS_CONFIG, False)
+	
+	output_path = f'{self.results_dir}/amass_intel.txt'
+	
+	cmd = f'amass intel -d {host} -whois -o {output_path}'
+	cmd += ' -config /root/.config/amass.ini' if use_amass_config else ''
+	
+	proxy = get_random_proxy()
+	if proxy:
+		cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
+		
+	opsec = OpSecManager()
+	cmd = opsec.apply_stealth('amass', cmd, proxy=proxy)
+	
+	run_command(
+		cmd,
+		shell=True,
+		history_file=self.history_file,
+		scan_id=self.scan_id,
+		activity_id=self.activity_id
+	)
+	
+	# Process results: finding other root domains
+	discovered_count = 0
+	if os.path.exists(output_path):
+		with open(output_path, 'r') as f:
+			for line in f:
+				domain_name = line.strip()
+				if domain_name and domain_name != host:
+					discovered_count += 1
+					logger.info(f"Discovered associated domain: {domain_name}")
+					
+	if discovered_count > 0:
+		self.notify(fields={'Infrastructure Discovery': f'Discovered {discovered_count} associated domains/assets via Amass Intel.'})
+		
+	return True
+
+
 @app.task(name='subdomain_discovery', queue='main_scan_queue', base=RengineTask, bind=True)
 def subdomain_discovery(
 		self,
@@ -868,7 +915,7 @@ def subdomain_discovery(
 				cmd = f'python3 /usr/src/github/Sublist3r/sublist3r.py -d {host} -t {threads} -o {self.results_dir}/subdomains_sublister.txt'
 
 			elif tool == 'subfinder':
-				cmd = f'subfinder -d {host} -o {self.results_dir}/subdomains_subfinder.txt'
+				cmd = f'subfinder -d {host} -all -o {self.results_dir}/subdomains_subfinder.txt'
 				use_subfinder_config = config.get(USE_SUBFINDER_CONFIG, False)
 				cmd += ' -config /root/.config/subfinder/config.yaml' if use_subfinder_config else ''
 				cmd += f' -proxy {proxy}' if proxy else ''
@@ -941,7 +988,7 @@ def subdomain_discovery(
 			continue
 
 		# Apply OpSec stealth
-		cmd = opsec.apply_stealth(tool, cmd)
+		cmd = opsec.apply_stealth(tool, cmd, proxy=proxy)
 
 		# Run tool
 		try:
@@ -2385,8 +2432,9 @@ def nmap(
 		return
 
 	# Apply OpSec stealth
+	proxy = get_random_proxy()
 	opsec = OpSecManager()
-	nmap_cmd = opsec.apply_stealth('nmap', nmap_cmd)
+	nmap_cmd = opsec.apply_stealth('nmap', nmap_cmd, proxy=proxy)
 
 	# Run cmd
 	run_command(
@@ -2618,52 +2666,35 @@ def dir_file_fuzz(self, ctx={}, description=None):
 		list: List of URLs discovered.
 	"""
 	# Config
-	cmd = 'ffuf'
-	config = self.yaml_configuration.get(DIR_FILE_FUZZ) or {}
-	custom_headers = self.yaml_configuration.get(CUSTOM_HEADERS, [])
-	# support for custom header will be remove in next major release, as of now it will be supported
-	# for backward compatibility
-	custom_header = self.yaml_configuration.get(CUSTOM_HEADER)
-	if custom_header:
-		custom_headers.append(custom_header)
-	auto_calibration = config.get(AUTO_CALIBRATION, True)
-	enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
-	rate_limit = config.get(RATE_LIMIT) or self.yaml_configuration.get(RATE_LIMIT, DEFAULT_RATE_LIMIT)
-	extensions = config.get(EXTENSIONS, DEFAULT_DIR_FILE_FUZZ_EXTENSIONS)
-	# prepend . on extensions
-	extensions = [ext if ext.startswith('.') else '.' + ext for ext in extensions]
-	extensions_str = ','.join(map(str, extensions))
-	follow_redirect = config.get(FOLLOW_REDIRECT, FFUF_DEFAULT_FOLLOW_REDIRECT)
-	max_time = config.get(MAX_TIME, 0)
-	match_http_status = config.get(MATCH_HTTP_STATUS, FFUF_DEFAULT_MATCH_HTTP_STATUS)
-	mc = ','.join([str(c) for c in match_http_status])
-	recursive_level = config.get(RECURSIVE_LEVEL, FFUF_DEFAULT_RECURSIVE_LEVEL)
-	stop_on_error = config.get(STOP_ON_ERROR, False)
-	timeout = config.get(TIMEOUT) or self.yaml_configuration.get(TIMEOUT, DEFAULT_HTTP_TIMEOUT)
-	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
-	wordlist_name = config.get(WORDLIST, 'dicc')
-	delay = rate_limit / (threads * 100) # calculate request pause delay from rate_limit and number of threads
-	input_path = f'{self.results_dir}/input_dir_file_fuzz.txt'
-
-	# Get wordlist
-	wordlist_name = 'dicc' if wordlist_name == 'default' else wordlist_name
-	wordlist_path = f'/usr/src/wordlist/{wordlist_name}.txt'
-
-	# Build command
-	cmd += f' -w {wordlist_path}'
-	cmd += f' -e {extensions_str}' if extensions else ''
-	cmd += f' -maxtime {max_time}' if max_time > 0 else ''
-	cmd += f' -p {delay}' if delay > 0 else ''
-	cmd += f' -recursion -recursion-depth {recursive_level} ' if recursive_level > 0 else ''
-	cmd += f' -t {threads}' if threads and threads > 0 else ''
-	cmd += f' -timeout {timeout}' if timeout and timeout > 0 else ''
-	cmd += ' -se' if stop_on_error else ''
-	cmd += ' -fr' if follow_redirect else ''
-	cmd += ' -ac' if auto_calibration else ''
-	cmd += f' -mc {mc}' if mc else ''
+	# Build ffuf command
+	ffuf_base_cmd = 'ffuf'
+	ffuf_base_cmd += f' -w {wordlist_path}'
+	ffuf_base_cmd += f' -e {extensions_str}' if extensions else ''
+	ffuf_base_cmd += f' -maxtime {max_time}' if max_time > 0 else ''
+	ffuf_base_cmd += f' -p {delay}' if delay > 0 else ''
+	ffuf_base_cmd += f' -recursion -recursion-depth {recursive_level} ' if recursive_level > 0 else ''
+	ffuf_base_cmd += f' -t {threads}' if threads and threads > 0 else ''
+	ffuf_base_cmd += f' -timeout {timeout}' if timeout and timeout > 0 else ''
+	ffuf_base_cmd += ' -se' if stop_on_error else ''
+	ffuf_base_cmd += ' -fr' if follow_redirect else ''
+	ffuf_base_cmd += ' -ac' if auto_calibration else ''
+	ffuf_base_cmd += f' -mc {mc}' if mc else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
-		cmd += formatted_headers
+		ffuf_base_cmd += f' {formatted_headers}'
+
+	# Build dirsearch command
+	dirsearch_base_cmd = 'dirsearch'
+	dirsearch_base_cmd += f' -w {wordlist_path}'
+	dirsearch_base_cmd += f' -e {extensions_str.replace(".", "")}' if extensions else ''
+	dirsearch_base_cmd += f' -t {threads}' if threads and threads > 0 else ''
+	dirsearch_base_cmd += f' --timeout {timeout}' if timeout and timeout > 0 else ''
+	dirsearch_base_cmd += f' -r' if recursive_level > 0 else ''
+	dirsearch_base_cmd += f' --recursion-depth {recursive_level}' if recursive_level > 0 else ''
+	dirsearch_base_cmd += f' -i {mc}' if mc else ''
+	dirsearch_base_cmd += ' --follow-redirects' if follow_redirect else ''
+	for header in custom_headers:
+		dirsearch_base_cmd += f' -H "{header}"'
 
 	# Grab URLs to fuzz
 	urls = get_http_urls(
@@ -2673,49 +2704,39 @@ def dir_file_fuzz(self, ctx={}, description=None):
 		get_only_default_urls=True,
 		ctx=ctx
 	)
-	logger.warning(urls)
+	logger.info(f'Fuzzing URLs: {urls}')
 
-	# Loop through URLs and run command
 	results = []
-	
-	# Global lock for ffuf to ensure strictly sequential execution across all workers
 	redis_client = Redis.from_url(os.environ.get('CELERY_BROKER', 'redis://redis:6379/0'))
+	opsec = OpSecManager()
 
 	for url in urls:
 		url_parse = urlparse(url)
 		base_url = url_parse.scheme + '://' + url_parse.netloc
-		fuzz_url = base_url + '/FUZZ'
+		subdomain_name = get_subdomain_from_url(base_url)
+		subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=self.scan).first()
+		if not subdomain and ctx.get('subdomain_id', 0) > 0:
+			subdomain = Subdomain.objects.filter(id=ctx['subdomain_id']).first()
+
 		proxy = get_random_proxy()
 
-		# Build final cmd
-		fcmd = cmd
-		fcmd += f' -x {proxy}' if proxy else ''
-		fcmd += f' -u {fuzz_url} -json -s' # Added -s for silent mode to help stream_command
+		# Initialize DirectoryScan object
+		dirscan = DirectoryScan.objects.create(
+			scanned_date=timezone.now(),
+			command_line=f'ffuf + dirsearch for {base_url}'
+		)
+		if subdomain:
+			subdomain.directories.add(dirscan)
 
-		# Apply OpSec stealth
-		opsec = OpSecManager()
-		fcmd = opsec.apply_stealth('ffuf', fcmd)
-
-		# Use a global lock to ensure only one ffuf runs at a time
-		with redis_client.lock("ffuf_execution_lock", timeout=14400):
-
-			# Initialize DirectoryScan object
-			dirscan = DirectoryScan.objects.create(
-				scanned_date=timezone.now(),
-				command_line=fcmd
-			)
-
-			# Associate with subdomain even if no results found
-			subdomain_name = get_subdomain_from_url(base_url)
-			subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=self.scan).first()
+		# Use a global lock to ensure sequential execution across all workers
+		with redis_client.lock("fuzz_execution_lock", timeout=14400):
 			
-			if not subdomain and ctx.get('subdomain_id', 0) > 0:
-				subdomain = Subdomain.objects.filter(id=ctx['subdomain_id']).first()
+			# 1. Run FFUF
+			fcmd = ffuf_base_cmd + f' -u {base_url}/FUZZ -json -s'
+			fcmd += f' -x {proxy}' if proxy else ''
+			fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=proxy)
 			
-			if subdomain:
-				subdomain.directories.add(dirscan)
-
-			# Loop through results and populate EndPoint and DirectoryFile in DB
+			logger.info(f'Running ffuf for {base_url}')
 			for line in stream_command(
 					fcmd,
 					shell=True,
@@ -2726,15 +2747,11 @@ def dir_file_fuzz(self, ctx={}, description=None):
 				if not isinstance(line, dict):
 					continue
 
-				# Append line to results
 				results.append(line)
-
-				# Retrieve FFUF output
 				res_url = line.get('url')
 				if not res_url:
 					continue
 
-				# Extract path and convert to base64
 				name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
 				length = line.get('length', 0)
 				status = line.get('status', 0)
@@ -2746,10 +2763,7 @@ def dir_file_fuzz(self, ctx={}, description=None):
 				if not name:
 					continue
 
-				# Get or create endpoint from URL
 				endpoint, created = save_endpoint(res_url, crawl=False, ctx=ctx)
-
-				d_created = False
 				if endpoint:
 					endpoint.http_status = status
 					endpoint.content_length = length
@@ -2757,8 +2771,6 @@ def dir_file_fuzz(self, ctx={}, description=None):
 					endpoint.content_type = content_type
 					endpoint.save()
 
-
-					# Save directory file
 					dfile, d_created = DirectoryFile.objects.get_or_create(
 						name=name,
 						length=length,
@@ -2767,20 +2779,69 @@ def dir_file_fuzz(self, ctx={}, description=None):
 						content_type=content_type,
 						url=res_url,
 						http_status=status)
-
-					# Add file to current dirscan
 					dirscan.directory_files.add(dfile)
-
-					# Add subscan relation if exists
 					if self.subscan:
 						dirscan.dir_subscan_ids.add(self.subscan)
 
-				# Log newly created file or directory if debug activated
-				if d_created:
-					logger.info(f'Found new directory or file {res_url}')
+			# 2. Run Dirsearch
+			dirsearch_output = f'{self.results_dir}/dirsearch_{subdomain_name}.json'
+			dcmd = f'{dirsearch_base_cmd} -u {base_url} --format json -o {dirsearch_output}'
+			if proxy:
+				# Dirsearch uses --proxy for http/socks
+				dcmd += f' --proxy {proxy}'
+			
+			dcmd = opsec.apply_stealth('dirsearch', dcmd, proxy=proxy)
+			logger.info(f'Running dirsearch for {base_url}')
+			
+			run_command(
+				dcmd,
+				shell=True,
+				history_file=self.history_file,
+				scan_id=self.scan_id,
+				activity_id=self.activity_id
+			)
+			
+			# Parse dirsearch results
+			if os.path.exists(dirsearch_output):
+				try:
+					with open(dirsearch_output, 'r') as f:
+						ds_data = json.load(f)
+						# dirsearch output is {"results": [{"url": "...", "status": 200, "content-length": 123, "content-type": "..."}]}
+						for ds_res in ds_data.get('results', []):
+							res_url = ds_res.get('url')
+							status = ds_res.get('status', 0)
+							length = ds_res.get('content-length', 0)
+							content_type = ds_res.get('content-type', '')
+							
+							if not res_url:
+								continue
+							
+							name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
+							if not name:
+								continue
+							
+							endpoint, created = save_endpoint(res_url, crawl=False, ctx=ctx)
+							if endpoint:
+								endpoint.http_status = status
+								endpoint.content_length = length
+								endpoint.content_type = content_type
+								endpoint.save()
 
-			# Final save for dirscan to ensure any metadata is persisted
+								# DirectoryFile.objects.get_or_create handles deduplication
+								dfile, d_created = DirectoryFile.objects.get_or_create(
+									name=name,
+									length=length,
+									content_type=content_type,
+									url=res_url,
+									http_status=status)
+								dirscan.directory_files.add(dfile)
+								if self.subscan:
+									dirscan.dir_subscan_ids.add(self.subscan)
+				except Exception as e:
+					logger.error(f'Error parsing dirsearch results for {base_url}: {e}')
+
 			dirscan.save()
+
 
 
 
@@ -3348,6 +3409,7 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	should_run_acunetix = config.get(RUN_ACUNETIX, False)
 	should_run_wpscan = config.get(RUN_WPSCAN, True)
 	should_run_cpanel = config.get('cpanel_scanner', {}).get(RUN_CPANEL2SHELL, True)
+	should_run_react2shell = config.get('react_scanner', {}).get(RUN_REACT2SHELL, True)
 
 	grouped_tasks = []
 	if should_run_nuclei:
@@ -3411,6 +3473,15 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 			urls=urls,
 			ctx=ctx,
 			description=f'WPScan'
+		)
+		grouped_tasks.append(_task)
+
+	# Run react2shell-scanner
+	if should_run_react2shell:
+		logger.info('Running react2shell-scanner...')
+		_task = react2shell_scan.si(
+			ctx=ctx,
+			description=f'React Vulnerability Scan'
 		)
 		grouped_tasks.append(_task)
 
@@ -3782,7 +3853,29 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	use_nuclei_conf = nuclei_specific_config.get(USE_NUCLEI_CONFIG, False)
 	severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
 	tags = nuclei_specific_config.get(NUCLEI_TAGS, [])
-	tags = ','.join(tags)
+	
+	# Intelligence-Driven Scanning: Inject tags based on detected technologies
+	tech_tags = []
+	if self.scan:
+		# Get all technologies discovered for this scan
+		subdomains = Subdomain.objects.filter(scan_history=self.scan)
+		all_techs = set()
+		for sub in subdomains:
+			# assuming technologies is a many-to-many field with 'name' attribute
+			all_techs.update(sub.technologies.values_list('name', flat=True))
+		
+		if all_techs:
+			tech_tags = get_nuclei_tags_from_techs(list(all_techs))
+			logger.info(f'Detected technologies: {list(all_techs)}. Adding targeted Nuclei tags: {tech_tags}')
+
+	if tech_tags:
+		# Combine user tags with tech tags
+		user_tags = set(tags if isinstance(tags, list) else tags.split(',') if tags else [])
+		user_tags.update(tech_tags)
+		tags = ','.join(user_tags)
+	else:
+		tags = ','.join(tags) if isinstance(tags, list) else tags
+
 	nuclei_templates = nuclei_specific_config.get(NUCLEI_TEMPLATE)
 	custom_nuclei_templates = nuclei_specific_config.get(NUCLEI_CUSTOM_TEMPLATE)
 	# severities_str = ','.join(severities)
@@ -3817,6 +3910,13 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 
 	# Build templates
 	logger.info('Updating Nuclei templates ...')
+	# Wordfence Templates integration
+	from startScan.models import Subdomain
+	is_wordpress_detected = Subdomain.objects.filter(scan_history=self.scan, technologies__name__icontains='WordPress').exists()
+	if is_wordpress_detected:
+		logger.info("WordPress detected. Preparing Wordfence Nuclei Templates...")
+		os.environ['GITHUB_TEMPLATE_REPO'] = 'topscoder/nuclei-wordfence-cve'
+
 	run_command(
 		'nuclei -update-templates',
 		shell=True,
@@ -3849,8 +3949,9 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	cmd += f' -irr'
 
 	# Apply OpSec stealth
+	proxy = get_random_proxy()
 	opsec = OpSecManager()
-	cmd = opsec.apply_stealth('nuclei', cmd)
+	cmd = opsec.apply_stealth('nuclei', cmd, proxy=proxy)
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
 		cmd += formatted_headers
@@ -3865,6 +3966,16 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	cmd += f' -silent'
 	for tpl in templates:
 		cmd += f' -t {tpl}'
+	
+	if is_wordpress_detected:
+		# Add Wordfence template path
+		cmd += " -t github/topscoder/nuclei-wordfence-cve"
+		# Default to production, optional candidate
+		use_candidate = config.get('nuclei_config', {}).get(USE_WORDFENCE_CANDIDATE, False)
+		if use_candidate:
+			cmd += " -tags candidate"
+		else:
+			cmd += " -tags production"
 
 
 	grouped_tasks = []
@@ -3933,9 +4044,12 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 
 	# command builder
 	proxy = get_random_proxy()
+	opsec = OpSecManager()
 	cmd = 'dalfox --silence --no-color --no-spinner'
 	cmd += f' --only-poc r '
 	cmd += f' --ignore-return 302,404,403'
+	
+	cmd = opsec.apply_stealth('dalfox', cmd, proxy=proxy)
 	cmd += f' --skip-bav'
 	cmd += f' file {input_path}'
 	cmd += f' --proxy {proxy}' if proxy else ''
@@ -4282,7 +4396,7 @@ def http_crawl(
 	
 	# Apply OpSec stealth
 	opsec = OpSecManager()
-	cmd = opsec.apply_stealth('httpx', cmd)
+	cmd = opsec.apply_stealth('httpx', cmd, proxy=proxy)
 
 	results = []
 	endpoint_ids = []
@@ -6463,6 +6577,9 @@ def brute_force_scan(self, targets=[], ctx={}, description=None):
 	config = self.yaml_configuration.get(BRUTE_FORCE_SCAN) or {}
 	allowed_services = config.get(SERVICES, [])
 	
+	# Extract threads and pass to ctx
+	ctx['threads'] = config.get(THREADS, 5)
+	
 	# Execute orchestration
 	results = orchestrator.run_orchestration(ctx=ctx, allowed_services=allowed_services)
 	
@@ -6478,7 +6595,7 @@ def brute_force_scan(self, targets=[], ctx={}, description=None):
 		vuln_data = {
 			'name': f'Successful Brute-Force: {res["service"].upper()}',
 			'severity': 4, # Critical
-			'description': f'Successfully identified valid credentials on {res["target"]} via Hydra.\n\n'
+			'description': f'Successfully identified valid credentials on {res["target"]} via Brutus.\n\n'
 						 f'User: {res["user"]}\n'
 						 f'Password: {res["password"]}\n'
 						 f'Service: {res["service"]}\n'
@@ -6807,7 +6924,7 @@ def sync_semgrep_rules():
 	# Rule sets to sync
 	rule_sets = {
 		"p/secrets": "secrets.yaml",
-		"p/owasp-top-10": "owasp-top-10.yaml",
+		"p/owasp-top-ten": "owasp-top-10.yaml",
 		"p/ci": "ci.yaml",
 		"p/javascript": "javascript.yaml",
 		"p/python": "python.yaml"
@@ -6815,11 +6932,16 @@ def sync_semgrep_rules():
 	
 	for config, filename in rule_sets.items():
 		target_path = os.path.join(rules_dir, filename)
-		# We use --generate-config to download and bundle the rules into a single file
-		cmd = f"semgrep --config {config} --generate-config > {target_path}"
+		url = f"https://semgrep.dev/c/{config}"
 		try:
 			logger.info(f"Syncing Semgrep rule set: {config} -> {filename}")
-			subprocess.run(cmd, shell=True, check=True)
+			response = requests.get(url, timeout=60)
+			if response.status_code == 200:
+				with open(target_path, 'wb') as f:
+					f.write(response.content)
+				logger.info(f"Successfully synced Semgrep rule set: {config}")
+			else:
+				logger.error(f"Failed to download Semgrep rule set {config}: HTTP {response.status_code}")
 		except Exception as e:
 			logger.error(f"Failed to sync Semgrep rule set {config}: {e}")
 

@@ -95,8 +95,7 @@ class UpdateThemeView(APIView):
 
 class SOCSettingsViewSet(viewsets.ModelViewSet):
 	"""ViewSet for managing global SOC configuration."""
-	permission_classes = [IsAuthenticated, HasPermission]
-	required_permission = PERM_MODIFY_SCAN_CONFIGURATIONS
+	permission_classes = [IsAuditor]
 	serializer_class = SOCConfigurationSerializer
 	queryset = SOCConfiguration.objects.all()
 
@@ -3798,7 +3797,7 @@ class ScreenshotViewSet(viewsets.ModelViewSet):
 from rest_framework.permissions import AllowAny
 
 class DirectoryViewSet(viewsets.ModelViewSet):
-	permission_classes = [IsAuthenticated, HasPermission]
+	permission_classes = [IsAuditor]
 
 
 	queryset = DirectoryFile.objects.none()

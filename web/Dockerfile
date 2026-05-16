@@ -9,7 +9,6 @@ RUN npm run build
 # Stage 2: Final Image
 FROM ubuntu:22.04
 
-ARG GECKOVERSION=0.36.0
 ARG GOVERSION=1.25.0
 
 RUN ARCH=$(dpkg --print-architecture) \ 
@@ -41,7 +40,6 @@ RUN apt update -y && \
     python3-dev \
     python3-pip \
     python3-venv \
-    xvfb \
     libpci-dev \
     libpciaccess-dev \
     libegl-dev \
@@ -80,7 +78,6 @@ RUN apt install -y --no-install-recommends \
     netcat \
     nmap \
     x11-utils \
-    xvfb \
     wget \
     curl \
     libcairo2 \
@@ -94,8 +91,6 @@ RUN apt install -y --no-install-recommends \
     software-properties-common \
     ike-scan \
     sslscan \
-    medusa \
-    hydra \
     proxychains4 \
     jq \
     wrk \
@@ -103,33 +98,13 @@ RUN apt install -y --no-install-recommends \
     postgresql-client \
     unzip --fix-missing -y
 
-RUN add-apt-repository ppa:mozillateam/ppa && \
-    apt update -y && \
-    apt install -y --no-install-recommends \
-    firefox \
-    libgtk-3-0 \
-    libdbus-glib-1-2 \
-    libasound2 \
-    libx11-xcb1 \
-    libxt6 
-
 # Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
+# Install Go
 RUN ARCH=$(dpkg --print-architecture) \ 
     && curl -L https://go.dev/dl/go${GOVERSION}.linux-${ARCH}.tar.gz | tar -xzC /usr/local
-
-RUN ARCH=$(dpkg --print-architecture) \ 
-    && if [ "${ARCH}" = "arm64" ]; then \
-      GECKOPATH="geckodriver-v${GECKOVERSION}-linux-aarch64.tar.gz"; \
-    elif [ "${ARCH}" = "amd64" ]; then \
-      GECKOPATH="geckodriver-v${GECKOVERSION}-linux64.tar.gz"; \
-    fi \
-    && wget https://github.com/mozilla/geckodriver/releases/download/v${GECKOVERSION}/${GECKOPATH} \
-    && tar -xvf ${GECKOPATH} \
-    && rm ${GECKOPATH} \
-    && mv geckodriver /usr/bin
 
 # Install Rust for orjson
 RUN set -e; curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -182,6 +157,31 @@ RUN ARCH=$(dpkg --print-architecture) \
     && mv k6-v${K6_VERSION}-linux-${K6_ARCH}/k6 /usr/local/bin/ \
     && rm -rf k6-v${K6_VERSION}-linux-${K6_ARCH}*
 
+# Install Brutus
+RUN curl -L https://github.com/praetorian-inc/brutus/releases/latest/download/brutus-linux-amd64.tar.gz | tar xz && \
+    mv brutus /usr/local/bin
+
+# Install Spiderfoot
+RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot && \
+    pip3 install -r /usr/src/github/spiderfoot/requirements.txt
+
+# Install cpanel2shell-scanner
+RUN git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner && \
+    pip3 install -r /usr/src/github/cpanel2shell-scanner/requirements.txt
+
+# Install react2shell-scanner
+RUN git clone https://github.com/assetnote/react2shell-scanner /usr/src/github/react2shell-scanner && \
+    pip3 install -r /usr/src/github/react2shell-scanner/requirements.txt
+
+# Install CTFR
+RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
+    pip3 install -r /usr/src/github/ctfr/requirements.txt
+
+# Install theHarvester
+RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
+    cd /usr/src/github/theHarvester && uv sync && \
+    cd /usr/src/app
+
 # Install BetterLeaks
 RUN git clone https://github.com/betterleaks/betterleaks /usr/src/github/betterleaks && \
     cd /usr/src/github/betterleaks && make build && \
@@ -198,9 +198,77 @@ RUN ARCH=$(dpkg --print-architecture) \
     && mv aquatone /usr/local/bin/ \
     && rm -rf aquatone_linux_${ARCH}_1.7.0.zip README.md LICENSE.txt
 
+# Install Betterleaks
+RUN git clone https://github.com/betterleaks/betterleaks /usr/src/github/betterleaks && \
+    cd /usr/src/github/betterleaks && make build && \
+    ln -sf /usr/src/github/betterleaks/betterleaks /usr/local/bin/betterleaks
+
+# Install react2shell & cpanel2shell
+RUN git clone https://github.com/assetnote/react2shell-scanner /usr/src/github/react2shell-scanner && \
+    pip3 install -r /usr/src/github/react2shell-scanner/requirements.txt && \
+    git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner && \
+    pip3 install -r /usr/src/github/cpanel2shell-scanner/requirements.txt
+
+# Install Spiderfoot
+RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot && \
+    pip3 install /usr/src/github/spiderfoot/requirements.txt
+
+# Install goofuzz
+RUN cd /usr/src/github && \
+    wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip && \
+    unzip GooFuzz.v.1.2.6.zip && \
+    mv GooFuzz.v.1.2.6 goofuzz && \
+    chmod +x goofuzz/GooFuzz && \
+    rm GooFuzz.v.1.2.6.zip && \
+    cd /usr/src/app
+
+# Install acunetix
+RUN git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python && \
+    pip3 install /usr/src/github/acunetix-python && \
+    pip3 install -r /usr/src/github/acunetix-python/requirements.txt
+
+# Install CTFR
+RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
+    pip3 install -r /usr/src/github/ctfr/requirements.txt
+
+# Install theHarvester
+RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
+    cd /usr/src/github/theHarvester && uv sync && \
+    cd /usr/src/app
+
+# Install OneForAll
+RUN git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll && \
+    pip3 install -r /usr/src/github/OneForAll/requirements.txt
+
+# Install Sublist3r
+RUN git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r && \
+    pip3 install -r /usr/src/github/Sublist3r/requirements.txt
+
+# Install semgrep
+RUN git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep && \
+    cd /usr/src/github/semgrep && \
+    pip3 install . && \
+    cd /usr/src/app 
+
+# Install paramspider
+RUN git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider && \
+    cd /usr/src/github/ParamSpider && pip3 install . && python3 setup.py install && \
+    cd /usr/src/app
+
+# Install linkfinder
+RUN git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder && \
+    pip3 install -r /usr/src/github/LinkFinder/requirements.txt && \
+    cd /usr/src/github/LinkFinder && \
+    python3 setup.py install && \
+    cd /usr/src/app
+
+# Install CMSeek
+RUN git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK && \
+    pip3 install -r /usr/src/github/CMSeeK/requirements.txt
+
 # Install Arjun, InQL, Netlas, holehe, maigret (needs newer meson for pycairo)
-RUN pip3 install semgrep --break-system-packages
-RUN pip3 install --upgrade meson ninja && pip3 install --upgrade arjun inql netlas holehe maigret
+RUN pip3 install semgrep
+RUN pip3 install --upgrade meson ninja && pip3 install --upgrade arjun inql netlas holehe maigret dirsearch
 
 # Install Node.js 20 and Retire.js
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -228,6 +296,9 @@ RUN mkdir -p /usr/src/wordlist/kr && \
     tar -xvf routes-small.kite.tar.gz && \
     rm -rf routes-small.kite.tar.gz
 
+RUN git clone https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy && \
+    ln -sf /usr/src/github/username-anarchy/username-anarchy /usr/local/bin/username-anarchy
+
 # Install WPScan
 RUN gem install wpscan --no-document
 
@@ -237,7 +308,7 @@ RUN python3 -m pip install pipx && \
 
 # Copy requirements
 COPY web/requirements.txt /tmp/requirements.txt
-RUN pip3 install --upgrade pip setuptools wheel
+RUN pip3 install --upgrade pip setuptools wheel pyOpenSSL h8mail
 RUN pip3 install -r /tmp/requirements.txt --no-cache-dir --ignore-installed blinker
 RUN playwright install-deps chromium && playwright install chromium
 
