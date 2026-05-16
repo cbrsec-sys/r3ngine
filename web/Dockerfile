@@ -182,11 +182,6 @@ RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarves
     cd /usr/src/github/theHarvester && uv sync && \
     cd /usr/src/app
 
-# Install BetterLeaks
-RUN git clone https://github.com/betterleaks/betterleaks /usr/src/github/betterleaks && \
-    cd /usr/src/github/betterleaks && make build && \
-    ln -sf /usr/src/github/betterleaks/betterleaks /usr/local/bin/betterleaks
-
 # Install Username Anarchy
 RUN git clone https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy && \
     ln -sf /usr/src/github/username-anarchy/username-anarchy /usr/local/bin/username-anarchy
@@ -203,16 +198,6 @@ RUN git clone https://github.com/betterleaks/betterleaks /usr/src/github/betterl
     cd /usr/src/github/betterleaks && make build && \
     ln -sf /usr/src/github/betterleaks/betterleaks /usr/local/bin/betterleaks
 
-# Install react2shell & cpanel2shell
-RUN git clone https://github.com/assetnote/react2shell-scanner /usr/src/github/react2shell-scanner && \
-    pip3 install -r /usr/src/github/react2shell-scanner/requirements.txt && \
-    git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner && \
-    pip3 install -r /usr/src/github/cpanel2shell-scanner/requirements.txt
-
-# Install Spiderfoot
-RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot && \
-    pip3 install /usr/src/github/spiderfoot/requirements.txt
-
 # Install goofuzz
 RUN cd /usr/src/github && \
     wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip && \
@@ -224,17 +209,7 @@ RUN cd /usr/src/github && \
 
 # Install acunetix
 RUN git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python && \
-    pip3 install /usr/src/github/acunetix-python && \
-    pip3 install -r /usr/src/github/acunetix-python/requirements.txt
-
-# Install CTFR
-RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
-    pip3 install -r /usr/src/github/ctfr/requirements.txt
-
-# Install theHarvester
-RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
-    cd /usr/src/github/theHarvester && uv sync && \
-    cd /usr/src/app
+    pip3 install /usr/src/github/acunetix-python
 
 # Install OneForAll
 RUN git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll && \
@@ -295,9 +270,6 @@ RUN mkdir -p /usr/src/wordlist/kr && \
     wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-small.kite.tar.gz -O routes-small.kite.tar.gz && \
     tar -xvf routes-small.kite.tar.gz && \
     rm -rf routes-small.kite.tar.gz
-
-RUN git clone https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy && \
-    ln -sf /usr/src/github/username-anarchy/username-anarchy /usr/local/bin/username-anarchy
 
 # Install WPScan
 RUN gem install wpscan --no-document
