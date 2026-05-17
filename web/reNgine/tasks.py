@@ -856,8 +856,8 @@ def initiate_subscan(
 	}
 
 
-@app.task(name='report', bind=False, queue='report_queue')
-def report(ctx={}, description=None):
+@app.task(name='report', bind=True, queue='report_queue')
+def report(self, ctx={}, description=None):
 	"""Report task running after all other tasks.
 	Mark ScanHistory or SubScan object as completed and update with final
 	status, log run details and send notification.
@@ -868,6 +868,21 @@ def report(ctx={}, description=None):
 	# Get objects
 	subscan_id = ctx.get('subscan_id')
 	scan_id = ctx.get('scan_history_id')
+
+	# Check if there are other scanning tasks still running
+	if scan_id:
+		from startScan.models import ScanActivity
+		from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
+		post_processing_names = ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'run_apme', 'report']
+		running_scans = ScanActivity.objects.filter(
+			scan_of_id=scan_id,
+			status__in=[RUNNING_TASK, INITIATED_TASK]
+		).exclude(name__in=post_processing_names)
+		if running_scans.exists():
+			running_names = list(running_scans.values_list('name', flat=True))
+			logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling report...")
+			raise self.retry(countdown=10, max_retries=1000)
+
 	engine_id = ctx.get('engine_id')
 	scan = ScanHistory.objects.filter(pk=scan_id).first()
 	subscan = SubScan.objects.filter(pk=subscan_id).first()
@@ -2927,7 +2942,7 @@ def dir_file_fuzz(self, ctx={}, description=None):
 				if not name:
 					continue
 
-				endpoint, created = save_endpoint(res_url, crawl=False, ctx=ctx)
+				endpoint, created = save_endpoint(res_url, crawl=False, ctx=ctx, subdomain=subdomain, source='Dir Fuzzer (FFUF)')
 				if endpoint:
 					endpoint.http_status = status
 					endpoint.content_length = length
@@ -2984,7 +2999,7 @@ def dir_file_fuzz(self, ctx={}, description=None):
 							if not name:
 								continue
 							
-							endpoint, created = save_endpoint(res_url, crawl=False, ctx=ctx)
+							endpoint, created = save_endpoint(res_url, crawl=False, ctx=ctx, subdomain=subdomain, source='Dir Fuzzer (Dirsearch)')
 							if endpoint:
 								endpoint.http_status = status
 								endpoint.content_length = length
@@ -6997,6 +7012,19 @@ def correlate_vulnerabilities(self, scan_history_id):
 	"""
 	Correlates discovered technologies with known CVEs and updates the graph.
 	"""
+	# Check if there are other scanning tasks still running
+	from startScan.models import ScanActivity
+	from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
+	post_processing_names = ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'run_apme', 'report']
+	running_scans = ScanActivity.objects.filter(
+		scan_of_id=scan_history_id,
+		status__in=[RUNNING_TASK, INITIATED_TASK]
+	).exclude(name__in=post_processing_names)
+	if running_scans.exists():
+		running_names = list(running_scans.values_list('name', flat=True))
+		logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling correlate_vulnerabilities...")
+		raise self.retry(countdown=10, max_retries=1000)
+
 	nm = Neo4jManager()
 	try:
 		# In a real scenario, this would query a CVE DB. 
@@ -7014,6 +7042,19 @@ def calculate_risk_scores(self, scan_history_id):
 	Calculates a weighted risk score for vulnerabilities.
 	Score = (Severity * 0.4) + (AssetCriticality * 0.3) + (Exploitability * 0.2) + (Exposure * 0.1)
 	"""
+	# Check if there are other scanning tasks still running
+	from startScan.models import ScanActivity
+	from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
+	post_processing_names = ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'run_apme', 'report']
+	running_scans = ScanActivity.objects.filter(
+		scan_of_id=scan_history_id,
+		status__in=[RUNNING_TASK, INITIATED_TASK]
+	).exclude(name__in=post_processing_names)
+	if running_scans.exists():
+		running_names = list(running_scans.values_list('name', flat=True))
+		logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling calculate_risk_scores...")
+		raise self.retry(countdown=10, max_retries=1000)
+
 	from reNgine.correlation import VulnerabilityCorrelationEngine
 	scan_history = ScanHistory.objects.get(id=scan_history_id)
 	correlator = VulnerabilityCorrelationEngine(scan_history=scan_history)
@@ -7037,6 +7078,20 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 	else:
 		logger.error("Neither scan_history_id nor vulnerability_id provided for impact assessment.")
 		return False
+
+	# Check if there are other scanning tasks still running
+	if scan_history_id:
+		from startScan.models import ScanActivity
+		from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
+		post_processing_names = ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'run_apme', 'report']
+		running_scans = ScanActivity.objects.filter(
+			scan_of_id=scan_history_id,
+			status__in=[RUNNING_TASK, INITIATED_TASK]
+		).exclude(name__in=post_processing_names)
+		if running_scans.exists():
+			running_names = list(running_scans.values_list('name', flat=True))
+			logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling generate_impact_assessment...")
+			raise self.retry(countdown=10, max_retries=1000)
 
 	generator = LLMImpactGenerator(logger)
 
@@ -7147,7 +7202,7 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 	os.makedirs(semgrep_dir, exist_ok=True)
 
 	# But to be robust, we'll download files ourselves if the directory is empty
-	SENSITIVE_EXTENSIONS = ('.js', '.env', '.php', '.asp', '.aspx', '.jsp', '.jspx', '.txt', '.log', '.conf', '.config', '.bak', '.old', '.json', '.yaml', '.yml')
+	SENSITIVE_EXTENSIONS = ('.js', '.env', '.php', '.asp', '.aspx', '.jsp', '.jspx', '.txt', '.log', '.conf', '.config', '.bak', '.old', '.json', '.yaml', '.yml', '.html', '.htm')
 	
 	# Load URLs from fetch_url output files and tool-specific files
 	urls_from_files = set()
@@ -7194,25 +7249,58 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 			'https': proxy
 		}
 
+	# Convert custom headers list to dictionary
+	headers_dict = {}
+	custom_headers = self.yaml_configuration.get(CUSTOM_HEADERS, [])
+	custom_header = self.yaml_configuration.get(CUSTOM_HEADER)
+	if custom_header:
+		custom_headers.append(custom_header)
+	for h in custom_headers:
+		if ':' in h:
+			k, v = h.split(':', 1)
+			headers_dict[k.strip()] = v.strip()
+	if 'User-Agent' not in headers_dict:
+		headers_dict['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
 	for url in target_urls:
 		try:
+			# Normalize URL if relative or missing scheme
+			base_domain = self.domain.name if self.domain else None
+			full_url = url.strip()
+			if not full_url:
+				continue
+			
+			parsed_url = urlparse(full_url)
+			if not parsed_url.scheme:
+				if base_domain:
+					if full_url.startswith('//'):
+						full_url = f"https:{full_url}"
+					else:
+						full_url = f"https://{base_domain}/{full_url.lstrip('/')}"
+				else:
+					full_url = f"https://{full_url.lstrip('/')}"
+			
 			# Create a safe filename from URL
 			safe_name = "".join([c if c.isalnum() else "_" for c in url])
 			# Preserve extension if possible
-			ext = os.path.splitext(urlparse(url).path)[1]
-			if not ext: ext = ".js"
+			ext = os.path.splitext(urlparse(full_url).path)[1]
+			if not ext:
+				ext = ".js"
 			filename = f"{safe_name}{ext}"
 			filepath = os.path.join(semgrep_dir, filename)
 			
-			if os.path.exists(filepath): continue # Skip if already exists
+			if os.path.exists(filepath):
+				continue # Skip if already exists
 			
-			resp = requests.get(url, proxies=proxies, timeout=10, verify=False)
+			resp = requests.get(full_url, headers=headers_dict, proxies=proxies, timeout=10, verify=False)
 			if resp.status_code == 200:
 				with open(filepath, 'w', encoding='utf-8') as f:
 					f.write(resp.text)
 				downloaded_count += 1
+			else:
+				logger.debug(f"Semgrep downloader got status {resp.status_code} for {full_url}")
 		except Exception as e:
-			logger.debug(f"Semgrep downloader failed for {url}: {e}")
+			logger.debug(f"Semgrep downloader failed for {url} (full: {full_url}): {e}")
 
 	if downloaded_count == 0:
 		logger.warning("No files could be downloaded for Semgrep scan.")
@@ -7314,6 +7402,19 @@ def run_apme(self, scan_history_id):
 	if not RENGINE_APME_ENABLED:
 		logger.info("APME is disabled in settings (RENGINE_APME_ENABLED=False). Skipping.")
 		return
+
+	# Check if there are other scanning tasks still running
+	from startScan.models import ScanActivity
+	from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
+	post_processing_names = ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'run_apme', 'report']
+	running_scans = ScanActivity.objects.filter(
+		scan_of_id=scan_history_id,
+		status__in=[RUNNING_TASK, INITIATED_TASK]
+	).exclude(name__in=post_processing_names)
+	if running_scans.exists():
+		running_names = list(running_scans.values_list('name', flat=True))
+		logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling run_apme...")
+		raise self.retry(countdown=10, max_retries=1000)
 
 	logger.info(f"APME: Initiating attack path modeling for scan_history_id={scan_history_id}")
 	try:

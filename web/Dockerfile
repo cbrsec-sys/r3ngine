@@ -282,7 +282,8 @@ RUN python3 -m pip install pipx && \
 COPY web/requirements.txt /tmp/requirements.txt
 RUN pip3 install --upgrade pip setuptools wheel pyOpenSSL h8mail
 RUN pip3 install -r /tmp/requirements.txt --no-cache-dir --ignore-installed blinker
-RUN playwright install-deps chromium && playwright install chromium
+RUN playwright install-deps chromium && playwright install chromium && \
+    ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome /usr/bin/chromium
 
 # Install Frontend Dependencies (for Dev mode)
 # RUN mkdir -p /usr/src/app/frontend
