@@ -2,12 +2,32 @@
 
 **Official Repo location:** <p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
+### [v3.0.0-rc7] - 2026-05-17
+
+### Fixed
+- **APME Path Persistence Database Constraint Resolution**: Resolved a database unique constraint violation in the Attack Path Modeling Engine by separating lookup and update logic depending on whether a representative vulnerability exists, preventing duplicate key database crashes on `ImpactAssessment` creation.
+- **Vulnerability Scan Engine Fault-Isolation**: Enhanced the Celery base class `RengineTask` to suppress exception propagation for vulnerability scanner sub-tasks (e.g. `nuclei_scan`, `acunetix_scan`, `crlfuzz_scan`, `s3scanner`, `cpanel_scan`, `wpscan_scan`, `react2shell_scan`, `semgrep_scan`). This preserves the Celery chord callback (`finish_vulnerability_scan`), preventing a single scanner tool's failure from halting or aborting the rest of the scanning engine.
+- **Vulnerability Sub-Task Tracking**: Mapped `react2shell_scan`, `semgrep_scan`, and `crlfuzz_scan` inside the `RengineTask`'s `dependent_tasks` mapping to guarantee all scan activity and sub-task statuses are tracked and persisted.
+- **Celery Starvation & Join Deadlock Resolution after Nmap**: Resolved an indefinite scanning stall/hang after Nmap runs by executing nmap tasks synchronously in-process via Celery's eager `.apply()` execution wrapper, completely bypassing Celery worker pool starvation and result-backend synchronization deadlocks.
+
 ### [v3.0.0-rc6] - 2026-05-16
 
 ### Added
+- **Adaptive Stress Interface Layout Refinement**: Rearranged the live telemetry space below the KPIs into a highly optimized 2-column tactical cockpit. Stacks all three real-time graphs (Latency, Throughput, and Saturation Heatmap) in a unified left column while stretching the raw telemetry log component full-height in the right column for enhanced observation density.
+- **Raw stdout/stderr Live Terminal Streaming**: Implemented real-time streaming of raw tool execution commands and stdout/stderr output lines via WebSockets to the frontend telemetry terminal log.
+- **Persistent Telemetry Session History**: Modified the telemetry consumer to reload the past 1000 logged items upon client connection, restoring terminal logs and ECharts dynamically on browser refresh.
+- **Stress Scan Database Sync & Safe Completion**: Wrapped the Celery stress scan task in a `try...finally` block to guarantee a final `'completed'` telemetry packet is always sent to the client. Integrated explicit database updates to the `ScanHistory` object's `scan_status` attribute (`RUNNING_TASK`, `SUCCESS_TASK`, `ABORTED_TASK`, `FAILED_TASK`).
+- **Activity & Command History Integration**: Registered all generated stress testing commands as command history records prior to subprocess execution, storing command lines, return codes, and raw stdout upon completion.
 - **Mobile Companion Documentation**: Integrated high-fidelity visual documentation into the `r3ngine-mobile` repository, including a functional interface walkthrough and core UI screenshots.
+- **Clear Logs Button**: Added a beautifully styled outlined button in the headerAction of the web dashboard's telemetry panel ([StressTestingPage.tsx](file:///d:/Repos/r3ngine/frontend/src/pages/StressTestingPage.tsx)) that completely clears the telemetry store logs on-demand.
+- **Mobile Stress Telemetry Cockpit**: Built a high-fidelity, real-time stress testing telemetry dashboard in the `r3ngine-mobile` companion app (`app/scan/stress/[id].tsx`) featuring lightweight custom SVG line and bar charts, a live raw console log terminal with dynamic filters, haptic feedback abort controls (Kill Switch), and glassmorphic muted report triggers.
 
 ### Fixed
+- **Zero-Reload Kill Switch State Transition**: Updated the Kill Switch action on both the web dashboard ([StressTestingPage.tsx](file:///d:/Repos/r3ngine/frontend/src/pages/StressTestingPage.tsx)) and the mobile companion app ([id].tsx](file:///d:/Repos/r3ngine/r3ngine-mobile/app/scan/stress/%5Bid%5D.tsx)) to immediately reset the UI scanning and standby states on success, removing the requirement for a page/screen reload.
+- **Proxy Authentication Guard**: Enhanced `get_random_proxy` in [common_func.py](file:///d:/Repos/r3ngine/web/reNgine/common_func.py) and `ProxychainsWrapper` in [opsec_utils.py](file:///d:/Repos/r3ngine/web/reNgine/opsec_utils.py) to perform strict validation checks for `407 Proxy Authentication Required` status codes and authentication headers before selecting a proxy. This guarantees that dead or password-locked proxies are automatically skipped and replaced, preventing scanning tools from failing with proxy authentication errors.
+- **Adaptive Stress Analysis Chart Overlap**: Adjusted the Endpoint Saturation heatmap's grid right boundary to `'18%'` and visualMap position to `'2%'` to resolve and prevent overlapping labels and colors on the dashboard.
+- **Muted Generate Report Button**: Replaced the high-intensity secondary background gradient and glow of the "Generate Report" button with an elegant alpha-blended transparent look (`alpha(theme.palette.secondary.main, 0.15)`) to align with the dashboard's visual hierarchy.
+- **In-App Notification and Celery Status Crash**: Resolved an `UnboundLocalError` inside `generate_inapp_notification` by defensively initializing notification attributes. Mapped final celery notification statuses to Definitions-supported keys (`'SUCCESS'`, `'ABORTED'`, `'FAILED'`), fixing the `None` severity warnings in Celery logs.
 - **Static Asset Management Optimization**:
   - **Deduplicated Static Sources**: Refactored `STATICFILES_DIRS` to prevent "Found another file" warnings during container startup by prioritizing image-internal assets.
   - **Automated Cache Busting**: Implemented version-based query parameters (`?v=...`) for all frontend JavaScript and CSS assets, ensuring clients always load the latest versions after updates.

@@ -9,7 +9,9 @@ export interface TelemetryPoint {
   p95_latency?: number;
   throughput_rps?: number;
   error_rate?: number;
-  packet_loss?: number;
+  type?: 'command' | 'log' | 'metric';
+  command?: string;
+  line?: string;
   [key: string]: any;
 }
 

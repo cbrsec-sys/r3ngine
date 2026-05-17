@@ -287,7 +287,57 @@ class ProxychainsWrapper:
         return proxies
 
     def get_random_proxy(self):
-        return random.choice(self.proxies) if self.proxies else None
+        """
+        Retrieves a random, verified alive, and unauthenticated proxy from the fetched proxy list.
+        Converts the proxychains line format to standard requests proxy dictionary for testing.
+
+        Returns:
+            str: Validated proxy line in 'type host port [user pass]' format, or None if no valid proxy is found.
+        """
+        if not self.proxies:
+            return None
+        
+        # Create a copy and shuffle to test proxies in a random sequence
+        test_list = list(self.proxies)
+        random.shuffle(test_list)
+        
+        for proxy_str in test_list:
+            # Parse the proxychains formatted line: type host port [user pass]
+            parts = proxy_str.split()
+            if len(parts) >= 3:
+                p_type = parts[0]
+                p_host = parts[1]
+                p_port = parts[2]
+                
+                # Map proxychains protocol name to requests standard scheme
+                scheme = "http" if p_type in ["http", "https"] else p_type
+                proxy_url = f"{scheme}://{p_host}:{p_port}"
+                
+                try:
+                    import requests
+                    # Perform validation check with short timeout to not block scan initiation
+                    response = requests.get(
+                        'http://google.com', 
+                        proxies={'http': proxy_url, 'https': proxy_url}, 
+                        timeout=5,
+                        allow_redirects=True
+                    )
+                    
+                    # Reject proxy if it responds with HTTP Status 407 (Proxy Authentication Required)
+                    if response.status_code == 407 or 'Proxy-Authenticate' in response.headers or 'proxy-authenticate' in response.headers:
+                        raise Exception("Proxy Authentication Required (Status 407)")
+                    
+                    # Reject if custom proxy authentication failure text is found in response body
+                    if "Proxy Authentication Required" in response.text or "Proxy Authentication Required" in str(response.headers):
+                        raise Exception("Proxy Authentication Required returned in response text/headers")
+                        
+                    # Valid proxy found, return the original proxychains formatted line
+                    return proxy_str
+                except Exception as e:
+                    # Log the proxy validation failure and continue to the next one
+                    logging.getLogger(__name__).error(f"Proxychains proxy {proxy_url} validation failed: {e}")
+                    
+        return None
 
     def should_wrap(self):
         proxy_obj = Proxy.objects.first()

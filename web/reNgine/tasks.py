@@ -315,8 +315,8 @@ def initiate_scan(
 		# HTTP crawling can start somewhere
 		http_url = f'{domain.name}{starting_point_path}' if starting_point_path else domain.name
 		# Check if we should use a simplified alive check for stress tests
-		stress_config = self.yaml_configuration.get('stress_test', {})
-		is_stress_only = 'stress_test' in self.tasks and len(self.tasks) == 1
+		stress_config = config.get('stress_test', {})
+		is_stress_only = 'stress_test' in engine.tasks and len(engine.tasks) == 1
 		
 		should_crawl = enable_http_crawl
 		endpoint = None
@@ -2409,7 +2409,6 @@ def port_scan(self, hosts=[], ctx={}, description=None):
 	logger.info('Finished running naabu port scan.')
 
 	# Process nmap results: 1 process per host
-	sigs = []
 	if nmap_enabled:
 		logger.warning(f'Starting nmap scans ...')
 		logger.warning(ports_data)
@@ -2427,10 +2426,8 @@ def port_scan(self, hosts=[], ctx={}, description=None):
 				script_args=nmap_script_args,
 				max_rate=rate_limit,
 				ctx=ctx_nmap)
-			sigs.append(sig)
-		task = group(sigs).apply_async()
-		with allow_join_result():
-			results = task.get()
+			logger.warning(f"APME: Running nmap task synchronously for {host} in port_scan to prevent Celery starvation/join deadlocks.")
+			sig.apply()
 
 	return ports_data
 
@@ -2717,7 +2714,46 @@ def dir_file_fuzz(self, ctx={}, description=None):
 	Returns:
 		list: List of URLs discovered.
 	"""
+	from scanEngine.models import Wordlist
+
 	# Config
+	config = self.yaml_configuration.get(DIR_FILE_FUZZ) or {}
+	enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
+	rate_limit = config.get(RATE_LIMIT) or self.yaml_configuration.get(RATE_LIMIT, DEFAULT_RATE_LIMIT)
+	extensions = config.get(EXTENSIONS, DEFAULT_DIR_FILE_FUZZ_EXTENSIONS)
+	follow_redirect = config.get(FOLLOW_REDIRECT, False)
+	max_time = config.get(MAX_TIME, 0)
+	match_http_status = config.get(MATCH_HTTP_STATUS, FFUF_DEFAULT_MATCH_HTTP_STATUS)
+	recursive_level = config.get(RECURSIVE_LEVEL, FFUF_DEFAULT_RECURSIVE_LEVEL)
+	stop_on_error = config.get(STOP_ON_ERROR, False)
+	timeout = config.get(TIMEOUT) or self.yaml_configuration.get(TIMEOUT, DEFAULT_HTTP_TIMEOUT)
+	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
+	wordlist_name = config.get(WORDLIST, 'dicc')
+	auto_calibration = config.get(AUTO_CALIBRATION, False)
+	delay = config.get(DELAY, 0)
+	custom_headers = config.get(CUSTOM_HEADERS) or config.get(CUSTOM_HEADER, [])
+
+	# Resolve wordlist path
+	wordlist_path = f'/usr/src/wordlist/{wordlist_name}.txt'
+	if not os.path.exists(wordlist_path):
+		db_wl = Wordlist.objects.filter(short_name=wordlist_name).first()
+		if db_wl:
+			wordlist_path = f'/usr/src/wordlist/{db_wl.short_name}.txt'
+		else:
+			wordlist_path = FFUF_DEFAULT_WORDLIST_PATH
+
+	# Format extensions
+	if extensions:
+		extensions_str = ','.join(extensions)
+	else:
+		extensions_str = ''
+
+	# Format match HTTP status
+	mc = ','.join(str(status) for status in match_http_status) if match_http_status else ''
+
+	# Define input path
+	input_path = f'{self.results_dir}/input_endpoints_dir_file_fuzz.txt'
+
 	# Build ffuf command
 	ffuf_base_cmd = 'ffuf'
 	ffuf_base_cmd += f' -w {wordlist_path}'
@@ -4646,10 +4682,17 @@ def send_scan_notif(
 			**opts)
 	
 def generate_inapp_notification(scan, subscan, status, engine, fields):
+	if status == 'COMPLETED':
+		status = 'SUCCESS'
+
 	scan_type = "Subscan" if subscan else "Scan"
 	domain = subscan.domain.name if subscan else scan.domain.name
 	duration_msg = None
 	redirect_link = None
+	title = f"Scan Status Update"
+	description = f"Scan status update for {domain}"
+	icon = "mdi-information-outline"
+	notif_status = 'info'
 	
 	if status == 'RUNNING':
 		title = f"{scan_type} Started"

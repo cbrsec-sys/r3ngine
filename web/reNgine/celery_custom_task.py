@@ -105,12 +105,15 @@ class RengineTask(Task):
 				dependent_tasks = {
 					'dalfox_xss_scan': 'vulnerability_scan',
 					'crlfuzz': 'vulnerability_scan',
+					'crlfuzz_scan': 'vulnerability_scan',
 					'nuclei_scan': 'vulnerability_scan',
 					'nuclei_individual_severity_module': 'vulnerability_scan',
 					's3scanner': 'vulnerability_scan',
 					'cpanel_scan': 'vulnerability_scan',
 					'wpscan_scan': 'vulnerability_scan',
 					'acunetix_scan': 'vulnerability_scan',
+					'react2shell_scan': 'vulnerability_scan',
+					'semgrep_scan': 'vulnerability_scan',
 					'stress_testing': 'stress_test',
 				}
 				# Tasks that are post-processing and don't require engine validation
@@ -160,7 +163,18 @@ class RengineTask(Task):
 				self.subscan_id)
 			os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
 
-			if RENGINE_RAISE_ON_ERROR:
+			# Vulnerability scan tasks and their sub-tasks should never raise exceptions
+			# to Celery, to prevent breaking chords or failing the rest of the scan engine.
+			is_vulnerability_scan_task = (
+				self.task_name == 'vulnerability_scan' or
+				self.task_name in {
+					'nuclei_scan', 'nuclei_individual_severity_module', 'acunetix_scan',
+					'crlfuzz_scan', 'crlfuzz', 'dalfox_xss_scan', 's3scanner',
+					'cpanel_scan', 'wpscan_scan', 'react2shell_scan', 'semgrep_scan'
+				}
+			)
+
+			if RENGINE_RAISE_ON_ERROR and not is_vulnerability_scan_task:
 				raise exc
 
 			logger.exception(exc)
