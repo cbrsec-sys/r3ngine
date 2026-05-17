@@ -234,11 +234,13 @@ _static_dirs = [
     os.path.join(BASE_DIR, "static"),
 ]
 
-# Prefer /usr/src/frontend/dist if it exists (built in Docker), 
-# otherwise fallback to local app directory version
-_frontend_dist = '/usr/src/frontend/dist'
-if not os.path.exists(_frontend_dist):
-    _frontend_dist = os.path.join(env('RENGINE_HOME', default='/usr/src/app'), "frontend", "dist")
+# Prefer the dynamically built/mounted local frontend dist directory if it exists,
+# otherwise fall back to the baked-in Docker version
+_local_dist = os.path.join(env('RENGINE_HOME', default='/usr/src/app'), "frontend", "dist")
+if os.path.exists(_local_dist):
+    _frontend_dist = _local_dist
+else:
+    _frontend_dist = '/usr/src/frontend/dist'
 
 if os.path.exists(_frontend_dist):
     _static_dirs.append(_frontend_dist)
@@ -270,6 +272,10 @@ DELETE_DUPLICATES_THRESHOLD = 10
 CELERY settings
 '''
 CELERY_BROKER_URL = env("CELERY_BROKER", default="redis://redis:6379/0")
+import urllib.parse
+_parsed_redis = urllib.parse.urlparse(CELERY_BROKER_URL)
+REDIS_HOST = _parsed_redis.hostname or 'redis'
+REDIS_PORT = _parsed_redis.port or 6379
 CELERY_RESULT_BACKEND = env("CELERY_BROKER", default="redis://redis:6379/0")
 CELERY_ENABLE_UTC = False
 CELERY_TIMEZONE = 'UTC'

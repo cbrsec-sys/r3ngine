@@ -408,8 +408,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 fontWeight: 900,
                 fontFamily: "'Bangers', cursive",
                 letterSpacing: 2,
-                color: "rgb(255, 0, 241) !important",
-                textShadow: "rgb(255, 0, 0) 0px 0px 21px !important",
+                color: '#d846cb !important', /* #db4224 */
+                textShadow: "#8018c7c2 0px 0px 21px !important",
                 fontSize: '1.4rem',
                 mr: 1.5,
                 ml: 12,
@@ -425,8 +425,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                   fontSize: '0.6rem',
                   fontWeight: 800,
                   bgcolor: 'transparent',
-                  border: '1px solid #ff00ff !important',
-                  color: '#ff00ff !important',
+                  border: '1px solid #8c2a83 !important',
+                  color: '#d846cb !important',
                   borderRadius: 1
                 }}
               />
@@ -734,15 +734,15 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               slotProps={{
                 paper: {
                   sx: {
-                  width: 300,
-                  bgcolor: alpha(theme.palette.background.paper, 0.8),
-                  backdropFilter: 'blur(25px)',
-                  borderLeft: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
-                  boxShadow: `-10px 0 30px ${alpha('#000', 0.5)}`,
-                  backgroundImage: 'none',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  overflow: 'hidden'
+                    width: 300,
+                    bgcolor: alpha(theme.palette.background.paper, 0.8),
+                    backdropFilter: 'blur(25px)',
+                    borderLeft: `1px solid ${alpha(theme.palette.primary.main, 0.2)}`,
+                    boxShadow: `-10px 0 30px ${alpha('#000', 0.5)}`,
+                    backgroundImage: 'none',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    overflow: 'hidden'
                   }
                 }
               }}

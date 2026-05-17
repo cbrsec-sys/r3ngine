@@ -684,28 +684,49 @@ def get_chaos_api_key():
 
 
 def get_random_proxy():
-	"""Get a random proxy from the list of proxies input by user in the UI.
+	"""Get a random proxy from the list of proxies input by user in the UI,
+	validating that it is alive and does not require authentication.
 
 	Returns:
 		str: Proxy name or '' if no proxy defined in db or use_proxy is False.
 	"""
+	# Check if any Proxy records exist in the database
 	if not Proxy.objects.all().exists():
 		return ''
+	
+	# Retrieve the global proxy configuration
 	proxy = Proxy.objects.first()
 	if not proxy.use_proxy:
 		return ''
 
+	# Parse and clean the newline-separated proxy lines
 	proxies = [p.strip() for p in proxy.proxies.splitlines() if p.strip()]
 	if not proxies:
 		return ''
 
+	# Shuffle the proxies to distribute traffic randomly
 	random.shuffle(proxies)
 
+	# Validate each proxy sequentially until we find a working, unauthenticated one
 	for proxy_name in proxies:
 		try:
 			logger.info(f'Validating proxy: {proxy_name}')
-			# Use a short timeout to prevent blocking tasks for too long
-			requests.get('http://google.com', proxies={'http': proxy_name, 'https': proxy_name}, timeout=5)
+			# Perform a request with a short timeout to check availability
+			response = requests.get(
+				'http://google.com', 
+				proxies={'http': proxy_name, 'https': proxy_name}, 
+				timeout=5, 
+				allow_redirects=True
+			)
+			
+			# Check specifically for HTTP Status 407 (Proxy Authentication Required)
+			if response.status_code == 407 or 'Proxy-Authenticate' in response.headers or 'proxy-authenticate' in response.headers:
+				raise Exception("Proxy Authentication Required (Status 407)")
+			
+			# Check if "Proxy Authentication Required" is in the response body or headers (fallback logic)
+			if "Proxy Authentication Required" in response.text or "Proxy Authentication Required" in str(response.headers):
+				raise Exception("Proxy Authentication Required returned in response text/headers")
+				
 			logger.warning('Using valid proxy: ' + proxy_name)
 			return proxy_name
 		except Exception as e:
