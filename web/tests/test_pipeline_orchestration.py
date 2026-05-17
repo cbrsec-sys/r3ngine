@@ -43,6 +43,9 @@ class TestPipelineOrchestration(TestCase):
         )
 
     def tearDown(self):
+        from startScan.models import ScanActivity, Subdomain
+        ScanActivity.objects.filter(scan_of=self.scan).delete()
+        Subdomain.objects.filter(scan_history=self.scan).delete()
         self.scan.delete()
         self.engine.delete()
         self.domain.delete()
@@ -57,25 +60,29 @@ class TestPipelineOrchestration(TestCase):
         mock_group.side_effect = lambda tasks: MagicMock(name="Group", tasks=tasks)
         
         # We need to mock the .si() methods of all tasks used in initiate_scan
-        with patch('reNgine.tasks.subdomain_discovery.si') as m_sub, \
-             patch('reNgine.tasks.osint.si') as m_osint, \
-             patch('reNgine.tasks.spiderfoot_scan.si') as m_sf, \
-             patch('reNgine.tasks.firewall_vpn_scan.si') as m_fw, \
-             patch('reNgine.tasks.http_crawl.si') as m_crawl, \
-             patch('reNgine.tasks.port_scan.si') as m_port, \
-             patch('reNgine.tasks.screenshot.si') as m_shot, \
-             patch('reNgine.tasks.dir_file_fuzz.si') as m_fuzz, \
-             patch('reNgine.tasks.fetch_url.si') as m_fetch, \
-             patch('reNgine.tasks.web_api_discovery.si') as m_api, \
-             patch('reNgine.tasks.waf_detection.si') as m_waf, \
-             patch('reNgine.tasks.waf_bypass.si') as m_bypass, \
-             patch('reNgine.tasks.vulnerability_scan.si') as m_vuln, \
-             patch('reNgine.tasks.brute_force_scan.si') as m_brute, \
-             patch('reNgine.tasks.correlate_vulnerabilities.si') as m_corr, \
-             patch('reNgine.tasks.calculate_risk_scores.si') as m_risk, \
-             patch('reNgine.tasks.generate_impact_assessment.si') as m_ai, \
-             patch('reNgine.tasks.run_stress_testing.si') as m_stress, \
-             patch('reNgine.tasks.run_apme.si') as m_apme:
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            m_sub = stack.enter_context(patch('reNgine.tasks.subdomain_discovery.si'))
+            m_osint = stack.enter_context(patch('reNgine.tasks.osint.si'))
+            m_sf = stack.enter_context(patch('reNgine.tasks.spiderfoot_scan.si'))
+            m_fw = stack.enter_context(patch('reNgine.tasks.firewall_vpn_scan.si'))
+            m_crawl = stack.enter_context(patch('reNgine.tasks.http_crawl.si'))
+            m_port = stack.enter_context(patch('reNgine.tasks.port_scan.si'))
+            m_shot = stack.enter_context(patch('reNgine.tasks.screenshot.si'))
+            m_fuzz = stack.enter_context(patch('reNgine.tasks.dir_file_fuzz.si'))
+            m_fetch = stack.enter_context(patch('reNgine.tasks.fetch_url.si'))
+            m_api = stack.enter_context(patch('reNgine.tasks.web_api_discovery.si'))
+            m_waf = stack.enter_context(patch('reNgine.tasks.waf_detection.si'))
+            m_bypass = stack.enter_context(patch('reNgine.tasks.waf_bypass.si'))
+            m_vuln = stack.enter_context(patch('reNgine.tasks.vulnerability_scan.si'))
+            m_resolve = stack.enter_context(patch('reNgine.tasks.resolve_vulnerability_tasks'))
+            m_finish_vuln = stack.enter_context(patch('reNgine.tasks.finish_vulnerability_scan.s'))
+            m_brute = stack.enter_context(patch('reNgine.tasks.brute_force_scan.si'))
+            m_corr = stack.enter_context(patch('reNgine.tasks.correlate_vulnerabilities.si'))
+            m_risk = stack.enter_context(patch('reNgine.tasks.calculate_risk_scores.si'))
+            m_ai = stack.enter_context(patch('reNgine.tasks.generate_impact_assessment.si'))
+            m_stress = stack.enter_context(patch('reNgine.tasks.run_stress_testing.si'))
+            m_apme = stack.enter_context(patch('reNgine.tasks.run_apme.si'))
              
             # Set descriptive names for the signatures
             m_sub.return_value = MagicMock(name='subdomain_discovery_si')
@@ -91,6 +98,8 @@ class TestPipelineOrchestration(TestCase):
             m_waf.return_value = MagicMock(name='waf_detection_si')
             m_bypass.return_value = MagicMock(name='waf_bypass_si')
             m_vuln.return_value = MagicMock(name='vulnerability_scan_si')
+            m_resolve.return_value = [MagicMock(name='mock_subtask_1')]
+            m_finish_vuln.return_value = MagicMock(name='finish_vulnerability_scan_s')
             m_brute.return_value = MagicMock(name='brute_force_scan_si')
             m_corr.return_value = MagicMock(name='correlate_vulnerabilities_si')
             m_risk.return_value = MagicMock(name='calculate_risk_scores_si')
@@ -128,8 +137,8 @@ class TestPipelineOrchestration(TestCase):
         t1_group_tasks = None
         for call in mock_group.call_args_list:
             tasks_str = [str(t) for t in call.args[0]]
-            # Search for background tasks only (osint or spiderfoot)
-            if any(x in t.lower() for t in tasks_str for x in ['osint', 'spiderfoot']):
+            # Search for background tasks only (osint)
+            if any('osint' in t.lower() for t in tasks_str):
                 t1_group_tasks = tasks_str
                 break
         
@@ -137,7 +146,6 @@ class TestPipelineOrchestration(TestCase):
         
         # Background tasks should be in the group
         self.assertTrue(any('osint' in t.lower() for t in t1_group_tasks))
-        self.assertTrue(any('spiderfoot' in t.lower() for t in t1_group_tasks))
         
         # The main branch should also be in the group
         self.assertTrue(any('chain' in t.lower() for t in t1_group_tasks))

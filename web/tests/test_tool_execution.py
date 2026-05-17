@@ -47,7 +47,8 @@ class ToolExecutionTest(TransactionTestCase):
             'scan_history_id': self.scan.id,
             'domain_id': self.domain.id,
             'results_dir': self.results_dir,
-            'yaml_configuration': {}
+            'yaml_configuration': {},
+            'track': False
         }
         
         self.real_target = os.environ.get('TEST_REAL_TARGET', 'defijn.io')
@@ -259,3 +260,31 @@ class ToolExecutionTest(TransactionTestCase):
                 self.assertIsNotNone(email_obj)
                 self.assertIn('holehe', email_obj.metadata)
                 self.assertIn('twitter', email_obj.metadata['holehe'])
+
+    def test_enrich_identities_execution(self):
+        email = "test.user@defijn.io"
+        print(f"\n[DEBUG] Starting enrich_identities test.")
+        if self.is_real_mode:
+            pass
+        else:
+            with patch('reNgine.osint_tasks.subprocess.Popen') as mock_popen:
+                process_mock = MagicMock()
+                # Mock username-anarchy output (one username per line) and gosearch output
+                process_mock.communicate.side_effect = [
+                    ("testuser\ntest.user\ntuser\n", ""), # For username-anarchy
+                    ("http://twitter.com/testuser\n", ""),   # For gosearch 1
+                    ("http://twitter.com/testuser\n", ""),   # For gosearch 2
+                    ("http://twitter.com/testuser\n", ""),   # For gosearch 3
+                    ("http://twitter.com/testuser\n", "")    # For gosearch 4
+                ]
+                mock_popen.return_value = process_mock
+                
+                # Mock OsintStaging to avoid DB constraint failures if any
+                res = enrich_identities_task(email, 'email', self.scan.id)
+                print(f"[DEBUG] enrich_identities_task result: {res}")
+                
+                # Check that staging object was created
+                staging = OsintStaging.objects.filter(scan_history=self.scan).first()
+                self.assertIsNotNone(staging)
+                self.assertEqual(staging.content, "http://twitter.com/testuser")
+                self.assertEqual(staging.source, "gosearch")

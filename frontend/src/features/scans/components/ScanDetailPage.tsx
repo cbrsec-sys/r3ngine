@@ -396,6 +396,29 @@ const formatTimeAgo = (date: string) => {
   return `${hrs} hours ago`;
 };
 
+const getCommandBinary = (cmd: string) => {
+  if (!cmd) return 'Command';
+  const cleanCmd = cmd.trim();
+  const parts = cleanCmd.split(/\s+/);
+  if (parts.length === 0) return 'Command';
+  let binary = parts[0].split('/').pop() || parts[0];
+  if ((binary === 'python' || binary === 'python3' || binary === 'python2') && parts.length > 1) {
+    const script = parts[1].split('/').pop() || parts[1];
+    binary = `${binary} ${script}`;
+  }
+  return binary;
+};
+
+const getToolColor = (binary: string) => {
+  const b = binary.toLowerCase();
+  if (b.includes('httpx')) return '#00f3ff';
+  if (b.includes('nuclei')) return '#ff003c';
+  if (b.includes('semgrep')) return '#00ff62';
+  if (b.includes('gau') || b.includes('hakrawler') || b.includes('katana') || b.includes('gospider') || b.includes('waybackurls')) return '#fffc00';
+  if (b.includes('cat') || b.includes('sort') || b.includes('grep') || b.includes('mv') || b.includes('rm')) return 'rgba(255,255,255,0.4)';
+  return '#ff00ff';
+};
+
 const TaskOverlay: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -436,10 +459,10 @@ const TaskOverlay: React.FC<{
       }}
     >
       <DialogTitle sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <Stack direction="row" sx={{ spacing: 2, alignItems: "center" }}>
+        <Stack direction="row" sx={{ alignItems: "center" }}>
           <Terminal size={20} color="#00f3ff" />
           <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: '1rem', letterSpacing: 1, ml: 2 }}>
-            {activityTitle}
+            {activityTitle} Execution Logs
           </Typography>
         </Stack>
         <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' } }}>
@@ -457,7 +480,12 @@ const TaskOverlay: React.FC<{
             ) : logs && logs.length > 0 ? (
               <List sx={{ p: 0 }}>
                 {logs.map((log: Command) => {
-                  const engineColor = getFrontendEngineColor(log.activity?.title || activityTitle);
+                  const cmdStr = log.command || '';
+                  const binaryName = getCommandBinary(cmdStr);
+                  const toolColor = getToolColor(binaryName);
+                  const parts = cmdStr.trim().split(/\s+/);
+                  const displayArgs = parts.length > 0 ? cmdStr.replace(parts[0], '').trim() : '';
+                  
                   return (
                     <ListItem
                       key={log.id}
@@ -466,27 +494,55 @@ const TaskOverlay: React.FC<{
                       sx={{
                         cursor: 'pointer',
                         borderBottom: '1px solid rgba(255,255,255,0.03)',
-                        py: 2,
+                        py: 1.5,
+                        px: 2,
                         bgcolor: selectedLog?.id === log.id ? 'rgba(0,243,255,0.05)' : 'transparent',
+                        borderLeft: selectedLog?.id === log.id ? `3px solid ${toolColor}` : '3px solid transparent',
                         '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }
                       }}
                     >
                       <ListItemText
                         primary={
-                          <Typography sx={{
-                            fontSize: '0.8rem',
-                            color: selectedLog?.id === log.id ? '#00f3ff' : engineColor,
-                            fontWeight: 700,
-                            mb: 0.5,
-                            fontFamily: 'monospace'
-                          }}>
-                            {log.activity?.title || activityTitle || "Tool Execution"}
-                          </Typography>
+                          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5, overflow: 'hidden' }}>
+                            <Box sx={{
+                              px: 0.8,
+                              py: 0.2,
+                              fontSize: '0.6rem',
+                              fontFamily: 'monospace',
+                              fontWeight: 900,
+                              borderRadius: 0.5,
+                              bgcolor: `${toolColor}15`,
+                              color: toolColor,
+                              border: `1px solid ${toolColor}30`,
+                              textTransform: 'uppercase',
+                              letterSpacing: 0.5,
+                              flexShrink: 0
+                            }}>
+                              {binaryName}
+                            </Box>
+                            <Typography sx={{
+                              fontSize: '0.75rem',
+                              color: selectedLog?.id === log.id ? '#fff' : 'rgba(255,255,255,0.7)',
+                              fontWeight: 700,
+                              fontFamily: 'monospace',
+                              whiteSpace: 'nowrap',
+                              textOverflow: 'ellipsis',
+                              overflow: 'hidden',
+                              flexGrow: 1
+                            }}>
+                              {displayArgs || '(no arguments)'}
+                            </Typography>
+                          </Stack>
                         }
                         secondary={
-                          <Typography noWrap sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
-                            {log.command}
-                          </Typography>
+                          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
+                            <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+                              ID: #{log.id}
+                            </Typography>
+                            <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+                              {new Date(log.time).toLocaleTimeString()}
+                            </Typography>
+                          </Stack>
                         }
                       />
                     </ListItem>
@@ -505,6 +561,67 @@ const TaskOverlay: React.FC<{
           <Grid size={{ xs: 8 }} sx={{ height: '100%', overflowY: 'auto', bgcolor: '#050505' }}>
             {selectedLog ? (
               <Box sx={{ p: 2 }}>
+                {/* Clean Command Box Header */}
+                <Box sx={{
+                  p: 2,
+                  mb: 3,
+                  bgcolor: 'rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: 1,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                }}>
+                  <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                      <Box sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        bgcolor: selectedLog.return_code === 0 ? '#00ff62' : selectedLog.return_code === null ? '#ff9f00' : '#ff003c',
+                        boxShadow: `0 0 10px ${selectedLog.return_code === 0 ? '#00ff62' : selectedLog.return_code === null ? '#ff9f00' : '#ff003c'}`
+                      }} />
+                      <Typography sx={{
+                        fontSize: '0.65rem',
+                        color: 'rgba(255,255,255,0.5)',
+                        fontWeight: 900,
+                        letterSpacing: 1,
+                        textTransform: 'uppercase'
+                      }}>
+                        Command Execution Detail
+                      </Typography>
+                    </Stack>
+                    <Box sx={{
+                      px: 1,
+                      py: 0.3,
+                      fontSize: '0.55rem',
+                      fontFamily: 'monospace',
+                      fontWeight: 900,
+                      borderRadius: 0.5,
+                      bgcolor: selectedLog.return_code === 0 ? 'rgba(0,255,98,0.1)' : selectedLog.return_code === null ? 'rgba(255,159,0,0.1)' : 'rgba(255,0,60,0.1)',
+                      color: selectedLog.return_code === 0 ? '#00ff62' : selectedLog.return_code === null ? '#ff9f00' : '#ff003c',
+                      border: `1px solid ${selectedLog.return_code === 0 ? 'rgba(0,255,98,0.2)' : selectedLog.return_code === null ? 'rgba(255,159,0,0.2)' : 'rgba(255,0,60,0.2)'}`
+                    }}>
+                      STATUS: {selectedLog.return_code === 0 ? 'SUCCESS' : selectedLog.return_code === null ? 'RUNNING' : `EXIT CODE: ${selectedLog.return_code}`}
+                    </Box>
+                  </Stack>
+                  
+                  {/* The Executed Command */}
+                  <Box sx={{
+                    p: 1.5,
+                    bgcolor: 'rgba(255,255,255,0.02)',
+                    borderLeft: `3px solid ${getToolColor(getCommandBinary(selectedLog.command || ''))}`,
+                    fontFamily: 'monospace',
+                    fontSize: '0.75rem',
+                    color: '#fff',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                    position: 'relative'
+                  }}>
+                    <Box component="span" sx={{ color: 'rgba(255,255,255,0.3)', mr: 1, userSelect: 'none' }}>$</Box>
+                    {selectedLog.command || ''}
+                  </Box>
+                </Box>
+
+                {/* Output Header */}
                 <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Typography sx={{
                     fontSize: '0.7rem',
@@ -533,7 +650,8 @@ const TaskOverlay: React.FC<{
                   fontSize: '0.75rem',
                   color: 'rgba(255,255,255,0.8)',
                   whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-all'
+                  wordBreak: 'break-all',
+                  minHeight: '30vh'
                 }}>
                   {selectedLog.output || "No output captured yet..."}
                 </Box>

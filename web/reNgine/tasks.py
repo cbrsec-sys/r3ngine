@@ -177,6 +177,62 @@ def finish_osint_discovery(results, results_dir):
     return results
 
 
+def resolve_vulnerability_tasks(config, urls=[], ctx={}):
+    """Parses vulnerability subtasks configuration and returns their signatures.
+
+    Args:
+        config (dict): The engine YAML configuration.
+        urls (list): Optional URL targets.
+        ctx (dict): The scan workflow context dictionary.
+    """
+    vuln_config = config.get(VULNERABILITY_SCAN) or {}
+    should_run_nuclei = vuln_config.get(RUN_NUCLEI, True)
+    should_run_crlfuzz = vuln_config.get(RUN_CRLFUZZ, False)
+    should_run_dalfox = vuln_config.get(RUN_DALFOX, False)
+    should_run_s3scanner = vuln_config.get(RUN_S3SCANNER, True)
+    should_run_acunetix = vuln_config.get(RUN_ACUNETIX, False)
+    should_run_wpscan = vuln_config.get(RUN_WPSCAN, True)
+    should_run_cpanel = vuln_config.get('cpanel_scanner', {}).get(RUN_CPANEL2SHELL, True)
+    should_run_react2shell = vuln_config.get('react_scanner', {}).get(RUN_REACT2SHELL, True)
+
+    subtasks = []
+
+    if should_run_nuclei:
+        subtasks.append(nuclei_scan.si(urls=urls, ctx=ctx, description='Nuclei Scan'))
+
+    if should_run_acunetix:
+        creds = AcunetixAPIKey.objects.first()
+        if creds and creds.server_url and creds.api_key:
+            subtasks.append(acunetix_scan.si(
+                domain_id=ctx.get('domain_id'),
+                scan_history_id=ctx.get('scan_history_id'),
+                ctx=ctx
+            ))
+
+    if should_run_crlfuzz:
+        subtasks.append(crlfuzz_scan.si(urls=urls, ctx=ctx, description='CRLFuzz Scan'))
+
+    if should_run_dalfox:
+        subtasks.append(dalfox_xss_scan.si(urls=urls, ctx=ctx, description='Dalfox XSS Scan'))
+
+    if should_run_s3scanner:
+        subtasks.append(s3scanner.si(ctx=ctx, description='Misconfigured S3 Buckets Scanner'))
+
+    if should_run_cpanel:
+        subtasks.append(cpanel_scan.si(ctx=ctx, description='cPanel Vulnerability Scan'))
+
+    if should_run_wpscan:
+        subtasks.append(wpscan_scan.si(urls=urls, ctx=ctx, description='WPScan'))
+
+    if should_run_react2shell:
+        subtasks.append(react2shell_scan.si(ctx=ctx, description='React Vulnerability Scan'))
+
+    # Always append Semgrep Vulnerability Scan as default
+    subtasks.append(semgrep_scan.si(ctx=ctx, mode='vulnerability', description='Semgrep Vulnerability Scan'))
+
+    return subtasks
+
+
 @app.task(name='initiate_scan', bind=False, queue='initiate_scan_queue')
 def initiate_scan(
 		scan_history_id,
@@ -471,6 +527,11 @@ def initiate_scan(
 		# Helper to wrap task with plugins
 		def get_wrapped(name):
 			if not is_task_enabled(name): return None
+			if name == 'vulnerability_scan':
+				subtasks = resolve_vulnerability_tasks(config, [], ctx)
+				if not subtasks: return None
+				base_flow = chain(group(subtasks), finish_vulnerability_scan.s(scan_history_id=ctx.get('scan_history_id')))
+				return PluginOrchestrator.inject_tasks(name, base_flow, ctx)
 			return PluginOrchestrator.inject_tasks(name, task_map[name], ctx)
 
 		# Tier 7: Sequential terminal chain
@@ -501,24 +562,39 @@ def initiate_scan(
 		if t7_chain: assessment_steps.append(t7_chain)
 		assessment_chain = chain(*assessment_steps) if assessment_steps else None
 
-		# Tier 4: Blocker for Tier 5
+		# Branch A: Independent URL Gathering & GF Pattern Matching flow (fetch_url)
+		# Starts directly after Subdomain Enumeration, running in parallel.
 		t4_task = get_wrapped('fetch_url')
-		t4_chain = chain(t4_task, assessment_chain) if t4_task else assessment_chain
 
-		# Tier 3: Blocker for Tier 4
+		# Branch B: http_crawl -> dir_file_fuzz
 		t3_task = get_wrapped('dir_file_fuzz')
-		t3_chain = chain(t3_task, t4_chain) if t3_task else t4_chain
-
-		# Tier 2: Branching logic
 		t2_blocker = get_wrapped('http_crawl')
-		t2_main_branch = chain(t2_blocker, t3_chain) if t2_blocker else t3_chain
 		
+		branch_b = None
+		if t2_blocker and t3_task:
+			branch_b = chain(t2_blocker, t3_task)
+		elif t2_blocker:
+			branch_b = t2_blocker
+		elif t3_task:
+			branch_b = t3_task
+
+		# Define other Tier 2 background tasks running in parallel
 		t2_background = []
 		for t in ['port_scan', 'screenshot']:
 			wrapped = get_wrapped(t)
 			if wrapped: t2_background.append(wrapped)
+
+		# Add Branch A and Branch B as parallel components in Tier 2 group
+		parallel_branches = []
+		if t4_task:
+			parallel_branches.append(t4_task) # Branch A runs in parallel
+		if branch_b:
+			parallel_branches.append(branch_b) # Branch B runs in parallel
 		
-		t2_step = group(t2_background + ([t2_main_branch] if t2_main_branch else []))
+		t2_step = group(t2_background + parallel_branches) if (t2_background or parallel_branches) else None
+
+		# Combine Tier 2 parallel group with the subsequent assessment chain (chords compile automatically)
+		t2_main_branch = chain(t2_step, assessment_chain) if (t2_step and assessment_chain) else (t2_step or assessment_chain)
 
 		# Tier 1: Branching logic
 		t1_blockers = []
@@ -526,7 +602,7 @@ def initiate_scan(
 			wrapped = get_wrapped(t)
 			if wrapped: t1_blockers.append(wrapped)
 		
-		t1_main_branch = chain(group(t1_blockers), t2_step) if t1_blockers else t2_step
+		t1_main_branch = chain(group(t1_blockers), t2_main_branch) if t1_blockers else t2_main_branch
 
 		t1_background = []
 		for t in ['osint']:
@@ -2778,7 +2854,7 @@ def dir_file_fuzz(self, ctx={}, description=None):
 	dirsearch_base_cmd += f' -t {threads}' if threads and threads > 0 else ''
 	dirsearch_base_cmd += f' --timeout {timeout}' if timeout and timeout > 0 else ''
 	dirsearch_base_cmd += f' -r' if recursive_level > 0 else ''
-	dirsearch_base_cmd += f' --recursion-depth {recursive_level}' if recursive_level > 0 else ''
+	dirsearch_base_cmd += f' --max-recursion-depth {recursive_level}' if recursive_level > 0 else ''
 	dirsearch_base_cmd += f' -i {mc}' if mc else ''
 	dirsearch_base_cmd += ' --follow-redirects' if follow_redirect else ''
 	for header in custom_headers:
@@ -2999,7 +3075,7 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		'katana': f'katana -list {input_path} -silent -jc -kf all -d 3 -fs rdn',
 	}
 
-	tasks = []
+	recon_run = False
 	for tool in tools:
 		if tool in base_cmd_map:
 			p = get_random_proxy()
@@ -3025,19 +3101,17 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 				elif tool == 'hakrawler': tool_cmd += ';;'.join(header for header in custom_headers)
 				elif tool == 'katana': tool_cmd += formatted_headers
 
-			full_cmd = f'cat {input_path} | {tool_cmd} | grep -Eo {host_regex} > {self.results_dir}/urls_{tool}.txt'
+			full_cmd = f'cat {input_path} | {tool_cmd} | grep -Eo {host_regex} | tee {self.results_dir}/urls_{tool}.txt'
 			
-			tasks.append(run_command.si(
+			run_command(
 				full_cmd,
 				shell=True,
 				scan_id=self.scan_id,
-				activity_id=self.activity_id,
-				proxy=p if tool not in ['gau', 'gospider', 'hakrawler', 'katana'] else None
-			))
+				activity_id=self.activity_id
+			)
+			recon_run = True
 	
-	if tasks:
-		tasks = group(tasks)
-	else:
+	if not recon_run:
 		logger.warning('No reconnaissance tools enabled for fetch_url. Skipping.')
 		return
 
@@ -3054,19 +3128,14 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			f'mv {self.results_dir}/urls_filtered.txt {self.output_path}'
 		]
 		sort_output.extend(grep_ext_filtered_output)
-	cleanup = chain(
-		run_command.si(
+
+	for cmd in sort_output:
+		run_command(
 			cmd,
 			shell=True,
 			scan_id=self.scan_id,
-			activity_id=self.activity_id)
-		for cmd in sort_output
-	)
-
-	# Run all commands
-	task = chord(tasks)(cleanup)
-	with allow_join_result():
-		task.get()
+			activity_id=self.activity_id
+		)
 
 	# Store all the endpoints and run httpx
 	with open(self.output_path) as f:
@@ -3144,7 +3213,7 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		# Run gf on current pattern
 		logger.warning(f'Running gf on pattern "{gf_pattern}"')
 		gf_output_file = f'{self.results_dir}/gf_patterns_{gf_pattern}.txt'
-		cmd = f'cat {self.output_path} | gf {gf_pattern} | grep -Eo {host_regex} >> {gf_output_file}'
+		cmd = f'cat {self.output_path} | gf {gf_pattern} | grep -Eo {host_regex} | tee -a {gf_output_file}'
 		run_command(
 			cmd,
 			shell=True,
@@ -3278,7 +3347,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if 'kiterunner' in uses_tools:
 			logger.info(f'Running Kiterunner on {url}')
 			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
-			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json >> {kr_output}"
+			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json | tee -a {kr_output}"
 			proxy = get_random_proxy()
 			if proxy:
 				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
@@ -3307,10 +3376,10 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			logger.info(f'Running ParamSpider on {subdomain_name}')
 			processed_paramspider_subdomains.add(subdomain_name)
 			ps_output = f"{results_dir}/ps_{subdomain_name}.txt"
-			cmd = f"paramspider --domain {subdomain_name} > {ps_output}"
+			cmd = f"paramspider --domain {subdomain_name} | tee {ps_output}"
 			proxy = get_random_proxy()
 			if proxy:
-				cmd = f"paramspider --domain {subdomain_name} --proxy {proxy} > {ps_output}"
+				cmd = f"paramspider --domain {subdomain_name} --proxy {proxy} | tee {ps_output}"
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
 			if os.path.exists(ps_output):
 				try:
@@ -3332,7 +3401,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if 'linkfinder' in uses_tools:
 			logger.info(f'Running LinkFinder on {url}')
 			lf_output = f"{results_dir}/lf_{subdomain_name}.txt"
-			cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -i {url} -o cli > {lf_output}"
+			cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -i {url} -o cli | tee {lf_output}"
 			proxy = get_random_proxy()
 			if proxy:
 				cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
@@ -3397,13 +3466,32 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		retire_output = f"{results_dir}/retire_results.json"
 		cmd = f"npx -y retire --path {results_dir} --outputformat json --outputpath {retire_output}"
 		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
-		# Parse Retire.js results
 		if os.path.exists(retire_output):
 			with open(retire_output, 'r') as f:
 				data = json.load(f)
-				for result in data:
+				
+				# Retire.js results can be either a list of file results or a dictionary wrapper
+				results_list = []
+				if isinstance(data, list):
+					results_list = data
+				elif isinstance(data, dict):
+					# Check standard Retire.js dictionary output keys
+					if 'data' in data and isinstance(data['data'], list):
+						results_list = data['data']
+					elif 'results' in data and isinstance(data['results'], list):
+						results_list = data['results']
+					else:
+						results_list = [data]
+						
+				for result in results_list:
+					if not isinstance(result, dict):
+						continue
 					for component in result.get('results', []):
+						if not isinstance(component, dict):
+							continue
 						for vuln in component.get('vulnerabilities', []):
+							if not isinstance(vuln, dict):
+								continue
 							vuln_data = parse_retire_result({
 								'component': component.get('component'),
 								'version': component.get('version'),
@@ -3424,7 +3512,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			for ep in all_endpoints:
 				f.write(f"{ep.http_url}\n")
 		
-		cmd = f"cat {urls_file} | aquatone -out {aquatone_dir} -silent"
+		cmd = f"cat {urls_file} | aquatone -out {aquatone_dir}" # -silent"
 		if proxy:
 			cmd += f" -proxy {proxy}"
 		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
@@ -3917,6 +4005,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	Unfurl the urls to keep only domain and path, will be sent to vuln scan and
 	ignore certain file extensions. Thanks: https://github.com/six2dez/reconftw
 	"""
+	from startScan.models import Subdomain
 	# Config
 	config = self.yaml_configuration.get(VULNERABILITY_SCAN) or {}
 	input_path = f'{self.results_dir}/input_endpoints_vulnerability_scan.txt'
@@ -3999,7 +4088,6 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	# Build templates
 	logger.info('Updating Nuclei templates ...')
 	# Wordfence Templates integration
-	from startScan.models import Subdomain
 	is_wordpress_detected = Subdomain.objects.filter(scan_history=self.scan, technologies__name__icontains='WordPress').exists()
 	if is_wordpress_detected:
 		logger.info("WordPress detected. Preparing Wordfence Nuclei Templates...")
@@ -7058,21 +7146,54 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 	semgrep_dir = os.path.join(results_dir, f'semgrep_{mode}_temp')
 	os.makedirs(semgrep_dir, exist_ok=True)
 
-	# In secret mode, we might already have files in secrets_temp if called from secret_scanning
 	# But to be robust, we'll download files ourselves if the directory is empty
-	# We'll target JS and other sensitive files found in EndPoint
-	
 	SENSITIVE_EXTENSIONS = ('.js', '.env', '.php', '.asp', '.aspx', '.jsp', '.jspx', '.txt', '.log', '.conf', '.config', '.bak', '.old', '.json', '.yaml', '.yml')
 	
+	# Load URLs from fetch_url output files and tool-specific files
+	urls_from_files = set()
+	if os.path.exists(results_dir):
+		for f in os.listdir(results_dir):
+			if f.endswith('_fetch_url.txt') or (f.startswith('urls_') and f.endswith('.txt')):
+				fpath = os.path.join(results_dir, f)
+				try:
+					with open(fpath, 'r', encoding='utf-8', errors='ignore') as f_in:
+						for line in f_in:
+							url_str = line.strip()
+							if url_str:
+								urls_from_files.add(url_str)
+					logger.info(f"Loaded URLs from fetch_url output file: {fpath}")
+				except Exception as e:
+					logger.error(f"Failed to read file {fpath}: {e}")
+
 	endpoints = EndPoint.objects.filter(scan_history_id=scan_id)
-	target_urls = [e.http_url for e in endpoints if e.http_url.lower().endswith(SENSITIVE_EXTENSIONS)]
+	all_urls = set(e.http_url for e in endpoints)
+	all_urls.update(urls_from_files)
+	
+	# Filter sensitive URLs robustly by parsing their path component
+	target_urls = []
+	for url in all_urls:
+		try:
+			path = urlparse(url).path.lower()
+			if path.endswith(SENSITIVE_EXTENSIONS):
+				target_urls.append(url)
+		except Exception:
+			if url.lower().endswith(SENSITIVE_EXTENSIONS):
+				target_urls.append(url)
 	
 	if not target_urls:
 		logger.info(f"No target files found for Semgrep {mode} scan.")
 		return
 
-	# Download files
+	# Download files with hardened network timeouts and proxy usage
 	downloaded_count = 0
+	proxy = get_random_proxy()
+	proxies = None
+	if proxy:
+		proxies = {
+			'http': proxy,
+			'https': proxy
+		}
+
 	for url in target_urls:
 		try:
 			# Create a safe filename from URL
@@ -7085,7 +7206,7 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 			
 			if os.path.exists(filepath): continue # Skip if already exists
 			
-			resp = requests.get(url, timeout=10, verify=False)
+			resp = requests.get(url, proxies=proxies, timeout=10, verify=False)
 			if resp.status_code == 200:
 				with open(filepath, 'w', encoding='utf-8') as f:
 					f.write(resp.text)

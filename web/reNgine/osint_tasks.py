@@ -168,6 +168,9 @@ def enrich_identities_task(self, identity, identity_type, scan_history_id, ctx={
     scan_history = ScanHistory.objects.get(pk=scan_history_id)
     domain = scan_history.domain
     
+    results_dir = f"{scan_history.results_dir}/osint/gosearch"
+    os.makedirs(results_dir, exist_ok=True)
+    
     full_name = identity
     if identity_type == 'email':
         # Logic: mark.person@email.com -> Mark Person
@@ -199,7 +202,7 @@ def enrich_identities_task(self, identity, identity_type, scan_history_id, ctx={
     if not usernames and identity_type == 'email':
         # Fallback to the actual username from email
         usernames = [identity.split('@')[0]]
-
+ 
     logger.info(f"Generated usernames for {full_name}: {usernames}")
     
     # 2. Run gosearch for each username
@@ -210,7 +213,7 @@ def enrich_identities_task(self, identity, identity_type, scan_history_id, ctx={
         # We'll run it and parse output. gosearch output can be noisy.
         # It usually outputs discovered URLs.
         
-        cmd_gs = ['gosearch', '-u', username, '--no-false-positives']
+        cmd_gs = ['gosearch', '-u', username, '--no-false-positives', '-o', results_dir]
         
         # Check for proxy in ctx or global
         proxy = get_random_proxy()

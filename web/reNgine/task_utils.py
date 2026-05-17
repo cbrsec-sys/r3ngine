@@ -83,11 +83,16 @@ def run_command(
             cmd, conf_path = proxy_manager.wrap_command(cmd, proxy=proxy)
 
     # Create a command record in the database
-    command_obj = Command.objects.create(
-        command=sanitize_command_for_db(cmd),
-        time=timezone.now(),
-        scan_history_id=scan_id,
-        activity_id=activity_id)
+    from django.db import IntegrityError
+    try:
+        command_obj = Command.objects.create(
+            command=sanitize_command_for_db(cmd),
+            time=timezone.now(),
+            scan_history_id=scan_id,
+            activity_id=activity_id)
+    except IntegrityError as e:
+        logger.warning(f"Could not create Command object in DB (scan or activity may have been deleted/rolled back): {e}")
+        command_obj = None
 
     # Run the command using subprocess
     try:
@@ -120,10 +125,13 @@ def run_command(
         if conf_path and os.path.exists(conf_path):
             os.remove(conf_path)
 
-    logger.warning(f"Command {command_obj.id} finished with return code {return_code}")
-    command_obj.output = output
-    command_obj.return_code = return_code
-    command_obj.save()
+    if command_obj:
+        logger.warning(f"Command {command_obj.id} finished with return code {return_code}")
+        command_obj.output = output
+        command_obj.return_code = return_code
+        command_obj.save()
+    else:
+        logger.warning(f"Command finished with return code {return_code} (no database record saved)")
 
     if history_file:
         mode = 'a'

@@ -287,7 +287,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             const hasChildren = item.children && item.children.length > 0;
             const isOpen = openItems.includes(item.title);
             const isActive = activePath.startsWith(item.path);
-            const itemColor = isActive ? '#7000ff' : '#00f3ff';
+            const itemColor = isActive ? '#ec00ff' : '#00f3ff';
 
             return (
               <React.Fragment key={item.title}>
@@ -452,7 +452,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                   placeholder="Universal Search..."
                   sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.75rem', flex: 1, ml: 1 }}
                 />
-                <Search size={14} style={{ color: '#ff00ff', opacity: 0.8 }} />
+                <Search size={14} style={{ color: '#ec00ff', opacity: 0.8 }} />
               </Box>
 
               {!isMobileHeader ? (

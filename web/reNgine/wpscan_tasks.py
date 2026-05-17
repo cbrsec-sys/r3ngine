@@ -77,9 +77,10 @@ def save_finding(task_instance, finding, subdomain, default_title):
             else:
                 ref_urls.append(str(ref_list))
 
+    severity_num = NUCLEI_SEVERITY_MAP.get(severity, 2)
     vuln_data = {
         'name': title,
-        'severity': severity,
+        'severity': severity_num,
         'description': description,
         'type': 'WordPress',
         'references': ref_urls,

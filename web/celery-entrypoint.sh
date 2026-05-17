@@ -51,17 +51,17 @@ pip install requests==2.32.3 "urllib3>=1.26.0,<3.0.0" "charset-normalizer>=3.0.0
 pip install tenacity==8.2.2
 
 # install firefox https://askubuntu.com/a/1404401
-echo '
-Package: *
-Pin: release o=LP-PPA-mozillateam
-Pin-Priority: 1001
+# echo '
+# Package: *
+# Pin: release o=LP-PPA-mozillateam
+# Pin-Priority: 1001
 
-Package: firefox
-Pin: version 1:1snap1-0ubuntu2
-Pin-Priority: -1
-' | tee /etc/apt/preferences.d/mozilla-firefox
-apt update
-apt install firefox -y
+# Package: firefox
+# Pin: version 1:1snap1-0ubuntu2
+# Pin-Priority: -1
+# ' | tee /etc/apt/preferences.d/mozilla-firefox
+# apt update
+# apt install firefox -y
 
 # Temporary fix for whatportis bug - See https://github.com/yogeshojha/rengine/issues/984
 sed -i 's/purge()/truncate()/g' /usr/local/lib/python3.10/dist-packages/whatportis/cli.py
