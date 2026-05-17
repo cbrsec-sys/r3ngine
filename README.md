@@ -164,7 +164,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 
 ## Workflow
 
-<img src="https://github.com/whiterabb17/r3ngine/assets/17223002/10c475b8-b4a8-440d-9126-77fe2038a386">
+<img src=".github/workflows/workflows.png">
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -230,26 +230,6 @@ The r3ngine v3 frontend is built with a "Safety-First" philosophy, enforcing str
 *   **Contract Integrity**: Frontend models are strictly mapped to the auto-generated OpenAPI schema (`src/types/api.ts`). We enforce `verbatimModuleSyntax` to optimize build-time tree shaking and ensure type-only imports are explicitly marked.
 *   **Modular Architecture**: Following a feature-based structure, each module (`targets`, `scans`, `vulnerabilities`) maintains its own API hooks and types, inheriting from the global contract while providing specialized UI adaptations.
 *   **Production Hardening**: Our CI/CD pipeline validates every commit against `tsc -b` and `vite build`. We prioritize type-safe UI components over loose `any` declarations, utilizing safe type guards and defensive casting for robust API integration.
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-<p align="center">
-  <h3>Enterprise Support</h3>
-</p>
-
-<p align="center">
-  <a href="https://hailbytes.com/hardened-ubuntu-rengine/" target="_blank">
-    <img src="https://hailbytes.com/wp-content/uploads/2020/04/HailBytes-Logo-2023-350-%C3%97-100-px.png" alt="HailBytes - Enterprise reNgine Support" height="60"/>
-  </a>
-</p>
-
-<p align="center">
-  Official enterprise-grade support, deployment, and maintenance services for reNgine are available through <a href="https://hailbytes.com">HailBytes</a>.
-</p>
-
-<p align="center">
-You can also find the deep dive video on how to use and install reNgine from here <a href="https://www.youtube.com/watch?v=C6BFBxLmZIA">reNgine Deep Dive by HailBytes</a>
-</p>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 

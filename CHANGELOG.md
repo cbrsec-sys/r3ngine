@@ -4,11 +4,14 @@
 
 ### [v3.0.0-rc7] - 2026-05-17
 
-### Fixed
+- **Mobile Notification Header Styling**: Restored appropriate dark styling (`Theme.colors.surface`) and readable title/icon color tokens (`Theme.colors.primary` / `Theme.colors.text`) to the mobile companion app's Notification Center (bell icon scan history drawer) header, preventing an unreadable white header issue under React Native Stack presentation modals.
 - **APME Path Persistence Database Constraint Resolution**: Resolved a database unique constraint violation in the Attack Path Modeling Engine by separating lookup and update logic depending on whether a representative vulnerability exists, preventing duplicate key database crashes on `ImpactAssessment` creation.
 - **Vulnerability Scan Engine Fault-Isolation**: Enhanced the Celery base class `RengineTask` to suppress exception propagation for vulnerability scanner sub-tasks (e.g. `nuclei_scan`, `acunetix_scan`, `crlfuzz_scan`, `s3scanner`, `cpanel_scan`, `wpscan_scan`, `react2shell_scan`, `semgrep_scan`). This preserves the Celery chord callback (`finish_vulnerability_scan`), preventing a single scanner tool's failure from halting or aborting the rest of the scanning engine.
 - **Vulnerability Sub-Task Tracking**: Mapped `react2shell_scan`, `semgrep_scan`, and `crlfuzz_scan` inside the `RengineTask`'s `dependent_tasks` mapping to guarantee all scan activity and sub-task statuses are tracked and persisted.
-- **Celery Starvation & Join Deadlock Resolution after Nmap**: Resolved an indefinite scanning stall/hang after Nmap runs by executing nmap tasks synchronously in-process via Celery's eager `.apply()` execution wrapper, completely bypassing Celery worker pool starvation and result-backend synchronization deadlocks.
+- **Retire.js Parser Hardening**: Fixed an `AttributeError` in the `web_api_discovery` Retire.js parser by handling string type return values when no vulnerable libraries are found, preventing scanning task failure.
+- **Nuclei Scan Import Resiliency**: Resolved a name resolution/unbound local variable error in `nuclei_scan` by correctly importing and referencing the `Subdomain` model when processing vulnerability scan results.
+- **Result Path Isolation**: Configured the scanning output directory structure to persistently separate scan runs per target and scan ID (`scan_results/{target}_{scanId}`), preventing overlapping tool runs from overwriting each other.
+- **Celery Chord & Chain Synchronization**: Re-orchestrated the scan pipeline's task dependencies to run vulnerability scans in a coordinated Celery chord, ensuring that subsequent downstream engines (e.g. `APME` and `ERL`) wait for all vulnerability sub-tasks to finish before starting.
 
 ### [v3.0.0-rc6] - 2026-05-16
 
@@ -21,24 +24,6 @@
 - **Mobile Companion Documentation**: Integrated high-fidelity visual documentation into the `r3ngine-mobile` repository, including a functional interface walkthrough and core UI screenshots.
 - **Clear Logs Button**: Added a beautifully styled outlined button in the headerAction of the web dashboard's telemetry panel ([StressTestingPage.tsx](file:///d:/Repos/r3ngine/frontend/src/pages/StressTestingPage.tsx)) that completely clears the telemetry store logs on-demand.
 - **Mobile Stress Telemetry Cockpit**: Built a high-fidelity, real-time stress testing telemetry dashboard in the `r3ngine-mobile` companion app (`app/scan/stress/[id].tsx`) featuring lightweight custom SVG line and bar charts, a live raw console log terminal with dynamic filters, haptic feedback abort controls (Kill Switch), and glassmorphic muted report triggers.
-
-### Fixed
-- **Zero-Reload Kill Switch State Transition**: Updated the Kill Switch action on both the web dashboard ([StressTestingPage.tsx](file:///d:/Repos/r3ngine/frontend/src/pages/StressTestingPage.tsx)) and the mobile companion app ([id].tsx](file:///d:/Repos/r3ngine/r3ngine-mobile/app/scan/stress/%5Bid%5D.tsx)) to immediately reset the UI scanning and standby states on success, removing the requirement for a page/screen reload.
-- **Proxy Authentication Guard**: Enhanced `get_random_proxy` in [common_func.py](file:///d:/Repos/r3ngine/web/reNgine/common_func.py) and `ProxychainsWrapper` in [opsec_utils.py](file:///d:/Repos/r3ngine/web/reNgine/opsec_utils.py) to perform strict validation checks for `407 Proxy Authentication Required` status codes and authentication headers before selecting a proxy. This guarantees that dead or password-locked proxies are automatically skipped and replaced, preventing scanning tools from failing with proxy authentication errors.
-- **Adaptive Stress Analysis Chart Overlap**: Adjusted the Endpoint Saturation heatmap's grid right boundary to `'18%'` and visualMap position to `'2%'` to resolve and prevent overlapping labels and colors on the dashboard.
-- **Muted Generate Report Button**: Replaced the high-intensity secondary background gradient and glow of the "Generate Report" button with an elegant alpha-blended transparent look (`alpha(theme.palette.secondary.main, 0.15)`) to align with the dashboard's visual hierarchy.
-- **In-App Notification and Celery Status Crash**: Resolved an `UnboundLocalError` inside `generate_inapp_notification` by defensively initializing notification attributes. Mapped final celery notification statuses to Definitions-supported keys (`'SUCCESS'`, `'ABORTED'`, `'FAILED'`), fixing the `None` severity warnings in Celery logs.
-- **Static Asset Management Optimization**:
-  - **Deduplicated Static Sources**: Refactored `STATICFILES_DIRS` to prevent "Found another file" warnings during container startup by prioritizing image-internal assets.
-  - **Automated Cache Busting**: Implemented version-based query parameters (`?v=...`) for all frontend JavaScript and CSS assets, ensuring clients always load the latest versions after updates.
-  - **Clean Static Collection**: Added the `--clear` flag to the `collectstatic` process in the container entrypoint to ensure stale or orphaned assets are removed before deployment.
-  - **Fixed Circular Imports**: Resolved a critical startup failure in Celery and management commands by conditionally initializing Django in `celery.py`, preventing recursion during settings loading.
-  - **PyOpenSSL Compatibility**: Fixed `TypeError: deprecated() got an unexpected keyword argument 'name'` by enforcing `pyOpenSSL>=24.0.0` in `requirements.txt`, resolving conflicts with newer `cryptography` versions.
-  - **Daphne HTTP/2 Support**: Enabled HTTP/2 and TLS support in Daphne by adding `h2`, `priority`, and `service_identity` to `requirements.txt`.
-- **Semgrep Rule Synchronization Fix**:
-  - Replaced deprecated `semgrep --generate-config` flag with a robust `requests`-based sync engine that downloads YAML rules directly from the official registry.
-  - Corrected registry naming for OWASP Top 10 (`p/owasp-top-ten`) and verified successful synchronization for `secrets`, `ci`, `javascript`, and `python` rulesets.
-  - Improved local rule persistence to `/usr/src/github/semgrep_rules/` to ensure scanning stability in containerized environments.
 
 ### [v3.0.0-rc5] - 2026-05-15
 
@@ -65,10 +50,6 @@
   - **Automated Performance Insights**: Integrated LLM-generated executive summaries for stress test results, covering bottleneck analysis and resilience scoring.
   - **Advanced Visualizations**: Added dedicated PDF charts for latency distribution, throughput stability, and endpoint saturation.
   - **Dashboard Integration**: Added on-demand report generation directly from the Stress Testing dashboard.
-
-### Fixed
-- **Report Generation Pipeline**: Resolved a critical `'NoneType' object has no attribute 'replace'` error occurring when the executive summary description was left empty in report settings.
-- **Model Resilience**: Added default empty string values to report configuration fields to prevent future serialization and string replacement failures.
 
 ## [v3.0.0-rc3] - 2026-05-15
 

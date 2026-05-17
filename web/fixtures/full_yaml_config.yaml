@@ -9,7 +9,7 @@
 # retries: 1                        # Nuclei
 
 subdomain_discovery: {
-  'uses_tools': ['subfinder', 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas'],  # amass-passive, amass-active, reconx All
+  'uses_tools': ['subfinder', 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'baddns'],  # amass-passive, amass-active, reconx All
   'enable_http_crawl': true,
   'threads': 30,
   'timeout': 5,
@@ -32,7 +32,7 @@ port_scan: {
   'passive': false,
   # 'use_naabu_config': false,
   # 'enable_nmap': true,
-  # 'nmap_cmd': 'nmap -vv -Pn',
+  # 'nmap_cmd': 'nmap -vv -Pn ',
   # 'nmap_script': '',
   # 'nmap_script_args': ''
 }
@@ -166,7 +166,7 @@ screenshot: {
   'threads': 40
 }
 web_api_discovery: {
-  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'],
+  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep', 'retire'],
   'scan_only_active': true,
   'threads': 30,
   'timeout': 5,

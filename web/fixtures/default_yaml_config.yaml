@@ -32,7 +32,7 @@ port_scan: {
   'passive': false,
   # 'use_naabu_config': false,
   # 'enable_nmap': true,
-  # 'nmap_cmd': '',
+  # 'nmap_cmd': 'nmap -vv -Pn ',
   # 'nmap_script': '',
   # 'nmap_script_args': ''
 }
@@ -68,7 +68,7 @@ dir_file_fuzz: {
   'rate_limit': 150,
   'extensions': ['html', 'php','git','yaml','conf','cnf','config','gz','env','log','db','mysql','bak','asp','aspx','txt','conf','sql','json','yml','pdf'],
   'follow_redirect': false,
-  'max_time': 0,
+  'max_time': 120,
   'match_http_status': [200, 204],
   'recursive_level': 2,
   'stop_on_error': false,
@@ -83,7 +83,7 @@ fetch_url: {
   'enable_http_crawl': true,
   'gf_patterns': ['debug_logic', 'idor', 'interestingEXT', 'interestingparams', 'interestingsubs', 'lfi', 'rce', 'redirect', 'sqli', 'ssrf', 'ssti', 'xss'],
   'ignore_file_extensions': ['png', 'jpg', 'jpeg', 'gif', 'mp4', 'mpeg', 'mp3'],
-  'threads': 30,
+  'threads': 20,
   # 'exclude_subdomains': false
 }
 vulnerability_scan: {
@@ -92,6 +92,7 @@ vulnerability_scan: {
   'run_crlfuzz': false,
   'run_s3scanner': false,
   'enable_http_crawl': true,
+  'run_acunetix': false,
   'concurrency': 50,
   'intensity': 'normal',
   'rate_limit': 150,
@@ -110,10 +111,6 @@ vulnerability_scan: {
     'cpanel_user_wordlist': '/usr/src/app/wordlist/auth/cpanel_users.txt',
     'proxy_type': 'rotating'
   },
-  'attack_path_modeling': {
-    'enabled': true,
-    'top_n': 5
-  },
   'run_wpscan': true,
   'wpscan_enumeration': 'vp,vt,u',
   'wpscan_detection_mode': 'mixed'
@@ -123,6 +120,11 @@ leaks_and_secrets: {
   'gitleaks': true,
   'trufflehog': true,
   'leaklookup': false
+}
+
+attack_path_modeling: {
+    'enabled': true,
+    'top_n': 5
 }
 
 waf_detection: {
@@ -145,15 +147,15 @@ firewall_vpn_scan: {
   'ports': [443, 4444, 8443],     # Ports to audit for VPN/Admin portals
 }
 brute_force_scan: {
-  'users_wordlist': ['top-100-users'], # Wordlist names from reNgine Vault
+  'users_wordlist': ['top-100-users'],                          # Wordlist names from reNgine Vault
   'pass_wordlist': ['top-100-pass'],
-  'service': 'http',              # Target service (http, ssh, etc.)
-  'max_retries': 3,               # Max consecutive fatal errors before stopping
-  # 'port': 443                   # Optional: Specific port override
+  'services': ['ssh', 'ftp', 'http', 'smb', 'rdp', 'telnet'],   # Target service (http, ssh, etc.)
+  'max_retries': 3,                                             # Max consecutive fatal errors before stopping
+  # 'port': 443                                                 # Optional: Specific port override
 }
 spiderfoot_scan: {
   'modules': 'all',               # SF modules to run (comma separated or 'all')
-  # 'use_api_keys': true,         # Explicitly use API keys from SF config
+  'intensity': 'normal',          # SF intensity (normal, investigative, deep)
 }
 screenshot: {
   'enable_http_crawl': true,
@@ -162,7 +164,7 @@ screenshot: {
   'threads': 40
 }
 web_api_discovery: {
-  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'],
+  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep', 'retire'],
   'scan_only_active': true,
   'threads': 30,
   'timeout': 5,

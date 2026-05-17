@@ -214,28 +214,33 @@ class RengineTask(Task):
 			return
 		from startScan.models import ScanActivity
 		celery_id = self.request.id
-		self.activity = ScanActivity(
-			name=self.task_name,
-			title=self.description,
-			time=timezone.now(),
-			status=RUNNING_TASK,
-			celery_id=celery_id)
-		self.activity.save()
-		self.activity_id = self.activity.id
-		if self.scan:
-			self.activity.scan_of = self.scan
+		try:
+			self.activity = ScanActivity(
+				name=self.task_name,
+				title=self.description,
+				time=timezone.now(),
+				status=RUNNING_TASK,
+				celery_id=celery_id)
 			self.activity.save()
-			self.scan.celery_ids.append(celery_id)
-			self.scan.save()
-		if self.subscan:
-			self.subscan.celery_ids.append(celery_id)
-			self.subscan.save()
+			self.activity_id = self.activity.id
+			if self.scan:
+				self.activity.scan_of = self.scan
+				self.activity.save()
+				self.scan.celery_ids.append(celery_id)
+				self.scan.save()
+			if self.subscan:
+				self.subscan.celery_ids.append(celery_id)
+				self.subscan.save()
+		except Exception as e:
+			logger.warning(f"Could not create ScanActivity record in DB (scan may have been deleted/rolled back): {e}")
+			self.activity = None
+			self.activity_id = None
 
 		# Send notification
 		self.notify()
 
 	def update_scan_activity(self):
-		if not self.track:
+		if not self.track or not getattr(self, 'activity', None):
 			return
 
 		# Trim error before saving to DB
@@ -243,11 +248,14 @@ class RengineTask(Task):
 		if self.error and len(self.error) > 300:
 			error_message = self.error[:288] + '...[trimmed]'
 
-		self.activity.status = self.status
-		self.activity.error_message = error_message
-		self.activity.traceback = self.traceback
-		self.activity.time = timezone.now()
-		self.activity.save()
+		try:
+			self.activity.status = self.status
+			self.activity.error_message = error_message
+			self.activity.traceback = self.traceback
+			self.activity.time = timezone.now()
+			self.activity.save()
+		except Exception as e:
+			logger.warning(f"Could not update ScanActivity record in DB: {e}")
 
 		# # Update scan status if task failed
 		# if self.status == FAILED_TASK:

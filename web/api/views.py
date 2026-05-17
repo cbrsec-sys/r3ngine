@@ -4201,9 +4201,9 @@ class NotificationSettingsAPIView(APIView):
 class MobileMediaServeView(APIView):
 	permission_classes = [AllowAny]
 	def get(self, request):
-		logger.warning(f"!!! MobileMediaServeView HIT !!! User authenticated: {request.user.is_authenticated}")
+		#logger.warning(f"!!! MobileMediaServeView HIT !!! User authenticated: {request.user.is_authenticated}")
 		path = request.query_params.get('path')
-		logger.warning(f"!!! Path requested: {path} !!!")
+		#logger.warning(f"!!! Path requested: {path} !!!")
 		if not path:
 			return Response({'error': 'Path is required'}, status=status.HTTP_400_BAD_REQUEST)
 		
@@ -4223,7 +4223,7 @@ class MobileMediaServeView(APIView):
 		path = path.lstrip('/')
 		file_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, path))
 		
-		logger.info(f"MobileMediaServeView: path={path}, file_path={file_path}, MEDIA_ROOT={settings.MEDIA_ROOT}")
+		#logger.info(f"MobileMediaServeView: path={path}, file_path={file_path}, MEDIA_ROOT={settings.MEDIA_ROOT}")
 		
 		# Security check
 		if not is_safe_path(settings.MEDIA_ROOT, file_path):
@@ -4235,7 +4235,7 @@ class MobileMediaServeView(APIView):
 				raise Http404("File not found")
 				
 			content_type, _ = mimetypes.guess_type(file_path)
-			logger.warning(f"!!! MobileMediaServeView: Returning file with content_type={content_type} !!!")
+			#logger.warning(f"!!! MobileMediaServeView: Returning file with content_type={content_type} !!!")
 			return FileResponse(open(file_path, 'rb'), content_type=content_type)
 		else:
 			logger.error(f"File not found: {file_path}")

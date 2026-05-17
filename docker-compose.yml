@@ -42,7 +42,7 @@ services:
     command: celery -A reNgine worker --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l WARNING
     volumes:
       - ./web:/usr/src/app
-      - ./frontend:/usr/src/app/frontend
+      #- ./frontend:/usr/src/app/frontend
       - github_repos:/usr/src/github
       - wordlist:/usr/src/wordlist
       - scan_results:/usr/src/scan_results
@@ -50,7 +50,7 @@ services:
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
-      - plugins_data:/usr/src/app/plugins_data
+      #- plugins_data:/usr/src/app/plugins_data
     environment:
       - DEBUG=0
       - CELERY_BROKER=redis://redis:6379/0
@@ -101,7 +101,7 @@ services:
       - gf_patterns:/root/.gf
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
-      - plugins_data:/usr/src/app/plugins_data
+      #- plugins_data:/usr/src/app/plugins_data
     networks:
       - r3ngine_network
       
@@ -125,8 +125,8 @@ services:
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
     volumes:
       - ./web:/usr/src/app
-      - ./frontend:/usr/src/app/frontend
-      - /usr/src/app/frontend/node_modules
+      #- ./frontend:/usr/src/app/frontend
+      #- /usr/src/app/frontend/node_modules
       - github_repos:/usr/src/github
       - wordlist:/usr/src/wordlist
       - scan_results:/usr/src/scan_results
@@ -134,7 +134,7 @@ services:
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
-      - plugins_data:/usr/src/app/plugins_data
+      #- plugins_data:/usr/src/app/plugins_data
     ports:
       - "8000:8000"
       - "5173:5173"
