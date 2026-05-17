@@ -3799,8 +3799,7 @@ from rest_framework.permissions import AllowAny
 class DirectoryViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsAuditor]
 
-
-	queryset = DirectoryFile.objects.none()
+	queryset = EndPoint.objects.none()
 	serializer_class = DirectoryFileSerializer
 
 	def get_queryset(self):
@@ -3809,20 +3808,16 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 		subdomain_id = req.query_params.get('subdomain_id')
 		
 		if not (scan_id or subdomain_id):
-			return DirectoryFile.objects.none()
+			return EndPoint.objects.none()
 
-		subdomains = Subdomain.objects.none()
-		if subdomain_id:
-			subdomains = Subdomain.objects.filter(id=subdomain_id)
-		elif scan_id:
-			subdomains = Subdomain.objects.filter(scan_history__id=scan_id)
+		queryset = EndPoint.objects.filter(scan_history__id=scan_id)
+		if subdomain_id and subdomain_id != '0':
+			queryset = queryset.filter(subdomain__id=subdomain_id)
 		
-		dirs_scans = DirectoryScan.objects.filter(directories__in=subdomains)
-		return (
-			DirectoryFile.objects
-			.filter(directory_files__in=dirs_scans)
-			.distinct()
-		)
+		return queryset.order_by('http_url')
+
+	def get_serializer_class(self):
+		return EndPointDirectorySerializer
 
 	def list(self, request, *args, **kwargs):
 		scan_id = self.request.query_params.get('scan_history')
@@ -3834,10 +3829,9 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 
 		# If subdomain_id is missing, return list of subdomains that have findings
 		if scan_id and not subdomain_id:
-
 			subdomains = Subdomain.objects.filter(
 				scan_history__id=scan_id,
-				directories__isnull=False
+				endpoint__isnull=False
 			).distinct()
 			
 			results = []
@@ -3845,7 +3839,7 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 				results.append({
 					'id': sd.id,
 					'name': sd.name,
-					'directory_count': DirectoryFile.objects.filter(directory_files__directories=sd).distinct().count()
+					'directory_count': EndPoint.objects.filter(scan_history__id=scan_id, subdomain=sd).count()
 				})
 			return Response({
 				'count': len(results),
@@ -3853,7 +3847,7 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 				'previous': None,
 				'results': results
 			})
-			
+		
 		return super().list(request, *args, **kwargs)
 
 

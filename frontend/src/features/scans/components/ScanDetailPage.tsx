@@ -78,7 +78,8 @@ import {
   X,
   Copy,
   RefreshCw,
-  GitBranch
+  GitBranch,
+  Brain
 } from 'lucide-react';
 import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois } from '../api';
 import type { Command, SubScan, Vulnerability, ScanActivity, Subdomain, ScanSummaryResponse, TodoNote } from '../types';
@@ -90,6 +91,7 @@ import { DirectoriesTab } from './DirectoriesTab';
 import { EndpointsTab } from './EndpointsTab';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { VulnerabilityTable } from '../../vulnerabilities/components/VulnerabilityTable';
+import { useGptVulnerabilityDetails } from '../../vulnerabilities/api';
 import { SecretLeaksTab } from './SecretLeaksTab';
 import { AttackSurfaceTab } from './AttackSurfaceTab';
 import VisualizationTab from './VisualizationTab';
@@ -134,12 +136,37 @@ const VulnerabilityInfoModal: React.FC<{
   onClose: () => void;
   vulnerability: any;
 }> = ({ open, onClose, vulnerability }) => {
-  if (!vulnerability) return null;
+  const gptMutation = useGptVulnerabilityDetails();
+  const [localVuln, setLocalVuln] = useState<any>(null);
 
-  const severityColor = Number(vulnerability.severity) === 4 ? '#ff003c' :
-    Number(vulnerability.severity) === 3 ? '#ff9f00' :
-      Number(vulnerability.severity) === 2 ? '#fffc00' :
-        Number(vulnerability.severity) === 1 ? '#00ff62' : '#00f3ff';
+  React.useEffect(() => {
+    setLocalVuln(vulnerability);
+  }, [vulnerability]);
+
+  if (!localVuln) return null;
+
+  const severityColor = Number(localVuln.severity) === 4 ? '#ff003c' :
+    Number(localVuln.severity) === 3 ? '#ff9f00' :
+      Number(localVuln.severity) === 2 ? '#fffc00' :
+        Number(localVuln.severity) === 1 ? '#00ff62' : '#00f3ff';
+
+  const handleFetchGpt = async () => {
+    if (!localVuln) return;
+    try {
+      const result = await gptMutation.mutateAsync({ id: localVuln.id!, name: localVuln.name });
+      if (result.status) {
+        setLocalVuln((prev: any) => ({
+          ...prev,
+          description: result.description,
+          impact: result.impact,
+          remediation: result.remediation,
+          references: result.references?.join('\n') || prev.references || ''
+        }));
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   return (
     <Dialog
@@ -165,9 +192,9 @@ const VulnerabilityInfoModal: React.FC<{
           <Bug size={24} color={severityColor} />
           <Box>
             <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: '1.1rem', letterSpacing: 1, fontFamily: 'Orbitron' }}>
-              {vulnerability.name}
+              {localVuln.name}
             </Typography>
-            <SeverityBadge severity={Number(vulnerability.severity)} />
+            <SeverityBadge severity={Number(localVuln.severity)} />
           </Box>
         </Stack>
         <IconButton onClick={onClose} sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' } }}>
@@ -184,20 +211,20 @@ const VulnerabilityInfoModal: React.FC<{
             <Grid container spacing={2}>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS SCORE</Typography>
-                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 900 }}>{vulnerability.cvss_score || 'N/A'}</Typography>
+                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 900 }}>{localVuln.cvss_score || 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS METRICS</Typography>
-                <Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>{vulnerability.cvss_metrics || 'N/A'}</Typography>
+                <Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>{localVuln.cvss_metrics || 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>SOURCE</Typography>
-                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 700 }}>{vulnerability.source || 'N/A'}</Typography>
+                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 700 }}>{localVuln.source || 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>TAGS</Typography>
                 <Stack direction="row" sx={{ spacing: 0.5, flexWrap: "wrap" }}>
-                  {vulnerability.tags?.map((tag: any, i: number) => (
+                  {localVuln.tags?.map((tag: any, i: number) => (
                     <Chip
                       key={i}
                       label={tag.name}
@@ -222,30 +249,42 @@ const VulnerabilityInfoModal: React.FC<{
               Description
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-              {vulnerability.description || 'No description provided.'}
+              {localVuln.description || 'No description provided.'}
             </Typography>
           </Box>
 
+          {/* Impact Section */}
+          {localVuln.impact && (
+            <Box>
+              <Typography sx={{ color: '#ff003c', fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Impact
+              </Typography>
+              <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                {localVuln.impact}
+              </Typography>
+            </Box>
+          )}
+
           {/* Remediation Section */}
-          {vulnerability.remediation && (
+          {localVuln.remediation && (
             <Box>
               <Typography sx={{ color: '#00ff62', fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
                 Remediation
               </Typography>
               <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                {vulnerability.remediation}
+                {localVuln.remediation}
               </Typography>
             </Box>
           )}
 
           {/* References Section */}
-          {vulnerability.references && (
+          {localVuln.references && (
             <Box>
               <Typography sx={{ color: '#00f3ff', fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
                 References
               </Typography>
               <Stack spacing={1}>
-                {vulnerability.references.split('\n').filter(Boolean).map((ref: string, i: number) => (
+                {localVuln.references.split('\n').filter(Boolean).map((ref: string, i: number) => (
                   <Link
                     key={i}
                     href={ref}
@@ -269,7 +308,37 @@ const VulnerabilityInfoModal: React.FC<{
           )}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+      <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Button
+          onClick={handleFetchGpt}
+          disabled={gptMutation.isPending}
+          startIcon={gptMutation.isPending ? <CircularProgress size={14} sx={{ color: '#fffc00' }} /> : <Brain size={14} />}
+          sx={{
+            bgcolor: 'rgba(255, 252, 0, 0.1)',
+            color: '#fffc00',
+            border: '1px solid rgba(255, 252, 0, 0.3)',
+            fontFamily: 'Orbitron',
+            fontSize: '0.75rem',
+            fontWeight: 900,
+            px: 2.5,
+            py: 1,
+            borderRadius: '4px',
+            textShadow: '0 0 10px rgba(255, 252, 0, 0.3)',
+            boxShadow: '0 0 15px rgba(255, 252, 0, 0.05)',
+            '&:hover': {
+              bgcolor: 'rgba(255, 252, 0, 0.2)',
+              borderColor: '#fffc00',
+              boxShadow: '0 0 20px rgba(255, 252, 0, 0.15)'
+            },
+            '&.Mui-disabled': {
+              color: 'rgba(255, 252, 0, 0.5)',
+              borderColor: 'rgba(255, 252, 0, 0.1)',
+              bgcolor: 'rgba(255, 252, 0, 0.05)'
+            }
+          }}
+        >
+          {gptMutation.isPending ? 'THINKING...' : 'AI ANALYSIS'}
+        </Button>
         <Button
           onClick={onClose}
           sx={{

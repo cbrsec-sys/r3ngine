@@ -139,7 +139,8 @@ class RengineTask(Task):
 					self.update_scan_activity()
 				return json.loads(result)
 
-		from celery.exceptions import Ignore
+		from celery.exceptions import Ignore, Retry
+		self.is_retrying = False
 		# Execute task, catch exceptions and update ScanActivity object after
 		# task has finished running.
 		try:
@@ -149,6 +150,10 @@ class RengineTask(Task):
 		except Ignore as exc:
 			# If the task is replaced, it's not a failure
 			self.status = SUCCESS_TASK
+			raise exc
+
+		except Retry as exc:
+			self.is_retrying = True
 			raise exc
 
 		except Exception as exc:
@@ -180,13 +185,14 @@ class RengineTask(Task):
 			logger.exception(exc)
 
 		finally:
-			self.write_results()
+			if not self.is_retrying:
+				self.write_results()
 
-			if RENGINE_RECORD_ENABLED and self.track:
-				msg = f'Task {self.task_name} status is {self.status_str}'
-				msg += f' | Error: {self.error}' if self.error else ''
-				logger.warning(msg)
-				self.update_scan_activity()
+				if RENGINE_RECORD_ENABLED and self.track:
+					msg = f'Task {self.task_name} status is {self.status_str}'
+					msg += f' | Error: {self.error}' if self.error else ''
+					logger.warning(msg)
+					self.update_scan_activity()
 
 		# Set task result in cache if task was successful
 		if RENGINE_CACHE_ENABLED and self.status == SUCCESS_TASK and result:
