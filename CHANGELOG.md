@@ -4,6 +4,12 @@
 
 ### [v3.0.0-rc8] - 2026-05-19
 
+- **Vulnerability Scan Pipeline Synchronization**:
+  - Refactored the vulnerability scanning pipeline in `tasks.py` by implementing a blocking 2-stage execution flow that runs Stage 1 (primary tools: Nuclei, CRLFuzz, Dalfox, S3Scanner) and Stage 2 (additional tools: Acunetix, WPScan, cPanel, React2Shell, Semgrep) sequentially.
+  - Wrapped vulnerability tasks resolution in helper functions `resolve_primary_vulnerability_tasks` and `resolve_additional_vulnerability_tasks`.
+  - Configured `vulnerability_scan` to use Celery's `allow_join_result()` blocking mechanism to prevent out-of-order execution of downstream post-scan engines.
+  - Updated orchestrator triggers in `initiate_scan` and `initiate_subscan` to queue the parent `vulnerability_scan` task signature instead of expanding grouped signatures.
+
 - **Subscan and Vulnerability Scan Stability Bugfixes**:
   - **Vulnerability Scan Engine Stalling**: Refactored `nuclei_scan` to run individual severities sequentially and synchronously within a single task context. This eliminates the Celery `self.replace()` task-chaining anti-pattern, ensuring the parent chord barrier is respected and preventing premature callbacks, infinite post-processing retry loops, and queue stalls.
   - **Standardized React2Shell Command**: Refactored `react2shell_scan` in `vulnerability_tasks.py` to use `stream_command` instead of raw `subprocess.run`, standardizing database command history tracking, real-time log streaming, and dynamic proxychains wrapping.
