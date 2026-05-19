@@ -26,7 +26,9 @@ def bulk_import_targets(
 	monitor_engine_id: int = None,
 	monitor_scan_scope: str = 'none',
 	starting_point_path: str = None,
-	excluded_paths: list = None):
+	excluded_paths: list = None,
+	in_scope_ips: str = None,
+	secondary_domains: str = None):
 	""" 
 		Used to import targets in reNgine
 
@@ -36,6 +38,8 @@ def bulk_import_targets(
 			organization_name (str): name of the organization to tag these targets
 			org_description (str): description of the organization
 			h1_team_handle (str): hackerone team handle (if imported from hackerone)
+			in_scope_ips (str, optional): manually specified newline-separated in-scope IPs or Ranges
+			secondary_domains (str, optional): manually specified newline-separated secondary domains/URLs
 
 		Returns:
 			bool: True if new targets are imported, False otherwise
@@ -67,11 +71,11 @@ def bulk_import_targets(
 		logger.info(f'{name} | Domain? {is_domain} | IP? {is_ip} | URL? {is_url}')
 
 		if is_domain:
-			target_obj = store_domain(name, project, description, h1_team_handle, starting_point_path, excluded_paths)
+			target_obj = store_domain(name, project, description, h1_team_handle, starting_point_path, excluded_paths, in_scope_ips, secondary_domains)
 		elif is_url:
-			target_obj = store_url(name, project, description, h1_team_handle, starting_point_path, excluded_paths)
+			target_obj = store_url(name, project, description, h1_team_handle, starting_point_path, excluded_paths, in_scope_ips, secondary_domains)
 		elif is_ip:
-			target_obj = store_ip(name, project, description, h1_team_handle, starting_point_path, excluded_paths)
+			target_obj = store_ip(name, project, description, h1_team_handle, starting_point_path, excluded_paths, in_scope_ips, secondary_domains)
 		else:
 			logger.warning(f'{name} is not supported by reNgine')
 			continue
@@ -118,7 +122,6 @@ def bulk_import_targets(
 	return new_targets_imported
 
 
-
 def remove_wildcard(input_string):
 	"""
 		Remove wildcard (*) from the beginning of the input string.
@@ -126,7 +129,7 @@ def remove_wildcard(input_string):
 	"""
 	return re.sub(r'^\*\.', '', input_string)
 
-def store_domain(domain_name, project, description, h1_team_handle, starting_point_path=None, excluded_paths=None):
+def store_domain(domain_name, project, description, h1_team_handle, starting_point_path=None, excluded_paths=None, in_scope_ips=None, secondary_domains=None):
 	"""
 		This function is used to store domain in reNgine
 	"""
@@ -145,14 +148,16 @@ def store_domain(domain_name, project, description, h1_team_handle, starting_poi
 		project=project,
 		insert_date=current_time,
 		starting_point_path=starting_point_path,
-		excluded_paths=excluded_paths or []
+		excluded_paths=excluded_paths or [],
+		in_scope_ips=in_scope_ips,
+		secondary_domains=secondary_domains
 	)
 
 	logger.info(f'Added new domain {new_domain.name}')
 
 	return new_domain
 
-def store_url(url, project, description, h1_team_handle, starting_point_path=None, excluded_paths=None):
+def store_url(url, project, description, h1_team_handle, starting_point_path=None, excluded_paths=None, in_scope_ips=None, secondary_domains=None):
 	parsed_url = urlparse(url)
 	http_url = parsed_url.geturl()
 	domain_name = parsed_url.netloc
@@ -170,7 +175,9 @@ def store_url(url, project, description, h1_team_handle, starting_point_path=Non
 			project=project,
 			insert_date=timezone.now(),
 			starting_point_path=starting_point_path,
-			excluded_paths=excluded_paths or []
+			excluded_paths=excluded_paths or [],
+			in_scope_ips=in_scope_ips,
+			secondary_domains=secondary_domains
 		)
 		logger.info(f'Added new domain {domain.name}')
 
@@ -181,7 +188,7 @@ def store_url(url, project, description, h1_team_handle, starting_point_path=Non
 
 	return domain
 
-def store_ip(ip_address, project, description, h1_team_handle, starting_point_path=None, excluded_paths=None):
+def store_ip(ip_address, project, description, h1_team_handle, starting_point_path=None, excluded_paths=None, in_scope_ips=None, secondary_domains=None):
 
 	domain = Domain.objects.filter(name=ip_address).first()
 	
@@ -196,7 +203,9 @@ def store_ip(ip_address, project, description, h1_team_handle, starting_point_pa
 			insert_date=timezone.now(),
 			ip_address_cidr=ip_address,
 			starting_point_path=starting_point_path,
-			excluded_paths=excluded_paths or []
+			excluded_paths=excluded_paths or [],
+			in_scope_ips=in_scope_ips,
+			secondary_domains=secondary_domains
 		)
 		logger.info(f'Added new domain {domain.name}')
 	

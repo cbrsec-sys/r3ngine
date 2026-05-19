@@ -46,12 +46,30 @@ def _infer_sensitivity(name: str) -> str:
 
 def ingest_subdomains(target_id: int) -> Tuple[List[Node], List[Edge]]:
     """
-    Ingests Subdomains and their IP addresses for a given target domain.
+    Ingests Subdomains and their IP addresses for a given target domain, including the root Domain.
     """
-    from startScan.models import Subdomain
+    from startScan.models import Subdomain, Domain
 
     nodes: List[Node] = []
     edges: List[Edge] = []
+
+    # Ingest the root domain itself first if it exists
+    try:
+        root_domain = Domain.objects.get(id=target_id)
+        root_node = Node(
+            id=_make_id("domain", root_domain.name),
+            type="Asset",
+            subtype="domain",
+            confidence=1.0,
+            source="reNgine:domain_discovery",
+            properties={
+                "name": root_domain.name,
+                "sensitivity": _infer_sensitivity(root_domain.name),
+            },
+        )
+        nodes.append(root_node)
+    except Domain.DoesNotExist:
+        pass
 
     subdomains = Subdomain.objects.filter(
         target_domain_id=target_id

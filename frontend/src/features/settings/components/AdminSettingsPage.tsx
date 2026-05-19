@@ -44,7 +44,7 @@ const textFieldStyle = {
 };
 
 const ROLES = [
-  { value: 'system_administrator', label: 'Sys Admin' },
+  { value: 'sys_admin', label: 'Sys Admin' },
   { value: 'auditor', label: 'Auditor' },
   { value: 'penetration_tester', label: 'Penetration Tester' },
 ];

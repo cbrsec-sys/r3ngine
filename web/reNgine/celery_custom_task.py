@@ -216,11 +216,26 @@ class RengineTask(Task):
 			logger.warning(f'Wrote {self.task_name} results to {self.output_path}')
 
 	def create_scan_activity(self):
+		"""Create or update a ScanActivity record in the database for task execution tracking.
+		
+		Avoids duplicate records on task retries by checking for existing celery_id.
+		"""
 		if not self.track:
 			return
 		from startScan.models import ScanActivity
 		celery_id = self.request.id
 		try:
+			# Check if activity already exists for this task execution (e.g. on retry)
+			if celery_id:
+				existing_activity = ScanActivity.objects.filter(celery_id=celery_id).first()
+				if existing_activity:
+					self.activity = existing_activity
+					self.activity.status = RUNNING_TASK
+					self.activity.time = timezone.now()
+					self.activity.save()
+					self.activity_id = self.activity.id
+					return
+
 			self.activity = ScanActivity(
 				name=self.task_name,
 				title=self.description,
@@ -232,11 +247,13 @@ class RengineTask(Task):
 			if self.scan:
 				self.activity.scan_of = self.scan
 				self.activity.save()
-				self.scan.celery_ids.append(celery_id)
-				self.scan.save()
+				if celery_id and celery_id not in self.scan.celery_ids:
+					self.scan.celery_ids.append(celery_id)
+					self.scan.save()
 			if self.subscan:
-				self.subscan.celery_ids.append(celery_id)
-				self.subscan.save()
+				if celery_id and celery_id not in self.subscan.celery_ids:
+					self.subscan.celery_ids.append(celery_id)
+					self.subscan.save()
 		except Exception as e:
 			logger.warning(f"Could not create ScanActivity record in DB (scan may have been deleted/rolled back): {e}")
 			self.activity = None

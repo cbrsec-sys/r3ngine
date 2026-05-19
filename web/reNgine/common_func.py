@@ -536,6 +536,12 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, **
 		if target_domain:
 			vuln_data['target_domain'] = target_domain
 
+	# Ensure severity is an integer if passed as a string
+	severity = vuln_data.get('severity')
+	if isinstance(severity, str):
+		from reNgine.definitions import NUCLEI_SEVERITY_MAP
+		vuln_data['severity'] = NUCLEI_SEVERITY_MAP.get(severity.lower(), 2)  # default to Medium
+
 	references = vuln_data.pop('references', [])
 	cve_ids = vuln_data.pop('cve_ids', [])
 	cwe_ids = vuln_data.pop('cwe_ids', [])
@@ -683,6 +689,55 @@ def get_chaos_api_key():
 	return key_obj.key if key_obj else ''
 
 
+def validate_single_proxy(proxy_name):
+	"""Helper to validate a single proxy string.
+	Returns (proxy_name, True) if valid, otherwise (proxy_name, False).
+	"""
+	try:
+		proxy_name = proxy_name.strip()
+		if not proxy_name:
+			return proxy_name, False
+		test_proxy = proxy_name
+		if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
+			test_proxy = 'http://' + test_proxy
+		
+		response = requests.get(
+			'http://google.com', 
+			proxies={'http': test_proxy, 'https': test_proxy}, 
+			timeout=3, 
+			allow_redirects=True
+		)
+		if response.status_code == 407 or 'Proxy-Authenticate' in response.headers or 'proxy-authenticate' in response.headers:
+			return proxy_name, False
+		if "Proxy Authentication Required" in response.text or "Proxy Authentication Required" in str(response.headers):
+			return proxy_name, False
+		if not (200 <= response.status_code < 400):
+			return proxy_name, False
+		return proxy_name, True
+	except Exception:
+		return proxy_name, False
+
+
+def validate_proxies(proxy_text):
+	"""Concurrently validate newline-separated proxy strings.
+	Returns a newline-separated string of validated live proxies.
+	"""
+	from concurrent.futures import ThreadPoolExecutor
+	if not proxy_text:
+		return ''
+	raw_proxies = [line.strip() for line in proxy_text.splitlines() if line.strip()]
+	if not raw_proxies:
+		return ''
+	valid_proxies = []
+	max_workers = min(50, len(raw_proxies))
+	with ThreadPoolExecutor(max_workers=max_workers) as executor:
+		results = executor.map(validate_single_proxy, raw_proxies)
+		for proxy_name, is_valid in results:
+			if is_valid:
+				valid_proxies.append(proxy_name)
+	return '\n'.join(valid_proxies)
+
+
 def get_random_proxy():
 	"""Get a random proxy from the list of proxies input by user in the UI,
 	validating that it is alive and does not require authentication.
@@ -707,14 +762,23 @@ def get_random_proxy():
 	# Shuffle the proxies to distribute traffic randomly
 	random.shuffle(proxies)
 
-	# Validate each proxy sequentially until we find a working, unauthenticated one
+	# Validate each proxy sequentially until we find a working, unauthenticated one.
+	# Limit checking to a maximum of 5 to prevent long sequential timeout loops (max 25s).
+	checked_count = 0
 	for proxy_name in proxies:
+		if checked_count >= 5:
+			logger.warning('Reached maximum sequential proxy validation limit (5). Stopping checks.')
+			break
+		checked_count += 1
 		try:
 			logger.info(f'Validating proxy: {proxy_name}')
+			test_proxy = proxy_name
+			if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
+				test_proxy = 'http://' + test_proxy
 			# Perform a request with a short timeout to check availability
 			response = requests.get(
 				'http://google.com', 
-				proxies={'http': proxy_name, 'https': proxy_name}, 
+				proxies={'http': test_proxy, 'https': test_proxy}, 
 				timeout=5, 
 				allow_redirects=True
 			)
@@ -726,6 +790,10 @@ def get_random_proxy():
 			# Check if "Proxy Authentication Required" is in the response body or headers (fallback logic)
 			if "Proxy Authentication Required" in response.text or "Proxy Authentication Required" in str(response.headers):
 				raise Exception("Proxy Authentication Required returned in response text/headers")
+			
+			# Ensure the response indicates a successful HTTP status code (2xx or 3xx)
+			if not (200 <= response.status_code < 400):
+				raise Exception(f"Proxy returned invalid status code: {response.status_code}")
 				
 			logger.warning('Using valid proxy: ' + proxy_name)
 			return proxy_name

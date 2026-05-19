@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useParams, Link as RouterLink } from '@tanstack/react-router';
 import { 
   Box, 
@@ -30,7 +30,8 @@ import {
   Switch,
   FormControlLabel,
   Divider,
-  Fab
+  Fab,
+  Checkbox
 } from '@mui/material';
 import { 
   Play, 
@@ -85,6 +86,27 @@ export const StressTestingPage: React.FC = () => {
 
   // Tool configuration dialog state
   const [openToolConfig, setOpenToolConfig] = useState(false);
+
+  const [endpoints, setEndpoints] = useState<any[]>([]);
+  const [selectedEndpoints, setSelectedEndpoints] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (projectSlug && scanId) {
+      axios.get(`/api/listEndpoints/`, {
+        params: {
+          project: projectSlug,
+          scan_history: scanId,
+        }
+      })
+      .then(response => {
+        const results = response.data.results || response.data || [];
+        setEndpoints(results);
+      })
+      .catch(error => {
+        console.error("Failed to load endpoints for stress testing", error);
+      });
+    }
+  }, [projectSlug, scanId]);
 
   // Tool-specific configurations (persisted per tool)
   const [toolConfigs, setToolConfigs] = useState<Record<string, any>>({
@@ -146,31 +168,41 @@ export const StressTestingPage: React.FC = () => {
 
     // Merge global settings into target active tool configs
     const updatedToolConfigs = { ...toolConfigs };
-    if (updatedToolConfigs[activeTab]) {
-      if (activeTab === 'k6') {
-        updatedToolConfigs.k6.vus = config.concurrency;
-        updatedToolConfigs.k6.duration = config.duration;
-      } else if (activeTab === 'wrk') {
-        updatedToolConfigs.wrk.connections = config.concurrency;
-        updatedToolConfigs.wrk.duration = config.duration;
-      } else if (activeTab === 'hping3') {
-        // hping3 default concurrency uses packet count or fast rates
-      } else if (activeTab === 'locust') {
-        updatedToolConfigs.locust.users = config.concurrency;
-        updatedToolConfigs.locust.run_time = config.duration;
-      }
+    
+    // Concurrency/duration mappings
+    if (updatedToolConfigs.k6) {
+      updatedToolConfigs.k6.vus = config.concurrency;
+      updatedToolConfigs.k6.duration = config.duration;
+    }
+    if (updatedToolConfigs.wrk) {
+      updatedToolConfigs.wrk.connections = config.concurrency;
+      updatedToolConfigs.wrk.duration = config.duration;
+    }
+    if (updatedToolConfigs.locust) {
+      updatedToolConfigs.locust.users = config.concurrency;
+      updatedToolConfigs.locust.run_time = config.duration;
     }
 
+    const startPayload: any = {
+      action: 'start',
+      config: {
+        concurrency: config.concurrency,
+        duration: config.duration,
+        uses_tools: config.uses_tools.length > 0 ? config.uses_tools : [activeTab],
+        selected_endpoints: selectedEndpoints,
+      }
+    };
+
+    // Add configs for each selected tool
+    const toolsToRun = config.uses_tools.length > 0 ? config.uses_tools : [activeTab];
+    toolsToRun.forEach((tool: string) => {
+      if (updatedToolConfigs[tool]) {
+        startPayload.config[`${tool}_config`] = updatedToolConfigs[tool];
+      }
+    });
+
     try {
-      await axios.post(`/api/stress/${scanId}/control/`, { 
-        action: 'start', 
-        config: {
-          concurrency: config.concurrency,
-          duration: config.duration,
-          uses_tools: [activeTab], // Execute ONE tool at a time based on active tab
-          [`${activeTab}_config`]: updatedToolConfigs[activeTab]
-        }
-      });
+      await axios.post(`/api/stress/${scanId}/control/`, startPayload);
     } catch (error) {
       console.error("Failed to start stress test", error);
       setScanning(false);
@@ -211,9 +243,17 @@ export const StressTestingPage: React.FC = () => {
 
   // ECharts Configurations
   const latencyOption = useMemo(() => {
-    const data = filteredTelemetry
+    let data = filteredTelemetry
       .filter(p => (p.avg_latency || p.latency) && p.timestamp)
       .map(p => [p.timestamp * 1000, p.avg_latency || p.latency]);
+
+    const commandPoint = filteredTelemetry.find(p => p.type === 'command');
+    if (commandPoint && commandPoint.timestamp) {
+      const startTime = commandPoint.timestamp * 1000;
+      if (data.length > 0 && !data.some(d => d[0] === startTime)) {
+        data = [[startTime, undefined], ...data];
+      }
+    }
 
     return {
       backgroundColor: 'transparent',
@@ -253,7 +293,8 @@ export const StressTestingPage: React.FC = () => {
         name: 'Avg Latency',
         type: 'line',
         smooth: true,
-        showSymbol: false,
+        showSymbol: true,
+        symbolSize: 6,
         data: data,
         itemStyle: { color: theme.palette.primary.main },
         lineStyle: { width: 3, shadowBlur: 10, shadowColor: alpha(theme.palette.primary.main, 0.5) },
@@ -272,9 +313,17 @@ export const StressTestingPage: React.FC = () => {
   }, [filteredTelemetry, theme.palette.primary.main]);
 
   const rpsOption = useMemo(() => {
-    const data = filteredTelemetry
+    let data = filteredTelemetry
       .filter(p => p.throughput_rps && p.timestamp)
       .map(p => [p.timestamp * 1000, p.throughput_rps]);
+
+    const commandPoint = filteredTelemetry.find(p => p.type === 'command');
+    if (commandPoint && commandPoint.timestamp) {
+      const startTime = commandPoint.timestamp * 1000;
+      if (data.length > 0 && !data.some(d => d[0] === startTime)) {
+        data = [[startTime, undefined], ...data];
+      }
+    }
 
     return {
       backgroundColor: 'transparent',
@@ -312,7 +361,8 @@ export const StressTestingPage: React.FC = () => {
         name: 'RPS',
         type: 'line',
         smooth: true,
-        showSymbol: false,
+        showSymbol: true,
+        symbolSize: 6,
         data: data,
         itemStyle: { color: '#6be6c1' },
         lineStyle: { width: 3 },
@@ -401,6 +451,44 @@ export const StressTestingPage: React.FC = () => {
       }
     }));
   };
+
+  // Find the latest valid metrics by scanning backwards through filtered telemetry
+  const latestMetrics = useMemo(() => {
+    const metrics = {
+      avg_latency: 0,
+      throughput_rps: 0,
+      error_rate: 0
+    };
+    
+    // Find latest avg_latency or latency
+    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
+      const p = filteredTelemetry[i];
+      if (p.avg_latency !== undefined || p.latency !== undefined) {
+        metrics.avg_latency = p.avg_latency || p.latency || 0;
+        break;
+      }
+    }
+
+    // Find latest throughput_rps
+    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
+      const p = filteredTelemetry[i];
+      if (p.throughput_rps !== undefined) {
+        metrics.throughput_rps = p.throughput_rps;
+        break;
+      }
+    }
+
+    // Find latest error_rate
+    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
+      const p = filteredTelemetry[i];
+      if (p.error_rate !== undefined) {
+        metrics.error_rate = p.error_rate;
+        break;
+      }
+    }
+
+    return metrics;
+  }, [filteredTelemetry]);
 
   return (
     <Box sx={{ p: { xs: 2, md: 4 } }}>
@@ -610,7 +698,7 @@ export const StressTestingPage: React.FC = () => {
             <Grid size={{ xs: 12, md: 3 }}>
               <KpiCard 
                 title="LATENCY AVG"
-                value={filteredTelemetry.length > 0 ? filteredTelemetry[filteredTelemetry.length-1].avg_latency || filteredTelemetry[filteredTelemetry.length-1].latency || 0 : 0}
+                value={latestMetrics.avg_latency}
                 icon={Activity}
                 color={theme.palette.primary.main}
                 subtitle="Milliseconds"
@@ -619,7 +707,7 @@ export const StressTestingPage: React.FC = () => {
             <Grid size={{ xs: 12, md: 3 }}>
               <KpiCard 
                 title="THROUGHPUT"
-                value={filteredTelemetry.length > 0 ? filteredTelemetry[filteredTelemetry.length-1].throughput_rps || 0 : 0}
+                value={latestMetrics.throughput_rps}
                 icon={Zap}
                 color="#6be6c1"
                 subtitle="Req / Sec"
@@ -628,7 +716,7 @@ export const StressTestingPage: React.FC = () => {
             <Grid size={{ xs: 12, md: 3 }}>
               <KpiCard 
                 title="ERROR RATE"
-                value={filteredTelemetry.length > 0 ? (filteredTelemetry[filteredTelemetry.length-1].error_rate || 0) * 100 : 0}
+                value={latestMetrics.error_rate * 100}
                 icon={AlertTriangle}
                 color="#ff003c"
                 subtitle="Percentage %"
@@ -850,6 +938,33 @@ export const StressTestingPage: React.FC = () => {
                 {['k6', 'wrk', 'hping3', 'locust'].map((name) => (
                   <MenuItem key={name} value={name}>{name.toUpperCase()}</MenuItem>
                 ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth>
+              <InputLabel sx={{ color: 'rgba(255,255,255,0.5)' }}>Target Specific Endpoints (Optional)</InputLabel>
+              <Select
+                multiple
+                value={selectedEndpoints}
+                onChange={(e) => setSelectedEndpoints(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
+                input={<OutlinedInput label="Target Specific Endpoints (Optional)" />}
+                renderValue={(selected) => (
+                  <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                    {selected.map((value) => (
+                      <Chip key={value} label={value} sx={{ bgcolor: '#ff5f1f', color: '#fff', height: 20, fontSize: 10 }} />
+                    ))}
+                  </Box>
+                )}
+                sx={{ color: '#fff', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' } }}
+              >
+                {endpoints.map((ep) => (
+                  <MenuItem key={ep.id || ep.http_url} value={ep.http_url}>
+                    <Checkbox checked={selectedEndpoints.indexOf(ep.http_url) > -1} sx={{ color: '#00f3ff', '&.Mui-checked': { color: '#00f3ff' } }} />
+                    <ListItemText primary={ep.http_url} secondary={ep.http_status ? `Status: ${ep.http_status}` : ''} sx={{ color: '#fff', '.MuiListItemText-secondary': { color: 'rgba(255,255,255,0.4)' } }} />
+                  </MenuItem>
+                ))}
+                {endpoints.length === 0 && (
+                  <MenuItem disabled sx={{ color: 'rgba(255,255,255,0.3)' }}>No found endpoints available</MenuItem>
+                )}
               </Select>
             </FormControl>
           </Box>

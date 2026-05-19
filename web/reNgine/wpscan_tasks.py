@@ -123,7 +123,9 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
 
     # Determine targets
     targets = []
-    if urls:
+    if self.subscan and self.subdomain:
+        targets.append((f"https://{self.subdomain.name}/", self.subdomain))
+    elif urls:
         # Targeted scan on specific URLs
         for url in urls:
             subdomain_name = get_subdomain_from_url(url)

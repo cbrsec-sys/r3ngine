@@ -329,7 +329,7 @@ class UserSerializer(serializers.ModelSerializer):
 		from rolepermissions.roles import get_user_roles
 		roles = get_user_roles(obj)
 		if roles:
-			return roles[0].role_name
+			return roles[0].get_name()
 		return 'penetration_tester'
 
 	def get_last_login_humanized(self, obj):

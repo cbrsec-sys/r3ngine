@@ -242,12 +242,8 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
              const node = event.target;
              useGraphStore.getState().setActivePanel('blastRadius');
              setSelectedNode(node.id(), node.data());
-          }
-        },
-        {
-          id: 'separator',
-          content: '----',
-          selector: 'node'
+          },
+          hasTrailingDivider: true
         },
         {
           id: 'run-scan',

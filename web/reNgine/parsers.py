@@ -47,25 +47,72 @@ class K6Parser(BaseParser):
         return self.metrics
 
 class WrkParser(BaseParser):
-    """Parses wrk output summary."""
+    """Parses wrk output summary and accumulates performance statistics over multiple output lines.
+
+    Keeps state between parsed lines to provide complete telemetry containing latency,
+    throughput, total requests, socket errors, and calculated error rate.
+    """
+    def __init__(self):
+        """Initialize the WrkParser state."""
+        self.metrics = {
+            "avg_latency": 0.0,
+            "throughput_rps": 0.0,
+            "error_rate": 0.0,
+            "total_requests": 0,
+            "socket_errors": 0
+        }
+
     def parse_line(self, line):
-        # wrk output is mostly a summary at the end, 
-        # but we can parse the intermediate stats if using a custom script.
-        metrics = {}
+        """Parse a single line of wrk command output.
+
+        Args:
+            line (str): The raw output line from wrk standard output.
+
+        Returns:
+            dict or None: The accumulated metrics dictionary if a metric was parsed, else None.
+        """
+        has_update = False
+        
+        # Parse Latency line (e.g., "Latency   318.27ms   35.96ms 781.98ms   93.08%")
         latency_match = re.search(r"Latency\s+([0-9.]+)([a-z]+)", line)
         if latency_match:
             val = float(latency_match.group(1))
             unit = latency_match.group(2)
             if unit == "ms":
-                metrics["avg_latency"] = val
+                self.metrics["avg_latency"] = val
             elif unit == "s":
-                metrics["avg_latency"] = val * 1000
+                self.metrics["avg_latency"] = val * 1000
+            has_update = True
         
+        # Parse Requests/sec line (e.g., "Requests/sec:    114.27")
         rps_match = re.search(r"Requests/sec:\s+([0-9.]+)", line)
         if rps_match:
-            metrics["throughput_rps"] = float(rps_match.group(1))
+            self.metrics["throughput_rps"] = float(rps_match.group(1))
+            has_update = True
+
+        # Parse Total Requests line (e.g., "6864 requests in 1.00m, 5.46MB read")
+        reqs_match = re.search(r"([0-9]+)\s+requests\s+in", line)
+        if reqs_match:
+            self.metrics["total_requests"] = int(reqs_match.group(1))
+            has_update = True
+            # Recompute error rate if both metrics exist
+            if self.metrics["total_requests"] > 0 and self.metrics["socket_errors"] > 0:
+                self.metrics["error_rate"] = self.metrics["socket_errors"] / self.metrics["total_requests"]
+
+        # Parse Socket Errors line (e.g., "Socket errors: connect 25, read 0, write 0, timeout 0")
+        errors_match = re.search(r"Socket errors:\s+connect\s+([0-9]+),\s+read\s+([0-9]+),\s+write\s+([0-9]+),\s+timeout\s+([0-9]+)", line)
+        if errors_match:
+            connect_err = int(errors_match.group(1))
+            read_err = int(errors_match.group(2))
+            write_err = int(errors_match.group(3))
+            timeout_err = int(errors_match.group(4))
+            self.metrics["socket_errors"] = connect_err + read_err + write_err + timeout_err
+            has_update = True
+            # Recompute error rate if total requests is already known
+            if self.metrics["total_requests"] > 0:
+                self.metrics["error_rate"] = self.metrics["socket_errors"] / self.metrics["total_requests"]
             
-        return metrics
+        return self.metrics if has_update else None
 
 class Hping3Parser(BaseParser):
     """Parses hping3 output for L4 stats."""
