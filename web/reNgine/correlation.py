@@ -1,4 +1,5 @@
 import logging
+from django.db import IntegrityError
 from django.db.models import Q
 from startScan.models import Vulnerability, Subdomain, EndPoint
 
@@ -160,10 +161,19 @@ class VulnerabilityCorrelationEngine:
             existing.subdomain = vuln.subdomain
             existing.save()
         else:
-            ImpactAssessment.objects.create(
-                vulnerability=vuln,
-                potential_attack_chain=chain,
-                scan_history=self.scan_history,
-                subdomain=vuln.subdomain
-            )
+            try:
+                ImpactAssessment.objects.create(
+                    vulnerability=vuln,
+                    potential_attack_chain=chain,
+                    scan_history=self.scan_history,
+                    subdomain=vuln.subdomain
+                )
+            except IntegrityError:
+                # Handle concurrent creation by another task to prevent unique violation IntegrityError
+                logger.warning(f"Correlation: ImpactAssessment for vuln {vuln.id} was created concurrently. Updating instead.")
+                ImpactAssessment.objects.filter(vulnerability=vuln).update(
+                    potential_attack_chain=chain,
+                    scan_history=self.scan_history,
+                    subdomain=vuln.subdomain
+                )
 

@@ -160,7 +160,9 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
             cmd += f" --proxy {proxy}"
         if api_key:
             cmd += f" --api-token {api_key}"
-            
+        
+        logger.info(f"Running WPScan for {target_url}")
+        logger.warning(f"Full WPScan command: {cmd}")
         # Execute tool — stream_command is a generator; must be consumed to run the subprocess.
         for _ in stream_command(cmd, scan_id=self.scan_id, activity_id=self.activity_id):
             pass

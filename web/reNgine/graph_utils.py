@@ -33,9 +33,9 @@ class Neo4jManager:
 
         try:
             scan = ScanHistory.objects.get(id=scan_history_id)
-            project_id = scan.domain.project.id
-            project_name = scan.domain.project.name
-            target_name = scan.domain.name
+            project_id = scan.domain.project.id if scan.domain and scan.domain.project else 0
+            project_name = scan.domain.project.name if scan.domain and scan.domain.project else "Default Project"
+            target_name = scan.domain.name if scan.domain else "Unknown Target"
             scan_date = (
                 scan.start_scan_date.isoformat() if scan.start_scan_date else None
             )
@@ -57,8 +57,8 @@ class Neo4jManager:
             # Sync Subdomains
             subdomains = Subdomain.objects.filter(scan_history_id=scan_history_id)
             for sub in subdomains:
-                domain_name = sub.target_domain.name
-                subdomain_name = sub.name
+                domain_name = sub.target_domain.name if sub.target_domain else target_name
+                subdomain_name = sub.name or "unknown"
                 ip_address = sub.ip_addresses if hasattr(sub, "ip_addresses") else None
 
                 session.execute_write(
@@ -72,20 +72,22 @@ class Neo4jManager:
             # Sync Endpoints and Parameters
             endpoints = EndPoint.objects.filter(scan_history_id=scan_history_id)
             for endpoint in endpoints:
+                subdomain_name = endpoint.subdomain.name if endpoint.subdomain else target_name
                 session.execute_write(
                     self._merge_endpoints,
-                    endpoint.subdomain.name,
-                    endpoint.http_url,
+                    subdomain_name,
+                    endpoint.http_url or "unknown",
                     scan_history_id,
                 )
 
                 # Sync Parameters
                 parameters = endpoint.parameters.all()
                 for param in parameters:
+                    param_name = param.name or "unknown"
                     session.execute_write(
                         self._merge_parameters,
-                        endpoint.http_url,
-                        param.name,
+                        endpoint.http_url or "unknown",
+                        param_name,
                         param.type,
                         scan_history_id,
                     )
@@ -94,9 +96,10 @@ class Neo4jManager:
             subdomains = Subdomain.objects.filter(scan_history_id=scan_history_id)
             for sub in subdomains:
                 for tech in sub.technologies.all():
-                    session.execute_write(
-                        self._merge_technologies, sub.name, tech.name, scan_history_id
-                    )
+                    if tech and tech.name:
+                        session.execute_write(
+                            self._merge_technologies, sub.name or "unknown", tech.name, scan_history_id
+                        )
 
             # Sync Vulnerabilities
             from startScan.models import Vulnerability
@@ -113,12 +116,12 @@ class Neo4jManager:
                     if vuln.subdomain
                     else ("Endpoint" if vuln.endpoint else None)
                 )
-                if asset_name:
+                if asset_name and asset_type:
                     session.execute_write(
                         self._merge_vulnerabilities,
                         asset_name,
                         asset_type,
-                        vuln.name,
+                        vuln.name or "Unknown Vulnerability",
                         vuln.severity,
                         vuln.correlation_score,
                         scan_history_id,
@@ -126,9 +129,10 @@ class Neo4jManager:
                     )
                     # Sync CVEs linked to this vulnerability
                     for cve in vuln.cve_ids.all():
-                        session.execute_write(
-                            self._merge_cves, vuln.name, cve.name, scan_history_id
-                        )
+                        if cve and cve.name:
+                            session.execute_write(
+                                self._merge_cves, vuln.name or "Unknown Vulnerability", cve.name, scan_history_id
+                            )
 
     @staticmethod
     def _initialize_scan_context(

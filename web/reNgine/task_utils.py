@@ -43,6 +43,8 @@ def sanitize_command_for_db(cmd):
     """
     if not cmd:
         return cmd
+    if isinstance(cmd, str):
+        cmd = cmd.replace('\x00', '')
     # Strip export statements (matches both single and double quotes)
     cmd = re.sub(r'^export\s+.*?\s+&&\s+', '', cmd)
     # Strip proxychains4 wrapper with its config file
@@ -95,6 +97,7 @@ def run_command(
         command_obj = None
 
     # Run the command using subprocess
+    popen = None
     try:
         popen = subprocess.Popen(
             cmd if shell else cmd.split(),
@@ -114,20 +117,45 @@ def run_command(
         except subprocess.TimeoutExpired:
             popen.kill()
             return_code = 124 # Timeout
-            output += "\nCommand timed out after 30 seconds."
+            output += "\nCommand timed out."
         else:
             return_code = popen.returncode
     except Exception as e:
         logger.error(f"Error executing command {cmd}: {str(e)}")
         output = f"Error executing command: {str(e)}"
         return_code = 127 # Command not found / error
+    except BaseException as e:
+        logger.error(f"BaseException raised during command execution: {str(e)}")
+        if popen:
+            try:
+                popen.kill()
+            except Exception:
+                pass
+        raise
     finally:
+        if popen:
+            try:
+                if popen.stdout:
+                    popen.stdout.close()
+            except Exception:
+                pass
+            try:
+                if popen.poll() is None:
+                    popen.terminate()
+                    try:
+                        popen.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        popen.kill()
+                else:
+                    popen.wait()
+            except Exception as ex:
+                logger.error(f"Error reaping process in run_command: {ex}")
         if conf_path and os.path.exists(conf_path):
             os.remove(conf_path)
 
     if command_obj:
         logger.warning(f"Command {command_obj.id} finished with return code {return_code}")
-        command_obj.output = output
+        command_obj.output = output.replace('\x00', '')
         command_obj.return_code = return_code
         command_obj.save()
     else:
@@ -387,6 +415,7 @@ def stream_command(
 		for line in iter(lambda: process.stdout.readline(), ''):
 			if not line:
 				break
+			line = line.replace('\x00', '')
 			line = line.strip()
 			ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 			line = ansi_escape.sub('', line)
@@ -438,11 +467,11 @@ def stream_command(
 			output += '\n' + line
 			line_count += 1
 			if line_count % 10 == 0:
-				command_obj.output = output
+				command_obj.output = output.replace('\x00', '')
 				command_obj.save()
 
 		process.wait()
-		command_obj.output = output
+		command_obj.output = output.replace('\x00', '')
 		command_obj.return_code = process.returncode
 		command_obj.save()
 
@@ -604,4 +633,61 @@ def parse_custom_header_to_list(custom_header):
 				res.append(h)
 		return res
 	return []
+
+
+def is_iterable(variable):
+	try:
+		iter(variable)
+		return not isinstance(variable, (str, bytes))
+	except TypeError:
+		return False
+
+
+def save_subdomain_metadata(subdomain, endpoint, extra_datas=None):
+	"""Save metadata from endpoint to subdomain.
+
+	Args:
+		subdomain: Subdomain object
+		endpoint: EndPoint object
+		extra_datas: Additional metadata to save
+	"""
+	if extra_datas is None:
+		extra_datas = {}
+	if endpoint and endpoint.is_alive:
+		logger.info(f'Saving HTTP metadatas from {endpoint.http_url}')
+		subdomain.http_url = endpoint.http_url
+		subdomain.http_status = endpoint.http_status
+		subdomain.response_time = endpoint.response_time
+		subdomain.page_title = endpoint.page_title
+		subdomain.content_type = endpoint.content_type
+		subdomain.content_length = endpoint.content_length
+		subdomain.webserver = endpoint.webserver
+
+		cname = extra_datas.get('cname')
+		if cname and is_iterable(cname):
+			subdomain.cname = ','.join(cname)
+		elif isinstance(cname, str):
+			subdomain.cname = cname
+
+		is_cdn = extra_datas.get('is_cdn', False)
+		if isinstance(is_cdn, bool):
+			subdomain.is_cdn = is_cdn
+		else:
+			cdn = extra_datas.get('cdn')
+			if cdn:
+				subdomain.is_cdn = True
+
+		cdn_name = extra_datas.get('cdn_name')
+		if cdn_name:
+			subdomain.cdn_name = cdn_name
+
+		for tech in endpoint.techs.all():
+			subdomain.technologies.add(tech)
+		subdomain.save()
+	elif http_url := extra_datas.get('http_url'):
+		subdomain.http_url = http_url
+		subdomain.save()
+	else:
+		logger.error(f'No HTTP URL found for {subdomain.name}. Skipping.')
+
 

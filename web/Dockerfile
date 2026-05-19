@@ -88,6 +88,7 @@ RUN apt install -y --no-install-recommends \
     libjpeg-dev \
     libopenjp2-7-dev \
     python3-netaddr \
+    libpcap-dev \
     software-properties-common \
     ike-scan \
     sslscan \
@@ -115,30 +116,53 @@ RUN pip3 install maturin
 WORKDIR /usr/src/app
 
 ENV GO111MODULE=on 
-RUN printf "\
-    github.com/ibnaleem/gosearch@latest\n\
-    github.com/jaeles-project/gospider@latest\n\
-    github.com/tomnomnom/gf@latest\n\
-    github.com/tomnomnom/unfurl@latest\n\
-    github.com/tomnomnom/waybackurls@latest\n\
-    github.com/projectdiscovery/httpx/cmd/httpx@latest\n\
-    github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest\n\
-    github.com/projectdiscovery/chaos-client/cmd/chaos@latest\n\
-    github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest\n\
-    github.com/projectdiscovery/naabu/v2/cmd/naabu@latest\n\
-    github.com/hakluke/hakrawler@latest\n\
-    github.com/lc/gau/v2/cmd/gau@latest\n\
-    github.com/owasp-amass/amass/v3/...@latest\n\
-    github.com/ffuf/ffuf@latest\n\
-    github.com/projectdiscovery/tlsx/cmd/tlsx@latest\n\
-    github.com/hahwul/dalfox/v2@latest\n\
-    github.com/projectdiscovery/katana/cmd/katana@latest\n\
-    github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest\n\
-    github.com/sa7mon/s3scanner@latest\n\
-    github.com/zricethezav/gitleaks/v8@latest\n\
-    github.com/xalgord/reconx/cmd/reconx@latest\n" | \
-    xargs -L1 go install -ldflags="-s -w" -v && \
-    rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
+# RUN printf "\
+#     github.com/ibnaleem/gosearch@latest\n\
+#     github.com/jaeles-project/gospider@latest\n\
+#     github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006\n\
+#     github.com/tomnomnom/unfurl@latest\n\
+#     github.com/tomnomnom/waybackurls@latest\n\
+#     github.com/projectdiscovery/httpx/cmd/httpx@latest\n\
+#     github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest\n\
+#     github.com/projectdiscovery/chaos-client/cmd/chaos@latest\n\
+#     github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8\n\
+#     github.com/projectdiscovery/naabu/v2/cmd/naabu@latest\n\
+#     github.com/hakluke/hakrawler@latest\n\
+#     github.com/lc/gau/v2/cmd/gau@latest\n\
+#     github.com/owasp-amass/amass/v4/...@v4.2.0\n\
+#     github.com/ffuf/ffuf/v2@latest\n\
+#     github.com/projectdiscovery/tlsx/cmd/tlsx@latest\n\
+#     github.com/hahwul/dalfox/v2@latest\n\
+#     github.com/projectdiscovery/katana/cmd/katana@latest\n\
+#     github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest\n\
+#     github.com/sa7mon/s3scanner@b6c26d67bc2abe346555dd7010e6065889d66039\n\
+#     github.com/zricethezav/gitleaks/v8@latest\n\
+#     github.com/xalgord/reconx/cmd/reconx@latest\n" | \
+#     xargs -L1 go install -ldflags="-s -w" -v && \
+#     rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -v github.com/jaeles-project/gospider@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/tomnomnom/unfurl@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/tomnomnom/waybackurls@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/hakluke/hakrawler@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/lc/gau/v2/cmd/gau@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/owasp-amass/amass/v4/...@v4.2.0
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/ffuf/ffuf/v2@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/hahwul/dalfox/v2@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/katana/cmd/katana@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/sa7mon/s3scanner@b6c26d67bc2abe346555dd7010e6065889d66039
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/zricethezav/gitleaks/v8@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/xalgord/reconx/cmd/reconx@latest
+RUN rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
+
 
 # Install Trufflehog
 RUN ARCH=$(dpkg --print-architecture) \
@@ -177,11 +201,6 @@ RUN git clone https://github.com/assetnote/react2shell-scanner /usr/src/github/r
 RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
     pip3 install -r /usr/src/github/ctfr/requirements.txt
 
-# Install theHarvester
-RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
-    cd /usr/src/github/theHarvester && uv sync && \
-    cd /usr/src/app
-
 # Install Username Anarchy
 RUN git clone https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy && \
     ln -sf /usr/src/github/username-anarchy/username-anarchy /usr/local/bin/username-anarchy
@@ -213,11 +232,19 @@ RUN git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunet
 
 # Install OneForAll
 RUN git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll && \
+    cd /usr/src/github/OneForAll && \
+#    git reset --hard cefa100ba6472e1bf0f5ee128868e4b3739b684e && \
+    cd /usr/src/app && \
     pip3 install -r /usr/src/github/OneForAll/requirements.txt
 
 # Install Sublist3r
 RUN git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r && \
     pip3 install -r /usr/src/github/Sublist3r/requirements.txt
+
+# Install theHarvester
+RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
+    cd /usr/src/github/theHarvester && uv sync && \
+    cd /usr/src/app
 
 # Install semgrep
 RUN git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep && \

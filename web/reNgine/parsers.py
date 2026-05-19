@@ -168,8 +168,6 @@ class SpiderFootBatchParser(BaseParser):
         "hash": re.compile(r"\b[a-fA-F0-9]{32,64}\b"),
     }
 
-
-
     # Maps SF Type strings (from CSV) to internal OSINT types and confidence weights
     SF_TYPE_MAPPING = {
         'EMAIL_ADDRESS': {'osint_type': 'Email', 'weight': 90},
@@ -357,3 +355,34 @@ class SpiderFootBatchParser(BaseParser):
             if matches:
                 results[name] = list(sorted(set(matches)))
         return results
+
+
+class TAStressorParser(BaseParser):
+    """Parses TA_Stresser.py debug output for PPS/throughput."""
+    def __init__(self):
+        self.metrics = {
+            "avg_latency": 0.0,
+            "throughput_rps": 0.0,
+            "error_rate": 0.0,
+            "total_requests": 0,
+        }
+
+    def parse_line(self, line):
+        # Regex to capture the PPS (Packets/Requests per second) and optional unit suffix
+        pps_match = re.search(r"PPS:\s*([0-9.]+)([kmg]?)", line, re.IGNORECASE)
+        if pps_match:
+            val = float(pps_match.group(1))
+            unit = pps_match.group(2).lower()
+            if unit == 'k':
+                val *= 1_000
+            elif unit == 'm':
+                val *= 1_000_000
+            elif unit == 'g':
+                val *= 1_000_000_000
+            
+            self.metrics["throughput_rps"] = val
+            # Accumulate requests dynamically (since logs output rate every 1 second)
+            self.metrics["total_requests"] += int(val)
+            return self.metrics
+        return None
+

@@ -129,9 +129,14 @@ def dir_file_fuzz(self, ctx=None, description=None):
 		ffuf_base_cmd += ' -fr' if follow_redirect else ''
 		ffuf_base_cmd += ' -ac' if auto_calibration else ''
 		ffuf_base_cmd += f' -mc {mc}' if mc else ''
-		formatted_headers_ffuf = ' '.join(f'-H "{header}"' for header in custom_headers_list)
-		if formatted_headers_ffuf:
-			ffuf_base_cmd += f' {formatted_headers_ffuf}'
+
+		# Check if User-Agent is already in custom headers
+		has_ua = any('user-agent' in h.lower() for h in custom_headers_list)
+		if not has_ua:
+			ffuf_base_cmd += ' -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"'
+		
+		for header in custom_headers_list:
+			ffuf_base_cmd += f' -H "{header}"'
 
 		# Build dirsearch base command
 		dirsearch_base_cmd = 'dirsearch'
@@ -143,6 +148,13 @@ def dir_file_fuzz(self, ctx=None, description=None):
 		dirsearch_base_cmd += f' --max-recursion-depth {recursive_level}' if recursive_level > 0 else ''
 		dirsearch_base_cmd += f' -i {mc}' if mc else ''
 		dirsearch_base_cmd += ' --follow-redirects' if follow_redirect else ''
+		dirsearch_base_cmd += f' --max-time {max_time}' if max_time > 0 else ''
+		dirsearch_base_cmd += f' --delay {delay}' if delay > 0 else ''
+		dirsearch_base_cmd += ' --exit-on-error' if stop_on_error else ''
+		
+		if not has_ua:
+			dirsearch_base_cmd += ' --random-agent'
+
 		for header in custom_headers_list:
 			dirsearch_base_cmd += f' -H "{header}"'
 
@@ -165,6 +177,7 @@ def dir_file_fuzz(self, ctx=None, description=None):
 		opsec = OpSecManager()
 
 		for url in urls:
+			logger.warning(f'Fuzzing URL: {url}')
 			url_parse = urlparse(url)
 			base_url = url_parse.scheme + '://' + url_parse.netloc
 			subdomain_name = get_subdomain_from_url(base_url)
@@ -173,6 +186,9 @@ def dir_file_fuzz(self, ctx=None, description=None):
 				subdomain = Subdomain.objects.filter(id=ctx['subdomain_id']).first()
 
 			proxy = get_random_proxy()
+			if proxy:
+				if not any(proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
+					proxy = 'http://' + proxy
 
 			# Use a global lock to ensure sequential execution across all workers
 			with redis_client.lock("fuzz_execution_lock", timeout=14400):
@@ -223,6 +239,7 @@ def dir_file_fuzz(self, ctx=None, description=None):
 					if endpoint is None:
 						continue
 
+					logger.warning(f'Endpoint: {endpoint} Created: {created}')
 					endpoint.http_status = status
 					endpoint.content_length = length
 					endpoint.response_time = duration / 1000000000
@@ -253,9 +270,9 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 				# 2. Run Dirsearch
 				dirsearch_output = f'{self.results_dir}/dirsearch_{subdomain_name}.json'
-				dcmd = f'{dirsearch_base_cmd} -u {base_url} --format json -o {dirsearch_output}'
+				dcmd = f'{dirsearch_base_cmd} -u {base_url} --format=json -o {dirsearch_output} --no-color'
 				if proxy:
-					dcmd += f' --proxy {proxy}'
+					dcmd += f' --proxy={proxy}'
 				
 				dcmd = opsec.apply_stealth('dirsearch', dcmd, proxy=proxy)
 				
@@ -329,7 +346,7 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 		# Crawl discovered URLs if enabled
 		if enable_http_crawl:
-			ctx['track'] = False
+			ctx['track'] = True
 			http_crawl(urls, ctx=ctx)
 
 		return results

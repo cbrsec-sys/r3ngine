@@ -2,32 +2,15 @@
 
 **Official Repo location:** <p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
-### [v3.0.0-rc8] - 2026-05-19
 
-- **Vulnerability Scan Pipeline Synchronization**:
-  - Refactored the vulnerability scanning pipeline in `tasks.py` by implementing a blocking 2-stage execution flow that runs Stage 1 (primary tools: Nuclei, CRLFuzz, Dalfox, S3Scanner) and Stage 2 (additional tools: Acunetix, WPScan, cPanel, React2Shell, Semgrep) sequentially.
-  - Wrapped vulnerability tasks resolution in helper functions `resolve_primary_vulnerability_tasks` and `resolve_additional_vulnerability_tasks`.
-  - Configured `vulnerability_scan` to use Celery's `allow_join_result()` blocking mechanism to prevent out-of-order execution of downstream post-scan engines.
-  - Updated orchestrator triggers in `initiate_scan` and `initiate_subscan` to queue the parent `vulnerability_scan` task signature instead of expanding grouped signatures.
+### [v3.0.0-rc7] - 2026-05-19
 
-- **Subscan and Vulnerability Scan Stability Bugfixes**:
-  - **Vulnerability Scan Engine Stalling**: Refactored `nuclei_scan` to run individual severities sequentially and synchronously within a single task context. This eliminates the Celery `self.replace()` task-chaining anti-pattern, ensuring the parent chord barrier is respected and preventing premature callbacks, infinite post-processing retry loops, and queue stalls.
-  - **Standardized React2Shell Command**: Refactored `react2shell_scan` in `vulnerability_tasks.py` to use `stream_command` instead of raw `subprocess.run`, standardizing database command history tracking, real-time log streaming, and dynamic proxychains wrapping.
-  - **Dynamic Subscan Signature Mapping**: Fixed a critical `TypeError` when initiating targeted subscans from the Subdomains tab (e.g., `dir_file_fuzz`, `port_scan`, `fetch_url`) by dynamically mapping arguments to match task function expectations.
-  - **Robust Severity Integer Guard**: Hardened `save_vulnerability` to automatically map string-based severities (e.g. `'high'`, `'critical'`) to their integer equivalents. This prevents Django database validation crashes (`ValueError`) and subsequent Celery worker restarts.
-  - **React2Shell Severity Normalization**: Explicitly converted string severities returned from the `react2shell-scanner` to integers using `NUCLEI_SEVERITY_MAP` before invoking `save_vulnerability`.
-  - **Stream Command Watchdog Timeout**: Integrated a background thread watchdog to all process-spawning tool commands run via `stream_command` (e.g., `nuclei`, `dirsearch`), automatically terminating processes that exceed the maximum timeout limit (defaulting to 1 hour). This prevents unstable or dead public proxies from stalling Celery worker threads indefinitely.
-  - **Concurrent Proxy Settings Validation**: Added concurrent `ThreadPoolExecutor`-based validation of the proxy list during settings form submission and API updates, verifying that only live proxies are saved to the database.
-  - **Capped Proxy Validation Retries**: Limited sequentially checked proxies to a maximum of 5 in `get_random_proxy()` and `ProxychainsWrapper.get_random_proxy()`, and capped download/proxy cycle attempts to 5 in `semgrep_scan()`. This prevents worker loops from stalling for hours on database configurations containing hundreds of dead proxies.
-  - **Prevent Duplicate Technology Failures**: Added robust exception handling for `MultipleObjectsReturned` on `Technology` lookups inside HTTP crawl and SpiderFoot tasks, returning the first matched technology instance.
-  - **Prevent Subprocess Zombie Process Leaks**: Enhanced `stream_command` in `task_utils.py` to catch `BaseException` (like `GeneratorExit` on early exit) and robustly kill/reap the spawned process in the `finally` block.
-  - **Temporarily Disable Wordfence Templates**: Temporarily disabled topscoder/Wordfence template updates in `nuclei_scan` to prevent external template download stalls.
-- **Admin User Settings Bugfixes**:
-  - **Resolve Role Update 500 Error**: Fixed a critical 500 Internal Server Error when editing or updating user profiles in the Admin Settings panel. Aligned the dropdown value for "Sys Admin" (`'system_administrator'`) to match the backend database role name (`'sys_admin'`).
-  - **Secure User Role Serialization**: Resolved a backend `AttributeError` in the DRF `UserSerializer` where the system attempted to access a non-existent `role_name` attribute on the `django-role-permissions` class. Replaced it with the library-supported native `get_name()` method.
-
-### [v3.0.0-rc7] - 2026-05-17
-
+- **APME Task Autodiscovery & Trigger Button Execution**: Created a dedicated `tasks.py` entrypoint in the `apme` app directory to resolve Celery autodiscovery failures (`run_llm_apme` not registered in workers), and documented all orchestrator functions with strict parameter and return descriptions conforming to codebase guidelines.
+- **APME Concurrency & Graph Sync Stability**: Catch `IntegrityError` in vulnerability correlation during concurrent `ImpactAssessment` creation, falling back to updating the record. Safe-guard the Neo4j graph results synchronization parser against `None` references for missing relation attributes (e.g. `target_domain`, `subdomain`, `technologies`, `cve_ids`).
+- **Celery binding and NameError fixes**: Fixed a critical `NameError` in `theHarvester` Celery task where `self` was referenced but not bound, causing task crashes and pipeline deadlocks. Changed task registration to use `bind=True` and `base=RengineTask` and injected the `self` context as the first argument.
+- **CTFR Subdomain Extraction File Truncation**: Resolved a classic Bash file redirection bug in `ctfr` subdomain extraction that immediately truncated `{results_file}` to 0 bytes before `cat` could read it. Modified the extraction command to write to a temporary file first and rename it back.
+- **URL Fetching and GF Pattern Filter Fix**: Corrected a overly restrictive regex in `fetch_url` and `gf` pattern filters (`host_regex`) that only permitted lowercase alphanumeric subdomains. This caused all captured URLs and endpoints belonging to subdomains with hyphens (`-`), underscores (`_`), and uppercase letters to be discarded. Modified the regex pattern to match standard RFC-compliant subdomain characters `[a-zA-Z0-9_-]`.
+- **NUL Character Database Ingestion Fix**: Resolved a critical PostgreSQL/SQLite database error (`ValueError: A string literal cannot contain NUL (0x00) characters`) that aborted Celery tasks when tools produced stdout containing null bytes (e.g. `LinkFinder` output). Added automatic NUL character stripping inside `sanitize_command_for_db`, `run_command`, and `stream_command` before command models are persisted.
 - **Mobile Companion App Enhancements**:
   - **Premium Vulnerability Detail Modal**: Integrated an elegant glassmorphic detail drawer on the dashboard's recent vulnerabilities list that displays detailed vulnerability descriptions, commands, severities, and the exact target domain names on which they were found (replacing generic N/A values).
   - **Most Vulnerable Targets Redirection**: Configured the "Most Vulnerable Targets" list to redirect users directly to a comprehensive `TargetSummary` view showing active subdomains, scan telemetry, and historical security findings.

@@ -12,7 +12,7 @@ from targetApp.models import Domain
 from reNgine.graph_utils import Neo4jManager
 from django.utils import timezone
 from reNgine.celery_custom_task import RengineTask
-from reNgine.parsers import K6Parser, WrkParser, Hping3Parser, LocustParser
+from reNgine.parsers import K6Parser, WrkParser, Hping3Parser, LocustParser, TAStressorParser
 from reNgine.stress_telemetry import StressTelemetryPublisher
 from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, RUNNING_TASK, ABORTED_TASK
 
@@ -144,6 +144,7 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, *
                 parser = None
                 cmd = []
                 temp_conf_path = None
+                temp_proxy_path = None
                 
                 tool_config = stress_config.get(f"{tool}_config", {})
                 
@@ -299,6 +300,88 @@ class StressUser(HttpUser):
                         "--print-stats"
                     ]
 
+                elif tool == "stressor":
+                    parser = TAStresserParser()
+                    stresser_method = sanitize(tool_config.get("method"), default="GET")
+                    stresser_threads = sanitize(tool_config.get("threads"), default=str(concurrency))
+                    stresser_duration = sanitize(tool_config.get("duration"), default=str(duration))
+                    stresser_rpc = sanitize(tool_config.get("rpc"), default="1")
+                    stresser_proxy_type = sanitize(tool_config.get("proxy_type"), default="0")
+                    stresser_proxy_file = sanitize(tool_config.get("proxy_file"), default="")
+
+                    # Fetch proxies from global reNgine settings and write formatted proxies to temp file
+                    from scanEngine.models import Proxy
+                    import tempfile
+                    
+                    temp_proxy_lines = []
+                    if Proxy.objects.all().exists():
+                        proxy_config = Proxy.objects.first()
+                        if proxy_config.use_proxy and proxy_config.proxies:
+                            for line in proxy_config.proxies.splitlines():
+                                line = line.strip()
+                                if not line:
+                                    continue
+                                # Strip scheme: http://, https://, socks4://, socks5://, etc.
+                                for scheme in ['http://', 'https://', 'socks4://', 'socks5://', 'socks5h://', 'socks4a://']:
+                                    if line.lower().startswith(scheme):
+                                        line = line[len(scheme):]
+                                        break
+                                if line:
+                                    temp_proxy_lines.append(line)
+                    
+                    if temp_proxy_lines:
+                        try:
+                            temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', prefix='proxies_stressor_')
+                            temp_file.write('\n'.join(temp_proxy_lines) + '\n')
+                            temp_file.close()
+                            temp_proxy_path = temp_file.name
+                            stresser_proxy_file = temp_proxy_path
+                            logger.info(f"Saved {len(temp_proxy_lines)} proxies to temp file: {temp_proxy_path}")
+                        except Exception as temp_err:
+                            logger.error(f"Failed to create temp proxy file: {temp_err}")
+
+                    # TA_Stresser expects absolute script path. We can place it at /usr/src/app/TA_Stresser.py in Docker.
+                    # Fix: script path to lowercase "stressor.py" to match file name and ensure Linux compatibility.
+                    script_path = "./stressor/stressor.py"
+
+                    # Construct command depending on whether it is Layer 4 or Layer 7
+                    is_l7 = stresser_method in ["CFB", "BYPASS", "GET", "POST", "OVH", "STRESS", "SLOW", "HEAD", "COOKIE", "TOR"]
+                    
+                    if is_l7:
+                        # Format: [method] [url] [proxy_type] [threads] [proxy_file] [rpc] [duration] [debug_flag]
+                        cmd = [
+                            "python3", script_path,
+                            stresser_method,
+                            endpoint.http_url,
+                            stresser_proxy_type,
+                            stresser_threads,
+                            stresser_proxy_file if stresser_proxy_file else "none",
+                            stresser_rpc,
+                            stresser_duration,
+                            "debug"  # 9th argument enables debug logger (printing PPS/BPS output)
+                        ]
+                    else:
+                        # Format: [method] [target_host:port] [threads] [duration]
+                        target_host_port = f"{target_domain_name}:{tool_config.get('port', '80')}"
+                        if stresser_proxy_file:
+                            cmd = [
+                                "python3", script_path,
+                                stresser_method,
+                                target_host_port,
+                                stresser_threads,
+                                stresser_duration,
+                                stresser_proxy_type,
+                                stresser_proxy_file
+                            ]
+                        else:
+                            cmd = [
+                                "python3", script_path,
+                                stresser_method,
+                                target_host_port,
+                                stresser_threads,
+                                stresser_duration,
+                            ]
+
                 if not cmd:
                     continue
 
@@ -307,9 +390,9 @@ class StressUser(HttpUser):
                 if proxy_wrapper.should_wrap():
                     cmd_str, temp_conf_path = proxy_wrapper.wrap_command(cmd_str)
                     logger.info(f"Wrapping execution via proxychains: {cmd_str}")
-                elif single_proxy:
-                    cmd_str = f"export HTTP_PROXY='{single_proxy}' HTTPS_PROXY='{single_proxy}' && {cmd_str}"
-                    logger.info(f"Prepending single proxy environment: {cmd_str}")
+                #elif single_proxy:
+                #    cmd_str = f"export HTTP_PROXY='{single_proxy}' HTTPS_PROXY='{single_proxy}' && {cmd_str}"
+                #    logger.info(f"Prepending single proxy environment: {cmd_str}")
                 else:
                     logger.info(f"Executing {tool}: {cmd_str}")
                 
@@ -386,6 +469,11 @@ class StressUser(HttpUser):
                             os.remove(temp_conf_path)
                         except Exception as rm_err:
                             logger.error(f"Failed to remove temp config file: {rm_err}")
+                    if temp_proxy_path and os.path.exists(temp_proxy_path):
+                        try:
+                            os.remove(temp_proxy_path)
+                        except Exception as rm_err:
+                            logger.error(f"Failed to remove temp proxy file: {rm_err}")
 
         neo4j.close()
 
