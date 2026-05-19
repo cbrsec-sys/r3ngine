@@ -475,3 +475,133 @@ def stream_command(
 				logger.error(f"Error reaping process in stream_command: {ex}")
 		if conf_path and os.path.exists(conf_path):
 			os.remove(conf_path)
+
+
+def ensure_endpoints_crawled_and_execute(task_function, ctx, description=None, max_wait_time=300):
+	"""
+	Ensure endpoints are crawled before executing a task that needs alive endpoints.
+	
+	Args:
+		task_function: The task function to execute
+		ctx: Task context
+		description: Task description
+		max_wait_time: Maximum time to wait for endpoints (seconds)
+		
+	Returns:
+		Task result or None if no alive endpoints available
+	"""
+	from copy import deepcopy
+	import time
+	from reNgine.common_func import get_http_urls
+	
+	logger.info(f'Ensuring endpoints are crawled for {task_function.__name__}')
+
+	if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
+		logger.info(f'Found {len(alive_endpoints)} alive endpoints, executing {task_function.__name__}')
+		return task_function(ctx=ctx, description=description)
+
+	# No alive endpoints found, check if we have uncrawled endpoints
+	uncrawled_endpoints = get_http_urls(is_uncrawled=True, ctx=ctx)
+
+	if not uncrawled_endpoints:
+		logger.warning(f'No endpoints found for {task_function.__name__}, skipping task')
+		return None
+
+	logger.info(f'Found {len(uncrawled_endpoints)} uncrawled endpoints, launching HTTP crawl first')
+
+	# Launch http_crawl synchronously for the specific endpoints we need
+	from reNgine.tasks import http_crawl
+	custom_ctx = deepcopy(ctx)
+	custom_ctx['track'] = False  # Don't track this internal crawl
+
+	# Execute http_crawl and wait for completion (but with timeout)
+	http_crawl_task = http_crawl.delay(
+		urls=uncrawled_endpoints[:50],  # Limit to avoid overwhelming
+		ctx=custom_ctx
+	)
+
+	# Wait for crawl completion with timeout
+	wait_time = 0
+	check_interval = 10  # Check every 10 seconds
+
+	while wait_time < max_wait_time:
+		time.sleep(check_interval)
+		wait_time += check_interval
+
+		if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
+			logger.info(f'HTTP crawl completed, found {len(alive_endpoints)} alive endpoints')
+			return task_function(ctx=ctx, description=description)
+
+		# Check if crawl task is done
+		if http_crawl_task.ready():
+			break
+
+	if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
+		logger.info(f'Found {len(alive_endpoints)} alive endpoints after wait period')
+		return task_function(ctx=ctx, description=description)
+	else:
+		logger.warning(f'No alive endpoints found after {wait_time}s wait, skipping {task_function.__name__}')
+		return None
+
+
+def save_fuzzing_file(name, url, http_status, length=0, words=0, lines=0, content_type=None):
+	"""
+	Save or retrieve DirectoryFile safely handling database concurrency/race conditions.
+	"""
+	from startScan.models import DirectoryFile
+	from django.db import IntegrityError
+	import time
+
+	# Try/except block with retries to handle database concurrency/race conditions
+	for attempt in range(3):
+		try:
+			dfile, created = DirectoryFile.objects.get_or_create(
+				name=name,
+				url=url,
+				http_status=http_status,
+				defaults={
+					'length': length,
+					'words': words,
+					'lines': lines,
+					'content_type': content_type or ''
+				}
+			)
+			return dfile, created
+		except IntegrityError:
+			if attempt < 2:
+				time.sleep(0.1 * (attempt + 1))
+			continue
+
+	# Final attempt
+	return DirectoryFile.objects.get_or_create(
+		name=name,
+		url=url,
+		http_status=http_status,
+		defaults={
+			'length': length,
+			'words': words,
+			'lines': lines,
+			'content_type': content_type or ''
+		}
+	)
+
+
+def parse_custom_header_to_list(custom_header):
+	"""
+	Convert dictionary, comma-separated string, or list of headers to flat list of header strings.
+	"""
+	if not custom_header:
+		return []
+	if isinstance(custom_header, list):
+		return custom_header
+	if isinstance(custom_header, dict):
+		return [f"{k}: {v}" for k, v in custom_header.items()]
+	if isinstance(custom_header, str):
+		res = []
+		for h in custom_header.split(','):
+			h = h.strip()
+			if h:
+				res.append(h)
+		return res
+	return []
+
