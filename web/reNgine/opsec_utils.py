@@ -301,7 +301,12 @@ class ProxychainsWrapper:
         test_list = list(self.proxies)
         random.shuffle(test_list)
         
+        checked_count = 0
         for proxy_str in test_list:
+            if checked_count >= 5:
+                logging.getLogger(__name__).warning("Reached maximum sequential proxychains validation limit (5). Stopping checks.")
+                break
+            checked_count += 1
             # Parse the proxychains formatted line: type host port [user pass]
             parts = proxy_str.split()
             if len(parts) >= 3:
@@ -330,6 +335,11 @@ class ProxychainsWrapper:
                     # Reject if custom proxy authentication failure text is found in response body
                     if "Proxy Authentication Required" in response.text or "Proxy Authentication Required" in str(response.headers):
                         raise Exception("Proxy Authentication Required returned in response text/headers")
+                    
+                    # Ensure the response indicates a successful HTTP status code (2xx or 3xx)
+                    # Reject proxies returning 502 Bad Gateway, 503 Service Unavailable, 403 Forbidden, etc.
+                    if not (200 <= response.status_code < 400):
+                        raise Exception(f"Proxy returned invalid status code: {response.status_code}")
                         
                     # Valid proxy found, return the original proxychains formatted line
                     return proxy_str

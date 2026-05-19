@@ -487,16 +487,16 @@ def initiate_scan(
 			'secret_scanning': secret_scanning.si(ctx=ctx, description='Secrets & Leaks Scan'),
 			'firewall_vpn_scan': firewall_vpn_scan.si(ctx=ctx, description='Firewall & VPN scan'),
 			'brute_force_scan': brute_force_scan.si(ctx=ctx, description='Brute force scan'),
-			'correlate_vulnerabilities': correlate_vulnerabilities.si(scan_history_id=scan_history_id),
-			'calculate_risk_scores': calculate_risk_scores.si(scan_history_id=scan_history_id),
-			'generate_impact_assessment': generate_impact_assessment.si(scan_history_id=scan_history_id),
+			'correlate_vulnerabilities': correlate_vulnerabilities.si(scan_history_id=scan_history_id, ctx=ctx),
+			'calculate_risk_scores': calculate_risk_scores.si(scan_history_id=scan_history_id, ctx=ctx),
+			'generate_impact_assessment': generate_impact_assessment.si(scan_history_id=scan_history_id, ctx=ctx),
 			'stress_test': run_stress_testing.si(
 				scan_history_id=scan_history_id, 
 				target_domain_name=domain.name, 
 				yaml_config=config,
 				ctx=ctx
 			),
-			'run_apme': run_apme.si(scan_history_id=scan_history_id)
+			'run_apme': run_apme.si(scan_history_id=scan_history_id, ctx=ctx)
 		}
 
 		def is_task_enabled(task_name):
@@ -782,49 +782,34 @@ def initiate_subscan(
 			subdomain.technologies.add(tech)
 		subdomain.save()
 
-	# Build workflow steps
-	workflow_steps = [method.si(ctx=ctx, host=subdomain.name)]
+	# Build workflow steps based on task signature expectations
+	target_url = subdomain.http_url or f"http://{subdomain.name}/"
+	if scan_type == 'osint':
+		workflow_steps = [method.si(ctx=ctx, host=subdomain.name)]
+	elif scan_type == 'subdomain_discovery':
+		workflow_steps = [method.si(ctx=ctx, host=subdomain.name)]
+	elif scan_type == 'port_scan':
+		workflow_steps = [method.si(ctx=ctx, hosts=[subdomain.name])]
+	elif scan_type == 'fetch_url':
+		workflow_steps = [method.si(ctx=ctx, urls=[target_url])]
+	elif scan_type == 'vulnerability_scan':
+		subtasks = resolve_vulnerability_tasks(config, [target_url], ctx)
+		workflow_steps = [group(subtasks)] if subtasks else []
+	else:
+		# dir_file_fuzz, screenshot, waf_detection and other plugin/unknown tasks
+		# do not accept a 'host' or 'urls' parameter at the task level and read from ctx
+		workflow_steps = [method.si(ctx=ctx)]
 
 	# If this is a vulnerability scan, we need to run correlation
 	if scan_type == 'vulnerability_scan':
-		# Run Acunetix if enabled in config and credentials are present.
-		# We must check here (not rely on vulnerability_scan parent task) because
-		# initiate_subscan invokes acunetix_scan directly, bypassing vulnerability_scan.
-		should_run_acunetix = config.get(RUN_ACUNETIX, False)
-		if should_run_acunetix:
-			acunetix_creds = AcunetixAPIKey.objects.first()
-			if acunetix_creds and acunetix_creds.server_url and acunetix_creds.api_key:
-				logger.info('Acunetix is configured. Adding to subscan workflow...')
-				workflow_steps.append(acunetix_scan.si(
-					domain_id=domain.id,
-					scan_history_id=scan.id,
-					ctx=ctx
-				))
-			else:
-				logger.warning("Acunetix is enabled in engine config but not configured in vault. Skipping.")
-
-		# WPScan: must pass ctx so RengineTask can resolve self.scan and self.yaml_configuration.
-		# Previously called with scan_history_id= which is not a recognised task parameter.
-		workflow_steps.append(wpscan_scan.si(
-			ctx=ctx,
-			description='WPScan'
-		))
-
-		# cPanel scanner: same ctx requirement as WPScan above.
-		workflow_steps.append(cpanel_scan.si(
-			ctx=ctx,
-			description='cPanel Vulnerability Scan'
-		))
-
-
 		# Run ERL validation if plugin is installed
 		workflow_steps.append(PluginOrchestrator.inject_tasks('ExploitReadinessLayer', None, ctx))
 
 		# Run correlation
-		workflow_steps.append(correlate_vulnerabilities.si(scan_history_id=scan.id))
+		workflow_steps.append(correlate_vulnerabilities.si(scan_history_id=scan.id, ctx=ctx))
 
 		# Run risk score calculation
-		workflow_steps.append(calculate_risk_scores.si(scan_history_id=scan.id))
+		workflow_steps.append(calculate_risk_scores.si(scan_history_id=scan.id, ctx=ctx))
 
 	# Attack Path Modeling Engine (APME)
 	apme_config = config.get(ATTACK_PATH_MODELING, {})
@@ -2091,7 +2076,7 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 	# Run Semgrep Secret Scan (Default)
 	try:
 		logger.info('Running Semgrep Secret Scan...')
-		semgrep_scan.apply(args=(ctx,), kwargs={'mode': 'secret', 'description': 'Semgrep Secret Scan'})
+		semgrep_scan.apply(kwargs={'ctx': ctx, 'mode': 'secret', 'description': 'Semgrep Secret Scan'})
 	except Exception as e:
 		logger.error(f"Semgrep secret scan failed: {e}")
 
@@ -2213,7 +2198,11 @@ def persist_osint_item(scan_history, domain, osint_type, e_data, confidence, sou
 			port_num = int(e_data)
 			update_or_create_port(port_num)
 	elif osint_type == 'Tech':
-		tech_obj, _ = Technology.objects.get_or_create(name=e_data)
+		from django.core.exceptions import MultipleObjectsReturned
+		try:
+			tech_obj, _ = Technology.objects.get_or_create(name=e_data)
+		except MultipleObjectsReturned:
+			tech_obj = Technology.objects.filter(name=e_data).first()
 		if source_data:
 			subdomain = Subdomain.objects.filter(name=source_data, scan_history=scan_history).first()
 			if subdomain:
@@ -2616,11 +2605,29 @@ def nmap(
 		# Register Auth Candidates from vulnerability tags (like auth_portal)
 		if 'auth_portal' in (vuln_data.get('tags') or []):
 			from reNgine.utilities import save_auth_candidate
+			# Parse port safely from http_url
+			url_str = vuln_data.get('http_url') or ''
+			parsed_port = 80
+			if url_str:
+				try:
+					from urllib.parse import urlparse
+					parsed_url = urlparse(url_str)
+					if parsed_url.port:
+						parsed_port = parsed_url.port
+					else:
+						parsed_port = 443 if parsed_url.scheme == 'https' else 80
+				except Exception:
+					try:
+						port_part = url_str.split(':')[-1]
+						if port_part.isdigit():
+							parsed_port = int(port_part)
+					except Exception:
+						pass
 			save_auth_candidate(
 				scan_history=self.scan,
 				target=vuln_data['http_url'],
 				protocol='http',
-				port=int(vuln_data['http_url'].split(':')[-1]) if ':' in vuln_data['http_url'] else 80,
+				port=parsed_port,
 				source_tool='Nmap NSE',
 				metadata={'tags': vuln_data.get('tags') or [], 'nse_script': vuln_data.get('name')},
 				subdomain=self.subdomain,
@@ -3296,6 +3303,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
 	arjun_methods = config.get(ARJUN_METHODS, ARJUN_DEFAULT_METHODS)
+	proxy = None
 
 	# Get targets
 	if not urls:
@@ -3527,9 +3535,11 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			for ep in all_endpoints:
 				f.write(f"{ep.http_url}\n")
 		
-		cmd = f"cat {urls_file} | aquatone -out {aquatone_dir}" # -silent"
-		if proxy:
-			cmd += f" -proxy {proxy}"
+		cmd = f"cat {urls_file} | aquatone -out {aquatone_dir} -chrome-path /usr/bin/chromium" # -silent"
+		# Get a fresh random proxy specifically for Aquatone to avoid stale leaked loop variables
+		aquatone_proxy = get_random_proxy()
+		if aquatone_proxy:
+			cmd += f" -proxy {aquatone_proxy}"
 		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 
 		# Parse Aquatone results and link to database
@@ -3582,122 +3592,33 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 
 	# Trigger Intelligent Auth Candidate Extraction
 	from reNgine.auth_discovery_tasks import extract_auth_candidates
-	extract_auth_candidates.apply(args=(self,), kwargs={'ctx': ctx})
+	extract_auth_candidates.apply(kwargs={'ctx': ctx})
 
 
 @app.task(name='vulnerability_scan', queue='main_scan_queue', bind=True, base=RengineTask)
 def vulnerability_scan(self, urls=[], ctx={}, description=None):
-	"""
-		This function will serve as an entrypoint to vulnerability scan.
-		All other vulnerability scan will be run from here including nuclei, crlfuzz, etc
+	"""This task serves as the entrypoint for vulnerability scans, spawning all enabled scanners.
+
+	Args:
+		urls (list): Target URLs to scan.
+		ctx (dict): Scan context.
+		description (str): Task description.
 	"""
 	logger.info('Running Vulnerability Scan Queue')
-	config = self.yaml_configuration.get(VULNERABILITY_SCAN) or {}
-	should_run_nuclei = config.get(RUN_NUCLEI, True)
-	should_run_crlfuzz = config.get(RUN_CRLFUZZ, False)
-	should_run_dalfox = config.get(RUN_DALFOX, False)
-	should_run_s3scanner = config.get(RUN_S3SCANNER, True)
-	should_run_acunetix = config.get(RUN_ACUNETIX, False)
-	should_run_wpscan = config.get(RUN_WPSCAN, True)
-	should_run_cpanel = config.get('cpanel_scanner', {}).get(RUN_CPANEL2SHELL, True)
-	should_run_react2shell = config.get('react_scanner', {}).get(RUN_REACT2SHELL, True)
-
-	grouped_tasks = []
-	if should_run_nuclei:
-		_task = nuclei_scan.si(
-			urls=urls,
-			ctx=ctx,
-			description=f'Nuclei Scan'
-		)
-		grouped_tasks.append(_task)
-
-	if should_run_acunetix:
-		logger.info('Running Acunetix Scan')
-		# Double check if acunetix is configured
-		creds = AcunetixAPIKey.objects.first()
-		if creds and creds.server_url and creds.api_key:
-			logger.info('Acunetix is configured. Running scan...')
-			_task = acunetix_scan.si(
-				domain_id=ctx.get('domain_id'),
-				scan_history_id=ctx.get('scan_history_id'),
-				ctx=ctx
-			)
-			grouped_tasks.append(_task)
-		else:
-			logger.warning("Acunetix is enabled in engine but not configured in vault. Skipping.")
-
-	if should_run_crlfuzz:
-		_task = crlfuzz_scan.si(
-			urls=urls,
-			ctx=ctx,
-			description=f'CRLFuzz Scan'
-		)
-		grouped_tasks.append(_task)
-
-	if should_run_dalfox:
-		_task = dalfox_xss_scan.si(
-			urls=urls,
-			ctx=ctx,
-			description=f'Dalfox XSS Scan'
-		)
-		grouped_tasks.append(_task)
-
-	if should_run_s3scanner:
-		_task = s3scanner.si(
-			ctx=ctx,
-			description=f'Misconfigured S3 Buckets Scanner'
-		)
-		grouped_tasks.append(_task)
-
-	# Run cPanel Scanner
-	if should_run_cpanel:
-		logger.info('Running cPanel Scanner...')
-		_task = cpanel_scan.si(
-			ctx=ctx,
-			description=f'cPanel Vulnerability Scan'
-		)
-		grouped_tasks.append(_task)
-
-	if should_run_wpscan:
-		logger.info('Running WPScan...')
-		_task = wpscan_scan.si(
-			urls=urls,
-			ctx=ctx,
-			description=f'WPScan'
-		)
-		grouped_tasks.append(_task)
-
-	# Run react2shell-scanner
-	if should_run_react2shell:
-		logger.info('Running react2shell-scanner...')
-		_task = react2shell_scan.si(
-			ctx=ctx,
-			description=f'React Vulnerability Scan'
-		)
-		grouped_tasks.append(_task)
-
-	# Run Semgrep Vulnerability Scan (Default)
-	logger.info('Running Semgrep Vulnerability Scan...')
-	_semgrep_task = semgrep_scan.si(
-		ctx=ctx,
-		mode='vulnerability',
-		description='Semgrep Vulnerability Scan'
-	)
-	grouped_tasks.append(_semgrep_task)
+	config = self.yaml_configuration
+	grouped_tasks = resolve_vulnerability_tasks(config, urls, ctx)
 
 	if grouped_tasks:
 		return self.replace(chord(grouped_tasks, finish_vulnerability_scan.s(scan_history_id=ctx.get('scan_history_id'))))
 
 	logger.info('Vulnerability scan completed...')
-
-	# return results
 	return None
 
 @app.task(name='nuclei_individual_severity_module', queue='main_scan_queue', base=RengineTask, bind=True)
 def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, should_fetch_gpt_report, ctx={}, description=None):
 	'''
-		This celery task will run vulnerability scan in parallel.
-		All severities supplied should run in parallel as grouped tasks.
+		This celery task will run vulnerability scan for a specific severity.
+		All severities run sequentially to optimize resource utilization and prevent worker crashes.
 	'''
 	results = []
 	logger.info(f'Running vulnerability scan with severity: {severity}')
@@ -4056,9 +3977,10 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 			# assuming technologies is a many-to-many field with 'name' attribute
 			all_techs.update(sub.technologies.values_list('name', flat=True))
 		
-		if all_techs:
-			tech_tags = get_nuclei_tags_from_techs(list(all_techs))
-			logger.info(f'Detected technologies: {list(all_techs)}. Adding targeted Nuclei tags: {tech_tags}')
+		# Temporarily disabled to check if this is causing nuclei scans to hang
+		#if all_techs:
+		#	tech_tags = get_nuclei_tags_from_techs(list(all_techs))
+		#	logger.info(f'Detected technologies: {list(all_techs)}. Adding targeted Nuclei tags: {tech_tags}')
 
 	if tech_tags:
 		# Combine user tags with tech tags
@@ -4103,10 +4025,31 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	# Build templates
 	logger.info('Updating Nuclei templates ...')
 	# Wordfence Templates integration
-	is_wordpress_detected = Subdomain.objects.filter(scan_history=self.scan, technologies__name__icontains='WordPress').exists()
+	is_wordpress_detected = False # Temporarily disabled topscoder wordpress nuclei templates
+	wordfence_exists = False
 	if is_wordpress_detected:
 		logger.info("WordPress detected. Preparing Wordfence Nuclei Templates...")
 		os.environ['GITHUB_TEMPLATE_REPO'] = 'topscoder/nuclei-wordfence-cve'
+		
+		wordfence_dir = '/usr/src/github/topscoder/nuclei-wordfence-cve'
+		if not os.path.exists(wordfence_dir) or not os.listdir(wordfence_dir):
+			os.makedirs(os.path.dirname(wordfence_dir), exist_ok=True)
+			logger.info("Cloning topscoder/nuclei-wordfence-cve templates from GitHub...")
+			try:
+				import subprocess
+				subprocess.run(
+					["git", "clone", "--depth", "1", "https://github.com/topscoder/nuclei-wordfence-cve.git", wordfence_dir],
+					timeout=20,
+					check=True,
+					stdout=subprocess.PIPE,
+					stderr=subprocess.PIPE
+				)
+				logger.info("Successfully cloned Wordfence templates.")
+				wordfence_exists = True
+			except Exception as e:
+				logger.warning(f"Could not clone Wordfence templates: {str(e)}")
+		else:
+			wordfence_exists = True
 
 	run_command(
 		'nuclei -update-templates',
@@ -4158,9 +4101,9 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	for tpl in templates:
 		cmd += f' -t {tpl}'
 	
-	if is_wordpress_detected:
+	if is_wordpress_detected and wordfence_exists:
 		# Add Wordfence template path
-		cmd += " -t github/topscoder/nuclei-wordfence-cve"
+		cmd += " -t /usr/src/github/topscoder/nuclei-wordfence-cve"
 		# Default to production, optional candidate
 		use_candidate = config.get('nuclei_config', {}).get(USE_WORDFENCE_CANDIDATE, False)
 		if use_candidate:
@@ -4169,25 +4112,26 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 			cmd += " -tags production"
 
 
-	grouped_tasks = []
-	custom_ctx = ctx
+	# Run each severity sequentially inside the same nuclei_scan task
 	for severity in severities:
-		custom_ctx['track'] = True
-		_task = nuclei_individual_severity_module.si(
-			cmd,
-			severity,
-			enable_http_crawl,
-			should_fetch_gpt_report,
-			ctx=custom_ctx,
-			description=f'Nuclei Scan with severity {severity}'
+		logger.info(f"Running Nuclei severity: {severity}")
+		if hasattr(self, 'activity') and self.activity:
+			self.activity.title = f"Nuclei Scan - Severity: {severity}"
+			self.activity.save()
+		
+		# Invoke the nuclei_individual_severity_module synchronously via Celery apply
+		nuclei_individual_severity_module.apply(
+			kwargs={
+				'cmd': cmd,
+				'severity': severity,
+				'enable_http_crawl': enable_http_crawl,
+				'should_fetch_gpt_report': should_fetch_gpt_report,
+				'ctx': ctx,
+				'description': f'Nuclei Scan with severity {severity}'
+			}
 		)
-		grouped_tasks.append(_task)
-
-	if grouped_tasks:
-		return self.replace(chord(grouped_tasks, finish_nuclei_scan.s(scan_history_id=ctx.get('scan_history_id'))))
 
 	logger.info('Vulnerability scan with all severities completed...')
-
 	return None
 
 @app.task(name='dalfox_xss_scan', queue='main_scan_queue', base=RengineTask, bind=True)
@@ -4642,7 +4586,11 @@ def http_crawl(
 
 		# Add technology objects to DB
 		for technology in techs:
-			tech, _ = Technology.objects.get_or_create(name=technology)
+			from django.core.exceptions import MultipleObjectsReturned
+			try:
+				tech, _ = Technology.objects.get_or_create(name=technology)
+			except MultipleObjectsReturned:
+				tech = Technology.objects.filter(name=technology).first()
 			endpoint.techs.add(tech)
 			if is_ran_from_subdomain_scan:
 				subdomain.technologies.add(tech)
@@ -6696,14 +6644,13 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 		ike_output_file = f'{self.results_dir}/ike_scan_{target}.txt'
 		# ike-scan does not natively support HTTP/SOCKS proxies
 		cmd = f'ike-scan --multiline {target} > {ike_output_file}'
-		proxy = get_random_proxy()
+		#proxy = get_random_proxy()
 		run_command(
 			cmd,
 			shell=True,
 			history_file=self.history_file,
 			scan_id=self.scan_id,
-			activity_id=self.activity_id,
-			proxy=proxy)
+			activity_id=self.activity_id)
 
 		if os.path.isfile(ike_output_file):
 			with open(ike_output_file, 'r') as f:
@@ -6725,14 +6672,13 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 			ssl_output_file = f'{self.results_dir}/sslscan_{target}_{port}.xml'
 			# sslscan does not natively support proxies
 			cmd = f'sslscan --xml={ssl_output_file} {target}:{port}'
-			proxy = get_random_proxy()
+			#proxy = get_random_proxy()
 			run_command(
 				cmd,
 				shell=True,
 				history_file=self.history_file,
 				scan_id=self.scan_id,
-				activity_id=self.activity_id,
-				proxy=proxy)
+				activity_id=self.activity_id)
 
 			if os.path.isfile(ssl_output_file):
 				vuln_data = {
@@ -6765,7 +6711,7 @@ def brute_force_scan(self, targets=[], ctx={}, description=None):
 	
 	# Prerequisite: Run Intelligent Form Extraction (Tier 3)
 	from reNgine.auth_discovery_tasks import extract_auth_candidates
-	extract_auth_candidates.apply(args=(self,), kwargs={'ctx': ctx})
+	extract_auth_candidates.apply(kwargs={'ctx': ctx})
 	
 	# Initialize Orchestrator
 	from reNgine.opsec_utils import BruteForceOrchestrator
@@ -6920,6 +6866,7 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 			
 		# Wait for scan to complete
 		# We'll poll /api/v1/scans
+		scan_id = None
 		max_retries = 360 # 1 hour
 		retries = 0
 		while retries < max_retries:
@@ -7008,18 +6955,29 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 
 
 @app.task(name='correlate_vulnerabilities', queue='main_scan_queue', base=RengineTask, bind=True)
-def correlate_vulnerabilities(self, scan_history_id):
-	"""
-	Correlates discovered technologies with known CVEs and updates the graph.
+def correlate_vulnerabilities(self, scan_history_id, ctx={}):
+	"""Correlate discovered technologies with known CVEs and update the graph database.
+
+	Args:
+		scan_history_id (int): Scan history ID.
+		ctx (dict): Scan context.
 	"""
 	# Check if there are other scanning tasks still running
 	from startScan.models import ScanActivity
 	from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
 	post_processing_names = ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'run_apme', 'report']
-	running_scans = ScanActivity.objects.filter(
-		scan_of_id=scan_history_id,
-		status__in=[RUNNING_TASK, INITIATED_TASK]
-	).exclude(name__in=post_processing_names)
+	
+	if self.subscan:
+		running_scans = ScanActivity.objects.filter(
+			celery_id__in=self.subscan.celery_ids,
+			status__in=[RUNNING_TASK, INITIATED_TASK]
+		).exclude(name__in=post_processing_names)
+	else:
+		running_scans = ScanActivity.objects.filter(
+			scan_of_id=scan_history_id,
+			status__in=[RUNNING_TASK, INITIATED_TASK]
+		).exclude(name__in=post_processing_names)
+
 	if running_scans.exists():
 		running_names = list(running_scans.values_list('name', flat=True))
 		logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling correlate_vulnerabilities...")
@@ -7037,19 +6995,29 @@ def correlate_vulnerabilities(self, scan_history_id):
 
 
 @app.task(name='calculate_risk_scores', queue='main_scan_queue', base=RengineTask, bind=True)
-def calculate_risk_scores(self, scan_history_id):
-	"""
-	Calculates a weighted risk score for vulnerabilities.
-	Score = (Severity * 0.4) + (AssetCriticality * 0.3) + (Exploitability * 0.2) + (Exposure * 0.1)
+def calculate_risk_scores(self, scan_history_id, ctx={}):
+	"""Calculate a weighted risk score for discovered vulnerabilities.
+
+	Args:
+		scan_history_id (int): Scan history ID.
+		ctx (dict): Scan context.
 	"""
 	# Check if there are other scanning tasks still running
 	from startScan.models import ScanActivity
 	from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
 	post_processing_names = ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'run_apme', 'report']
-	running_scans = ScanActivity.objects.filter(
-		scan_of_id=scan_history_id,
-		status__in=[RUNNING_TASK, INITIATED_TASK]
-	).exclude(name__in=post_processing_names)
+	
+	if self.subscan:
+		running_scans = ScanActivity.objects.filter(
+			celery_id__in=self.subscan.celery_ids,
+			status__in=[RUNNING_TASK, INITIATED_TASK]
+		).exclude(name__in=post_processing_names)
+	else:
+		running_scans = ScanActivity.objects.filter(
+			scan_of_id=scan_history_id,
+			status__in=[RUNNING_TASK, INITIATED_TASK]
+		).exclude(name__in=post_processing_names)
+
 	if running_scans.exists():
 		running_names = list(running_scans.values_list('name', flat=True))
 		logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling calculate_risk_scores...")
@@ -7062,9 +7030,13 @@ def calculate_risk_scores(self, scan_history_id):
 
 
 @app.task(name='generate_impact_assessment', queue='main_scan_queue', base=RengineTask, bind=True)
-def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None):
-	"""
-	Generates an AI-powered impact assessment for vulnerabilities.
+def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None, ctx={}):
+	"""Generate an AI-powered impact assessment for vulnerabilities.
+
+	Args:
+		scan_history_id (int): Scan history ID.
+		vulnerability_id (int): Specific vulnerability ID.
+		ctx (dict): Scan context.
 	"""
 	from reNgine.llm import LLMImpactGenerator
 	from reNgine.privacy import PIIGate
@@ -7084,10 +7056,18 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 		from startScan.models import ScanActivity
 		from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
 		post_processing_names = ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'run_apme', 'report']
-		running_scans = ScanActivity.objects.filter(
-			scan_of_id=scan_history_id,
-			status__in=[RUNNING_TASK, INITIATED_TASK]
-		).exclude(name__in=post_processing_names)
+		
+		if self.subscan:
+			running_scans = ScanActivity.objects.filter(
+				celery_id__in=self.subscan.celery_ids,
+				status__in=[RUNNING_TASK, INITIATED_TASK]
+			).exclude(name__in=post_processing_names)
+		else:
+			running_scans = ScanActivity.objects.filter(
+				scan_of_id=scan_history_id,
+				status__in=[RUNNING_TASK, INITIATED_TASK]
+			).exclude(name__in=post_processing_names)
+
 		if running_scans.exists():
 			running_names = list(running_scans.values_list('name', flat=True))
 			logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling generate_impact_assessment...")
@@ -7239,15 +7219,22 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 		logger.info(f"No target files found for Semgrep {mode} scan.")
 		return
 
-	# Download files with hardened network timeouts and proxy usage
+	# Retrieve proxies configuration from database
 	downloaded_count = 0
-	proxy = get_random_proxy()
-	proxies = None
-	if proxy:
-		proxies = {
-			'http': proxy,
-			'https': proxy
-		}
+	available_proxies = []
+	use_proxy = False
+	current_proxy_index = 0
+	
+	try:
+		if Proxy.objects.all().exists():
+			proxy_config = Proxy.objects.first()
+			if proxy_config.use_proxy:
+				use_proxy = True
+				available_proxies = [p.strip() for p in proxy_config.proxies.splitlines() if p.strip()]
+				# Shuffle the proxies to distribute traffic randomly
+				random.shuffle(available_proxies)
+	except Exception as e:
+		logger.error(f"Failed to load proxies configuration: {e}")
 
 	# Convert custom headers list to dictionary
 	headers_dict = {}
@@ -7292,15 +7279,57 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 			if os.path.exists(filepath):
 				continue # Skip if already exists
 			
-			resp = requests.get(full_url, headers=headers_dict, proxies=proxies, timeout=10, verify=False)
-			if resp.status_code == 200:
-				with open(filepath, 'w', encoding='utf-8') as f:
-					f.write(resp.text)
-				downloaded_count += 1
-			else:
-				logger.debug(f"Semgrep downloader got status {resp.status_code} for {full_url}")
+			# Try downloading the URL, with proxy cycling on failure (capped at max 5 to prevent stalls)
+			max_retries = min(5, len(available_proxies)) if use_proxy and available_proxies else 1
+			if max_retries < 1:
+				max_retries = 1
+			attempt = 0
+			download_success = False
+
+			while attempt < max_retries:
+				proxies = None
+				current_proxy_name = None
+				if use_proxy and available_proxies:
+					current_proxy_name = available_proxies[current_proxy_index % len(available_proxies)]
+					proxies = {
+						'http': current_proxy_name,
+						'https': current_proxy_name
+					}
+
+				try:
+					resp = requests.get(full_url, headers=headers_dict, proxies=proxies, timeout=10, verify=False)
+					if resp.status_code == 200:
+						with open(filepath, 'w', encoding='utf-8') as f:
+							f.write(resp.text)
+						downloaded_count += 1
+						download_success = True
+						break  # Successfully downloaded
+					elif resp.status_code in [407, 502, 503, 504]:
+						# Proxy connection or authentication error code, cycle and retry
+						raise requests.exceptions.ProxyError(f"Proxy returned status code {resp.status_code}")
+					else:
+						logger.debug(f"Semgrep downloader got status {resp.status_code} for {full_url}")
+						# Other response codes (e.g. 404/403) are verified responses from the target host itself
+						break
+				except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+					attempt += 1
+					if use_proxy and available_proxies:
+						old_proxy = current_proxy_name
+						current_proxy_index += 1
+						new_proxy = available_proxies[current_proxy_index % len(available_proxies)]
+						logger.warning(
+							f"Proxy failure using {old_proxy} for {full_url}. "
+							f"Cycling to next proxy: {new_proxy} (Attempt {attempt}/{max_retries}). Error: {e}"
+						)
+					else:
+						logger.debug(f"Semgrep downloader network failure for {full_url}: {e}")
+						break
+				except Exception as e:
+					logger.debug(f"Semgrep downloader got non-network error for {url} (full: {full_url}): {e}")
+					break
+
 		except Exception as e:
-			logger.debug(f"Semgrep downloader failed for {url} (full: {full_url}): {e}")
+			logger.debug(f"Semgrep downloader loop error for {url}: {e}")
 
 	if downloaded_count == 0:
 		logger.warning("No files could be downloaded for Semgrep scan.")
@@ -7388,16 +7417,12 @@ def save_semgrep_secret_finding(result, ctx, base_dir):
 
 
 @app.task(name='run_apme', queue='main_scan_queue', base=RengineTask, bind=True)
-def run_apme(self, scan_history_id):
-	"""
-	Runs the Attack Path Modeling Engine (APME).
+def run_apme(self, scan_history_id, ctx={}):
+	"""Run the Attack Path Modeling Engine (APME).
 
-	This task runs AFTER both vulnerability_scan and ERL validation to ensure:
-	- All vulnerabilities are discovered and correlated
-	- ERL validation (via Plugin) has updated confidence scores
-	- The graph has the most accurate data for path computation
-
-	Results are persisted to ImpactAssessment for API and frontend consumption.
+	Args:
+		scan_history_id (int): Scan history ID.
+		ctx (dict): Scan context.
 	"""
 	if not RENGINE_APME_ENABLED:
 		logger.info("APME is disabled in settings (RENGINE_APME_ENABLED=False). Skipping.")
@@ -7407,10 +7432,18 @@ def run_apme(self, scan_history_id):
 	from startScan.models import ScanActivity
 	from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
 	post_processing_names = ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'run_apme', 'report']
-	running_scans = ScanActivity.objects.filter(
-		scan_of_id=scan_history_id,
-		status__in=[RUNNING_TASK, INITIATED_TASK]
-	).exclude(name__in=post_processing_names)
+	
+	if self.subscan:
+		running_scans = ScanActivity.objects.filter(
+			celery_id__in=self.subscan.celery_ids,
+			status__in=[RUNNING_TASK, INITIATED_TASK]
+		).exclude(name__in=post_processing_names)
+	else:
+		running_scans = ScanActivity.objects.filter(
+			scan_of_id=scan_history_id,
+			status__in=[RUNNING_TASK, INITIATED_TASK]
+		).exclude(name__in=post_processing_names)
+
 	if running_scans.exists():
 		running_names = list(running_scans.values_list('name', flat=True))
 		logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling run_apme...")

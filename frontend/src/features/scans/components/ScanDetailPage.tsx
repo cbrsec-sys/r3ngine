@@ -37,7 +37,8 @@ import {
   Slide,
   Backdrop,
   DialogActions,
-  Link
+  Link,
+  Alert
 } from '@mui/material';
 import {
   Activity,
@@ -138,9 +139,11 @@ const VulnerabilityInfoModal: React.FC<{
 }> = ({ open, onClose, vulnerability }) => {
   const gptMutation = useGptVulnerabilityDetails();
   const [localVuln, setLocalVuln] = useState<any>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     setLocalVuln(vulnerability);
+    setError(null);
   }, [vulnerability]);
 
   if (!localVuln) return null;
@@ -152,6 +155,7 @@ const VulnerabilityInfoModal: React.FC<{
 
   const handleFetchGpt = async () => {
     if (!localVuln) return;
+    setError(null);
     try {
       const result = await gptMutation.mutateAsync({ id: localVuln.id!, name: localVuln.name });
       if (result.status) {
@@ -162,9 +166,12 @@ const VulnerabilityInfoModal: React.FC<{
           remediation: result.remediation,
           references: result.references?.join('\n') || prev.references || ''
         }));
+      } else {
+        setError(result.error || 'Failed to generate GPT description');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setError(err?.response?.data?.error || err?.message || 'Something went wrong while generating GPT description');
     }
   };
 
@@ -203,6 +210,11 @@ const VulnerabilityInfoModal: React.FC<{
       </DialogTitle>
       <DialogContent sx={{ p: 3 }}>
         <Stack spacing={4}>
+          {error && (
+            <Alert severity="error" sx={{ bgcolor: 'rgba(255, 0, 60, 0.05)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)' }}>
+              {error}
+            </Alert>
+          )}
           {/* Classification Section */}
           <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1 }}>
             <Typography sx={{ color: severityColor, fontSize: '0.7rem', fontWeight: 900, mb: 2, letterSpacing: 1, textTransform: 'uppercase' }}>

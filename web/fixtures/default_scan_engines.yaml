@@ -3,7 +3,7 @@
     engine_name: Full Scan
     yaml_configuration: |
       subdomain_discovery: {
-        'uses_tools': ['subfinder', 'amass-passive', 'amass-active', 'chaos', 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'baddns'],
+        'uses_tools': ['subfinder', 'chaos', 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'baddns'],
         'enable_http_crawl': true,
         'threads': 30,
         'timeout': 5,

@@ -312,7 +312,8 @@ def stream_command(
 		scan_id=None, 
 		activity_id=None, 
 		trunc_char=None,
-		proxy=None
+		proxy=None,
+		timeout=3600
 	):
 	"""Run a command and yield output line by line.
 
@@ -326,6 +327,7 @@ def stream_command(
 		activity_id (int): Activity ID.
 		trunc_char (str): Character used to truncate the output line.
 		proxy (str): If provided, may be used for proxychains wrapping.
+		timeout (int): Overall execution timeout in seconds.
 	Yields:
 		str/dict: Output line.
 	"""
@@ -355,6 +357,26 @@ def stream_command(
 		stderr=subprocess.STDOUT,
 		universal_newlines=True,
 		shell=shell)
+
+	# Start a watchdog thread to terminate the command if it runs too long
+	import threading
+	import time
+
+	def watchdog(proc, limit_sec):
+		time.sleep(limit_sec)
+		if proc.poll() is None:
+			logger.error(f"Watchdog: Command timed out after {limit_sec} seconds. Killing process: {cmd}")
+			try:
+				proc.kill()
+			except Exception as ex:
+				logger.error(f"Watchdog: Failed to kill process: {ex}")
+
+	watchdog_thread = threading.Thread(
+		target=watchdog,
+		args=(process, timeout),
+		daemon=True
+	)
+	watchdog_thread.start()
 
 	# Log the output in real-time to the database
 	output = ""
@@ -424,10 +446,32 @@ def stream_command(
 		command_obj.return_code = process.returncode
 		command_obj.save()
 
-	except Exception as e:
-		logger.error(f"Error in stream_command: {str(e)}")
+	except BaseException as e:
+		if not isinstance(e, GeneratorExit):
+			logger.error(f"Error in stream_command: {str(e)}")
 		if process:
-			process.kill()
+			try:
+				process.kill()
+			except Exception:
+				pass
+		raise
 	finally:
+		if process:
+			if process.stdout:
+				try:
+					process.stdout.close()
+				except Exception:
+					pass
+			try:
+				if process.poll() is None:
+					process.terminate()
+					try:
+						process.wait(timeout=5)
+					except subprocess.TimeoutExpired:
+						process.kill()
+				else:
+					process.wait()
+			except Exception as ex:
+				logger.error(f"Error reaping process in stream_command: {ex}")
 		if conf_path and os.path.exists(conf_path):
 			os.remove(conf_path)

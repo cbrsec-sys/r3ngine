@@ -45,6 +45,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
     spiderfoot_scan: false,
     importSubdomainTextArea: '',
     outOfScopeSubdomainTextarea: '',
+    startingPointPath: '',
   });
 
   const { data: engines, isLoading: loadingEngines } = useEngines();
@@ -63,6 +64,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
       spiderfoot_scan: formData.spiderfoot_scan,
       importSubdomainTextArea: formData.importSubdomainTextArea.split('\n').filter(s => s.trim()),
       outOfScopeSubdomainTextarea: formData.outOfScopeSubdomainTextarea.split('\n').filter(s => s.trim()),
+      startingPointPath: formData.startingPointPath.trim(),
     }, {
       onSuccess: () => {
         onClose();
@@ -256,10 +258,20 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
                 <TextField
+                  label="Starting Point Path"
+                  fullWidth
+                  value={formData.startingPointPath}
+                  onChange={(e) => setFormData({ ...formData, startingPointPath: e.target.value })}
+                  placeholder="e.g. /api/v1/auth/login or /admin/dashboard"
+                  sx={fieldStyles}
+                  helperText="Define custom start directories or files for spider/crawler"
+                />
+
+                <TextField
                   label="Import Subdomains"
                   fullWidth
                   multiline
-                  rows={4}
+                  rows={3}
                   value={formData.importSubdomainTextArea}
                   onChange={(e) => setFormData({ ...formData, importSubdomainTextArea: e.target.value })}
                   placeholder="Paste subdomains to include..."
@@ -271,7 +283,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
                   label="Out of Scope Subdomains"
                   fullWidth
                   multiline
-                  rows={4}
+                  rows={3}
                   value={formData.outOfScopeSubdomainTextarea}
                   onChange={(e) => setFormData({ ...formData, outOfScopeSubdomainTextarea: e.target.value })}
                   placeholder="Paste subdomains to exclude..."
