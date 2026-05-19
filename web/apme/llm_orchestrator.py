@@ -16,12 +16,22 @@ class LLMPathOrchestrator:
     """
 
     def __init__(self):
+        """
+        Initialize the LLMPathOrchestrator class.
+        Sets up the LLMBaseGenerator for API interactions and PIIGate for privacy validation.
+        """
         self.generator = LLMBaseGenerator(logger)
         self.gate = PIIGate()
 
     def run(self, scan_history_id: int) -> Dict[str, Any]:
         """
         Execute the LLM-assisted modeling pipeline.
+
+        Args:
+            scan_history_id (int): The database ID of the ScanHistory to analyze.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing total paths found, details of each path, or an error message.
         """
         logger.info(f"LLM APME: Starting for scan_history_id={scan_history_id}")
         
@@ -50,7 +60,14 @@ class LLMPathOrchestrator:
         }
 
     def _gather_context(self, scan: ScanHistory) -> Dict[str, Any]:
-        """Gather scan findings for the prompt."""
+        """Gather scan findings for the prompt.
+
+        Args:
+            scan (ScanHistory): The ScanHistory instance to retrieve findings for.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing gathered subdomains, vulnerabilities, endpoints, and root domain.
+        """
         domain_id = scan.domain_id
         
         # Fetch Subdomains
@@ -94,7 +111,14 @@ class LLMPathOrchestrator:
         }
 
     def _get_llm_paths(self, context: Dict[str, Any]) -> Optional[str]:
-        """Send context to LLM and get modeled paths."""
+        """Send context to LLM and get modeled paths.
+
+        Args:
+            context (Dict[str, Any]): The reconnaissance and scan findings context dictionary.
+
+        Returns:
+            Optional[str]: The raw text/JSON response from the LLM, or None if the request failed.
+        """
         system_prompt = """
         You are an elite Red Team Architect and Attack Path Analyst. 
         Your goal is to identify logical and high-risk attack paths based on the provided reconnaissance data and vulnerabilities.
@@ -134,7 +158,15 @@ class LLMPathOrchestrator:
         return self.generator._call_llm(system_prompt, user_message)
 
     def _parse_and_save_paths(self, llm_output: str, scan: ScanHistory) -> List[AttackPath]:
-        """Parse LLM JSON and save to ImpactAssessment."""
+        """Parse LLM JSON response and save to database.
+
+        Args:
+            llm_output (str): The raw text response from the LLM.
+            scan (ScanHistory): The ScanHistory database object to associate findings with.
+
+        Returns:
+            List[AttackPath]: A list of parsed AttackPath data-class instances.
+        """
         try:
             # Clean possible markdown noise
             json_str = llm_output.strip()
@@ -180,7 +212,12 @@ class LLMPathOrchestrator:
             return []
 
     def _persist_to_db(self, path: AttackPath, scan: ScanHistory):
-        """Save a single path to ImpactAssessment."""
+        """Save a single path to ImpactAssessment.
+
+        Args:
+            path (AttackPath): The AttackPath instance to save.
+            scan (ScanHistory): The ScanHistory database object to link.
+        """
         try:
             # Try to find a representative vulnerability in the path to link it
             # We look for steps that mention something that looks like a vuln
@@ -210,4 +247,12 @@ class LLMPathOrchestrator:
             logger.error(f"LLM APME: Database persistence failed: {str(e)}")
 
     def _risk_to_priority(self, risk: str) -> int:
+        """Map a risk severity level string to an integer remediation priority.
+
+        Args:
+            risk (str): The risk severity level string (e.g. 'critical', 'high', 'medium', 'low').
+
+        Returns:
+            int: The integer representation of the priority (from 1 to 5).
+        """
         return {"critical": 5, "high": 4, "medium": 3, "low": 2}.get(risk.lower(), 1)

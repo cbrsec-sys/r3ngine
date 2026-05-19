@@ -54,7 +54,7 @@ from reNgine.osint_tasks import *
 from reNgine.task_utils import (
     run_command, stream_command, save_email, save_employee, save_subdomain, save_endpoint, save_parameter,
     sanitize_command_for_db, get_tool_color, ensure_endpoints_crawled_and_execute, save_fuzzing_file,
-    parse_custom_header_to_list
+    parse_custom_header_to_list, save_subdomain_metadata
 )
 from reNgine.report_tasks import *
 from reNgine.wpscan_tasks import wpscan_scan
@@ -977,12 +977,12 @@ def amass_intel_discovery(self, host, ctx={}, description=None):
 	cmd = f'amass intel -d {host} -whois -o {output_path}'
 	cmd += ' -config /root/.config/amass.ini' if use_amass_config else ''
 	
-	proxy = get_random_proxy()
-	if proxy:
-		cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
+	#proxy = get_random_proxy()
+	#if proxy:
+	#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 		
-	opsec = OpSecManager()
-	cmd = opsec.apply_stealth('amass', cmd, proxy=proxy)
+	#opsec = OpSecManager()
+	#cmd = opsec.apply_stealth('amass', cmd, proxy=proxy)
 	
 	run_command(
 		cmd,
@@ -1068,8 +1068,8 @@ def subdomain_discovery(
 				use_amass_config = config.get(USE_AMASS_CONFIG, False)
 				cmd = f'amass enum -passive -d {host} -o {self.results_dir}/subdomains_amass.txt'
 				cmd += ' -config /root/.config/amass.ini' if use_amass_config else ''
-				if proxy:
-					cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
+				#if proxy:
+				#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 
 			elif tool == 'amass-active':
 				use_amass_config = config.get(USE_AMASS_CONFIG, False)
@@ -1078,8 +1078,8 @@ def subdomain_discovery(
 				cmd = f'amass enum -active -d {host} -o {self.results_dir}/subdomains_amass_active.txt'
 				cmd += ' -config /root/.config/amass.ini' if use_amass_config else ''
 				cmd += f' -brute -w {wordlist_path}'
-				if proxy:
-					cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
+				#if proxy:
+				#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 
 			elif tool == 'sublist3r':
 				cmd = f'python3 /usr/src/github/Sublist3r/sublist3r.py -d {host} -t {threads} -o {self.results_dir}/subdomains_sublister.txt'
@@ -1088,7 +1088,7 @@ def subdomain_discovery(
 				cmd = f'subfinder -d {host} -all -o {self.results_dir}/subdomains_subfinder.txt'
 				use_subfinder_config = config.get(USE_SUBFINDER_CONFIG, False)
 				cmd += ' -config /root/.config/subfinder/config.yaml' if use_subfinder_config else ''
-				cmd += f' -proxy {proxy}' if proxy else ''
+				#cmd += f' -proxy {proxy}' if proxy else ''
 				cmd += f' -timeout {timeout}' if timeout else ''
 				cmd += f' -t {threads}' if threads else ''
 				cmd += f' -silent'
@@ -1102,7 +1102,7 @@ def subdomain_discovery(
 			elif tool == 'ctfr':
 				results_file = self.results_dir + '/subdomains_ctfr.txt'
 				cmd = f'python3 /usr/src/github/ctfr/ctfr.py -d {host} -o {results_file}'
-				cmd_extract = f"cat {results_file} | sed 's/\*.//g' | tail -n +12 | uniq | sort > {results_file}"
+				cmd_extract = f"cat {results_file} | sed 's/\\*.//g' | tail -n +12 | uniq | sort > {results_file}_temp && mv {results_file}_temp {results_file}"
 				cmd += f' && {cmd_extract}'
 
 			elif tool == 'tlsx':
@@ -1162,6 +1162,7 @@ def subdomain_discovery(
 
 		# Run tool
 		try:
+			logger.warning(f'Running {tool} with command: {cmd}')
 			run_command(
 				cmd,
 				shell=True,
@@ -1245,14 +1246,20 @@ def subdomain_discovery(
 			subdomains.append(subdomain)
 			urls.append(subdomain.name)
 
-	# Bulk crawl subdomains
-	if enable_http_crawl:
-		ctx['track'] = True
-		http_crawl(urls, ctx=ctx, is_ran_from_subdomain_scan=True)
+	# Bulk crawl subdomains - removed to avoid collisions; delegated to next stage in pipeline
+	url_filter = ctx.get('url_filter')
 
-	# Find root subdomain endpoints
+	# Find root subdomain endpoints and save default endpoints
 	for subdomain in subdomains:
-		pass
+		http_url = f'{subdomain.name}{url_filter}' if url_filter else subdomain.name
+		endpoint, _ = save_endpoint(
+			http_url,
+			ctx=ctx,
+			is_default=True,
+			subdomain=subdomain
+		)
+		if endpoint:
+			save_subdomain_metadata(subdomain, endpoint)
 
 	# Send notifications
 	subdomains_str = '\n'.join([f'• `{subdomain.name}`' for subdomain in subdomains])
@@ -1757,8 +1764,8 @@ def dorking(config, host, scan_history_id, results_dir, activity_id=None, raw_do
 	return results
 
 
-@app.task(name='theHarvester', queue='main_scan_queue', bind=False)
-def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}):
+@app.task(name='theHarvester', queue='main_scan_queue', base=RengineTask, bind=True)
+def theHarvester(self, config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run theHarvester to get save emails, hosts, employees found in domain.
 
 	Args:
@@ -1789,10 +1796,12 @@ def theHarvester(config, host, scan_history_id, activity_id, results_dir, ctx={}
 				yaml.dump(yaml_data, file)
 
 	# Run cmd
-	cmd = f'python3 theHarvester.py -d {host} -b all -f {output_path_json}'
+	logger.info('theHarvester started')
+	cmd = f'uv run theHarvester -d {host} -b all -f {output_path_json}'
+	logger.warning(f'TheHarvester command: {cmd}')
 	run_command(
 		cmd,
-		shell=False,
+		shell=True,
 		cwd=theHarvester_dir,
 		history_file=history_file,
 		scan_id=scan_history_id,
@@ -2097,9 +2106,10 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 		# Command: betterleaks -p {temp_dir}
 		cmd = f"betterleaks -p {temp_dir}"
 		# Since betterleaks output format might vary, we'll try to parse stdout
+		logger.info(f"Running Betterleaks on {temp_dir}")
 		process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 		stdout, stderr = process.communicate()
-		
+		logger.info(f"Betterleaks output: {stdout}")
 		for line in stdout.splitlines():
 			if line.strip():
 				# Assuming betterleaks outputs findings in a recognizable format
@@ -2702,11 +2712,11 @@ def nmap(
 			)
 
 	# Send only 1 notif for all vulns to reduce number of notifs
-	if len(vulns) > 0:
-		self.notify(
-			severity=0,
-			fields={'Vulnerabilities discovered': vulns_str},
-			add_meta_info=False)
+	#if len(vulns) > 0:
+	self.notify(
+		severity=0,
+		fields={'Vulnerabilities discovered': vulns_str},
+		add_meta_info=False)
 
 	# Automatic Trigger for Brute Force Scan (Legacy Support for chaining)
 	auth_targets = []
@@ -2747,6 +2757,7 @@ def waf_detection(self, ctx={}, description=None):
 	)
 
 	cmd = f'wafw00f -i {input_path} -o {self.output_path}'
+	logger.info(f'Running WAFW00F on {input_path}')
 	run_command(
 		cmd,
 		history_file=self.history_file,
@@ -2894,7 +2905,7 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 
 	# Domain regex
 	host = self.domain.name if self.domain else urlparse(urls[0]).netloc
-	host_regex = f"\'https?://([a-z0-9]+[.])*{host}.*\'"
+	host_regex = f"\'https?://([a-zA-Z0-9_-]+[.])*{host}.*\'"
 
 	# Tools cmds
 	base_cmd_map = {
@@ -2913,10 +2924,10 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			
 			# Apply proxy
 			if p:
-				if tool == 'gau': tool_cmd += f' --proxy "{p}"'
-				elif tool == 'gospider': tool_cmd += f' -p {p}'
-				elif tool == 'hakrawler': tool_cmd += f' -proxy {p}'
-				elif tool == 'katana': tool_cmd += f' -proxy {p}'
+				if tool == 'katana': tool_cmd += f' -proxy "{p}"'
+				#elif tool == 'gospider': tool_cmd += f' -p {p}'
+				#elif tool == 'hakrawler': tool_cmd += f' -proxy {p}'
+				#elif tool == 'katana': tool_cmd += f' -proxy {p}'
 			
 			# Apply threads
 			if threads > 0:
@@ -3013,15 +3024,20 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		f.write('\n'.join(all_urls))
 	logger.warning(f'Found {len(all_urls)} usable URLs')
 
-	# Crawl discovered URLs
-	if enable_http_crawl:
-		ctx['track'] = False
-		http_crawl(
-			all_urls,
+	# Save discovered URLs immediately to database as skeleton endpoints.
+	# Crawling is delegated to the next stage in the pipeline to avoid collisions.
+	for url in all_urls:
+		http_url = sanitize_url(url)
+		subdomain_name = get_subdomain_from_url(http_url)
+		subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
+		if not isinstance(subdomain, Subdomain):
+			continue
+		save_endpoint(
+			http_url,
 			ctx=ctx,
-			should_remove_duplicate_endpoints=should_remove_duplicate_endpoints,
-			duplicate_removal_fields=duplicate_removal_fields
+			subdomain=subdomain
 		)
+
 
 
 	#-------------------#
@@ -3472,6 +3488,8 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 	cmd += f' -severity {severity}'
 	proxy = get_random_proxy()
 	if proxy:
+		if not any(proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
+			proxy = 'http://' + proxy
 		cmd += f' -proxy {proxy}'
 	# Send start notification
 	notif = Notification.objects.first()
@@ -3826,7 +3844,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 		
 		# Temporarily disabled to check if this is causing nuclei scans to hang
 		if all_techs:
-			tech_tags = get_nuclei_tags_from_techs(list(all_techs))
+		#	tech_tags = get_nuclei_tags_from_techs(list(all_techs))
 			logger.info(f'Detected technologies: {list(all_techs)}. Adding targeted Nuclei tags: {tech_tags}')
 
 	if tech_tags:
@@ -3950,6 +3968,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	
 	if is_wordpress_detected and wordfence_exists:
 		# Add Wordfence template path
+		logger.warning(f'wordfence_detected: {is_wordpress_detected}, wordfence_exists: {wordfence_exists}')
 		cmd += " -t /usr/src/github/topscoder/nuclei-wordfence-cve"
 		# Default to production, optional candidate
 		use_candidate = config.get('nuclei_config', {}).get(USE_WORDFENCE_CANDIDATE, False)
@@ -3967,6 +3986,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 			self.activity.save()
 		
 		# Invoke the nuclei_individual_severity_module synchronously via Celery apply
+		logger.warning(f'cmd: {cmd}')
 		nuclei_individual_severity_module.apply(
 			kwargs={
 				'cmd': cmd,
@@ -4072,7 +4092,7 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 		)
 		endpoint, _ = save_endpoint(
 			http_url,
-			crawl=True,
+			crawl=False,
 			subdomain=subdomain,
 			ctx=ctx
 		)
@@ -4172,7 +4192,7 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 
 	run_command(
 		cmd,
-		shell=False,
+		shell=True,
 		history_file=self.history_file,
 		scan_id=self.scan_id,
 		activity_id=self.activity_id
@@ -4203,7 +4223,7 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 
 		endpoint, _ = save_endpoint(
 			http_url,
-			crawl=True,
+			crawl=False,
 			subdomain=subdomain,
 			ctx=ctx
 		)
