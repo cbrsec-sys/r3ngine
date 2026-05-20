@@ -128,19 +128,41 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, *
         )
 
         from reNgine.opsec_utils import ProxychainsWrapper
-        from reNgine.common_func import get_random_proxy
+        from reNgine.common_func import get_random_proxy, get_random_user_agent
         
         proxy_wrapper = ProxychainsWrapper()
         single_proxy = get_random_proxy()
+        # Fetch a user agent from OpSec settings (rotates if enable_random_ua is on)
+        k6_user_agent = get_random_user_agent()
+
+        # Initialize aggregate metric accumulators across all tools and endpoints
+        total_requests = 0
+        successful_requests = 0
+        failed_requests = 0
+        
+        avg_latencies = []
+        p95_latencies = []
+        p99_latencies = []
+        max_rps_values = []
+
+        task_aborted = False
 
         for endpoint in endpoints:
             if is_kill_switch_active(scan_history_id):
                 logger.warning(f"Kill switch activated for scan {scan_history_id}. Aborting.")
                 overall_result.is_kill_switch_triggered = True
                 overall_result.save()
+                task_aborted = True
                 break
 
             for tool in tools:
+                if is_kill_switch_active(scan_history_id):
+                    logger.warning(f"Kill switch activated for scan {scan_history_id}. Aborting tool {tool}.")
+                    overall_result.is_kill_switch_triggered = True
+                    overall_result.save()
+                    task_aborted = True
+                    break
+
                 parser = None
                 cmd = []
                 temp_conf_path = None
@@ -172,40 +194,68 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, *
                     k6_http_debug = sanitize(tool_config.get("http_debug"), default="")
 
                     script_path = f"/tmp/k6_script_{scan_history_id}.js"
+                    # Resolve proxy for k6 - k6 uses env var HTTP_PROXY / HTTPS_PROXY or --http-debug
+                    # We pass it via the scenario's executor env block inside the script itself.
+                    k6_proxy_block = ""
+                    if single_proxy:
+                        # Ensure scheme prefix for k6 compatibility
+                        _p = single_proxy if '://' in single_proxy else f'http://{single_proxy}'
+                        k6_proxy_block = f"""
+    scenarios: {{
+        default: {{
+            executor: 'constant-vus',
+            vus: {k6_vus},
+            duration: '{k6_duration}',
+            env: {{ HTTP_PROXY: '{_p}', HTTPS_PROXY: '{_p}' }},
+        }},
+    }},"""
+                    else:
+                        k6_proxy_block = f"""
+    vus: {k6_vus},
+    duration: '{k6_duration}',"""
+
                     with open(script_path, "w") as f:
                         if k6_attack_type == "slowloris":
-                            f.write(f"""
-                            import http from 'k6/http';
-                            import {{ sleep }} from 'k6';
-                            export const options = {{
-                                vus: {k6_vus},
-                                duration: '{k6_duration}',
-                            }};
-                            export default function () {{
-                                const params = {{
-                                    headers: {{
-                                        'User-Agent': 'k6-slowloris-agent',
-                                        'X-Keep-Alive': 'true',
-                                    }},
-                                    timeout: '30s',
-                                }};
-                                try {{
-                                    const res = http.get('{endpoint.http_url}', params);
-                                    sleep(10);
-                                }} catch (e) {{
-                                    sleep(1);
-                                }}
-                            }}
-                            """)
+                            f.write(f"""import http from 'k6/http';
+import {{ sleep }} from 'k6';
+export const options = {{{k6_proxy_block}
+}};
+export default function () {{
+    const params = {{
+        headers: {{
+            'User-Agent': '{k6_user_agent}',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'X-Keep-Alive': 'true',
+        }},
+        timeout: '30s',
+    }};
+    try {{
+        const res = http.get('{endpoint.http_url}', params);
+        sleep(10);
+    }} catch (e) {{
+        sleep(1);
+    }}
+}}
+""")
                         else:
-                            f.write(f"""
-                            import http from 'k6/http';
-                            import {{ sleep }} from 'k6';
-                            export default function () {{
-                                http.get('{endpoint.http_url}');
-                                sleep(0.5);
-                            }}
-                            """)
+                            f.write(f"""import http from 'k6/http';
+import {{ sleep }} from 'k6';
+export const options = {{{k6_proxy_block}
+}};
+export default function () {{
+    const params = {{
+        headers: {{
+            'User-Agent': '{k6_user_agent}',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+        }},
+    }};
+    const res = http.get('{endpoint.http_url}', params);
+    sleep(0.5);
+}}
+""")
+
                     
                     cmd = ["k6", "run", "--vus", k6_vus, "--duration", k6_duration]
                     if k6_rps:
@@ -232,6 +282,8 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, *
                         cmd += ["--latency"]
                     if wrk_timeout:
                         cmd += ["--timeout", wrk_timeout]
+                    # Always inject a realistic browser User-Agent from OpSec settings
+                    cmd += ["-H", f"User-Agent: {k6_user_agent}"]
                     for header in wrk_headers:
                         san_hdr = sanitize(header, allowed_chars=r"^[a-zA-Z0-9.\-_/:=%\s]+$")
                         if san_hdr:
@@ -275,15 +327,35 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, *
                     locust_loglevel = sanitize(tool_config.get("loglevel"), default="ERROR")
 
                     script_path = f"/tmp/locustfile_{scan_history_id}.py"
+                    
+                    # Build proxy dict for locust if a proxy is available
+                    # Locust's HttpUser uses the requests library, so proxies
+                    # are set via self.client.proxies — a natively supported feature.
+                    locust_proxy_lines = []
+                    if single_proxy:
+                        _lp = single_proxy if '://' in single_proxy else f'http://{single_proxy}'
+                        locust_proxy_lines = [
+                            "    def on_start(self):",
+                            f"        self.client.headers.update({{'User-Agent': '{k6_user_agent}', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5'}})",
+                            f"        self.client.proxies = {{'http': '{_lp}', 'https': '{_lp}'}}",
+                        ]
+                    else:
+                        locust_proxy_lines = [
+                            "    def on_start(self):",
+                            f"        self.client.headers.update({{'User-Agent': '{k6_user_agent}', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5'}})",
+                        ]
+                    locust_on_start = "\n".join(locust_proxy_lines)
+                    
                     with open(script_path, "w") as f:
-                        f.write(f"""
-from locust import HttpUser, task, between
+                        f.write(f"""from locust import HttpUser, task, between
 import logging
 
 logging.getLogger('locust').setLevel(logging.{locust_loglevel})
 
 class StressUser(HttpUser):
     wait_time = between(0.1, 0.5)
+
+{locust_on_start}
 
     @task
     def test_target(self):
@@ -342,7 +414,7 @@ class StressUser(HttpUser):
 
                     # TA_Stresser expects absolute script path. We can place it at /usr/src/app/TA_Stresser.py in Docker.
                     # Fix: script path to lowercase "stressor.py" to match file name and ensure Linux compatibility.
-                    script_path = "./stressor/stressor.py"
+                    script_path = os.path.join(settings.BASE_DIR, "reNgine", "stressor", "stressor.py")
 
                     # Construct command depending on whether it is Layer 4 or Layer 7
                     is_l7 = stresser_method in ["CFB", "BYPASS", "GET", "POST", "OVH", "STRESS", "SLOW", "HEAD", "COOKIE", "TOR"]
@@ -460,6 +532,22 @@ class StressUser(HttpUser):
                     command_obj.output = "\n".join(accumulated_lines)
                     command_obj.return_code = process.returncode
                     command_obj.save()
+
+                    # Extract final metrics from the parser after process completes and add them to totals
+                    if parser:
+                        final_metrics = parser.get_final_metrics()
+                        total_requests += final_metrics.get("total_requests", 0)
+                        successful_requests += final_metrics.get("successful_requests", 0)
+                        failed_requests += final_metrics.get("failed_requests", 0)
+                        
+                        if final_metrics.get("avg_latency_ms", 0.0) > 0:
+                            avg_latencies.append(final_metrics["avg_latency_ms"])
+                        if final_metrics.get("p95_latency_ms", 0.0) > 0:
+                            p95_latencies.append(final_metrics["p95_latency_ms"])
+                        if final_metrics.get("p99_latency_ms", 0.0) > 0:
+                            p99_latencies.append(final_metrics["p99_latency_ms"])
+                        if final_metrics.get("max_requests_per_second", 0.0) > 0:
+                            max_rps_values.append(final_metrics["max_requests_per_second"])
                     
                 except Exception as e:
                     logger.error(f"Execution of {tool} failed: {e}")
@@ -474,6 +562,19 @@ class StressUser(HttpUser):
                             os.remove(temp_proxy_path)
                         except Exception as rm_err:
                             logger.error(f"Failed to remove temp proxy file: {rm_err}")
+            
+            if task_aborted:
+                break
+
+        # Compute averages and maximums across all runs, then persist to the database model
+        overall_result.total_requests = total_requests
+        overall_result.successful_requests = successful_requests
+        overall_result.failed_requests = failed_requests
+        overall_result.avg_latency_ms = sum(avg_latencies) / len(avg_latencies) if avg_latencies else 0.0
+        overall_result.p95_latency_ms = sum(p95_latencies) / len(p95_latencies) if p95_latencies else 0.0
+        overall_result.p99_latency_ms = sum(p99_latencies) / len(p99_latencies) if p99_latencies else 0.0
+        overall_result.max_requests_per_second = max(max_rps_values) if max_rps_values else 0.0
+        overall_result.save()
 
         neo4j.close()
 

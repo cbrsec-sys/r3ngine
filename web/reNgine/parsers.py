@@ -17,16 +17,26 @@ class K6Parser(BaseParser):
     or we can parse the standard output summary if needed.
     """
     def __init__(self):
+        """Initialize the K6Parser state."""
         self.metrics = {
             "avg_latency": 0.0,
             "p95_latency": 0.0,
+            "p99_latency": 0.0,
             "error_rate": 0.0,
             "throughput_rps": 0.0,
             "total_requests": 0,
         }
 
     def parse_line(self, line):
-        # Example: http_req_duration..............: avg=12.34ms min=1.23ms med=10.11ms max=100.22ms p(90)=20.33ms p(95)=25.44ms
+        """Parse a single line of k6 stdout.
+
+        Args:
+            line (str): The raw output line from k6 standard output.
+
+        Returns:
+            dict: The updated metrics dictionary.
+        """
+        # Example: http_req_duration..............: avg=12.34ms min=1.23ms med=10.11ms max=100.22ms p(90)=20.33ms p(95)=25.44ms p(99)=30.45ms
         avg_match = re.search(r"http_req_duration\.*:\s+avg=([0-9.]+)", line)
         if avg_match:
             self.metrics["avg_latency"] = float(avg_match.group(1))
@@ -34,6 +44,10 @@ class K6Parser(BaseParser):
         p95_match = re.search(r"p\(95\)=([0-9.]+)", line)
         if p95_match:
             self.metrics["p95_latency"] = float(p95_match.group(1))
+
+        p99_match = re.search(r"p\(99\)=([0-9.]+)", line)
+        if p99_match:
+            self.metrics["p99_latency"] = float(p99_match.group(1))
 
         reqs_match = re.search(r"http_reqs\.*:\s+([0-9]+)\s+([0-9.]+)/s", line)
         if reqs_match:
@@ -46,6 +60,27 @@ class K6Parser(BaseParser):
 
         return self.metrics
 
+    def get_final_metrics(self):
+        """Calculate and return the final aggregated metrics for the k6 run.
+
+        Returns:
+            dict: Standardized dictionary containing total/success/failed requests, latencies, and max RPS.
+        """
+        total = self.metrics.get("total_requests", 0)
+        error_rate = self.metrics.get("error_rate", 0.0)
+        failed = int(total * error_rate)
+        success = max(0, total - failed)
+        return {
+            "total_requests": total,
+            "successful_requests": success,
+            "failed_requests": failed,
+            "avg_latency_ms": self.metrics.get("avg_latency", 0.0),
+            "p95_latency_ms": self.metrics.get("p95_latency", 0.0),
+            "p99_latency_ms": self.metrics.get("p99_latency", 0.0) or self.metrics.get("p95_latency", 0.0),
+            "max_requests_per_second": self.metrics.get("throughput_rps", 0.0)
+        }
+
+
 class WrkParser(BaseParser):
     """Parses wrk output summary and accumulates performance statistics over multiple output lines.
 
@@ -56,6 +91,8 @@ class WrkParser(BaseParser):
         """Initialize the WrkParser state."""
         self.metrics = {
             "avg_latency": 0.0,
+            "p95_latency": 0.0,
+            "p99_latency": 0.0,
             "throughput_rps": 0.0,
             "error_rate": 0.0,
             "total_requests": 0,
@@ -77,11 +114,29 @@ class WrkParser(BaseParser):
         latency_match = re.search(r"Latency\s+([0-9.]+)([a-z]+)", line)
         if latency_match:
             val = float(latency_match.group(1))
-            unit = latency_match.group(2)
+            unit = latency_match.group(2).lower()
             if unit == "ms":
                 self.metrics["avg_latency"] = val
             elif unit == "s":
                 self.metrics["avg_latency"] = val * 1000
+            has_update = True
+
+        # Parse Latency distribution table lines, e.g. " 95% 150.34ms" or " 99% 250.12ms"
+        p_match = re.search(r"^\s*(95%|99%)\s+([0-9.]+)([a-z]+)", line)
+        if p_match:
+            pct = p_match.group(1)
+            val = float(p_match.group(2))
+            unit = p_match.group(3).lower()
+            if unit == "ms":
+                ms_val = val
+            elif unit == "s":
+                ms_val = val * 1000.0
+            else:
+                ms_val = val
+            if pct == "95%":
+                self.metrics["p95_latency"] = ms_val
+            elif pct == "99%":
+                self.metrics["p99_latency"] = ms_val
             has_update = True
         
         # Parse Requests/sec line (e.g., "Requests/sec:    114.27")
@@ -114,42 +169,232 @@ class WrkParser(BaseParser):
             
         return self.metrics if has_update else None
 
+    def get_final_metrics(self):
+        """Calculate and return the final aggregated metrics for the wrk run.
+
+        Returns:
+            dict: Standardized dictionary containing total/success/failed requests, latencies, and max RPS.
+        """
+        total = self.metrics.get("total_requests", 0)
+        failed = self.metrics.get("socket_errors", 0)
+        success = max(0, total - failed)
+        return {
+            "total_requests": total,
+            "successful_requests": success,
+            "failed_requests": failed,
+            "avg_latency_ms": self.metrics.get("avg_latency", 0.0),
+            "p95_latency_ms": self.metrics.get("p95_latency", 0.0) or self.metrics.get("avg_latency", 0.0),
+            "p99_latency_ms": self.metrics.get("p99_latency", 0.0) or self.metrics.get("avg_latency", 0.0),
+            "max_requests_per_second": self.metrics.get("throughput_rps", 0.0)
+        }
+
+
 class Hping3Parser(BaseParser):
     """Parses hping3 output for L4 stats."""
+    def __init__(self):
+        """Initialize the Hping3Parser state."""
+        self.latencies = []
+        self.total_packets = 0
+        self.failed_packets = 0
+        self.packet_loss = 0.0
+        
+        self.start_time = None
+        self.last_calc_time = None
+        self.packets_in_window = 0
+        self.current_rps = 0.0
+
     def parse_line(self, line):
-        # len=46 ip=1.2.3.4 ttl=64 id=1234 sport=80 flags=SA seq=0 win=512 rtt=12.3 ms
+        """Parse a single line of hping3 output.
+
+        Args:
+            line (str): The raw output line from hping3 standard output.
+
+        Returns:
+            dict: Parsed metrics for latency or packet loss.
+        """
         metrics = {}
+        now = time.time()
+        
+        if self.start_time is None:
+            self.start_time = now
+            self.last_calc_time = now
+            
+        # len=46 ip=1.2.3.4 ttl=64 id=1234 sport=80 flags=SA seq=0 win=512 rtt=12.3 ms
         rtt_match = re.search(r"rtt=([0-9.]+)\s+ms", line)
         if rtt_match:
-            metrics["latency"] = float(rtt_match.group(1))
+            lat = float(rtt_match.group(1))
+            self.latencies.append(lat)
+            metrics["latency"] = lat
+            self.packets_in_window += 1
         
         # 100 packets transmitted, 100 packets received, 0% packet loss
-        loss_match = re.search(r"([0-9.]+)%\s+packet\s+loss", line)
+        loss_match = re.search(r"([0-9]+)\s+packets\s+transmitted,\s+([0-9]+)\s+packets\s+received,\s+([0-9.]+)%\s+packet\s+loss", line)
         if loss_match:
-            metrics["packet_loss"] = float(loss_match.group(1))
+            self.total_packets = int(loss_match.group(1))
+            received = int(loss_match.group(2))
+            self.failed_packets = self.total_packets - received
+            self.packet_loss = float(loss_match.group(3))
+            metrics["packet_loss"] = self.packet_loss
             
-        return metrics
+        # Calculate live RPS every 1 second
+        if now - self.last_calc_time >= 1.0:
+            self.current_rps = self.packets_in_window / (now - self.last_calc_time)
+            metrics["throughput_rps"] = self.current_rps
+            self.packets_in_window = 0
+            self.last_calc_time = now
+        else:
+            if self.current_rps > 0:
+                metrics["throughput_rps"] = self.current_rps
+            
+        return metrics if metrics else None
+
+    def get_final_metrics(self):
+        """Calculate and return the final aggregated metrics for the hping3 run.
+
+        Returns:
+            dict: Standardized dictionary containing total/success/failed requests, latencies, and max RPS.
+        """
+        avg_lat = sum(self.latencies) / len(self.latencies) if self.latencies else 0.0
+        sorted_lats = sorted(self.latencies)
+        p95 = sorted_lats[int(len(sorted_lats) * 0.95)] if sorted_lats else 0.0
+        p99 = sorted_lats[int(len(sorted_lats) * 0.99)] if sorted_lats else 0.0
+        
+        # If loss match was not encountered or packet stats not captured yet, estimate from RTT list
+        total = self.total_packets
+        if total == 0 and self.latencies:
+            total = len(self.latencies)
+            
+        # RPS over the entire run
+        total_time = time.time() - (self.start_time or time.time())
+        max_rps = total / total_time if total_time > 0 else 0.0
+            
+        return {
+            "total_requests": total,
+            "successful_requests": total - self.failed_packets,
+            "failed_requests": self.failed_packets,
+            "avg_latency_ms": avg_lat,
+            "p95_latency_ms": p95,
+            "p99_latency_ms": p99,
+            "max_requests_per_second": max_rps
+        }
+
 
 class LocustParser(BaseParser):
     """Parses Locust --print-stats output."""
+    def __init__(self):
+        """Initialize the LocustParser state."""
+        self.metrics = {
+            "avg_latency": 0.0,
+            "p95_latency": 0.0,
+            "p99_latency": 0.0,
+            "throughput_rps": 0.0,
+            "total_requests": 0,
+            "failed_requests": 0,
+            "error_rate": 0.0,
+            "main_table": [],
+            "percentile_table": []
+        }
+        self.in_main = False
+        self.in_perc = False
+
     def parse_line(self, line):
-        # Example: Aggregated    100    0(0.00%)  |      45      12     120     30   |    2.50    0.00
-        metrics = {}
-        if "Aggregated" in line:
-            parts = re.split(r'\s+', line.strip())
-            # parts: ['Aggregated', '100', '0(0.00%)', '|', '45', '12', '120', '30', '|', '2.50', '0.00']
-            if len(parts) >= 11:
+        """Parse a single line of Locust --print-stats output.
+
+        Args:
+            line (str): The raw output line.
+
+        Returns:
+            dict: The updated metrics dictionary.
+        """
+        has_update = False
+        line_stripped = line.strip("\r")
+        if "Type" in line_stripped and "# reqs" in line_stripped and "# fails" in line_stripped:
+            self.in_main = True
+            self.in_perc = False
+            self.metrics["main_table"] = []
+            return None
+        if "Type" in line_stripped and "50%" in line_stripped and "66%" in line_stripped:
+            self.in_perc = True
+            self.in_main = False
+            self.metrics["percentile_table"] = []
+            return None
+            
+        if line_stripped.startswith("--------"):
+            return None
+
+        if self.in_main and line_stripped.strip() != "":
+            cleaned = line_stripped.replace("|", " ").replace("(", " ").replace(")", " ").replace("%", " ")
+            parts = re.split(r'\s+', cleaned.strip())
+            if len(parts) >= 10:
+                has_update = True
                 try:
-                    metrics["total_requests"] = int(parts[1])
-                    metrics["avg_latency"] = float(parts[4])
-                    metrics["throughput_rps"] = float(parts[9])
-                    # Parse failure rate from 0(0.00%)
-                    fail_match = re.search(r'\(([0-9.]+)%\)', parts[2])
-                    if fail_match:
-                        metrics["error_rate"] = float(fail_match.group(1)) / 100.0
+                    if parts[0] == "Aggregated":
+                        self.metrics["main_table"].append({
+                            "method": "", "name": "Aggregated", "reqs": int(parts[1]), "fails": int(parts[2]),
+                            "error_rate": float(parts[3]), "avg": float(parts[4]), "min": float(parts[5]),
+                            "max": float(parts[6]), "med": float(parts[7]), "req_s": float(parts[8]), "fail_s": float(parts[9])
+                        })
+                        # Also update top-level metrics
+                        self.metrics["total_requests"] = int(parts[1])
+                        self.metrics["failed_requests"] = int(parts[2])
+                        self.metrics["error_rate"] = float(parts[3]) / 100.0
+                        self.metrics["avg_latency"] = float(parts[4])
+                        self.metrics["throughput_rps"] = float(parts[8])
+                        self.in_main = False # End of table
+                    else:
+                        self.metrics["main_table"].append({
+                            "method": parts[0], "name": parts[1], "reqs": int(parts[2]), "fails": int(parts[3]),
+                            "error_rate": float(parts[4]), "avg": float(parts[5]), "min": float(parts[6]),
+                            "max": float(parts[7]), "med": float(parts[8]), "req_s": float(parts[9]), "fail_s": float(parts[10])
+                        })
                 except (ValueError, IndexError):
                     pass
-        return metrics
+
+        if self.in_perc and line_stripped.strip() != "":
+            cleaned = line_stripped.replace("|", " ")
+            parts = re.split(r'\s+', cleaned.strip())
+            if len(parts) >= 12:
+                has_update = True
+                try:
+                    if parts[0] == "Aggregated":
+                        self.metrics["percentile_table"].append({
+                            "method": "", "name": "Aggregated",
+                            "p50": float(parts[1]), "p66": float(parts[2]), "p75": float(parts[3]), "p80": float(parts[4]),
+                            "p90": float(parts[5]), "p95": float(parts[6]), "p98": float(parts[7]), "p99": float(parts[8]),
+                            "p999": float(parts[9]), "p9999": float(parts[10]), "p100": float(parts[11]), "reqs": int(parts[12])
+                        })
+                        self.in_perc = False # End of table
+                    else:
+                        self.metrics["percentile_table"].append({
+                            "method": parts[0], "name": parts[1],
+                            "p50": float(parts[2]), "p66": float(parts[3]), "p75": float(parts[4]), "p80": float(parts[5]),
+                            "p90": float(parts[6]), "p95": float(parts[7]), "p98": float(parts[8]), "p99": float(parts[9]),
+                            "p999": float(parts[10]), "p9999": float(parts[11]), "p100": float(parts[12]), "reqs": int(parts[13])
+                        })
+                except (ValueError, IndexError):
+                    pass
+        
+        return self.metrics if has_update else None
+
+    def get_final_metrics(self):
+        """Calculate and return the final aggregated metrics for the Locust run.
+
+        Returns:
+            dict: Standardized dictionary containing total/success/failed requests, latencies, and max RPS.
+        """
+        total = self.metrics.get("total_requests", 0)
+        failed = self.metrics.get("failed_requests", 0)
+        success = max(0, total - failed)
+        return {
+            "total_requests": total,
+            "successful_requests": success,
+            "failed_requests": failed,
+            "avg_latency_ms": self.metrics.get("avg_latency", 0.0),
+            "p95_latency_ms": self.metrics.get("avg_latency", 0.0),
+            "p99_latency_ms": self.metrics.get("avg_latency", 0.0),
+            "max_requests_per_second": self.metrics.get("throughput_rps", 0.0)
+        }
+
 
 
 class SpiderFootBatchParser(BaseParser):
@@ -360,16 +605,33 @@ class SpiderFootBatchParser(BaseParser):
 class TAStressorParser(BaseParser):
     """Parses TA_Stresser.py debug output for PPS/throughput."""
     def __init__(self):
+        """Initialize the TAStressorParser state."""
         self.metrics = {
             "avg_latency": 0.0,
             "throughput_rps": 0.0,
+            "throughput_bps": 0.0,
             "error_rate": 0.0,
             "total_requests": 0,
+            "failed_requests": 0,
+            "total_bytes": 0,
         }
 
     def parse_line(self, line):
+        """Parse a single line of TAStressor debug output.
+
+        Args:
+            line (str): The raw output line.
+
+        Returns:
+            dict: The updated metrics dictionary.
+        """
+        has_update = False
+        
+        # Strip ANSI escape codes
+        clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line)
+        
         # Regex to capture the PPS (Packets/Requests per second) and optional unit suffix
-        pps_match = re.search(r"PPS:\s*([0-9.]+)([kmg]?)", line, re.IGNORECASE)
+        pps_match = re.search(r"PPS:\s*([0-9.]+)([kmgtp]?)", clean_line, re.IGNORECASE)
         if pps_match:
             val = float(pps_match.group(1))
             unit = pps_match.group(2).lower()
@@ -379,10 +641,69 @@ class TAStressorParser(BaseParser):
                 val *= 1_000_000
             elif unit == 'g':
                 val *= 1_000_000_000
+            elif unit == 't':
+                val *= 1_000_000_000_000
             
             self.metrics["throughput_rps"] = val
             # Accumulate requests dynamically (since logs output rate every 1 second)
             self.metrics["total_requests"] += int(val)
-            return self.metrics
-        return None
+            has_update = True
+            
+        # Regex to capture BPS (Bytes per second)
+        bps_match = re.search(r"BPS:\s*([0-9.]+)\s*([kmgtp]?b)", clean_line, re.IGNORECASE)
+        if bps_match:
+            val = float(bps_match.group(1))
+            unit = bps_match.group(2).lower()
+            if unit == 'kb':
+                val *= 1_000
+            elif unit == 'mb':
+                val *= 1_000_000
+            elif unit == 'gb':
+                val *= 1_000_000_000
+            elif unit == 'tb':
+                val *= 1_000_000_000_000
+                
+            self.metrics["throughput_bps"] = val
+            self.metrics["total_bytes"] += int(val)
+            has_update = True
+            
+        # Parse failed count if present (for future-proofing)
+        failed_match = re.search(r"PPS_failed:\s*([0-9.]+)([kmgtp]?)", clean_line, re.IGNORECASE)
+        if failed_match:
+            f_val = float(failed_match.group(1))
+            f_unit = failed_match.group(2).lower()
+            if f_unit == 'k': f_val *= 1_000
+            elif f_unit == 'm': f_val *= 1_000_000
+            elif f_unit == 'g': f_val *= 1_000_000_000
+                
+            self.metrics["failed_requests"] += int(f_val)
+            has_update = True
+            
+        return self.metrics if has_update else None
+
+    def get_final_metrics(self):
+        """Calculate and return the final aggregated metrics for the TAStressor run.
+
+        Returns:
+            dict: Standardized dictionary containing total/success/failed requests, latencies, and max RPS.
+        """
+        total = self.metrics.get("total_requests", 0)
+        failed = self.metrics.get("failed_requests", 0)
+        
+        # fallback to error_rate if failed is 0 and error_rate exists
+        if failed == 0 and total > 0:
+            error_rate = self.metrics.get("error_rate", 0.0)
+            failed = int(total * error_rate)
+            
+        success = max(0, total - failed)
+        return {
+            "total_requests": total,
+            "successful_requests": success,
+            "failed_requests": failed,
+            "avg_latency_ms": 0.0,
+            "p95_latency_ms": 0.0,
+            "p99_latency_ms": 0.0,
+            "max_requests_per_second": self.metrics.get("throughput_rps", 0.0)
+        }
+
 

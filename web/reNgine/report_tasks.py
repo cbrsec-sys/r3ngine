@@ -154,11 +154,13 @@ def generate_report_task(self, report_id):
             total_reqs = sum(r.total_requests for r in stress_results)
             total_success = sum(r.successful_requests for r in stress_results)
             total_failed = sum(r.failed_requests for r in stress_results)
-            avg_p99 = sum(r.p95_latency_ms for r in stress_results) / stress_results.count()
+            avg_p95 = sum(r.p95_latency_ms for r in stress_results) / stress_results.count()
+            avg_p99 = sum(r.p99_latency_ms for r in stress_results) / stress_results.count()
             data['stress_total_requests'] = total_reqs
             data['stress_total_success'] = total_success
             data['stress_total_failed'] = total_failed
             data['stress_avg_p95'] = avg_p95
+            data['stress_avg_p99'] = avg_p99
             data['stress_max_rps'] = max(r.max_requests_per_second for r in stress_results)
 
         # Get report related config

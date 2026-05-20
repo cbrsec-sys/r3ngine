@@ -3844,7 +3844,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 		
 		# Temporarily disabled to check if this is causing nuclei scans to hang
 		if all_techs:
-		#	tech_tags = get_nuclei_tags_from_techs(list(all_techs))
+			tech_tags = get_nuclei_tags_from_techs(list(all_techs))
 			logger.info(f'Detected technologies: {list(all_techs)}. Adding targeted Nuclei tags: {tech_tags}')
 
 	if tech_tags:
@@ -3857,7 +3857,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 
 	nuclei_templates = nuclei_specific_config.get(NUCLEI_TEMPLATE)
 	custom_nuclei_templates = nuclei_specific_config.get(NUCLEI_CUSTOM_TEMPLATE)
-	# severities_str = ','.join(severities)
+	severities_str = ','.join(severities)
 
 	# Get alive endpoints
 	if urls:

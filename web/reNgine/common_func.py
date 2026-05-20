@@ -738,6 +738,45 @@ def validate_proxies(proxy_text):
 	return '\n'.join(valid_proxies)
 
 
+# Curated pool of modern desktop browser user agents for realistic request spoofing.
+# Rotated when OpSec random UA is enabled.
+_USER_AGENT_POOL = [
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0',
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15',
+	'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14.4; rv:125.0) Gecko/20100101 Firefox/125.0',
+	'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 OPR/110.0.0.0',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Vivaldi/6.7.3329.21',
+]
+
+# Fallback UA used when OpSec random UA is disabled.
+_DEFAULT_USER_AGENT = _USER_AGENT_POOL[0]
+
+
+def get_random_user_agent():
+	"""Return a user agent string respecting the OpSec random UA setting.
+
+	If OpSec is enabled and enable_random_ua is True, returns a randomly chosen
+	modern browser user agent from the curated pool. Otherwise returns the default
+	Chrome UA to avoid fingerprinting as a scanner.
+
+	Returns:
+		str: A User-Agent header value string.
+	"""
+	try:
+		from scanEngine.models import OpSec
+		opsec = OpSec.objects.first()
+		if opsec and opsec.enable_random_ua:
+			return random.choice(_USER_AGENT_POOL)
+	except Exception as e:
+		logger.warning(f'get_random_user_agent: could not read OpSec settings: {e}')
+	return _DEFAULT_USER_AGENT
+
+
 def get_random_proxy():
 	"""Get a random proxy from the list of proxies input by user in the UI,
 	validating that it is alive and does not require authentication.

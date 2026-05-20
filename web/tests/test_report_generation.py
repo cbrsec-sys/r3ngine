@@ -1,0 +1,184 @@
+import os
+from unittest.mock import patch, MagicMock
+from django.test import TransactionTestCase
+from django.utils import timezone
+
+from reNgine.report_tasks import generate_report_task
+from startScan.models import Domain, ScanHistory, ScanReport, StressTestResult
+from scanEngine.models import EngineType, VulnerabilityReportSetting, OpSec, Proxy
+
+class ReportGenerationTest(TransactionTestCase):
+    """
+    Test suite to verify that PDF report generation for stress testing runs successfully,
+    correctly aggregates telemetry data, and passes all required metrics to WeasyPrint
+    without raising NameError or other template compilation crashes.
+    """
+
+    def setUp(self):
+        """
+        Set up the test fixtures, including domain, scan history, engine type,
+        reports settings, and sample stress results.
+        """
+        # Create dependencies
+        self.domain = Domain.objects.create(name="defijn.io")
+        self.engine = EngineType.objects.create(engine_name="Test Engine")
+        
+        # Ensure OpSec and Proxy records exist to prevent DB errors
+        OpSec.objects.get_or_create(id=1)
+        Proxy.objects.get_or_create(id=1)
+
+        self.scan = ScanHistory.objects.create(
+            domain=self.domain,
+            scan_status=2,
+            start_scan_date=timezone.now(),
+            scan_type=self.engine
+        )
+
+        # Create StressTestResult objects associated with the scan
+        StressTestResult.objects.create(
+            scan_history=self.scan,
+            tool_used="k6",
+            total_requests=1000,
+            successful_requests=950,
+            failed_requests=50,
+            avg_latency_ms=12.5,
+            p95_latency_ms=25.0,
+            p99_latency_ms=35.0,
+            max_requests_per_second=100.0
+        )
+        
+        StressTestResult.objects.create(
+            scan_history=self.scan,
+            tool_used="wrk",
+            total_requests=2000,
+            successful_requests=1980,
+            failed_requests=20,
+            avg_latency_ms=15.0,
+            p95_latency_ms=30.0,
+            p99_latency_ms=45.0,
+            max_requests_per_second=200.0
+        )
+
+        # Create VulnerabilityReportSetting
+        VulnerabilityReportSetting.objects.create(
+            company_name="Test Corp",
+            company_address="123 Test St",
+            company_email="admin@test.com",
+            company_website="https://test.com",
+            show_rengine_banner=True,
+            show_footer=True,
+            footer_text="Test Footer",
+            show_executive_summary=True,
+            executive_summary_description="Summary for {company_name} scan on {target_name}. P95 Latency: {stress_avg_p95}"
+        )
+
+    @patch('reNgine.report_tasks.HTML')
+    @patch('reNgine.charts.generate_subdomain_chart_by_http_status')
+    @patch('reNgine.charts.generate_stress_latency_chart')
+    @patch('reNgine.charts.generate_stress_success_rate_chart')
+    def test_stress_modern_report_generation(self, mock_success_chart, mock_latency_chart, mock_subdomain_chart, mock_html):
+        """
+        Verify that the 'stress_modern' template compiles correctly and is successfully
+        written to a PDF via WeasyPrint.
+        """
+        mock_subdomain_chart.return_value = 'mocked_chart_base64'
+        mock_latency_chart.return_value = 'mocked_chart_base64'
+        mock_success_chart.return_value = 'mocked_chart_base64'
+
+        # Mock WeasyPrint write_pdf return value
+        mock_html_instance = MagicMock()
+        mock_html_instance.write_pdf.return_value = b"%PDF-1.4 Mock Content"
+        mock_html.return_value = mock_html_instance
+
+        # Create ScanReport for stress_modern
+        report = ScanReport.objects.create(
+            scan_history=self.scan,
+            report_type="stress_test",
+            report_template="stress_modern",
+            params={'ignore_info_vuln': False, 'include_attack_surface_map': False},
+            status=0
+        )
+
+        # Trigger Celery report generation task synchronously
+        generate_report_task(report.id)
+
+        # Reload report from DB
+        report.refresh_from_db()
+
+        # Assertions
+        self.assertEqual(report.status, 2) # Success status
+        self.assertIsNone(report.error_message)
+        self.assertTrue(report.report_file.name.endswith(".pdf"))
+        self.assertTrue(report.report_file.size > 0)
+        
+        # Verify rendered HTML contains aggregated metrics
+        mock_html.assert_called_once()
+        rendered_html = mock_html.call_args[1]['string']
+        
+        # Total requests: 1000 + 2000 = 3000
+        self.assertIn("3000", rendered_html)
+        
+        # Avg P95: (25.0 + 30.0) / 2 = 27.5
+        # The templates format this using floatformat filter
+        self.assertIn("27.5", rendered_html)
+        
+        # Verify individual results are rendered
+        self.assertIn("wrk", rendered_html)
+        self.assertIn("k6", rendered_html)
+        self.assertIn("15.0ms", rendered_html)
+        self.assertIn("12.5ms", rendered_html)
+
+    @patch('reNgine.report_tasks.HTML')
+    @patch('reNgine.charts.generate_subdomain_chart_by_http_status')
+    @patch('reNgine.charts.generate_stress_latency_chart')
+    @patch('reNgine.charts.generate_stress_success_rate_chart')
+    def test_stress_cyber_pro_report_generation(self, mock_success_chart, mock_latency_chart, mock_subdomain_chart, mock_html):
+        """
+        Verify that the 'stress_cyber_pro' template compiles correctly and is successfully
+        written to a PDF via WeasyPrint.
+        """
+        mock_subdomain_chart.return_value = 'mocked_chart_base64'
+        mock_latency_chart.return_value = 'mocked_chart_base64'
+        mock_success_chart.return_value = 'mocked_chart_base64'
+
+        # Mock WeasyPrint write_pdf return value
+        mock_html_instance = MagicMock()
+        mock_html_instance.write_pdf.return_value = b"%PDF-1.4 Mock Content"
+        mock_html.return_value = mock_html_instance
+
+        # Create ScanReport for stress_cyber_pro
+        report = ScanReport.objects.create(
+            scan_history=self.scan,
+            report_type="stress_test",
+            report_template="stress_cyber_pro",
+            params={'ignore_info_vuln': False, 'include_attack_surface_map': False},
+            status=0
+        )
+
+        # Trigger Celery report generation task synchronously
+        generate_report_task(report.id)
+
+        # Reload report from DB
+        report.refresh_from_db()
+
+        # Assertions
+        self.assertEqual(report.status, 2) # Success status
+        self.assertIsNone(report.error_message)
+        self.assertTrue(report.report_file.name.endswith(".pdf"))
+        self.assertTrue(report.report_file.size > 0)
+        
+        # Verify WeasyPrint was called
+        mock_html.assert_called_once()
+        rendered_html = mock_html.call_args[1]['string']
+        
+        # Total requests: 1000 + 2000 = 3000
+        self.assertIn("3000", rendered_html)
+        
+        # Avg P95: (25.0 + 30.0) / 2 = 27.5
+        self.assertIn("27.5", rendered_html)
+        
+        # Verify individual results are rendered
+        self.assertIn("wrk", rendered_html)
+        self.assertIn("k6", rendered_html)
+        self.assertIn("45.0ms", rendered_html) # P99 for wrk
+        self.assertIn("35.0ms", rendered_html) # P99 for k6

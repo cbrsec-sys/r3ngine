@@ -1,7 +1,25 @@
 # Changelog
 
+### [v3.1.0] - 2026-05-20
+
+- **Scan Pipeline**: fully fixed and stabilized. All tools now working to their full capabilities again.
+- **Stress Testing Pipeline**: added a new internal stress module that takes the adaptive stress engine from load testing to full denial-of-service testing to ensure you can test the full resiliance of your servers fall-over
+- **Stress Testing Results & Reporting**: All stress testing results are all correctly parsed, stored and *surfaced? for reports.
+
 **Official Repo location:** <p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
+
+### [v3.0.0-rc9] - 2026-05-20
+
+- **Stress Testing Dashboard WebSocket Telemetry**: Corrected WebSocket event parsing in the React frontend (`useStressTelemetry.ts`) to unwrap events from the `'telemetry_update'` envelope, enabling proper processing of `scan_status` updates and resolving the issue where the Kill Switch button failed to update to disabled.
+- **Stress Tool Execution Scope Constraint**: Fixed `handleStart` in `StressTestingPage.tsx` to launch only the active tool tab (`activeTab`) instead of all tools in `config.uses_tools`, preventing unwanted concurrent tool runs.
+- **Stressor Absolute Path Resolution**: Fixed path resolution in `stress_testing_tasks.py` for the custom stressor script to use `settings.BASE_DIR`, preventing execution failures on Celery workers.
+
+### [v3.0.0-rc8] - 2026-05-20
+
+- **Stress Testing Data Persistence**: Implemented stateful metric parsing and final metric aggregation (`get_final_metrics()`) for all five supported load testing tools (`k6`, `wrk`, `hping3`, `Locust`, and `TAStressor`) inside `parsers.py`.
+- **Pipeline Metric Aggregation**: Enhanced `stress_testing_tasks.py` to accumulate total requests, successful/failed requests, average/percentile latencies, and peak requests per second across multiple endpoints/tools, persisting the final aggregates to the `StressTestResult` database model.
+- **Report Generation Bug Fix**: Corrected a critical `NameError` in `report_tasks.py` where the undefined variable `avg_p95` was referenced during PDF report generation, resolving stress report failures.
 
 ### [v3.0.0-rc7] - 2026-05-19
 
