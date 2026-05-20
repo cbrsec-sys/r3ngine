@@ -31,7 +31,14 @@ import {
   FormControlLabel,
   Divider,
   Fab,
-  Checkbox
+  Checkbox,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Paper
 } from '@mui/material';
 import {
   Play,
@@ -139,7 +146,7 @@ export const StressTestingPage: React.FC = () => {
       run_time: "30s",
       loglevel: "ERROR"
     },
-    ta_stresser: {
+    stressor: {
       method: 'GET',
       threads: 10,
       duration: '30s',
@@ -191,9 +198,9 @@ export const StressTestingPage: React.FC = () => {
       updatedToolConfigs.locust.users = config.concurrency;
       updatedToolConfigs.locust.run_time = config.duration;
     }
-    if (updatedToolConfigs.ta_stresser) {
-      updatedToolConfigs.ta_stresser.threads = config.concurrency;
-      updatedToolConfigs.ta_stresser.duration = config.duration.replace('s', ''); // script expects integer seconds
+    if (updatedToolConfigs.stressor) {
+      updatedToolConfigs.stressor.threads = config.concurrency;
+      updatedToolConfigs.stressor.duration = config.duration.replace('s', ''); // script expects integer seconds
     }
 
     const startPayload: any = {
@@ -201,13 +208,13 @@ export const StressTestingPage: React.FC = () => {
       config: {
         concurrency: config.concurrency,
         duration: config.duration,
-        uses_tools: config.uses_tools.length > 0 ? config.uses_tools : [activeTab],
+        uses_tools: [activeTab],
         selected_endpoints: selectedEndpoints,
       }
     };
 
     // Add configs for each selected tool
-    const toolsToRun = config.uses_tools.length > 0 ? config.uses_tools : [activeTab];
+    const toolsToRun = [activeTab];
     toolsToRun.forEach((tool: string) => {
       if (updatedToolConfigs[tool]) {
         startPayload.config[`${tool}_config`] = updatedToolConfigs[tool];
@@ -500,6 +507,33 @@ export const StressTestingPage: React.FC = () => {
       }
     }
 
+    // Find latest TAStressor specific metrics
+    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
+      const p = filteredTelemetry[i];
+      if (p.throughput_bps !== undefined) {
+        (metrics as any).throughput_bps = p.throughput_bps;
+        break;
+      }
+    }
+    
+    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
+      const p = filteredTelemetry[i];
+      if (p.total_requests !== undefined) {
+        (metrics as any).total_requests = p.total_requests;
+        break;
+      }
+    }
+
+    // Find latest locust tables
+    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
+      const p = filteredTelemetry[i];
+      if (p.main_table !== undefined) {
+        (metrics as any).main_table = p.main_table;
+        (metrics as any).percentile_table = p.percentile_table;
+        break;
+      }
+    }
+
     return metrics;
   }, [filteredTelemetry]);
 
@@ -709,17 +743,27 @@ export const StressTestingPage: React.FC = () => {
         <Grid size={{ xs: 12 }}>
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 3 }}>
-              <KpiCard
-                title="LATENCY AVG"
-                value={latestMetrics.avg_latency}
-                icon={Activity}
-                color={theme.palette.primary.main}
-                subtitle="Milliseconds"
-              />
+              {activeTab === 'stressor' && (latestMetrics as any).total_requests !== undefined ? (
+                <KpiCard
+                  title="TOTAL REQUESTS"
+                  value={(latestMetrics as any).total_requests}
+                  icon={Activity}
+                  color={theme.palette.primary.main}
+                  subtitle="Packets Sent"
+                />
+              ) : (
+                <KpiCard
+                  title="LATENCY AVG"
+                  value={latestMetrics.avg_latency}
+                  icon={Activity}
+                  color={theme.palette.primary.main}
+                  subtitle="Milliseconds"
+                />
+              )}
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
               <KpiCard
-                title="THROUGHPUT"
+                title="THROUGHPUT (RPS)"
                 value={latestMetrics.throughput_rps}
                 icon={Zap}
                 color="#6be6c1"
@@ -727,13 +771,23 @@ export const StressTestingPage: React.FC = () => {
               />
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
-              <KpiCard
-                title="ERROR RATE"
-                value={latestMetrics.error_rate * 100}
-                icon={AlertTriangle}
-                color="#ff003c"
-                subtitle="Percentage %"
-              />
+              {activeTab === 'stressor' && (latestMetrics as any).throughput_bps !== undefined ? (
+                <KpiCard
+                  title="BANDWIDTH (BPS)"
+                  value={(latestMetrics as any).throughput_bps}
+                  icon={Zap}
+                  color="#6be6c1"
+                  subtitle="Bytes / Sec"
+                />
+              ) : (
+                <KpiCard
+                  title="ERROR RATE"
+                  value={latestMetrics.error_rate * 100}
+                  icon={AlertTriangle}
+                  color="#ff003c"
+                  subtitle="Percentage %"
+                />
+              )}
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
               <KpiCard
@@ -909,6 +963,108 @@ export const StressTestingPage: React.FC = () => {
           </TacticalPanel>
         </Grid>
       </Grid>
+
+      {/* Locust Specific Metrics Tables */}
+      {activeTab === 'locust' && (latestMetrics as any).main_table && (latestMetrics as any).main_table.length > 0 && (
+        <Grid container spacing={4} sx={{ mt: 2 }}>
+          <Grid size={{ xs: 12 }}>
+            <TacticalPanel
+              title="LOCUST AGGREGATED STATISTICS"
+              icon={<FileText size={18} color={theme.palette.primary.main} />}
+            >
+              <TableContainer component={Paper} sx={{ bgcolor: 'rgba(0,0,0,0.3)', backgroundImage: 'none' }}>
+                <Table size="small">
+                  <TableHead>
+                    <TableRow sx={{ '& th': { color: theme.palette.primary.main, fontFamily: 'Orbitron', fontSize: '0.75rem' } }}>
+                      <TableCell>Method</TableCell>
+                      <TableCell>Name</TableCell>
+                      <TableCell align="right">Requests</TableCell>
+                      <TableCell align="right">Failures</TableCell>
+                      <TableCell align="right">Error Rate (%)</TableCell>
+                      <TableCell align="right">Avg (ms)</TableCell>
+                      <TableCell align="right">Min (ms)</TableCell>
+                      <TableCell align="right">Max (ms)</TableCell>
+                      <TableCell align="right">Med (ms)</TableCell>
+                      <TableCell align="right">Req/s</TableCell>
+                      <TableCell align="right">Fail/s</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {(latestMetrics as any).main_table.map((row: any, i: number) => (
+                      <TableRow key={i} sx={{ '& td': { color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.05)' } }}>
+                        <TableCell>{row.method}</TableCell>
+                        <TableCell>{row.name}</TableCell>
+                        <TableCell align="right">{row.reqs}</TableCell>
+                        <TableCell align="right" sx={{ color: row.fails > 0 ? '#ef4444' : 'inherit' }}>{row.fails}</TableCell>
+                        <TableCell align="right">{row.error_rate}</TableCell>
+                        <TableCell align="right">{row.avg}</TableCell>
+                        <TableCell align="right">{row.min}</TableCell>
+                        <TableCell align="right">{row.max}</TableCell>
+                        <TableCell align="right">{row.med}</TableCell>
+                        <TableCell align="right">{row.req_s}</TableCell>
+                        <TableCell align="right">{row.fail_s}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </TacticalPanel>
+          </Grid>
+          
+          {(latestMetrics as any).percentile_table && (latestMetrics as any).percentile_table.length > 0 && (
+            <Grid size={{ xs: 12 }}>
+              <TacticalPanel
+                title="LOCUST RESPONSE TIME PERCENTILES"
+                icon={<Activity size={18} color="#6be6c1" />}
+              >
+                <TableContainer component={Paper} sx={{ bgcolor: 'rgba(0,0,0,0.3)', backgroundImage: 'none' }}>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow sx={{ '& th': { color: '#6be6c1', fontFamily: 'Orbitron', fontSize: '0.75rem' } }}>
+                        <TableCell>Method</TableCell>
+                        <TableCell>Name</TableCell>
+                        <TableCell align="right">50%</TableCell>
+                        <TableCell align="right">66%</TableCell>
+                        <TableCell align="right">75%</TableCell>
+                        <TableCell align="right">80%</TableCell>
+                        <TableCell align="right">90%</TableCell>
+                        <TableCell align="right">95%</TableCell>
+                        <TableCell align="right">98%</TableCell>
+                        <TableCell align="right">99%</TableCell>
+                        <TableCell align="right">99.9%</TableCell>
+                        <TableCell align="right">99.99%</TableCell>
+                        <TableCell align="right">100%</TableCell>
+                        <TableCell align="right">Requests</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {(latestMetrics as any).percentile_table.map((row: any, i: number) => (
+                        <TableRow key={i} sx={{ '& td': { color: 'rgba(255,255,255,0.7)', borderColor: 'rgba(255,255,255,0.05)' } }}>
+                          <TableCell>{row.method}</TableCell>
+                          <TableCell>{row.name}</TableCell>
+                          <TableCell align="right">{row.p50}</TableCell>
+                          <TableCell align="right">{row.p66}</TableCell>
+                          <TableCell align="right">{row.p75}</TableCell>
+                          <TableCell align="right">{row.p80}</TableCell>
+                          <TableCell align="right">{row.p90}</TableCell>
+                          <TableCell align="right">{row.p95}</TableCell>
+                          <TableCell align="right">{row.p98}</TableCell>
+                          <TableCell align="right">{row.p99}</TableCell>
+                          <TableCell align="right">{row.p999}</TableCell>
+                          <TableCell align="right">{row.p9999}</TableCell>
+                          <TableCell align="right">{row.p100}</TableCell>
+                          <TableCell align="right">{row.reqs}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </TacticalPanel>
+            </Grid>
+          )}
+        </Grid>
+      )}
+
 
       {/* Global Config Settings Dialog */}
       <Dialog open={openSettings} onClose={() => setOpenSettings(false)} slotProps={{ paper: { sx: { bgcolor: '#1a1a1a', color: '#fff' } } }}>
@@ -1281,15 +1437,15 @@ export const StressTestingPage: React.FC = () => {
               </>
             )}
 
-            {activeTab === 'ta_stresser' && (
+            {activeTab === 'stressor' && (
               <>
                 <FormControl fullWidth>
                   <InputLabel sx={{ color: 'rgba(255,255,255,0.5)' }}>Attack Method</InputLabel>
                   <Select
-                    value={toolConfigs.ta_stresser.method}
+                    value={toolConfigs.stressor.method}
                     onChange={(e) => setToolConfigs({
                       ...toolConfigs,
-                      ta_stresser: { ...toolConfigs.ta_stresser, method: e.target.value }
+                      stressor: { ...toolConfigs.stressor, method: e.target.value }
                     })}
                     input={<OutlinedInput label="Attack Method" />}
                     sx={{ color: '#fff', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' } }}
@@ -1297,23 +1453,62 @@ export const StressTestingPage: React.FC = () => {
                     <MenuItem value="GET">GET (L7 HTTP)</MenuItem>
                     <MenuItem value="POST">POST (L7 HTTP)</MenuItem>
                     <MenuItem value="SLOW">SLOW (Slowloris)</MenuItem>
+                    <MenuItem value="CFB">CFB (Cloudflare Bypass)</MenuItem>
+                    <MenuItem value="BYPASS">BYPASS (Bypass L7)</MenuItem>
+                    <MenuItem value="OVH">OVH (Bypass OVH)</MenuItem>
+                    <MenuItem value="STRESS">STRESS (High PPS L7)</MenuItem>
+                    <MenuItem value="HEAD">HEAD (HTTP HEAD)</MenuItem>
+                    <MenuItem value="COOKIE">COOKIE (Cookie Flood)</MenuItem>
+                    <MenuItem value="TOR">TOR (Tor proxy L7)</MenuItem>
                     <MenuItem value="TCP">TCP (L4 Flood)</MenuItem>
                     <MenuItem value="UDP">UDP (L4 Flood)</MenuItem>
                     <MenuItem value="SYN">SYN (L4 Half-Open)</MenuItem>
                   </Select>
                 </FormControl>
+                {['TCP', 'UDP', 'SYN'].includes(toolConfigs.stressor.method) && (
+                  <TextField
+                    label="Target Port (L4 only)"
+                    type="number"
+                    fullWidth
+                    value={toolConfigs.stressor.port}
+                    onChange={(e) => setToolConfigs({
+                      ...toolConfigs,
+                      stressor: { ...toolConfigs.stressor, port: e.target.value }
+                    })}
+                    slotProps={{ inputLabel: { style: { color: 'rgba(255,255,255,0.5)' } } }}
+                    sx={{ input: { color: '#fff' }, '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' } } }}
+                  />
+                )}
                 <TextField
-                  label="Target Port (L4 only)"
+                  label="Requests Per Connection (RPC)"
                   type="number"
                   fullWidth
-                  value={toolConfigs.ta_stresser.port}
+                  value={toolConfigs.stressor.rpc}
                   onChange={(e) => setToolConfigs({
                     ...toolConfigs,
-                    ta_stresser: { ...toolConfigs.ta_stresser, port: e.target.value }
+                    stressor: { ...toolConfigs.stressor, rpc: e.target.value }
                   })}
-                  sx={{ input: { color: '#fff' } }}
+                  slotProps={{ inputLabel: { style: { color: 'rgba(255,255,255,0.5)' } } }}
+                  sx={{ input: { color: '#fff' }, '& .MuiOutlinedInput-root': { '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' } } }}
                 />
-                {/* Threads, RPC, Proxy Type fields similar to above */}
+                <FormControl fullWidth>
+                  <InputLabel sx={{ color: 'rgba(255,255,255,0.5)' }}>Proxy Type</InputLabel>
+                  <Select
+                    value={toolConfigs.stressor.proxy_type}
+                    onChange={(e) => setToolConfigs({
+                      ...toolConfigs,
+                      stressor: { ...toolConfigs.stressor, proxy_type: e.target.value }
+                    })}
+                    input={<OutlinedInput label="Proxy Type" />}
+                    sx={{ color: '#fff', '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' } }}
+                  >
+                    <MenuItem value="0">SOCKS ALL (Randomized/Direct)</MenuItem>
+                    <MenuItem value="1">HTTP Proxy</MenuItem>
+                    <MenuItem value="4">SOCKS4 Proxy</MenuItem>
+                    <MenuItem value="5">SOCKS5 Proxy</MenuItem>
+                    <MenuItem value="6">Random (HTTP/SOCKS4/SOCKS5)</MenuItem>
+                  </Select>
+                </FormControl>
               </>
             )}
 

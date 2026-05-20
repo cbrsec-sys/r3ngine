@@ -1237,7 +1237,10 @@ class VulnerabilitySerializer(serializers.ModelSerializer):
 		scan_history_dict = {}
 		scan_history = vulnerability.scan_history
 		if scan_history:
-			scan_history_dict = model_to_dict(scan_history)
+			scan_history_dict = model_to_dict(
+				scan_history, 
+				exclude=['emails', 'employees', 'buckets', 'dorks']
+			)
 			scan_history_dict['domain'] = {
 				'name': scan_history.domain.name,
 			}

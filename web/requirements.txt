@@ -62,3 +62,4 @@ django-cors-headers==4.3.1
 h2
 priority
 service_identity
+git+https://github.com/MatrixTM/PyRoxy.git

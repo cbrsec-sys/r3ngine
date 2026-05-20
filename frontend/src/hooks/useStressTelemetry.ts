@@ -38,7 +38,13 @@ export const useStressTelemetry = (scanId: number | string | undefined) => {
         try {
           const message = JSON.parse(event.data);
           if (message.type === 'telemetry_update') {
-            addTelemetryPoint(message.data);
+            const data = message.data;
+            if (data) {
+              if (data.type === 'scan_status') {
+                setScanning(data.status === 'running');
+              }
+              addTelemetryPoint(data);
+            }
           } else if (message.type === 'scan_status') {
             setScanning(message.status === 'running');
           }
