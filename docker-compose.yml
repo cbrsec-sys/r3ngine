@@ -34,9 +34,7 @@ services:
           memory: 512M
 
   celery:
-    build:
-      context: .
-      dockerfile: web/Dockerfile
+    image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     restart: always
     entrypoint: /usr/src/app/celery-entrypoint.sh
     command: celery -A reNgine worker --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l WARNING
@@ -76,9 +74,7 @@ services:
           memory: 4G
 
   celery-beat:
-    build:
-      context: .
-      dockerfile: web/Dockerfile
+    image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     entrypoint: /usr/src/app/beat-entrypoint.sh
     command: celery -A reNgine beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
     environment:
@@ -110,7 +106,7 @@ services:
           memory: 2G
         reservations:
           memory: 1G
-      
+
   web:
     build:
       context: .
@@ -226,13 +222,104 @@ services:
         reservations:
           memory: 1G
 
+  temporal:
+    image: temporalio/auto-setup:1.22.4
+    restart: always
+    ports:
+      - "127.0.0.1:7233:7233"
+      - "127.0.0.1:8233:8233"
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD}
+      - POSTGRES_SEEDS=db
+    depends_on:
+      - db
+    networks:
+      - r3ngine_network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  temporal-python-orchestrator:
+    image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
+    restart: always
+    entrypoint: python3 /usr/src/app/manage.py run_temporal_orchestrator
+    environment:
+      - DEBUG=0
+      - TEMPORAL_HOST=temporal:7233
+      - TEMPORAL_NAMESPACE=default
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+    depends_on:
+      - temporal
+      - db
+      - neo4j
+    volumes:
+      - ./web:/usr/src/app
+      - github_repos:/usr/src/github
+      - wordlist:/usr/src/wordlist
+      - scan_results:/usr/src/scan_results
+      - gf_patterns:/root/.gf
+      - nuclei_templates:/root/nuclei-templates
+      - tool_config:/root/.config
+      - static_volume:/usr/src/app/staticfiles/
+    networks:
+      - r3ngine_network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  temporal-go-executor:
+    image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
+    restart: always
+    entrypoint: /usr/local/bin/r3ngine-executor
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - TEMPORAL_NAMESPACE=default
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+    depends_on:
+      - temporal
+      - db
+    volumes:
+      - ./web:/usr/src/app
+      - github_repos:/usr/src/github
+      - wordlist:/usr/src/wordlist
+      - scan_results:/usr/src/scan_results
+      - gf_patterns:/root/.gf
+      - nuclei_templates:/root/nuclei-templates
+      - tool_config:/root/.config
+      - static_volume:/usr/src/app/staticfiles/
+    networks:
+      - r3ngine_network
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
 networks:
   r3ngine_network:
 
 volumes:
   tool_config:
     name: r3ngine_tool_config
-    
   postgres_data:
     name: r3ngine_postgres_data
   gf_patterns:
@@ -253,7 +340,6 @@ volumes:
     name: r3ngine_neo4j_data
   plugins_data:
     name: r3ngine_plugins_data
-
 
 secrets:
   proxy.ca:
