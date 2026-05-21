@@ -689,33 +689,64 @@ def get_chaos_api_key():
 	return key_obj.key if key_obj else ''
 
 
+def check_proxy_robust(proxy_url, timeout=5):
+	"""Test if a proxy is truly working.
+	Avoids false positives from captive portals, ISP redirects, or proxy auth/block pages
+	by making a request to a public API returning a JSON payload with client IP.
+	
+	Args:
+		proxy_url (str): The proxy connection string (e.g., http://1.2.3.4:8080)
+		timeout (int): Timeout in seconds. Defaults to 5.
+		
+	Returns:
+		bool: True if proxy forwards traffic and responds successfully, False otherwise.
+	"""
+	try:
+		proxy_url = proxy_url.strip()
+		if not proxy_url:
+			return False
+		test_proxy = proxy_url
+		if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
+			test_proxy = 'http://' + test_proxy
+			
+		proxies = {
+			'http': test_proxy,
+			'https': test_proxy,
+		}
+		
+		# Try up to 2 different reliable JSON APIs to avoid single-point failure (e.g. rate limits)
+		check_targets = [
+			("https://api.ipify.org?format=json", "ip"),
+			("http://ip-api.com/json", "query")
+		]
+		
+		for url, expected_key in check_targets:
+			try:
+				response = requests.get(
+					url,
+					proxies=proxies,
+					headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"},
+					timeout=timeout,
+					allow_redirects=True
+				)
+				if response.status_code == 200:
+					# Verify response contains valid JSON with the expected key
+					data = response.json()
+					if expected_key in data:
+						return True
+			except Exception:
+				continue
+		return False
+	except Exception:
+		return False
+
+
 def validate_single_proxy(proxy_name):
 	"""Helper to validate a single proxy string.
 	Returns (proxy_name, True) if valid, otherwise (proxy_name, False).
 	"""
-	try:
-		proxy_name = proxy_name.strip()
-		if not proxy_name:
-			return proxy_name, False
-		test_proxy = proxy_name
-		if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
-			test_proxy = 'http://' + test_proxy
-		
-		response = requests.get(
-			'http://google.com', 
-			proxies={'http': test_proxy, 'https': test_proxy}, 
-			timeout=3, 
-			allow_redirects=True
-		)
-		if response.status_code == 407 or 'Proxy-Authenticate' in response.headers or 'proxy-authenticate' in response.headers:
-			return proxy_name, False
-		if "Proxy Authentication Required" in response.text or "Proxy Authentication Required" in str(response.headers):
-			return proxy_name, False
-		if not (200 <= response.status_code < 400):
-			return proxy_name, False
-		return proxy_name, True
-	except Exception:
-		return proxy_name, False
+	is_valid = check_proxy_robust(proxy_name, timeout=3)
+	return proxy_name, is_valid
 
 
 def validate_proxies(proxy_text):

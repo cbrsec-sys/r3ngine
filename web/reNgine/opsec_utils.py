@@ -319,27 +319,11 @@ class ProxychainsWrapper:
                 proxy_url = f"{scheme}://{p_host}:{p_port}"
                 
                 try:
-                    import requests
-                    # Perform validation check with short timeout to not block scan initiation
-                    response = requests.get(
-                        'http://google.com', 
-                        proxies={'http': proxy_url, 'https': proxy_url}, 
-                        timeout=5,
-                        allow_redirects=True
-                    )
+                    from reNgine.common_func import check_proxy_robust
                     
-                    # Reject proxy if it responds with HTTP Status 407 (Proxy Authentication Required)
-                    if response.status_code == 407 or 'Proxy-Authenticate' in response.headers or 'proxy-authenticate' in response.headers:
-                        raise Exception("Proxy Authentication Required (Status 407)")
-                    
-                    # Reject if custom proxy authentication failure text is found in response body
-                    if "Proxy Authentication Required" in response.text or "Proxy Authentication Required" in str(response.headers):
-                        raise Exception("Proxy Authentication Required returned in response text/headers")
-                    
-                    # Ensure the response indicates a successful HTTP status code (2xx or 3xx)
-                    # Reject proxies returning 502 Bad Gateway, 503 Service Unavailable, 403 Forbidden, etc.
-                    if not (200 <= response.status_code < 400):
-                        raise Exception(f"Proxy returned invalid status code: {response.status_code}")
+                    # Perform validation check with robust verification method to avoid false positives
+                    if not check_proxy_robust(proxy_url, timeout=5):
+                        raise Exception("Proxy verification failed (robust check)")
                         
                     # Valid proxy found, return the original proxychains formatted line
                     return proxy_str
