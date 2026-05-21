@@ -113,13 +113,45 @@ class GraphBuilder:
     @staticmethod
     def _merge_edge(tx, edge: Edge, scan_id: int) -> bool:
         """
-        Create a directed edge between two existing APMENodes.
-        Returns True if successfully created, False if endpoints not found.
+        Create a directed edge between two APMENodes, automatically generating
+        skeleton endpoints if one or both nodes are missing from the ingestion layer.
         """
+        def infer_node_type(apme_id: str) -> tuple:
+            if apme_id.startswith("domain::"):
+                return "Asset", "domain"
+            elif apme_id.startswith("ip::"):
+                return "Asset", "ip"
+            elif apme_id.startswith("service::"):
+                return "Asset", "service"
+            elif apme_id.startswith("endpoint::"):
+                return "Asset", "endpoint"
+            elif apme_id.startswith("vuln::"):
+                return "Vulnerability", "generic"
+            elif apme_id.startswith("goal::capability::"):
+                return "Capability", apme_id.split("::")[-1]
+            elif apme_id.startswith("goal::privilege::"):
+                return "Privilege", apme_id.split("::")[-1]
+            return "Asset", "generic"
+
+        from_type, from_subtype = infer_node_type(edge.from_id)
+        to_type, to_subtype = infer_node_type(edge.to_id)
+
         result = tx.run(
             """
-            MATCH (a:APMENode {apme_id: $from_id, scan_id: $scan_id})
-            MATCH (b:APMENode {apme_id: $to_id, scan_id: $scan_id})
+            MERGE (a:APMENode {apme_id: $from_id, scan_id: $scan_id})
+            ON CREATE SET a.type = $from_type, 
+                          a.subtype = $from_subtype, 
+                          a.confidence = 0.5, 
+                          a.source = "APME:skeleton",
+                          a.properties = '{}'
+            
+            MERGE (b:APMENode {apme_id: $to_id, scan_id: $scan_id})
+            ON CREATE SET b.type = $to_type, 
+                          b.subtype = $to_subtype, 
+                          b.confidence = 0.5, 
+                          b.source = "APME:skeleton",
+                          b.properties = '{}'
+            
             MERGE (a)-[r:APME_EDGE {edge_type: $type}]->(b)
             SET r.confidence  = $confidence,
                 r.properties  = $properties
@@ -131,5 +163,9 @@ class GraphBuilder:
             type=edge.type,
             confidence=edge.confidence,
             properties=str(edge.properties),
+            from_type=from_type,
+            from_subtype=from_subtype,
+            to_type=to_type,
+            to_subtype=to_subtype,
         )
         return result.single() is not None

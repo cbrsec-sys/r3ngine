@@ -462,12 +462,30 @@ export const TargetSummary = () => {
 
           {/* Footer Info Cards */}
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2 }}>
-            <TacticalPanel title="IP Addresses" icon={<Database size={14} />} sx={{ height: 300 }}>
+            <TacticalPanel title="IP Ranges & Scope" icon={<Database size={14} />} sx={{ height: 300 }}>
               <Box sx={{ p: 2 }}>
+                {data.target_info?.in_scope_ips && data.target_info.in_scope_ips.length > 0 && (
+                  <Box sx={{ mb: 2 }}>
+                    <Typography variant="overline" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontWeight: 900, display: 'block', mb: 1, letterSpacing: 1 }}>
+                      MANUAL IN-SCOPE RANGES
+                    </Typography>
+                    <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                      {data.target_info.in_scope_ips.map((ip: string) => (
+                        <Chip key={ip} label={ip} size="small" sx={{ mb: 1, bgcolor: 'rgba(0, 243, 255, 0.15)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.3)', fontWeight: 800, fontFamily: 'monospace' }} />
+                      ))}
+                    </Stack>
+                  </Box>
+                )}
+                <Typography variant="overline" sx={{ color: 'rgba(255, 255, 255, 0.3)', fontWeight: 900, display: 'block', mb: 1, letterSpacing: 1 }}>
+                  HISTORICAL RESOLVED IPS
+                </Typography>
                 <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                   {data.domain_info?.historical_ips?.map((ip: any) => (
-                    <Chip key={ip.ip} label={ip.ip} size="small" sx={{ mb: 1, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff', border: '1px solid rgba(0,243,255,0.2)' }} />
+                    <Chip key={ip.ip} label={ip.ip} size="small" sx={{ mb: 1, bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.1)' }} />
                   ))}
+                  {(!data.domain_info?.historical_ips || data.domain_info.historical_ips.length === 0) && (
+                    <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', py: 1 }}>NO RESOLVED IPS</Typography>
+                  )}
                 </Stack>
               </Box>
             </TacticalPanel>

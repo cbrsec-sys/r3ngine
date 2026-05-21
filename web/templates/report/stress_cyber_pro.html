@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Stress Performance Intelligence Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+        @page {
+            size: A4;
+            margin: 20mm;
+
+            @bottom-left {
+                content: "{% if show_footer %}{{footer_text}}{% else %}{{company_name}} - Confidential{% endif %}";
+                font-family: 'Inter', sans-serif;
+                font-size: 8pt;
+                color: #64748b;
+            }
+
+            @bottom-right {
+                content: "Page " counter(page);
+                font-family: 'Inter', sans-serif;
+                font-size: 8pt;
+                color: #64748b;
+            }
+        }
+
+        @page cover-page {
+            margin: 0;
+            @bottom-left { content: none !important; }
+            @bottom-right { content: none !important; }
+        }
+
+        html {
+            color: #1e293b;
+            font-family: 'Inter', sans-serif;
+            font-size: 10pt;
+            line-height: 1.6;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Utility Classes */
+        .text-center { text-align: center; }
+        .text-right { text-align: right; }
+        .font-bold { font-weight: 600; }
+        .uppercase { text-transform: uppercase; letter-spacing: 0.05em; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .mb-4 { margin-bottom: 1rem; }
+        .mb-8 { margin-bottom: 2rem; }
+        .mt-8 { margin-top: 2rem; }
+        .page-break { page-break-before: always; }
+        
+        /* Colors */
+        .text-primary { color: {{primary_color|default:"#00f3ff"}}; }
+        .text-secondary { color: #64748b; }
+        .bg-primary { background-color: {{primary_color|default:"#00f3ff"}}; }
+        .bg-secondary { background-color: {{secondary_color|default:"#0d0c14"}}; }
+
+        /* Performance Status Colors */
+        .status-success { background-color: #059669; color: white; }
+        .status-warning { background-color: #d97706; color: white; }
+        .status-danger { background-color: #dc2626; color: white; }
+
+        /* Typography */
+        h1, h2, h3, h4 {
+            color: {{primary_color|default:"#00f3ff"}};
+            font-weight: 600;
+        }
+
+        h1 { 
+            font-size: 24pt; 
+            border-bottom: 2px solid {{primary_color|default:"#00f3ff"}}; 
+            padding-bottom: 3mm; 
+            margin-bottom: 8mm;
+            break-after: avoid !important;
+        }
+        h2 { font-size: 18pt; margin-top: 8mm; margin-bottom: 4mm; break-after: avoid !important; }
+        h3 { font-size: 14pt; margin-top: 8mm; margin-bottom: 4mm; }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 8mm;
+        }
+
+        th {
+            background-color: #1e293b;
+            text-align: left;
+            padding: 3mm 4mm;
+            font-size: 9pt;
+            text-transform: uppercase;
+            color: #f1f5f9;
+            border-bottom: 2px solid {{primary_color|default:"#00f3ff"}};
+        }
+
+        td {
+            padding: 3mm 4mm;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: top;
+        }
+
+        /* Cover Page Styles */
+        #cover {
+            page: cover-page;
+            height: 297mm;
+            width: 210mm;
+            background-color: {{secondary_color|default:"#0d0c14"}};
+            position: relative;
+            overflow: hidden;
+            color: #ffffff;
+        }
+
+        .border-accent {
+            position: absolute;
+            border: 1px solid {{primary_color|default:"#00f3ff"}};
+            opacity: 0.3;
+        }
+        .accent-1 { top: 10mm; left: 10mm; right: 40mm; height: 1px; }
+        .accent-2 { top: 10mm; right: 10mm; bottom: 40mm; width: 1px; }
+        .accent-3 { bottom: 10mm; right: 10mm; left: 40mm; height: 1px; }
+        .accent-4 { bottom: 10mm; left: 10mm; top: 40mm; width: 1px; }
+
+        .content-box {
+            position: absolute;
+            top: 60mm;
+            left: 20mm;
+            right: 20mm;
+        }
+
+        .report-type-tag {
+            display: inline-block;
+            background-color: {{primary_color|default:"#00f3ff"}};
+            color: {{secondary_color|default:"#0d0c14"}};
+            padding: 2mm 6mm;
+            font-size: 10pt;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin-bottom: 8mm;
+        }
+
+        .cover-report-title {
+            font-size: 42pt;
+            font-weight: 200;
+            letter-spacing: -1px;
+            line-height: 1;
+            margin: 0;
+            color: white;
+        }
+
+        .cover-report-title b {
+            font-weight: 800;
+            color: {{primary_color|default:"#00f3ff"}};
+        }
+
+        .target-box {
+            margin-top: 20mm;
+            padding: 10mm;
+            border: 1px solid rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.03);
+        }
+
+        .metadata-grid {
+            position: absolute;
+            bottom: 30mm;
+            left: 20mm;
+            right: 20mm;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10mm;
+            font-size: 9pt;
+        }
+
+        .meta-item label {
+            display: block;
+            color: {{primary_color|default:"#00f3ff"}};
+            text-transform: uppercase;
+            font-weight: 700;
+            margin-bottom: 1mm;
+            opacity: 0.8;
+        }
+
+        /* Performance Metrics Grid */
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 5mm;
+            margin-bottom: 8mm;
+        }
+
+        .metric-card {
+            padding: 6mm;
+            border: 1px solid #e2e8f0;
+            border-radius: 2mm;
+            background-color: #f8fafc;
+            text-align: center;
+        }
+
+        .metric-value {
+            font-size: 24pt;
+            font-weight: 700;
+            color: #1e293b;
+            display: block;
+        }
+
+        .metric-label {
+            font-size: 9pt;
+            text-transform: uppercase;
+            color: #64748b;
+            font-weight: 600;
+        }
+
+        /* Charts */
+        .chart-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 5mm;
+            margin-bottom: 8mm;
+        }
+
+        .chart-box {
+            border: 1px solid #e2e8f0;
+            border-radius: 2mm;
+            padding: 4mm;
+            background-color: white;
+            text-align: center;
+        }
+
+        .chart-img {
+            max-width: 100%;
+            height: auto;
+        }
+
+        .llm-section {
+            background-color: #f1f5f9;
+            padding: 6mm;
+            border-left: 4px solid {{primary_color|default:"#00f3ff"}};
+            border-radius: 1mm;
+            margin-bottom: 8mm;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Cover Page -->
+    <article id="cover">
+        <div class="border-accent accent-1"></div>
+        <div class="border-accent accent-2"></div>
+        <div class="border-accent accent-3"></div>
+        <div class="border-accent accent-4"></div>
+
+        <div class="content-box">
+            {% if company_logo %}
+            <img src="{{company_logo}}" style="max-width: 50mm; margin-bottom: 10mm; display: block;" />
+            {% endif %}
+            <div class="report-type-tag">Performance Intelligence</div>
+            <h1 class="cover-report-title">
+                Stress <b>Performance Report</b>
+            </h1>
+            
+            <div class="target-box">
+                <div style="font-size: 10pt; opacity: 0.6; text-transform: uppercase; margin-bottom: 2mm;">Assessment Target</div>
+                <div style="font-size: 20pt; font-weight: 300;">{{ scan_object.domain.name }}</div>
+            </div>
+        </div>
+
+        <div class="metadata-grid">
+            <div class="meta-item">
+                <label>Issued By</label>
+                <div>{{ company_name }}</div>
+            </div>
+            <div class="meta-item">
+                <label>Date</label>
+                <div>{% now "F j, Y" %}</div>
+            </div>
+            <div class="meta-item">
+                <label>Classification</label>
+                <div>PROPRIETARY / CONFIDENTIAL</div>
+            </div>
+        </div>
+    </article>
+
+    <!-- Confidentiality Notice -->
+    <article class="page-break">
+        <h1>Confidentiality Notice</h1>
+        <div style="border: 1px solid #e2e8f0; padding: 10mm; background-color: #fff; margin-top: 20mm;">
+            <p><b>CONFIDENTIALITY NOTICE:</b> This report contains highly sensitive performance data regarding <b>{{ scan_object.domain.name }}</b>. The findings represent the system's behavior under simulated load conditions at the time of testing.</p>
+            <p>Load testing can identify critical stability thresholds. This data should be handled with care as it reveals potential denial-of-service vectors or resource exhaustion points.</p>
+        </div>
+        
+        <h2 class="mt-8">Contact Information</h2>
+        <table>
+            <tr>
+                <td><b>Organization</b></td>
+                <td>{{ company_name }}</td>
+            </tr>
+            <tr>
+                <td><b>Website</b></td>
+                <td>{{ company_website }}</td>
+            </tr>
+            <tr>
+                <td><b>Email</b></td>
+                <td>{{ company_email }}</td>
+            </tr>
+        </table>
+    </article>
+
+    <!-- Executive Summary -->
+    <article class="page-break">
+        <h1>Performance Executive Summary</h1>
+        
+        {% if enable_llm_report_generation %}
+        <div class="llm-section">
+            {{ llm_executive_brief | safe }}
+        </div>
+        {% endif %}
+
+        <div class="metric-grid">
+            <div class="metric-card">
+                <span class="metric-value">{{ stress_total_requests|default:0 }}</span>
+                <span class="metric-label">Total Requests</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-value {% if stress_total_failed > 0 %}status-danger{% endif %}">
+                    {{ stress_total_success|default:0 }} / {{ stress_total_failed|default:0 }}
+                </span>
+                <span class="metric-label">Success / Failure</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-value">{{ stress_max_rps|default:0|floatformat:2 }}</span>
+                <span class="metric-label">Peak RPS</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-value">{{ stress_avg_p95|default:0|floatformat:2 }}ms</span>
+                <span class="metric-label">Avg P95 Latency</span>
+            </div>
+        </div>
+
+        {% if enable_llm_report_generation %}
+        <h3>Analysis Overview</h3>
+        <div class="summary-content">
+            {{ llm_overview | safe }}
+        </div>
+        {% endif %}
+    </article>
+
+    <!-- Visual Analysis -->
+    <article class="page-break">
+        <h1>Visual Performance Analysis</h1>
+        
+        <div class="chart-row">
+            <div class="chart-box">
+                <img class="chart-img" src="data:image/png;base64,{{ stress_latency_chart }}" />
+                <p style="font-size: 8pt; color: #64748b;">Latency distribution (Avg vs P95 vs P99)</p>
+            </div>
+            <div class="chart-box">
+                <img class="chart-img" src="data:image/png;base64,{{ stress_success_rate_chart }}" />
+                <p style="font-size: 8pt; color: #64748b;">Overall test success rate</p>
+            </div>
+        </div>
+
+        <h3>Test Methodology</h3>
+        <p>The assessment utilized distributed load generation tools including k6, locust, and wrk to simulate high-concurrency user traffic. The focus was on identifying the target's breaking point and measuring latency degradation under pressure.</p>
+    </article>
+
+    <!-- Detailed Results -->
+    <article class="page-break">
+        <h1>Detailed Stress Test Results</h1>
+        <table>
+            <thead>
+                <tr>
+                    <th>Tool</th>
+                    <th>Concurrency</th>
+                    <th>Requests</th>
+                    <th>Success Rate</th>
+                    <th>P99 Latency</th>
+                    <th>Max RPS</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for res in stress_results %}
+                <tr>
+                    <td><b>{{ res.tool_used }}</b></td>
+                    <td>{{ res.concurrency_used }}</td>
+                    <td>{{ res.total_requests }}</td>
+                    <td>
+                        <span class="status-badge {% if res.failed_requests > 0 %}status-warning{% else %}status-success{% endif %}" style="padding: 1mm 2mm; border-radius: 1mm; font-size: 8pt; font-weight: 700;">
+                            {% widthratio res.successful_requests res.total_requests 100 %}%
+                        </span>
+                    </td>
+                    <td>{{ res.p99_latency_ms }}ms</td>
+                    <td>{{ res.max_requests_per_second|floatformat:2 }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </article>
+
+    <!-- Conclusion -->
+    <article class="page-break">
+        <h1>Conclusion & Recommendations</h1>
+        {% if enable_llm_report_generation %}
+        <div class="llm-section">
+            {{ llm_conclusion | safe }}
+        </div>
+        {% else %}
+        <p>The system demonstrated stability up to the tested concurrency levels. Recommendations include optimizing database query execution and implementing aggressive caching for high-traffic endpoints to further reduce latency spikes.</p>
+        {% endif %}
+    </article>
+</body>
+
+</html>

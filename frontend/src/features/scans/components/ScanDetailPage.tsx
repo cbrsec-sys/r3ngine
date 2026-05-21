@@ -37,7 +37,8 @@ import {
   Slide,
   Backdrop,
   DialogActions,
-  Link
+  Link,
+  Alert
 } from '@mui/material';
 import {
   Activity,
@@ -78,7 +79,8 @@ import {
   X,
   Copy,
   RefreshCw,
-  GitBranch
+  GitBranch,
+  Brain
 } from 'lucide-react';
 import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois } from '../api';
 import type { Command, SubScan, Vulnerability, ScanActivity, Subdomain, ScanSummaryResponse, TodoNote } from '../types';
@@ -90,6 +92,7 @@ import { DirectoriesTab } from './DirectoriesTab';
 import { EndpointsTab } from './EndpointsTab';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { VulnerabilityTable } from '../../vulnerabilities/components/VulnerabilityTable';
+import { useGptVulnerabilityDetails } from '../../vulnerabilities/api';
 import { SecretLeaksTab } from './SecretLeaksTab';
 import { AttackSurfaceTab } from './AttackSurfaceTab';
 import VisualizationTab from './VisualizationTab';
@@ -134,12 +137,43 @@ const VulnerabilityInfoModal: React.FC<{
   onClose: () => void;
   vulnerability: any;
 }> = ({ open, onClose, vulnerability }) => {
-  if (!vulnerability) return null;
+  const gptMutation = useGptVulnerabilityDetails();
+  const [localVuln, setLocalVuln] = useState<any>(null);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const severityColor = Number(vulnerability.severity) === 4 ? '#ff003c' :
-    Number(vulnerability.severity) === 3 ? '#ff9f00' :
-      Number(vulnerability.severity) === 2 ? '#fffc00' :
-        Number(vulnerability.severity) === 1 ? '#00ff62' : '#00f3ff';
+  React.useEffect(() => {
+    setLocalVuln(vulnerability);
+    setError(null);
+  }, [vulnerability]);
+
+  if (!localVuln) return null;
+
+  const severityColor = Number(localVuln.severity) === 4 ? '#ff003c' :
+    Number(localVuln.severity) === 3 ? '#ff9f00' :
+      Number(localVuln.severity) === 2 ? '#fffc00' :
+        Number(localVuln.severity) === 1 ? '#00ff62' : '#00f3ff';
+
+  const handleFetchGpt = async () => {
+    if (!localVuln) return;
+    setError(null);
+    try {
+      const result = await gptMutation.mutateAsync({ id: localVuln.id!, name: localVuln.name });
+      if (result.status) {
+        setLocalVuln((prev: any) => ({
+          ...prev,
+          description: result.description,
+          impact: result.impact,
+          remediation: result.remediation,
+          references: result.references?.join('\n') || prev.references || ''
+        }));
+      } else {
+        setError(result.error || 'Failed to generate GPT description');
+      }
+    } catch (err: any) {
+      console.error(err);
+      setError(err?.response?.data?.error || err?.message || 'Something went wrong while generating GPT description');
+    }
+  };
 
   return (
     <Dialog
@@ -165,9 +199,9 @@ const VulnerabilityInfoModal: React.FC<{
           <Bug size={24} color={severityColor} />
           <Box>
             <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: '1.1rem', letterSpacing: 1, fontFamily: 'Orbitron' }}>
-              {vulnerability.name}
+              {localVuln.name}
             </Typography>
-            <SeverityBadge severity={Number(vulnerability.severity)} />
+            <SeverityBadge severity={Number(localVuln.severity)} />
           </Box>
         </Stack>
         <IconButton onClick={onClose} sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' } }}>
@@ -176,6 +210,11 @@ const VulnerabilityInfoModal: React.FC<{
       </DialogTitle>
       <DialogContent sx={{ p: 3 }}>
         <Stack spacing={4}>
+          {error && (
+            <Alert severity="error" sx={{ bgcolor: 'rgba(255, 0, 60, 0.05)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)' }}>
+              {error}
+            </Alert>
+          )}
           {/* Classification Section */}
           <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1 }}>
             <Typography sx={{ color: severityColor, fontSize: '0.7rem', fontWeight: 900, mb: 2, letterSpacing: 1, textTransform: 'uppercase' }}>
@@ -184,20 +223,20 @@ const VulnerabilityInfoModal: React.FC<{
             <Grid container spacing={2}>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS SCORE</Typography>
-                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 900 }}>{vulnerability.cvss_score || 'N/A'}</Typography>
+                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 900 }}>{localVuln.cvss_score || 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS METRICS</Typography>
-                <Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>{vulnerability.cvss_metrics || 'N/A'}</Typography>
+                <Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>{localVuln.cvss_metrics || 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>SOURCE</Typography>
-                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 700 }}>{vulnerability.source || 'N/A'}</Typography>
+                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 700 }}>{localVuln.source || 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
                 <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>TAGS</Typography>
                 <Stack direction="row" sx={{ spacing: 0.5, flexWrap: "wrap" }}>
-                  {vulnerability.tags?.map((tag: any, i: number) => (
+                  {localVuln.tags?.map((tag: any, i: number) => (
                     <Chip
                       key={i}
                       label={tag.name}
@@ -222,30 +261,42 @@ const VulnerabilityInfoModal: React.FC<{
               Description
             </Typography>
             <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-              {vulnerability.description || 'No description provided.'}
+              {localVuln.description || 'No description provided.'}
             </Typography>
           </Box>
 
+          {/* Impact Section */}
+          {localVuln.impact && (
+            <Box>
+              <Typography sx={{ color: '#ff003c', fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
+                Impact
+              </Typography>
+              <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
+                {localVuln.impact}
+              </Typography>
+            </Box>
+          )}
+
           {/* Remediation Section */}
-          {vulnerability.remediation && (
+          {localVuln.remediation && (
             <Box>
               <Typography sx={{ color: '#00ff62', fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
                 Remediation
               </Typography>
               <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.9rem', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-                {vulnerability.remediation}
+                {localVuln.remediation}
               </Typography>
             </Box>
           )}
 
           {/* References Section */}
-          {vulnerability.references && (
+          {localVuln.references && (
             <Box>
               <Typography sx={{ color: '#00f3ff', fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
                 References
               </Typography>
               <Stack spacing={1}>
-                {vulnerability.references.split('\n').filter(Boolean).map((ref: string, i: number) => (
+                {localVuln.references.split('\n').filter(Boolean).map((ref: string, i: number) => (
                   <Link
                     key={i}
                     href={ref}
@@ -269,7 +320,37 @@ const VulnerabilityInfoModal: React.FC<{
           )}
         </Stack>
       </DialogContent>
-      <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+      <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Button
+          onClick={handleFetchGpt}
+          disabled={gptMutation.isPending}
+          startIcon={gptMutation.isPending ? <CircularProgress size={14} sx={{ color: '#fffc00' }} /> : <Brain size={14} />}
+          sx={{
+            bgcolor: 'rgba(255, 252, 0, 0.1)',
+            color: '#fffc00',
+            border: '1px solid rgba(255, 252, 0, 0.3)',
+            fontFamily: 'Orbitron',
+            fontSize: '0.75rem',
+            fontWeight: 900,
+            px: 2.5,
+            py: 1,
+            borderRadius: '4px',
+            textShadow: '0 0 10px rgba(255, 252, 0, 0.3)',
+            boxShadow: '0 0 15px rgba(255, 252, 0, 0.05)',
+            '&:hover': {
+              bgcolor: 'rgba(255, 252, 0, 0.2)',
+              borderColor: '#fffc00',
+              boxShadow: '0 0 20px rgba(255, 252, 0, 0.15)'
+            },
+            '&.Mui-disabled': {
+              color: 'rgba(255, 252, 0, 0.5)',
+              borderColor: 'rgba(255, 252, 0, 0.1)',
+              bgcolor: 'rgba(255, 252, 0, 0.05)'
+            }
+          }}
+        >
+          {gptMutation.isPending ? 'THINKING...' : 'AI ANALYSIS'}
+        </Button>
         <Button
           onClick={onClose}
           sx={{
@@ -396,6 +477,29 @@ const formatTimeAgo = (date: string) => {
   return `${hrs} hours ago`;
 };
 
+const getCommandBinary = (cmd: string) => {
+  if (!cmd) return 'Command';
+  const cleanCmd = cmd.trim();
+  const parts = cleanCmd.split(/\s+/);
+  if (parts.length === 0) return 'Command';
+  let binary = parts[0].split('/').pop() || parts[0];
+  if ((binary === 'python' || binary === 'python3' || binary === 'python2') && parts.length > 1) {
+    const script = parts[1].split('/').pop() || parts[1];
+    binary = `${binary} ${script}`;
+  }
+  return binary;
+};
+
+const getToolColor = (binary: string) => {
+  const b = binary.toLowerCase();
+  if (b.includes('httpx')) return '#00f3ff';
+  if (b.includes('nuclei')) return '#ff003c';
+  if (b.includes('semgrep')) return '#00ff62';
+  if (b.includes('gau') || b.includes('hakrawler') || b.includes('katana') || b.includes('gospider') || b.includes('waybackurls')) return '#fffc00';
+  if (b.includes('cat') || b.includes('sort') || b.includes('grep') || b.includes('mv') || b.includes('rm')) return 'rgba(255,255,255,0.4)';
+  return '#ff00ff';
+};
+
 const TaskOverlay: React.FC<{
   open: boolean;
   onClose: () => void;
@@ -436,10 +540,10 @@ const TaskOverlay: React.FC<{
       }}
     >
       <DialogTitle sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-        <Stack direction="row" sx={{ spacing: 2, alignItems: "center" }}>
+        <Stack direction="row" sx={{ alignItems: "center" }}>
           <Terminal size={20} color="#00f3ff" />
           <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: '1rem', letterSpacing: 1, ml: 2 }}>
-            {activityTitle}
+            {activityTitle} Execution Logs
           </Typography>
         </Stack>
         <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' } }}>
@@ -457,7 +561,12 @@ const TaskOverlay: React.FC<{
             ) : logs && logs.length > 0 ? (
               <List sx={{ p: 0 }}>
                 {logs.map((log: Command) => {
-                  const engineColor = getFrontendEngineColor(log.activity?.title || activityTitle);
+                  const cmdStr = log.command || '';
+                  const binaryName = getCommandBinary(cmdStr);
+                  const toolColor = getToolColor(binaryName);
+                  const parts = cmdStr.trim().split(/\s+/);
+                  const displayArgs = parts.length > 0 ? cmdStr.replace(parts[0], '').trim() : '';
+                  
                   return (
                     <ListItem
                       key={log.id}
@@ -466,27 +575,55 @@ const TaskOverlay: React.FC<{
                       sx={{
                         cursor: 'pointer',
                         borderBottom: '1px solid rgba(255,255,255,0.03)',
-                        py: 2,
+                        py: 1.5,
+                        px: 2,
                         bgcolor: selectedLog?.id === log.id ? 'rgba(0,243,255,0.05)' : 'transparent',
+                        borderLeft: selectedLog?.id === log.id ? `3px solid ${toolColor}` : '3px solid transparent',
                         '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }
                       }}
                     >
                       <ListItemText
                         primary={
-                          <Typography sx={{
-                            fontSize: '0.8rem',
-                            color: selectedLog?.id === log.id ? '#00f3ff' : engineColor,
-                            fontWeight: 700,
-                            mb: 0.5,
-                            fontFamily: 'monospace'
-                          }}>
-                            {log.activity?.title || activityTitle || "Tool Execution"}
-                          </Typography>
+                          <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.5, overflow: 'hidden' }}>
+                            <Box sx={{
+                              px: 0.8,
+                              py: 0.2,
+                              fontSize: '0.6rem',
+                              fontFamily: 'monospace',
+                              fontWeight: 900,
+                              borderRadius: 0.5,
+                              bgcolor: `${toolColor}15`,
+                              color: toolColor,
+                              border: `1px solid ${toolColor}30`,
+                              textTransform: 'uppercase',
+                              letterSpacing: 0.5,
+                              flexShrink: 0
+                            }}>
+                              {binaryName}
+                            </Box>
+                            <Typography sx={{
+                              fontSize: '0.75rem',
+                              color: selectedLog?.id === log.id ? '#fff' : 'rgba(255,255,255,0.7)',
+                              fontWeight: 700,
+                              fontFamily: 'monospace',
+                              whiteSpace: 'nowrap',
+                              textOverflow: 'ellipsis',
+                              overflow: 'hidden',
+                              flexGrow: 1
+                            }}>
+                              {displayArgs || '(no arguments)'}
+                            </Typography>
+                          </Stack>
                         }
                         secondary={
-                          <Typography noWrap sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
-                            {log.command}
-                          </Typography>
+                          <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
+                            <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+                              ID: #{log.id}
+                            </Typography>
+                            <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+                              {new Date(log.time).toLocaleTimeString()}
+                            </Typography>
+                          </Stack>
                         }
                       />
                     </ListItem>
@@ -505,6 +642,67 @@ const TaskOverlay: React.FC<{
           <Grid size={{ xs: 8 }} sx={{ height: '100%', overflowY: 'auto', bgcolor: '#050505' }}>
             {selectedLog ? (
               <Box sx={{ p: 2 }}>
+                {/* Clean Command Box Header */}
+                <Box sx={{
+                  p: 2,
+                  mb: 3,
+                  bgcolor: 'rgba(0,0,0,0.6)',
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  borderRadius: 1,
+                  boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+                }}>
+                  <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                    <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+                      <Box sx={{
+                        width: 8,
+                        height: 8,
+                        borderRadius: '50%',
+                        bgcolor: selectedLog.return_code === 0 ? '#00ff62' : selectedLog.return_code === null ? '#ff9f00' : '#ff003c',
+                        boxShadow: `0 0 10px ${selectedLog.return_code === 0 ? '#00ff62' : selectedLog.return_code === null ? '#ff9f00' : '#ff003c'}`
+                      }} />
+                      <Typography sx={{
+                        fontSize: '0.65rem',
+                        color: 'rgba(255,255,255,0.5)',
+                        fontWeight: 900,
+                        letterSpacing: 1,
+                        textTransform: 'uppercase'
+                      }}>
+                        Command Execution Detail
+                      </Typography>
+                    </Stack>
+                    <Box sx={{
+                      px: 1,
+                      py: 0.3,
+                      fontSize: '0.55rem',
+                      fontFamily: 'monospace',
+                      fontWeight: 900,
+                      borderRadius: 0.5,
+                      bgcolor: selectedLog.return_code === 0 ? 'rgba(0,255,98,0.1)' : selectedLog.return_code === null ? 'rgba(255,159,0,0.1)' : 'rgba(255,0,60,0.1)',
+                      color: selectedLog.return_code === 0 ? '#00ff62' : selectedLog.return_code === null ? '#ff9f00' : '#ff003c',
+                      border: `1px solid ${selectedLog.return_code === 0 ? 'rgba(0,255,98,0.2)' : selectedLog.return_code === null ? 'rgba(255,159,0,0.2)' : 'rgba(255,0,60,0.2)'}`
+                    }}>
+                      STATUS: {selectedLog.return_code === 0 ? 'SUCCESS' : selectedLog.return_code === null ? 'RUNNING' : `EXIT CODE: ${selectedLog.return_code}`}
+                    </Box>
+                  </Stack>
+                  
+                  {/* The Executed Command */}
+                  <Box sx={{
+                    p: 1.5,
+                    bgcolor: 'rgba(255,255,255,0.02)',
+                    borderLeft: `3px solid ${getToolColor(getCommandBinary(selectedLog.command || ''))}`,
+                    fontFamily: 'monospace',
+                    fontSize: '0.75rem',
+                    color: '#fff',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-all',
+                    position: 'relative'
+                  }}>
+                    <Box component="span" sx={{ color: 'rgba(255,255,255,0.3)', mr: 1, userSelect: 'none' }}>$</Box>
+                    {selectedLog.command || ''}
+                  </Box>
+                </Box>
+
+                {/* Output Header */}
                 <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                   <Typography sx={{
                     fontSize: '0.7rem',
@@ -533,7 +731,8 @@ const TaskOverlay: React.FC<{
                   fontSize: '0.75rem',
                   color: 'rgba(255,255,255,0.8)',
                   whiteSpace: 'pre-wrap',
-                  wordBreak: 'break-all'
+                  wordBreak: 'break-all',
+                  minHeight: '30vh'
                 }}>
                   {selectedLog.output || "No output captured yet..."}
                 </Box>

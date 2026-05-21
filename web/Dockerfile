@@ -9,7 +9,6 @@ RUN npm run build
 # Stage 2: Final Image
 FROM ubuntu:22.04
 
-ARG GECKOVERSION=0.36.0
 ARG GOVERSION=1.25.0
 
 RUN ARCH=$(dpkg --print-architecture) \ 
@@ -41,7 +40,6 @@ RUN apt update -y && \
     python3-dev \
     python3-pip \
     python3-venv \
-    xvfb \
     libpci-dev \
     libpciaccess-dev \
     libegl-dev \
@@ -80,7 +78,6 @@ RUN apt install -y --no-install-recommends \
     netcat \
     nmap \
     x11-utils \
-    xvfb \
     wget \
     curl \
     libcairo2 \
@@ -91,11 +88,10 @@ RUN apt install -y --no-install-recommends \
     libjpeg-dev \
     libopenjp2-7-dev \
     python3-netaddr \
+    libpcap-dev \
     software-properties-common \
     ike-scan \
     sslscan \
-    medusa \
-    hydra \
     proxychains4 \
     jq \
     wrk \
@@ -103,33 +99,13 @@ RUN apt install -y --no-install-recommends \
     postgresql-client \
     unzip --fix-missing -y
 
-RUN add-apt-repository ppa:mozillateam/ppa && \
-    apt update -y && \
-    apt install -y --no-install-recommends \
-    firefox \
-    libgtk-3-0 \
-    libdbus-glib-1-2 \
-    libasound2 \
-    libx11-xcb1 \
-    libxt6 
-
 # Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
 ENV PATH="/root/.local/bin:${PATH}"
 
+# Install Go
 RUN ARCH=$(dpkg --print-architecture) \ 
     && curl -L https://go.dev/dl/go${GOVERSION}.linux-${ARCH}.tar.gz | tar -xzC /usr/local
-
-RUN ARCH=$(dpkg --print-architecture) \ 
-    && if [ "${ARCH}" = "arm64" ]; then \
-      GECKOPATH="geckodriver-v${GECKOVERSION}-linux-aarch64.tar.gz"; \
-    elif [ "${ARCH}" = "amd64" ]; then \
-      GECKOPATH="geckodriver-v${GECKOVERSION}-linux64.tar.gz"; \
-    fi \
-    && wget https://github.com/mozilla/geckodriver/releases/download/v${GECKOVERSION}/${GECKOPATH} \
-    && tar -xvf ${GECKOPATH} \
-    && rm ${GECKOPATH} \
-    && mv geckodriver /usr/bin
 
 # Install Rust for orjson
 RUN set -e; curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
@@ -140,30 +116,53 @@ RUN pip3 install maturin
 WORKDIR /usr/src/app
 
 ENV GO111MODULE=on 
-RUN printf "\
-    github.com/ibnaleem/gosearch@latest\n\
-    github.com/jaeles-project/gospider@latest\n\
-    github.com/tomnomnom/gf@latest\n\
-    github.com/tomnomnom/unfurl@latest\n\
-    github.com/tomnomnom/waybackurls@latest\n\
-    github.com/projectdiscovery/httpx/cmd/httpx@latest\n\
-    github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest\n\
-    github.com/projectdiscovery/chaos-client/cmd/chaos@latest\n\
-    github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest\n\
-    github.com/projectdiscovery/naabu/v2/cmd/naabu@latest\n\
-    github.com/hakluke/hakrawler@latest\n\
-    github.com/lc/gau/v2/cmd/gau@latest\n\
-    github.com/owasp-amass/amass/v3/...@latest\n\
-    github.com/ffuf/ffuf@latest\n\
-    github.com/projectdiscovery/tlsx/cmd/tlsx@latest\n\
-    github.com/hahwul/dalfox/v2@latest\n\
-    github.com/projectdiscovery/katana/cmd/katana@latest\n\
-    github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest\n\
-    github.com/sa7mon/s3scanner@latest\n\
-    github.com/zricethezav/gitleaks/v8@latest\n\
-    github.com/xalgord/reconx/cmd/reconx@latest\n" | \
-    xargs -L1 go install -ldflags="-s -w" -v && \
-    rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
+# RUN printf "\
+#     github.com/ibnaleem/gosearch@latest\n\
+#     github.com/jaeles-project/gospider@latest\n\
+#     github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006\n\
+#     github.com/tomnomnom/unfurl@latest\n\
+#     github.com/tomnomnom/waybackurls@latest\n\
+#     github.com/projectdiscovery/httpx/cmd/httpx@latest\n\
+#     github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest\n\
+#     github.com/projectdiscovery/chaos-client/cmd/chaos@latest\n\
+#     github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8\n\
+#     github.com/projectdiscovery/naabu/v2/cmd/naabu@latest\n\
+#     github.com/hakluke/hakrawler@latest\n\
+#     github.com/lc/gau/v2/cmd/gau@latest\n\
+#     github.com/owasp-amass/amass/v4/...@v4.2.0\n\
+#     github.com/ffuf/ffuf/v2@latest\n\
+#     github.com/projectdiscovery/tlsx/cmd/tlsx@latest\n\
+#     github.com/hahwul/dalfox/v2@latest\n\
+#     github.com/projectdiscovery/katana/cmd/katana@latest\n\
+#     github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest\n\
+#     github.com/sa7mon/s3scanner@b6c26d67bc2abe346555dd7010e6065889d66039\n\
+#     github.com/zricethezav/gitleaks/v8@latest\n\
+#     github.com/xalgord/reconx/cmd/reconx@latest\n" | \
+#     xargs -L1 go install -ldflags="-s -w" -v && \
+#     rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -v github.com/jaeles-project/gospider@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/tomnomnom/unfurl@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/tomnomnom/waybackurls@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/httpx/cmd/httpx@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/hakluke/hakrawler@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/lc/gau/v2/cmd/gau@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/owasp-amass/amass/v4/...@v4.2.0
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/ffuf/ffuf/v2@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/hahwul/dalfox/v2@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/projectdiscovery/katana/cmd/katana@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/sa7mon/s3scanner@b6c26d67bc2abe346555dd7010e6065889d66039
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/zricethezav/gitleaks/v8@latest
+RUN ARCH=$(dpkg --print-architecture) && GOARCH=$ARCH go install -ldflags="-s -w" -v github.com/xalgord/reconx/cmd/reconx@latest
+RUN rm -rf /go/pkg/* && rm -rf /root/.cache/go-build
+
 
 # Install Trufflehog
 RUN ARCH=$(dpkg --print-architecture) \
@@ -182,10 +181,25 @@ RUN ARCH=$(dpkg --print-architecture) \
     && mv k6-v${K6_VERSION}-linux-${K6_ARCH}/k6 /usr/local/bin/ \
     && rm -rf k6-v${K6_VERSION}-linux-${K6_ARCH}*
 
-# Install BetterLeaks
-RUN git clone https://github.com/betterleaks/betterleaks /usr/src/github/betterleaks && \
-    cd /usr/src/github/betterleaks && make build && \
-    ln -sf /usr/src/github/betterleaks/betterleaks /usr/local/bin/betterleaks
+# Install Brutus
+RUN curl -L https://github.com/praetorian-inc/brutus/releases/latest/download/brutus-linux-amd64.tar.gz | tar xz && \
+    mv brutus /usr/local/bin
+
+# Install Spiderfoot
+RUN git clone https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot && \
+    pip3 install -r /usr/src/github/spiderfoot/requirements.txt
+
+# Install cpanel2shell-scanner
+RUN git clone https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner && \
+    pip3 install -r /usr/src/github/cpanel2shell-scanner/requirements.txt
+
+# Install react2shell-scanner
+RUN git clone https://github.com/assetnote/react2shell-scanner /usr/src/github/react2shell-scanner && \
+    pip3 install -r /usr/src/github/react2shell-scanner/requirements.txt
+
+# Install CTFR
+RUN git clone https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
+    pip3 install -r /usr/src/github/ctfr/requirements.txt
 
 # Install Username Anarchy
 RUN git clone https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy && \
@@ -198,8 +212,65 @@ RUN ARCH=$(dpkg --print-architecture) \
     && mv aquatone /usr/local/bin/ \
     && rm -rf aquatone_linux_${ARCH}_1.7.0.zip README.md LICENSE.txt
 
+# Install Betterleaks
+RUN git clone https://github.com/betterleaks/betterleaks /usr/src/github/betterleaks && \
+    cd /usr/src/github/betterleaks && make build && \
+    ln -sf /usr/src/github/betterleaks/betterleaks /usr/local/bin/betterleaks
+
+# Install goofuzz
+RUN cd /usr/src/github && \
+    wget https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip && \
+    unzip GooFuzz.v.1.2.6.zip && \
+    mv GooFuzz.v.1.2.6 goofuzz && \
+    chmod +x goofuzz/GooFuzz && \
+    rm GooFuzz.v.1.2.6.zip && \
+    cd /usr/src/app
+
+# Install acunetix
+RUN git clone https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python && \
+    pip3 install /usr/src/github/acunetix-python
+
+# Install OneForAll
+RUN git clone https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll && \
+    cd /usr/src/github/OneForAll && \
+#    git reset --hard cefa100ba6472e1bf0f5ee128868e4b3739b684e && \
+    cd /usr/src/app && \
+    pip3 install -r /usr/src/github/OneForAll/requirements.txt
+
+# Install Sublist3r
+RUN git clone https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r && \
+    pip3 install -r /usr/src/github/Sublist3r/requirements.txt
+
+# Install theHarvester
+RUN git clone https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
+    cd /usr/src/github/theHarvester && uv sync && \
+    cd /usr/src/app
+
+# Install semgrep
+RUN git clone https://github.com/semgrep/semgrep /usr/src/github/semgrep && \
+    cd /usr/src/github/semgrep && \
+    pip3 install . && \
+    cd /usr/src/app 
+
+# Install paramspider
+RUN git clone https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider && \
+    cd /usr/src/github/ParamSpider && pip3 install . && python3 setup.py install && \
+    cd /usr/src/app
+
+# Install linkfinder
+RUN git clone https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder && \
+    pip3 install -r /usr/src/github/LinkFinder/requirements.txt && \
+    cd /usr/src/github/LinkFinder && \
+    python3 setup.py install && \
+    cd /usr/src/app
+
+# Install CMSeek
+RUN git clone https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK && \
+    pip3 install -r /usr/src/github/CMSeeK/requirements.txt
+
 # Install Arjun, InQL, Netlas, holehe, maigret (needs newer meson for pycairo)
-RUN pip3 install --upgrade meson ninja && pip3 install --upgrade arjun inql netlas holehe maigret
+RUN pip3 install semgrep
+RUN pip3 install --upgrade meson ninja && pip3 install --upgrade arjun inql netlas holehe maigret dirsearch
 
 # Install Node.js 20 and Retire.js
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -236,9 +307,10 @@ RUN python3 -m pip install pipx && \
 
 # Copy requirements
 COPY web/requirements.txt /tmp/requirements.txt
-RUN pip3 install --upgrade pip setuptools wheel
+RUN pip3 install --upgrade pip setuptools wheel pyOpenSSL h8mail
 RUN pip3 install -r /tmp/requirements.txt --no-cache-dir --ignore-installed blinker
-RUN playwright install-deps chromium && playwright install chromium
+RUN playwright install-deps chromium && playwright install chromium && \
+    ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome /usr/bin/chromium
 
 # Install Frontend Dependencies (for Dev mode)
 # RUN mkdir -p /usr/src/app/frontend

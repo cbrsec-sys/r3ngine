@@ -1,12 +1,92 @@
 # Changelog
 
+### [v3.1.0] - 2026-05-20
+
+- **Scan Pipeline**: fully fixed and stabilized. All tools now working to their full capabilities again.
+- **Stress Testing Pipeline**: added a new internal stress module that takes the adaptive stress engine from load testing to full denial-of-service testing to ensure you can test the full resiliance of your servers fall-over
+- **Stress Testing Results & Reporting**: All stress testing results are all correctly parsed, stored and *surfaced? for reports.
+
 **Official Repo location:** <p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.0.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
+
+
+### [v3.0.0-rc9] - 2026-05-20
+
+- **Stress Testing Dashboard WebSocket Telemetry**: Corrected WebSocket event parsing in the React frontend (`useStressTelemetry.ts`) to unwrap events from the `'telemetry_update'` envelope, enabling proper processing of `scan_status` updates and resolving the issue where the Kill Switch button failed to update to disabled.
+- **Stress Tool Execution Scope Constraint**: Fixed `handleStart` in `StressTestingPage.tsx` to launch only the active tool tab (`activeTab`) instead of all tools in `config.uses_tools`, preventing unwanted concurrent tool runs.
+- **Stressor Absolute Path Resolution**: Fixed path resolution in `stress_testing_tasks.py` for the custom stressor script to use `settings.BASE_DIR`, preventing execution failures on Celery workers.
+
+### [v3.0.0-rc8] - 2026-05-20
+
+- **Stress Testing Data Persistence**: Implemented stateful metric parsing and final metric aggregation (`get_final_metrics()`) for all five supported load testing tools (`k6`, `wrk`, `hping3`, `Locust`, and `TAStressor`) inside `parsers.py`.
+- **Pipeline Metric Aggregation**: Enhanced `stress_testing_tasks.py` to accumulate total requests, successful/failed requests, average/percentile latencies, and peak requests per second across multiple endpoints/tools, persisting the final aggregates to the `StressTestResult` database model.
+- **Report Generation Bug Fix**: Corrected a critical `NameError` in `report_tasks.py` where the undefined variable `avg_p95` was referenced during PDF report generation, resolving stress report failures.
+
+### [v3.0.0-rc7] - 2026-05-19
+
+- **APME Task Autodiscovery & Trigger Button Execution**: Created a dedicated `tasks.py` entrypoint in the `apme` app directory to resolve Celery autodiscovery failures (`run_llm_apme` not registered in workers), and documented all orchestrator functions with strict parameter and return descriptions conforming to codebase guidelines.
+- **APME Concurrency & Graph Sync Stability**: Catch `IntegrityError` in vulnerability correlation during concurrent `ImpactAssessment` creation, falling back to updating the record. Safe-guard the Neo4j graph results synchronization parser against `None` references for missing relation attributes (e.g. `target_domain`, `subdomain`, `technologies`, `cve_ids`).
+- **Celery binding and NameError fixes**: Fixed a critical `NameError` in `theHarvester` Celery task where `self` was referenced but not bound, causing task crashes and pipeline deadlocks. Changed task registration to use `bind=True` and `base=RengineTask` and injected the `self` context as the first argument.
+- **CTFR Subdomain Extraction File Truncation**: Resolved a classic Bash file redirection bug in `ctfr` subdomain extraction that immediately truncated `{results_file}` to 0 bytes before `cat` could read it. Modified the extraction command to write to a temporary file first and rename it back.
+- **URL Fetching and GF Pattern Filter Fix**: Corrected a overly restrictive regex in `fetch_url` and `gf` pattern filters (`host_regex`) that only permitted lowercase alphanumeric subdomains. This caused all captured URLs and endpoints belonging to subdomains with hyphens (`-`), underscores (`_`), and uppercase letters to be discarded. Modified the regex pattern to match standard RFC-compliant subdomain characters `[a-zA-Z0-9_-]`.
+- **NUL Character Database Ingestion Fix**: Resolved a critical PostgreSQL/SQLite database error (`ValueError: A string literal cannot contain NUL (0x00) characters`) that aborted Celery tasks when tools produced stdout containing null bytes (e.g. `LinkFinder` output). Added automatic NUL character stripping inside `sanitize_command_for_db`, `run_command`, and `stream_command` before command models are persisted.
+- **Mobile Companion App Enhancements**:
+  - **Premium Vulnerability Detail Modal**: Integrated an elegant glassmorphic detail drawer on the dashboard's recent vulnerabilities list that displays detailed vulnerability descriptions, commands, severities, and the exact target domain names on which they were found (replacing generic N/A values).
+  - **Most Vulnerable Targets Redirection**: Configured the "Most Vulnerable Targets" list to redirect users directly to a comprehensive `TargetSummary` view showing active subdomains, scan telemetry, and historical security findings.
+  - **Interactive WHOIS Invalidation**: Added an on-demand, real-time WHOIS refresh trigger (`Zap` action) to the target information panel of the scan details tab, featuring live `ActivityIndicator` states and dynamic context refetching.
+- **Aquatone Visual Discovery & Proxy Validation Hardening**: Resolved a critical issue where Aquatone scans failed to capture screenshots and returned empty results. Corrected the proxy validation logic to reject dead or slow public proxies returning HTTP error pages (`502`, `503`, `504`, `403`), isolated the leaked `proxy` task variable to prevent scope bleed, and explicitly configured the Playwright Chromium binary path (`-chrome-path /usr/bin/chromium`) inside the Celery container.
+- **Nmap IP Target Parsing Stability**: Fixed a ValueError crash (`invalid literal for int() with base 10`) in the Celery `nmap` task during scanning of IP targets. Refactored the unsafe colon-splitting port extraction to use a robust, fallback-aware `urllib.parse.urlparse` logic.
+- **Attack Surface Canvas Stability**: Resolved a critical application crash when loading the Attack Surface tab in the tactical interface by removing the non-functional separator item in the Cytoscape context menu configuration and replacing it with the library-supported native `hasTrailingDivider: true` option.
+- **AI Vulnerability Enrichment & Description Sync**: Wired the Most Common Vulnerabilities overlay in the web dashboard to dynamically call the LLM-powered vulnerability details function. Clicking the new "AI Analysis" thinking button initiates the analysis, updates the modal in real-time, and saves the detailed description, impact, remediation, and references to the database.
+- **Directories Tab Endpoint Fallback**: Implemented a robust fallback mechanism in the directories view set that dynamically extracts and populates directory items from crawled target URLs (`EndPoint` table) if a scan's direct directory fuzzing results (e.g. `ffuf` or `dirsearch`) are empty. This ensures visual completeness of the scan detail Directories tab.
+- **Unified Vulnerability Dashboard Refinement**: Cleaned up the vulnerability table dashboard to display accurate, dedicated scanners (e.g. `Acunetix`, `Dalfox`, `CRLFuzz`, `S3Scanner`, `Semgrep`, `WPScan`, `Retire.js`) in the "Command/Source" badge and details view, replacing generic Nuclei templates or commands.
+- **Scan Completion Pipeline Synchronization**: Fully integrated Celery-native retry/polling logic in downstream post-processing and reporting tasks (`correlate_vulnerabilities`, `calculate_risk_scores`, `generate_impact_assessment`, `run_apme`, and `report`), enabling them to dynamically poll `ScanActivity` and postpone execution until all scanning and vulnerability tool sub-tasks have successfully completed.
+- **Harden URL Downloader in Semgrep Static Analysis**: Enabled dynamic relative/protocol-relative URL normalization based on the target scan's base domain, expanded the target list to scan `.html` and `.htm` pages with inline code/secrets, and automatically parsed and injected configured scan headers (falling back to a standard browser `User-Agent`) to prevent server-side blockages. Added a **resilient proxy-cycling rotation engine** that shuffles configured proxies and automatically switches to the next proxy when a connection error, timeout, or proxy error code (`407`, `502`, `503`, `504`) is encountered.
+- **Mobile Notification Header Styling**: Restored appropriate dark styling (`Theme.colors.surface`) and readable title/icon color tokens (`Theme.colors.primary` / `Theme.colors.text`) to the mobile companion app's Notification Center (bell icon scan history drawer) header, preventing an unreadable white header issue under React Native Stack presentation modals.
+- **APME Path Persistence Database Constraint Resolution**: Resolved a database unique constraint violation in the Attack Path Modeling Engine by separating lookup and update logic depending on whether a representative vulnerability exists, preventing duplicate key database crashes on `ImpactAssessment` creation.
+- **Vulnerability Scan Engine Fault-Isolation**: Enhanced the Celery base class `RengineTask` to suppress exception propagation for vulnerability scanner sub-tasks (e.g. `nuclei_scan`, `acunetix_scan`, `crlfuzz_scan`, `s3scanner`, `cpanel_scan`, `wpscan_scan`, `react2shell_scan`, `semgrep_scan`). This preserves the Celery chord callback (`finish_vulnerability_scan`), preventing a single scanner tool's failure from halting or aborting the rest of the scanning engine.
+- **Vulnerability Sub-Task Tracking**: Mapped `react2shell_scan`, `semgrep_scan`, and `crlfuzz_scan` inside the `RengineTask`'s `dependent_tasks` mapping to guarantee all scan activity and sub-task statuses are tracked and persisted.
+- **Retire.js Parser Hardening**: Fixed an `AttributeError` in the `web_api_discovery` Retire.js parser by handling string type return values when no vulnerable libraries are found, preventing scanning task failure.
+- **Nuclei Scan Import Resiliency**: Resolved a name resolution/unbound local variable error in `nuclei_scan` by correctly importing and referencing the `Subdomain` model when processing vulnerability scan results.
+- **Result Path Isolation**: Configured the scanning output directory structure to persistently separate scan runs per target and scan ID (`scan_results/{target}_{scanId}`), preventing overlapping tool runs from overwriting each other.
+- **Celery Chord & Chain Synchronization**: Re-orchestrated the scan pipeline's task dependencies to run vulnerability scans in a coordinated Celery chord, ensuring that subsequent downstream engines (e.g. `APME` and `ERL`) wait for all vulnerability sub-tasks to finish before starting.
+
+### [v3.0.0-rc6] - 2026-05-16
+
+### Added
+- **Adaptive Stress Interface Layout Refinement**: Rearranged the live telemetry space below the KPIs into a highly optimized 2-column tactical cockpit. Stacks all three real-time graphs (Latency, Throughput, and Saturation Heatmap) in a unified left column while stretching the raw telemetry log component full-height in the right column for enhanced observation density.
+- **Raw stdout/stderr Live Terminal Streaming**: Implemented real-time streaming of raw tool execution commands and stdout/stderr output lines via WebSockets to the frontend telemetry terminal log.
+- **Persistent Telemetry Session History**: Modified the telemetry consumer to reload the past 1000 logged items upon client connection, restoring terminal logs and ECharts dynamically on browser refresh.
+- **Stress Scan Database Sync & Safe Completion**: Wrapped the Celery stress scan task in a `try...finally` block to guarantee a final `'completed'` telemetry packet is always sent to the client. Integrated explicit database updates to the `ScanHistory` object's `scan_status` attribute (`RUNNING_TASK`, `SUCCESS_TASK`, `ABORTED_TASK`, `FAILED_TASK`).
+- **Activity & Command History Integration**: Registered all generated stress testing commands as command history records prior to subprocess execution, storing command lines, return codes, and raw stdout upon completion.
+- **Mobile Companion Documentation**: Integrated high-fidelity visual documentation into the `r3ngine-mobile` repository, including a functional interface walkthrough and core UI screenshots.
+- **Clear Logs Button**: Added a beautifully styled outlined button in the headerAction of the web dashboard's telemetry panel ([StressTestingPage.tsx](file:///d:/Repos/r3ngine/frontend/src/pages/StressTestingPage.tsx)) that completely clears the telemetry store logs on-demand.
+- **Mobile Stress Telemetry Cockpit**: Built a high-fidelity, real-time stress testing telemetry dashboard in the `r3ngine-mobile` companion app (`app/scan/stress/[id].tsx`) featuring lightweight custom SVG line and bar charts, a live raw console log terminal with dynamic filters, haptic feedback abort controls (Kill Switch), and glassmorphic muted report triggers.
+
+### [v3.0.0-rc5] - 2026-05-15
+
+### Added
+- **Semgrep Static Analysis Integration**:
+  - **Automated Rule Synchronization**: Introduced a startup sync routine that downloads and bundles high-impact Semgrep rules (OWASP Top 10, Secrets, etc.).
+  - **Unified SAST Task**: Developed a robust `semgrep_scan` task that automatically downloads relevant files (JS, PHP, etc.) from discovered endpoints for analysis.
+  - **Secrets Discovery**: Integrated Semgrep into the Tier 5 secret scanning phase to complement Gitleaks and Trufflehog.
+  - **Vulnerability Assessment**: Integrated Semgrep as a default, always-run tool in the vulnerability scan pipeline to identify code-based flaws.
+  - **Intelligence-Driven Finding Persistence**: Automated mapping of Semgrep results to `SecretLeak` and `Vulnerability` database models with context-aware severity mapping.
+- **Backend Security Toolchain Optimization**:
+  - **Infrastructure Hardening**: Streamlined Docker environment by removing legacy browser dependencies (Firefox/Gecko) and reducing container bloat.
+  - **Integrated Fuzzing Engine**: Refactored `dir_file_fuzz` to operate a concurrent pipeline utilizing both `ffuf` and `dirsearch`, with automated result deduplication.
+  - **Discovery Pipeline Upgrades**: Implemented `amass intel` for infrastructure mapping and enabled `subfinder` exhaustive mode (`-all`).
+  - **Intelligence-Driven Scanning**: Developed a technology mapping engine to automatically inject relevant tags into `nuclei` scans, ensuring high-impact vulnerability coverage.
+  - **System Reliability**: Finalized cleanup of redundant packages (`scapy`) and validated end-to-end performance of the refactored security pipeline.
 
 ### [v3.0.0-rc4] - 2026-05-15
 
-### Fixed
-- **Report Generation Pipeline**: Resolved a critical `'NoneType' object has no attribute 'replace'` error occurring when the executive summary description was left empty in report settings.
-- **Model Resilience**: Added default empty string values to report configuration fields to prevent future serialization and string replacement failures.
+### Added
+- **Stress Test Intelligence Reports**:
+  - **Specialized Reporting Engine**: Introduced professional-grade performance reports for the Adaptive Stress & Resilience Engine (ASRE).
+  - **Dynamic Templates**: Created `stress_cyber_pro` (high-contrast) and `stress_modern` (minimalist) templates with performance-focused aesthetics.
+  - **Automated Performance Insights**: Integrated LLM-generated executive summaries for stress test results, covering bottleneck analysis and resilience scoring.
+  - **Advanced Visualizations**: Added dedicated PDF charts for latency distribution, throughput stability, and endpoint saturation.
+  - **Dashboard Integration**: Added on-demand report generation directly from the Stress Testing dashboard.
 
 ## [v3.0.0-rc3] - 2026-05-15
 

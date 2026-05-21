@@ -193,8 +193,8 @@ export const useUpdateProxySettings = (slug: string) => {
 
 export const useFetchProxies = (slug: string) => {
   return useMutation({
-    mutationFn: async () => {
-      const response = await axios.post(`/scanEngine/${slug}/fetch_proxies`, {}, {
+    mutationFn: async (limit?: number) => {
+      const response = await axios.post(`/scanEngine/${slug}/fetch_proxies`, { limit }, {
         headers: {
           'X-CSRFToken': getCsrfToken()
         }

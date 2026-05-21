@@ -222,16 +222,31 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = RENGINE_RESULTS
 FILE_UPLOAD_MAX_MEMORY_SIZE = 100000000
 FILE_UPLOAD_PERMISSIONS = 0o644
+# Static files (CSS, JavaScript, Images)
+# https://docs.djangoproject.com/en/2.2/howto/static-files/
+
 STATIC_URL = '/staticfiles/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIRS = [
+
+# Deduplicate static files sources to prevent collectstatic warnings
+# and ensure the correct files are collected.
+_static_dirs = [
     os.path.join(BASE_DIR, "static"),
-] + [
-    path for path in [
-        os.path.join(env('RENGINE_HOME', default='/usr/src/app'), "frontend", "dist"),
-        '/usr/src/frontend/dist',
-    ] if os.path.exists(path)
 ]
+
+# Prefer the dynamically built/mounted local frontend dist directory if it exists,
+# otherwise fall back to the baked-in Docker version
+_local_dist = os.path.join(env('RENGINE_HOME', default='/usr/src/app'), "frontend", "dist")
+if os.path.exists(_local_dist):
+    _frontend_dist = _local_dist
+else:
+    _frontend_dist = '/usr/src/frontend/dist'
+
+if os.path.exists(_frontend_dist):
+    _static_dirs.append(_frontend_dist)
+
+# Use list(dict.fromkeys()) to preserve order while removing duplicates
+STATICFILES_DIRS = list(dict.fromkeys(_static_dirs))
 
 FIXTURE_DIRS = [
     os.path.join(BASE_DIR, "fixtures"),
@@ -257,6 +272,10 @@ DELETE_DUPLICATES_THRESHOLD = 10
 CELERY settings
 '''
 CELERY_BROKER_URL = env("CELERY_BROKER", default="redis://redis:6379/0")
+import urllib.parse
+_parsed_redis = urllib.parse.urlparse(CELERY_BROKER_URL)
+REDIS_HOST = _parsed_redis.hostname or 'redis'
+REDIS_PORT = _parsed_redis.port or 6379
 CELERY_RESULT_BACKEND = env("CELERY_BROKER", default="redis://redis:6379/0")
 CELERY_ENABLE_UTC = False
 CELERY_TIMEZONE = 'UTC'

@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Stress Performance Report</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&display=swap" rel="stylesheet" />
+    <style>
+        @page {
+            size: A4;
+            margin: 25mm 15mm;
+
+            @bottom-left {
+                content: "{% if show_footer %}{{footer_text}}{% else %}{{company_name}}{% endif %}";
+                font-family: 'Inter', sans-serif;
+                font-size: 9pt;
+                color: #94a3b8;
+                border-top: 0.5px solid #e2e8f0;
+                padding-top: 5mm;
+            }
+
+            @bottom-right {
+                content: counter(page);
+                font-family: 'Inter', sans-serif;
+                font-size: 9pt;
+                color: #94a3b8;
+                padding-top: 5mm;
+            }
+        }
+
+        @page :first {
+            margin: 0;
+        }
+
+        html {
+            color: #334155;
+            font-family: 'Inter', sans-serif;
+            font-weight: 300;
+            font-size: 11pt;
+            line-height: 1.6;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Cover Page */
+        #cover {
+            height: 297mm;
+            background-color: {{secondary_color|default:"#f8fafc"}};
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            padding: 40mm 20mm;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .cover-bg {
+            position: absolute;
+            top: -100mm;
+            right: -100mm;
+            width: 300mm;
+            height: 300mm;
+            background: radial-gradient(circle, {{primary_color|default:"#3b82f6"}}22 0%, transparent 70%);
+            border-radius: 50%;
+        }
+
+        h1.cover-title {
+            font-size: 48pt;
+            font-weight: 100;
+            color: {{primary_color|default:"#0f172a"}};
+            margin: 0;
+            text-transform: uppercase;
+            letter-spacing: -2px;
+        }
+
+        .cover-subtitle {
+            font-size: 24pt;
+            font-weight: 300;
+            color: #64748b;
+            margin-bottom: 20mm;
+        }
+
+        .cover-line {
+            width: 100mm;
+            height: 2px;
+            background: linear-gradient(to right, {{primary_color|default:"#3b82f6"}}, transparent);
+            margin-bottom: 20mm;
+        }
+
+        .cover-meta {
+            font-size: 12pt;
+            color: #475569;
+        }
+
+        /* General Layout */
+        .page-break { page-break-before: always; }
+        
+        h1 { font-size: 28pt; font-weight: 200; color: {{primary_color|default:"#0f172a"}}; margin-bottom: 10mm; }
+        h2 { font-size: 20pt; font-weight: 300; color: #1e293b; margin-top: 15mm; margin-bottom: 5mm; }
+        
+        .section-header {
+            display: flex;
+            align-items: baseline;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 8mm;
+            padding-bottom: 2mm;
+        }
+
+        /* Performance Cards */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5mm;
+            margin-bottom: 15mm;
+        }
+
+        .summary-card {
+            padding: 8mm 5mm;
+            background: white;
+            border-radius: 4mm;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            text-align: center;
+            border-top: 4px solid {{primary_color|default:"#3b82f6"}};
+        }
+
+        .summary-value {
+            font-size: 28pt;
+            font-weight: 200;
+            color: #0f172a;
+            display: block;
+        }
+
+        .summary-label {
+            font-size: 10pt;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        /* AI Analysis Section */
+        .ai-box {
+            background: linear-gradient(to bottom right, #f8fafc, #f1f5f9);
+            padding: 10mm;
+            border-radius: 6mm;
+            margin-bottom: 10mm;
+            position: relative;
+        }
+
+        .ai-badge {
+            position: absolute;
+            top: -4mm;
+            right: 10mm;
+            background: {{primary_color|default:"#3b82f6"}};
+            color: white;
+            padding: 1mm 4mm;
+            border-radius: 10mm;
+            font-size: 8pt;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        /* Charts */
+        .chart-box {
+            margin-bottom: 10mm;
+            text-align: center;
+        }
+
+        .chart-img {
+            max-width: 140mm;
+            height: auto;
+        }
+
+        /* Tables */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 5mm;
+        }
+
+        th {
+            text-align: left;
+            padding: 4mm;
+            font-size: 10pt;
+            color: #64748b;
+            text-transform: uppercase;
+            border-bottom: 2px solid #f1f5f9;
+        }
+
+        td {
+            padding: 4mm;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .badge {
+            padding: 1mm 3mm;
+            border-radius: 10mm;
+            font-size: 9pt;
+            font-weight: 500;
+        }
+
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-danger { background: #fee2e2; color: #991b1b; }
+
+    </style>
+</head>
+
+<body>
+    <!-- Cover -->
+    <article id="cover">
+        <div class="cover-bg"></div>
+        <h1 class="cover-title">Performance</h1>
+        <div class="cover-subtitle">Stress Test Insights</div>
+        <div class="cover-line"></div>
+        <div class="cover-meta">
+            <div>Target: <b>{{ scan_object.domain.name }}</b></div>
+            <div>Date: <b>{% now "F j, Y" %}</b></div>
+            <div style="margin-top: 10mm;">Reported by: <b>{{ company_name }}</b></div>
+        </div>
+    </article>
+
+    <!-- Executive Brief -->
+    <article class="page-break">
+        <h1>Executive Summary</h1>
+        
+        <div class="summary-grid">
+            <div class="summary-card">
+                <span class="summary-value">{{ stress_total_requests|default:0 }}</span>
+                <span class="summary-label">Requests</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-value" style="color: {% if stress_total_failed > 0 %}#dc2626{% else %}#059669{% endif %};">
+                    {% widthratio stress_total_success stress_total_requests 100 %}%
+                </span>
+                <span class="summary-label">Success Rate</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-value">{{ stress_avg_p95|default:0|floatformat:1 }}ms</span>
+                <span class="summary-label">P95 Latency</span>
+            </div>
+        </div>
+
+        {% if enable_llm_report_generation %}
+        <div class="ai-box">
+            <div class="ai-badge">AI Analysis</div>
+            {{ llm_executive_brief | safe }}
+        </div>
+        {% endif %}
+
+        <h2>Assessment Scope</h2>
+        <p>A comprehensive stress test was performed against <b>{{ scan_object.domain.name }}</b> to evaluate its resilience and stability under peak traffic conditions. This report details the observed behavior, identifying critical bottlenecks and performance thresholds.</p>
+    </article>
+
+    <!-- Visualizations -->
+    <article class="page-break">
+        <h1>Performance Visuals</h1>
+        
+        <div class="chart-box">
+            <img class="chart-img" src="data:image/png;base64,{{ stress_latency_chart }}" />
+            <p style="font-size: 9pt; color: #94a3b8; margin-top: 4mm;">Latency breakdown across different tools and concurrency levels.</p>
+        </div>
+
+        <div class="chart-box" style="margin-top: 15mm;">
+            <img class="chart-img" src="data:image/png;base64,{{ stress_success_rate_chart }}" style="max-width: 100mm;" />
+            <p style="font-size: 9pt; color: #94a3b8; margin-top: 4mm;">Global request success vs failure distribution.</p>
+        </div>
+    </article>
+
+    <!-- Data Table -->
+    <article class="page-break">
+        <h1>Technical Breakdown</h1>
+        
+        {% if enable_llm_report_generation %}
+        <div class="ai-box">
+            <div class="ai-badge">Technical Insight</div>
+            {{ llm_overview | safe }}
+        </div>
+        {% endif %}
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Tool</th>
+                    <th>Users</th>
+                    <th>RPS</th>
+                    <th>Avg Latency</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for res in stress_results %}
+                <tr>
+                    <td><b>{{ res.tool_used }}</b></td>
+                    <td>{{ res.concurrency_used }}</td>
+                    <td>{{ res.max_requests_per_second|floatformat:1 }}</td>
+                    <td>{{ res.avg_latency_ms }}ms</td>
+                    <td>
+                        <span class="badge {% if res.failed_requests > 0 %}badge-danger{% else %}badge-success{% endif %}">
+                            {% if res.failed_requests > 0 %}Degraded{% else %}Stable{% endif %}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </article>
+
+    <!-- Conclusion -->
+    <article class="page-break">
+        <h1>Final Conclusion</h1>
+        
+        {% if enable_llm_report_generation %}
+        <div class="ai-box" style="background: white; border: 1px solid #e2e8f0;">
+            {{ llm_conclusion | safe }}
+        </div>
+        {% else %}
+        <p>Based on the data collected, the target infrastructure is capable of handling current peak loads but may require scaling to maintain performance during extreme traffic events. Implementing rate limiting and horizontally scaling application servers is recommended.</p>
+        {% endif %}
+
+        <div style="margin-top: 30mm; text-align: center; color: #94a3b8; font-size: 10pt;">
+            End of Stress Performance Report
+        </div>
+    </article>
+</body>
+
+</html>

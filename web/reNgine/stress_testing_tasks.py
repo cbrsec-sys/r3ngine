@@ -7,13 +7,14 @@ import signal
 import redis
 import logging
 import time
-from startScan.models import ScanHistory, EndPoint, StressTestResult
+from startScan.models import ScanHistory, EndPoint, StressTestResult, Command
 from targetApp.models import Domain
 from reNgine.graph_utils import Neo4jManager
 from django.utils import timezone
 from reNgine.celery_custom_task import RengineTask
-from reNgine.parsers import K6Parser, WrkParser, Hping3Parser, LocustParser
+from reNgine.parsers import K6Parser, WrkParser, Hping3Parser, LocustParser, TAStressorParser
 from reNgine.stress_telemetry import StressTelemetryPublisher
+from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, RUNNING_TASK, ABORTED_TASK
 
 logger = logging.getLogger(__name__)
 
@@ -65,147 +66,559 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, *
     
     # Initialize Telemetry
     publisher = StressTelemetryPublisher(scan_history_id)
+    
+    # Publish initial running status
+    publisher.publish({
+        "type": "scan_status",
+        "status": "running",
+        "timestamp": time.time()
+    })
 
-    # Target Profiling
     try:
-        scan = ScanHistory.objects.get(id=scan_history_id)
-        domain = Domain.objects.get(name=target_domain_name)
-    except Exception as e:
-        logger.error(f"Stress test error: {e}")
-        return {"status": "failed"}
+        # Target Profiling
+        try:
+            scan = ScanHistory.objects.get(id=scan_history_id)
+            domain = Domain.objects.get(name=target_domain_name)
+            scan.scan_status = RUNNING_TASK
+            scan.save()
+        except Exception as e:
+            logger.error(f"Stress test error: {e}")
+            return {"status": "failed"}
 
-    endpoints = EndPoint.objects.filter(scan_history_id=scan_history_id)[:5]
-    if not endpoints:
-        logger.warning(f"No endpoints found for scan {scan_history_id} to stress test.")
-        return {"status": "success", "message": "No endpoints to stress test"}
+        selected_endpoints = stress_config.get('selected_endpoints', [])
+        
+        if selected_endpoints:
+            # Filter specifically on selected endpoints matching the list of URLs
+            endpoints = EndPoint.objects.filter(
+                scan_history_id=scan_history_id,
+                http_url__in=selected_endpoints
+            )
+        else:
+            crawl_targets = yaml_config.get('crawl_targets', False)
+            if not crawl_targets:
+                # Only take the root target.
+                endpoints = EndPoint.objects.filter(
+                    scan_history_id=scan_history_id, 
+                    subdomain__name=target_domain_name
+                ).order_by('id')[:1]
+            else:
+                # Take up to 5 endpoints on the target domain
+                endpoints = EndPoint.objects.filter(
+                    scan_history_id=scan_history_id, 
+                    subdomain__name=target_domain_name
+                )[:5]
+        if not endpoints:
+            logger.warning(f"No endpoints found for scan {scan_history_id} to stress test.")
+            try:
+                scan.scan_status = SUCCESS_TASK
+                scan.stop_scan_date = timezone.now()
+                scan.save()
+            except Exception as e:
+                logger.error(f"Failed to update scan status: {e}")
+            return {"status": "success", "message": "No endpoints to stress test"}
 
-    neo4j = Neo4jManager()
+        neo4j = Neo4jManager()
 
-    overall_result = StressTestResult.objects.create(
-        scan_history=scan,
-        target_domain=domain,
-        tool_used=",".join(tools),
-        concurrency_used=concurrency,
-        duration=duration,
-    )
+        overall_result = StressTestResult.objects.create(
+            scan_history=scan,
+            target_domain=domain,
+            tool_used=",".join(tools),
+            concurrency_used=concurrency,
+            duration=duration,
+        )
 
-    for endpoint in endpoints:
-        if is_kill_switch_active(scan_history_id):
-            logger.warning(f"Kill switch activated for scan {scan_history_id}. Aborting.")
-            overall_result.is_kill_switch_triggered = True
-            overall_result.save()
-            break
+        from reNgine.opsec_utils import ProxychainsWrapper
+        from reNgine.common_func import get_random_proxy, get_random_user_agent
+        
+        proxy_wrapper = ProxychainsWrapper()
+        single_proxy = get_random_proxy()
+        # Fetch a user agent from OpSec settings (rotates if enable_random_ua is on)
+        k6_user_agent = get_random_user_agent()
 
-        for tool in tools:
-            parser = None
-            cmd = []
-            
-            if tool == "k6":
-                parser = K6Parser()
-                script_path = f"/tmp/k6_script_{scan_history_id}.js"
-                with open(script_path, "w") as f:
-                    f.write(f"""
-                    import http from 'k6/http';
-                    import {{ sleep }} from 'k6';
-                    export default function () {{
-                        http.get('{endpoint.http_url}');
-                        sleep(1);
-                    }}
-                    """)
-                cmd = ["k6", "run", "--vus", str(concurrency), "--duration", str(duration), script_path]
-            
-            elif tool == "wrk":
-                parser = WrkParser()
-                cmd = ["wrk", "-t", "2", "-c", str(concurrency), "-d", duration, endpoint.http_url]
-            
-            elif tool == "hping3":
-                parser = Hping3Parser()
-                # hping3 needs careful handling of parameters
-                cmd = ["hping3", "-S", "-p", "80", "-c", "10", target_domain_name]
-            
-            elif tool == "locust":
-                parser = LocustParser()
-                script_path = f"/tmp/locustfile_{scan_history_id}.py"
-                with open(script_path, "w") as f:
-                    f.write(f"""
-from locust import HttpUser, task, between
+        # Initialize aggregate metric accumulators across all tools and endpoints
+        total_requests = 0
+        successful_requests = 0
+        failed_requests = 0
+        
+        avg_latencies = []
+        p95_latencies = []
+        p99_latencies = []
+        max_rps_values = []
+
+        task_aborted = False
+
+        for endpoint in endpoints:
+            if is_kill_switch_active(scan_history_id):
+                logger.warning(f"Kill switch activated for scan {scan_history_id}. Aborting.")
+                overall_result.is_kill_switch_triggered = True
+                overall_result.save()
+                task_aborted = True
+                break
+
+            for tool in tools:
+                if is_kill_switch_active(scan_history_id):
+                    logger.warning(f"Kill switch activated for scan {scan_history_id}. Aborting tool {tool}.")
+                    overall_result.is_kill_switch_triggered = True
+                    overall_result.save()
+                    task_aborted = True
+                    break
+
+                parser = None
+                cmd = []
+                temp_conf_path = None
+                temp_proxy_path = None
+                
+                tool_config = stress_config.get(f"{tool}_config", {})
+                
+                # Dynamic sanitisation to avoid shell injection
+                def sanitize(val, allowed_chars=None, default=""):
+                    if val is None:
+                        return default
+                    val_str = str(val).strip()
+                    if not allowed_chars:
+                        allowed_chars = r"^[a-zA-Z0-9.\-_/:=%]+$"
+                    import re
+                    if not re.match(allowed_chars, val_str):
+                        logger.warning(f"Sanitization blocked input: {val_str}")
+                        return default
+                    return val_str
+
+                if tool == "k6":
+                    parser = K6Parser()
+                    k6_vus = sanitize(tool_config.get("vus"), default=str(concurrency))
+                    k6_duration = sanitize(tool_config.get("duration"), default=str(duration))
+                    k6_attack_type = sanitize(tool_config.get("attack_type", "http_get"), default="http_get")
+                    k6_rps = sanitize(tool_config.get("rps"), default="")
+                    k6_insecure = tool_config.get("insecure_skip_tls", False)
+                    k6_no_reuse = tool_config.get("no_connection_reuse", False)
+                    k6_http_debug = sanitize(tool_config.get("http_debug"), default="")
+
+                    script_path = f"/tmp/k6_script_{scan_history_id}.js"
+                    # Resolve proxy for k6 - k6 uses env var HTTP_PROXY / HTTPS_PROXY or --http-debug
+                    # We pass it via the scenario's executor env block inside the script itself.
+                    k6_proxy_block = ""
+                    if single_proxy:
+                        # Ensure scheme prefix for k6 compatibility
+                        _p = single_proxy if '://' in single_proxy else f'http://{single_proxy}'
+                        k6_proxy_block = f"""
+    scenarios: {{
+        default: {{
+            executor: 'constant-vus',
+            vus: {k6_vus},
+            duration: '{k6_duration}',
+            env: {{ HTTP_PROXY: '{_p}', HTTPS_PROXY: '{_p}' }},
+        }},
+    }},"""
+                    else:
+                        k6_proxy_block = f"""
+    vus: {k6_vus},
+    duration: '{k6_duration}',"""
+
+                    with open(script_path, "w") as f:
+                        if k6_attack_type == "slowloris":
+                            f.write(f"""import http from 'k6/http';
+import {{ sleep }} from 'k6';
+export const options = {{{k6_proxy_block}
+}};
+export default function () {{
+    const params = {{
+        headers: {{
+            'User-Agent': '{k6_user_agent}',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+            'X-Keep-Alive': 'true',
+        }},
+        timeout: '30s',
+    }};
+    try {{
+        const res = http.get('{endpoint.http_url}', params);
+        sleep(10);
+    }} catch (e) {{
+        sleep(1);
+    }}
+}}
+""")
+                        else:
+                            f.write(f"""import http from 'k6/http';
+import {{ sleep }} from 'k6';
+export const options = {{{k6_proxy_block}
+}};
+export default function () {{
+    const params = {{
+        headers: {{
+            'User-Agent': '{k6_user_agent}',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.5',
+        }},
+    }};
+    const res = http.get('{endpoint.http_url}', params);
+    sleep(0.5);
+}}
+""")
+
+                    
+                    cmd = ["k6", "run", "--vus", k6_vus, "--duration", k6_duration]
+                    if k6_rps:
+                        cmd += ["--rps", k6_rps]
+                    if k6_insecure:
+                        cmd += ["--insecure-skip-tls-verify"]
+                    if k6_no_reuse:
+                        cmd += ["--no-connection-reuse"]
+                    if k6_http_debug:
+                        cmd += [f"--http-debug={k6_http_debug}"]
+                    cmd += [script_path]
+                
+                elif tool == "wrk":
+                    parser = WrkParser()
+                    wrk_threads = sanitize(tool_config.get("threads"), default="2")
+                    wrk_connections = sanitize(tool_config.get("connections"), default=str(concurrency))
+                    wrk_duration = sanitize(tool_config.get("duration"), default=str(duration))
+                    wrk_latency = tool_config.get("latency", True)
+                    wrk_timeout = sanitize(tool_config.get("timeout"), default="")
+                    wrk_headers = tool_config.get("headers", [])
+
+                    cmd = ["wrk", "-t", wrk_threads, "-c", wrk_connections, "-d", wrk_duration]
+                    if wrk_latency:
+                        cmd += ["--latency"]
+                    if wrk_timeout:
+                        cmd += ["--timeout", wrk_timeout]
+                    # Always inject a realistic browser User-Agent from OpSec settings
+                    cmd += ["-H", f"User-Agent: {k6_user_agent}"]
+                    for header in wrk_headers:
+                        san_hdr = sanitize(header, allowed_chars=r"^[a-zA-Z0-9.\-_/:=%\s]+$")
+                        if san_hdr:
+                            cmd += ["-H", san_hdr]
+                    cmd += [endpoint.http_url]
+                
+                elif tool == "hping3":
+                    parser = Hping3Parser()
+                    hping_mode = sanitize(tool_config.get("attack_mode"), default="syn")
+                    hping_port = sanitize(tool_config.get("port"), default="80")
+                    hping_rate = sanitize(tool_config.get("rate"), default="fast")
+                    hping_data = sanitize(tool_config.get("data_size"), default="")
+                    
+                    cmd = ["hping3"]
+                    if hping_mode == "udp":
+                        cmd += ["--udp"]
+                    elif hping_mode == "icmp":
+                        cmd += ["--icmp"]
+                    else:
+                        cmd += ["--syn"]
+
+                    cmd += ["-p", hping_port]
+
+                    if hping_rate == "flood":
+                        cmd += ["--flood"]
+                    elif hping_rate == "faster":
+                        cmd += ["--faster"]
+                    else:
+                        cmd += ["--fast"]
+
+                    if hping_data:
+                        cmd += ["-d", hping_data]
+                    
+                    cmd += ["-c", "100", target_domain_name]
+                
+                elif tool == "locust":
+                    parser = LocustParser()
+                    locust_users = sanitize(tool_config.get("users"), default=str(concurrency))
+                    locust_spawn = sanitize(tool_config.get("spawn_rate"), default=str(max(1, int(concurrency) // 5)))
+                    locust_runtime = sanitize(tool_config.get("run_time"), default=str(duration))
+                    locust_loglevel = sanitize(tool_config.get("loglevel"), default="ERROR")
+
+                    script_path = f"/tmp/locustfile_{scan_history_id}.py"
+                    
+                    # Build proxy dict for locust if a proxy is available
+                    # Locust's HttpUser uses the requests library, so proxies
+                    # are set via self.client.proxies — a natively supported feature.
+                    locust_proxy_lines = []
+                    if single_proxy:
+                        _lp = single_proxy if '://' in single_proxy else f'http://{single_proxy}'
+                        locust_proxy_lines = [
+                            "    def on_start(self):",
+                            f"        self.client.headers.update({{'User-Agent': '{k6_user_agent}', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5'}})",
+                            f"        self.client.proxies = {{'http': '{_lp}', 'https': '{_lp}'}}",
+                        ]
+                    else:
+                        locust_proxy_lines = [
+                            "    def on_start(self):",
+                            f"        self.client.headers.update({{'User-Agent': '{k6_user_agent}', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5'}})",
+                        ]
+                    locust_on_start = "\n".join(locust_proxy_lines)
+                    
+                    with open(script_path, "w") as f:
+                        f.write(f"""from locust import HttpUser, task, between
 import logging
 
-# Disable locust logging to stdout to keep telemetry clean
-logging.getLogger('locust').setLevel(logging.ERROR)
+logging.getLogger('locust').setLevel(logging.{locust_loglevel})
 
 class StressUser(HttpUser):
     wait_time = between(0.1, 0.5)
+
+{locust_on_start}
 
     @task
     def test_target(self):
         self.client.get("/")
 """)
-                # Locust needs a host. If endpoint is a full URL, we use it as host and get("/")
-                cmd = [
-                    "locust",
-                    "--headless",
-                    "-u", str(concurrency),
-                    "-r", str(max(1, int(concurrency) // 5)),
-                    "--run-time", duration,
-                    "--host", endpoint.http_url,
-                    "--locustfile", script_path,
-                    "--print-stats"
-                ]
+                    cmd = [
+                        "locust",
+                        "--headless",
+                        "-u", locust_users,
+                        "-r", locust_spawn,
+                        "--run-time", locust_runtime,
+                        "--host", endpoint.http_url,
+                        "--locustfile", script_path,
+                        "--print-stats"
+                    ]
 
-            if not cmd:
-                continue
+                elif tool == "stressor":
+                    parser = TAStresserParser()
+                    stresser_method = sanitize(tool_config.get("method"), default="GET")
+                    stresser_threads = sanitize(tool_config.get("threads"), default=str(concurrency))
+                    stresser_duration = sanitize(tool_config.get("duration"), default=str(duration))
+                    stresser_rpc = sanitize(tool_config.get("rpc"), default="1")
+                    stresser_proxy_type = sanitize(tool_config.get("proxy_type"), default="0")
+                    stresser_proxy_file = sanitize(tool_config.get("proxy_file"), default="")
 
-            logger.info(f"Executing {tool}: {' '.join(cmd)}")
-            
-            try:
-                # Use start_new_session to ensure we can kill the whole process group
-                process = subprocess.Popen(
-                    cmd, 
-                    stdout=subprocess.PIPE, 
-                    stderr=subprocess.STDOUT, 
-                    text=True,
-                    start_new_session=True
+                    # Fetch proxies from global reNgine settings and write formatted proxies to temp file
+                    from scanEngine.models import Proxy
+                    import tempfile
+                    
+                    temp_proxy_lines = []
+                    if Proxy.objects.all().exists():
+                        proxy_config = Proxy.objects.first()
+                        if proxy_config.use_proxy and proxy_config.proxies:
+                            for line in proxy_config.proxies.splitlines():
+                                line = line.strip()
+                                if not line:
+                                    continue
+                                # Strip scheme: http://, https://, socks4://, socks5://, etc.
+                                for scheme in ['http://', 'https://', 'socks4://', 'socks5://', 'socks5h://', 'socks4a://']:
+                                    if line.lower().startswith(scheme):
+                                        line = line[len(scheme):]
+                                        break
+                                if line:
+                                    temp_proxy_lines.append(line)
+                    
+                    if temp_proxy_lines:
+                        try:
+                            temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', prefix='proxies_stressor_')
+                            temp_file.write('\n'.join(temp_proxy_lines) + '\n')
+                            temp_file.close()
+                            temp_proxy_path = temp_file.name
+                            stresser_proxy_file = temp_proxy_path
+                            logger.info(f"Saved {len(temp_proxy_lines)} proxies to temp file: {temp_proxy_path}")
+                        except Exception as temp_err:
+                            logger.error(f"Failed to create temp proxy file: {temp_err}")
+
+                    # TA_Stresser expects absolute script path. We can place it at /usr/src/app/TA_Stresser.py in Docker.
+                    # Fix: script path to lowercase "stressor.py" to match file name and ensure Linux compatibility.
+                    script_path = os.path.join(settings.BASE_DIR, "reNgine", "stressor", "stressor.py")
+
+                    # Construct command depending on whether it is Layer 4 or Layer 7
+                    is_l7 = stresser_method in ["CFB", "BYPASS", "GET", "POST", "OVH", "STRESS", "SLOW", "HEAD", "COOKIE", "TOR"]
+                    
+                    if is_l7:
+                        # Format: [method] [url] [proxy_type] [threads] [proxy_file] [rpc] [duration] [debug_flag]
+                        cmd = [
+                            "python3", script_path,
+                            stresser_method,
+                            endpoint.http_url,
+                            stresser_proxy_type,
+                            stresser_threads,
+                            stresser_proxy_file if stresser_proxy_file else "none",
+                            stresser_rpc,
+                            stresser_duration,
+                            "debug"  # 9th argument enables debug logger (printing PPS/BPS output)
+                        ]
+                    else:
+                        # Format: [method] [target_host:port] [threads] [duration]
+                        target_host_port = f"{target_domain_name}:{tool_config.get('port', '80')}"
+                        if stresser_proxy_file:
+                            cmd = [
+                                "python3", script_path,
+                                stresser_method,
+                                target_host_port,
+                                stresser_threads,
+                                stresser_duration,
+                                stresser_proxy_type,
+                                stresser_proxy_file
+                            ]
+                        else:
+                            cmd = [
+                                "python3", script_path,
+                                stresser_method,
+                                target_host_port,
+                                stresser_threads,
+                                stresser_duration,
+                            ]
+
+                if not cmd:
+                    continue
+
+                cmd_str = ' '.join(cmd)
+
+                if proxy_wrapper.should_wrap():
+                    cmd_str, temp_conf_path = proxy_wrapper.wrap_command(cmd_str)
+                    logger.info(f"Wrapping execution via proxychains: {cmd_str}")
+                #elif single_proxy:
+                #    cmd_str = f"export HTTP_PROXY='{single_proxy}' HTTPS_PROXY='{single_proxy}' && {cmd_str}"
+                #    logger.info(f"Prepending single proxy environment: {cmd_str}")
+                else:
+                    logger.info(f"Executing {tool}: {cmd_str}")
+                
+                command_obj = Command.objects.create(
+                    command=cmd_str,
+                    time=timezone.now(),
+                    scan_history_id=scan_history_id
                 )
 
-                while True:
-                    line = process.stdout.readline()
-                    if not line and process.poll() is not None:
-                        break
+                publisher.publish({
+                    "type": "command",
+                    "tool": tool,
+                    "endpoint": endpoint.http_url,
+                    "command": cmd_str,
+                    "timestamp": time.time()
+                })
+
+                accumulated_lines = []
+                
+                try:
+                    process = subprocess.Popen(
+                        cmd_str, 
+                        stdout=subprocess.PIPE, 
+                        stderr=subprocess.STDOUT, 
+                        text=True,
+                        shell=True,
+                        start_new_session=True
+                    )
+
+                    while True:
+                        line = process.stdout.readline()
+                        if not line and process.poll() is not None:
+                            break
+                        
+                        if line:
+                            line = line.strip()
+                            accumulated_lines.append(line)
+
+                            publisher.publish({
+                                "type": "log",
+                                "tool": tool,
+                                "endpoint": endpoint.http_url,
+                                "line": line,
+                                "timestamp": time.time()
+                            })
+
+                            metrics = parser.parse_line(line)
+                            if metrics:
+                                metrics["type"] = "metric"
+                                metrics["tool"] = tool
+                                metrics["endpoint"] = endpoint.http_url
+                                metrics["timestamp"] = time.time()
+                                publisher.publish(metrics)
+
+                        if is_kill_switch_active(scan_history_id):
+                            import signal
+                            try:
+                                os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+                            except Exception as kill_err:
+                                logger.error(f"Failed to kill process group: {kill_err}")
+                            break
+
+                    process.wait()
                     
-                    if line:
-                        line = line.strip()
-                        # Parse metrics in real-time
-                        metrics = parser.parse_line(line)
-                        if metrics:
-                            # Add context to metrics
-                            metrics["tool"] = tool
-                            metrics["endpoint"] = endpoint.http_url
-                            metrics["timestamp"] = time.time()
-                            
-                            # Publish to Redis Stream
-                            publisher.publish(metrics)
+                    command_obj.output = "\n".join(accumulated_lines)
+                    command_obj.return_code = process.returncode
+                    command_obj.save()
 
-                    # Check kill switch during execution
-                    if is_kill_switch_active(scan_history_id):
-                        os.killpg(os.getpgid(process.pid), signal.SIGTERM)
-                        break
+                    # Extract final metrics from the parser after process completes and add them to totals
+                    if parser:
+                        final_metrics = parser.get_final_metrics()
+                        total_requests += final_metrics.get("total_requests", 0)
+                        successful_requests += final_metrics.get("successful_requests", 0)
+                        failed_requests += final_metrics.get("failed_requests", 0)
+                        
+                        if final_metrics.get("avg_latency_ms", 0.0) > 0:
+                            avg_latencies.append(final_metrics["avg_latency_ms"])
+                        if final_metrics.get("p95_latency_ms", 0.0) > 0:
+                            p95_latencies.append(final_metrics["p95_latency_ms"])
+                        if final_metrics.get("p99_latency_ms", 0.0) > 0:
+                            p99_latencies.append(final_metrics["p99_latency_ms"])
+                        if final_metrics.get("max_requests_per_second", 0.0) > 0:
+                            max_rps_values.append(final_metrics["max_requests_per_second"])
+                    
+                except Exception as e:
+                    logger.error(f"Execution of {tool} failed: {e}")
+                finally:
+                    if temp_conf_path and os.path.exists(temp_conf_path):
+                        try:
+                            os.remove(temp_conf_path)
+                        except Exception as rm_err:
+                            logger.error(f"Failed to remove temp config file: {rm_err}")
+                    if temp_proxy_path and os.path.exists(temp_proxy_path):
+                        try:
+                            os.remove(temp_proxy_path)
+                        except Exception as rm_err:
+                            logger.error(f"Failed to remove temp proxy file: {rm_err}")
+            
+            if task_aborted:
+                break
 
-                process.wait()
-                
-                # Final aggregation for this tool/endpoint can be done here
-                # For now, we rely on the summary stored at the end of the line loop
-                
-            except Exception as e:
-                logger.error(f"Execution of {tool} failed: {e}")
+        # Compute averages and maximums across all runs, then persist to the database model
+        overall_result.total_requests = total_requests
+        overall_result.successful_requests = successful_requests
+        overall_result.failed_requests = failed_requests
+        overall_result.avg_latency_ms = sum(avg_latencies) / len(avg_latencies) if avg_latencies else 0.0
+        overall_result.p95_latency_ms = sum(p95_latencies) / len(p95_latencies) if p95_latencies else 0.0
+        overall_result.p99_latency_ms = sum(p99_latencies) / len(p99_latencies) if p99_latencies else 0.0
+        overall_result.max_requests_per_second = max(max_rps_values) if max_rps_values else 0.0
+        overall_result.save()
 
-    neo4j.close()
+        neo4j.close()
 
-    # Final notification
-    from reNgine.tasks import send_scan_notif
-    send_scan_notif(
-        scan_history_id=scan_history_id,
-        status='COMPLETED'
-    )
+        # Update ScanHistory status
+        is_aborted = is_kill_switch_active(scan_history_id) or overall_result.is_kill_switch_triggered
+        if is_aborted:
+            scan.scan_status = ABORTED_TASK
+            status_notif = 'ABORTED'
+        else:
+            scan.scan_status = SUCCESS_TASK
+            status_notif = 'SUCCESS'
+            
+        scan.stop_scan_date = timezone.now()
+        scan.save()
 
-    return {"status": "success"}
+        # Final notification
+        from reNgine.tasks import send_scan_notif
+        send_scan_notif(
+            scan_history_id=scan_history_id,
+            status=status_notif
+        )
+
+        return {"status": "success"}
+
+    except Exception as exc:
+        logger.error(f"Stress test failed: {exc}")
+        try:
+            scan = ScanHistory.objects.get(id=scan_history_id)
+            scan.scan_status = FAILED_TASK
+            scan.stop_scan_date = timezone.now()
+            scan.save()
+            from reNgine.tasks import send_scan_notif
+            send_scan_notif(
+                scan_history_id=scan_history_id,
+                status='FAILED'
+            )
+        except Exception as db_err:
+            logger.error(f"Failed to update scan status: {db_err}")
+        raise exc
+
+    finally:
+        # Publish final completed status to telemetry
+        publisher.publish({
+            "type": "scan_status",
+            "status": "completed",
+            "timestamp": time.time()
+        })

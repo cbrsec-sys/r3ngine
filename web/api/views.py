@@ -95,8 +95,7 @@ class UpdateThemeView(APIView):
 
 class SOCSettingsViewSet(viewsets.ModelViewSet):
 	"""ViewSet for managing global SOC configuration."""
-	permission_classes = [IsAuthenticated, HasPermission]
-	required_permission = PERM_MODIFY_SCAN_CONFIGURATIONS
+	permission_classes = [IsAuditor]
 	serializer_class = SOCConfigurationSerializer
 	queryset = SOCConfiguration.objects.all()
 
@@ -480,22 +479,36 @@ class OllamaManager(APIView):
 
 
 class GPTAttackSuggestion(APIView):
+	"""API Endpoint to generate LLM-powered attack surface suggestions for a given subdomain.
+
+	Provides a structured security analysis and potential attack vectors based on target recon data.
+	"""
 	permission_classes = [IsPenetrationTester]
+	
 	def get(self, request):
+		"""Retrieve or trigger LLM generation of attack surface analysis for a subdomain.
+
+		Args:
+			request (Request): Django Rest Framework Request object.
+				Requires 'subdomain_id' in GET parameters.
+
+		Returns:
+			Response: JSON response with 'status', 'description', and 'subdomain_name' or error details.
+		"""
 		req = self.request
 		subdomain_id = req.query_params.get('subdomain_id')
 		if not subdomain_id:
 			return Response({
 				'status': False,
 				'error': 'Missing GET param Subdomain `subdomain_id`'
-			})
+			}, status=status.HTTP_400_BAD_REQUEST)
 		try:
 			subdomain = Subdomain.objects.get(id=subdomain_id)
 		except Exception as e:
 			return Response({
 				'status': False,
 				'error': 'Subdomain not found with id ' + subdomain_id
-			})
+			}, status=status.HTTP_404_NOT_FOUND)
 		if subdomain.attack_surface:
 			return Response({
 				'status': True,
@@ -528,22 +541,41 @@ class GPTAttackSuggestion(APIView):
 		if response.get('status'):
 			subdomain.attack_surface = response.get('description')
 			subdomain.save()
-		return Response(response)
+			return Response(response)
+		else:
+			return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class LLMVulnerabilityReportGenerator(APIView):
+	"""API Endpoint to generate detailed vulnerability reports using LLMs.
+
+	Triggers a Celery task that queries the LLM config and enrich descriptions/impacts/remediations.
+	"""
 	permission_classes = [IsPenetrationTester]
+	
 	def get(self, request):
+		"""Enrich vulnerability with LLM generated descriptions and mitigation options.
+
+		Args:
+			request (Request): Django Rest Framework Request object.
+				Requires vulnerability 'id' in GET parameters.
+
+		Returns:
+			Response: JSON response containing description, impact, remediation, and references.
+		"""
 		req = self.request
 		vulnerability_id = req.query_params.get('id')
 		if not vulnerability_id:
 			return Response({
 				'status': False,
 				'error': 'Missing GET param Vulnerability `id`'
-			})
+			}, status=status.HTTP_400_BAD_REQUEST)
 		task = llm_vulnerability_description.apply_async(args=(vulnerability_id,))
 		response = task.wait()
-		return Response(response)
+		if response and response.get('status'):
+			return Response(response)
+		else:
+			return Response(response, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 
@@ -1187,7 +1219,9 @@ class AddTarget(APIView):
 		starting_point_path = data.get('starting_point_path')
 		excluded_paths = data.get('excluded_paths', [])
 
-		# Support for multiple targets separated by newline
+		# Support for multiple targets separated by newline.
+		# The user wants to add multiple domains/IPs to a target when creating a new target.
+		# This should create them as a SINGLE entry with secondary domains and in-scope IPs grouped.
 		target_names = [t.strip().replace('*', '') for t in domain_name_input.split('\n') if t.strip()]
 		
 		# Clean up targets (remove leading dots)
@@ -1200,9 +1234,42 @@ class AddTarget(APIView):
 		if not cleaned_targets:
 			return Response({'status': False, 'message': 'No valid targets provided'}, status=status.HTTP_400_BAD_REQUEST)
 
-		targets_to_import = [{'name': name, 'description': description} for name in cleaned_targets]
+		# The first entry becomes the main target name
+		primary_target = cleaned_targets[0]
+		secondary_domains_list = []
+		in_scope_ips_list = []
 
-		status = bulk_import_targets(
+		# Loop through subsequent items and classify them as In-Scope IPs or Secondary Domains
+		# IP checks are done via simple validator logic or typical patterns (checking for digits, colons, CIDRs)
+		import ipaddress
+		for extra in cleaned_targets[1:]:
+			# Check if it's an IP, CIDR block, or IP range
+			is_ip_or_range = False
+			try:
+				# Check if CIDR or single IP
+				if '/' in extra:
+					ipaddress.ip_network(extra, strict=False)
+					is_ip_or_range = True
+				else:
+					ipaddress.ip_address(extra)
+					is_ip_or_range = True
+			except ValueError:
+				# Fallback regex check for standard IP/CIDR/range representations if parsing fails
+				if re.match(r'^[\d\.\:\/\-]+$', extra):
+					is_ip_or_range = True
+
+			if is_ip_or_range:
+				in_scope_ips_list.append(extra)
+			else:
+				secondary_domains_list.append(extra)
+
+		# Format manually parsed lists as newline-separated text strings
+		in_scope_ips_str = '\n'.join(in_scope_ips_list) if in_scope_ips_list else None
+		secondary_domains_str = '\n'.join(secondary_domains_list) if secondary_domains_list else None
+
+		targets_to_import = [{'name': primary_target, 'description': description}]
+
+		status_import = bulk_import_targets(
 			targets=targets_to_import,
 			organization_name=organization_name,
 			h1_team_handle=h1_team_handle,
@@ -1212,17 +1279,24 @@ class AddTarget(APIView):
 			monitor_engine_id=monitor_engine_id,
 			monitor_scan_scope=monitor_scan_scope,
 			starting_point_path=starting_point_path,
-			excluded_paths=excluded_paths
+			excluded_paths=excluded_paths,
+			in_scope_ips=in_scope_ips_str,
+			secondary_domains=secondary_domains_str
 		)
 
-		if status:
+		if status_import:
+			msg = f'Target {primary_target} successfully created as a single entry'
+			if secondary_domains_list or in_scope_ips_list:
+				msg += f' with {len(secondary_domains_list)} secondary domains and {len(in_scope_ips_list)} in-scope IPs.'
+			else:
+				msg += '.'
 			return Response({
 				'status': True,
-				'message': f'{len(cleaned_targets)} targets successfully processed!',
+				'message': msg,
 			})
 		return Response({
 			'status': False,
-			'message': 'Failed to add targets! They may already exist or are invalid.'
+			'message': 'Failed to add target! It may already exist or is invalid.'
 		})
 
 
@@ -1803,6 +1877,26 @@ class RengineUpdateCheck(APIView):
 			'redirect_link': 'https://github.com/whiterabb17/r3ngine/releases'
 		}
 
+		def safe_parse_version(v_str):
+			if not v_str:
+				return version.parse('0.0.0')
+			v_str = v_str.strip().lstrip('v')
+			try:
+				return version.parse(v_str)
+			except Exception:
+				# PEP 440 sanitization fallback
+				sanitized = v_str.replace('-beta.rc', 'b').replace('-rc', 'rc').replace('-beta', 'b').replace('-', '.')
+				try:
+					return version.parse(sanitized)
+				except Exception:
+					digits = re.findall(r'\d+', v_str)
+					if digits:
+						try:
+							return version.parse('.'.join(digits))
+						except Exception:
+							pass
+					return version.parse('0.0.0')
+
 		try:
 			response = requests.get(github_api).json()
 			if 'message' in response and 'rate limit' in response['message'].lower():
@@ -1825,7 +1919,7 @@ class RengineUpdateCheck(APIView):
 			if raw_version_response.status_code == 200:
 				raw_version = raw_version_response.text.strip().replace('v', '')
 				# If raw_version is higher than latest release or no release found
-				if not return_response['latest_version'] or version.parse(raw_version) > version.parse(return_response['latest_version']):
+				if not return_response['latest_version'] or safe_parse_version(raw_version) > safe_parse_version(return_response['latest_version']):
 					return_response['latest_version'] = raw_version
 					return_response['redirect_link'] = 'https://github.com/whiterabb17/r3ngine'
 					return_response['changelog'] = 'A new update is available in the repository. Please pull the latest changes from the main branch.'
@@ -1834,7 +1928,7 @@ class RengineUpdateCheck(APIView):
 			logger.error(f"Error fetching raw .version: {str(e)}")
 
 		if return_response['status'] and return_response['latest_version']:
-			is_version_update_available = version.parse(return_response['current_version']) < version.parse(return_response['latest_version'])
+			is_version_update_available = safe_parse_version(return_response['current_version']) < safe_parse_version(return_response['latest_version'])
 			return_response['update_available'] = is_version_update_available
 
 			if is_version_update_available:
@@ -1884,10 +1978,19 @@ class ProxySettingsAPIView(APIView):
 		proxy = Proxy.objects.first()
 		if not proxy:
 			proxy = Proxy.objects.create()
-		serializer = ProxySerializer(proxy, data=request.data, partial=True)
+		data = request.data.copy()
+		message = 'Proxies updated successfully'
+		if data.get('use_proxy') and data.get('proxies'):
+			from reNgine.common_func import validate_proxies
+			original_count = len([line for line in data['proxies'].splitlines() if line.strip()])
+			validated = validate_proxies(data['proxies'])
+			data['proxies'] = validated
+			saved_count = len([line for line in validated.splitlines() if line.strip()])
+			message = f'Proxies updated. Validated {saved_count}/{original_count} live proxies.'
+		serializer = ProxySerializer(proxy, data=data, partial=True)
 		if serializer.is_valid():
 			serializer.save()
-			return Response({'status': True, 'message': 'Proxies updated successfully'})
+			return Response({'status': True, 'message': message})
 		return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -1898,7 +2001,12 @@ class ProxyFetchAPIView(APIView):
 	def post(self, request):
 		try:
 			from reNgine.tasks import fetch_proxies_task
-			task = fetch_proxies_task.delay()
+			limit = request.data.get('limit', 1000)
+			try:
+				limit = int(limit)
+			except Exception:
+				limit = 1000
+			task = fetch_proxies_task.delay(limit=limit)
 			return Response({'status': True, 'task_id': task.id})
 		except Exception as e:
 			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -3798,10 +3906,9 @@ class ScreenshotViewSet(viewsets.ModelViewSet):
 from rest_framework.permissions import AllowAny
 
 class DirectoryViewSet(viewsets.ModelViewSet):
-	permission_classes = [IsAuthenticated, HasPermission]
+	permission_classes = [IsAuditor]
 
-
-	queryset = DirectoryFile.objects.none()
+	queryset = EndPoint.objects.none()
 	serializer_class = DirectoryFileSerializer
 
 	def get_queryset(self):
@@ -3810,20 +3917,16 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 		subdomain_id = req.query_params.get('subdomain_id')
 		
 		if not (scan_id or subdomain_id):
-			return DirectoryFile.objects.none()
+			return EndPoint.objects.none()
 
-		subdomains = Subdomain.objects.none()
-		if subdomain_id:
-			subdomains = Subdomain.objects.filter(id=subdomain_id)
-		elif scan_id:
-			subdomains = Subdomain.objects.filter(scan_history__id=scan_id)
+		queryset = EndPoint.objects.filter(scan_history__id=scan_id)
+		if subdomain_id and subdomain_id != '0':
+			queryset = queryset.filter(subdomain__id=subdomain_id)
 		
-		dirs_scans = DirectoryScan.objects.filter(directories__in=subdomains)
-		return (
-			DirectoryFile.objects
-			.filter(directory_files__in=dirs_scans)
-			.distinct()
-		)
+		return queryset.order_by('http_url')
+
+	def get_serializer_class(self):
+		return EndPointDirectorySerializer
 
 	def list(self, request, *args, **kwargs):
 		scan_id = self.request.query_params.get('scan_history')
@@ -3835,10 +3938,9 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 
 		# If subdomain_id is missing, return list of subdomains that have findings
 		if scan_id and not subdomain_id:
-
 			subdomains = Subdomain.objects.filter(
 				scan_history__id=scan_id,
-				directories__isnull=False
+				endpoint__isnull=False
 			).distinct()
 			
 			results = []
@@ -3846,7 +3948,7 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 				results.append({
 					'id': sd.id,
 					'name': sd.name,
-					'directory_count': DirectoryFile.objects.filter(directory_files__directories=sd).distinct().count()
+					'directory_count': EndPoint.objects.filter(scan_history__id=scan_id, subdomain=sd).count()
 				})
 			return Response({
 				'count': len(results),
@@ -3854,7 +3956,7 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 				'previous': None,
 				'results': results
 			})
-			
+		
 		return super().list(request, *args, **kwargs)
 
 
@@ -4202,9 +4304,9 @@ class NotificationSettingsAPIView(APIView):
 class MobileMediaServeView(APIView):
 	permission_classes = [AllowAny]
 	def get(self, request):
-		logger.warning(f"!!! MobileMediaServeView HIT !!! User authenticated: {request.user.is_authenticated}")
+		#logger.warning(f"!!! MobileMediaServeView HIT !!! User authenticated: {request.user.is_authenticated}")
 		path = request.query_params.get('path')
-		logger.warning(f"!!! Path requested: {path} !!!")
+		#logger.warning(f"!!! Path requested: {path} !!!")
 		if not path:
 			return Response({'error': 'Path is required'}, status=status.HTTP_400_BAD_REQUEST)
 		
@@ -4224,7 +4326,7 @@ class MobileMediaServeView(APIView):
 		path = path.lstrip('/')
 		file_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, path))
 		
-		logger.info(f"MobileMediaServeView: path={path}, file_path={file_path}, MEDIA_ROOT={settings.MEDIA_ROOT}")
+		#logger.info(f"MobileMediaServeView: path={path}, file_path={file_path}, MEDIA_ROOT={settings.MEDIA_ROOT}")
 		
 		# Security check
 		if not is_safe_path(settings.MEDIA_ROOT, file_path):
@@ -4236,7 +4338,7 @@ class MobileMediaServeView(APIView):
 				raise Http404("File not found")
 				
 			content_type, _ = mimetypes.guess_type(file_path)
-			logger.warning(f"!!! MobileMediaServeView: Returning file with content_type={content_type} !!!")
+			#logger.warning(f"!!! MobileMediaServeView: Returning file with content_type={content_type} !!!")
 			return FileResponse(open(file_path, 'rb'), content_type=content_type)
 		else:
 			logger.error(f"File not found: {file_path}")

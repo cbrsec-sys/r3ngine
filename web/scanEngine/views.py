@@ -367,13 +367,23 @@ def proxy_settings(request, slug):
             form = ProxyForm(request.POST or None)
 
         if form.is_valid():
-            form.save()
+            proxy_instance = form.save(commit=False)
+            if proxy_instance.use_proxy and proxy_instance.proxies:
+                from reNgine.common_func import validate_proxies
+                original_count = len([line for line in proxy_instance.proxies.splitlines() if line.strip()])
+                validated = validate_proxies(proxy_instance.proxies)
+                proxy_instance.proxies = validated
+                saved_count = len([line for line in validated.splitlines() if line.strip()])
+                message = f'Proxies updated. Validated {saved_count}/{original_count} live proxies.'
+            else:
+                message = 'Proxies updated.'
+            proxy_instance.save()
             if request.headers.get('Accept') == 'application/json':
-                return http.JsonResponse({'status': 'success', 'message': 'Proxies updated.'})
+                return http.JsonResponse({'status': 'success', 'message': message})
             messages.add_message(
                 request,
                 messages.INFO,
-                'Proxies updated.')
+                message)
             return http.HttpResponseRedirect(reverse('proxy_settings', kwargs={'slug': slug}))
         else:
             if request.headers.get('Accept') == 'application/json':
@@ -545,7 +555,16 @@ def report_settings(request, slug):
 def fetch_proxies(request, slug):
     if request.method == "POST":
         try:
-            task = fetch_proxies_task.delay()
+            limit = 1000
+            try:
+                import json
+                body = json.loads(request.body)
+                if 'limit' in body:
+                    limit = int(body['limit'])
+            except Exception:
+                if 'limit' in request.POST:
+                    limit = int(request.POST.get('limit'))
+            task = fetch_proxies_task.delay(limit=limit)
             return http.JsonResponse({'task_id': task.id})
         except Exception as e:
             return http.JsonResponse({'error': f"Celery error: {str(e)}"}, status=500)

@@ -157,6 +157,8 @@ class Domain(models.Model):
 	project = models.ForeignKey(Project, on_delete=models.CASCADE, null=True, blank=False)
 	starting_point_path = models.CharField(max_length=200, blank=True, null=True)
 	excluded_paths = models.JSONField(default=list, blank=True, null=True)
+	in_scope_ips = models.TextField(blank=True, null=True)
+	secondary_domains = models.TextField(blank=True, null=True)
 
 	def get_organization(self):
 		return Organization.objects.filter(domains__id=self.id)

@@ -536,6 +536,12 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, **
 		if target_domain:
 			vuln_data['target_domain'] = target_domain
 
+	# Ensure severity is an integer if passed as a string
+	severity = vuln_data.get('severity')
+	if isinstance(severity, str):
+		from reNgine.definitions import NUCLEI_SEVERITY_MAP
+		vuln_data['severity'] = NUCLEI_SEVERITY_MAP.get(severity.lower(), 2)  # default to Medium
+
 	references = vuln_data.pop('references', [])
 	cve_ids = vuln_data.pop('cve_ids', [])
 	cwe_ids = vuln_data.pop('cwe_ids', [])
@@ -683,29 +689,182 @@ def get_chaos_api_key():
 	return key_obj.key if key_obj else ''
 
 
+def check_proxy_robust(proxy_url, timeout=5):
+	"""Test if a proxy is truly working.
+	Avoids false positives from captive portals, ISP redirects, or proxy auth/block pages
+	by making a request to a public API returning a JSON payload with client IP.
+	
+	Args:
+		proxy_url (str): The proxy connection string (e.g., http://1.2.3.4:8080)
+		timeout (int): Timeout in seconds. Defaults to 5.
+		
+	Returns:
+		bool: True if proxy forwards traffic and responds successfully, False otherwise.
+	"""
+	try:
+		proxy_url = proxy_url.strip()
+		if not proxy_url:
+			return False
+		test_proxy = proxy_url
+		if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
+			test_proxy = 'http://' + test_proxy
+			
+		proxies = {
+			'http': test_proxy,
+			'https': test_proxy,
+		}
+		
+		# Try up to 2 different reliable JSON APIs to avoid single-point failure (e.g. rate limits)
+		check_targets = [
+			("https://api.ipify.org?format=json", "ip"),
+			("http://ip-api.com/json", "query")
+		]
+		
+		for url, expected_key in check_targets:
+			try:
+				response = requests.get(
+					url,
+					proxies=proxies,
+					headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"},
+					timeout=timeout,
+					allow_redirects=True
+				)
+				if response.status_code == 200:
+					# Verify response contains valid JSON with the expected key
+					data = response.json()
+					if expected_key in data:
+						return True
+			except Exception:
+				continue
+		return False
+	except Exception:
+		return False
+
+
+def validate_single_proxy(proxy_name):
+	"""Helper to validate a single proxy string.
+	Returns (proxy_name, True) if valid, otherwise (proxy_name, False).
+	"""
+	is_valid = check_proxy_robust(proxy_name, timeout=3)
+	return proxy_name, is_valid
+
+
+def validate_proxies(proxy_text):
+	"""Concurrently validate newline-separated proxy strings.
+	Returns a newline-separated string of validated live proxies.
+	"""
+	from concurrent.futures import ThreadPoolExecutor
+	if not proxy_text:
+		return ''
+	raw_proxies = [line.strip() for line in proxy_text.splitlines() if line.strip()]
+	if not raw_proxies:
+		return ''
+	valid_proxies = []
+	max_workers = min(50, len(raw_proxies))
+	with ThreadPoolExecutor(max_workers=max_workers) as executor:
+		results = executor.map(validate_single_proxy, raw_proxies)
+		for proxy_name, is_valid in results:
+			if is_valid:
+				valid_proxies.append(proxy_name)
+	return '\n'.join(valid_proxies)
+
+
+# Curated pool of modern desktop browser user agents for realistic request spoofing.
+# Rotated when OpSec random UA is enabled.
+_USER_AGENT_POOL = [
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0',
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15',
+	'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0',
+	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14.4; rv:125.0) Gecko/20100101 Firefox/125.0',
+	'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:125.0) Gecko/20100101 Firefox/125.0',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 OPR/110.0.0.0',
+	'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Vivaldi/6.7.3329.21',
+]
+
+# Fallback UA used when OpSec random UA is disabled.
+_DEFAULT_USER_AGENT = _USER_AGENT_POOL[0]
+
+
+def get_random_user_agent():
+	"""Return a user agent string respecting the OpSec random UA setting.
+
+	If OpSec is enabled and enable_random_ua is True, returns a randomly chosen
+	modern browser user agent from the curated pool. Otherwise returns the default
+	Chrome UA to avoid fingerprinting as a scanner.
+
+	Returns:
+		str: A User-Agent header value string.
+	"""
+	try:
+		from scanEngine.models import OpSec
+		opsec = OpSec.objects.first()
+		if opsec and opsec.enable_random_ua:
+			return random.choice(_USER_AGENT_POOL)
+	except Exception as e:
+		logger.warning(f'get_random_user_agent: could not read OpSec settings: {e}')
+	return _DEFAULT_USER_AGENT
+
+
 def get_random_proxy():
-	"""Get a random proxy from the list of proxies input by user in the UI.
+	"""Get a random proxy from the list of proxies input by user in the UI,
+	validating that it is alive and does not require authentication.
 
 	Returns:
 		str: Proxy name or '' if no proxy defined in db or use_proxy is False.
 	"""
+	# Check if any Proxy records exist in the database
 	if not Proxy.objects.all().exists():
 		return ''
+	
+	# Retrieve the global proxy configuration
 	proxy = Proxy.objects.first()
 	if not proxy.use_proxy:
 		return ''
 
+	# Parse and clean the newline-separated proxy lines
 	proxies = [p.strip() for p in proxy.proxies.splitlines() if p.strip()]
 	if not proxies:
 		return ''
 
+	# Shuffle the proxies to distribute traffic randomly
 	random.shuffle(proxies)
 
+	# Validate each proxy sequentially until we find a working, unauthenticated one.
+	# Limit checking to a maximum of 5 to prevent long sequential timeout loops (max 25s).
+	checked_count = 0
 	for proxy_name in proxies:
+		if checked_count >= 5:
+			logger.warning('Reached maximum sequential proxy validation limit (5). Stopping checks.')
+			break
+		checked_count += 1
 		try:
 			logger.info(f'Validating proxy: {proxy_name}')
-			# Use a short timeout to prevent blocking tasks for too long
-			requests.get('http://google.com', proxies={'http': proxy_name, 'https': proxy_name}, timeout=5)
+			test_proxy = proxy_name
+			if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
+				test_proxy = 'http://' + test_proxy
+			# Perform a request with a short timeout to check availability
+			response = requests.get(
+				'http://google.com', 
+				proxies={'http': test_proxy, 'https': test_proxy}, 
+				timeout=5, 
+				allow_redirects=True
+			)
+			
+			# Check specifically for HTTP Status 407 (Proxy Authentication Required)
+			if response.status_code == 407 or 'Proxy-Authenticate' in response.headers or 'proxy-authenticate' in response.headers:
+				raise Exception("Proxy Authentication Required (Status 407)")
+			
+			# Check if "Proxy Authentication Required" is in the response body or headers (fallback logic)
+			if "Proxy Authentication Required" in response.text or "Proxy Authentication Required" in str(response.headers):
+				raise Exception("Proxy Authentication Required returned in response text/headers")
+			
+			# Ensure the response indicates a successful HTTP status code (2xx or 3xx)
+			if not (200 <= response.status_code < 400):
+				raise Exception(f"Proxy returned invalid status code: {response.status_code}")
+				
 			logger.warning('Using valid proxy: ' + proxy_name)
 			return proxy_name
 		except Exception as e:

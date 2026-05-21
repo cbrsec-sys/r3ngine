@@ -20,13 +20,12 @@ def block_resources(route):
 
     route.continue_()
 
-def capture_url(url, scan_id, results_dir=None):
+def capture_url(browser, url, scan_id, results_dir=None):
     """
     Core capture engine (Synchronous).
     """
     if not results_dir:
         results_dir = settings.RENGINE_RESULTS
-    browser = browser_manager.get_browser()
     
     # Create unique context for this capture
     context = browser.new_context(
@@ -105,8 +104,6 @@ def capture_url(url, scan_id, results_dir=None):
     finally:
         page.close()
         context.close()
-        # Schedule idle shutdown after task finishes
-        browser_manager.schedule_idle_shutdown()
 
     return result
 
@@ -114,4 +111,4 @@ def run_capture(url, scan_id, results_dir=None):
     """Wrapper for Celery tasks (already sync now)."""
     if not results_dir:
         results_dir = settings.RENGINE_RESULTS
-    return capture_url(url, scan_id, results_dir)
+    return browser_manager.execute(capture_url, url, scan_id, results_dir=results_dir)

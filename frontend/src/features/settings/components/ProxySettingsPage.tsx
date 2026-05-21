@@ -12,7 +12,8 @@ import {
   Alert,
   Stack,
   Snackbar,
-  CircularProgress
+  CircularProgress,
+  Checkbox
 } from '@mui/material';
 import { 
   Settings, 
@@ -38,6 +39,8 @@ export const ProxySettingsPage: React.FC = () => {
   const [proxyList, setProxyList] = useState('');
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [fetchLimit, setFetchLimit] = useState<number | 'custom'>(1000);
+  const [customLimit, setCustomLimit] = useState<string>('2000');
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -101,6 +104,10 @@ export const ProxySettingsPage: React.FC = () => {
     });
   };
 
+  const handleLimitChange = (option: number | 'custom') => {
+    setFetchLimit(option);
+  };
+
   const handleFetchClick = () => {
     setIsConfirmOpen(true);
   };
@@ -112,7 +119,10 @@ export const ProxySettingsPage: React.FC = () => {
       message: 'Initiating proxy fetch task...',
       severity: 'success'
     });
-    fetchProxies.mutate(undefined, {
+    
+    const finalLimit = fetchLimit === 'custom' ? parseInt(customLimit, 10) || 1000 : fetchLimit;
+    
+    fetchProxies.mutate(finalLimit, {
       onSuccess: (data) => {
         setCurrentTaskId(data.task_id);
         setSnackbar({
@@ -217,6 +227,78 @@ export const ProxySettingsPage: React.FC = () => {
               />
             </Box>
             
+            <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(255, 255, 255, 0.02)', borderRadius: 1, border: '1px solid rgba(0, 243, 255, 0.1)' }}>
+              <Typography variant="subtitle2" sx={{ color: '#fff', fontFamily: 'Orbitron', mb: 1, fontWeight: 700 }}>
+                AUTOMATED PROXY FETCH LIMIT
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block', mb: 2 }}>
+                Select the maximum number of raw proxies to scrape and check for liveness.
+              </Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: 'flex-start' }}>
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={fetchLimit === 500}
+                      onChange={() => handleLimitChange(500)}
+                      sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
+                    />
+                  }
+                  label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.85rem' }}>500 Proxies</Typography>}
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={fetchLimit === 1000}
+                      onChange={() => handleLimitChange(1000)}
+                      sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
+                    />
+                  }
+                  label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.85rem' }}>1000 Proxies</Typography>}
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={fetchLimit === 5000}
+                      onChange={() => handleLimitChange(5000)}
+                      sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
+                    />
+                  }
+                  label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.85rem' }}>5000 Proxies</Typography>}
+                />
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={fetchLimit === 'custom'}
+                      onChange={() => handleLimitChange('custom')}
+                      sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
+                    />
+                  }
+                  label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.85rem' }}>Custom</Typography>}
+                />
+              </Stack>
+              {fetchLimit === 'custom' && (
+                <TextField
+                  type="number"
+                  label="Enter Proxy Count"
+                  value={customLimit}
+                  onChange={(e) => setCustomLimit(e.target.value)}
+                  size="small"
+                  sx={{
+                    mt: 2,
+                    width: 200,
+                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.8rem' },
+                    '& .MuiOutlinedInput-root': {
+                      color: '#fff',
+                      bgcolor: 'rgba(255,255,255,0.02)',
+                      '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                      '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
+                      '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+                    }
+                  }}
+                />
+              )}
+            </Box>
+
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mt: 3, mb: 1, fontWeight: 600 }}>
               PROXY LIST (ONE PER LINE)
             </Typography>
@@ -329,7 +411,7 @@ export const ProxySettingsPage: React.FC = () => {
       <ConfirmDialog
         open={isConfirmOpen}
         title="FETCH PROXIES"
-        message="This will initiate an automated task to fetch and verify new proxies. The existing list will be updated with the results. You will need to SAVE the settings once the task completes. Proceed?"
+        message={`This will initiate an automated task to fetch up to ${fetchLimit === 'custom' ? customLimit : fetchLimit} raw proxies and verify them. The existing list will be updated with the results. You will need to SAVE the settings once the task completes. Proceed?`}
         onConfirm={handleConfirmFetch}
         onClose={() => setIsConfirmOpen(false)}
         type="info"

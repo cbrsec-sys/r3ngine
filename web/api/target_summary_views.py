@@ -90,12 +90,24 @@ class TargetSummaryAPIView(APIView):
                 'historical_ips': list(di.historical_ips.all().values('ip', 'location', 'owner', 'last_seen'))[:10],
             }
 
-        # Related
+        # Related domains: include both automatically discovered related domains and manually specified secondary domains
         related_domains = []
         related_tlds = []
         if hasattr(target, 'domain_info') and target.domain_info:
             related_domains = list(target.domain_info.related_domains.all().values_list('name', flat=True)[:20])
             related_tlds = list(target.domain_info.related_tlds.all().values_list('name', flat=True)[:20])
+
+        if target.secondary_domains:
+            # Split manual secondary domains and clean empty values
+            manual_sec_domains = [d.strip() for d in target.secondary_domains.split('\n') if d.strip()]
+            for sec_d in manual_sec_domains:
+                if sec_d not in related_domains:
+                    related_domains.append(sec_d)
+
+        # Parse manual In-Scope IPs and CIDRs
+        in_scope_ips_list = []
+        if target.in_scope_ips:
+            in_scope_ips_list = [ip.strip() for ip in target.in_scope_ips.split('\n') if ip.strip()]
 
         # Monitoring
         monitoring_discoveries = MonitoringDiscovery.objects.filter(domain=target).order_by('-discovered_at')[:10]
@@ -146,7 +158,12 @@ class TargetSummaryAPIView(APIView):
             'discovered_ports': list(discovered_ports),
             'discovered_technologies': list(discovered_technologies),
             'project_info': {'name': project.name, 'slug': project.slug},
-            'target_info': {'name': target.name, 'id': target.id},
+            'target_info': {
+                'name': target.name,
+                'id': target.id,
+                'in_scope_ips': in_scope_ips_list,
+                'secondary_domains': manual_sec_domains if target.secondary_domains else []
+            },
             'domain_info': domain_info_data,
             'related_domains': related_domains,
             'related_tlds': related_tlds,
