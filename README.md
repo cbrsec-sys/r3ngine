@@ -9,13 +9,14 @@
   <h4 align="center"><strong>Phoenix: Fire from the Ashes even Stronger</strong></h4> 
   <h3 align="center">Official v3 Rebirth: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
 </p>
-
+<p align="center">
 <h3>New V3 Dashboard</h3>
+</p>
 <p align="center">
 <img src=".github/screenshots/r3ngine_dash.png" height="400px" width="520px" alt=""/>
 </p>
 
-<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.2.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
+<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.1.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=Xk_YH83IQgg" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--Asia-2023-blue.svg?logo=none" alt="" /></a>&nbsp;
@@ -35,9 +36,9 @@
 <a href="https://opensourcesecurityindex.io/" target="_blank" rel="noopener">
 <img style="width: 282px; height: 56px" src="https://opensourcesecurityindex.io/badge.svg" alt="Open Source Security Index - Fastest Growing Open Source Security Projects" width="282" height="56" /> </a>
 </p>
-<h4>r3ngine 3.0.0: The Phoenix Rebirth</h4>
+<h4>r3ngine 3.1.0: The Phoenix Rebirth</h4>
 <p>
-  r3ngine 3.0.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity - and for those a little less excentric there is a more toned-down theme as well. Also we have introduced <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
+  r3ngine 3.1.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity - and for those a little less excentric there is a more toned-down theme as well. Also we have introduced <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
 </p>
 
 <h4>Attack Path Modeling Engine<h4>
@@ -45,8 +46,8 @@
 <img src=".github/screenshots/apme.png" height="400px" width="520px" alt=""/>
 </p>
 
-<img src="https://img.shields.io/badge/r3ngine--mobile-1.0.0-orange.svg?logo=none" alt="r3ngine Mobile SOC" />
-<h5><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3ngine Mobile SOC</a>: Alpha Release Out Now</h5>
+<img src="https://img.shields.io/badge/r3ngine--mobile-1.2.0-orange.svg?logo=none" alt="r3ngine Mobile SOC" />
+<h5><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3ngine Mobile SOC</a>: Beta Release Out Now</h5>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
