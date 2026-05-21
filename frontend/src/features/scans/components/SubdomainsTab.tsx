@@ -906,7 +906,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             </Box>
           ) : attackSurfaceMutation.isError ? (
             <Alert severity="error" sx={{ bgcolor: 'rgba(255, 0, 60, 0.05)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)' }}>
-              Failed to generate attack surface. Ensure LLM is configured in settings.
+              {((attackSurfaceMutation.error as any)?.response?.data?.error) || (attackSurfaceMutation.error as any)?.message || "Failed to generate attack surface. Ensure LLM is configured in settings."}
+            </Alert>
+          ) : attackSurfaceMutation.data?.status === false ? (
+            <Alert severity="error" sx={{ bgcolor: 'rgba(255, 0, 60, 0.05)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)' }}>
+              {attackSurfaceMutation.data?.error || "Failed to generate attack surface. Ensure LLM is configured in settings."}
             </Alert>
           ) : (
             <Box sx={{

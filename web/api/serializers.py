@@ -329,7 +329,7 @@ class UserSerializer(serializers.ModelSerializer):
 		from rolepermissions.roles import get_user_roles
 		roles = get_user_roles(obj)
 		if roles:
-			return roles[0].role_name
+			return roles[0].get_name()
 		return 'penetration_tester'
 
 	def get_last_login_humanized(self, obj):
@@ -1019,6 +1019,31 @@ class DirectoryFileSerializer(serializers.ModelSerializer):
 		fields = '__all__'
 
 
+class EndPointDirectorySerializer(serializers.ModelSerializer):
+	url = serializers.CharField(source='http_url')
+	length = serializers.IntegerField(source='content_length', default=0)
+	lines = serializers.SerializerMethodField()
+	words = serializers.SerializerMethodField()
+	name = serializers.SerializerMethodField()
+	content_type = serializers.CharField(default='text/html')
+
+	class Meta:
+		model = EndPoint
+		fields = ['id', 'length', 'lines', 'http_status', 'words', 'name', 'url', 'content_type']
+
+	def get_lines(self, obj):
+		return 0
+
+	def get_words(self, obj):
+		return 0
+
+	def get_name(self, obj):
+		import base64
+		path = extract_path_from_url(obj.http_url) or '/'
+		return base64.b64encode(path.encode('utf-8')).decode('utf-8')
+
+
+
 class DirectoryScanSerializer(serializers.ModelSerializer):
 	scanned_date = serializers.SerializerMethodField()
 	formatted_date_for_id = serializers.SerializerMethodField()
@@ -1212,7 +1237,10 @@ class VulnerabilitySerializer(serializers.ModelSerializer):
 		scan_history_dict = {}
 		scan_history = vulnerability.scan_history
 		if scan_history:
-			scan_history_dict = model_to_dict(scan_history)
+			scan_history_dict = model_to_dict(
+				scan_history, 
+				exclude=['emails', 'employees', 'buckets', 'dorks']
+			)
 			scan_history_dict['domain'] = {
 				'name': scan_history.domain.name,
 			}

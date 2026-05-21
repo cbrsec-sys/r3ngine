@@ -276,9 +276,9 @@ def monitor_target_task(domain_id):
 			# Use CSV output for streaming. -r includes source data, -n strips newlines.
 			sf_cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {domain.name} -m {sf_modules} -q -o csv -r -n -c {sf_config_path}"
 			
-			proxy = get_random_proxy()
-			if proxy:
-				sf_cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {sf_cmd}"
+			#proxy = get_random_proxy()
+			#if proxy:
+			#	sf_cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {sf_cmd}"
 			
 			# Initialize stateful parser with Redis dedup
 			redis_client = Redis(host="redis", port=6379, decode_responses=True)

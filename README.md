@@ -9,13 +9,15 @@
   <h4 align="center"><strong>Phoenix: Fire from the Ashes even Stronger</strong></h4> 
   <h3 align="center">Official v3 Rebirth: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
 </p>
-
-<h3>New V3 Dashboard</h3>
 <p align="center">
-<img src=".github/screenshots/r3ngine_dash.png" height="400px" width="520px" alt=""/>
+  <h3>New V3 Dashboard</h3>
 </p>
 
-<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.2.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
+<p align="center">
+  <img src=".github/screenshots/r3ngine_dash.png" height="400px" width="520px" alt=""/>
+</p>
+
+<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.1.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=Xk_YH83IQgg" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--Asia-2023-blue.svg?logo=none" alt="" /></a>&nbsp;
@@ -35,9 +37,9 @@
 <a href="https://opensourcesecurityindex.io/" target="_blank" rel="noopener">
 <img style="width: 282px; height: 56px" src="https://opensourcesecurityindex.io/badge.svg" alt="Open Source Security Index - Fastest Growing Open Source Security Projects" width="282" height="56" /> </a>
 </p>
-<h4>r3ngine 3.0.0: The Phoenix Rebirth</h4>
+<h4>r3ngine 3.1.0: The Phoenix Rebirth</h4>
 <p>
-  r3ngine 3.0.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Human-in-the-Loop OSINT Staging</b>, and <b>Reinforced Security Discovery Stack</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
+  r3ngine 3.1.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity - and for those a little less excentric there is a more toned-down theme as well. Also we have introduced <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
 </p>
 
 <h4>Attack Path Modeling Engine<h4>
@@ -45,8 +47,8 @@
 <img src=".github/screenshots/apme.png" height="400px" width="520px" alt=""/>
 </p>
 
-<img src="https://img.shields.io/badge/r3ngine--mobile-1.0.0-orange.svg?logo=none" alt="r3ngine Mobile SOC" />
-<h6><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3ngine Mobile SOC</a>: COMING SOON</h6>
+<img src="https://img.shields.io/badge/r3ngine--mobile-1.2.0-orange.svg?logo=none" alt="r3ngine Mobile SOC" />
+<h5><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3ngine Mobile SOC</a>: Beta Release Out Now</h5>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -71,6 +73,7 @@ reNgine now features a high-performance stress testing suite, enabling users to 
 *   **Real-Time Telemetry Dashboard**: A premium monitoring interface featuring synchronized **ECharts** for Latency, RPS, and Throughput, powered by low-latency **Redis Streams** and **WebSockets**.
 *   **Scenario-Based Testing**: Support for headless Locust execution with dynamic scenario generation and aggregated stats parsing.
 *   **Infrastructure Safety**: Integrated safety guardrails and Redis-backed kill-switch mechanisms for instant termination of high-load tests.
+*   **Specialized Intelligence Reports**: High-fidelity PDF reports with performance-focused aesthetics (`stress_cyber_pro` and `stress_modern`). Includes LLM-powered bottleneck analysis, latency heatmaps, and success-rate stability charts.
 *   **Vulnerability Correlation Engine**: Unifies findings from **Nuclei, Semgrep, Gitleaks, Acunetix, and Retire.js** into a prioritized threat landscape.
 *   **Persistent Vulnerability State Tracking**: Automated lifecycle management that identifies vulnerabilities and their status over time.
 *   **Centralized Brute-Force Orchestration**: A multi-tiered authentication attack pipeline that supports **multi-service targeting (SSH, FTP, HTTP, SMB, RDP, Telnet)**. Centralizes targets from Nmap, Nuclei, and intelligent form extraction into a unified `AuthCandidate` queue, orchestrated via **Hydra** with full OpSec controls.
@@ -163,7 +166,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 
 ## Workflow
 
-<img src="https://github.com/whiterabb17/r3ngine/assets/17223002/10c475b8-b4a8-440d-9126-77fe2038a386">
+<img src=".github/workflows/workflows.png">
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -190,8 +193,8 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **Deep OSINT 2.0**: A modular, internal intelligence pipeline featuring automated email pivoting, social profile mapping, **gosearch** for social presence discovery, **username-anarchy** for tactical identity permutation, and a **Custom Playwright-driven Social Intelligence Engine** that mimics human behavior to discover corporate personnel while maintaining high OpSec.
 *   **ReconX 24/7 Monitoring**: Dedicated, domain-specific background monitoring engine for continuous asset tracking and automated findings ingestion.
 *   **Vulnerability Scanning**:
-    *   **Nuclei**: Specialized templates and rate-limited execution.
-    *   **Semgrep**: Automated static analysis for JS and GraphQL.
+    *   **Nuclei**: Specialized templates and intelligence-driven targeted scanning.
+    *   **Semgrep**: Automated static analysis for discovered endpoints (JS, PHP, Env, etc.) with automated rule synchronization (OWASP Top 10, Secrets).
     *   **WPScan**: Automated WordPress reconnaissance and vulnerability identification.
     *   **baddns**: Automated subdomain takeover detection with critical severity mapping.
     *   **betterleaks**: High-precision secret and leak identification in discovered assets.
@@ -229,26 +232,6 @@ The r3ngine v3 frontend is built with a "Safety-First" philosophy, enforcing str
 *   **Contract Integrity**: Frontend models are strictly mapped to the auto-generated OpenAPI schema (`src/types/api.ts`). We enforce `verbatimModuleSyntax` to optimize build-time tree shaking and ensure type-only imports are explicitly marked.
 *   **Modular Architecture**: Following a feature-based structure, each module (`targets`, `scans`, `vulnerabilities`) maintains its own API hooks and types, inheriting from the global contract while providing specialized UI adaptations.
 *   **Production Hardening**: Our CI/CD pipeline validates every commit against `tsc -b` and `vite build`. We prioritize type-safe UI components over loose `any` declarations, utilizing safe type guards and defensive casting for robust API integration.
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-<p align="center">
-  <h3>Enterprise Support</h3>
-</p>
-
-<p align="center">
-  <a href="https://hailbytes.com/hardened-ubuntu-rengine/" target="_blank">
-    <img src="https://hailbytes.com/wp-content/uploads/2020/04/HailBytes-Logo-2023-350-%C3%97-100-px.png" alt="HailBytes - Enterprise reNgine Support" height="60"/>
-  </a>
-</p>
-
-<p align="center">
-  Official enterprise-grade support, deployment, and maintenance services for reNgine are available through <a href="https://hailbytes.com">HailBytes</a>.
-</p>
-
-<p align="center">
-You can also find the deep dive video on how to use and install reNgine from here <a href="https://www.youtube.com/watch?v=C6BFBxLmZIA">reNgine Deep Dive by HailBytes</a>
-</p>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 

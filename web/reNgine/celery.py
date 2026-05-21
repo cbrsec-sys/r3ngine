@@ -5,12 +5,19 @@ from celery import Celery
 from celery.signals import setup_logging
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'reNgine.settings')
-django.setup()
 
 # Celery app
 app = Celery('reNgine')
 app.config_from_object('django.conf:settings', namespace='CELERY')
-app.autodiscover_tasks()
+
+# Only initialize Django and autodiscover tasks if we're running a Celery/Beat process
+# This prevents circular imports when manage.py or gunicorn imports reNgine.settings
+import sys
+from django.apps import apps
+if any(x in sys.argv[0] for x in ['celery', 'beat']):
+    if not apps.ready:
+        django.setup()
+    app.autodiscover_tasks()
 
 
 @setup_logging.connect()
@@ -68,6 +75,15 @@ def setup_startup_sync(sender, **kwargs):
             sync_cisa_kev_catalog.delay()
         else:
             startup_logger.debug(">>> [STARTUP] CISA KEV sync already triggered or lock active.")
+
+        # 3. Semgrep Rule Synchronization
+        semgrep_lock_key = "rengine:startup_semgrep_sync_lock"
+        if r.set(semgrep_lock_key, "locked", nx=True, ex=3600):
+            startup_logger.info(">>> [STARTUP] Triggering Semgrep rule synchronization...")
+            from reNgine.tasks import sync_semgrep_rules
+            sync_semgrep_rules.delay()
+        else:
+            startup_logger.debug(">>> [STARTUP] Semgrep rule sync already triggered or lock active.")
             
     except Exception as e:
         # Avoid crashing startup if Redis or task dispatch fails

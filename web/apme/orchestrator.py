@@ -250,25 +250,47 @@ class APMEOrchestrator:
                 # Try to link to the most impactful vulnerability in the path
                 vuln = self._find_representative_vuln(path, scan_history_id)
 
-                ImpactAssessment.objects.update_or_create(
-                    scan_history=scan_history,
-                    vulnerability=vuln,
-                    potential_attack_chain__apme_path_id=path.id,
-                    defaults={
-                        "simulated_path": path_dict,
-                        "potential_attack_chain": {
-                            "apme_path_id": path.id,
-                            "risk": path.risk,
-                            "score": path.score,
-                            "steps": [s.to_dict() for s in path.steps],
-                            "narrative": narrative,
-                            "metadata": self._build_path_metadata(path, node_index),
+                if vuln:
+                    # Update or create by vulnerability since vulnerability_id must be unique
+                    ImpactAssessment.objects.update_or_create(
+                        vulnerability=vuln,
+                        defaults={
+                            "scan_history": scan_history,
+                            "simulated_path": path_dict,
+                            "potential_attack_chain": {
+                                "apme_path_id": path.id,
+                                "risk": path.risk,
+                                "score": path.score,
+                                "steps": [s.to_dict() for s in path.steps],
+                                "narrative": narrative,
+                                "metadata": self._build_path_metadata(path, node_index),
+                            },
+                            "potential_impact": narrative,
+                            "remediation_priority": self._risk_to_priority(path.risk),
+                            "is_ai_generated": False,
                         },
-                        "potential_impact": narrative,
-                        "remediation_priority": self._risk_to_priority(path.risk),
-                        "is_ai_generated": False,
-                    },
-                )
+                    )
+                else:
+                    # Vulnerability is None, unique constraint doesn't apply, lookup by path ID
+                    ImpactAssessment.objects.update_or_create(
+                        scan_history=scan_history,
+                        vulnerability=None,
+                        potential_attack_chain__apme_path_id=path.id,
+                        defaults={
+                            "simulated_path": path_dict,
+                            "potential_attack_chain": {
+                                "apme_path_id": path.id,
+                                "risk": path.risk,
+                                "score": path.score,
+                                "steps": [s.to_dict() for s in path.steps],
+                                "narrative": narrative,
+                                "metadata": self._build_path_metadata(path, node_index),
+                            },
+                            "potential_impact": narrative,
+                            "remediation_priority": self._risk_to_priority(path.risk),
+                            "is_ai_generated": False,
+                        },
+                    )
                 logger.debug(f"APME: Persisted path {path.id} with narrative.")
 
         except Exception as exc:

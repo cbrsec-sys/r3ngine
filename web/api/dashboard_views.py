@@ -106,7 +106,7 @@ class DashboardAPIView(APIView):
                 low_count=Count('scanhistory__vulnerability', filter=Q(scanhistory__vulnerability__severity=1)),
                 info_count=Count('scanhistory__vulnerability', filter=Q(scanhistory__vulnerability__severity=0)),
                 unknown_count=Count('scanhistory__vulnerability', filter=Q(scanhistory__vulnerability__severity=-1)),
-            ).order_by('-vuln_count')[:7].values('name', 'vuln_count', 'critical_count', 'high_count', 'medium_count', 'low_count', 'info_count', 'unknown_count'),
+            ).order_by('-vuln_count')[:7].values('id', 'name', 'vuln_count', 'critical_count', 'high_count', 'medium_count', 'low_count', 'info_count', 'unknown_count'),
             'most_common_vulnerabilities': vulnerabilities.values('name', 'severity').annotate(count=Count('id')).order_by('-count')[:7],
             'activity_feed': ScanActivitySerializer(ScanActivity.objects.filter(scan_of__domain__project=project).order_by('-time')[:10], many=True).data,
             'vulnerability_feed': VulnerabilitySerializer(vulnerabilities.order_by('-discovered_date')[:10], many=True).data,

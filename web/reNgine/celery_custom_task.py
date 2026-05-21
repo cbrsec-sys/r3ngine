@@ -105,12 +105,15 @@ class RengineTask(Task):
 				dependent_tasks = {
 					'dalfox_xss_scan': 'vulnerability_scan',
 					'crlfuzz': 'vulnerability_scan',
+					'crlfuzz_scan': 'vulnerability_scan',
 					'nuclei_scan': 'vulnerability_scan',
 					'nuclei_individual_severity_module': 'vulnerability_scan',
 					's3scanner': 'vulnerability_scan',
 					'cpanel_scan': 'vulnerability_scan',
 					'wpscan_scan': 'vulnerability_scan',
 					'acunetix_scan': 'vulnerability_scan',
+					'react2shell_scan': 'vulnerability_scan',
+					'semgrep_scan': 'vulnerability_scan',
 					'stress_testing': 'stress_test',
 				}
 				# Tasks that are post-processing and don't require engine validation
@@ -136,7 +139,8 @@ class RengineTask(Task):
 					self.update_scan_activity()
 				return json.loads(result)
 
-		from celery.exceptions import Ignore
+		from celery.exceptions import Ignore, Retry
+		self.is_retrying = False
 		# Execute task, catch exceptions and update ScanActivity object after
 		# task has finished running.
 		try:
@@ -146,6 +150,10 @@ class RengineTask(Task):
 		except Ignore as exc:
 			# If the task is replaced, it's not a failure
 			self.status = SUCCESS_TASK
+			raise exc
+
+		except Retry as exc:
+			self.is_retrying = True
 			raise exc
 
 		except Exception as exc:
@@ -160,19 +168,31 @@ class RengineTask(Task):
 				self.subscan_id)
 			os.makedirs(os.path.dirname(self.output_path), exist_ok=True)
 
-			if RENGINE_RAISE_ON_ERROR:
+			# Vulnerability scan tasks and their sub-tasks should never raise exceptions
+			# to Celery, to prevent breaking chords or failing the rest of the scan engine.
+			is_vulnerability_scan_task = (
+				self.task_name == 'vulnerability_scan' or
+				self.task_name in {
+					'nuclei_scan', 'nuclei_individual_severity_module', 'acunetix_scan',
+					'crlfuzz_scan', 'crlfuzz', 'dalfox_xss_scan', 's3scanner',
+					'cpanel_scan', 'wpscan_scan', 'react2shell_scan', 'semgrep_scan'
+				}
+			)
+
+			if RENGINE_RAISE_ON_ERROR and not is_vulnerability_scan_task:
 				raise exc
 
 			logger.exception(exc)
 
 		finally:
-			self.write_results()
+			if not self.is_retrying:
+				self.write_results()
 
-			if RENGINE_RECORD_ENABLED and self.track:
-				msg = f'Task {self.task_name} status is {self.status_str}'
-				msg += f' | Error: {self.error}' if self.error else ''
-				logger.warning(msg)
-				self.update_scan_activity()
+				if RENGINE_RECORD_ENABLED and self.track:
+					msg = f'Task {self.task_name} status is {self.status_str}'
+					msg += f' | Error: {self.error}' if self.error else ''
+					logger.warning(msg)
+					self.update_scan_activity()
 
 		# Set task result in cache if task was successful
 		if RENGINE_CACHE_ENABLED and self.status == SUCCESS_TASK and result:
@@ -196,32 +216,54 @@ class RengineTask(Task):
 			logger.warning(f'Wrote {self.task_name} results to {self.output_path}')
 
 	def create_scan_activity(self):
+		"""Create or update a ScanActivity record in the database for task execution tracking.
+		
+		Avoids duplicate records on task retries by checking for existing celery_id.
+		"""
 		if not self.track:
 			return
 		from startScan.models import ScanActivity
 		celery_id = self.request.id
-		self.activity = ScanActivity(
-			name=self.task_name,
-			title=self.description,
-			time=timezone.now(),
-			status=RUNNING_TASK,
-			celery_id=celery_id)
-		self.activity.save()
-		self.activity_id = self.activity.id
-		if self.scan:
-			self.activity.scan_of = self.scan
+		try:
+			# Check if activity already exists for this task execution (e.g. on retry)
+			if celery_id:
+				existing_activity = ScanActivity.objects.filter(celery_id=celery_id).first()
+				if existing_activity:
+					self.activity = existing_activity
+					self.activity.status = RUNNING_TASK
+					self.activity.time = timezone.now()
+					self.activity.save()
+					self.activity_id = self.activity.id
+					return
+
+			self.activity = ScanActivity(
+				name=self.task_name,
+				title=self.description,
+				time=timezone.now(),
+				status=RUNNING_TASK,
+				celery_id=celery_id)
 			self.activity.save()
-			self.scan.celery_ids.append(celery_id)
-			self.scan.save()
-		if self.subscan:
-			self.subscan.celery_ids.append(celery_id)
-			self.subscan.save()
+			self.activity_id = self.activity.id
+			if self.scan:
+				self.activity.scan_of = self.scan
+				self.activity.save()
+				if celery_id and celery_id not in self.scan.celery_ids:
+					self.scan.celery_ids.append(celery_id)
+					self.scan.save()
+			if self.subscan:
+				if celery_id and celery_id not in self.subscan.celery_ids:
+					self.subscan.celery_ids.append(celery_id)
+					self.subscan.save()
+		except Exception as e:
+			logger.warning(f"Could not create ScanActivity record in DB (scan may have been deleted/rolled back): {e}")
+			self.activity = None
+			self.activity_id = None
 
 		# Send notification
 		self.notify()
 
 	def update_scan_activity(self):
-		if not self.track:
+		if not self.track or not getattr(self, 'activity', None):
 			return
 
 		# Trim error before saving to DB
@@ -229,11 +271,14 @@ class RengineTask(Task):
 		if self.error and len(self.error) > 300:
 			error_message = self.error[:288] + '...[trimmed]'
 
-		self.activity.status = self.status
-		self.activity.error_message = error_message
-		self.activity.traceback = self.traceback
-		self.activity.time = timezone.now()
-		self.activity.save()
+		try:
+			self.activity.status = self.status
+			self.activity.error_message = error_message
+			self.activity.traceback = self.traceback
+			self.activity.time = timezone.now()
+			self.activity.save()
+		except Exception as e:
+			logger.warning(f"Could not update ScanActivity record in DB: {e}")
 
 		# # Update scan status if task failed
 		# if self.status == FAILED_TASK:

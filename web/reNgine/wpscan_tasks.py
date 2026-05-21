@@ -77,9 +77,10 @@ def save_finding(task_instance, finding, subdomain, default_title):
             else:
                 ref_urls.append(str(ref_list))
 
+    severity_num = NUCLEI_SEVERITY_MAP.get(severity, 2)
     vuln_data = {
         'name': title,
-        'severity': severity,
+        'severity': severity_num,
         'description': description,
         'type': 'WordPress',
         'references': ref_urls,
@@ -122,7 +123,9 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
 
     # Determine targets
     targets = []
-    if urls:
+    if self.subscan and self.subdomain:
+        targets.append((f"https://{self.subdomain.name}/", self.subdomain))
+    elif urls:
         # Targeted scan on specific URLs
         for url in urls:
             subdomain_name = get_subdomain_from_url(url)
@@ -157,7 +160,9 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
             cmd += f" --proxy {proxy}"
         if api_key:
             cmd += f" --api-token {api_key}"
-            
+        
+        logger.info(f"Running WPScan for {target_url}")
+        logger.warning(f"Full WPScan command: {cmd}")
         # Execute tool — stream_command is a generator; must be consumed to run the subprocess.
         for _ in stream_command(cmd, scan_id=self.scan_id, activity_id=self.activity_id):
             pass

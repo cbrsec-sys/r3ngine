@@ -42,7 +42,7 @@ services:
     command: celery -A reNgine worker --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l WARNING
     volumes:
       - ./web:/usr/src/app
-      - ./frontend:/usr/src/app/frontend
+      #- ./frontend:/usr/src/app/frontend
       - github_repos:/usr/src/github
       - wordlist:/usr/src/wordlist
       - scan_results:/usr/src/scan_results
@@ -50,7 +50,7 @@ services:
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
-      - plugins_data:/usr/src/app/plugins_data
+      #- plugins_data:/usr/src/app/plugins_data
     environment:
       - DEBUG=0
       - CELERY_BROKER=redis://redis:6379/0
@@ -71,9 +71,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
+          memory: 8G
         reservations:
-          memory: 2G
+          memory: 4G
 
   celery-beat:
     build:
@@ -101,9 +101,15 @@ services:
       - gf_patterns:/root/.gf
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
-      - plugins_data:/usr/src/app/plugins_data
+      #- plugins_data:/usr/src/app/plugins_data
     networks:
       - r3ngine_network
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
       
   web:
     build:
@@ -125,8 +131,8 @@ services:
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
     volumes:
       - ./web:/usr/src/app
-      - ./frontend:/usr/src/app/frontend
-      - /usr/src/app/frontend/node_modules
+      #- ./frontend:/usr/src/app/frontend
+      #- /usr/src/app/frontend/node_modules
       - github_repos:/usr/src/github
       - wordlist:/usr/src/wordlist
       - scan_results:/usr/src/scan_results
@@ -134,7 +140,7 @@ services:
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
-      - plugins_data:/usr/src/app/plugins_data
+      #- plugins_data:/usr/src/app/plugins_data
     ports:
       - "8000:8000"
       - "5173:5173"
@@ -184,21 +190,21 @@ services:
         reservations:
           memory: 256M
 
-  ollama:
-    image: ollama/ollama
-    container_name: ollama
-    volumes:
-      - ollama_data:/root/.ollama
-    ports:
-      - "11434:11434"
-    networks:
-      - r3ngine_network
-    deploy:
-      resources:
-        limits:
-          memory: 4G
-        reservations:
-          memory: 2G
+  # ollama:
+  #   image: ollama/ollama
+  #   container_name: ollama
+  #   volumes:
+  #     - ollama_data:/root/.ollama
+  #   ports:
+  #     - "11434:11434"
+  #   networks:
+  #     - r3ngine_network
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 4G
+  #       reservations:
+  #         memory: 2G
 
   neo4j:
     image: neo4j:5.12.0
@@ -226,6 +232,7 @@ networks:
 volumes:
   tool_config:
     name: r3ngine_tool_config
+    
   postgres_data:
     name: r3ngine_postgres_data
   gf_patterns:

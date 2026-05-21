@@ -43,6 +43,8 @@ def sanitize_command_for_db(cmd):
     """
     if not cmd:
         return cmd
+    if isinstance(cmd, str):
+        cmd = cmd.replace('\x00', '')
     # Strip export statements (matches both single and double quotes)
     cmd = re.sub(r'^export\s+.*?\s+&&\s+', '', cmd)
     # Strip proxychains4 wrapper with its config file
@@ -83,13 +85,19 @@ def run_command(
             cmd, conf_path = proxy_manager.wrap_command(cmd, proxy=proxy)
 
     # Create a command record in the database
-    command_obj = Command.objects.create(
-        command=sanitize_command_for_db(cmd),
-        time=timezone.now(),
-        scan_history_id=scan_id,
-        activity_id=activity_id)
+    from django.db import IntegrityError
+    try:
+        command_obj = Command.objects.create(
+            command=sanitize_command_for_db(cmd),
+            time=timezone.now(),
+            scan_history_id=scan_id,
+            activity_id=activity_id)
+    except IntegrityError as e:
+        logger.warning(f"Could not create Command object in DB (scan or activity may have been deleted/rolled back): {e}")
+        command_obj = None
 
     # Run the command using subprocess
+    popen = None
     try:
         popen = subprocess.Popen(
             cmd if shell else cmd.split(),
@@ -109,21 +117,49 @@ def run_command(
         except subprocess.TimeoutExpired:
             popen.kill()
             return_code = 124 # Timeout
-            output += "\nCommand timed out after 30 seconds."
+            output += "\nCommand timed out."
         else:
             return_code = popen.returncode
     except Exception as e:
         logger.error(f"Error executing command {cmd}: {str(e)}")
         output = f"Error executing command: {str(e)}"
         return_code = 127 # Command not found / error
+    except BaseException as e:
+        logger.error(f"BaseException raised during command execution: {str(e)}")
+        if popen:
+            try:
+                popen.kill()
+            except Exception:
+                pass
+        raise
     finally:
+        if popen:
+            try:
+                if popen.stdout:
+                    popen.stdout.close()
+            except Exception:
+                pass
+            try:
+                if popen.poll() is None:
+                    popen.terminate()
+                    try:
+                        popen.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        popen.kill()
+                else:
+                    popen.wait()
+            except Exception as ex:
+                logger.error(f"Error reaping process in run_command: {ex}")
         if conf_path and os.path.exists(conf_path):
             os.remove(conf_path)
 
-    logger.warning(f"Command {command_obj.id} finished with return code {return_code}")
-    command_obj.output = output
-    command_obj.return_code = return_code
-    command_obj.save()
+    if command_obj:
+        logger.warning(f"Command {command_obj.id} finished with return code {return_code}")
+        command_obj.output = output.replace('\x00', '')
+        command_obj.return_code = return_code
+        command_obj.save()
+    else:
+        logger.warning(f"Command finished with return code {return_code} (no database record saved)")
 
     if history_file:
         mode = 'a'
@@ -304,7 +340,8 @@ def stream_command(
 		scan_id=None, 
 		activity_id=None, 
 		trunc_char=None,
-		proxy=None
+		proxy=None,
+		timeout=3600
 	):
 	"""Run a command and yield output line by line.
 
@@ -318,6 +355,7 @@ def stream_command(
 		activity_id (int): Activity ID.
 		trunc_char (str): Character used to truncate the output line.
 		proxy (str): If provided, may be used for proxychains wrapping.
+		timeout (int): Overall execution timeout in seconds.
 	Yields:
 		str/dict: Output line.
 	"""
@@ -348,6 +386,26 @@ def stream_command(
 		universal_newlines=True,
 		shell=shell)
 
+	# Start a watchdog thread to terminate the command if it runs too long
+	import threading
+	import time
+
+	def watchdog(proc, limit_sec):
+		time.sleep(limit_sec)
+		if proc.poll() is None:
+			logger.error(f"Watchdog: Command timed out after {limit_sec} seconds. Killing process: {cmd}")
+			try:
+				proc.kill()
+			except Exception as ex:
+				logger.error(f"Watchdog: Failed to kill process: {ex}")
+
+	watchdog_thread = threading.Thread(
+		target=watchdog,
+		args=(process, timeout),
+		daemon=True
+	)
+	watchdog_thread.start()
+
 	# Log the output in real-time to the database
 	output = ""
 
@@ -357,6 +415,7 @@ def stream_command(
 		for line in iter(lambda: process.stdout.readline(), ''):
 			if not line:
 				break
+			line = line.replace('\x00', '')
 			line = line.strip()
 			ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
 			line = ansi_escape.sub('', line)
@@ -408,18 +467,227 @@ def stream_command(
 			output += '\n' + line
 			line_count += 1
 			if line_count % 10 == 0:
-				command_obj.output = output
+				command_obj.output = output.replace('\x00', '')
 				command_obj.save()
 
 		process.wait()
-		command_obj.output = output
+		command_obj.output = output.replace('\x00', '')
 		command_obj.return_code = process.returncode
 		command_obj.save()
 
-	except Exception as e:
-		logger.error(f"Error in stream_command: {str(e)}")
+	except BaseException as e:
+		if not isinstance(e, GeneratorExit):
+			logger.error(f"Error in stream_command: {str(e)}")
 		if process:
-			process.kill()
+			try:
+				process.kill()
+			except Exception:
+				pass
+		raise
 	finally:
+		if process:
+			if process.stdout:
+				try:
+					process.stdout.close()
+				except Exception:
+					pass
+			try:
+				if process.poll() is None:
+					process.terminate()
+					try:
+						process.wait(timeout=5)
+					except subprocess.TimeoutExpired:
+						process.kill()
+				else:
+					process.wait()
+			except Exception as ex:
+				logger.error(f"Error reaping process in stream_command: {ex}")
 		if conf_path and os.path.exists(conf_path):
 			os.remove(conf_path)
+
+
+def ensure_endpoints_crawled_and_execute(task_function, ctx, description=None, max_wait_time=300):
+	"""
+	Ensure endpoints are crawled before executing a task that needs alive endpoints.
+	
+	Args:
+		task_function: The task function to execute
+		ctx: Task context
+		description: Task description
+		max_wait_time: Maximum time to wait for endpoints (seconds)
+		
+	Returns:
+		Task result or None if no alive endpoints available
+	"""
+	from copy import deepcopy
+	import time
+	from reNgine.common_func import get_http_urls
+	
+	logger.info(f'Ensuring endpoints are crawled for {task_function.__name__}')
+
+	if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
+		logger.info(f'Found {len(alive_endpoints)} alive endpoints, executing {task_function.__name__}')
+		return task_function(ctx=ctx, description=description)
+
+	# No alive endpoints found, check if we have uncrawled endpoints
+	uncrawled_endpoints = get_http_urls(is_uncrawled=True, ctx=ctx)
+
+	if not uncrawled_endpoints:
+		logger.warning(f'No endpoints found for {task_function.__name__}, skipping task')
+		return None
+
+	logger.info(f'Found {len(uncrawled_endpoints)} uncrawled endpoints, launching HTTP crawl first')
+
+	# Launch http_crawl synchronously for the specific endpoints we need
+	from reNgine.tasks import http_crawl
+	custom_ctx = deepcopy(ctx)
+	custom_ctx['track'] = False  # Don't track this internal crawl
+
+	# Execute http_crawl and wait for completion (but with timeout)
+	http_crawl_task = http_crawl.delay(
+		urls=uncrawled_endpoints[:50],  # Limit to avoid overwhelming
+		ctx=custom_ctx
+	)
+
+	# Wait for crawl completion with timeout
+	wait_time = 0
+	check_interval = 10  # Check every 10 seconds
+
+	while wait_time < max_wait_time:
+		time.sleep(check_interval)
+		wait_time += check_interval
+
+		if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
+			logger.info(f'HTTP crawl completed, found {len(alive_endpoints)} alive endpoints')
+			return task_function(ctx=ctx, description=description)
+
+		# Check if crawl task is done
+		if http_crawl_task.ready():
+			break
+
+	if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
+		logger.info(f'Found {len(alive_endpoints)} alive endpoints after wait period')
+		return task_function(ctx=ctx, description=description)
+	else:
+		logger.warning(f'No alive endpoints found after {wait_time}s wait, skipping {task_function.__name__}')
+		return None
+
+
+def save_fuzzing_file(name, url, http_status, length=0, words=0, lines=0, content_type=None):
+	"""
+	Save or retrieve DirectoryFile safely handling database concurrency/race conditions.
+	"""
+	from startScan.models import DirectoryFile
+	from django.db import IntegrityError
+	import time
+
+	# Try/except block with retries to handle database concurrency/race conditions
+	for attempt in range(3):
+		try:
+			dfile, created = DirectoryFile.objects.get_or_create(
+				name=name,
+				url=url,
+				http_status=http_status,
+				defaults={
+					'length': length,
+					'words': words,
+					'lines': lines,
+					'content_type': content_type or ''
+				}
+			)
+			return dfile, created
+		except IntegrityError:
+			if attempt < 2:
+				time.sleep(0.1 * (attempt + 1))
+			continue
+
+	# Final attempt
+	return DirectoryFile.objects.get_or_create(
+		name=name,
+		url=url,
+		http_status=http_status,
+		defaults={
+			'length': length,
+			'words': words,
+			'lines': lines,
+			'content_type': content_type or ''
+		}
+	)
+
+
+def parse_custom_header_to_list(custom_header):
+	"""
+	Convert dictionary, comma-separated string, or list of headers to flat list of header strings.
+	"""
+	if not custom_header:
+		return []
+	if isinstance(custom_header, list):
+		return custom_header
+	if isinstance(custom_header, dict):
+		return [f"{k}: {v}" for k, v in custom_header.items()]
+	if isinstance(custom_header, str):
+		res = []
+		for h in custom_header.split(','):
+			h = h.strip()
+			if h:
+				res.append(h)
+		return res
+	return []
+
+
+def is_iterable(variable):
+	try:
+		iter(variable)
+		return not isinstance(variable, (str, bytes))
+	except TypeError:
+		return False
+
+
+def save_subdomain_metadata(subdomain, endpoint, extra_datas=None):
+	"""Save metadata from endpoint to subdomain.
+
+	Args:
+		subdomain: Subdomain object
+		endpoint: EndPoint object
+		extra_datas: Additional metadata to save
+	"""
+	if extra_datas is None:
+		extra_datas = {}
+	if endpoint and endpoint.is_alive:
+		logger.info(f'Saving HTTP metadatas from {endpoint.http_url}')
+		subdomain.http_url = endpoint.http_url
+		subdomain.http_status = endpoint.http_status
+		subdomain.response_time = endpoint.response_time
+		subdomain.page_title = endpoint.page_title
+		subdomain.content_type = endpoint.content_type
+		subdomain.content_length = endpoint.content_length
+		subdomain.webserver = endpoint.webserver
+
+		cname = extra_datas.get('cname')
+		if cname and is_iterable(cname):
+			subdomain.cname = ','.join(cname)
+		elif isinstance(cname, str):
+			subdomain.cname = cname
+
+		is_cdn = extra_datas.get('is_cdn', False)
+		if isinstance(is_cdn, bool):
+			subdomain.is_cdn = is_cdn
+		else:
+			cdn = extra_datas.get('cdn')
+			if cdn:
+				subdomain.is_cdn = True
+
+		cdn_name = extra_datas.get('cdn_name')
+		if cdn_name:
+			subdomain.cdn_name = cdn_name
+
+		for tech in endpoint.techs.all():
+			subdomain.technologies.add(tech)
+		subdomain.save()
+	elif http_url := extra_datas.get('http_url'):
+		subdomain.http_url = http_url
+		subdomain.save()
+	else:
+		logger.error(f'No HTTP URL found for {subdomain.name}. Skipping.')
+
+

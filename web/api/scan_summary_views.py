@@ -276,9 +276,10 @@ class ScanSummaryAPIView(APIView):
                     'remediation': v['remediation'],
                     'url': v['http_url'],
                     'matched_at': v['discovered_date'],
-                    'is_gpt_used': v['is_gpt_used']
+                    'is_gpt_used': v['is_gpt_used'],
+                    'domain_name': v['subdomain__name'] or v['target_domain__name'] or target.name
                 } for v in vulnerabilities.order_by('-severity')[:100].values(
-                    'id', 'name', 'severity', 'description', 'impact', 'remediation', 'http_url', 'discovered_date', 'is_gpt_used'
+                    'id', 'name', 'severity', 'description', 'impact', 'remediation', 'http_url', 'discovered_date', 'is_gpt_used', 'subdomain__name', 'target_domain__name'
                 )
             ],
             'monitoring_discoveries': list(monitoring_discoveries.values('id', 'discovery_type', 'content')),

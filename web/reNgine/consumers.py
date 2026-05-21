@@ -47,12 +47,16 @@ class StressTelemetryConsumer(AsyncWebsocketConsumer):
             decode_responses=True
         )
         
-        last_id = '$' # Start from now
+        last_id = '0' # Start from the beginning to load history
+        loop = asyncio.get_running_loop()
         
         while self.keep_running:
             try:
-                # Use XREAD to block and wait for new data
-                streams = r.xread({self.stream_key: last_id}, count=10, block=5000)
+                # Run the blocking xread in a thread pool to avoid blocking the event loop
+                streams = await loop.run_in_executor(
+                    None,
+                    lambda: r.xread({self.stream_key: last_id}, count=10, block=2000)
+                )
                 if streams:
                     for stream_name, messages in streams:
                         for msg_id, data in messages:
@@ -115,11 +119,15 @@ class ScanLogConsumer(AsyncWebsocketConsumer):
         )
         
         last_id = '$' # Start from now
+        loop = asyncio.get_running_loop()
         
         while self.keep_running:
             try:
-                # Use XREAD to block and wait for new data
-                streams = r.xread({self.stream_key: last_id}, count=50, block=5000)
+                # Run the blocking xread in a thread pool to avoid blocking the event loop
+                streams = await loop.run_in_executor(
+                    None,
+                    lambda: r.xread({self.stream_key: last_id}, count=50, block=2000)
+                )
                 if streams:
                     for stream_name, messages in streams:
                         for msg_id, data in messages:
