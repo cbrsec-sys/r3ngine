@@ -2001,7 +2001,12 @@ class ProxyFetchAPIView(APIView):
 	def post(self, request):
 		try:
 			from reNgine.tasks import fetch_proxies_task
-			task = fetch_proxies_task.delay()
+			limit = request.data.get('limit', 1000)
+			try:
+				limit = int(limit)
+			except Exception:
+				limit = 1000
+			task = fetch_proxies_task.delay(limit=limit)
 			return Response({'status': True, 'task_id': task.id})
 		except Exception as e:
 			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

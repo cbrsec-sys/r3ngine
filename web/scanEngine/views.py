@@ -555,7 +555,16 @@ def report_settings(request, slug):
 def fetch_proxies(request, slug):
     if request.method == "POST":
         try:
-            task = fetch_proxies_task.delay()
+            limit = 1000
+            try:
+                import json
+                body = json.loads(request.body)
+                if 'limit' in body:
+                    limit = int(body['limit'])
+            except Exception:
+                if 'limit' in request.POST:
+                    limit = int(request.POST.get('limit'))
+            task = fetch_proxies_task.delay(limit=limit)
             return http.JsonResponse({'task_id': task.id})
         except Exception as e:
             return http.JsonResponse({'error': f"Celery error: {str(e)}"}, status=500)

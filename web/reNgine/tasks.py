@@ -6311,52 +6311,136 @@ def llm_vulnerability_description(vulnerability_id):
 
 
 @app.task(name='fetch_proxies_task', bind=True, queue='main_scan_queue')
-def fetch_proxies_task(self):
-    logger.info("Starting automated proxy fetch and verification task.")
+def fetch_proxies_task(self, limit=1000):
+    """Scrape proxies concurrently from a large list of public sources,
+    verify their validity against robust target APIs, and return the live ones.
+
+    Args:
+        self: The task instance bind.
+        limit (int, optional): Maximum number of raw proxies to scrape and check. Defaults to 1000.
+
+    Returns:
+        str: Newline-separated list of validated live proxies.
+    """
+    from reNgine.common_func import check_proxy_robust
+    import re
+
+    logger.info(f"Starting automated proxy fetch and verification task (limit={limit}).")
     self.update_state(state='PROGRESS', meta={'message': 'Downloading new proxies', 'progress': 10})
-    urls = [
-        'https://github.com/ProxyScraper/ProxyScraper/raw/refs/heads/main/http.txt',
-        'https://sunny9577.github.io/proxy-scraper/proxies.txt'
+    
+    proxy_urls = [
+        'https://api.proxyscrape.com/v2/?request=displayproxies',
+        'https://raw.githubusercontent.com/officialputuid/KangProxy/KangProxy/http/http.txt',
+        'https://raw.githubusercontent.com/roosterkid/openproxylist/main/HTTPS_RAW.txt',
+        'https://raw.githubusercontent.com/yuceltoluyag/GoodProxy/main/raw.txt',
+        'https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/http.txt',
+        'https://raw.githubusercontent.com/ShiftyTR/Proxy-List/master/https.txt',
+        'https://raw.githubusercontent.com/mmpx12/proxy-list/master/https.txt',
+        'https://raw.githubusercontent.com/TheSpeedX/PROXY-List/master/http.txt',
+        'https://raw.githubusercontent.com/jetkai/proxy-list/main/online-proxies/txt/proxies.txt',
+        'https://raw.githubusercontent.com/hookzof/socks5_list/master/proxy.txt',
+        'https://raw.githubusercontent.com/clarketm/proxy-list/master/proxy-list-raw.txt',
+        'https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/proxies.txt',
+        'https://raw.githubusercontent.com/opsxcq/proxy-list/master/list.txt',
+        'https://proxyspace.pro/http.txt',
+        'https://api.proxyscrape.com/?request=displayproxies&proxytype=http',
+        'https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/http.txt',
+        'http://worm.rip/http.txt',
+        'http://alexa.lr2b.com/proxylist.txt',
+        'https://api.openproxylist.xyz/http.txt',
+        'http://rootjazz.com/proxies/proxies.txt',
+        'https://multiproxy.org/txt_all/proxy.txt',
+        'https://proxy-spider.com/api/proxies.example.txt',
+        'https://api.proxyscrape.com/v2/?request=getproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=all',
+        'https://api.proxyscrape.com/v2/?request=getproxies&protocol=http&timeout=10000&country=all&ssl=all&anonymity=anonymous',
+        'https://raw.githubusercontent.com/sunny9577/proxy-scraper/master/generated/http_proxies.txt',
+        'https://raw.githubusercontent.com/Firdoxx/proxy-list/main/https',
+        'https://raw.githubusercontent.com/Firdoxx/proxy-list/main/http',
+        'https://raw.githubusercontent.com/mmpx12/proxy-list/master/http.txt',
+        'https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/https.txt',
+        'https://raw.githubusercontent.com/zevtyardt/proxy-list/main/http.txt',
+        'https://raw.githubusercontent.com/prxchk/proxy-list/main/http.txt',
+        'https://raw.githubusercontent.com/Zaeem20/FREE_PROXIES_LIST/master/http.txt',
+        'https://raw.githubusercontent.com/ALIILAPRO/Proxy/main/http.txt',
+        'https://raw.githubusercontent.com/casals-ar/proxy-list/main/http',
+        'https://raw.githubusercontent.com/casals-ar/proxy-list/main/https',
+        'https://raw.githubusercontent.com/MuRongPIG/Proxy-Master/main/http.txt',
+        'https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/http.txt',
+        'https://raw.githubusercontent.com/vakhov/fresh-proxy-list/master/https.txt',
+        'https://raw.githubusercontent.com/Jakee8718/Free-Proxies/main/proxy/-http%20and%20https.txt',
+        'https://raw.githubusercontent.com/Tsprnay/Proxy-lists/master/proxies/http.txt',
+        'https://raw.githubusercontent.com/Tsprnay/Proxy-lists/master/proxies/https.txt',
+        'https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks5.txt',
+        'https://raw.githubusercontent.com/TheSpeedX/SOCKS-List/master/socks4.txt',
+        'https://api.proxyscrape.com/v2/?request=getproxies&protocol=socks5&timeout=10000&country=all',
+        'https://www.proxy-list.download/api/v1/get?type=socks5',
+        'https://raw.githubusercontent.com/manuGMG/proxy-365/main/SOCKS5.txt',
+        'https://raw.githubusercontent.com/monosans/proxy-list/main/proxies/socks5.txt',
+        'https://raw.githubusercontent.com/roosterkid/openproxylist/main/SOCKS5_RAW.txt',
+        'https://raw.githubusercontent.com/prxchk/proxy-list/main/socks5.txt',
+        'https://raw.githubusercontent.com/a2u/free-proxy-list/master/free-proxy-list.txt',
+        'https://raw.githubusercontent.com/mishakorzik/Free-Proxy/main/proxy.txt',
+        'https://raw.githubusercontent.com/mertguvencli/http-proxy-list/main/proxy-list/data.txt',
+        'https://raw.githubusercontent.com/UptimerBot/proxy-list/master/proxies/http.txt',
+        'https://github.com/hookzof/socks5_list/blob/master/proxy.txt',
+        'https://github.com/jetkai/proxy-list/blob/main/online-proxies/txt/proxies-http.txt',
+        'https://github.com/jetkai/proxy-list/blob/main/online-proxies/txt/proxies-https.txt',
+        'https://github.com/jetkai/proxy-list/blob/main/online-proxies/txt/proxies-socks4.txt',
+        'https://github.com/jetkai/proxy-list/blob/main/online-proxies/txt/proxies-socks5.txt',
+        'https://github.com/jetkai/proxy-list/blob/main/online-proxies/txt/proxies.txt',
+        'https://github.com/clarketm/proxy-list/blob/master/proxy-list-raw.txt'
     ]
+
     all_proxies = set()
-    for url in urls:
+    for url in proxy_urls:
+        if len(all_proxies) >= limit:
+            break
+            
+        if 'github.com' in url and '/blob/' in url:
+            url = url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/')
+            
         logger.info(f"Downloading proxy list from: {url}")
         try:
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
-                proxies = response.text.splitlines()
-                logger.info(f"Successfully downloaded {len(proxies)} proxies from {url}")
-                for p in proxies:
-                    p = p.strip()
-                    if p:
-                        all_proxies.add(p)
+                # Process lines to extract IP:PORT
+                lines = response.text.splitlines()
+                added_this_url = 0
+                for line in lines:
+                    if len(all_proxies) >= limit:
+                        break
+                        
+                    line = line.strip()
+                    if not line or line.startswith('#') or line.startswith('//') or line.startswith('<'):
+                        continue
+                        
+                    # Split by space, comma or semicolon and take the first valid part containing colon
+                    parts = re.split(r'[\s,;]+', line)
+                    token = parts[0].strip()
+                    if ':' in token:
+                        if token not in all_proxies:
+                            all_proxies.add(token)
+                            added_this_url += 1
+                            
+                logger.info(f"Successfully added {added_this_url} raw proxies from {url}")
             else:
                 logger.warning(f"Failed to download proxy list from {url}. Status code: {response.status_code}")
         except Exception as e:
             logger.error(f"Error fetching proxies from {url}: {str(e)}")
 
-    logger.info(f"Total unique proxies found after merging: {len(all_proxies)}")
-    self.update_state(state='PROGRESS', meta={'message': 'Merging proxy lists', 'progress': 30})
-    unique_proxies = list(all_proxies)
-
-    logger.info("Starting proxy verification process...")
-    self.update_state(state='PROGRESS', meta={'message': 'Checking proxy access', 'progress': 40})
-    live_proxies = []
+    unique_proxies = list(all_proxies)[:limit]
     total = len(unique_proxies)
+    logger.info(f"Total unique raw proxies fetched: {total} (capped at {limit})")
+    
+    self.update_state(state='PROGRESS', meta={'message': f'Verifying {total} proxies', 'progress': 30})
+
+    live_proxies = []
 
     def check_proxy(proxy_str):
-        try:
-            proxies = {
-                "http": f"http://{proxy_str}",
-                "https": f"http://{proxy_str}",
-            }
-            # Use a fast responding site
-            requests.get("http://www.google.com", proxies=proxies, timeout=3)
+        if check_proxy_robust(proxy_str):
             logger.info(f"Proxy LIVE: {proxy_str}")
             return proxy_str
-        except:
-            # logger.debug(f"Proxy DEAD: {proxy_str}")
-            return None
+        return None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
         future_to_proxy = {executor.submit(check_proxy, proxy): proxy for proxy in unique_proxies}
@@ -6367,23 +6451,21 @@ def fetch_proxies_task(self):
             if res:
                 live_proxies.append(res)
 
-            if completed % 100 == 0 or completed == total:
+            if completed % 50 == 0 or completed == total:
                 logger.info(f"Verification progress: {completed}/{total} - Found {len(live_proxies)} live proxies so far.")
-                progress = 40 + int((completed / total) * 50)
+                progress = 30 + int((completed / total) * 65)
                 self.update_state(state='PROGRESS', meta={
                     'message': f'Checking proxies: {completed}/{total} ({len(live_proxies)} live)',
                     'progress': progress
                 })
 
     logger.info(f"Proxy verification complete. Found {len(live_proxies)} live proxies out of {total} tested.")
-    self.update_state(state='PROGRESS', meta={'message': 'Discarding bad hits', 'progress': 95})
+    self.update_state(state='PROGRESS', meta={'message': 'Formatting live proxies', 'progress': 95})
 
-    logger.info("Updating final proxy list and adding http:// prefix.")
-    self.update_state(state='PROGRESS', meta={'message': 'Proxy list updated', 'progress': 100})
-
-    # Prefix with http:// as requested
-    final_list = [f"http://{p}" if not p.startswith('http') else p for p in live_proxies]
+    # Prefix with http:// if missing scheme, as requested
+    final_list = [f"http://{p}" if not p.startswith('http') and not p.startswith('socks') else p for p in live_proxies]
     
+    self.update_state(state='PROGRESS', meta={'message': 'Proxy list updated', 'progress': 100})
     logger.info("Automated proxy fetch task finished successfully.")
     return "\n".join(final_list)
 
