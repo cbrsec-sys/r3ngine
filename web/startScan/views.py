@@ -868,7 +868,7 @@ def start_organization_scan(request, id, slug):
         # split excluded paths by ,
         excluded_paths = [path.strip() for path in excluded_paths.split(',')]
 
-        # Start Celery task for each organization's domains
+        # Start Temporal workflow for each organization's domains
         for domain in organization.get_domains():
             scan_history_id = create_scan_object(
                 host_id=domain.id,
@@ -890,7 +890,7 @@ def start_organization_scan(request, id, slug):
                 'excluded_paths': excluded_paths,
                 'enable_spiderfoot_scan': 'spiderfoot_scan' in request.POST,
             }
-            initiate_scan.apply_async(kwargs=kwargs)
+            initiate_scan_temporal(**kwargs)
             scan.save()
 
 
