@@ -1,5 +1,20 @@
 # Changelog
 
+### [v3.2.0] - 2026-05-22
+
+- **Scan Result Recovery Tool**: Added `recover_scan_results` Django management command (`web/scanEngine/management/commands/recover_scan_results.py`). In the event of database corruption or loss, this command walks the `scan_results` volume and reconstructs the database from files on disk — recovering Domains, ScanHistory records, Subdomains, EndPoints, Ports/IpAddresses, Vulnerabilities (nmap + nuclei), and WAF associations.
+  - **Dry-run by default**: run without flags to preview what would be recovered, with per-record output and a summary table. Pass `--apply` to commit.
+  - **Idempotent**: scans whose `results_dir` already exists in the database are silently skipped — safe to re-run at any time.
+  - **Dual port-scan format support**: handles both the modern naabu JSONL format (`{"host":…,"port":…}` per line) and the legacy JSON-object format (`{"host": [port, …]}`).
+  - **Targeted recovery**: use `--scan-dir /path/to/scan` to recover a single folder, or `--results-root /alt/path` to point at a non-default results volume.
+  - **Usage**:
+    ```bash
+    # Inside the web or celery container:
+    python manage.py recover_scan_results           # dry-run
+    python manage.py recover_scan_results --apply   # write to DB
+    python manage.py recover_scan_results --apply --scan-dir /usr/src/scan_results/defijn.io_108
+    ```
+
 ### [v3.1.0] - 2026-05-20
 
 - **Scan Pipeline**: fully fixed and stabilized. All tools now working to their full capabilities again.

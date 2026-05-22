@@ -2,6 +2,7 @@ import json
 import asyncio
 import logging
 import redis
+from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncWebsocketConsumer
 from django.conf import settings
 
@@ -22,9 +23,28 @@ class StressTelemetryConsumer(AsyncWebsocketConsumer):
         await self.accept()
         logger.info(f"WebSocket connected for scan {self.scan_id}")
 
+        # Send authoritative current status from DB before replaying stream history.
+        # This prevents a page reload from getting stuck in "running" state when the
+        # Celery worker was killed before publishing the final "completed" message.
+        is_running = await self._is_scan_running()
+        await self.send(text_data=json.dumps({
+            'type': 'scan_status',
+            'status': 'running' if is_running else 'completed'
+        }))
+
         # Start background task to tail Redis Stream
         self.keep_running = True
         self.tail_task = asyncio.create_task(self.tail_redis_stream())
+
+    @database_sync_to_async
+    def _is_scan_running(self):
+        from startScan.models import ScanHistory
+        from reNgine.definitions import RUNNING_TASK
+        try:
+            scan = ScanHistory.objects.filter(id=self.scan_id).first()
+            return scan is not None and scan.scan_status == RUNNING_TASK
+        except Exception:
+            return False
 
     async def disconnect(self, close_code):
         self.keep_running = False

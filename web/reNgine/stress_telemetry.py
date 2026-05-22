@@ -20,6 +20,15 @@ class StressTelemetryPublisher:
             logger.error(f"Failed to connect to Redis for telemetry: {e}")
             self.redis_client = None
 
+    def clear_stream(self):
+        """Delete the telemetry stream so a fresh test run starts with no stale history."""
+        if not self.redis_client:
+            return
+        try:
+            self.redis_client.delete(self.stream_key)
+        except Exception as e:
+            logger.error(f"Error clearing telemetry stream: {e}")
+
     def publish(self, metrics):
         """Publish a metric packet to the stream."""
         if not self.redis_client:

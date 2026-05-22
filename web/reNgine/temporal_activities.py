@@ -1,0 +1,1462 @@
+"""
+Temporal Activities for r3ngine scan pipeline.
+
+All Python-side activities are implemented here. They are designed to be
+called by the Python Orchestrator Worker listening on the
+'python-orchestrator-queue'.
+
+The activities delegate to the existing scan task functions in
+web/reNgine/tasks.py, which contain the full scan logic. Since the Python
+worker runs with UnsandboxedWorkflowRunner, Django models and the existing
+task code are fully accessible here without sandbox restrictions.
+
+Design principle: Activities call existing RengineTask-decorated scan functions
+directly, providing a lightweight proxy object (TemporalTaskProxy) that satisfies
+the `self` interface expected by those tasks without requiring Celery.
+"""
+
+import logging
+import os
+import yaml
+
+from temporalio import activity
+from django.utils import timezone
+
+logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# TemporalTaskProxy
+# ---------------------------------------------------------------------------
+
+class TemporalTaskProxy:
+    """A lightweight proxy that mimics the `self` interface of RengineTask.
+
+    Existing scan task functions (subdomain_discovery, port_scan, etc.)
+    are bound to a Celery Task instance via `self`. This proxy satisfies
+    that interface so the same functions can be called directly inside
+    Temporal activities without Celery.
+
+    Args:
+        ctx (dict): The Temporal workflow context dictionary containing all
+                    relevant scan metadata (scan_history_id, engine_id,
+                    results_dir, yaml_configuration, etc.).
+        task_name (str): Short name of the task (used for ScanActivity tracking).
+        description (str, optional): Human-readable description for the UI.
+    """
+
+    def __init__(self, ctx: dict, task_name: str, description: str = None):
+        from startScan.models import ScanHistory, SubScan, ScanActivity
+        from scanEngine.models import EngineType
+        from targetApp.models import Domain
+        from reNgine.definitions import RUNNING_TASK
+        from reNgine.settings import RENGINE_RESULTS
+
+        self._is_temporal_proxy = True
+        self.task_name = task_name
+        self.description = description or ' '.join(task_name.split('_')).capitalize()
+        self.status = RUNNING_TASK
+        self.result = None
+        self.error = None
+        self.traceback = None
+
+        # Core context fields
+        self.scan_id = ctx.get('scan_history_id')
+        self.subscan_id = ctx.get('subscan_id')
+        self.engine_id = ctx.get('engine_id')
+        self.domain_id = ctx.get('domain_id')
+        self.subdomain_id = ctx.get('subdomain_id')
+        self.results_dir = ctx.get('results_dir', RENGINE_RESULTS)
+        self.yaml_configuration = ctx.get('yaml_configuration', {})
+        self.out_of_scope_subdomains = ctx.get('out_of_scope_subdomains', [])
+        self.starting_point_path = ctx.get('starting_point_path', '')
+        self.excluded_paths = ctx.get('excluded_paths', [])
+        self.history_file = f'{self.results_dir}/commands.txt'
+        self.output_path = f'{self.results_dir}/{task_name}.txt'
+        self.filename = f'{task_name}.txt'
+        self.activity_id = ctx.get('activity_id')
+        self.track = ctx.get('track', True)
+
+        # Django ORM objects
+        self.scan = ScanHistory.objects.filter(pk=self.scan_id).first()
+        self.subscan = SubScan.objects.filter(pk=self.subscan_id).first() if self.subscan_id else None
+        self.engine = EngineType.objects.filter(pk=self.engine_id).first()
+        if not self.engine and self.scan:
+            self.engine = self.scan.scan_type
+            self.engine_id = self.engine.id if self.engine else None
+        self.domain = self.scan.domain if self.scan else Domain.objects.filter(id=self.domain_id).first()
+        self.subdomain = self.subscan.subdomain if self.subscan else None
+
+        # Create a ScanActivity record in the DB to track this task
+        if self.track and self.scan:
+            self._create_scan_activity()
+
+    def _create_scan_activity(self):
+        """Create a ScanActivity entry in the database for progress tracking.
+
+        This mirrors the create_scan_activity() call from RengineTask.__call__
+        so the scan activity feed in the frontend is populated correctly.
+        """
+        from startScan.models import ScanActivity
+        from reNgine.definitions import RUNNING_TASK
+        try:
+            # Use temporal activity ID as the tracking ID
+            temporal_activity_id = activity.info().activity_id
+            self.activity = ScanActivity(
+                name=self.task_name,
+                title=self.description,
+                time=timezone.now(),
+                status=RUNNING_TASK,
+                celery_id=f"temporal-{temporal_activity_id}"
+            )
+            self.activity.save()
+            self.activity_id = self.activity.id
+            if self.scan:
+                self.activity.scan_of = self.scan
+                self.activity.save()
+        except Exception as e:
+            logger.warning(f"Could not create ScanActivity for {self.task_name}: {e}")
+            self.activity = None
+            self.activity_id = None
+
+    def update_scan_activity(self, status, error_message=None):
+        """Update the ScanActivity record with the final task status.
+
+        Args:
+            status (int): Task status code (SUCCESS_TASK, FAILED_TASK, etc.)
+            error_message (str, optional): Error message if the task failed.
+        """
+        from startScan.models import ScanActivity
+        try:
+            if getattr(self, 'activity', None):
+                self.activity.status = status
+                self.activity.error_message = error_message
+                self.activity.time = timezone.now()
+                self.activity.save()
+        except Exception as e:
+            logger.warning(f"Could not update ScanActivity for {self.task_name}: {e}")
+
+    def notify(self, name=None, severity=None, fields={}, add_meta_info=True):
+        """Send a Temporal-compatible notification (no-op for now).
+
+        In Celery, this triggered send_task_notif.delay(). In Temporal, the
+        notification is sent via the dedicated SendScanNotificationActivity
+        at workflow completion. Individual per-task notifications are a
+        best-effort log entry here.
+
+        Args:
+            name (str, optional): Notification name override.
+            severity (str, optional): Severity level.
+            fields (dict): Extra notification fields.
+            add_meta_info (bool): Whether to include scan metadata.
+        """
+        logger.info(f"[notify] Task '{name or self.task_name}' fields={fields}")
+
+
+# ---------------------------------------------------------------------------
+# Helper: run a RengineTask function via TemporalTaskProxy
+# ---------------------------------------------------------------------------
+
+def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **kwargs):
+    """Execute an existing RengineTask-decorated function inside a Temporal activity.
+
+    Spawns a heartbeat thread that sends signals to Temporal every 30 seconds
+    to prevent activity timeout for long-running operations.
+
+    Constructs a TemporalTaskProxy as the task's `self`, sets the status on
+    success/failure and returns the task's result.
+
+    Args:
+        task_func (callable): The unwrapped task function (e.g. subdomain_discovery.run).
+        ctx (dict): Temporal workflow context dictionary.
+        task_name (str): Short task name for DB tracking.
+        description (str, optional): Human-readable description.
+        **kwargs: Extra keyword arguments passed to task_func.
+
+    Returns:
+        bool: True on success.
+
+    Raises:
+        Exception: Re-raises any exception from the underlying task so Temporal
+                   can retry or fail the activity appropriately.
+    """
+    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
+    import contextvars
+    import threading
+    import time
+
+    proxy = TemporalTaskProxy(ctx, task_name, description)
+
+    activity_running = True
+
+    # Copy the current contextvars context so the heartbeat thread inherits the
+    # Temporal activity context. threading.Thread does NOT copy contextvars by
+    # default, causing activity.heartbeat() to fail with "Not in activity context",
+    # which silently prevents all heartbeats from reaching Temporal and triggers
+    # the heartbeat_timeout cancellation + retry loop.
+    _activity_ctx = contextvars.copy_context()
+
+    def send_heartbeats():
+        def _do_heartbeats():
+            while activity_running:
+                try:
+                    activity.heartbeat(
+                        f"Activity {task_name} running for {proxy.task_name}"
+                    )
+                    activity.logger.debug(f"[_run_task] Sent heartbeat for {task_name}")
+                except Exception as hb_err:
+                    activity.logger.warning(f"[_run_task] Heartbeat failed: {hb_err}")
+
+                for _ in range(6):  # 6 * 5s = 30s, checking flag each iteration
+                    if not activity_running:
+                        break
+                    time.sleep(5)
+        _activity_ctx.run(_do_heartbeats)
+
+    heartbeat_thread = threading.Thread(target=send_heartbeats, daemon=True)
+    heartbeat_thread.start()
+
+    try:
+        # task_func is typically celery_task_instance.run — a bound method where
+        # self is already the Celery task instance. Unwrap it so proxy is used as self.
+        raw_func = task_func.__func__ if hasattr(task_func, '__func__') else task_func
+        raw_func(proxy, ctx=ctx, description=description, **kwargs)
+        proxy.update_scan_activity(SUCCESS_TASK)
+        return True
+    except Exception as exc:
+        activity.logger.exception(f"[_run_task] Task {task_name} failed: {exc}")
+        proxy.update_scan_activity(FAILED_TASK, error_message=repr(exc))
+        raise
+    finally:
+        activity_running = False
+        heartbeat_thread.join(timeout=5)
+
+
+# ===========================================================================
+# Step 0 — Target Profiling & Checkpoint Management
+# ===========================================================================
+
+@activity.defn(name="TargetProfilingActivity")
+def target_profiling_activity(ctx: dict) -> dict:
+    """Validate the scan target and populate baseline scan context.
+
+    Reads the ScanHistory record, resolves the domain, loads and caches the
+    engine YAML configuration into ctx, and creates the scan results directory.
+
+    Args:
+        ctx (dict): Temporal workflow context. Must contain 'scan_history_id'
+                    and 'engine_id'.
+
+    Returns:
+        dict: Enriched ctx with 'yaml_configuration', 'results_dir', and
+              'domain_name' populated.
+    """
+    from startScan.models import ScanHistory
+    from scanEngine.models import EngineType
+    from reNgine.settings import RENGINE_RESULTS
+
+    scan_id = ctx.get('scan_history_id')
+    activity.logger.info(f"[TargetProfilingActivity] Profiling scan_history_id={scan_id}")
+
+    scan = ScanHistory.objects.filter(pk=scan_id).first()
+    if not scan:
+        raise ValueError(f"ScanHistory with id={scan_id} not found.")
+
+    engine_id = ctx.get('engine_id') or (scan.scan_type.id if scan.scan_type else None)
+    engine = EngineType.objects.filter(pk=engine_id).first()
+    if not engine:
+        raise ValueError(f"EngineType with id={engine_id} not found.")
+
+    # Parse YAML configuration if not already done
+    if 'yaml_configuration' not in ctx or not ctx['yaml_configuration']:
+        ctx['yaml_configuration'] = yaml.safe_load(engine.yaml_configuration) or {}
+
+    # Set task list from engine
+    if 'tasks' not in ctx:
+        ctx['tasks'] = engine.tasks or []
+
+    # Ensure results dir exists
+    results_dir = ctx.get('results_dir')
+    if not results_dir:
+        results_dir = f'{RENGINE_RESULTS}/{scan.domain.name}_{scan_id}'
+        ctx['results_dir'] = results_dir
+    os.makedirs(results_dir, exist_ok=True)
+
+    # Enrich ctx with domain information
+    ctx['domain_name'] = scan.domain.name
+    ctx['engine_id'] = engine_id
+
+    activity.logger.info(
+        f"[TargetProfilingActivity] Profiled target {scan.domain.name}, "
+        f"tasks={ctx.get('tasks')}"
+    )
+    return ctx
+
+
+@activity.defn(name="LoadCheckpointActivity")
+def load_checkpoint_activity(ctx: dict) -> dict:
+    """Load persisted workflow checkpoint state (if any) for resumability.
+
+    In a future implementation, this will query WorkflowCheckpoint DB records
+    so long-running scans can resume from the correct tier after a crash.
+    Currently returns an empty state dict.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        dict: Checkpoint state dictionary (empty if no checkpoint exists).
+    """
+    scan_id = ctx.get('scan_history_id')
+    activity.logger.info(f"[LoadCheckpointActivity] Loading checkpoint for scan {scan_id}")
+    # TODO: query WorkflowCheckpoint.objects.filter(workflow_execution__scan_history_id=scan_id)
+    return {}
+
+
+@activity.defn(name="SaveCheckpointActivity")
+def save_checkpoint_activity(state: dict) -> bool:
+    """Persist the current workflow state to the database for crash recovery.
+
+    Args:
+        state (dict): Current workflow checkpoint state payload.
+
+    Returns:
+        bool: True on success.
+    """
+    activity.logger.info(f"[SaveCheckpointActivity] Saving checkpoint state: {list(state.keys())}")
+    # TODO: upsert WorkflowCheckpoint record
+    return True
+
+
+# ===========================================================================
+# Tier 1 — Discovery
+# ===========================================================================
+
+@activity.defn(name="RunSubdomainDiscoveryActivity")
+def run_subdomain_discovery_activity(ctx: dict) -> bool:
+    """Execute subdomain discovery tools (subfinder, amass, etc.) against the target.
+
+    Delegates to the existing `subdomain_discovery` Celery task function which
+    runs all configured discovery tools sequentially, writing results to the
+    scan results directory and persisting discovered subdomains to the DB.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import subdomain_discovery
+    activity.logger.info(f"[RunSubdomainDiscoveryActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        subdomain_discovery.run,
+        ctx,
+        task_name='subdomain_discovery',
+        description='Subdomain Discovery'
+    )
+
+
+@activity.defn(name="RunAmassIntelDiscoveryActivity")
+def run_amass_intel_discovery_activity(ctx: dict) -> bool:
+    """Run Amass Intel infrastructure discovery against the target domain.
+
+    Delegates to the existing `amass_intel_discovery` task to find related
+    root domains and IP ranges via WHOIS and other intelligence sources.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import amass_intel_discovery
+    from startScan.models import ScanHistory
+    scan = ScanHistory.objects.filter(pk=ctx.get('scan_history_id')).first()
+    host = scan.domain.name if scan else ctx.get('domain_name', '')
+    activity.logger.info(f"[RunAmassIntelDiscoveryActivity] host={host}")
+    return _run_task(
+        amass_intel_discovery.run,
+        ctx,
+        task_name='amass_intel_discovery',
+        description='Infrastructure Discovery',
+        host=host
+    )
+
+
+@activity.defn(name="RunFirewallVPNScanActivity")
+def run_firewall_vpn_scan_activity(ctx: dict) -> bool:
+    """Detect firewall and VPN infrastructure protecting the target.
+
+    Delegates to the existing `firewall_vpn_scan` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import firewall_vpn_scan
+    activity.logger.info(f"[RunFirewallVPNScanActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        firewall_vpn_scan.run,
+        ctx,
+        task_name='firewall_vpn_scan',
+        description='Firewall & VPN Scan'
+    )
+
+
+@activity.defn(name="ParseDiscoveryResultsActivity")
+def parse_discovery_results_activity(ctx: dict) -> bool:
+    """Parse and persist discovery tier results to the database.
+
+    After all Tier 1 tools finish, this activity consolidates output files,
+    deduplicates subdomains, and writes them to the Subdomain model.
+    In the current implementation, each discovery tool writes directly to the
+    DB via save_subdomain(), so this is a lightweight verification pass.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from startScan.models import ScanHistory, Subdomain
+    scan_id = ctx.get('scan_history_id')
+    count = Subdomain.objects.filter(scan_history_id=scan_id).count()
+    activity.logger.info(
+        f"[ParseDiscoveryResultsActivity] scan_id={scan_id}: "
+        f"{count} subdomains persisted."
+    )
+    return True
+
+
+# ===========================================================================
+# Tier 2 — Enumeration
+# ===========================================================================
+
+@activity.defn(name="RunHTTPCrawlActivity")
+def run_http_crawl_activity(ctx: dict) -> bool:
+    """Run httpx HTTP crawl across all discovered subdomains.
+
+    Delegates to the existing `http_crawl` task which probes all discovered
+    subdomains for live HTTP services and persists endpoint metadata.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import http_crawl
+    activity.logger.info(f"[RunHTTPCrawlActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        http_crawl.run,
+        ctx,
+        task_name='http_crawl',
+        description='HTTP Crawl'
+    )
+
+
+@activity.defn(name="ParseHTTPCrawlResultsActivity")
+def parse_http_crawl_results_activity(ctx: dict) -> bool:
+    """Verify HTTP crawl results are persisted correctly after http_crawl runs.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from startScan.models import EndPoint
+    scan_id = ctx.get('scan_history_id')
+    # is_alive is a @property (not a DB column): http_status > 0, < 500, != 404
+    alive_count = EndPoint.objects.filter(
+        scan_history_id=scan_id,
+        http_status__gt=0,
+        http_status__lt=500,
+    ).exclude(http_status=404).count()
+    activity.logger.info(
+        f"[ParseHTTPCrawlResultsActivity] scan_id={scan_id}: "
+        f"{alive_count} alive endpoints."
+    )
+    return True
+
+
+@activity.defn(name="RunPortScanActivity")
+def run_port_scan_activity(ctx: dict) -> bool:
+    """Run port scanning (naabu, nmap) across all discovered subdomains.
+
+    Delegates to the existing `port_scan` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import port_scan
+    activity.logger.info(f"[RunPortScanActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        port_scan.run,
+        ctx,
+        task_name='port_scan',
+        description='Port Scan'
+    )
+
+
+@activity.defn(name="RunScreenshotActivity")
+def run_screenshot_activity(ctx: dict) -> bool:
+    """Capture screenshots of all live HTTP endpoints.
+
+    Delegates to the existing `screenshot` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import screenshot
+    activity.logger.info(f"[RunScreenshotActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        screenshot.run,
+        ctx,
+        task_name='screenshot',
+        description='Screenshot'
+    )
+
+
+@activity.defn(name="RunFetchURLActivity")
+def run_fetch_url_activity(ctx: dict) -> bool:
+    """Fetch and collect all URLs across the target using gau, waybackurls, etc.
+
+    Delegates to the existing `fetch_url` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import fetch_url
+    activity.logger.info(f"[RunFetchURLActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        fetch_url.run,
+        ctx,
+        task_name='fetch_url',
+        description='Fetch URL'
+    )
+
+
+@activity.defn(name="ParseEnumerationResultsActivity")
+def parse_enumeration_results_activity(ctx: dict) -> bool:
+    """Verify enumeration tier (ports, screenshots, URLs) results are persisted.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from startScan.models import EndPoint, IpAddress
+    scan_id = ctx.get('scan_history_id')
+    endpoint_count = EndPoint.objects.filter(scan_history_id=scan_id).count()
+    activity.logger.info(
+        f"[ParseEnumerationResultsActivity] scan_id={scan_id}: "
+        f"{endpoint_count} total endpoints."
+    )
+    return True
+
+
+# ===========================================================================
+# Tier 3/4 — Fuzzing & URL Extraction
+# ===========================================================================
+
+@activity.defn(name="RunDirFileFuzzActivity")
+def run_dir_file_fuzz_activity(ctx: dict) -> bool:
+    """Run directory and file fuzzing (dirsearch, ffuf) across all endpoints.
+
+    Delegates to the existing `dir_file_fuzz` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.fuzzing_tasks import dir_file_fuzz
+    activity.logger.info(f"[RunDirFileFuzzActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        dir_file_fuzz.run,
+        ctx,
+        task_name='dir_file_fuzz',
+        description='Directory & File Fuzz'
+    )
+
+
+@activity.defn(name="ParseFuzzResultsActivity")
+def parse_fuzz_results_activity(ctx: dict) -> bool:
+    """Verify fuzzing results are persisted to the database.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from startScan.models import DirectoryFile
+    from startScan.models import Subdomain
+    scan_id = ctx.get('scan_history_id')
+    # Count DirectoryFile objects linked to this scan's subdomains
+    subdomain_ids = Subdomain.objects.filter(
+        scan_history_id=scan_id
+    ).values_list('id', flat=True)
+    fuzz_count = DirectoryFile.objects.filter(
+        directory_files__in=subdomain_ids
+    ).count()
+    activity.logger.info(
+        f"[ParseFuzzResultsActivity] scan_id={scan_id}: {fuzz_count} fuzz entries."
+    )
+    return True
+
+
+# ===========================================================================
+# Tier 5 — Analysis
+# ===========================================================================
+
+@activity.defn(name="RunWebAPIDiscoveryActivity")
+def run_web_api_discovery_activity(ctx: dict) -> bool:
+    """Discover web API endpoints and routes using kiterunner.
+
+    Delegates to the existing `web_api_discovery` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import web_api_discovery
+    activity.logger.info(f"[RunWebAPIDiscoveryActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        web_api_discovery.run,
+        ctx,
+        task_name='web_api_discovery',
+        description='Web API Discovery'
+    )
+
+
+@activity.defn(name="RunWAFDetectionActivity")
+def run_waf_detection_activity(ctx: dict) -> bool:
+    """Detect Web Application Firewalls protecting the target.
+
+    Delegates to the existing `waf_detection` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import waf_detection
+    activity.logger.info(f"[RunWAFDetectionActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        waf_detection.run,
+        ctx,
+        task_name='waf_detection',
+        description='WAF Detection'
+    )
+
+
+@activity.defn(name="RunSecretScanningActivity")
+def run_secret_scanning_activity(ctx: dict) -> bool:
+    """Scan for exposed secrets, credentials, and API keys using Semgrep/trufflehog.
+
+    Delegates to the existing `secret_scanning` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import secret_scanning
+    activity.logger.info(f"[RunSecretScanningActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        secret_scanning.run,
+        ctx,
+        task_name='secret_scanning',
+        description='Secrets & Leaks Scan'
+    )
+
+
+@activity.defn(name="ParseAnalysisResultsActivity")
+def parse_analysis_results_activity(ctx: dict) -> bool:
+    """Verify analysis tier results (WAF, API routes, secrets) are persisted.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    activity.logger.info(
+        f"[ParseAnalysisResultsActivity] scan_id={ctx.get('scan_history_id')}"
+    )
+    return True
+
+
+# ===========================================================================
+# Tier 6 — Assessment
+# ===========================================================================
+
+@activity.defn(name="RunVulnerabilityScanActivity")
+def run_vulnerability_scan_activity(ctx: dict) -> bool:
+    """Run full vulnerability assessment without dispatching via Celery.
+
+    Directly executes each enabled sub-scanner (Nuclei, CRLFuzz, Dalfox,
+    S3Scanner, Acunetix, cPanel, WPScan, React2Shell, Semgrep) via _run_task,
+    keeping all execution inside the Temporal activity context instead of
+    delegating to vulnerability_scan which uses group.apply_async().
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    import yaml as _yaml
+    from reNgine.tasks import (
+        nuclei_scan, crlfuzz_scan, dalfox_xss_scan, s3scanner,
+        acunetix_scan, semgrep_scan,
+    )
+    from reNgine.vulnerability_tasks import cpanel_scan, react2shell_scan
+    from reNgine.wpscan_tasks import wpscan_scan
+    from reNgine.definitions import (
+        VULNERABILITY_SCAN,
+        RUN_NUCLEI, RUN_CRLFUZZ, RUN_DALFOX, RUN_S3SCANNER,
+        RUN_ACUNETIX, RUN_WPSCAN, RUN_CPANEL2SHELL, RUN_REACT2SHELL,
+    )
+    from scanEngine.models import EngineType
+    from dashboard.models import AcunetixAPIKey
+
+    scan_id = ctx.get('scan_history_id')
+    activity.logger.info(f"[RunVulnerabilityScanActivity] scan_id={scan_id}")
+
+    engine_id = ctx.get('engine_id')
+    engine = EngineType.objects.filter(pk=engine_id).first()
+    config = _yaml.safe_load(engine.yaml_configuration) if engine and engine.yaml_configuration else {}
+    vuln_config = config.get(VULNERABILITY_SCAN) or {}
+    urls = ctx.get('urls', [])
+
+    # --- Stage 1: Primary scanners ---
+    if vuln_config.get(RUN_NUCLEI, True):
+        _run_task(nuclei_scan.run, ctx, task_name='nuclei_scan',
+                  description='Nuclei Scan', urls=urls)
+
+    if vuln_config.get(RUN_CRLFUZZ, False):
+        _run_task(crlfuzz_scan.run, ctx, task_name='crlfuzz_scan',
+                  description='CRLFuzz Scan', urls=urls)
+
+    if vuln_config.get(RUN_DALFOX, False):
+        _run_task(dalfox_xss_scan.run, ctx, task_name='dalfox_xss_scan',
+                  description='Dalfox XSS Scan', urls=urls)
+
+    if vuln_config.get(RUN_S3SCANNER, True):
+        _run_task(s3scanner.run, ctx, task_name='s3scanner',
+                  description='S3 Bucket Scanner')
+
+    # --- Stage 2: Additional scanners ---
+    if vuln_config.get(RUN_ACUNETIX, False):
+        creds = AcunetixAPIKey.objects.first()
+        if creds and creds.server_url and creds.api_key:
+            _run_task(acunetix_scan.run, ctx, task_name='acunetix_scan',
+                      description='Acunetix Scan',
+                      domain_id=ctx.get('domain_id'),
+                      scan_history_id=scan_id)
+
+    cpanel_cfg = vuln_config.get('cpanel_scanner', {})
+    if cpanel_cfg.get(RUN_CPANEL2SHELL, True):
+        _run_task(cpanel_scan.run, ctx, task_name='cpanel_scan',
+                  description='cPanel Vulnerability Scan')
+
+    if vuln_config.get(RUN_WPSCAN, True):
+        _run_task(wpscan_scan.run, ctx, task_name='wpscan_scan',
+                  description='WPScan', urls=urls)
+
+    react_cfg = vuln_config.get('react_scanner', {})
+    if react_cfg.get(RUN_REACT2SHELL, True):
+        _run_task(react2shell_scan.run, ctx, task_name='react2shell_scan',
+                  description='React Vulnerability Scan')
+
+    _run_task(semgrep_scan.run, ctx, task_name='semgrep_scan',
+              description='Semgrep Vulnerability Scan', mode='vulnerability')
+
+    return True
+
+
+@activity.defn(name="RunWAFBypassActivity")
+def run_waf_bypass_activity(ctx: dict) -> bool:
+    """Attempt to bypass detected WAF protections to find unprotected origins.
+
+    Delegates to the existing `waf_bypass` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import waf_bypass
+    activity.logger.info(f"[RunWAFBypassActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        waf_bypass.run,
+        ctx,
+        task_name='waf_bypass',
+        description='WAF Bypass'
+    )
+
+
+@activity.defn(name="RunBruteForceScanActivity")
+def run_brute_force_scan_activity(ctx: dict) -> bool:
+    """Run brute force attacks against discovered login endpoints.
+
+    Delegates to the existing `brute_force_scan` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import brute_force_scan
+    activity.logger.info(f"[RunBruteForceScanActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        brute_force_scan.run,
+        ctx,
+        task_name='brute_force_scan',
+        description='Brute Force Scan'
+    )
+
+
+@activity.defn(name="ParseAssessmentResultsActivity")
+def parse_assessment_results_activity(ctx: dict) -> bool:
+    """Verify assessment tier (vulnerability) results are persisted.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from startScan.models import Vulnerability
+    scan_id = ctx.get('scan_history_id')
+    vuln_count = Vulnerability.objects.filter(scan_history_id=scan_id).count()
+    activity.logger.info(
+        f"[ParseAssessmentResultsActivity] scan_id={scan_id}: "
+        f"{vuln_count} vulnerabilities found."
+    )
+    return True
+
+
+# ===========================================================================
+# Tier 7 — Post-Processing & Intelligence
+# ===========================================================================
+
+@activity.defn(name="CorrelateVulnerabilitiesActivity")
+def correlate_vulnerabilities_activity(ctx: dict) -> bool:
+    """Correlate discovered vulnerabilities with CVE databases and Neo4j graph.
+
+    Delegates to the existing `correlate_vulnerabilities` task which syncs
+    the graph and links technology findings to CVE records.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import correlate_vulnerabilities
+    scan_id = ctx.get('scan_history_id')
+    activity.logger.info(f"[CorrelateVulnerabilitiesActivity] scan_id={scan_id}")
+    return _run_task(
+        correlate_vulnerabilities.run,
+        ctx,
+        task_name='correlate_vulnerabilities',
+        description='Correlate Vulnerabilities',
+        scan_history_id=scan_id
+    )
+
+
+@activity.defn(name="CalculateRiskScoresActivity")
+def calculate_risk_scores_activity(ctx: dict) -> bool:
+    """Calculate weighted risk scores for all discovered vulnerabilities.
+
+    Delegates to the existing `calculate_risk_scores` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import calculate_risk_scores
+    scan_id = ctx.get('scan_history_id')
+    activity.logger.info(f"[CalculateRiskScoresActivity] scan_id={scan_id}")
+    return _run_task(
+        calculate_risk_scores.run,
+        ctx,
+        task_name='calculate_risk_scores',
+        description='Calculate Risk Scores',
+        scan_history_id=scan_id
+    )
+
+
+@activity.defn(name="GenerateImpactAssessmentActivity")
+def generate_impact_assessment_activity(ctx: dict) -> bool:
+    """Run AI-powered vulnerability impact assessment (if enabled in config).
+
+    Delegates to the existing `generate_impact_assessment` task.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import generate_impact_assessment
+    scan_id = ctx.get('scan_history_id')
+    activity.logger.info(f"[GenerateImpactAssessmentActivity] scan_id={scan_id}")
+    return _run_task(
+        generate_impact_assessment.run,
+        ctx,
+        task_name='generate_impact_assessment',
+        description='AI Impact Assessment',
+        scan_history_id=scan_id
+    )
+
+
+@activity.defn(name="SyncGraphActivity")
+def sync_graph_activity(ctx: dict) -> bool:
+    """Synchronize all scan results to the Neo4j Attack Path Modeling graph.
+
+    Delegates to `run_apme` task and additionally runs `Neo4jManager.sync_scan_results`.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.graph_utils import Neo4jManager
+    from reNgine.tasks import run_apme
+    scan_id = ctx.get('scan_history_id')
+    activity.logger.info(f"[SyncGraphActivity] Syncing scan_id={scan_id} to Neo4j")
+
+    # Run APME
+    _run_task(
+        run_apme.run,
+        ctx,
+        task_name='run_apme',
+        description='Attack Path Modeling',
+        scan_history_id=scan_id
+    )
+
+    # Also run raw graph sync
+    nm = Neo4jManager()
+    try:
+        nm.sync_scan_results(scan_id)
+        activity.logger.info(f"[SyncGraphActivity] Neo4j sync complete for scan_id={scan_id}")
+        return True
+    except Exception as e:
+        activity.logger.error(f"[SyncGraphActivity] Neo4j sync failed: {e}")
+        logger.error(f"Neo4j sync failed: {e}")
+        return False
+    finally:
+        nm.close()
+
+
+@activity.defn(name="SendScanNotificationActivity")
+def send_scan_notification_activity(ctx: dict) -> bool:
+    """Mark the scan as completed and send the final scan status notification.
+
+    Calls the `report` task function to update ScanHistory.scan_status to
+    SUCCESS/FAILED and dispatch the completion webhook/notification.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from startScan.models import ScanHistory, ScanActivity
+    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
+    from reNgine.tasks import send_scan_notif
+
+    scan_id = ctx.get('scan_history_id')
+    engine_id = ctx.get('engine_id')
+    activity.logger.info(f"[SendScanNotificationActivity] Finalizing scan_id={scan_id}")
+
+    scan = ScanHistory.objects.filter(pk=scan_id).first()
+    if not scan:
+        activity.logger.error(f"[SendScanNotificationActivity] ScanHistory {scan_id} not found.")
+        return False
+
+    # Determine overall scan status from ScanActivity records
+    failed_tasks = ScanActivity.objects.filter(
+        scan_of=scan,
+        status=FAILED_TASK
+    ).count()
+
+    status = SUCCESS_TASK if failed_tasks == 0 else FAILED_TASK
+    status_h = 'SUCCESS' if failed_tasks == 0 else 'FAILED'
+
+    scan.scan_status = status
+    scan.stop_scan_date = timezone.now()
+    scan.save()
+
+    activity.logger.info(
+        f"[SendScanNotificationActivity] scan_id={scan_id} finished with status={status_h}"
+    )
+
+    # Send notification directly (no Celery)
+    try:
+        send_scan_notif(
+            scan_history_id=scan_id,
+            subscan_id=None,
+            engine_id=engine_id,
+            status=status_h
+        )
+    except Exception as e:
+        # Non-fatal: log and continue
+        logger.warning(f"Could not send scan notification: {e}")
+
+    return True
+
+
+@activity.defn(name="RunGenericTaskActivity")
+def run_generic_task_activity(ctx: dict, task_name: str, description: str = None, extra_args: dict = None) -> bool:
+    """Execute any existing RengineTask-decorated task dynamically in a Temporal activity.
+
+    Imports the task function by name from `reNgine.tasks` (or globals),
+    constructs a TemporalTaskProxy, and executes it.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+        task_name (str): The name of the Celery task function (e.g., 'osint').
+        description (str, optional): Description for the UI tracking.
+        extra_args (dict, optional): Extra keyword arguments for the task function.
+    """
+    import importlib
+    activity.logger.info(f"[RunGenericTaskActivity] task={task_name} scan_id={ctx.get('scan_history_id')}")
+
+    # Import tasks dynamically
+    tasks_module = importlib.import_module("reNgine.tasks")
+    task_func = getattr(tasks_module, task_name, None)
+
+    if not task_func:
+        raise ValueError(f"Task function '{task_name}' not found in reNgine.tasks.")
+
+    # Call the unwrapped run method
+    run_args = extra_args or {}
+    return _run_task(
+        task_func.run,
+        ctx,
+        task_name=task_name,
+        description=description or ' '.join(task_name.split('_')).capitalize(),
+        **run_args
+    )
+
+
+@activity.defn(name="FinalizeSubScanActivity")
+def finalize_subscan_activity(ctx: dict, success: bool) -> bool:
+    """Mark the subscan as completed and update its status.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+        success (bool): True if all subscan steps succeeded, False otherwise.
+    """
+    from startScan.models import SubScan
+    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
+    from reNgine.tasks import send_scan_notif
+
+    subscan_id = ctx.get('subscan_id')
+    scan_id = ctx.get('scan_history_id')
+    engine_id = ctx.get('engine_id')
+
+    subscan = SubScan.objects.filter(pk=subscan_id).first()
+    if not subscan:
+        activity.logger.error(f"[FinalizeSubScanActivity] SubScan {subscan_id} not found.")
+        return False
+
+    status = SUCCESS_TASK if success else FAILED_TASK
+    status_h = 'SUCCESS' if success else 'FAILED'
+
+    subscan.status = status
+    subscan.stop_scan_date = timezone.now()
+    subscan.save()
+
+    activity.logger.info(
+        f"[FinalizeSubScanActivity] subscan_id={subscan_id} finished with status={status_h}"
+    )
+
+    # Send notification directly (no Celery)
+    try:
+        send_scan_notif(
+            scan_history_id=scan_id,
+            subscan_id=subscan_id,
+            engine_id=engine_id,
+            status=status_h
+        )
+    except Exception as e:
+        logger.warning(f"Could not send subscan notification: {e}")
+
+    return True
+
+
+# ===========================================================================
+# Stress Testing Activities
+# ===========================================================================
+
+@activity.defn(name="InitStressTestActivity")
+def init_stress_test_activity(ctx: dict) -> dict:
+    """Resolve target endpoints and create the StressTestResult DB record.
+
+    Mirrors the target profiling + endpoint query block from run_stress_testing.
+    Clears any stale telemetry stream and publishes the initial 'running' status.
+
+    Args:
+        ctx: Must contain scan_history_id, target_domain_name, stress_config.
+
+    Returns:
+        Enriched ctx with 'resolved_endpoints' (list[str]) and 'stress_result_id' (int).
+    """
+    import time
+    from startScan.models import ScanHistory, EndPoint, StressTestResult
+    from targetApp.models import Domain
+    from reNgine.definitions import RUNNING_TASK
+    from reNgine.stress_telemetry import StressTelemetryPublisher
+
+    scan_id = ctx["scan_history_id"]
+    target_domain = ctx["target_domain_name"]
+    stress_config = ctx.get("stress_config", {})
+
+    activity.logger.info(f"[InitStressTestActivity] scan_id={scan_id}")
+
+    scan = ScanHistory.objects.get(id=scan_id)
+    domain = Domain.objects.get(name=target_domain)
+
+    scan.scan_status = RUNNING_TASK
+    scan.save()
+
+    selected = stress_config.get("selected_endpoints", [])
+    if selected:
+        endpoints = list(
+            EndPoint.objects.filter(
+                scan_history_id=scan_id, http_url__in=selected
+            ).values_list("http_url", flat=True)
+        )
+    else:
+        crawl_targets = stress_config.get("crawl_targets", False)
+        qs = EndPoint.objects.filter(
+            scan_history_id=scan_id, subdomain__name=target_domain
+        ).order_by("id")
+        endpoints = list(qs.values_list("http_url", flat=True)[:5 if crawl_targets else 1])
+
+    tools = stress_config.get("uses_tools", ["k6"])
+    concurrency = stress_config.get("concurrency", 50)
+    duration = stress_config.get("duration", "30s") or "30s"
+
+    result = StressTestResult.objects.create(
+        scan_history=scan,
+        target_domain=domain,
+        tool_used=",".join(tools),
+        concurrency_used=concurrency,
+        duration=duration,
+    )
+
+    publisher = StressTelemetryPublisher(scan_id)
+    publisher.clear_stream()
+    publisher.publish({"type": "scan_status", "status": "running", "timestamp": time.time()})
+
+    activity.logger.info(
+        f"[InitStressTestActivity] scan_id={scan_id} "
+        f"resolved {len(endpoints)} endpoint(s) for tools={tools}"
+    )
+
+    return {
+        **ctx,
+        "resolved_endpoints": endpoints,
+        "stress_result_id": result.id,
+    }
+
+
+@activity.defn(name="RunStressToolActivity")
+def run_stress_tool_activity(ctx: dict) -> dict:
+    """Execute a single stress tool against a single endpoint.
+
+    Corresponds to the inner (endpoint × tool) loop of run_stress_testing.
+    Sends Temporal heartbeats every 15 seconds.  Also checks the Redis kill
+    switch as a belt-and-braces fallback for the window before the Temporal
+    signal reaches the workflow.
+
+    Args:
+        ctx: Must contain scan_history_id, target_domain_name, stress_config,
+             current_endpoint (str), current_tool (str).
+
+    Returns:
+        dict of aggregated metrics from the parser (total_requests,
+        successful_requests, failed_requests, avg_latency_ms, p95_latency_ms,
+        p99_latency_ms, max_requests_per_second).
+    """
+    import os
+    import signal as os_signal
+    import subprocess
+    import threading
+    import time
+
+    import redis as redis_lib
+    from django.conf import settings
+    from django.utils import timezone
+    from startScan.models import Command
+    from reNgine.parsers import K6Parser, WrkParser, Hping3Parser, LocustParser, TAStressorParser
+    from reNgine.stress_telemetry import StressTelemetryPublisher
+    from reNgine.stress_cmd_builder import build_stress_command
+    from reNgine.common_func import get_random_proxy, get_random_user_agent
+    from reNgine.opsec_utils import ProxychainsWrapper
+
+    scan_id = ctx["scan_history_id"]
+    target_domain = ctx["target_domain_name"]
+    endpoint_url = ctx["current_endpoint"]
+    tool = ctx["current_tool"]
+    stress_config = ctx.get("stress_config", {})
+    tool_config = stress_config.get(f"{tool}_config", {})
+    concurrency = stress_config.get("concurrency", 50)
+    duration = stress_config.get("duration", "30s") or "30s"
+
+    activity.logger.info(
+        f"[RunStressToolActivity] tool={tool} endpoint={endpoint_url} scan_id={scan_id}"
+    )
+
+    publisher = StressTelemetryPublisher(scan_id)
+
+    # Redis kill-switch check — secondary fallback alongside the Temporal signal
+    try:
+        rdb = redis_lib.StrictRedis(
+            host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0
+        )
+    except Exception:
+        rdb = None
+
+    def _kill_switch_active():
+        try:
+            return rdb is not None and rdb.get(f"kill_switch_{scan_id}") == b"1"
+        except Exception:
+            return False
+
+    # Select the right parser
+    parsers = {
+        "k6": K6Parser,
+        "wrk": WrkParser,
+        "hping3": Hping3Parser,
+        "locust": LocustParser,
+        "stressor": TAStressorParser,
+    }
+    parser_cls = parsers.get(tool)
+    if not parser_cls:
+        raise ValueError(f"[RunStressToolActivity] Unknown tool: {tool!r}")
+    parser = parser_cls()
+
+    single_proxy = get_random_proxy()
+    k6_user_agent = get_random_user_agent()
+
+    cmd_str, temp_files = build_stress_command(
+        tool=tool,
+        tool_config=tool_config,
+        endpoint_url=endpoint_url,
+        target_domain=target_domain,
+        scan_id=scan_id,
+        concurrency=concurrency,
+        duration=duration,
+        single_proxy=single_proxy,
+        k6_user_agent=k6_user_agent,
+        base_dir=settings.BASE_DIR,
+    )
+
+    proxy_wrapper = ProxychainsWrapper()
+    temp_conf_path = None
+    if proxy_wrapper.should_wrap():
+        cmd_str, temp_conf_path = proxy_wrapper.wrap_command(cmd_str)
+        activity.logger.info(f"[RunStressToolActivity] Wrapping via proxychains: {cmd_str}")
+    else:
+        activity.logger.info(f"[RunStressToolActivity] Executing: {cmd_str}")
+
+    if temp_conf_path:
+        temp_files.append(temp_conf_path)
+
+    command_obj = Command.objects.create(
+        command=cmd_str,
+        time=timezone.now(),
+        scan_history_id=scan_id,
+    )
+
+    publisher.publish({
+        "type": "command",
+        "tool": tool,
+        "endpoint": endpoint_url,
+        "command": cmd_str,
+        "timestamp": time.time(),
+    })
+
+    # Heartbeat thread — keeps the activity alive in Temporal's eyes
+    stop_heartbeat = threading.Event()
+
+    def _heartbeat():
+        while not stop_heartbeat.is_set():
+            try:
+                activity.heartbeat(f"Running {tool} against {endpoint_url}")
+            except Exception:
+                pass
+            stop_heartbeat.wait(15)
+
+    hb_thread = threading.Thread(target=_heartbeat, daemon=True)
+    hb_thread.start()
+
+    accumulated_lines = []
+    try:
+        process = subprocess.Popen(
+            cmd_str,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            shell=True,
+            start_new_session=True,
+        )
+
+        while True:
+            line = process.stdout.readline()
+            if not line and process.poll() is not None:
+                break
+            if line:
+                line = line.strip()
+                accumulated_lines.append(line)
+                publisher.publish({
+                    "type": "log",
+                    "tool": tool,
+                    "endpoint": endpoint_url,
+                    "line": line,
+                    "timestamp": time.time(),
+                })
+                metrics = parser.parse_line(line)
+                if metrics:
+                    metrics.update({
+                        "type": "metric",
+                        "tool": tool,
+                        "endpoint": endpoint_url,
+                        "timestamp": time.time(),
+                    })
+                    publisher.publish(metrics)
+
+            if _kill_switch_active():
+                activity.logger.info(
+                    f"[RunStressToolActivity] Redis kill switch active — terminating {tool}"
+                )
+                try:
+                    os.killpg(os.getpgid(process.pid), os_signal.SIGTERM)
+                except Exception as kill_err:
+                    activity.logger.error(f"[RunStressToolActivity] Kill failed: {kill_err}")
+                break
+
+        process.wait()
+        command_obj.output = "\n".join(accumulated_lines)
+        command_obj.return_code = process.returncode
+        command_obj.save()
+
+    finally:
+        stop_heartbeat.set()
+        hb_thread.join(timeout=5)
+        for path in temp_files:
+            if path and os.path.exists(path):
+                try:
+                    os.remove(path)
+                except Exception as rm_err:
+                    activity.logger.error(
+                        f"[RunStressToolActivity] Could not remove temp file {path}: {rm_err}"
+                    )
+
+    final_metrics = parser.get_final_metrics()
+    activity.logger.info(
+        f"[RunStressToolActivity] tool={tool} endpoint={endpoint_url} "
+        f"done — {final_metrics.get('total_requests', 0)} requests"
+    )
+    return final_metrics
+
+
+@activity.defn(name="FinalizeStressTestActivity")
+def finalize_stress_test_activity(ctx: dict) -> bool:
+    """Aggregate metrics, update StressTestResult + ScanHistory, send notification.
+
+    Mirrors the post-loop finalisation block in run_stress_testing and always
+    publishes a 'completed' status to the telemetry stream so the frontend
+    exits the running state even if a previous worker crash left it stale.
+
+    Args:
+        ctx: Must contain scan_history_id, stress_result_id, aborted (bool),
+             and pre-aggregated metric fields from the workflow.
+
+    Returns:
+        True on success.
+    """
+    import time
+    from django.utils import timezone
+    from startScan.models import ScanHistory, StressTestResult
+    from reNgine.definitions import SUCCESS_TASK, ABORTED_TASK
+    from reNgine.stress_telemetry import StressTelemetryPublisher
+    from reNgine.tasks import send_scan_notif
+
+    scan_id = ctx["scan_history_id"]
+    result_id = ctx.get("stress_result_id")
+    aborted = ctx.get("aborted", False)
+
+    activity.logger.info(
+        f"[FinalizeStressTestActivity] scan_id={scan_id} aborted={aborted}"
+    )
+
+    result = StressTestResult.objects.filter(id=result_id).first()
+    if result:
+        result.total_requests = ctx.get("total_requests", 0)
+        result.successful_requests = ctx.get("successful_requests", 0)
+        result.failed_requests = ctx.get("failed_requests", 0)
+        result.avg_latency_ms = ctx.get("avg_latency_ms", 0.0)
+        result.p95_latency_ms = ctx.get("p95_latency_ms", 0.0)
+        result.p99_latency_ms = ctx.get("p99_latency_ms", 0.0)
+        result.max_requests_per_second = ctx.get("max_rps", 0.0)
+        result.is_kill_switch_triggered = aborted
+        result.save()
+
+    scan = ScanHistory.objects.filter(id=scan_id).first()
+    if scan:
+        scan.scan_status = ABORTED_TASK if aborted else SUCCESS_TASK
+        scan.stop_scan_date = timezone.now()
+        scan.save()
+
+    # Always publish completed status — prevents the frontend from getting stuck
+    # in 'running' state after a worker crash between activities.
+    publisher = StressTelemetryPublisher(scan_id)
+    publisher.publish({
+        "type": "scan_status",
+        "status": "completed",
+        "timestamp": time.time(),
+    })
+
+    try:
+        send_scan_notif(
+            scan_history_id=scan_id,
+            status="ABORTED" if aborted else "SUCCESS",
+        )
+    except Exception as e:
+        activity.logger.warning(
+            f"[FinalizeStressTestActivity] Notification failed (non-fatal): {e}"
+        )
+
+    return True
