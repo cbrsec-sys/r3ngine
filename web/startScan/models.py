@@ -876,30 +876,136 @@ class MonitoringDiscovery(models.Model):
 
 
 class StressTestResult(models.Model):
+    TEST_STATUS_CHOICES = [
+        ('success', 'Success'),
+        ('aborted', 'Aborted'),
+        ('failed', 'Failed'),
+        ('running', 'Running'),
+    ]
+
     scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, related_name='stress_results')
     target_domain = models.ForeignKey(Domain, on_delete=models.CASCADE, related_name='stress_results', null=True, blank=True)
     tool_used = models.CharField(max_length=50, default="k6")
     concurrency_used = models.IntegerField(default=0)
     duration = models.CharField(max_length=50, blank=True, null=True)
-    
+
     total_requests = models.IntegerField(default=0)
     successful_requests = models.IntegerField(default=0)
     failed_requests = models.IntegerField(default=0)
-    
+
     avg_latency_ms = models.FloatField(default=0.0)
     p95_latency_ms = models.FloatField(default=0.0)
     p99_latency_ms = models.FloatField(default=0.0)
     max_requests_per_second = models.FloatField(default=0.0)
-    
+
+    # NEW: Extended metrics
+    start_time = models.DateTimeField(auto_now_add=True)
+    end_time = models.DateTimeField(null=True, blank=True)
+    endpoints_tested = models.JSONField(default=list, blank=True)
+    response_code_distribution = models.JSONField(default=dict, blank=True)
+    error_breakdown = models.JSONField(default=dict, blank=True)
+
+    # NEW: Additional percentiles
+    p50_latency_ms = models.FloatField(default=0.0)
+    p75_latency_ms = models.FloatField(default=0.0)
+    p90_latency_ms = models.FloatField(default=0.0)
+    p999_latency_ms = models.FloatField(default=0.0)
+    percentile_latencies = models.JSONField(default=dict, blank=True)
+
+    # NEW: Performance insights
+    max_concurrent_connections = models.IntegerField(default=0)
+    peak_throughput_rps = models.FloatField(default=0.0)
+    test_status = models.CharField(
+        max_length=20,
+        choices=TEST_STATUS_CHOICES,
+        default='success'
+    )
+
+    # NEW: Findings & analysis
+    findings = models.TextField(blank=True, default='')
+    anomalies_detected = models.JSONField(default=list, blank=True)
+    recommendations = models.TextField(blank=True, default='')
+
     is_kill_switch_triggered = models.BooleanField(default=False)
     timestamp = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = 'Stress Test Result'
         verbose_name_plural = 'Stress Test Results'
+        indexes = [
+            models.Index(fields=['scan_history', '-start_time']),
+            models.Index(fields=['test_status']),
+        ]
 
     def __str__(self):
         return f"Stress Test Result for Scan {self.scan_history.id} - {self.tool_used}"
+
+
+class StressTelemetryPoint(models.Model):
+    """Individual metric snapshot during a stress test (time-series data)."""
+    TOOL_CHOICES = [
+        ('k6', 'k6'),
+        ('wrk', 'wrk'),
+        ('hping3', 'hping3'),
+        ('locust', 'locust'),
+        ('stressor', 'stressor'),
+    ]
+
+    stress_result = models.ForeignKey(
+        StressTestResult,
+        on_delete=models.CASCADE,
+        related_name='telemetry_points'
+    )
+    endpoint = models.ForeignKey(
+        EndPoint,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    tool = models.CharField(max_length=20, choices=TOOL_CHOICES)
+    timestamp = models.DateTimeField(db_index=True)
+
+    # Common metrics (normalized across tools)
+    latency_ms = models.FloatField(null=True, blank=True)
+    throughput = models.FloatField(null=True, blank=True)
+    error_rate = models.FloatField(null=True, blank=True)
+    request_count = models.IntegerField(null=True, blank=True)
+    error_count = models.IntegerField(null=True, blank=True)
+
+    # Tool-specific metrics (JSON for flexibility)
+    tool_specific_metrics = models.JSONField(default=dict, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Stress Telemetry Point'
+        verbose_name_plural = 'Stress Telemetry Points'
+        indexes = [
+            models.Index(fields=['stress_result', 'timestamp']),
+            models.Index(fields=['tool', 'timestamp']),
+            models.Index(fields=['endpoint', 'timestamp']),
+        ]
+
+    def __str__(self):
+        return f"{self.tool} telemetry at {self.timestamp}"
+
+
+class StressToolConfiguration(models.Model):
+    """Stores exact tool parameters used in each test."""
+    stress_result = models.OneToOneField(
+        StressTestResult,
+        on_delete=models.CASCADE,
+        related_name='tool_config'
+    )
+    tool_configs = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Stress Tool Configuration'
+        verbose_name_plural = 'Stress Tool Configurations'
+
+    def __str__(self):
+        return f"Tool config for stress result {self.stress_result.id}"
 
 
 class AuthCandidate(models.Model):
@@ -976,3 +1082,102 @@ class OsintStaging(models.Model):
 
 	def __str__(self):
 		return f"{self.osint_type}: {self.content[:50]}"
+
+
+class TemporalWorkflowExecution(models.Model):
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, related_name='temporal_executions')
+	workflow_id = models.CharField(max_length=255, unique=True)
+	run_id = models.CharField(max_length=255)
+	workflow_type = models.CharField(max_length=100)
+	status = models.CharField(max_length=50, default="RUNNING") # RUNNING, COMPLETED, FAILED, TIMED_OUT, CANCELLED, TERMINATED
+	started_at = models.DateTimeField(auto_now_add=True)
+	ended_at = models.DateTimeField(null=True, blank=True)
+	error_message = models.TextField(null=True, blank=True)
+
+	def __str__(self):
+		return f"{self.workflow_type} ({self.workflow_id})"
+
+
+class WorkflowLineage(models.Model):
+	id = models.AutoField(primary_key=True)
+	parent_execution = models.ForeignKey(TemporalWorkflowExecution, on_delete=models.CASCADE, related_name='child_lineages', null=True, blank=True)
+	child_execution = models.ForeignKey(TemporalWorkflowExecution, on_delete=models.CASCADE, related_name='parent_lineages')
+	relation_type = models.CharField(max_length=50) # CHILD_WORKFLOW, RECURSIVE_EXPANSION, EVENT_TRIGGERED
+	depth = models.IntegerField(default=0)
+
+
+class TemporalActivityExecution(models.Model):
+	id = models.AutoField(primary_key=True)
+	workflow_execution = models.ForeignKey(TemporalWorkflowExecution, on_delete=models.CASCADE, related_name='activities')
+	activity_id = models.CharField(max_length=255)
+	activity_type = models.CharField(max_length=100)
+	status = models.CharField(max_length=50, default="RUNNING")
+	retry_count = models.IntegerField(default=0)
+	started_at = models.DateTimeField(auto_now_add=True)
+	ended_at = models.DateTimeField(null=True, blank=True)
+	heartbeat_telemetry = models.JSONField(null=True, blank=True)
+	error_message = models.TextField(null=True, blank=True)
+
+
+class WorkflowCheckpoint(models.Model):
+	id = models.AutoField(primary_key=True)
+	workflow_execution = models.ForeignKey(TemporalWorkflowExecution, on_delete=models.CASCADE)
+	checkpoint_name = models.CharField(max_length=100)
+	state_payload = models.JSONField() # JSON state containing found subdomains, ports, etc.
+	saved_at = models.DateTimeField(auto_now_add=True)
+
+
+class RecursiveExpansionState(models.Model):
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE)
+	target = models.CharField(max_length=1000)
+	depth = models.IntegerField(default=0)
+	budget_allocated = models.IntegerField(default=100)
+	budget_consumed = models.IntegerField(default=0)
+	ancestry_path = ArrayField(models.CharField(max_length=1000), default=list) # Trace roots
+	expansion_score = models.FloatField(default=1.0)
+
+
+class OASTCorrelationState(models.Model):
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE)
+	token = models.CharField(max_length=255, unique=True) # Interactsh token
+	workflow_id = models.CharField(max_length=255)
+	registered_at = models.DateTimeField(auto_now_add=True)
+	expires_at = models.DateTimeField()
+	is_correlated = models.BooleanField(default=False)
+	interaction_payload = models.JSONField(null=True, blank=True)
+
+
+class WorkflowSuppressionState(models.Model):
+	id = models.AutoField(primary_key=True)
+	target_domain = models.ForeignKey(Domain, on_delete=models.CASCADE)
+	identifier = models.CharField(max_length=500) # SHA-256 of template_id + host + port
+	suppressed_until = models.DateTimeField()
+	reason = models.CharField(max_length=500, blank=True, null=True)
+
+
+class WorkflowSignal(models.Model):
+	id = models.AutoField(primary_key=True)
+	workflow_execution = models.ForeignKey(TemporalWorkflowExecution, on_delete=models.CASCADE, related_name='signals')
+	signal_name = models.CharField(max_length=100)
+	payload = models.JSONField(null=True, blank=True)
+	received_at = models.DateTimeField(auto_now_add=True)
+
+
+class WorkflowEvent(models.Model):
+	id = models.AutoField(primary_key=True)
+	workflow_execution = models.ForeignKey(TemporalWorkflowExecution, on_delete=models.CASCADE, related_name='events')
+	event_type = models.CharField(max_length=100) # e.g. subdomain_discovered, endpoint_discovered, etc.
+	payload = models.JSONField(null=True, blank=True)
+	timestamp = models.DateTimeField(auto_now_add=True)
+
+
+class ExecutionTelemetry(models.Model):
+	id = models.AutoField(primary_key=True)
+	workflow_execution = models.ForeignKey(TemporalWorkflowExecution, on_delete=models.CASCADE, related_name='telemetry')
+	cpu_usage = models.FloatField(default=0.0)
+	memory_usage = models.FloatField(default=0.0)
+	active_threads = models.IntegerField(default=0)
+	timestamp = models.DateTimeField(auto_now_add=True)

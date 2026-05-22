@@ -21,7 +21,7 @@ from reNgine.celery import app
 from reNgine.charts import *
 from reNgine.common_func import *
 from reNgine.definitions import ABORTED_TASK, SUCCESS_TASK, PERM_MODIFY_SCAN_REPORT, FOUR_OH_FOUR_URL
-from reNgine.tasks import create_scan_activity, initiate_scan, run_command
+from reNgine.tasks import create_scan_activity, initiate_scan, initiate_scan_temporal, run_command
 from scanEngine.models import EngineType
 from startScan.models import *
 from targetApp.models import *
@@ -302,7 +302,10 @@ def start_scan_ui(request, slug, domain_id):
             scan.cfg_custom_dorks = custom_dorks
             scan.save()
 
-        # Start the celery task
+        # Start the scan via Temporal durable workflow orchestration.
+        # initiate_scan_temporal performs the same scan bootstrap as the
+        # legacy Celery initiate_scan, then starts a MasterScanWorkflow on
+        # the Temporal cluster.
         kwargs = {
             'scan_history_id': scan.id,
             'domain_id': domain.id,
@@ -317,7 +320,7 @@ def start_scan_ui(request, slug, domain_id):
             'enable_spiderfoot_scan': spiderfoot_scan,
             'initiated_by_id': request.user.id
         }
-        initiate_scan.apply_async(kwargs=kwargs)
+        initiate_scan_temporal(**kwargs)
         scan.save()
 
         # Send start notif
@@ -413,12 +416,8 @@ def start_multiple_scan(request, slug):
                     'excluded_paths': excluded_paths,
                     'enable_spiderfoot_scan': spiderfoot_scan,
                 }
-
-                _scan_task = initiate_scan.si(**kwargs)
-                grouped_scans.append(_scan_task)
-
-            celery_group = group(grouped_scans)
-            celery_group.apply_async()
+                # Start each scan as an independent Temporal workflow
+                initiate_scan_temporal(**kwargs)
 
             # Send start notif
             messages.add_message(

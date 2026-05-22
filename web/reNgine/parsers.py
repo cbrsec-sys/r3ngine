@@ -1,6 +1,7 @@
 import re
 import json
 import logging
+import time
 from typing import Optional, List, Dict
 
 logger = logging.getLogger(__name__)
@@ -12,9 +13,7 @@ class BaseParser:
 
 class K6Parser(BaseParser):
     """
-    Parses k6 output. 
-    Note: For real-time telemetry, k6 is best run with '--out json' 
-    or we can parse the standard output summary if needed.
+    Parses k6 output for real-time and summary metrics.
     """
     def __init__(self):
         """Initialize the K6Parser state."""
@@ -25,17 +24,27 @@ class K6Parser(BaseParser):
             "error_rate": 0.0,
             "throughput_rps": 0.0,
             "total_requests": 0,
+            "current_vus": 0,
         }
 
     def parse_line(self, line):
-        """Parse a single line of k6 stdout.
+        """Parse a single line of k6 stdout for real-time metrics.
 
         Args:
             line (str): The raw output line from k6 standard output.
 
         Returns:
-            dict: The updated metrics dictionary.
+            dict: The updated metrics dictionary, or None if no metrics found.
         """
+        # K6 progress line: "     execution: 00m10.0s / 00m30.0s, 3/3 VUs, 95 complete and 0 interrupted transactions"
+        progress_match = re.search(r'(\d+)/(\d+) VUs.*?(\d+) complete', line)
+        if progress_match:
+            self.metrics["current_vus"] = int(progress_match.group(1))
+            self.metrics["total_requests"] = int(progress_match.group(3))
+            self.metrics["throughput_rps"] = self.metrics.get("throughput_rps", 0)
+            return self.metrics
+
+        # Summary lines with metrics
         # Example: http_req_duration..............: avg=12.34ms min=1.23ms med=10.11ms max=100.22ms p(90)=20.33ms p(95)=25.44ms p(99)=30.45ms
         avg_match = re.search(r"http_req_duration\.*:\s+avg=([0-9.]+)", line)
         if avg_match:
@@ -53,12 +62,17 @@ class K6Parser(BaseParser):
         if reqs_match:
             self.metrics["total_requests"] = int(reqs_match.group(1))
             self.metrics["throughput_rps"] = float(reqs_match.group(2))
+            return self.metrics
 
         failed_match = re.search(r"http_req_failed\.*:\s+([0-9.]+)%", line)
         if failed_match:
             self.metrics["error_rate"] = float(failed_match.group(1)) / 100.0
 
-        return self.metrics
+        # Return metrics if we found any useful data
+        if progress_match or avg_match or p95_match or p99_match or reqs_match or failed_match:
+            return self.metrics
+
+        return None
 
     def get_final_metrics(self):
         """Calculate and return the final aggregated metrics for the k6 run.
@@ -70,6 +84,7 @@ class K6Parser(BaseParser):
         error_rate = self.metrics.get("error_rate", 0.0)
         failed = int(total * error_rate)
         success = max(0, total - failed)
+
         return {
             "total_requests": total,
             "successful_requests": success,
@@ -77,7 +92,7 @@ class K6Parser(BaseParser):
             "avg_latency_ms": self.metrics.get("avg_latency", 0.0),
             "p95_latency_ms": self.metrics.get("p95_latency", 0.0),
             "p99_latency_ms": self.metrics.get("p99_latency", 0.0) or self.metrics.get("p95_latency", 0.0),
-            "max_requests_per_second": self.metrics.get("throughput_rps", 0.0)
+            "max_requests_per_second": self.metrics.get("throughput_rps", 0.0),
         }
 
 
@@ -93,11 +108,31 @@ class WrkParser(BaseParser):
             "avg_latency": 0.0,
             "p95_latency": 0.0,
             "p99_latency": 0.0,
+            "max_latency": 0.0,
+            "latency_stdev": 0.0,
             "throughput_rps": 0.0,
             "error_rate": 0.0,
             "total_requests": 0,
-            "socket_errors": 0
+            "socket_errors": 0,
+            "timeout_errors": 0,
         }
+
+    def _to_ms(self, val, unit):
+        """Convert a wrk latency value to milliseconds.
+
+        Args:
+            val (float): The numeric value.
+            unit (str): The unit string ('ms', 's', 'us').
+
+        Returns:
+            float: Value in milliseconds.
+        """
+        u = unit.lower()
+        if u == 's':
+            return val * 1000.0
+        if u == 'us':
+            return val / 1000.0
+        return val  # already ms
 
     def parse_line(self, line):
         """Parse a single line of wrk command output.
@@ -109,36 +144,50 @@ class WrkParser(BaseParser):
             dict or None: The accumulated metrics dictionary if a metric was parsed, else None.
         """
         has_update = False
-        
-        # Parse Latency line (e.g., "Latency   318.27ms   35.96ms 781.98ms   93.08%")
-        latency_match = re.search(r"Latency\s+([0-9.]+)([a-z]+)", line)
-        if latency_match:
-            val = float(latency_match.group(1))
-            unit = latency_match.group(2).lower()
-            if unit == "ms":
-                self.metrics["avg_latency"] = val
-            elif unit == "s":
-                self.metrics["avg_latency"] = val * 1000
+
+        # Parse full Latency summary line:
+        # Format: "  Latency   318.27ms   35.96ms 781.98ms   93.08%"
+        # Fields:          avg      stdev      max   pct_within_1_stdev
+        latency_full_match = re.search(
+            r"Latency\s+([0-9.]+)([a-zµ]+)\s+([0-9.]+)([a-zµ]+)\s+([0-9.]+)([a-zµ]+)",
+            line
+        )
+        if latency_full_match:
+            self.metrics["avg_latency"] = self._to_ms(
+                float(latency_full_match.group(1)), latency_full_match.group(2))
+            self.metrics["latency_stdev"] = self._to_ms(
+                float(latency_full_match.group(3)), latency_full_match.group(4))
+            self.metrics["max_latency"] = self._to_ms(
+                float(latency_full_match.group(5)), latency_full_match.group(6))
+            has_update = True
+        elif re.search(r"Latency\s+([0-9.]+)([a-zµ]+)", line):
+            # Fallback: parse avg only from a simpler line format
+            m = re.search(r"Latency\s+([0-9.]+)([a-zµ]+)", line)
+            self.metrics["avg_latency"] = self._to_ms(float(m.group(1)), m.group(2))
             has_update = True
 
-        # Parse Latency distribution table lines, e.g. " 95% 150.34ms" or " 99% 250.12ms"
-        p_match = re.search(r"^\s*(95%|99%)\s+([0-9.]+)([a-z]+)", line)
+        # Parse Latency distribution table lines:
+        # e.g. " 95%  150.34ms" or " 99%  250.12ms" or "100%  779.00ms (longest request)"
+        p_match = re.search(r"^\s*(\d+)%\s+([0-9.]+)([a-zµ]+)", line)
         if p_match:
-            pct = p_match.group(1)
-            val = float(p_match.group(2))
-            unit = p_match.group(3).lower()
-            if unit == "ms":
-                ms_val = val
-            elif unit == "s":
-                ms_val = val * 1000.0
-            else:
-                ms_val = val
-            if pct == "95%":
+            pct = int(p_match.group(1))
+            ms_val = self._to_ms(float(p_match.group(2)), p_match.group(3))
+            if pct == 50:
+                self.metrics["p50_latency"] = ms_val
+            elif pct == 75:
+                self.metrics["p75_latency"] = ms_val
+            elif pct == 90:
+                self.metrics["p90_latency"] = ms_val
+            elif pct == 95:
                 self.metrics["p95_latency"] = ms_val
-            elif pct == "99%":
+            elif pct == 99:
                 self.metrics["p99_latency"] = ms_val
+            elif pct == 100:
+                # 100% line = actual max (same as latency line max; keep the more accurate value)
+                if ms_val > self.metrics.get("max_latency", 0):
+                    self.metrics["max_latency"] = ms_val
             has_update = True
-        
+
         # Parse Requests/sec line (e.g., "Requests/sec:    114.27")
         rps_match = re.search(r"Requests/sec:\s+([0-9.]+)", line)
         if rps_match:
@@ -155,18 +204,26 @@ class WrkParser(BaseParser):
                 self.metrics["error_rate"] = self.metrics["socket_errors"] / self.metrics["total_requests"]
 
         # Parse Socket Errors line (e.g., "Socket errors: connect 25, read 0, write 0, timeout 0")
-        errors_match = re.search(r"Socket errors:\s+connect\s+([0-9]+),\s+read\s+([0-9]+),\s+write\s+([0-9]+),\s+timeout\s+([0-9]+)", line)
+        # Split timeout_errors out from socket_errors so the WrkDashboard can display them separately.
+        errors_match = re.search(
+            r"Socket errors:\s+connect\s+([0-9]+),\s+read\s+([0-9]+),\s+write\s+([0-9]+),\s+timeout\s+([0-9]+)",
+            line
+        )
         if errors_match:
             connect_err = int(errors_match.group(1))
-            read_err = int(errors_match.group(2))
-            write_err = int(errors_match.group(3))
+            read_err    = int(errors_match.group(2))
+            write_err   = int(errors_match.group(3))
             timeout_err = int(errors_match.group(4))
-            self.metrics["socket_errors"] = connect_err + read_err + write_err + timeout_err
+            # socket_errors = connection-level errors (exclude timeouts, counted separately)
+            self.metrics["socket_errors"] = connect_err + read_err + write_err
+            self.metrics["timeout_errors"] = timeout_err
+            # Total error count used for error_rate = all non-timeout + timeout
+            total_errors = connect_err + read_err + write_err + timeout_err
             has_update = True
-            # Recompute error rate if total requests is already known
+            # Recompute error rate
             if self.metrics["total_requests"] > 0:
-                self.metrics["error_rate"] = self.metrics["socket_errors"] / self.metrics["total_requests"]
-            
+                self.metrics["error_rate"] = total_errors / self.metrics["total_requests"]
+
         return self.metrics if has_update else None
 
     def get_final_metrics(self):
@@ -308,7 +365,7 @@ class LocustParser(BaseParser):
         """
         has_update = False
         line_stripped = line.strip("\r")
-        if "Type" in line_stripped and "# reqs" in line_stripped and "# fails" in line_stripped:
+        if ("Type" in line_stripped or "Name" in line_stripped) and "# reqs" in line_stripped and "# fails" in line_stripped:
             self.in_main = True
             self.in_perc = False
             self.metrics["main_table"] = []

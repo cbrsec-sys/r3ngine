@@ -13,6 +13,12 @@ services:
       - postgres_data:/var/lib/postgresql/data/
     networks:
       - r3ngine_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -37,7 +43,7 @@ services:
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     restart: always
     entrypoint: /usr/src/app/celery-entrypoint.sh
-    command: celery -A reNgine worker --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l WARNING
+    command: celery -A reNgine worker -Q main_scan_queue,background_queue,report_queue,celery --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l INFO
     volumes:
       - ./web:/usr/src/app
       #- ./frontend:/usr/src/app/frontend
@@ -115,7 +121,7 @@ services:
     restart: always
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     environment:
-      - DEBUG=0
+      - DEBUG=1
       - CELERY_BROKER=redis://redis:6379/0
       - CELERY_BACKEND=redis://redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}
@@ -127,8 +133,8 @@ services:
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
     volumes:
       - ./web:/usr/src/app
-      #- ./frontend:/usr/src/app/frontend
-      #- /usr/src/app/frontend/node_modules
+      - ./frontend:/usr/src/app/frontend
+      - /usr/src/app/frontend/node_modules
       - github_repos:/usr/src/github
       - wordlist:/usr/src/wordlist
       - scan_results:/usr/src/scan_results
@@ -215,6 +221,12 @@ services:
       - neo4j_data:/data
     networks:
       - r3ngine_network
+    healthcheck:
+      test: [ "CMD", "wget", "-O", "/dev/null", "-q", "http://localhost:7474" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -233,11 +245,19 @@ services:
       - DB_PORT=5432
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PWD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_SEEDS=db
     depends_on:
       - db
+      #  condition: service_healthy
     networks:
       - r3ngine_network
+    healthcheck:
+      test: [ "CMD", "tctl", "namespace", "list" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -260,9 +280,12 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}
     depends_on:
-      - temporal
-      - db
-      - neo4j
+      temporal:
+        condition: service_healthy
+      db:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
     volumes:
       - ./web:/usr/src/app
       - github_repos:/usr/src/github
@@ -274,6 +297,12 @@ services:
       - static_volume:/usr/src/app/staticfiles/
     networks:
       - r3ngine_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pgrep -f run_temporal_orchestrator || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -294,8 +323,10 @@ services:
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT}
     depends_on:
-      - temporal
-      - db
+      temporal:
+        condition: service_healthy
+      db:
+        condition: service_healthy
     volumes:
       - ./web:/usr/src/app
       - github_repos:/usr/src/github
@@ -307,6 +338,12 @@ services:
       - static_volume:/usr/src/app/staticfiles/
     networks:
       - r3ngine_network
+    healthcheck:
+      test: [ "CMD", "pgrep", "-f", "r3ngine-executor" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     deploy:
       resources:
         limits:

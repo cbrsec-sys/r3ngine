@@ -1,7 +1,13 @@
+import os
+import django
+from django.apps import apps
+if not apps.ready:
+    os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'reNgine.settings')
+    django.setup()
+
 import csv
 import requests
 import json
-import os
 import pprint
 import subprocess
 import time
@@ -709,6 +715,452 @@ def initiate_scan(
 			scan.scan_status = FAILED_TASK
 			scan.error_message = str(e)
 			scan.save()
+		return {
+			'success': False,
+			'error': str(e)
+		}
+
+
+def initiate_scan_temporal(
+		scan_history_id,
+		domain_id,
+		engine_id=None,
+		scan_type=LIVE_SCAN,
+		results_dir=RENGINE_RESULTS,
+		imported_subdomains=[],
+		out_of_scope_subdomains=[],
+		initiated_by_id=None,
+		starting_point_path='',
+		excluded_paths=[],
+		custom_dorks=None,
+		enable_spiderfoot_scan=False,
+	):
+	"""Initiate a new scan using Temporal durable workflow orchestration.
+
+	This function performs the same scan setup as `initiate_scan` (creates the
+	ScanHistory record, results directory, initial subdomain and endpoint objects)
+	but delegates execution to a `MasterScanWorkflow` on the Temporal cluster
+	instead of building a Celery chain.
+
+	This is the production entrypoint for all new scans when Temporal is active.
+
+	Args:
+		scan_history_id (int): ScanHistory id.
+		domain_id (int): Domain id.
+		engine_id (int): Engine ID.
+		scan_type (int): Scan type (periodic, live).
+		results_dir (str): Results directory root.
+		imported_subdomains (list): Pre-imported subdomains.
+		out_of_scope_subdomains (list): Out-of-scope subdomains to skip.
+		initiated_by_id (int): User ID initiating the scan.
+		starting_point_path (str): URL path filter. Default: ''.
+		excluded_paths (list): URL paths to exclude from scan.
+		custom_dorks (str): Custom dorks to run. Default: None.
+		enable_spiderfoot_scan (bool): Whether to enable SpiderFoot scan.
+
+	Returns:
+		dict: {'success': True, 'workflow_id': str} on success.
+	"""
+	import asyncio
+	import uuid
+
+	logger.info('Initiating scan via Temporal workflow orchestrator')
+	scan = None
+	try:
+		# ---- Get scan objects ----
+		if scan_history_id:
+			scan = ScanHistory.objects.filter(pk=scan_history_id).first()
+
+		if not engine_id and scan:
+			engine_id = scan.scan_type.id
+		engine = EngineType.objects.get(pk=engine_id)
+
+		# ---- Parse engine YAML config ----
+		config = yaml.safe_load(engine.yaml_configuration)
+		enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
+		gf_patterns = config.get(GF_PATTERNS, [])
+		api_discovery_config = config.get(WEB_API_DISCOVERY, {})
+		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
+		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
+
+		# ---- Get domain ----
+		domain = Domain.objects.get(pk=domain_id)
+		domain.last_scan_date = timezone.now()
+		domain.save()
+
+		starting_point_path = starting_point_path.rstrip('/')
+
+		if scan_type == SCHEDULED_SCAN:
+			scan_history_id = create_scan_object(
+				host_id=domain_id,
+				engine_id=engine_id,
+				initiated_by_id=initiated_by_id,
+			)
+
+		if not scan:
+			scan = ScanHistory.objects.get(pk=scan_history_id)
+
+		tasks = list(engine.tasks)
+
+		# WAF Logic: If WAF Bypass is enabled, WAF Detection MUST also be enabled
+		if 'waf_bypass' in tasks and 'waf_detection' not in tasks:
+			tasks.insert(tasks.index('waf_bypass'), 'waf_detection')
+
+		if enable_spiderfoot_scan and 'spiderfoot_scan' not in tasks:
+			tasks.append('spiderfoot_scan')
+
+		# ---- Update ScanHistory ----
+		scan.scan_status = RUNNING_TASK
+		scan.scan_type = engine
+		scan.domain = domain
+		scan.start_scan_date = timezone.now()
+		scan.tasks = tasks
+		scan.results_dir = f'{results_dir}/{domain.name}_{scan.id}'
+		scan.cfg_starting_point_path = starting_point_path
+		scan.cfg_excluded_paths = excluded_paths
+		scan.cfg_out_of_scope_subdomains = out_of_scope_subdomains
+		scan.cfg_imported_subdomains = imported_subdomains
+
+		add_gf_patterns = gf_patterns and 'fetch_url' in tasks
+		if add_gf_patterns:
+			scan.used_gf_patterns = ','.join(gf_patterns)
+
+		if custom_dorks:
+			scan.cfg_custom_dorks = custom_dorks
+
+		scan.save()
+
+		# ---- Create scan results directory ----
+		os.makedirs(scan.results_dir, exist_ok=True)
+
+		if custom_dorks:
+			with open(f'{scan.results_dir}/custom_dorks.txt', 'w') as f:
+				f.write(custom_dorks)
+
+		# ---- Save imported subdomains ----
+		save_imported_subdomains(imported_subdomains, ctx={
+			'scan_history_id': scan.id,
+			'domain_id': domain.id,
+			'results_dir': scan.results_dir
+		})
+
+		# ---- Create initial root subdomain & endpoint ----
+		ctx_bootstrap = {
+			'scan_history_id': scan.id,
+			'engine_id': engine_id,
+			'domain_id': domain.id,
+			'results_dir': scan.results_dir,
+			'starting_point_path': starting_point_path,
+			'out_of_scope_subdomains': out_of_scope_subdomains,
+		}
+		subdomain, _ = save_subdomain(domain.name, ctx=ctx_bootstrap)
+		http_url = f'{domain.name}{starting_point_path}' if starting_point_path else domain.name
+		endpoint, _ = save_endpoint(
+			http_url,
+			ctx=ctx_bootstrap,
+			crawl=enable_http_crawl,
+			is_default=True,
+			subdomain=subdomain
+		)
+		if endpoint and endpoint.is_alive:
+			subdomain.http_url = endpoint.http_url
+			subdomain.http_status = endpoint.http_status
+			subdomain.response_time = endpoint.response_time
+			subdomain.page_title = endpoint.page_title
+			subdomain.content_type = endpoint.content_type
+			subdomain.content_length = endpoint.content_length
+			for tech in endpoint.techs.all():
+				subdomain.technologies.add(tech)
+			subdomain.save()
+
+		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
+		temporal_ctx = {
+			'scan_history_id': scan.id,
+			'engine_id': engine_id,
+			'domain_id': domain.id,
+			'results_dir': scan.results_dir,
+			'starting_point_path': starting_point_path,
+			'excluded_paths': excluded_paths,
+			'yaml_configuration': config,
+			'out_of_scope_subdomains': out_of_scope_subdomains,
+			'custom_dorks': custom_dorks,
+			'api_discovery_tools': api_discovery_tools,
+			'kr_wordlist': kr_wordlist,
+			'tasks': tasks,
+		}
+
+		# ---- Start MasterScanWorkflow on Temporal ----
+		from reNgine.temporal_client import TemporalClientProvider
+		from datetime import timedelta
+		from temporalio.exceptions import ServerError as TemporalServiceError
+
+		workflow_id = f"scan-{scan.id}-{uuid.uuid4().hex[:8]}"
+		max_retries = 3
+		backoff_base = 2
+
+		async def _start_workflow_with_retry():
+			"""Async helper: connect to Temporal, start workflow, retry on transient errors."""
+			for attempt in range(1, max_retries + 1):
+				try:
+					client = await TemporalClientProvider.get_client()
+					logger.info(
+						f'[initiate_scan_temporal] Starting MasterScanWorkflow '
+						f'attempt {attempt}/{max_retries} workflow_id={workflow_id}'
+					)
+					handle = await client.start_workflow(
+						"MasterScanWorkflow",
+						temporal_ctx,
+						id=workflow_id,
+						task_queue="python-orchestrator-queue",
+						execution_timeout=timedelta(days=30),
+						run_timeout=timedelta(days=30),
+						task_timeout=timedelta(hours=1),
+					)
+					return handle.id
+				except TemporalServiceError as e:
+					if attempt == max_retries:
+						logger.error(
+							f'[initiate_scan_temporal] Failed after {max_retries} retries: {e}'
+						)
+						raise
+					wait_time = backoff_base ** (attempt - 1)
+					logger.warning(
+						f'[initiate_scan_temporal] Attempt {attempt} failed, retrying in {wait_time}s: {e}'
+					)
+					await asyncio.sleep(wait_time)
+
+		TemporalClientProvider.reset()
+		loop = asyncio.new_event_loop()
+		asyncio.set_event_loop(loop)
+		try:
+			started_workflow_id = loop.run_until_complete(_start_workflow_with_retry())
+		finally:
+			loop.close()
+
+		logger.info(
+			f'Started MasterScanWorkflow id={started_workflow_id} '
+			f'for scan_history_id={scan.id}'
+		)
+
+		# Send start notification via Celery (non-blocking)
+		send_scan_notif.delay(
+			scan.id,
+			subscan_id=None,
+			engine_id=engine_id,
+			status=CELERY_TASK_STATUS_MAP.get(scan.scan_status, 'RUNNING')
+		)
+
+		return {
+			'success': True,
+			'workflow_id': started_workflow_id,
+		}
+
+	except Exception as e:
+		logger.exception(e)
+		if scan:
+			scan.scan_status = FAILED_TASK
+			scan.error_message = str(e)
+			scan.save()
+		return {
+			'success': False,
+			'error': str(e)
+		}
+
+
+def initiate_subscan_temporal(
+		scan_history_id,
+		subdomain_id,
+		engine_id=None,
+		scan_type=None,
+		results_dir=RENGINE_RESULTS,
+		starting_point_path='',
+		excluded_paths=[],
+		custom_dorks=None,
+	):
+	"""Initiate a new subscan using Temporal durable workflow orchestration.
+
+	This function performs the same subdomain scan setup as `initiate_subscan`
+	(creates the SubScan record, results directory, initial subdomain and endpoint
+	objects) but delegates execution to a `SubScanWorkflow` on the Temporal cluster
+	instead of building a Celery chain.
+
+	Args:
+		scan_history_id (int): ScanHistory id.
+		subdomain_id (int): Subdomain id.
+		engine_id (int, optional): Engine ID.
+		scan_type (str, optional): Scan type (e.g. 'osint', 'port_scan', etc.).
+		results_dir (str, optional): Results directory root.
+		starting_point_path (str, optional): URL path. Default: ''.
+		excluded_paths (list, optional): Excluded paths. Default: [].
+		custom_dorks (str, optional): Custom dorks. Default: None.
+
+	Returns:
+		dict: {'success': True, 'workflow_id': str} on success.
+	"""
+	import asyncio
+	import uuid
+
+	logger.info(f"Initiating subdomain subscan '{scan_type}' via Temporal workflow orchestrator")
+	subscan = None
+	try:
+		# ---- Get Subdomain, Domain and ScanHistory ----
+		subdomain = Subdomain.objects.get(pk=subdomain_id)
+		scan = ScanHistory.objects.get(pk=subdomain.scan_history.id)
+		domain = Domain.objects.get(pk=subdomain.target_domain.id)
+
+		# ---- Get EngineType ----
+		engine_id = engine_id or scan.scan_type.id
+		engine = EngineType.objects.get(pk=engine_id)
+
+		# ---- Get YAML config ----
+		config = yaml.safe_load(engine.yaml_configuration)
+		enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
+		
+		# ---- Get web_api_discovery config ----
+		api_discovery_config = config.get(WEB_API_DISCOVERY, {})
+		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
+		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
+
+		# ---- Create scan activity of SubScan Model ----
+		subscan = SubScan(
+			start_scan_date=timezone.now(),
+			celery_ids=[], # Will store temporal workflow ID
+			scan_history=scan,
+			subdomain=subdomain,
+			type=scan_type,
+			status=RUNNING_TASK,
+			engine=engine
+		)
+		subscan.save()
+
+		# ---- Create results directory ----
+		subscan_results_dir = f'{scan.results_dir}/subscans/{subscan.id}'
+		os.makedirs(subscan_results_dir, exist_ok=True)
+
+		# ---- Update scan's tasks list ----
+		if scan_type not in scan.tasks:
+			scan.tasks.append(scan_type)
+			scan.save()
+
+		# ---- Send start notification via Celery (non-blocking) ----
+		try:
+			send_scan_notif.delay(
+				scan.id,
+				subscan_id=subscan.id,
+				engine_id=engine_id,
+				status='RUNNING'
+			)
+		except Exception as notif_err:
+			logger.warning(f"Could not send subscan start notification: {notif_err}")
+
+		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
+		temporal_ctx = {
+			'scan_history_id': scan.id,
+			'subscan_id': subscan.id,
+			'engine_id': engine_id,
+			'domain_id': domain.id,
+			'subdomain_id': subdomain.id,
+			'subdomain_name': subdomain.name,
+			'subdomain_http_url': subdomain.http_url,
+			'yaml_configuration': config,
+			'results_dir': subscan_results_dir,
+			'starting_point_path': starting_point_path,
+			'excluded_paths': excluded_paths,
+			'api_discovery_tools': api_discovery_tools,
+			'kr_wordlist': kr_wordlist
+		}
+
+		# ---- Create initial endpoints in DB ----
+		# Find domain HTTP endpoint so that HTTP crawling can start somewhere
+		base_url = f'{subdomain.name}{starting_point_path}' if starting_point_path else subdomain.name
+		endpoint, _ = save_endpoint(
+			base_url,
+			crawl=enable_http_crawl,
+			ctx=temporal_ctx,
+			subdomain=subdomain
+		)
+		if endpoint and endpoint.is_alive:
+			logger.warning(f'Found subdomain root HTTP URL {endpoint.http_url}')
+			subdomain.http_url = endpoint.http_url
+			subdomain.http_status = endpoint.http_status
+			subdomain.response_time = endpoint.response_time
+			subdomain.page_title = endpoint.page_title
+			subdomain.content_type = endpoint.content_type
+			subdomain.content_length = endpoint.content_length
+			for tech in endpoint.techs.all():
+				subdomain.technologies.add(tech)
+			subdomain.save()
+
+			# Update context with new URL
+			temporal_ctx['subdomain_http_url'] = subdomain.http_url
+
+		# ---- Start SubScanWorkflow on Temporal ----
+		from reNgine.temporal_client import TemporalClientProvider
+		from datetime import timedelta
+		from temporalio.exceptions import ServerError as TemporalServiceError
+
+		workflow_id = f"subscan-{subscan.id}-{uuid.uuid4().hex[:8]}"
+		max_retries = 3
+		backoff_base = 2
+
+		async def _start_subscan_workflow_with_retry():
+			"""Async helper: connect to Temporal, start SubScanWorkflow, retry on transient errors."""
+			for attempt in range(1, max_retries + 1):
+				try:
+					client = await TemporalClientProvider.get_client()
+					logger.info(
+						f'[initiate_subscan_temporal] Starting SubScanWorkflow '
+						f'attempt {attempt}/{max_retries} workflow_id={workflow_id}'
+					)
+					handle = await client.start_workflow(
+						"SubScanWorkflow",
+						args=[temporal_ctx, scan_type],
+						id=workflow_id,
+						task_queue="python-orchestrator-queue",
+						execution_timeout=timedelta(days=7),
+						run_timeout=timedelta(days=7),
+						task_timeout=timedelta(hours=1),
+					)
+					return handle.id
+				except TemporalServiceError as e:
+					if attempt == max_retries:
+						logger.error(
+							f'[initiate_subscan_temporal] Failed after {max_retries} retries: {e}'
+						)
+						raise
+					wait_time = backoff_base ** (attempt - 1)
+					logger.warning(
+						f'[initiate_subscan_temporal] Attempt {attempt} failed, retrying in {wait_time}s: {e}'
+					)
+					await asyncio.sleep(wait_time)
+
+		TemporalClientProvider.reset()
+		loop = asyncio.new_event_loop()
+		asyncio.set_event_loop(loop)
+		try:
+			started_workflow_id = loop.run_until_complete(_start_subscan_workflow_with_retry())
+		finally:
+			loop.close()
+
+		logger.info(
+			f"Started SubScanWorkflow id={started_workflow_id} "
+			f"for subscan_id={subscan.id} (type={scan_type})"
+		)
+
+		# Save workflow ID in subscan's celery_ids list for UI compatibility
+		subscan.celery_ids = [started_workflow_id]
+		subscan.save()
+
+		return {
+			'success': True,
+			'workflow_id': started_workflow_id,
+		}
+
+	except Exception as e:
+		logger.exception(e)
+		if subscan:
+			subscan.status = FAILED_TASK
+			subscan.save()
 		return {
 			'success': False,
 			'error': str(e)
@@ -4335,7 +4787,7 @@ def http_crawl(
 	logger.info('Initiating HTTP Crawl')
 	if is_ran_from_subdomain_scan:
 		logger.info('Running From Subdomain Scan...')
-	cmd = '/go/bin/httpx'
+	cmd = '/usr/local/bin/httpx'
 	cfg = self.yaml_configuration.get(HTTP_CRAWL) or {}
 	custom_headers = self.yaml_configuration.get(CUSTOM_HEADERS, [])
 	'''
@@ -4394,7 +4846,7 @@ def http_crawl(
 	cmd += f' -u {urls[0]}' if len(urls) == 1 else f' -l {input_path}'
 	cmd += f' -x {method}' if method else ''
 	if follow_redirect:
-		cmd += ' -fr'
+		cmd += ' --follow-redirects'
 	
 	# Apply OpSec stealth
 	opsec = OpSecManager()
@@ -6434,30 +6886,50 @@ def fetch_proxies_task(self, limit=1000):
     
     self.update_state(state='PROGRESS', meta={'message': f'Verifying {total} proxies', 'progress': 30})
 
+    import threading
+
     live_proxies = []
+    lock = threading.Lock()
+    completed_count = [0]
+    # Capture task_id here — self.request.id is thread-local and will be None inside spawned threads
+    task_id = self.request.id
 
-    def check_proxy(proxy_str):
-        if check_proxy_robust(proxy_str):
-            logger.info(f"Proxy LIVE: {proxy_str}")
-            return proxy_str
-        return None
+    N_THREADS = 4
+    WORKERS_PER_CHUNK = 13  # 4 * 13 ≈ 52 concurrent IO checks, matching original throughput
+    chunk_size = max(1, (total + N_THREADS - 1) // N_THREADS)
+    chunks = [unique_proxies[i:i + chunk_size] for i in range(0, total, chunk_size)]
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=50) as executor:
-        future_to_proxy = {executor.submit(check_proxy, proxy): proxy for proxy in unique_proxies}
-        completed = 0
-        for future in concurrent.futures.as_completed(future_to_proxy):
-            completed += 1
-            res = future.result()
-            if res:
-                live_proxies.append(res)
+    def check_chunk(chunk):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS_PER_CHUNK) as pool:
+            future_map = {pool.submit(check_proxy_robust, p): p for p in chunk}
+            for future in concurrent.futures.as_completed(future_map):
+                proxy_str = future_map[future]
+                try:
+                    alive = future.result()
+                except Exception:
+                    alive = False
+                if alive:
+                    logger.info(f"Proxy LIVE: {proxy_str}")
+                    print(f"[PROXY LIVE] {proxy_str}", flush=True)
+                    with lock:
+                        live_proxies.append(proxy_str)
+                with lock:
+                    completed_count[0] += 1
+                    done = completed_count[0]
+                if done % 50 == 0 or done == total:
+                    logger.info(f"Verification progress: {done}/{total} - Found {len(live_proxies)} live proxies so far.")
+                    progress = 30 + int((done / total) * 65)
+                    app.backend.store_result(
+                        task_id,
+                        {'message': f'Checking proxies: {done}/{total} ({len(live_proxies)} live)', 'progress': progress},
+                        'PROGRESS'
+                    )
 
-            if completed % 50 == 0 or completed == total:
-                logger.info(f"Verification progress: {completed}/{total} - Found {len(live_proxies)} live proxies so far.")
-                progress = 30 + int((completed / total) * 65)
-                self.update_state(state='PROGRESS', meta={
-                    'message': f'Checking proxies: {completed}/{total} ({len(live_proxies)} live)',
-                    'progress': progress
-                })
+    threads = [threading.Thread(target=check_chunk, args=(chunk,), daemon=True) for chunk in chunks]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
 
     logger.info(f"Proxy verification complete. Found {len(live_proxies)} live proxies out of {total} tested.")
     self.update_state(state='PROGRESS', meta={'message': 'Formatting live proxies', 'progress': 95})
@@ -6766,7 +7238,7 @@ def map_acunetix_severity(severity):
 
 
 @app.task(name='acunetix_scan', queue='main_scan_queue', base=RengineTask, bind=True)
-def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
+def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=None):
 	"""
 	Run Acunetix (AWVS) scan for the given domain.
 	"""
@@ -6904,7 +7376,7 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}):
 
 
 @app.task(name='correlate_vulnerabilities', queue='main_scan_queue', base=RengineTask, bind=True)
-def correlate_vulnerabilities(self, scan_history_id, ctx={}):
+def correlate_vulnerabilities(self, scan_history_id, ctx={}, description=None):
 	"""Correlate discovered technologies with known CVEs and update the graph database.
 
 	Args:
@@ -6927,7 +7399,7 @@ def correlate_vulnerabilities(self, scan_history_id, ctx={}):
 			status__in=[RUNNING_TASK, INITIATED_TASK]
 		).exclude(name__in=post_processing_names)
 
-	if running_scans.exists():
+	if running_scans.exists() and not getattr(self, '_is_temporal_proxy', False):
 		running_names = list(running_scans.values_list('name', flat=True))
 		#logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling correlate_vulnerabilities...")
 		raise self.retry(countdown=10, max_retries=1000)
@@ -6944,7 +7416,7 @@ def correlate_vulnerabilities(self, scan_history_id, ctx={}):
 
 
 @app.task(name='calculate_risk_scores', queue='main_scan_queue', base=RengineTask, bind=True)
-def calculate_risk_scores(self, scan_history_id, ctx={}):
+def calculate_risk_scores(self, scan_history_id, ctx={}, description=None):
 	"""Calculate a weighted risk score for discovered vulnerabilities.
 
 	Args:
@@ -6967,7 +7439,7 @@ def calculate_risk_scores(self, scan_history_id, ctx={}):
 			status__in=[RUNNING_TASK, INITIATED_TASK]
 		).exclude(name__in=post_processing_names)
 
-	if running_scans.exists():
+	if running_scans.exists() and not getattr(self, '_is_temporal_proxy', False):
 		running_names = list(running_scans.values_list('name', flat=True))
 		#logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling calculate_risk_scores...")
 		raise self.retry(countdown=10, max_retries=1000)
@@ -6979,7 +7451,7 @@ def calculate_risk_scores(self, scan_history_id, ctx={}):
 
 
 @app.task(name='generate_impact_assessment', queue='main_scan_queue', base=RengineTask, bind=True)
-def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None, ctx={}):
+def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None, ctx={}, description=None):
 	"""Generate an AI-powered impact assessment for vulnerabilities.
 
 	Args:
@@ -7017,7 +7489,7 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 				status__in=[RUNNING_TASK, INITIATED_TASK]
 			).exclude(name__in=post_processing_names)
 
-		if running_scans.exists():
+		if running_scans.exists() and not getattr(self, '_is_temporal_proxy', False):
 			running_names = list(running_scans.values_list('name', flat=True))
 			logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling generate_impact_assessment...")
 			raise self.retry(countdown=10, max_retries=1000)
@@ -7366,7 +7838,7 @@ def save_semgrep_secret_finding(result, ctx, base_dir):
 
 
 @app.task(name='run_apme', queue='main_scan_queue', base=RengineTask, bind=True)
-def run_apme(self, scan_history_id, ctx={}):
+def run_apme(self, scan_history_id, ctx={}, description=None):
 	"""Run the Attack Path Modeling Engine (APME).
 
 	Args:
@@ -7393,7 +7865,7 @@ def run_apme(self, scan_history_id, ctx={}):
 			status__in=[RUNNING_TASK, INITIATED_TASK]
 		).exclude(name__in=post_processing_names)
 
-	if running_scans.exists():
+	if running_scans.exists() and not getattr(self, '_is_temporal_proxy', False):
 		running_names = list(running_scans.values_list('name', flat=True))
 		#logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling run_apme...")
 		raise self.retry(countdown=10, max_retries=1000)

@@ -68,8 +68,13 @@ urlpatterns = [
         name='stress_test_status'
     ),
     path(
-        'media/<path:path>', 
-        rengine_views.serve_protected_media, 
+        'api/stress/<int:scan_id>/report/',
+        stress_views.StressReportGenerationAPI.as_view(),
+        name='stress_report_generation'
+    ),
+    path(
+        'media/<path:path>',
+        rengine_views.serve_protected_media,
         name='serve_protected_media'
     ),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

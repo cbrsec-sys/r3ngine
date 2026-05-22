@@ -1,7 +1,6 @@
 from celery import shared_task
 from django.conf import settings
 import subprocess
-import json
 import os
 import signal
 import redis
@@ -14,6 +13,7 @@ from django.utils import timezone
 from reNgine.celery_custom_task import RengineTask
 from reNgine.parsers import K6Parser, WrkParser, Hping3Parser, LocustParser, TAStressorParser
 from reNgine.stress_telemetry import StressTelemetryPublisher
+from reNgine.stress_cmd_builder import build_stress_command
 from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, RUNNING_TASK, ABORTED_TASK
 
 logger = logging.getLogger(__name__)
@@ -62,11 +62,18 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, *
 
     concurrency = stress_config.get("concurrency", 50)
     duration = stress_config.get("duration", "30s")
+
+    # Validate duration is not empty
+    if not duration or duration == "":
+        duration = "30s"
+        logger.warning(f"Empty duration received for scan {scan_history_id}, defaulting to 30s")
+
     tools = stress_config.get("uses_tools", ["k6"])
     
-    # Initialize Telemetry
+    # Initialize Telemetry — clear any stale stream from a previous run first
     publisher = StressTelemetryPublisher(scan_history_id)
-    
+    publisher.clear_stream()
+
     # Publish initial running status
     publisher.publish({
         "type": "scan_status",
@@ -163,308 +170,44 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, *
                     task_aborted = True
                     break
 
-                parser = None
-                cmd = []
-                temp_conf_path = None
-                temp_proxy_path = None
-                
                 tool_config = stress_config.get(f"{tool}_config", {})
-                
-                # Dynamic sanitisation to avoid shell injection
-                def sanitize(val, allowed_chars=None, default=""):
-                    if val is None:
-                        return default
-                    val_str = str(val).strip()
-                    if not allowed_chars:
-                        allowed_chars = r"^[a-zA-Z0-9.\-_/:=%]+$"
-                    import re
-                    if not re.match(allowed_chars, val_str):
-                        logger.warning(f"Sanitization blocked input: {val_str}")
-                        return default
-                    return val_str
 
-                if tool == "k6":
-                    parser = K6Parser()
-                    k6_vus = sanitize(tool_config.get("vus"), default=str(concurrency))
-                    k6_duration = sanitize(tool_config.get("duration"), default=str(duration))
-                    k6_attack_type = sanitize(tool_config.get("attack_type", "http_get"), default="http_get")
-                    k6_rps = sanitize(tool_config.get("rps"), default="")
-                    k6_insecure = tool_config.get("insecure_skip_tls", False)
-                    k6_no_reuse = tool_config.get("no_connection_reuse", False)
-                    k6_http_debug = sanitize(tool_config.get("http_debug"), default="")
-
-                    script_path = f"/tmp/k6_script_{scan_history_id}.js"
-                    # Resolve proxy for k6 - k6 uses env var HTTP_PROXY / HTTPS_PROXY or --http-debug
-                    # We pass it via the scenario's executor env block inside the script itself.
-                    k6_proxy_block = ""
-                    if single_proxy:
-                        # Ensure scheme prefix for k6 compatibility
-                        _p = single_proxy if '://' in single_proxy else f'http://{single_proxy}'
-                        k6_proxy_block = f"""
-    scenarios: {{
-        default: {{
-            executor: 'constant-vus',
-            vus: {k6_vus},
-            duration: '{k6_duration}',
-            env: {{ HTTP_PROXY: '{_p}', HTTPS_PROXY: '{_p}' }},
-        }},
-    }},"""
-                    else:
-                        k6_proxy_block = f"""
-    vus: {k6_vus},
-    duration: '{k6_duration}',"""
-
-                    with open(script_path, "w") as f:
-                        if k6_attack_type == "slowloris":
-                            f.write(f"""import http from 'k6/http';
-import {{ sleep }} from 'k6';
-export const options = {{{k6_proxy_block}
-}};
-export default function () {{
-    const params = {{
-        headers: {{
-            'User-Agent': '{k6_user_agent}',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'X-Keep-Alive': 'true',
-        }},
-        timeout: '30s',
-    }};
-    try {{
-        const res = http.get('{endpoint.http_url}', params);
-        sleep(10);
-    }} catch (e) {{
-        sleep(1);
-    }}
-}}
-""")
-                        else:
-                            f.write(f"""import http from 'k6/http';
-import {{ sleep }} from 'k6';
-export const options = {{{k6_proxy_block}
-}};
-export default function () {{
-    const params = {{
-        headers: {{
-            'User-Agent': '{k6_user_agent}',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-        }},
-    }};
-    const res = http.get('{endpoint.http_url}', params);
-    sleep(0.5);
-}}
-""")
-
-                    
-                    cmd = ["k6", "run", "--vus", k6_vus, "--duration", k6_duration]
-                    if k6_rps:
-                        cmd += ["--rps", k6_rps]
-                    if k6_insecure:
-                        cmd += ["--insecure-skip-tls-verify"]
-                    if k6_no_reuse:
-                        cmd += ["--no-connection-reuse"]
-                    if k6_http_debug:
-                        cmd += [f"--http-debug={k6_http_debug}"]
-                    cmd += [script_path]
-                
-                elif tool == "wrk":
-                    parser = WrkParser()
-                    wrk_threads = sanitize(tool_config.get("threads"), default="2")
-                    wrk_connections = sanitize(tool_config.get("connections"), default=str(concurrency))
-                    wrk_duration = sanitize(tool_config.get("duration"), default=str(duration))
-                    wrk_latency = tool_config.get("latency", True)
-                    wrk_timeout = sanitize(tool_config.get("timeout"), default="")
-                    wrk_headers = tool_config.get("headers", [])
-
-                    cmd = ["wrk", "-t", wrk_threads, "-c", wrk_connections, "-d", wrk_duration]
-                    if wrk_latency:
-                        cmd += ["--latency"]
-                    if wrk_timeout:
-                        cmd += ["--timeout", wrk_timeout]
-                    # Always inject a realistic browser User-Agent from OpSec settings
-                    cmd += ["-H", f"User-Agent: {k6_user_agent}"]
-                    for header in wrk_headers:
-                        san_hdr = sanitize(header, allowed_chars=r"^[a-zA-Z0-9.\-_/:=%\s]+$")
-                        if san_hdr:
-                            cmd += ["-H", san_hdr]
-                    cmd += [endpoint.http_url]
-                
-                elif tool == "hping3":
-                    parser = Hping3Parser()
-                    hping_mode = sanitize(tool_config.get("attack_mode"), default="syn")
-                    hping_port = sanitize(tool_config.get("port"), default="80")
-                    hping_rate = sanitize(tool_config.get("rate"), default="fast")
-                    hping_data = sanitize(tool_config.get("data_size"), default="")
-                    
-                    cmd = ["hping3"]
-                    if hping_mode == "udp":
-                        cmd += ["--udp"]
-                    elif hping_mode == "icmp":
-                        cmd += ["--icmp"]
-                    else:
-                        cmd += ["--syn"]
-
-                    cmd += ["-p", hping_port]
-
-                    if hping_rate == "flood":
-                        cmd += ["--flood"]
-                    elif hping_rate == "faster":
-                        cmd += ["--faster"]
-                    else:
-                        cmd += ["--fast"]
-
-                    if hping_data:
-                        cmd += ["-d", hping_data]
-                    
-                    cmd += ["-c", "100", target_domain_name]
-                
-                elif tool == "locust":
-                    parser = LocustParser()
-                    locust_users = sanitize(tool_config.get("users"), default=str(concurrency))
-                    locust_spawn = sanitize(tool_config.get("spawn_rate"), default=str(max(1, int(concurrency) // 5)))
-                    locust_runtime = sanitize(tool_config.get("run_time"), default=str(duration))
-                    locust_loglevel = sanitize(tool_config.get("loglevel"), default="ERROR")
-
-                    script_path = f"/tmp/locustfile_{scan_history_id}.py"
-                    
-                    # Build proxy dict for locust if a proxy is available
-                    # Locust's HttpUser uses the requests library, so proxies
-                    # are set via self.client.proxies — a natively supported feature.
-                    locust_proxy_lines = []
-                    if single_proxy:
-                        _lp = single_proxy if '://' in single_proxy else f'http://{single_proxy}'
-                        locust_proxy_lines = [
-                            "    def on_start(self):",
-                            f"        self.client.headers.update({{'User-Agent': '{k6_user_agent}', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5'}})",
-                            f"        self.client.proxies = {{'http': '{_lp}', 'https': '{_lp}'}}",
-                        ]
-                    else:
-                        locust_proxy_lines = [
-                            "    def on_start(self):",
-                            f"        self.client.headers.update({{'User-Agent': '{k6_user_agent}', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5'}})",
-                        ]
-                    locust_on_start = "\n".join(locust_proxy_lines)
-                    
-                    with open(script_path, "w") as f:
-                        f.write(f"""from locust import HttpUser, task, between
-import logging
-
-logging.getLogger('locust').setLevel(logging.{locust_loglevel})
-
-class StressUser(HttpUser):
-    wait_time = between(0.1, 0.5)
-
-{locust_on_start}
-
-    @task
-    def test_target(self):
-        self.client.get("/")
-""")
-                    cmd = [
-                        "locust",
-                        "--headless",
-                        "-u", locust_users,
-                        "-r", locust_spawn,
-                        "--run-time", locust_runtime,
-                        "--host", endpoint.http_url,
-                        "--locustfile", script_path,
-                        "--print-stats"
-                    ]
-
-                elif tool == "stressor":
-                    parser = TAStresserParser()
-                    stresser_method = sanitize(tool_config.get("method"), default="GET")
-                    stresser_threads = sanitize(tool_config.get("threads"), default=str(concurrency))
-                    stresser_duration = sanitize(tool_config.get("duration"), default=str(duration))
-                    stresser_rpc = sanitize(tool_config.get("rpc"), default="1")
-                    stresser_proxy_type = sanitize(tool_config.get("proxy_type"), default="0")
-                    stresser_proxy_file = sanitize(tool_config.get("proxy_file"), default="")
-
-                    # Fetch proxies from global reNgine settings and write formatted proxies to temp file
-                    from scanEngine.models import Proxy
-                    import tempfile
-                    
-                    temp_proxy_lines = []
-                    if Proxy.objects.all().exists():
-                        proxy_config = Proxy.objects.first()
-                        if proxy_config.use_proxy and proxy_config.proxies:
-                            for line in proxy_config.proxies.splitlines():
-                                line = line.strip()
-                                if not line:
-                                    continue
-                                # Strip scheme: http://, https://, socks4://, socks5://, etc.
-                                for scheme in ['http://', 'https://', 'socks4://', 'socks5://', 'socks5h://', 'socks4a://']:
-                                    if line.lower().startswith(scheme):
-                                        line = line[len(scheme):]
-                                        break
-                                if line:
-                                    temp_proxy_lines.append(line)
-                    
-                    if temp_proxy_lines:
-                        try:
-                            temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt', prefix='proxies_stressor_')
-                            temp_file.write('\n'.join(temp_proxy_lines) + '\n')
-                            temp_file.close()
-                            temp_proxy_path = temp_file.name
-                            stresser_proxy_file = temp_proxy_path
-                            logger.info(f"Saved {len(temp_proxy_lines)} proxies to temp file: {temp_proxy_path}")
-                        except Exception as temp_err:
-                            logger.error(f"Failed to create temp proxy file: {temp_err}")
-
-                    # TA_Stresser expects absolute script path. We can place it at /usr/src/app/TA_Stresser.py in Docker.
-                    # Fix: script path to lowercase "stressor.py" to match file name and ensure Linux compatibility.
-                    script_path = os.path.join(settings.BASE_DIR, "reNgine", "stressor", "stressor.py")
-
-                    # Construct command depending on whether it is Layer 4 or Layer 7
-                    is_l7 = stresser_method in ["CFB", "BYPASS", "GET", "POST", "OVH", "STRESS", "SLOW", "HEAD", "COOKIE", "TOR"]
-                    
-                    if is_l7:
-                        # Format: [method] [url] [proxy_type] [threads] [proxy_file] [rpc] [duration] [debug_flag]
-                        cmd = [
-                            "python3", script_path,
-                            stresser_method,
-                            endpoint.http_url,
-                            stresser_proxy_type,
-                            stresser_threads,
-                            stresser_proxy_file if stresser_proxy_file else "none",
-                            stresser_rpc,
-                            stresser_duration,
-                            "debug"  # 9th argument enables debug logger (printing PPS/BPS output)
-                        ]
-                    else:
-                        # Format: [method] [target_host:port] [threads] [duration]
-                        target_host_port = f"{target_domain_name}:{tool_config.get('port', '80')}"
-                        if stresser_proxy_file:
-                            cmd = [
-                                "python3", script_path,
-                                stresser_method,
-                                target_host_port,
-                                stresser_threads,
-                                stresser_duration,
-                                stresser_proxy_type,
-                                stresser_proxy_file
-                            ]
-                        else:
-                            cmd = [
-                                "python3", script_path,
-                                stresser_method,
-                                target_host_port,
-                                stresser_threads,
-                                stresser_duration,
-                            ]
-
-                if not cmd:
+                parsers = {
+                    "k6": K6Parser,
+                    "wrk": WrkParser,
+                    "hping3": Hping3Parser,
+                    "locust": LocustParser,
+                    "stressor": TAStresserParser,
+                }
+                parser_cls = parsers.get(tool)
+                if not parser_cls:
+                    logger.warning(f"Unknown stress tool {tool!r} — skipping.")
                     continue
+                parser = parser_cls()
+                temp_conf_path = None
 
-                cmd_str = ' '.join(cmd)
+                try:
+                    cmd_str, temp_files = build_stress_command(
+                        tool=tool,
+                        tool_config=tool_config,
+                        endpoint_url=endpoint.http_url,
+                        target_domain=target_domain_name,
+                        scan_id=scan_history_id,
+                        concurrency=concurrency,
+                        duration=duration,
+                        single_proxy=single_proxy,
+                        k6_user_agent=k6_user_agent,
+                        base_dir=settings.BASE_DIR,
+                    )
+                except Exception as build_err:
+                    logger.error(f"Failed to build command for tool={tool}: {build_err}")
+                    continue
 
                 if proxy_wrapper.should_wrap():
                     cmd_str, temp_conf_path = proxy_wrapper.wrap_command(cmd_str)
+                    if temp_conf_path:
+                        temp_files.append(temp_conf_path)
                     logger.info(f"Wrapping execution via proxychains: {cmd_str}")
-                #elif single_proxy:
-                #    cmd_str = f"export HTTP_PROXY='{single_proxy}' HTTPS_PROXY='{single_proxy}' && {cmd_str}"
-                #    logger.info(f"Prepending single proxy environment: {cmd_str}")
                 else:
                     logger.info(f"Executing {tool}: {cmd_str}")
                 
@@ -528,7 +271,7 @@ class StressUser(HttpUser):
                             break
 
                     process.wait()
-                    
+
                     command_obj.output = "\n".join(accumulated_lines)
                     command_obj.return_code = process.returncode
                     command_obj.save()
@@ -552,16 +295,12 @@ class StressUser(HttpUser):
                 except Exception as e:
                     logger.error(f"Execution of {tool} failed: {e}")
                 finally:
-                    if temp_conf_path and os.path.exists(temp_conf_path):
-                        try:
-                            os.remove(temp_conf_path)
-                        except Exception as rm_err:
-                            logger.error(f"Failed to remove temp config file: {rm_err}")
-                    if temp_proxy_path and os.path.exists(temp_proxy_path):
-                        try:
-                            os.remove(temp_proxy_path)
-                        except Exception as rm_err:
-                            logger.error(f"Failed to remove temp proxy file: {rm_err}")
+                    for _path in temp_files:
+                        if _path and os.path.exists(_path):
+                            try:
+                                os.remove(_path)
+                            except Exception as rm_err:
+                                logger.error(f"Failed to remove temp file {_path}: {rm_err}")
             
             if task_aborted:
                 break

@@ -227,76 +227,75 @@ export const ProxySettingsPage: React.FC = () => {
               />
             </Box>
             
-            <Box sx={{ mt: 3, p: 2, bgcolor: 'rgba(255, 255, 255, 0.02)', borderRadius: 1, border: '1px solid rgba(0, 243, 255, 0.1)' }}>
-              <Typography variant="subtitle2" sx={{ color: '#fff', fontFamily: 'Orbitron', mb: 1, fontWeight: 700 }}>
-                AUTOMATED PROXY FETCH LIMIT
-              </Typography>
-              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block', mb: 2 }}>
-                Select the maximum number of raw proxies to scrape and check for liveness.
-              </Typography>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: 'flex-start' }}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={fetchLimit === 500}
-                      onChange={() => handleLimitChange(500)}
-                      sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
-                    />
-                  }
-                  label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.85rem' }}>500 Proxies</Typography>}
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={fetchLimit === 1000}
-                      onChange={() => handleLimitChange(1000)}
-                      sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
-                    />
-                  }
-                  label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.85rem' }}>1000 Proxies</Typography>}
-                />
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={fetchLimit === 5000}
-                      onChange={() => handleLimitChange(5000)}
-                      sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
-                    />
-                  }
-                  label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.85rem' }}>5000 Proxies</Typography>}
-                />
+            <Box sx={{
+              mt: 3, p: 2,
+              bgcolor: 'rgba(255, 255, 255, 0.02)',
+              borderRadius: 1,
+              border: '1px solid rgba(0, 243, 255, 0.1)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 2,
+              flexWrap: { xs: 'wrap', md: 'nowrap' },
+            }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant="subtitle2" sx={{ color: '#fff', fontFamily: 'Orbitron', mb: 0.5, fontWeight: 700 }}>
+                  AUTOMATED PROXY FETCH LIMIT
+                </Typography>
+                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
+                  Select the maximum number of raw proxies to scrape and check for liveness.
+                </Typography>
+              </Box>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0, flexWrap: 'nowrap' }}>
+                {([500, 1000, 5000] as const).map((n) => (
+                  <FormControlLabel
+                    key={n}
+                    control={
+                      <Checkbox
+                        checked={fetchLimit === n}
+                        onChange={() => handleLimitChange(n)}
+                        size="small"
+                        sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
+                      />
+                    }
+                    label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{n.toLocaleString()} Proxies</Typography>}
+                    sx={{ mr: 0 }}
+                  />
+                ))}
                 <FormControlLabel
                   control={
                     <Checkbox
                       checked={fetchLimit === 'custom'}
                       onChange={() => handleLimitChange('custom')}
+                      size="small"
                       sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
                     />
                   }
-                  label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.85rem' }}>Custom</Typography>}
+                  label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.78rem' }}>Custom</Typography>}
+                  sx={{ mr: 0 }}
                 />
-              </Stack>
-              {fetchLimit === 'custom' && (
-                <TextField
-                  type="number"
-                  label="Enter Proxy Count"
-                  value={customLimit}
-                  onChange={(e) => setCustomLimit(e.target.value)}
-                  size="small"
-                  sx={{
-                    mt: 2,
-                    width: 200,
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.8rem' },
-                    '& .MuiOutlinedInput-root': {
-                      color: '#fff',
-                      bgcolor: 'rgba(255,255,255,0.02)',
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                      '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
-                      '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
-                    }
-                  }}
-                />
-              )}
+                {fetchLimit === 'custom' && (
+                  <TextField
+                    type="number"
+                    label="Enter Proxy Count"
+                    value={customLimit}
+                    onChange={(e) => setCustomLimit(e.target.value)}
+                    size="small"
+                    sx={{
+                      ml: 1,
+                      width: 160,
+                      '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.75rem' },
+                      '& .MuiOutlinedInput-root': {
+                        color: '#fff',
+                        bgcolor: 'rgba(255,255,255,0.02)',
+                        '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                        '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
+                        '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+                      },
+                    }}
+                  />
+                )}
+              </Box>
             </Box>
 
             <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mt: 3, mb: 1, fontWeight: 600 }}>

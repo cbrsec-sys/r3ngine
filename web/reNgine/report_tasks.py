@@ -18,6 +18,7 @@ from reNgine.charts import (
 )
 from reNgine.graph_utils import Neo4jManager
 from reNgine.common_func import get_interesting_subdomains
+from reNgine.stress_report_builder import StressReportBuilder
 from startScan.models import ScanHistory, Subdomain, Vulnerability, IpAddress, ScanReport, StressTestResult
 from scanEngine.models import VulnerabilityReportSetting
 
@@ -254,15 +255,39 @@ def generate_report_task(self, report_id):
             generate_vulnerability_chart_by_severity,
             generate_attack_surface_map,
             generate_stress_latency_chart,
-            generate_stress_success_rate_chart
+            generate_stress_success_rate_chart,
+            generate_stress_latency_distribution_chart,
+            generate_stress_response_code_chart,
+            generate_stress_error_breakdown_chart,
+            generate_stress_endpoint_heatmap
         )
-        
+
         data['subdomain_http_status_chart'] = generate_subdomain_chart_by_http_status(subdomains)
         data['vulns_severity_chart'] = generate_vulnerability_chart_by_severity(vulns) if vulns else ''
-        
+
+        # Enhanced stress test charts for detailed reports
         if stress_results.exists():
             data['stress_latency_chart'] = generate_stress_latency_chart(stress_results)
             data['stress_success_rate_chart'] = generate_stress_success_rate_chart(stress_results)
+
+            # Generate per-stress-result detailed charts and context
+            stress_report_contexts = []
+            for stress_result in stress_results:
+                builder = StressReportBuilder(stress_result)
+                report_context = builder.build()
+
+                # Generate charts specific to this result
+                report_context['latency_distribution_chart'] = generate_stress_latency_distribution_chart(stress_result)
+                report_context['response_code_chart'] = generate_stress_response_code_chart(stress_result.response_code_distribution)
+                report_context['error_breakdown_chart'] = generate_stress_error_breakdown_chart(stress_result.error_breakdown)
+                report_context['endpoint_heatmap_chart'] = generate_stress_endpoint_heatmap(
+                    stress_result.endpoints_tested,
+                    stress_result.response_code_distribution
+                )
+
+                stress_report_contexts.append(report_context)
+
+            data['stress_report_contexts'] = stress_report_contexts
 
         if report_template == 'enterprise':
             template = get_template('report/enterprise.html')

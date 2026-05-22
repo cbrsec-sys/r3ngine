@@ -47,7 +47,7 @@
       with increased threads.
     github_url: https://github.com/projectdiscovery/httpx
     license_url: https://github.com/projectdiscovery/httpx/blob/master/LICENSE.md
-    version_lookup_command: /go/bin/httpx -version
+    version_lookup_command: /usr/local/bin/httpx -version
     update_command: go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
     install_command: go install -v github.com/projectdiscovery/httpx/cmd/httpx@latest
     version_match_regex: v(?i:v)?\d+\.\d+(?:\.\d+)*
