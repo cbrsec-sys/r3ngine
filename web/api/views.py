@@ -1744,7 +1744,7 @@ class InitiateScan(APIView):
 						scan.cfg_custom_dorks = custom_dorks
 						scan.save()
 
-					# Start the celery task
+					# Start the scan via Temporal durable workflow orchestration
 					kwargs = {
 						'scan_history_id': scan.id,
 						'domain_id': domain.id,
@@ -1759,7 +1759,7 @@ class InitiateScan(APIView):
 						'enable_spiderfoot_scan': spiderfoot_scan,
 						'initiated_by_id': request.user.id
 					}
-					initiate_scan.apply_async(kwargs=kwargs)
+					initiate_scan_temporal(**kwargs)
 					results.append({'domain': domain.name, 'scan_id': scan.id})
 					
 				except Exception as e:
@@ -1806,7 +1806,7 @@ class InitiateSubTask(APIView):
 					'scan_type': stype,
 					'engine_id': engine_id
 				}
-				initiate_subscan.apply_async(kwargs=ctx)
+				initiate_subscan_temporal(**ctx)
 		return Response({'status': True})
 
 
@@ -2037,7 +2037,7 @@ class UninstallTool(APIView):
 
 		if 'go install' in tool.install_command:
 			tool_name = tool.install_command.split('/')[-1].split('@')[0]
-			uninstall_command = 'rm /go/bin/' + tool_name
+			uninstall_command = 'rm /usr/local/bin/' + tool_name
 		elif 'git clone' in tool.install_command:
 			tool_name = tool.install_command[:-1] if tool.install_command[-1] == '/' else tool.install_command
 			tool_name = tool_name.split('/')[-1]

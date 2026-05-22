@@ -122,6 +122,7 @@ Aesthetic excellence is a core requirement of the v3 vision.
 * [Features](#features)
 * [Enterprise Support](#enterprise-support)
 * [Quick Installation](#quick-installation)
+* [Administration & Recovery](#-administration--recovery)
 * [Installation Video](#installation-video-tutorial)
 * [Community-Curated Videos](#community-curated-videos)
 * [Screenshots](#screenshots)
@@ -326,6 +327,50 @@ Please note: This is community-curated content and is not owned by reNgine. The 
     ```bash
     sudo chmod +x update.sh
     ```
+
+![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
+
+## 🔧 Administration & Recovery
+
+### Scan Result Recovery
+
+If the database is lost or corrupted but the `scan_results` Docker volume is intact, the `recover_scan_results` management command can reconstruct the database from the files on disk.
+
+**What is recovered** (when the corresponding output files exist):
+
+| Data | Source file(s) |
+|------|----------------|
+| Domain | Parsed from folder name (`domain_scanid`) |
+| ScanHistory | Folder mtime used as scan date |
+| Subdomains | `#id_subdomain_discovery.txt`, `subdomains_*.txt`, subscan dirs |
+| Ports + IpAddresses | `#id_port_scan.txt` — naabu JSONL and legacy JSON-object formats |
+| EndPoints | `#id_fetch_url.txt`, `urls_*.txt` |
+| Vulnerabilities | `*_nmap_vulns.json`, `#id_nuclei_*_module.txt` |
+| WAF associations | `#id_waf_detection.txt` linked to matching subdomains |
+
+**Usage** (run inside the `web` or `celery` container):
+
+```bash
+# Dry-run — preview what would be recovered without writing anything
+python manage.py recover_scan_results
+
+# Apply — write recovered records to the database
+python manage.py recover_scan_results --apply
+
+# Recover a single scan folder
+python manage.py recover_scan_results --apply --scan-dir /usr/src/scan_results/defijn.io_108
+
+# Use a non-default results root
+python manage.py recover_scan_results --apply --results-root /alt/path/scan_results
+```
+
+**Docker Compose shortcut:**
+
+```bash
+docker-compose exec celery python manage.py recover_scan_results --apply
+```
+
+The command is **idempotent** — scans already tracked in the database are skipped on every run, so it is safe to re-run after partial recoveries.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 

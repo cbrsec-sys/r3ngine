@@ -4,7 +4,7 @@ import type { SxProps, Theme } from '@mui/material';
 
 export interface KpiCardProps {
   title: string;
-  value: number;
+  value: number | string;
   icon: any;
   color: string;
   subtitle?: string;
@@ -82,7 +82,7 @@ export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, colo
           letterSpacing: -1,
           color: '#fff'
         }}>
-          {value.toLocaleString()}
+          {typeof value === 'number' ? value.toLocaleString() : value}
         </Typography>
 
         {/* Footer Row */}

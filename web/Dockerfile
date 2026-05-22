@@ -20,7 +20,7 @@ RUN npm run build
 # Only /go/bin/* binaries are exported to the final image — the entire Go SDK,
 # module cache, and build cache stay inside this ephemeral stage.
 # ===========================================================================
-FROM golang:1.22-bookworm AS go-tools-builder
+FROM golang:1.25-bookworm AS go-tools-builder
 
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libpcap-dev make && \
@@ -114,67 +114,67 @@ LABEL \
 # ---------------------------------------------------------------------------
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
-        # Python 3 runtime
-        python3.10 \
-        python3-dev \
-        python3-pip \
-        python3-venv \
-        python3-netaddr \
-        # Ruby (WPScan)
-        ruby-full \
-        ruby-dev \
-        # Shared libraries required by Python C-extension packages
-        libcurl4-openssl-dev \
-        libxml2 \
-        libxml2-dev \
-        libxslt1-dev \
-        zlib1g-dev \
-        liblzma-dev \
-        libpq-dev \
-        libffi-dev \
-        libjpeg-dev \
-        libopenjp2-7-dev \
-        libcairo2-dev \
-        libcairo2 \
-        libpangocairo-1.0-0 \
-        libgdk-pixbuf2.0-0 \
-        libpango-1.0-0 \
-        libpangoft2-1.0-0 \
-        pkg-config \
-        shared-mime-info \
-        # libpcap runtime lib — needed by naabu binary at runtime
-        libpcap-dev \
-        # Capability bits for naabu raw sockets
-        libcap2-bin \
-        libcap2 \
-        # EGL/PCI — required by Playwright/Chromium GPU path
-        libpci-dev \
-        libpciaccess-dev \
-        libegl-dev \
-        libegl1 \
-        # Network and scanning tools
-        git \
-        wget \
-        curl \
-        nmap \
-        netcat \
-        ike-scan \
-        sslscan \
-        proxychains4 \
-        hping3 \
-        wrk \
-        postgresql-client \
-        # Utilities
-        jq \
-        unzip \
-        geoip-bin \
-        geoip-database \
-        patch \
-        # Build tools — required by pip (C extensions) and gem installs
-        build-essential \
-        cmake \
-        ninja-build \
-        gcc \
+    # Python 3 runtime
+    python3.10 \
+    python3-dev \
+    python3-pip \
+    python3-venv \
+    python3-netaddr \
+    # Ruby (WPScan)
+    ruby-full \
+    ruby-dev \
+    # Shared libraries required by Python C-extension packages
+    libcurl4-openssl-dev \
+    libxml2 \
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
+    liblzma-dev \
+    libpq-dev \
+    libffi-dev \
+    libjpeg-dev \
+    libopenjp2-7-dev \
+    libcairo2-dev \
+    libcairo2 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf2.0-0 \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    pkg-config \
+    shared-mime-info \
+    # libpcap runtime lib — needed by naabu binary at runtime
+    libpcap-dev \
+    # Capability bits for naabu raw sockets
+    libcap2-bin \
+    libcap2 \
+    # EGL/PCI — required by Playwright/Chromium GPU path
+    libpci-dev \
+    libpciaccess-dev \
+    libegl-dev \
+    libegl1 \
+    # Network and scanning tools
+    git \
+    wget \
+    curl \
+    nmap \
+    netcat \
+    ike-scan \
+    sslscan \
+    proxychains4 \
+    hping3 \
+    wrk \
+    postgresql-client \
+    # Utilities
+    jq \
+    unzip \
+    geoip-bin \
+    geoip-database \
+    patch \
+    # Build tools — required by pip (C extensions) and gem installs
+    build-essential \
+    cmake \
+    ninja-build \
+    gcc \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
@@ -322,6 +322,10 @@ RUN python3 -m pip install --no-cache-dir pipx && \
 COPY web/requirements.txt /tmp/requirements.txt
 RUN pip3 install --no-cache-dir -r /tmp/requirements.txt --ignore-installed blinker
 
+# pip's httpx Python package installs a CLI wrapper at /usr/local/bin/httpx that
+# overwrites the ProjectDiscovery Go tool copied earlier. Restore the Go binary.
+COPY --from=go-tools-builder /go/bin/httpx /usr/local/bin/httpx
+
 # ---------------------------------------------------------------------------
 # Install Playwright Chromium (required for Aquatone screenshot capability)
 # ---------------------------------------------------------------------------
@@ -334,6 +338,12 @@ RUN playwright install-deps chromium && \
 # above this line are fully cached on code-only rebuilds)
 # ---------------------------------------------------------------------------
 COPY web/ /usr/src/app/
+
+RUN mkdir -p /usr/src/app/frontend
+COPY frontend/ /usr/src/app/frontend/
+WORKDIR /usr/src/app/frontend
+RUN npm install
+WORKDIR /usr/src/app
 
 # ---------------------------------------------------------------------------
 # Copy built frontend from frontend-builder
