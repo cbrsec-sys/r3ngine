@@ -17,7 +17,6 @@ from rolepermissions.decorators import has_permission_decorator
 
 from reNgine.common_func import *
 from reNgine.tasks import (run_command, send_discord_message, send_slack_message,send_lark_message, send_telegram_message, fetch_proxies_task)
-from celery.result import AsyncResult
 from django.core.cache import cache
 from reNgine.celery import app
 from reNgine.llm_utils import LLMModelManager
@@ -565,28 +564,32 @@ def fetch_proxies(request, slug):
             except Exception:
                 if 'limit' in request.POST:
                     limit = int(request.POST.get('limit'))
-            task = fetch_proxies_task.delay(limit=limit)  # PHASE3D: returns task_id for polling
-            return http.JsonResponse({'task_id': task.id})
+            from reNgine.job_tracker import create_job
+            import threading
+            job_id = create_job()
+            threading.Thread(
+                target=fetch_proxies_task,
+                kwargs={'limit': limit, 'job_id': job_id},
+                daemon=True,
+            ).start()
+            return http.JsonResponse({'task_id': job_id})
         except Exception as e:
-            return http.JsonResponse({'error': f"Celery error: {str(e)}"}, status=500)
+            return http.JsonResponse({'error': str(e)}, status=500)
     return http.JsonResponse({'error': 'Invalid request method. POST required.'}, status=405)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def get_proxy_task_status(request, slug, task_id):
-    task_result = AsyncResult(task_id, app=app)
+    from reNgine.job_tracker import get_job
+    job = get_job(task_id)
     result = {
         "task_id": task_id,
-        "status": task_result.status,
-        "result": task_result.result if task_result.ready() else None,
+        "status": job.get("status", "UNKNOWN"),
+        "result": job.get("result") if job.get("status") == "SUCCESS" else None,
     }
-    if task_result.status == 'PROGRESS':
-        result['message'] = task_result.info.get('message')
-        result['progress'] = task_result.info.get('progress')
-    elif task_result.status == 'SUCCESS':
-        result['message'] = 'Proxy list updated'
-        result['progress'] = 100
-    
+    if job.get("status") in ("RUNNING", "SUCCESS"):
+        result["message"] = job.get("message", "")
+        result["progress"] = job.get("progress", 0)
     return http.JsonResponse(result)
 
 

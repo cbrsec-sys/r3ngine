@@ -769,3 +769,22 @@ class StressTestWorkflow:
     def is_running(self) -> bool:
         """Return True if the workflow has not yet received a kill signal."""
         return not self._kill_requested
+
+
+@workflow.defn(name="StartupSyncWorkflow")
+class StartupSyncWorkflow:
+    """One-shot workflow that runs a single named startup sync task as an activity.
+
+    Launched by a one-shot Temporal Schedule created on each orchestrator startup.
+    The schedule fires once (limited_actions=1) then exhausts itself.
+    """
+
+    @workflow.run
+    async def run(self, task_name: str) -> None:
+        await workflow.execute_activity(
+            "RunStartupSyncActivity",
+            args=[task_name],
+            start_to_close_timeout=timedelta(minutes=30),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+            task_queue="python-orchestrator-queue",
+        )

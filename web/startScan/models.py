@@ -1181,3 +1181,33 @@ class ExecutionTelemetry(models.Model):
 	memory_usage = models.FloatField(default=0.0)
 	active_threads = models.IntegerField(default=0)
 	timestamp = models.DateTimeField(auto_now_add=True)
+
+
+class TemporalSchedule(models.Model):
+	schedule_id = models.CharField(max_length=200, unique=True)
+	name = models.CharField(max_length=200)
+	# workflow_type values: 'MasterScanWorkflow', 'StressTestWorkflow', 'APMESyncWorkflow'
+	workflow_type = models.CharField(max_length=100)
+	workflow_args = models.JSONField(default=dict)
+	cron_expression = models.CharField(max_length=100, blank=True, default='')
+	interval_seconds = models.IntegerField(null=True, blank=True)
+	clocked_time = models.DateTimeField(null=True, blank=True)
+	one_off = models.BooleanField(default=False)
+	is_active = models.BooleanField(default=True)
+	total_run_count = models.IntegerField(default=0)
+	last_run_at = models.DateTimeField(null=True, blank=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+	domain = models.ForeignKey(
+		'targetApp.Domain',
+		null=True,
+		blank=True,
+		on_delete=models.SET_NULL,
+		related_name='temporal_schedules',
+	)
+
+	class Meta:
+		ordering = ['-created_at']
+
+	def __str__(self):
+		return f'{self.name} ({self.schedule_id})'

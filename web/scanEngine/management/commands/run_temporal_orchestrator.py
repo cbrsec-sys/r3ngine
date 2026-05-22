@@ -15,6 +15,7 @@ Usage (inside the container):
 """
 
 import asyncio
+import datetime
 import logging
 import os
 import signal
@@ -22,7 +23,17 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from django.core.management.base import BaseCommand
 from django.db import connections
-from temporalio.client import Client
+from temporalio.client import (
+    Client,
+    Schedule,
+    ScheduleActionStartWorkflow,
+    ScheduleIntervalSpec,
+    ScheduleOverlapPolicy,
+    SchedulePolicy,
+    ScheduleSpec,
+    ScheduleState,
+)
+from temporalio.common import WorkflowIDReusePolicy
 from temporalio.worker import Worker, UnsandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
@@ -47,6 +58,7 @@ from reNgine.temporal_workflows import (
     NucleiPlannerWorkflow,
     SubScanWorkflow,
     StressTestWorkflow,
+    StartupSyncWorkflow,
 )
 
 # Activities (all Python-side activities are registered here)
@@ -99,7 +111,58 @@ from reNgine.temporal_activities import (
     init_stress_test_activity,
     run_stress_tool_activity,
     finalize_stress_test_activity,
+
+    # Startup sync
+    run_startup_sync_activity,
 )
+
+
+_STARTUP_SYNC_TASKS = [
+    "sync_all_scans_to_graph",
+    "sync_cisa_kev_catalog",
+    "sync_semgrep_rules",
+]
+
+
+async def _register_startup_schedule(client: Client, task_name: str, today: str) -> None:
+    """Create (or recreate) a one-shot Temporal Schedule for a startup sync task.
+
+    The schedule is deleted first so each orchestrator restart gets a fresh one-shot
+    trigger. The workflow ID embeds today's date so successful runs are not repeated
+    within the same calendar day (WorkflowIDReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY).
+    """
+    schedule_id = f"startup-sync-{task_name.replace('_', '-')}"
+    workflow_id = f"{schedule_id}-{today}"
+
+    # Remove stale schedule from the previous run (idempotent — ignore if absent)
+    try:
+        handle = client.get_schedule_handle(schedule_id)
+        await handle.delete()
+    except Exception:
+        pass
+
+    await client.create_schedule(
+        schedule_id,
+        Schedule(
+            action=ScheduleActionStartWorkflow(
+                StartupSyncWorkflow.run,
+                args=[task_name],
+                id=workflow_id,
+                task_queue="python-orchestrator-queue",
+                id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY,
+            ),
+            spec=ScheduleSpec(
+                intervals=[ScheduleIntervalSpec(every=datetime.timedelta(seconds=30))],
+            ),
+            policy=SchedulePolicy(overlap=ScheduleOverlapPolicy.SKIP),
+            state=ScheduleState(
+                limited_actions=True,
+                remaining_actions=1,
+                note=f"One-shot startup sync: {task_name}",
+            ),
+        ),
+    )
+    logger.info(f"[Startup] Registered one-shot schedule '{schedule_id}' → workflow '{workflow_id}'")
 
 
 class Command(BaseCommand):
@@ -157,6 +220,17 @@ class Command(BaseCommand):
                 ))
 
             # -------------------------------------------------------------------
+            # Register one-shot startup sync schedules (Phase 4B)
+            # -------------------------------------------------------------------
+            today = datetime.date.today().isoformat()
+            for task_name in _STARTUP_SYNC_TASKS:
+                try:
+                    await _register_startup_schedule(client, task_name, today)
+                except Exception as sched_err:
+                    # Non-fatal: log and continue — don't block worker startup
+                    logger.error(f"[Startup] Failed to register schedule for '{task_name}': {sched_err}")
+
+            # -------------------------------------------------------------------
             # Collect all registered activities
             # -------------------------------------------------------------------
             all_activities = [
@@ -210,26 +284,34 @@ class Command(BaseCommand):
                 init_stress_test_activity,
                 run_stress_tool_activity,
                 finalize_stress_test_activity,
+
+                # Startup sync
+                run_startup_sync_activity,
             ]
 
             # -------------------------------------------------------------------
+            # Load dynamic plugins from the Temporal Registry
+            # -------------------------------------------------------------------
+            from plugins.temporal_registry import PluginTemporalRegistry
+            try:
+                plugin_workflows = PluginTemporalRegistry.get_all_plugin_workflows()
+                plugin_activities = PluginTemporalRegistry.get_all_plugin_activities()
+                
+                # Append to existing
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow] + plugin_workflows
+                all_activities.extend(plugin_activities)
+            except Exception as e:
+                logger.error(f"Failed to load dynamic plugin temporal exports: {e}")
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow]
+
+            # -------------------------------------------------------------------
             # Start the Temporal Worker
-            #
-            # Key configuration notes:
-            #   - workflow_runner=UnsandboxedWorkflowRunner(): Disables the
-            #     Temporal workflow sandbox, which would otherwise reject
-            #     Django/Celery transitive imports that use threading.local
-            #     proxy subclasses. Safe because all non-determinism is
-            #     isolated to activities, not workflow code.
-            #   - max_concurrent_activities=10: Aligned with ThreadPoolExecutor
-            #     max_workers to prevent the "activity executor capacity mismatch"
-            #     warning from Temporal SDK.
             # -------------------------------------------------------------------
             with DjangoAwareThreadPoolExecutor(max_workers=10) as executor:
                 worker = Worker(
                     client,
                     task_queue="python-orchestrator-queue",
-                    workflows=[MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow],
+                    workflows=all_workflows,
                     activities=all_activities,
                     activity_executor=executor,
                     workflow_runner=UnsandboxedWorkflowRunner(),

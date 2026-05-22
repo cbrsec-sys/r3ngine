@@ -189,6 +189,13 @@ class Domain(models.Model):
 		null=True,
 		blank=True
 	)
+	temporal_schedule = models.ForeignKey(
+		'startScan.TemporalSchedule',
+		on_delete=models.SET_NULL,
+		null=True,
+		blank=True,
+		related_name='monitoring_domains',
+	)
 
 	def __str__(self):
 		return str(self.name)

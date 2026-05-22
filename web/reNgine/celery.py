@@ -63,7 +63,7 @@ def setup_startup_sync(sender, **kwargs):
         if r.set(graph_lock_key, "locked", nx=True, ex=3600):
             startup_logger.info(">>> [STARTUP] Triggering global graph synchronization...")
             from reNgine.tasks import sync_all_scans_to_graph
-            sync_all_scans_to_graph.delay()  # PHASE4: startup sync triggered via Celery worker signal
+            sync_all_scans_to_graph.delay()  # PHASE4G-REMOVE
         else:
             startup_logger.debug(">>> [STARTUP] Graph sync already triggered or lock active.")
 
@@ -72,7 +72,7 @@ def setup_startup_sync(sender, **kwargs):
         if r.set(kev_lock_key, "locked", nx=True, ex=3600):
             startup_logger.info(">>> [STARTUP] Triggering CISA KEV catalog synchronization...")
             from reNgine.tasks import sync_cisa_kev_catalog
-            sync_cisa_kev_catalog.delay()  # PHASE4: startup sync triggered via Celery worker signal
+            sync_cisa_kev_catalog.delay()  # PHASE4G-REMOVE
         else:
             startup_logger.debug(">>> [STARTUP] CISA KEV sync already triggered or lock active.")
 
@@ -81,7 +81,7 @@ def setup_startup_sync(sender, **kwargs):
         if r.set(semgrep_lock_key, "locked", nx=True, ex=3600):
             startup_logger.info(">>> [STARTUP] Triggering Semgrep rule synchronization...")
             from reNgine.tasks import sync_semgrep_rules
-            sync_semgrep_rules.delay()  # PHASE4: startup sync triggered via Celery worker signal
+            sync_semgrep_rules.delay()  # PHASE4G-REMOVE
         else:
             startup_logger.debug(">>> [STARTUP] Semgrep rule sync already triggered or lock active.")
             
