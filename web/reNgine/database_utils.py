@@ -217,8 +217,13 @@ def store_ip(ip_address, project, description, h1_team_handle, starting_point_pa
 	
 	# Trigger geo localization
 	if created or ip.geo_iso is None:
+		import threading as _threading
 		from reNgine.tasks import geo_localize
-		geo_localize.delay(ip_address, ip_id=ip.id, scan_id=None, activity_id=None)
+		_threading.Thread(
+			target=geo_localize,
+			kwargs=dict(ip_address=ip_address, ip_id=ip.id, scan_id=None, activity_id=None),
+			daemon=True
+		).start()
 		
 	ip.save()
 

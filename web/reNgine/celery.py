@@ -15,7 +15,7 @@ app.config_from_object('django.conf:settings', namespace='CELERY')
 import sys
 from django.apps import apps
 if any(x in sys.argv[0] for x in ['celery', 'beat']):
-    if not apps.ready:
+    if not apps.ready and not apps.loading:
         django.setup()
     app.autodiscover_tasks()
 

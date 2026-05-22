@@ -54,6 +54,30 @@ export const Hping3Dashboard: React.FC<Hping3DashboardProps> = ({
     };
   }, [validPacketsSent, validPacketsReceived, validRttMin, validRttAvg, validRttMax]);
 
+  const rttTrendData = useMemo(() => {
+    let currentMin = Infinity;
+    let currentMax = -Infinity;
+    let sum = 0;
+
+    return validTelemetry.map((t, idx) => {
+      const lat = typeof t.latency === 'number'
+        ? t.latency
+        : (typeof t.avg_latency === 'number' ? t.avg_latency : 0);
+
+      if (lat < currentMin) currentMin = lat;
+      if (lat > currentMax) currentMax = lat;
+      sum += lat;
+      const runningAvg = sum / (idx + 1);
+
+      return {
+        timestamp: t.timestamp,
+        min: currentMin === Infinity ? 0 : currentMin,
+        avg: runningAvg,
+        max: currentMax === -Infinity ? 0 : currentMax,
+      };
+    });
+  }, [validTelemetry]);
+
   const packetLossColor = metrics.packetLoss < 1 ? '#10b981' : metrics.packetLoss < 5 ? '#facc15' : '#ef4444';
 
   return (
@@ -102,11 +126,11 @@ export const Hping3Dashboard: React.FC<Hping3DashboardProps> = ({
       <Grid container spacing={2}>
         {/* Packet Loss Gauge */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <TacticalPanel title="PACKET LOSS INDICATOR" icon={<AlertTriangle size={18} />}>
+          <TacticalPanel title="PACKET LOSS INDICATOR &" icon={<AlertTriangle size={18} />}>
             <PerformanceGauge
               value={metrics.packetLoss}
               max={100}
-              title="Packet Loss %"
+              title=""
               unit="%"
               colorRanges={[
                 { min: 0, max: 1, color: '#10b981' },
@@ -122,12 +146,7 @@ export const Hping3Dashboard: React.FC<Hping3DashboardProps> = ({
         <Grid size={{ xs: 12, md: 6 }}>
           <TacticalPanel title="RTT DISTRIBUTION" icon={<Gauge size={18} />}>
             <TimeSeriesChart
-              data={validTelemetry.map(t => ({
-                timestamp: t.timestamp,
-                min: metrics.rttMin,
-                avg: metrics.rttAvg,
-                max: metrics.rttMax,
-              }))}
+              data={rttTrendData}
               series={[
                 { key: 'min', name: 'Min RTT', color: '#10b981' },
                 { key: 'avg', name: 'Avg RTT', color: '#3b82f6' },
@@ -144,10 +163,18 @@ export const Hping3Dashboard: React.FC<Hping3DashboardProps> = ({
         <Grid size={{ xs: 12 }}>
           <TacticalPanel title="PACKET LOSS OVER TIME" icon={<AlertTriangle size={18} />}>
             <TimeSeriesChart
-              data={validTelemetry.map((t, idx) => ({
-                timestamp: t.timestamp,
-                loss: metrics.packetLoss * (idx / Math.max(1, validTelemetry.length - 1)),
-              }))}
+              data={validTelemetry.map((t, idx) => {
+                let loss = 0;
+                if (typeof t.packet_loss === 'number') {
+                  loss = t.packet_loss;
+                } else if (typeof t.packets_sent === 'number' && typeof t.packets_received === 'number') {
+                  loss = t.packets_sent > 0 ? ((t.packets_sent - t.packets_received) / t.packets_sent) * 100 : 0;
+                }
+                return {
+                  timestamp: t.timestamp,
+                  loss: Math.min(100, Math.max(0, loss)),
+                };
+              })}
               series={[{ key: 'loss', name: 'Packet Loss %', color: packetLossColor }]}
               title="Loss Rate Progression"
               yAxisLabel="Loss %"

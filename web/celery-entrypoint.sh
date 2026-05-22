@@ -76,10 +76,16 @@ then
   mkdir /usr/src/wordlist
 fi
 
-if [ ! -f "/usr/src/wordlist/" ]
+if [ ! -f "/usr/src/wordlist/dicc.txt" ]
 then
   echo "Downloading Default Directory Bruteforce Wordlist"
   wget https://raw.githubusercontent.com/maurosoria/dirsearch/master/db/dicc.txt -O /usr/src/wordlist/dicc.txt
+fi
+
+if [ ! -f "/usr/src/wordlist/raft-large-directories.txt" ]
+then
+  echo "Downloading raft-large-directories.txt Wordlist"
+  wget https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/raft-large-directories.txt -O /usr/src/wordlist/raft-large-directories.txt
 fi
 
 # check if default wordlist for amass exists

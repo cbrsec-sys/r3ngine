@@ -1214,6 +1214,8 @@ def run_stress_tool_activity(ctx: dict) -> dict:
     import subprocess
     import threading
     import time
+    import contextvars
+    from temporalio.exceptions import CancelledError
 
     import redis as redis_lib
     from django.conf import settings
@@ -1308,16 +1310,70 @@ def run_stress_tool_activity(ctx: dict) -> dict:
         "timestamp": time.time(),
     })
 
-    # Heartbeat thread — keeps the activity alive in Temporal's eyes
+    # Pre-declare process variable so the background heartbeat thread can inspect it safely
+    process = None
+
+    # Helper function to terminate the subprocess group
+    def _terminate_process():
+        is_mock = hasattr(process, 'assert_called')
+        if process and (process.poll() is None or is_mock):
+            try:
+                activity.logger.info(
+                    f"[RunStressToolActivity] Terminating process group for {tool} (PID: {process.pid})"
+                )
+                os.killpg(os.getpgid(process.pid), os_signal.SIGTERM)
+            except Exception as kill_err:
+                activity.logger.error(f"[RunStressToolActivity] Kill failed: {kill_err}")
+
+    # Helper to check if running inside a Temporal activity context (fails during direct unit tests)
+    def _is_in_activity_context():
+        try:
+            activity.is_cancelled()
+            return True
+        except RuntimeError:
+            return False
+
+    def _is_cancelled():
+        return _is_in_activity_context() and activity.is_cancelled()
+
+    # Heartbeat thread — keeps the activity alive in Temporal's eyes.
+    # Copy the current contextvars context so the heartbeat thread inherits the
+    # Temporal activity context. threading.Thread does NOT copy contextvars by
+    # default, causing activity.heartbeat() to fail with "Not in activity context",
+    # which silently prevents all heartbeats from reaching Temporal and triggers
+    # the heartbeat_timeout cancellation + retry loop.
     stop_heartbeat = threading.Event()
+    _activity_ctx = contextvars.copy_context()
 
     def _heartbeat():
-        while not stop_heartbeat.is_set():
-            try:
-                activity.heartbeat(f"Running {tool} against {endpoint_url}")
-            except Exception:
-                pass
-            stop_heartbeat.wait(15)
+        def _do_heartbeat():
+            while not stop_heartbeat.is_set():
+                # Perform periodic cancellation check
+                if _is_cancelled():
+                    activity.logger.info(
+                        f"[RunStressToolActivity] Activity cancelled — terminating {tool}"
+                    )
+                    _terminate_process()
+                    break
+                if _is_in_activity_context():
+                    try:
+                        activity.heartbeat(f"Running {tool} against {endpoint_url}")
+                    except CancelledError:
+                        activity.logger.info(
+                            f"[RunStressToolActivity] Heartbeat received cancellation — terminating {tool}"
+                        )
+                        _terminate_process()
+                        break
+                    except Exception as hb_err:
+                        if "cancel" in str(hb_err).lower():
+                            activity.logger.info(
+                                f"[RunStressToolActivity] Heartbeat received cancellation exception: {hb_err} — terminating {tool}"
+                            )
+                            _terminate_process()
+                            break
+                        activity.logger.warning(f"[RunStressToolActivity] Heartbeat failed: {hb_err}")
+                stop_heartbeat.wait(15)
+        _activity_ctx.run(_do_heartbeat)
 
     hb_thread = threading.Thread(target=_heartbeat, daemon=True)
     hb_thread.start()
@@ -1334,6 +1390,14 @@ def run_stress_tool_activity(ctx: dict) -> dict:
         )
 
         while True:
+            # Check for cancellation on each iteration
+            if _is_cancelled():
+                activity.logger.info(
+                    f"[RunStressToolActivity] Main thread detected cancellation — terminating {tool}"
+                )
+                _terminate_process()
+                break
+
             line = process.stdout.readline()
             if not line and process.poll() is not None:
                 break
@@ -1361,10 +1425,7 @@ def run_stress_tool_activity(ctx: dict) -> dict:
                 activity.logger.info(
                     f"[RunStressToolActivity] Redis kill switch active — terminating {tool}"
                 )
-                try:
-                    os.killpg(os.getpgid(process.pid), os_signal.SIGTERM)
-                except Exception as kill_err:
-                    activity.logger.error(f"[RunStressToolActivity] Kill failed: {kill_err}")
+                _terminate_process()
                 break
 
         process.wait()

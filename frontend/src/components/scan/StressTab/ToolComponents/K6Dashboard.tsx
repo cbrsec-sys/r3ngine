@@ -100,30 +100,34 @@ export const K6Dashboard: React.FC<K6DashboardProps> = ({ telemetry = [], status
             subtitle="Errors detected"
           />
         </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <KpiCard
-            title="STATUS CODES"
-            value={latestMetrics.statusCodeCount.toString()}
-            icon={BarChart3}
-            color="#3b82f6"
-            subtitle="Total responses"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <KpiCard
-            title="PASS RATE"
-            value={`${latestMetrics.checkPassRate}%`}
-            icon={CheckCircle}
-            color={latestMetrics.checkPassRate >= 95 ? '#10b981' : '#facc15'}
-            subtitle="2xx responses"
-          />
-        </Grid>
+        {Object.keys(validStatusCodes).length > 0 && (
+          <>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <KpiCard
+                title="STATUS CODES"
+                value={latestMetrics.statusCodeCount.toString()}
+                icon={BarChart3}
+                color="#3b82f6"
+                subtitle="Total responses"
+              />
+            </Grid>
+            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+              <KpiCard
+                title="PASS RATE"
+                value={`${latestMetrics.checkPassRate}%`}
+                icon={CheckCircle}
+                color={latestMetrics.checkPassRate >= 95 ? '#10b981' : '#facc15'}
+                subtitle="2xx responses"
+              />
+            </Grid>
+          </>
+        )}
       </Grid>
 
       {/* Charts Grid */}
       <Grid container spacing={2}>
         {/* RPS Trend */}
-        <Grid size={{ xs: 12, md: 6 }}>
+        <Grid size={{ xs: 12, md: Object.keys(validStatusCodes).length > 0 ? 6 : 12 }}>
           <TacticalPanel
             title="RPS TREND"
             icon={<Zap size={18} />}
@@ -143,17 +147,19 @@ export const K6Dashboard: React.FC<K6DashboardProps> = ({ telemetry = [], status
         </Grid>
 
         {/* Status Codes */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <TacticalPanel title="STATUS CODE DISTRIBUTION" icon={<BarChart3 size={18} />}>
-            <DistributionChart
-              data={validStatusCodes}
-              title="HTTP Status Codes"
-              type="pie"
-              colorMap={K6_STATUS_CODE_COLORS}
-              height={300}
-            />
-          </TacticalPanel>
-        </Grid>
+        {Object.keys(validStatusCodes).length > 0 && (
+          <Grid size={{ xs: 12, md: 6 }}>
+            <TacticalPanel title="STATUS CODE DISTRIBUTION" icon={<BarChart3 size={18} />}>
+              <DistributionChart
+                data={validStatusCodes}
+                title="HTTP Status Codes"
+                type="pie"
+                colorMap={K6_STATUS_CODE_COLORS}
+                height={300}
+              />
+            </TacticalPanel>
+          </Grid>
+        )}
 
         {/* Error Breakdown */}
         {Object.keys(validErrors).length > 0 && (

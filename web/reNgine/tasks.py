@@ -1,7 +1,7 @@
 import os
 import django
 from django.apps import apps
-if not apps.ready:
+if not apps.ready and not apps.loading:
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'reNgine.settings')
     django.setup()
 
@@ -397,11 +397,14 @@ def initiate_scan(
 
 		# Send start notif
 		logger.warning(f'Starting scan {scan_history_id} with context:\n{ctx_str}')
-		send_scan_notif.delay(
-			scan_history_id,
-			subscan_id=None,
-			engine_id=engine_id,
-			status=CELERY_TASK_STATUS_MAP[scan.scan_status])
+		try:
+			send_scan_notif(
+				scan_history_id,
+				subscan_id=None,
+				engine_id=engine_id,
+				status=CELERY_TASK_STATUS_MAP[scan.scan_status])
+		except Exception as e:
+			logger.warning(f"Could not send scan notification: {e}")
 
 		# Save imported subdomains in DB
 		save_imported_subdomains(imported_subdomains, ctx=ctx)
@@ -942,13 +945,16 @@ def initiate_scan_temporal(
 			f'for scan_history_id={scan.id}'
 		)
 
-		# Send start notification via Celery (non-blocking)
-		send_scan_notif.delay(
-			scan.id,
-			subscan_id=None,
-			engine_id=engine_id,
-			status=CELERY_TASK_STATUS_MAP.get(scan.scan_status, 'RUNNING')
-		)
+		# Send start notification
+		try:
+			send_scan_notif(
+				scan.id,
+				subscan_id=None,
+				engine_id=engine_id,
+				status=CELERY_TASK_STATUS_MAP.get(scan.scan_status, 'RUNNING')
+			)
+		except Exception as e:
+			logger.warning(f"Could not send scan notification: {e}")
 
 		return {
 			'success': True,
@@ -1042,9 +1048,9 @@ def initiate_subscan_temporal(
 			scan.tasks.append(scan_type)
 			scan.save()
 
-		# ---- Send start notification via Celery (non-blocking) ----
+		# ---- Send start notification ----
 		try:
-			send_scan_notif.delay(
+			send_scan_notif(
 				scan.id,
 				subscan_id=subscan.id,
 				engine_id=engine_id,
@@ -1233,11 +1239,14 @@ def initiate_subscan(
 	scan.save()
 
 	# Send start notif
-	send_scan_notif.delay(
-		scan.id,
-		subscan_id=subscan.id,
-		engine_id=engine_id,
-		status='RUNNING')
+	try:
+		send_scan_notif(
+			scan.id,
+			subscan_id=subscan.id,
+			engine_id=engine_id,
+			status='RUNNING')
+	except Exception as e:
+		logger.warning(f"Could not send scan notification: {e}")
 
 	# Build context
 	ctx = {
@@ -1403,11 +1412,14 @@ def report(self, ctx={}, description=None):
 	scan.save()
 
 	# Send scan status notif
-	send_scan_notif.delay(
-		scan_history_id=scan_id,
-		subscan_id=subscan_id,
-		engine_id=engine_id,
-		status=status_h)
+	try:
+		send_scan_notif(
+			scan_history_id=scan_id,
+			subscan_id=subscan_id,
+			engine_id=engine_id,
+			status=status_h)
+	except Exception as e:
+		logger.warning(f"Could not send scan notification: {e}")
 
 
 #------------------------- #
@@ -3178,9 +3190,11 @@ def nmap(
 	
 	if auth_targets and self.scan.tasks and 'brute_force_scan' in self.scan.tasks:
 		logger.warning(f'Detected Auth Portals on {host}. Triggering Brute Force Scan...')
-		# We use delay to run it asynchronously
 		from reNgine.tasks import brute_force_scan
-		brute_force_scan.delay(targets=list(set(auth_targets)), ctx=ctx)
+		try:
+			brute_force_scan.apply(kwargs={'targets': list(set(auth_targets)), 'ctx': ctx})
+		except Exception as e:
+			logger.warning(f"Brute force scan failed for {host}: {e}")
 
 	return vulns
 
@@ -4084,12 +4098,15 @@ def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, sh
 
 		if send_report:
 			hackerone = hackerone_query.first()
-			if hackerone.send_critical and severity == 'critical':
-				send_hackerone_report.delay(vuln.id)
-			elif hackerone.send_high and severity == 'high':
-				send_hackerone_report.delay(vuln.id)
-			elif hackerone.send_medium and severity == 'medium':
-				send_hackerone_report.delay(vuln.id)
+			try:
+				if hackerone.send_critical and severity == 'critical':
+					send_hackerone_report(vuln.id)
+				elif hackerone.send_high and severity == 'high':
+					send_hackerone_report(vuln.id)
+				elif hackerone.send_medium and severity == 'medium':
+					send_hackerone_report(vuln.id)
+			except Exception as e:
+				logger.warning(f"HackerOne report send failed for vuln {vuln.id}: {e}")
 
 	# Write results to JSON file
 	with open(self.output_path, 'w') as f:
@@ -6649,7 +6666,12 @@ def save_ip_address(ip_address, subdomain=None, subscan=None, scan_id=None, acti
 
 	# Trigger geo localization if newly created OR if geo_iso is null
 	if created or ip.geo_iso is None:
-		geo_localize.delay(ip_address, ip_id=ip.id, scan_id=scan_id, activity_id=activity_id)
+		import threading as _threading
+		_threading.Thread(
+			target=geo_localize,
+			kwargs=dict(ip_address=ip_address, ip_id=ip.id, scan_id=scan_id, activity_id=activity_id),
+			daemon=True
+		).start()
 
 	# Set extra attributes
 	for key, value in kwargs.items():
@@ -6664,10 +6686,6 @@ def save_ip_address(ip_address, subdomain=None, subscan=None, scan_id=None, acti
 	# Add subscan to IP
 	if subscan:
 		ip.ip_subscan_ids.add(subscan)
-
-	# Geo-localize IP asynchronously
-	if created:
-		geo_localize.delay(ip_address, ip.id)
 
 	return ip, created
 
@@ -7116,7 +7134,10 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 		auth_targets = [f'https://{target}:{port}' for port in ssl_ports]
 		logger.warning(f'Triggering Brute Force Scan for potential Sophos Portals on {target}')
 		from reNgine.tasks import brute_force_scan
-		brute_force_scan.delay(targets=auth_targets, ctx=ctx)
+		try:
+			brute_force_scan.apply(kwargs={'targets': auth_targets, 'ctx': ctx})
+		except Exception as e:
+			logger.warning(f"Brute force scan failed for {target}: {e}")
 
 	return True
 

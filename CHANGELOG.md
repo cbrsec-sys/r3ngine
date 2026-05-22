@@ -14,6 +14,16 @@
     python manage.py recover_scan_results --apply   # write to DB
     python manage.py recover_scan_results --apply --scan-dir /usr/src/scan_results/defijn.io_108
     ```
+- **Stress Testing Telemetry & Activity Stability**:
+  - Fixed a Temporal heartbeat context issue inside `RunStressToolActivity` by propagating the `contextvars` context to the background heartbeat loop thread, resolving `RuntimeError: Not in activity context` and allowing real-time status/cancellation detection.
+  - Hardened process cleanup by switching process termination to send SIGTERM/SIGKILL to the entire process group (`os.killpg`) to ensure that orphaned background processes are cleanly terminated when a scan is stopped or aborted.
+  - Resolved Vite dev server WebSocket configuration by proxying `/ws` paths to Daphne on port 8000, allowing the frontend telemetry component to receive real-time ECharts metrics and log lines during development.
+- **Locust Path Splitting & K6 Telemetry Fixes**:
+  - Fixed Locust target URL parsing in `_build_locust_cmd` by utilizing `urllib.parse.urlparse` to dynamically split target URLs into host and path components. This avoids trailing slash errors (such as `GET /xmlrpc.php/` returning `400 Bad Request`) and ensures Locust script generation properly separates the request path from the base host.
+  - Resolved K6 real-time dashboard updates by adding dynamic `throughput_rps` calculation to `K6Parser`. It extracts elapsed minutes and seconds from K6's progress output via regex and divides total requests by elapsed seconds, resolving static or missing real-time telemetry metrics.
+  - Fixed WrkParser final metrics aggregation by summing both socket errors and timeout errors to represent the correct count of failed requests.
+
+
 
 ### [v3.1.0] - 2026-05-20
 

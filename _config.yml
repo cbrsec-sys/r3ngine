@@ -1,1 +1,4 @@
-theme: jekyll-theme-cayman
+remote_theme: sproogen/markdown-theme
+
+plugins:
+  - jekyll-remote-theme

@@ -56,7 +56,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
       type: 'line',
       smooth: true,
       showSymbol: false,
-      data: data.map(d => d[s.key] || null),
+      data: data.map(d => [d.timestamp * 1000, d[s.key] || null]),
       itemStyle: { color: s.color },
       lineStyle: { width: 2, shadowBlur: 10, shadowColor: alpha(s.color, 0.5) },
       areaStyle: {

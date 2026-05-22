@@ -190,11 +190,11 @@ def _build_wrk_cmd(tool_config, endpoint_url, concurrency, duration, k6_user_age
         cmd += ["--latency"]
     if wrk_timeout:
         cmd += ["--timeout", wrk_timeout]
-    cmd += ["-H", f"User-Agent: {ua}"]
+    cmd += ["-H", f'"User-Agent: {ua}"']
     for header in wrk_headers:
         san_hdr = sanitize(header, allowed_chars=r"^[a-zA-Z0-9.\-_/:=%\s]+$")
         if san_hdr:
-            cmd += ["-H", san_hdr]
+            cmd += ["-H", f'"{san_hdr}"']
     cmd += [endpoint_url]
 
     return cmd, []
@@ -242,11 +242,50 @@ def _build_locust_cmd(tool_config, endpoint_url, scan_id, concurrency, duration,
                        single_proxy=None, k6_user_agent=None):
     """Build a Locust headless load test command.
 
-    Writes a temporary locustfile.py to /tmp.
+    Writes a temporary locustfile.py to /tmp, splitting the target endpoint
+    URL into a base host and relative path to avoid double slashes or target
+    mismatches at runtime.
+
+    Args:
+        tool_config (dict): Configuration dictionary containing tool parameters.
+        endpoint_url (str): The target URL endpoint.
+        scan_id (str/int): The scan ID.
+        concurrency (int): Concurrency level.
+        duration (str/int): Duration of stress scan.
+        single_proxy (str, optional): Target proxy IP/host.
+        k6_user_agent (str, optional): User agent string for client requests.
 
     Returns:
-        (cmd: list[str], temp_files: list[str])
+        tuple: (cmd: list[str], temp_files: list[str])
     """
+    from urllib.parse import urlparse
+
+    # Extract target host and relative path to prevent endpoint errors
+    parsed_url = urlparse(endpoint_url)
+    scheme = parsed_url.scheme or "http"
+    netloc = parsed_url.netloc
+
+    # Fallback in case endpoint was passed without a protocol scheme
+    if not netloc and '/' in endpoint_url:
+        parsed_url = urlparse(f"http://{endpoint_url}")
+        scheme = parsed_url.scheme or "http"
+        netloc = parsed_url.netloc
+    elif not netloc:
+        netloc = endpoint_url
+
+    base_host = f"{scheme}://{netloc}"
+    
+    # Construct relative path containing parameters, query and fragments
+    request_path = parsed_url.path
+    if not request_path:
+        request_path = "/"
+    if parsed_url.params:
+        request_path += f";{parsed_url.params}"
+    if parsed_url.query:
+        request_path += f"?{parsed_url.query}"
+    if parsed_url.fragment:
+        request_path += f"#{parsed_url.fragment}"
+
     locust_users = sanitize(tool_config.get("users"), default=str(concurrency))
     locust_spawn = sanitize(
         tool_config.get("spawn_rate"),
@@ -265,20 +304,27 @@ def _build_locust_cmd(tool_config, endpoint_url, scan_id, concurrency, duration,
             "    def on_start(self):",
             f"        self.client.headers.update({{'User-Agent': '{ua}', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5'}})",
             f"        self.client.proxies = {{'http': '{_lp}', 'https': '{_lp}'}}",
+            "        self.client.verify = False",
         ]
     else:
         proxy_lines = [
             "    def on_start(self):",
             f"        self.client.headers.update({{'User-Agent': '{ua}', 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8', 'Accept-Language': 'en-US,en;q=0.5'}})",
+            "        self.client.verify = False",
         ]
 
     locust_on_start = "\n".join(proxy_lines)
+
+    # Use json.dumps to safely convert path into a valid Python string literal
+    escaped_path = json.dumps(request_path)
 
     script_path = f"/tmp/locustfile_{scan_id}_{int(time.time())}.py"
     with open(script_path, "w") as f:
         f.write(f"""from locust import HttpUser, task, between
 import logging
+import urllib3
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 logging.getLogger('locust').setLevel(logging.{locust_loglevel})
 
 class StressUser(HttpUser):
@@ -288,7 +334,9 @@ class StressUser(HttpUser):
 
     @task
     def test_target(self):
-        self.client.get("/")
+        with self.client.get({escaped_path}, verify=False, catch_response=True) as response:
+            if response.status_code > 0:
+                response.success()
 """)
 
     cmd = [
@@ -297,7 +345,7 @@ class StressUser(HttpUser):
         "-u", locust_users,
         "-r", locust_spawn,
         "--run-time", locust_runtime,
-        "--host", endpoint_url,
+        "--host", base_host,
         "--locustfile", script_path,
         "--print-stats",
     ]
