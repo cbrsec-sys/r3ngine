@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import threading
 
 import redis
 from django.conf import settings
@@ -112,7 +113,7 @@ class StressTestControlAPI(APIView):
             # Fallback: Celery task (remove once Temporal is validated in production)
             try:
                 from reNgine.stress_testing_tasks import run_stress_testing
-                run_stress_testing.delay(scan.id, scan.domain.name, {"stress_test": config})
+                run_stress_testing.delay(scan.id, scan.domain.name, {"stress_test": config})  # PHASE3B3: remove after Temporal validated
                 return Response(
                     {"status": "started", "engine": "celery_fallback"},
                     status=status.HTTP_200_OK,
@@ -171,7 +172,11 @@ class StressReportGenerationAPI(APIView):
             )
 
             from reNgine.report_tasks import generate_report_task
-            generate_report_task.delay(report_obj.id)
+            threading.Thread(
+                target=generate_report_task.apply,
+                args=((report_obj.id,),),
+                daemon=True
+            ).start()
 
             return Response(
                 {

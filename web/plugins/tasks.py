@@ -1,5 +1,6 @@
 import os
 import subprocess
+import threading
 import logging
 import yaml
 from celery import shared_task
@@ -75,4 +76,8 @@ def verify_all_plugin_tools():
     """
     enabled_plugins = Plugin.objects.filter(is_enabled=True)
     for plugin in enabled_plugins:
-        install_plugin_tools.delay(plugin.slug)
+        threading.Thread(
+            target=install_plugin_tools,
+            args=(plugin.slug,),
+            daemon=True
+        ).start()

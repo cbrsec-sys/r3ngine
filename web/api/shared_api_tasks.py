@@ -1,4 +1,5 @@
 # include all the celery tasks to be used in the API, do not put in tasks.py
+import threading
 import requests
 
 from reNgine.common_func import create_inappnotification, get_hackerone_key_username
@@ -187,7 +188,12 @@ def sync_bookmarked_programs_task(project_slug):
 			)
 			return
 
-		import_hackerone_programs_task.delay(handles, project_slug, is_sync=True)
+		threading.Thread(
+			target=import_hackerone_programs_task,
+			args=(handles, project_slug),
+			kwargs={'is_sync': True},
+			daemon=True
+		).start()
 
 		create_inappnotification(
 			title="HackerOne Bookmarked Programs Sync Progress",

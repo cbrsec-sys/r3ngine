@@ -1,4 +1,5 @@
 import json
+import threading
 
 from celery import Task
 from celery.utils.log import get_task_logger
@@ -296,20 +297,24 @@ class RengineTask(Task):
 		self.notify()
 
 	def notify(self, name=None, severity=None, fields={}, add_meta_info=True):
-		# Import here to avoid Celery circular import and be able to use `delay`
 		from reNgine.tasks import send_task_notif
-		return send_task_notif.delay(
-			name or self.task_name,
-			status=self.status_str,
-			result=self.result,
-			traceback=self.traceback,
-			output_path=self.output_path,
-			scan_history_id=self.scan_id,
-			engine_id=self.engine_id,
-			subscan_id=self.subscan_id,
-			severity=severity,
-			add_meta_info=add_meta_info,
-			update_fields=fields)
+		threading.Thread(
+			target=send_task_notif,
+			kwargs={
+				'task_name': name or self.task_name,
+				'status': self.status_str,
+				'result': self.result,
+				'traceback': self.traceback,
+				'output_path': self.output_path,
+				'scan_history_id': self.scan_id,
+				'engine_id': self.engine_id,
+				'subscan_id': self.subscan_id,
+				'severity': severity,
+				'add_meta_info': add_meta_info,
+				'update_fields': fields,
+			},
+			daemon=True
+		).start()
 
 	def s(self, *args, **kwargs):
 		# TODO: set task status to INIT when creating a signature.

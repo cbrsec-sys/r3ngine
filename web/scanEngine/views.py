@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -564,7 +565,7 @@ def fetch_proxies(request, slug):
             except Exception:
                 if 'limit' in request.POST:
                     limit = int(request.POST.get('limit'))
-            task = fetch_proxies_task.delay(limit=limit)
+            task = fetch_proxies_task.delay(limit=limit)  # PHASE3D: returns task_id for polling
             return http.JsonResponse({'task_id': task.id})
         except Exception as e:
             return http.JsonResponse({'error': f"Celery error: {str(e)}"}, status=500)
@@ -682,7 +683,7 @@ def update_llm_settings(request, slug):
         
         if action == 'pull' and provider == 'ollama':
             from reNgine.tasks import pull_ollama_model
-            pull_ollama_model.delay(selected_model)
+            threading.Thread(target=pull_ollama_model, args=(selected_model,), daemon=True).start()
             return http.JsonResponse({'status': 'pulling', 'message': f'Started pulling {selected_model}'})
             
         return http.JsonResponse({'status': 'success', 'message': 'Settings updated successfully'})

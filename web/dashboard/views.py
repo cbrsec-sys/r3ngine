@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 
 from datetime import timedelta
 
@@ -579,7 +580,11 @@ def get_impact_graph_data(request, slug, vuln_id):
 def trigger_ai_impact(request, slug, vuln_id):
     if request.method == 'POST':
         from reNgine.tasks import generate_impact_assessment
-        generate_impact_assessment.delay(vulnerability_id=vuln_id)
+        threading.Thread(
+            target=generate_impact_assessment.apply,
+            kwargs={'kwargs': {'vulnerability_id': vuln_id}},
+            daemon=True
+        ).start()
         return JsonResponse({'status': True, 'message': 'AI Impact Generation started...'})
     return JsonResponse({'status': False})
 

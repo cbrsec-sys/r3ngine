@@ -1,6 +1,7 @@
 import re
 import socket
 import logging
+import threading
 import requests
 import validators
 from django.conf import settings
@@ -288,7 +289,11 @@ class HackerOneProgramViewSet(viewsets.ViewSet):
 			if not handles:
 				return Response({"error": "No program handles provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-			import_hackerone_programs_task.delay(handles, project_slug)
+			threading.Thread(
+				target=import_hackerone_programs_task,
+				args=(handles, project_slug),
+				daemon=True
+			).start()
 
 			create_inappnotification(
 				title="HackerOne Program Import Started",
@@ -310,7 +315,11 @@ class HackerOneProgramViewSet(viewsets.ViewSet):
 			if not project_slug:
 				return Response({"error": "Project slug is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-			sync_bookmarked_programs_task.delay(project_slug)
+			threading.Thread(
+				target=sync_bookmarked_programs_task,
+				args=(project_slug,),
+				daemon=True
+			).start()
 
 			create_inappnotification(
 				title="HackerOne Bookmarked Programs Sync Started",
@@ -570,8 +579,7 @@ class LLMVulnerabilityReportGenerator(APIView):
 				'status': False,
 				'error': 'Missing GET param Vulnerability `id`'
 			}, status=status.HTTP_400_BAD_REQUEST)
-		task = llm_vulnerability_description.apply_async(args=(vulnerability_id,))
-		response = task.wait()
+		response = llm_vulnerability_description(vulnerability_id)
 		if response and response.get('status'):
 			return Response(response)
 		else:
@@ -2006,7 +2014,7 @@ class ProxyFetchAPIView(APIView):
 				limit = int(limit)
 			except Exception:
 				limit = 1000
-			task = fetch_proxies_task.delay(limit=limit)
+			task = fetch_proxies_task.delay(limit=limit)  # PHASE3D: returns task_id for polling
 			return Response({'status': True, 'task_id': task.id})
 		except Exception as e:
 			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

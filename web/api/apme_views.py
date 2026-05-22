@@ -103,7 +103,7 @@ class TriggerLLMAPMEAPIView(APIView):
 
         # Trigger Celery Task
         from apme.apme_tasks import run_llm_apme
-        task = run_llm_apme.delay(scan_id)
+        task = run_llm_apme.delay(scan_id)  # PHASE3D: returns task_id to frontend
 
         return Response({
             'status': 'triggered',

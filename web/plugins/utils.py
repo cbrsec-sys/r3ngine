@@ -1,5 +1,6 @@
 import os
 import shutil
+import threading
 import time
 import zipfile
 import yaml
@@ -287,7 +288,13 @@ class AtomicInstaller:
                         
                         # Trigger background installation
                         from .tasks import install_plugin_tools
-                        transaction.on_commit(lambda: install_plugin_tools.delay(plugin_slug))
+                        transaction.on_commit(
+                            lambda: threading.Thread(
+                                target=install_plugin_tools,
+                                args=(plugin_slug,),
+                                daemon=True
+                            ).start()
+                        )
                     except Exception as e:
                         logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
 
