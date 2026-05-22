@@ -105,23 +105,8 @@ class StressTestControlAPI(APIView):
                 )
                 return Response({"status": "started"}, status=status.HTTP_200_OK)
             except Exception as e:
-                logger.warning(
-                    f"[StressTestControlAPI] Temporal start failed for scan {scan_id}: {e} "
-                    "— falling back to Celery."
-                )
-
-            # Fallback: Celery task (remove once Temporal is validated in production)
-            try:
-                from reNgine.stress_testing_tasks import run_stress_testing
-                run_stress_testing.delay(scan.id, scan.domain.name, {"stress_test": config})  # PHASE3B3: remove after Temporal validated
-                return Response(
-                    {"status": "started", "engine": "celery_fallback"},
-                    status=status.HTTP_200_OK,
-                )
-            except Exception as celery_err:
                 logger.error(
-                    f"[StressTestControlAPI] Both Temporal and Celery failed for scan {scan_id}: "
-                    f"{celery_err}"
+                    f"[StressTestControlAPI] Temporal start failed for scan {scan_id}: {e}"
                 )
                 return Response(
                     {"error": "Failed to start stress test"},

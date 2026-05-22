@@ -1521,3 +1521,28 @@ def finalize_stress_test_activity(ctx: dict) -> bool:
         )
 
     return True
+
+
+@activity.defn(name="RunStartupSyncActivity")
+def run_startup_sync_activity(task_name: str) -> None:
+    """Execute a named startup sync task. Called once per orchestrator start via StartupSyncWorkflow.
+
+    Supported task_name values:
+      'sync_all_scans_to_graph' — syncs all scan results to Neo4j
+      'sync_cisa_kev_catalog'   — downloads CISA KEV catalog and marks CVEs
+      'sync_semgrep_rules'      — syncs Semgrep rule sets to local filesystem
+    """
+    activity.logger.info(f"[RunStartupSyncActivity] Starting: {task_name}")
+    if task_name == 'sync_all_scans_to_graph':
+        from reNgine.tasks import sync_all_scans_to_graph
+        # bind=True task; self is unused in the function body
+        sync_all_scans_to_graph.run(None)
+    elif task_name == 'sync_cisa_kev_catalog':
+        from reNgine.tasks import sync_cisa_kev_catalog
+        sync_cisa_kev_catalog()
+    elif task_name == 'sync_semgrep_rules':
+        from reNgine.tasks import sync_semgrep_rules
+        sync_semgrep_rules()
+    else:
+        raise ValueError(f"[RunStartupSyncActivity] Unknown task: {task_name}")
+    activity.logger.info(f"[RunStartupSyncActivity] Completed: {task_name}")

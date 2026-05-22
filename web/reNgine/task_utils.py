@@ -527,9 +527,8 @@ def ensure_endpoints_crawled_and_execute(task_function, ctx, description=None, m
 		Task result or None if no alive endpoints available
 	"""
 	from copy import deepcopy
-	import time
 	from reNgine.common_func import get_http_urls
-	
+
 	logger.info(f'Ensuring endpoints are crawled for {task_function.__name__}')
 
 	if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
@@ -545,38 +544,18 @@ def ensure_endpoints_crawled_and_execute(task_function, ctx, description=None, m
 
 	logger.info(f'Found {len(uncrawled_endpoints)} uncrawled endpoints, launching HTTP crawl first')
 
-	# Launch http_crawl synchronously for the specific endpoints we need
 	from reNgine.tasks import http_crawl
 	custom_ctx = deepcopy(ctx)
 	custom_ctx['track'] = False  # Don't track this internal crawl
 
-	# Execute http_crawl and wait for completion (but with timeout)
-	http_crawl_task = http_crawl.delay(  # PHASE3D: polls task.ready() — needs job tracker
-		urls=uncrawled_endpoints[:50],  # Limit to avoid overwhelming
-		ctx=custom_ctx
-	)
-
-	# Wait for crawl completion with timeout
-	wait_time = 0
-	check_interval = 10  # Check every 10 seconds
-
-	while wait_time < max_wait_time:
-		time.sleep(check_interval)
-		wait_time += check_interval
-
-		if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
-			logger.info(f'HTTP crawl completed, found {len(alive_endpoints)} alive endpoints')
-			return task_function(ctx=ctx, description=description)
-
-		# Check if crawl task is done
-		if http_crawl_task.ready():
-			break
+	# Run synchronously — safe here because this function is called from Temporal activities
+	http_crawl(urls=uncrawled_endpoints[:50], ctx=custom_ctx)
 
 	if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
-		logger.info(f'Found {len(alive_endpoints)} alive endpoints after wait period')
+		logger.info(f'Found {len(alive_endpoints)} alive endpoints after crawl, executing {task_function.__name__}')
 		return task_function(ctx=ctx, description=description)
 	else:
-		logger.warning(f'No alive endpoints found after {wait_time}s wait, skipping {task_function.__name__}')
+		logger.warning(f'No alive endpoints found after crawl, skipping {task_function.__name__}')
 		return None
 
 

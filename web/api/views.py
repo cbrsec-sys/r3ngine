@@ -2009,13 +2009,20 @@ class ProxyFetchAPIView(APIView):
 	def post(self, request):
 		try:
 			from reNgine.tasks import fetch_proxies_task
+			from reNgine.job_tracker import create_job
+			import threading
 			limit = request.data.get('limit', 1000)
 			try:
 				limit = int(limit)
 			except Exception:
 				limit = 1000
-			task = fetch_proxies_task.delay(limit=limit)  # PHASE3D: returns task_id for polling
-			return Response({'status': True, 'task_id': task.id})
+			job_id = create_job()
+			threading.Thread(
+				target=fetch_proxies_task,
+				kwargs={'limit': limit, 'job_id': job_id},
+				daemon=True,
+			).start()
+			return Response({'status': True, 'task_id': job_id})
 		except Exception as e:
 			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 

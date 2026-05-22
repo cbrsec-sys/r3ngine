@@ -6790,7 +6790,7 @@ def llm_vulnerability_description(vulnerability_id):
 
 
 @app.task(name='fetch_proxies_task', bind=True, queue='main_scan_queue')
-def fetch_proxies_task(self, limit=1000):
+def fetch_proxies_task(self, limit=1000, job_id=None):
     """Scrape proxies concurrently from a large list of public sources,
     verify their validity against robust target APIs, and return the live ones.
 
@@ -6804,8 +6804,10 @@ def fetch_proxies_task(self, limit=1000):
     from reNgine.common_func import check_proxy_robust
     import re
 
+    from reNgine.job_tracker import update_job as _update_job
     logger.info(f"Starting automated proxy fetch and verification task (limit={limit}).")
-    self.update_state(state='PROGRESS', meta={'message': 'Downloading new proxies', 'progress': 10})
+    if job_id:
+        _update_job(job_id, 'RUNNING', 10, 'Downloading new proxies')
     
     proxy_urls = [
         'https://api.proxyscrape.com/v2/?request=displayproxies',
@@ -6911,15 +6913,16 @@ def fetch_proxies_task(self, limit=1000):
     total = len(unique_proxies)
     logger.info(f"Total unique raw proxies fetched: {total} (capped at {limit})")
     
-    self.update_state(state='PROGRESS', meta={'message': f'Verifying {total} proxies', 'progress': 30})
+    if job_id:
+        _update_job(job_id, 'RUNNING', 30, f'Verifying {total} proxies')
 
     import threading
 
     live_proxies = []
     lock = threading.Lock()
     completed_count = [0]
-    # Capture task_id here — self.request.id is thread-local and will be None inside spawned threads
-    task_id = self.request.id
+    # Capture job_id here so inner threads can report progress without accessing self
+    _job_id = job_id
 
     N_THREADS = 4
     WORKERS_PER_CHUNK = 13  # 4 * 13 ≈ 52 concurrent IO checks, matching original throughput
@@ -6946,11 +6949,11 @@ def fetch_proxies_task(self, limit=1000):
                 if done % 50 == 0 or done == total:
                     logger.info(f"Verification progress: {done}/{total} - Found {len(live_proxies)} live proxies so far.")
                     progress = 30 + int((done / total) * 65)
-                    app.backend.store_result(
-                        task_id,
-                        {'message': f'Checking proxies: {done}/{total} ({len(live_proxies)} live)', 'progress': progress},
-                        'PROGRESS'
-                    )
+                    if _job_id:
+                        _update_job(
+                            _job_id, 'RUNNING', progress,
+                            f'Checking proxies: {done}/{total} ({len(live_proxies)} live)',
+                        )
 
     threads = [threading.Thread(target=check_chunk, args=(chunk,), daemon=True) for chunk in chunks]
     for t in threads:
@@ -6959,14 +6962,17 @@ def fetch_proxies_task(self, limit=1000):
         t.join()
 
     logger.info(f"Proxy verification complete. Found {len(live_proxies)} live proxies out of {total} tested.")
-    self.update_state(state='PROGRESS', meta={'message': 'Formatting live proxies', 'progress': 95})
+    if job_id:
+        _update_job(job_id, 'RUNNING', 95, 'Formatting live proxies')
 
     # Prefix with http:// if missing scheme, as requested
     final_list = [f"http://{p}" if not p.startswith('http') and not p.startswith('socks') else p for p in live_proxies]
-    
-    self.update_state(state='PROGRESS', meta={'message': 'Proxy list updated', 'progress': 100})
+
+    proxy_str = "\n".join(final_list)
+    if job_id:
+        _update_job(job_id, 'SUCCESS', 100, 'Proxy list updated', result={"count": len(final_list), "proxies": proxy_str})
     logger.info("Automated proxy fetch task finished successfully.")
-    return "\n".join(final_list)
+    return proxy_str
 
 
 def parse_sslscan_results(xml_file):

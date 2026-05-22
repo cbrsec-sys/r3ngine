@@ -112,6 +112,38 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
 ]
+
+# Dynamically add enabled plugins to INSTALLED_APPS
+PLUGINS_DIR = os.path.join(BASE_DIR, 'plugins_data')
+if os.path.exists(PLUGINS_DIR):
+    # Ensure plugins_data is a python package
+    init_file = os.path.join(PLUGINS_DIR, '__init__.py')
+    if not os.path.exists(init_file):
+        try:
+            with open(init_file, 'w') as f:
+                pass
+        except IOError:
+            pass
+
+    for item in os.listdir(PLUGINS_DIR):
+        plugin_path = os.path.join(PLUGINS_DIR, item)
+        if os.path.isdir(plugin_path) and not item.startswith('.'):
+            backend_dir = os.path.join(plugin_path, 'backend')
+            if os.path.exists(backend_dir) and os.path.isdir(backend_dir):
+                # Ensure plugin_slug and backend have __init__.py
+                for d in [plugin_path, backend_dir]:
+                    init_f = os.path.join(d, '__init__.py')
+                    if not os.path.exists(init_f):
+                        try:
+                            with open(init_f, 'w') as f:
+                                pass
+                        except IOError:
+                            pass
+                
+                app_module = f"plugins_data.{item}.backend"
+                if app_module not in INSTALLED_APPS:
+                    INSTALLED_APPS.append(app_module)
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'corsheaders.middleware.CorsMiddleware',
