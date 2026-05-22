@@ -326,25 +326,31 @@ def monitor_target_task(domain_id):
 
 		# 6. Follow-up Scan
 		if domain.monitor_scan_scope != 'none' and new_discoveries:
-			from reNgine.tasks import initiate_scan
+			from reNgine.tasks import initiate_scan_temporal
 			if domain.monitor_scan_scope == 'targeted':
 				# Targeted scan for new subdomains
 				new_subs = [d.split(": ")[1] for d in new_discoveries if d.startswith("Subdomain")]
 				if new_subs:
-					initiate_scan.delay(
+					try:
+						initiate_scan_temporal(
+							scan_history_id=None,
+							domain_id=domain.id,
+							engine_id=engine.id,
+							scan_type=SCHEDULED_SCAN,
+							imported_subdomains=new_subs
+						)
+					except Exception as e:
+						logger.warning(f"Failed to start targeted recovery scan for {domain.name}: {e}")
+			elif domain.monitor_scan_scope == 'full':
+				try:
+					initiate_scan_temporal(
 						scan_history_id=None,
 						domain_id=domain.id,
 						engine_id=engine.id,
-						scan_type=SCHEDULED_SCAN,
-						imported_subdomains=new_subs
+						scan_type=SCHEDULED_SCAN
 					)
-			elif domain.monitor_scan_scope == 'full':
-				initiate_scan.delay(
-					scan_history_id=None,
-					domain_id=domain.id,
-					engine_id=engine.id,
-					scan_type=SCHEDULED_SCAN
-				)
+				except Exception as e:
+					logger.warning(f"Failed to start full recovery scan for {domain.name}: {e}")
 
 		scan_history.scan_status = SUCCESS_TASK
 		scan_history.stop_scan_date = timezone.now()
