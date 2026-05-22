@@ -6,6 +6,7 @@ if not apps.ready and not apps.loading:
     django.setup()
 
 import csv
+import threading
 import requests
 import json
 import pprint
@@ -157,10 +158,14 @@ def finish_chord(results, description="Task"):
 @app.task(name='finish_osint', queue='main_scan_queue')
 def finish_osint(results, scan_history_id):
     """Callback for OSINT tasks, triggers Deep Pursuit pipeline."""
-    from reNgine.tasks import osint_orchestrator
+    from reNgine.osint_tasks import osint_orchestrator
     logger.info(f"OSINT discovery completed for scan {scan_history_id}")
     logger.info('Starting Deep Pursuit OSINT Pipeline...')
-    osint_orchestrator.delay(scan_history_id=scan_history_id)
+    threading.Thread(
+        target=osint_orchestrator.apply,
+        kwargs={'kwargs': {'scan_history_id': scan_history_id}},
+        daemon=True
+    ).start()
     return results
 
 @app.task(name='finish_vulnerability_scan', queue='main_scan_queue')
@@ -665,7 +670,7 @@ def initiate_scan(
 			logger.warning(f"[DEBUG] Reached SpiderFoot trigger for {domain.name}. enable_spiderfoot_scan={enable_spiderfoot_scan}, tasks={engine.tasks}")
 			logger.warning(f"Triggering asynchronous SpiderFoot scan for {domain.name}")
 			# Pass host=None for main scan to allow the task to fetch subdomains if needed
-			spiderfoot_scan.apply_async(kwargs={'ctx': ctx, 'host': None})
+			spiderfoot_scan.apply_async(kwargs={'ctx': ctx, 'host': None})  # PHASE4: part of Celery pipeline
 
 		# Final Workflow construction
 		workflow_steps = []
@@ -704,7 +709,7 @@ def initiate_scan(
 
 		# Run Celery chord
 		logger.info(f'Running Celery workflow with {len(workflow.tasks) + 1} tasks')
-		task = chain(workflow, callback).on_error(callback).delay()
+		task = chain(workflow, callback).on_error(callback).delay()  # PHASE4: core pipeline chain
 		scan.celery_ids.append(task.id)
 		scan.save()
 
@@ -1333,7 +1338,7 @@ def initiate_subscan(
 	callback = report.si(ctx=ctx).set(link_error=[report.si(ctx=ctx)])
 
 	# Run Celery tasks
-	task = chain(workflow, callback).on_error(callback).delay()
+	task = chain(workflow, callback).on_error(callback).delay()  # PHASE4: core subscan chain
 	subscan.celery_ids.append(task.id)
 	subscan.save()
 
@@ -1798,7 +1803,11 @@ def osint(self, host=None, ctx={}, description=None):
 
 	# Deep Pursuit OSINT Pipeline (holehe, maigret, LinkedInt)
 	logger.info('Starting Deep Pursuit OSINT Pipeline...')
-	osint_orchestrator.delay(scan_history_id=self.scan.id)
+	threading.Thread(
+		target=osint_orchestrator.apply,
+		kwargs={'kwargs': {'scan_history_id': self.scan.id}},
+		daemon=True
+	).start()
 
 	logger.info('OSINT Tasks finished...')
 
@@ -3917,7 +3926,7 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	if primary_tasks:
 		logger.info(f"Starting {len(primary_tasks)} primary vulnerability scan tasks (Stage 1)")
 		primary_group = group(primary_tasks)
-		primary_job = primary_group.apply_async()
+		primary_job = primary_group.apply_async()  # PHASE4: legacy vulnerability_scan group
 		
 		# Block synchronous worker execution until Stage 1 completes to prevent premature flow progression
 		with allow_join_result():
@@ -3931,7 +3940,7 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	if additional_tasks:
 		logger.info(f"Starting {len(additional_tasks)} additional vulnerability scan tasks (Stage 2)")
 		additional_group = group(additional_tasks)
-		additional_job = additional_group.apply_async()
+		additional_job = additional_group.apply_async()  # PHASE4: legacy vulnerability_scan group
 		
 		# Block synchronous worker execution until Stage 2 completes to prevent premature flow progression
 		with allow_join_result():

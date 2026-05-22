@@ -1,6 +1,7 @@
 import markdown
 import requests
 import logging
+import threading
 from django.conf import settings
 
 from celery import group
@@ -1099,7 +1100,11 @@ def create_report(request, id):
     )
 
     from reNgine.report_tasks import generate_report_task
-    generate_report_task.delay(report_obj.id)
+    threading.Thread(
+        target=generate_report_task.apply,
+        args=((report_obj.id,),),
+        daemon=True
+    ).start()
 
     return JsonResponse({'status': True, 'report_id': report_obj.id})
 

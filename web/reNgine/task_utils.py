@@ -1,6 +1,7 @@
 import os
 import re
 import subprocess
+import threading
 import validators
 import json
 from django.utils import timezone
@@ -183,9 +184,12 @@ def save_email(email_address, scan_history=None):
     if scan_history:
         scan_history.emails.add(email)
         scan_history.save()
-        # Trigger identity enrichment
         from reNgine.osint_tasks import enrich_identities_task
-        enrich_identities_task.delay(email_address, 'email', scan_history.id)
+        threading.Thread(
+            target=enrich_identities_task.apply,
+            kwargs={'kwargs': {'identity': email_address, 'identity_type': 'email', 'scan_history_id': scan_history.id}},
+            daemon=True
+        ).start()
 
     return email, created
 
@@ -198,9 +202,12 @@ def save_employee(name, designation='', scan_history=None):
     if scan_history:
         scan_history.employees.add(employee)
         scan_history.save()
-        # Trigger identity enrichment
         from reNgine.osint_tasks import enrich_identities_task
-        enrich_identities_task.delay(name, 'employee', scan_history.id)
+        threading.Thread(
+            target=enrich_identities_task.apply,
+            kwargs={'kwargs': {'identity': name, 'identity_type': 'employee', 'scan_history_id': scan_history.id}},
+            daemon=True
+        ).start()
 
     return employee, created
 
@@ -544,7 +551,7 @@ def ensure_endpoints_crawled_and_execute(task_function, ctx, description=None, m
 	custom_ctx['track'] = False  # Don't track this internal crawl
 
 	# Execute http_crawl and wait for completion (but with timeout)
-	http_crawl_task = http_crawl.delay(
+	http_crawl_task = http_crawl.delay(  # PHASE3D: polls task.ready() — needs job tracker
 		urls=uncrawled_endpoints[:50],  # Limit to avoid overwhelming
 		ctx=custom_ctx
 	)

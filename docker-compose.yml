@@ -121,7 +121,7 @@ services:
     restart: always
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     environment:
-      - DEBUG=1
+      - DEBUG=0
       - CELERY_BROKER=redis://redis:6379/0
       - CELERY_BACKEND=redis://redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}
@@ -280,8 +280,8 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}
     depends_on:
-      temporal:
-        condition: service_healthy
+      #temporal:
+      #  condition: service_healthy
       db:
         condition: service_healthy
       neo4j:
@@ -323,8 +323,8 @@ services:
       - POSTGRES_HOST=${POSTGRES_HOST}
       - POSTGRES_PORT=${POSTGRES_PORT}
     depends_on:
-      temporal:
-        condition: service_healthy
+      #temporal:
+      #  condition: service_healthy
       db:
         condition: service_healthy
     volumes:

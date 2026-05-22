@@ -30,7 +30,7 @@ ENV GO111MODULE=on
 
 # All tools in one RUN: single cache-invalidation point, no intermediate layers
 # retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols.
-RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@latest && \
+RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && \
     go install -ldflags="-s -w" -v github.com/jaeles-project/gospider@latest && \
     go install -ldflags="-s -w" -v github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006 && \
     go install -ldflags="-s -w" -v github.com/tomnomnom/unfurl@latest && \

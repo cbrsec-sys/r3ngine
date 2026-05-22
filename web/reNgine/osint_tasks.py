@@ -4,6 +4,7 @@ import csv
 import subprocess
 import shutil
 import re
+import threading
 from celery.utils.log import get_task_logger
 from reNgine.celery import app
 from reNgine.common_func import (
@@ -153,9 +154,6 @@ def run_linkedint(self, company_name, scan_history_id):
         return []
 
 
-    # 3. LinkedInt for the domain/company
-    company_name = domain.split('.')[0]
-    run_linkedint.delay(company_name, scan_history_id)
 
 @app.task(name='enrich_identities_task', queue='osint_queue', base=RengineTask, bind=True)
 def enrich_identities_task(self, identity, identity_type, scan_history_id, ctx={}):
@@ -261,19 +259,37 @@ def osint_orchestrator(self, scan_history_id):
     # 1. Get already discovered emails
     emails = scan_history.emails.all()
     for email in emails:
-        run_holehe.delay(email.address, scan_history_id)
-        # New: Trigger identity enrichment
-        enrich_identities_task.delay(email.address, 'email', scan_history_id)
-        
+        threading.Thread(
+            target=run_holehe.apply,
+            kwargs={'kwargs': {'email_address': email.address, 'scan_history_id': scan_history_id}},
+            daemon=True
+        ).start()
+        threading.Thread(
+            target=enrich_identities_task.apply,
+            kwargs={'kwargs': {'identity': email.address, 'identity_type': 'email', 'scan_history_id': scan_history_id}},
+            daemon=True
+        ).start()
+
     # 2. Get already discovered employees/usernames
     employees = scan_history.employees.all()
     for employee in employees:
         if employee.name:
             if ' ' not in employee.name:
-                run_maigret.delay(employee.name, scan_history_id)
-            # New: Trigger identity enrichment for all employees
-            enrich_identities_task.delay(employee.name, 'employee', scan_history_id)
-            
+                threading.Thread(
+                    target=run_maigret.apply,
+                    kwargs={'kwargs': {'username': employee.name, 'scan_history_id': scan_history_id}},
+                    daemon=True
+                ).start()
+            threading.Thread(
+                target=enrich_identities_task.apply,
+                kwargs={'kwargs': {'identity': employee.name, 'identity_type': 'employee', 'scan_history_id': scan_history_id}},
+                daemon=True
+            ).start()
+
     # 3. LinkedInt for the domain/company
     company_name = domain.split('.')[0]
-    run_linkedint.delay(company_name, scan_history_id)
+    threading.Thread(
+        target=run_linkedint.apply,
+        kwargs={'kwargs': {'company_name': company_name, 'scan_history_id': scan_history_id}},
+        daemon=True
+    ).start()
