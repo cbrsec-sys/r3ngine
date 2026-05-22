@@ -587,6 +587,7 @@ export const StressTestingPage: React.FC = () => {
         'socket_errors', 'timeout_errors',
         'attack_mode', 'pps_peak', 'bps_peak', 'rps_peak', 'response_rate', 'block_rate',
         'main_table', 'percentile_table', 'percentiles',
+        'packets_sent', 'packets_received',
       ];
 
       for (const field of fieldsToAggregate) {

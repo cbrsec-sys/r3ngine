@@ -2046,7 +2046,6 @@ class UninstallTool(APIView):
 			return Response({'status': False, 'message': 'Cannot uninstall tool!'})
 
 		run_command.run(uninstall_command, shell=True)
-		run_command.apply_async(args=(uninstall_command,), kwargs={'shell': True})
 
 		tool.delete()
 
@@ -2081,15 +2080,10 @@ class UpdateTool(APIView):
 
 		
 		try:
-			# Execute via Celery and wait for result to ensure success
-			task = run_command.delay(update_command, shell=True)
-			res = task.get(timeout=300) # Updates can take time
-			return_code, output = res[0], res[1]
-			
+			return_code, output = run_command.run(update_command, shell=True)
 			if return_code == 0:
 				return Response({'status': True, 'message': tool.name + ' updated successfully.'})
 			else:
-				# Log the failure output for debugging
 				logger.error(f"Update failed for {tool.name}: {output}")
 				return Response({'status': False, 'message': f'Update failed: {output[:200]}...'})
 		except Exception as e:
@@ -2108,10 +2102,7 @@ class UninstallTool(APIView):
 		tool = InstalledExternalTool.objects.get(id=tool_id)
 		
 		try:
-			task = run_command.delay(tool.uninstall_command, shell=True)
-			res = task.get(timeout=60)
-			return_code, output = res[0], res[1]
-			
+			return_code, output = run_command.run(tool.uninstall_command, shell=True)
 			if return_code == 0:
 				tool.delete()
 				return Response({'status': True, 'message': tool.name + ' uninstalled successfully.'})
@@ -2148,16 +2139,12 @@ class GetExternalToolCurrentVersion(APIView):
 
 		version_number = None
 		try:
-			# Execute via Celery to ensure we are in the same environment as the workers
-			task = run_command.delay(tool.version_lookup_command, shell=True)
-			res = task.get(timeout=60)
-			return_code, stdout = res[0], res[1]
-			
+			return_code, stdout = run_command.run(tool.version_lookup_command, shell=True)
 			if return_code != 0:
 				logger.warning(f"Version lookup failed for {tool.name} with code {return_code}: {stdout}")
 				return Response({'status': False, 'message': 'Tool not found or check failed.'})
 		except Exception as e:
-			logger.error(f"Error running version lookup command via Celery: {str(e)}")
+			logger.error(f"Error running version lookup command: {str(e)}")
 			return Response({'status': False, 'message': f'Error running version lookup command: {str(e)}'})
 
 		if tool.version_match_regex:
@@ -2317,8 +2304,7 @@ class Whois(APIView):
 			return Response({'status': False, 'message': 'Invalid domain or IP'})
 		is_force_update = req.query_params.get('is_reload')
 		is_force_update = True if is_force_update and 'true' == is_force_update.lower() else False
-		task = query_whois.apply_async(args=(target,is_force_update))
-		response = task.wait()
+		response = query_whois(target, is_force_update)
 		return Response(response)
 
 
@@ -2327,8 +2313,7 @@ class ReverseWhois(APIView):
 	def get(self, request):
 		req = self.request
 		lookup_keyword = req.query_params.get('lookup_keyword')
-		task = query_reverse_whois.apply_async(args=(lookup_keyword,))
-		response = task.wait()
+		response = query_reverse_whois(lookup_keyword)
 		return Response(response)
 
 
@@ -2337,8 +2322,7 @@ class DomainIPHistory(APIView):
 	def get(self, request):
 		req = self.request
 		domain = req.query_params.get('domain')
-		task = query_ip_history.apply_async(args=(domain,))
-		response = task.wait()
+		response = query_ip_history(domain)
 		return Response(response)
 
 

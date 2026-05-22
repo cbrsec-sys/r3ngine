@@ -28,23 +28,42 @@ class K6Parser(BaseParser):
         }
 
     def parse_line(self, line):
-        """Parse a single line of k6 stdout for real-time metrics.
+        """Parse a single line of k6 stdout for real-time and summary metrics.
 
         Args:
             line (str): The raw output line from k6 standard output.
 
         Returns:
-            dict: The updated metrics dictionary, or None if no metrics found.
+            dict: The updated metrics dictionary containing current VUs, total
+                  requests, throughput (RPS), and latencies, or None if no matching
+                  metrics are found in the line.
         """
         # K6 progress line: "     execution: 00m10.0s / 00m30.0s, 3/3 VUs, 95 complete and 0 interrupted transactions"
+        # Or: "running (00m01.5s), 50/50 VUs, 100 complete"
         progress_match = re.search(r'(\d+)/(\d+) VUs.*?(\d+) complete', line)
         if progress_match:
+            # Extract current active VUs and cumulative completed requests
             self.metrics["current_vus"] = int(progress_match.group(1))
             self.metrics["total_requests"] = int(progress_match.group(3))
-            self.metrics["throughput_rps"] = self.metrics.get("throughput_rps", 0)
+            
+            # Parse elapsed time to calculate live throughput (RPS)
+            # Matches 'execution: 00m10.0s' or 'running (00m01.5s)'
+            time_match = re.search(r'(?:running\s*\(|execution:\s*)(?:(\d+)m)?([0-9.]+)s', line)
+            if time_match:
+                # Group 1 captures the optional minutes; defaults to 0 if not present
+                minutes = int(time_match.group(1)) if time_match.group(1) else 0
+                # Group 2 captures seconds (e.g. 10.0 or 1.5)
+                seconds = float(time_match.group(2))
+                elapsed_seconds = minutes * 60.0 + seconds
+                
+                # Protect against division by zero and compute real-time throughput RPS
+                if elapsed_seconds > 0:
+                    self.metrics["throughput_rps"] = round(self.metrics["total_requests"] / elapsed_seconds, 2)
+            else:
+                self.metrics["throughput_rps"] = self.metrics.get("throughput_rps", 0.0)
             return self.metrics
 
-        # Summary lines with metrics
+        # Summary lines with metrics (output at the end of the k6 run)
         # Example: http_req_duration..............: avg=12.34ms min=1.23ms med=10.11ms max=100.22ms p(90)=20.33ms p(95)=25.44ms p(99)=30.45ms
         avg_match = re.search(r"http_req_duration\.*:\s+avg=([0-9.]+)", line)
         if avg_match:
@@ -58,17 +77,19 @@ class K6Parser(BaseParser):
         if p99_match:
             self.metrics["p99_latency"] = float(p99_match.group(1))
 
+        # Example summary line for requests: "http_reqs..................: 1500    49.998334/s"
         reqs_match = re.search(r"http_reqs\.*:\s+([0-9]+)\s+([0-9.]+)/s", line)
         if reqs_match:
             self.metrics["total_requests"] = int(reqs_match.group(1))
             self.metrics["throughput_rps"] = float(reqs_match.group(2))
             return self.metrics
 
+        # Example failed requests percentage line: "http_req_failed............: 0.00%      ✓ 0          ✗ 1500"
         failed_match = re.search(r"http_req_failed\.*:\s+([0-9.]+)%", line)
         if failed_match:
             self.metrics["error_rate"] = float(failed_match.group(1)) / 100.0
 
-        # Return metrics if we found any useful data
+        # Return metrics if we found any useful data in this summary chunk
         if progress_match or avg_match or p95_match or p99_match or reqs_match or failed_match:
             return self.metrics
 
@@ -233,7 +254,8 @@ class WrkParser(BaseParser):
             dict: Standardized dictionary containing total/success/failed requests, latencies, and max RPS.
         """
         total = self.metrics.get("total_requests", 0)
-        failed = self.metrics.get("socket_errors", 0)
+        # Sum both connection socket errors and timeout errors to get total failed requests
+        failed = self.metrics.get("socket_errors", 0) + self.metrics.get("timeout_errors", 0)
         success = max(0, total - failed)
         return {
             "total_requests": total,
@@ -254,11 +276,16 @@ class Hping3Parser(BaseParser):
         self.total_packets = 0
         self.failed_packets = 0
         self.packet_loss = 0.0
+        self.max_seq = -1
         
         self.start_time = None
         self.last_calc_time = None
         self.packets_in_window = 0
         self.current_rps = 0.0
+        
+        self.min_rtt = float('inf')
+        self.max_rtt = float('-inf')
+        self.sum_rtt = 0.0
 
     def parse_line(self, line):
         """Parse a single line of hping3 output.
@@ -282,7 +309,32 @@ class Hping3Parser(BaseParser):
             lat = float(rtt_match.group(1))
             self.latencies.append(lat)
             metrics["latency"] = lat
+            
+            if lat < self.min_rtt:
+                self.min_rtt = lat
+            if lat > self.max_rtt:
+                self.max_rtt = lat
+            self.sum_rtt += lat
+            
+            metrics["rtt_min"] = self.min_rtt
+            metrics["rtt_max"] = self.max_rtt
+            metrics["rtt_avg"] = self.sum_rtt / len(self.latencies)
+            
             self.packets_in_window += 1
+            
+            seq_match = re.search(r"seq=([0-9]+)", line)
+            if seq_match:
+                seq = int(seq_match.group(1))
+                if seq > self.max_seq:
+                    self.max_seq = seq
+            
+            if self.max_seq >= 0:
+                packets_sent = self.max_seq + 1
+                packets_received = len(self.latencies)
+                packets_sent = max(packets_sent, packets_received)
+                metrics["packets_sent"] = packets_sent
+                metrics["packets_received"] = packets_received
+                metrics["packet_loss"] = ((packets_sent - packets_received) / packets_sent) * 100
         
         # 100 packets transmitted, 100 packets received, 0% packet loss
         loss_match = re.search(r"([0-9]+)\s+packets\s+transmitted,\s+([0-9]+)\s+packets\s+received,\s+([0-9.]+)%\s+packet\s+loss", line)
@@ -292,6 +344,8 @@ class Hping3Parser(BaseParser):
             self.failed_packets = self.total_packets - received
             self.packet_loss = float(loss_match.group(3))
             metrics["packet_loss"] = self.packet_loss
+            metrics["packets_sent"] = self.total_packets
+            metrics["packets_received"] = received
             
         # Calculate live RPS every 1 second
         if now - self.last_calc_time >= 1.0:
@@ -348,6 +402,9 @@ class LocustParser(BaseParser):
             "total_requests": 0,
             "failed_requests": 0,
             "error_rate": 0.0,
+            "total_users": 0,
+            "endpoint_count": 0,
+            "percentiles": {"p50": 0, "p90": 0, "p95": 0, "p99": 0},
             "main_table": [],
             "percentile_table": []
         }
@@ -365,6 +422,20 @@ class LocustParser(BaseParser):
         """
         has_update = False
         line_stripped = line.strip("\r")
+        
+        # Check for user count log lines
+        if "Ramping to " in line_stripped and " users " in line_stripped:
+            m = re.search(r"Ramping to (\d+) users", line_stripped)
+            if m:
+                self.metrics["total_users"] = int(m.group(1))
+                has_update = True
+                
+        if "total users" in line_stripped and "All users spawned" in line_stripped:
+            m = re.search(r"\((\d+) total users\)", line_stripped)
+            if m:
+                self.metrics["total_users"] = int(m.group(1))
+                has_update = True
+                
         if ("Type" in line_stripped or "Name" in line_stripped) and "# reqs" in line_stripped and "# fails" in line_stripped:
             self.in_main = True
             self.in_perc = False
@@ -397,6 +468,7 @@ class LocustParser(BaseParser):
                         self.metrics["error_rate"] = float(parts[3]) / 100.0
                         self.metrics["avg_latency"] = float(parts[4])
                         self.metrics["throughput_rps"] = float(parts[8])
+                        self.metrics["endpoint_count"] = len([x for x in self.metrics["main_table"] if x["name"] != "Aggregated"])
                         self.in_main = False # End of table
                     else:
                         self.metrics["main_table"].append({
@@ -420,6 +492,12 @@ class LocustParser(BaseParser):
                             "p90": float(parts[5]), "p95": float(parts[6]), "p98": float(parts[7]), "p99": float(parts[8]),
                             "p999": float(parts[9]), "p9999": float(parts[10]), "p100": float(parts[11]), "reqs": int(parts[12])
                         })
+                        self.metrics["percentiles"] = {
+                            "p50": float(parts[1]),
+                            "p90": float(parts[5]),
+                            "p95": float(parts[6]),
+                            "p99": float(parts[8])
+                        }
                         self.in_perc = False # End of table
                     else:
                         self.metrics["percentile_table"].append({
@@ -687,6 +765,16 @@ class TAStressorParser(BaseParser):
         # Strip ANSI escape codes
         clean_line = re.sub(r'\x1b\[[0-9;]*m', '', line)
         
+        # Try to extract Method to determine attack mode
+        method_match = re.search(r"Method:\s*([A-Za-z0-9_]+)", clean_line, re.IGNORECASE)
+        if method_match:
+            method = method_match.group(1).upper()
+            if method in ['GET', 'POST', 'HEAD', 'HTTP']:
+                self.metrics["attack_mode"] = 'layer7'
+            else:
+                self.metrics["attack_mode"] = 'layer4'
+            has_update = True
+
         # Regex to capture the PPS (Packets/Requests per second) and optional unit suffix
         pps_match = re.search(r"PPS:\s*([0-9.]+)([kmgtp]?)", clean_line, re.IGNORECASE)
         if pps_match:
@@ -702,6 +790,8 @@ class TAStressorParser(BaseParser):
                 val *= 1_000_000_000_000
             
             self.metrics["throughput_rps"] = val
+            self.metrics["pps"] = val
+            self.metrics["rps"] = val
             # Accumulate requests dynamically (since logs output rate every 1 second)
             self.metrics["total_requests"] += int(val)
             has_update = True
@@ -721,6 +811,7 @@ class TAStressorParser(BaseParser):
                 val *= 1_000_000_000_000
                 
             self.metrics["throughput_bps"] = val
+            self.metrics["bps"] = val
             self.metrics["total_bytes"] += int(val)
             has_update = True
             

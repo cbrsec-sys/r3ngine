@@ -34,19 +34,19 @@ export const WrkDashboard: React.FC<WrkDashboardProps> = ({
   const validTimeouts = typeof timeouts === 'number' ? timeouts : 0;
 
   const latestMetrics = useMemo(() => {
-    let throughputBps = 0;
+    let currentRps = 0;
     let peakRps = 0;
     let errorRate = 0;
 
     if (validTelemetry.length > 0) {
       const latest = validTelemetry[validTelemetry.length - 1];
-      throughputBps = latest.throughput_bps || 0;
+      currentRps = latest.throughput_rps || 0;
       peakRps = Math.max(...validTelemetry.map(t => t.throughput_rps || 0));
       errorRate = validSocketErrors + validTimeouts;
     }
 
     return {
-      throughputBps: (throughputBps / (1024 * 1024)).toFixed(2),
+      currentRps,
       peakRps,
       socketErrors: validSocketErrors,
       timeouts: validTimeouts,
@@ -60,11 +60,11 @@ export const WrkDashboard: React.FC<WrkDashboardProps> = ({
       <Grid container spacing={2} sx={{ mb: 3 }}>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
           <KpiCard
-            title="THROUGHPUT"
-            value={`${latestMetrics.throughputBps} MB/s`}
-            icon={HardDrive}
+            title="CURRENT RPS"
+            value={latestMetrics.currentRps.toFixed(1)}
+            icon={Activity}
             color="#10b981"
-            subtitle="Bytes/second"
+            subtitle="Requests/second"
           />
         </Grid>
         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
@@ -119,15 +119,15 @@ export const WrkDashboard: React.FC<WrkDashboardProps> = ({
 
         {/* Throughput Trend */}
         <Grid size={{ xs: 12, md: 6 }}>
-          <TacticalPanel title="THROUGHPUT TREND" icon={<HardDrive size={18} />}>
+          <TacticalPanel title="RPS TREND" icon={<TrendingUp size={18} />}>
             <TimeSeriesChart
               data={validTelemetry.map(t => ({
                 timestamp: t.timestamp,
-                throughput: (t.throughput_rps || 0) * 1000,
+                rps: t.throughput_rps || 0,
               }))}
-              series={[{ key: 'throughput', name: 'Throughput (bytes/s)', color: '#10b981' }]}
-              title="Data Transfer Rate"
-              yAxisLabel="Bytes/s"
+              series={[{ key: 'rps', name: 'RPS', color: '#10b981' }]}
+              title="Requests Per Second"
+              yAxisLabel="RPS"
               height={300}
             />
           </TacticalPanel>

@@ -66,9 +66,9 @@ export const StressorDashboard: React.FC<StressorDashboardProps> = ({
 
     if (validTelemetry.length > 0) {
       const latest = validTelemetry[validTelemetry.length - 1];
-      if (latest.pps) pps = Math.max(...validTelemetry.map(t => t.pps || 0));
-      if (latest.bps) bps = Math.max(...validTelemetry.map(t => t.bps || 0));
-      if (latest.rps) rps = Math.max(...validTelemetry.map(t => t.rps || 0));
+      if (latest.pps !== undefined) pps = Math.max(...validTelemetry.map(t => t.pps || 0));
+      if (latest.bps !== undefined) bps = Math.max(...validTelemetry.map(t => t.bps || 0));
+      if (latest.rps !== undefined) rps = Math.max(...validTelemetry.map(t => t.rps || 0));
     }
 
     return {
@@ -142,36 +142,42 @@ export const StressorDashboard: React.FC<StressorDashboardProps> = ({
                 subtitle="Requests/sec"
               />
             </Grid>
-            <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-              <KpiCard
-                title="STATUS CODES"
-                value={Object.values(validStatusCodes).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0).toString()}
-                icon={BarChart3}
-                color="#10b981"
-                subtitle="Total responses"
-              />
-            </Grid>
+            {Object.keys(validStatusCodes).length > 0 && (
+              <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+                <KpiCard
+                  title="STATUS CODES"
+                  value={Object.values(validStatusCodes).reduce((sum, v) => sum + (typeof v === 'number' ? v : 0), 0).toString()}
+                  icon={BarChart3}
+                  color="#10b981"
+                  subtitle="Total responses"
+                />
+              </Grid>
+            )}
           </>
         )}
 
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <KpiCard
-            title="RESPONSE RATE"
-            value={`${latestMetrics.responseRate}%`}
-            icon={Zap}
-            color="#10b981"
-            subtitle="Successful rate"
-          />
-        </Grid>
-        <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-          <KpiCard
-            title="BLOCK RATE"
-            value={`${latestMetrics.blockRate}%`}
-            icon={AlertTriangle}
-            color={validBlockRate > 0 ? '#facc15' : '#10b981'}
-            subtitle="Blocked rate"
-          />
-        </Grid>
+        {validResponseRate > 0 && (
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <KpiCard
+              title="RESPONSE RATE"
+              value={`${latestMetrics.responseRate}%`}
+              icon={Zap}
+              color="#10b981"
+              subtitle="Successful rate"
+            />
+          </Grid>
+        )}
+        {validBlockRate > 0 && (
+          <Grid size={{ xs: 12, sm: 6, md: 3 }}>
+            <KpiCard
+              title="BLOCK RATE"
+              value={`${latestMetrics.blockRate}%`}
+              icon={AlertTriangle}
+              color={validBlockRate > 0 ? '#facc15' : '#10b981'}
+              subtitle="Blocked rate"
+            />
+          </Grid>
+        )}
       </Grid>
 
       {/* Charts Grid */}
@@ -227,7 +233,7 @@ export const StressorDashboard: React.FC<StressorDashboardProps> = ({
         ) : (
           <>
             {/* RPS Trend */}
-            <Grid size={{ xs: 12, md: 6 }}>
+            <Grid size={{ xs: 12, md: Object.keys(validStatusCodes).length > 0 ? 6 : 12 }}>
               <TacticalPanel title="REQUESTS PER SECOND" icon={<Zap size={18} />}>
                 <TimeSeriesChart
                   data={validTelemetry.map(t => ({
@@ -243,55 +249,61 @@ export const StressorDashboard: React.FC<StressorDashboardProps> = ({
             </Grid>
 
             {/* Status Codes */}
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TacticalPanel title="HTTP STATUS CODES" icon={<BarChart3 size={18} />}>
-                <DistributionChart
-                  data={validStatusCodes}
-                  title="Status Code Distribution"
-                  type="pie"
-                  colorMap={STRESSOR_STATUS_COLORS}
-                  height={300}
-                />
-              </TacticalPanel>
-            </Grid>
+            {Object.keys(validStatusCodes).length > 0 && (
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TacticalPanel title="HTTP STATUS CODES" icon={<BarChart3 size={18} />}>
+                  <DistributionChart
+                    data={validStatusCodes}
+                    title="Status Code Distribution"
+                    type="pie"
+                    colorMap={STRESSOR_STATUS_COLORS}
+                    height={300}
+                  />
+                </TacticalPanel>
+              </Grid>
+            )}
           </>
         )}
 
         {/* Response Rate Gauge */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <TacticalPanel title="RESPONSE RATE" icon={<Zap size={18} />}>
-            <PerformanceGauge
-              value={validResponseRate}
-              max={100}
-              title="Success Rate"
-              unit="%"
-              colorRanges={[
-                { min: 80, max: 100, color: '#10b981' },
-                { min: 50, max: 80, color: '#f59e0b' },
-                { min: 0, max: 50, color: '#ef4444' },
-              ]}
-              size={250}
-            />
-          </TacticalPanel>
-        </Grid>
+        {validResponseRate > 0 && (
+          <Grid size={{ xs: 12, md: validBlockRate > 0 ? 6 : 12 }}>
+            <TacticalPanel title="RESPONSE RATE" icon={<Zap size={18} />}>
+              <PerformanceGauge
+                value={validResponseRate}
+                max={100}
+                title="Success Rate"
+                unit="%"
+                colorRanges={[
+                  { min: 80, max: 100, color: '#10b981' },
+                  { min: 50, max: 80, color: '#f59e0b' },
+                  { min: 0, max: 50, color: '#ef4444' },
+                ]}
+                size={250}
+              />
+            </TacticalPanel>
+          </Grid>
+        )}
 
         {/* Block Rate Gauge */}
-        <Grid size={{ xs: 12, md: 6 }}>
-          <TacticalPanel title="BLOCK RATE" icon={<AlertTriangle size={18} />}>
-            <PerformanceGauge
-              value={validBlockRate}
-              max={100}
-              title="Block Rate"
-              unit="%"
-              colorRanges={[
-                { min: 0, max: 5, color: '#10b981' },
-                { min: 5, max: 20, color: '#facc15' },
-                { min: 20, max: 100, color: '#ef4444' },
-              ]}
-              size={250}
-            />
-          </TacticalPanel>
-        </Grid>
+        {validBlockRate > 0 && (
+          <Grid size={{ xs: 12, md: validResponseRate > 0 ? 6 : 12 }}>
+            <TacticalPanel title="BLOCK RATE" icon={<AlertTriangle size={18} />}>
+              <PerformanceGauge
+                value={validBlockRate}
+                max={100}
+                title="Block Rate"
+                unit="%"
+                colorRanges={[
+                  { min: 0, max: 5, color: '#10b981' },
+                  { min: 5, max: 20, color: '#facc15' },
+                  { min: 20, max: 100, color: '#ef4444' },
+                ]}
+                size={250}
+              />
+            </TacticalPanel>
+          </Grid>
+        )}
       </Grid>
     </Box>
   );

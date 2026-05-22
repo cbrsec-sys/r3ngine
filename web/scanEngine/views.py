@@ -923,7 +923,8 @@ def add_tool(request, slug):
                 github_clone_path = '/usr/src/github/' + project_name
                 install_command = install_command + ' ' + github_clone_path + ' && pip3 install -r ' + github_clone_path + '/requirements.txt'
 
-            run_command.apply_async(args=(install_command,))
+            import threading as _threading
+            _threading.Thread(target=run_command.run, args=(install_command,), daemon=True).start()
             saved_form = form.save()
             if github_clone_path:
                 tool = InstalledExternalTool.objects.get(id=saved_form.pk)
@@ -981,7 +982,8 @@ def update_github_tool(request, slug, id):
         update_command = f"cd {tool.github_clone_path} && git pull"
         if tool.update_command:
              update_command = tool.update_command
-        run_command.apply_async(args=(update_command,))
+        import threading as _threading
+        _threading.Thread(target=run_command.run, args=(update_command,), daemon=True).start()
         messages.add_message(request, messages.INFO, f'Update started for {tool.name}')
     return http.HttpResponseRedirect(reverse('tool_arsenal', kwargs={'slug': slug}))
 

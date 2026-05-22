@@ -14,6 +14,20 @@ class StressParsersTest(unittest.TestCase):
         """
         parser = K6Parser()
         
+        # Test progress line parsing (running)
+        metrics = parser.parse_line("running (00m10.0s), 3/3 VUs, 150 complete")
+        self.assertIsNotNone(metrics)
+        self.assertEqual(metrics["current_vus"], 3)
+        self.assertEqual(metrics["total_requests"], 150)
+        self.assertAlmostEqual(metrics["throughput_rps"], 15.0)
+
+        # Test progress line parsing (execution)
+        metrics = parser.parse_line("     execution: 00m20.0s / 00m30.0s, 5/5 VUs, 400 complete")
+        self.assertIsNotNone(metrics)
+        self.assertEqual(metrics["current_vus"], 5)
+        self.assertEqual(metrics["total_requests"], 400)
+        self.assertAlmostEqual(metrics["throughput_rps"], 20.0)
+
         # Feed k6 output lines
         parser.parse_line("http_reqs..................: 1500    49.998334/s")
         parser.parse_line("http_req_duration..........: avg=12.5ms min=1.1ms med=10.2ms max=150.3ms p(90)=20.1ms p(95)=25.4ms p(99)=30.5ms")
