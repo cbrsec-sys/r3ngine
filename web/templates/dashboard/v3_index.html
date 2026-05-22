@@ -7,16 +7,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>r3ngine | Codename Phoenix</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css" />
-  <script type="module" crossorigin src="/staticfiles/assets/index.js"></script>
-  <link rel="modulepreload" crossorigin href="/staticfiles/assets/rolldown-runtime.js">
-  <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-base.js">
-  <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-mui.js">
-  <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-router.js">
-  <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-utils.js">
-  <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-echarts.js">
-  <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-react.js">
-  <link rel="stylesheet" crossorigin href="/staticfiles/assets/vendor-base.css">
-  <link rel="stylesheet" crossorigin href="/staticfiles/assets/index.css">
+  {% if VITE_ENABLED %}
+    <!-- Vite dev server in DEBUG mode -->
+    <script type="module">
+      import RefreshRuntime from '{{ VITE_DEV_SERVER_URL }}/@react-refresh'
+      RefreshRuntime.injectIntoGlobalHook(window)
+      window.$RefreshReg$ = () => {}
+      window.$RefreshSig$ = () => (x) => x
+    </script>
+    <script type="module" src="{{ VITE_DEV_SERVER_URL }}/@vite/client"></script>
+    <script type="module" src="{{ VITE_DEV_SERVER_URL }}/src/main.tsx"></script>
+  {% else %}
+    <!-- Production static files -->
+    <script type="module" crossorigin src="/staticfiles/assets/index.js"></script>
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/rolldown-runtime.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-base.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-mui.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-router.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-utils.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-echarts.js">
+    <link rel="modulepreload" crossorigin href="/staticfiles/assets/vendor-react.js">
+    <link rel="stylesheet" crossorigin href="/staticfiles/assets/vendor-base.css">
+    <link rel="stylesheet" crossorigin href="/staticfiles/assets/index.css">
+  {% endif %}
 </head>
 
 <body>

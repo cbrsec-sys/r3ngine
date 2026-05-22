@@ -328,7 +328,7 @@ then
 fi
 
 # httpx seems to have issue, use alias instead!!!
-echo 'alias httpx="/go/bin/httpx"' >> ~/.bashrc
+echo 'alias httpx="/usr/local/bin/httpx"' >> ~/.bashrc
 
 # TEMPORARY FIX, httpcore is causing issues with celery, removing it as temp fix
 #python3 -m pip uninstall -y httpcore

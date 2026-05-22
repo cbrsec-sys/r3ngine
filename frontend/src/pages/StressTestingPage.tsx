@@ -63,6 +63,13 @@ import { useStressStore } from '../store/stressStore';
 import { useStressTelemetry } from '../hooks/useStressTelemetry';
 import { KpiCard } from '../components/KpiCard';
 import { TacticalPanel } from '../components/TacticalPanel';
+import {
+  K6Dashboard,
+  WrkDashboard,
+  Hping3Dashboard,
+  LocustDashboard,
+  StressorDashboard,
+} from '../components/scan/StressTab/ToolComponents';
 import axios from 'axios';
 
 export const StressTestingPage: React.FC = () => {
@@ -81,11 +88,55 @@ export const StressTestingPage: React.FC = () => {
   const [isStopping, setIsStopping] = useState(false);
   const [openSettings, setOpenSettings] = useState(false);
 
+  const defaultToolConfigs = {
+    k6: {
+      vus: 50,
+      duration: "30s",
+      attack_type: "http_get",
+      rps: "",
+      insecure_skip_tls: true,
+      no_connection_reuse: false,
+      http_debug: ""
+    },
+    wrk: {
+      threads: "2",
+      connections: 50,
+      duration: "30s",
+      latency: true,
+      timeout: "",
+      headers: []
+    },
+    hping3: {
+      attack_mode: "syn",
+      port: "80",
+      rate: "fast",
+      data_size: ""
+    },
+    locust: {
+      users: 50,
+      spawn_rate: 10,
+      run_time: "30s",
+      loglevel: "ERROR"
+    },
+    stressor: {
+      method: 'GET',
+      threads: 10,
+      duration: '30s',
+      rpc: '1',
+      proxy_type: '0',
+      proxy_file: '',
+      port: '80',
+    }
+  };
+
   // Settings Config containing base concurrency/duration and list of active tools
-  const [config, setConfig] = useState({
-    concurrency: 50,
-    duration: "30s",
-    uses_tools: ["k6", "wrk"]
+  const [config, setConfig] = useState(() => {
+    const saved = localStorage.getItem('stress_test_config');
+    return saved ? JSON.parse(saved) : {
+      concurrency: 50,
+      duration: "30s",
+      uses_tools: ["k6", "wrk"]
+    };
   });
 
   // Current active tool tab
@@ -96,6 +147,22 @@ export const StressTestingPage: React.FC = () => {
 
   const [endpoints, setEndpoints] = useState<any[]>([]);
   const [selectedEndpoints, setSelectedEndpoints] = useState<string[]>([]);
+
+  // Tool-specific configurations (persisted to localStorage)
+  const [toolConfigs, setToolConfigs] = useState<Record<string, any>>(() => {
+    const saved = localStorage.getItem('stress_tool_configs');
+    return saved ? JSON.parse(saved) : defaultToolConfigs;
+  });
+
+  // Persist config to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('stress_test_config', JSON.stringify(config));
+  }, [config]);
+
+  // Persist toolConfigs to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('stress_tool_configs', JSON.stringify(toolConfigs));
+  }, [toolConfigs]);
 
   useEffect(() => {
     if (projectSlug && scanId) {
@@ -114,48 +181,6 @@ export const StressTestingPage: React.FC = () => {
         });
     }
   }, [projectSlug, scanId]);
-
-  // Tool-specific configurations (persisted per tool)
-  const [toolConfigs, setToolConfigs] = useState<Record<string, any>>({
-    k6: {
-      vus: 50,
-      duration: "30s",
-      attack_type: "http_get", // "http_get" | "slowloris"
-      rps: "",
-      insecure_skip_tls: true,
-      no_connection_reuse: false,
-      http_debug: ""
-    },
-    wrk: {
-      threads: "2",
-      connections: 50,
-      duration: "30s",
-      latency: true,
-      timeout: "",
-      headers: []
-    },
-    hping3: {
-      attack_mode: "syn", // "syn" | "udp" | "icmp"
-      port: "80",
-      rate: "fast", // "fast" | "faster" | "flood"
-      data_size: ""
-    },
-    locust: {
-      users: 50,
-      spawn_rate: 10,
-      run_time: "30s",
-      loglevel: "ERROR"
-    },
-    stressor: {
-      method: 'GET',
-      threads: 10,
-      duration: '30s',
-      rpc: '1',
-      proxy_type: '0',
-      proxy_file: '',
-      port: '80',
-    }
-  });
 
   const [reportTemplate, setReportTemplate] = useState('modern');
   const [isGeneratingReport, setIsGeneratingReport] = useState(false);
@@ -244,17 +269,52 @@ export const StressTestingPage: React.FC = () => {
   const handleGenerateReport = async () => {
     setIsGeneratingReport(true);
     try {
-      const response = await axios.get(`/scan/create_report/${scanId}`, {
-        params: {
-          report_type: 'stress_test',
-          report_template: reportTemplate === 'cyber_pro' ? 'stress_cyber_pro' : 'stress_modern'
-        }
+      const response = await axios.post(`/api/stress/${scanId}/report/`, {
+        report_template: reportTemplate === 'cyber_pro' ? 'stress_cyber_pro' : 'stress_modern',
+        include_endpoints: true,
+        include_timeline: true
       });
       if (response.data.status) {
-        alert("Stress Test Report generation started!");
+        const reportId = response.data.report_id;
+        alert(`Report generation initiated (ID: ${reportId}). Check back in a moment for your PDF.`);
+
+        // Poll for report status
+        let isComplete = false;
+        let attempts = 0;
+        const maxAttempts = 60; // 5 minutes with 5s polling
+
+        while (!isComplete && attempts < maxAttempts) {
+          attempts++;
+          await new Promise(resolve => setTimeout(resolve, 5000)); // Wait 5 seconds
+
+          try {
+            const statusResponse = await axios.get(`/api/stress/${scanId}/report/`, {
+              params: { report_id: reportId }
+            });
+
+            if (statusResponse.data.status === 2) { // Success status code
+              isComplete = true;
+              const reportUrl = statusResponse.data.report_url;
+              if (reportUrl) {
+                window.open(reportUrl, '_blank');
+              }
+              alert('Report generated successfully!');
+            } else if (statusResponse.data.status === 0) { // Failed status code
+              isComplete = true;
+              alert(`Report generation failed: ${statusResponse.data.error_message}`);
+            }
+          } catch (statusError) {
+            console.error('Error polling report status', statusError);
+          }
+        }
+
+        if (!isComplete) {
+          alert('Report generation is taking longer than expected. Please check back later.');
+        }
       }
     } catch (error) {
       console.error("Failed to generate report", error);
+      alert('Failed to initiate report generation. Please try again.');
     } finally {
       setIsGeneratingReport(false);
       setOpenReportDialog(false);
@@ -474,64 +534,91 @@ export const StressTestingPage: React.FC = () => {
 
   // Find the latest valid metrics by scanning backwards through filtered telemetry
   const latestMetrics = useMemo(() => {
-    const metrics = {
+    const metrics: any = {
       avg_latency: 0,
       throughput_rps: 0,
-      error_rate: 0
+      error_rate: 0,
+      response_codes: {},
+      error_breakdown: {},
     };
 
-    // Find latest avg_latency or latency
-    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
-      const p = filteredTelemetry[i];
-      if (p.avg_latency !== undefined || p.latency !== undefined) {
-        metrics.avg_latency = p.avg_latency || p.latency || 0;
-        break;
+    // Aggregate metrics from all telemetry points
+    let maxRps = 0;
+    let validLatencies: number[] = [];
+
+    // Hping3-specific: track per-packet RTT values from the `latency` field
+    // (Hping3Parser emits `latency` per packet, not rtt_min/avg/max/packets_sent)
+    let hpingRttValues: number[] = [];
+    let hpingPacketCount = 0;
+
+    for (const p of filteredTelemetry) {
+      // Collect latency metrics — both avg_latency (k6/wrk) and per-packet latency (hping3)
+      if (p.avg_latency !== undefined) {
+        validLatencies.push(p.avg_latency);
+      }
+      if (p.latency !== undefined) {
+        validLatencies.push(p.latency);
+        // Also track hping3 individual RTT values for min/avg/max computation
+        hpingRttValues.push(p.latency);
+        hpingPacketCount++;
+      }
+
+      // Track max RPS
+      if (p.throughput_rps !== undefined && p.throughput_rps > maxRps) {
+        maxRps = p.throughput_rps;
+      }
+
+      // Aggregate response codes (K6 style)
+      if (p.response_codes !== undefined && typeof p.response_codes === 'object') {
+        Object.assign(metrics.response_codes, p.response_codes);
+      }
+
+      // Aggregate error breakdown
+      if (p.error_breakdown !== undefined && typeof p.error_breakdown === 'object') {
+        Object.assign(metrics.error_breakdown, p.error_breakdown);
+      }
+
+      // Collect other named metrics from the telemetry payload
+      const fieldsToAggregate = [
+        'error_rate', 'total_requests', 'failed_requests', 'throughput_bps',
+        'min_latency', 'max_latency', 'latency_stdev',
+        'p50_latency', 'p90_latency', 'p95_latency', 'p99_latency',
+        'packet_loss', 'total_users', 'endpoint_count',
+        'socket_errors', 'timeout_errors',
+        'attack_mode', 'pps_peak', 'bps_peak', 'rps_peak', 'response_rate', 'block_rate',
+        'main_table', 'percentile_table', 'percentiles',
+      ];
+
+      for (const field of fieldsToAggregate) {
+        if (p[field] !== undefined) {
+          metrics[field] = p[field];
+        }
       }
     }
 
-    // Find latest throughput_rps
-    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
-      const p = filteredTelemetry[i];
-      if (p.throughput_rps !== undefined) {
-        metrics.throughput_rps = p.throughput_rps;
-        break;
-      }
+    // Calculate average latency from all collected values
+    if (validLatencies.length > 0) {
+      metrics.avg_latency = validLatencies.reduce((a, b) => a + b) / validLatencies.length;
     }
 
-    // Find latest error_rate
-    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
-      const p = filteredTelemetry[i];
-      if (p.error_rate !== undefined) {
-        metrics.error_rate = p.error_rate;
-        break;
-      }
-    }
+    // Set peak RPS
+    metrics.throughput_rps = maxRps;
 
-    // Find latest TAStressor specific metrics
-    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
-      const p = filteredTelemetry[i];
-      if (p.throughput_bps !== undefined) {
-        (metrics as any).throughput_bps = p.throughput_bps;
-        break;
-      }
+    // Derive hping3 RTT stats from per-packet `latency` telemetry points.
+    // The Hping3Parser never emits rtt_min/rtt_avg/rtt_max directly — we compute them here.
+    if (hpingRttValues.length > 0) {
+      metrics.rtt_min = Math.min(...hpingRttValues);
+      metrics.rtt_max = Math.max(...hpingRttValues);
+      metrics.rtt_avg = hpingRttValues.reduce((a, b) => a + b) / hpingRttValues.length;
     }
-    
-    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
-      const p = filteredTelemetry[i];
-      if (p.total_requests !== undefined) {
-        (metrics as any).total_requests = p.total_requests;
-        break;
-      }
-    }
-
-    // Find latest locust tables
-    for (let i = filteredTelemetry.length - 1; i >= 0; i--) {
-      const p = filteredTelemetry[i];
-      if (p.main_table !== undefined) {
-        (metrics as any).main_table = p.main_table;
-        (metrics as any).percentile_table = p.percentile_table;
-        break;
-      }
+    // Derive packets_sent/received from RTT point count + parser total_requests.
+    // hping3 outputs one RTT line per packet received; use that as a proxy for packets_received.
+    if (hpingPacketCount > 0 && !metrics.packets_sent) {
+      const packetLossPct = typeof metrics.packet_loss === 'number' ? metrics.packet_loss : 0;
+      // total_requests from the final summary (get_final_metrics) overrides if available
+      const totalSent = metrics.total_requests || Math.round(hpingPacketCount / (1 - packetLossPct / 100 || 1));
+      metrics.packets_sent = totalSent;
+      metrics.packets_received = hpingPacketCount;
     }
 
     return metrics;
@@ -722,7 +809,7 @@ export const StressTestingPage: React.FC = () => {
             }
           }}
         >
-          {activeTools.map((tool) => (
+          {activeTools.map((tool: string) => (
             <Tab key={tool} label={tool.toUpperCase()} value={tool} />
           ))}
         </Tabs>
@@ -736,233 +823,75 @@ export const StressTestingPage: React.FC = () => {
           </Box>
         )}
       </Box>
+ 
+      {/* Tool-Specific Dashboard Components */}
+      <Box sx={{ mb: 4 }}>
+      {activeTab === 'k6' && (
+        <K6Dashboard
+          telemetry={filteredTelemetry}
+          statusCodes={((latestMetrics as any).response_codes || {})}
+          errors={((latestMetrics as any).error_breakdown || {})}
+        />
+      )}
 
-      {/* Main Grid: Sliding collapsible configurations next to charts (Approach 1) */}
-      <Grid container spacing={4}>
-        {/* KPI Panel Row */}
-        <Grid size={{ xs: 12 }}>
-          <Grid container spacing={3}>
-            <Grid size={{ xs: 12, md: 3 }}>
-              {activeTab === 'stressor' && (latestMetrics as any).total_requests !== undefined ? (
-                <KpiCard
-                  title="TOTAL REQUESTS"
-                  value={(latestMetrics as any).total_requests}
-                  icon={Activity}
-                  color={theme.palette.primary.main}
-                  subtitle="Packets Sent"
-                />
-              ) : (
-                <KpiCard
-                  title="LATENCY AVG"
-                  value={latestMetrics.avg_latency}
-                  icon={Activity}
-                  color={theme.palette.primary.main}
-                  subtitle="Milliseconds"
-                />
-              )}
-            </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <KpiCard
-                title="THROUGHPUT (RPS)"
-                value={latestMetrics.throughput_rps}
-                icon={Zap}
-                color="#6be6c1"
-                subtitle="Req / Sec"
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              {activeTab === 'stressor' && (latestMetrics as any).throughput_bps !== undefined ? (
-                <KpiCard
-                  title="BANDWIDTH (BPS)"
-                  value={(latestMetrics as any).throughput_bps}
-                  icon={Zap}
-                  color="#6be6c1"
-                  subtitle="Bytes / Sec"
-                />
-              ) : (
-                <KpiCard
-                  title="ERROR RATE"
-                  value={latestMetrics.error_rate * 100}
-                  icon={AlertTriangle}
-                  color="#ff003c"
-                  subtitle="Percentage %"
-                />
-              )}
-            </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <KpiCard
-                title="CONCURRENCY"
-                value={config.concurrency}
-                icon={Server}
-                color="#facc15"
-                subtitle="Virtual Users"
-              />
-            </Grid>
-          </Grid>
-        </Grid>
+      {activeTab === 'wrk' && (
+        <WrkDashboard
+          telemetry={filteredTelemetry}
+          latencyStats={{
+            // min_latency/max_latency/latency_stdev are now parsed from the full wrk latency line
+            min: (latestMetrics as any).min_latency || 0,
+            avg: latestMetrics.avg_latency,
+            max: (latestMetrics as any).max_latency || 0,
+            stdev: (latestMetrics as any).latency_stdev || 0,
+            p50: (latestMetrics as any).p50_latency || 0,
+            p90: (latestMetrics as any).p90_latency || 0,
+            // p95_latency emitted by WrkParser from distribution table lines
+            p95: (latestMetrics as any).p95_latency || 0,
+            p99: (latestMetrics as any).p99_latency || 0,
+          }}
+          socketErrors={(latestMetrics as any).socket_errors || 0}
+          // timeout_errors is now parsed separately from the socket errors line
+          timeouts={(latestMetrics as any).timeout_errors || 0}
+        />
+      )}
 
-        {/* Left Column: ECharts Graphs (Latency, Throughput, Saturation stacked) */}
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <Grid container spacing={4}>
-            <Grid size={{ xs: 12 }}>
-              <TacticalPanel
-                title={`${activeTab.toUpperCase()} LATENCY METRICS`}
-                icon={<Activity size={18} color={theme.palette.primary.main} />}
-              >
-                <ReactECharts key={`latency-${activeTab}`} option={latencyOption} style={{ height: '350px' }} theme="dark" notMerge={true} />
-              </TacticalPanel>
-            </Grid>
+      {activeTab === 'hping3' && (
+        <Hping3Dashboard
+          telemetry={filteredTelemetry}
+          packetsSent={(latestMetrics as any).packets_sent || 0}
+          packetsReceived={(latestMetrics as any).packets_received || 0}
+          rttMin={(latestMetrics as any).rtt_min || 0}
+          rttAvg={(latestMetrics as any).rtt_avg || latestMetrics.avg_latency || 0}
+          rttMax={(latestMetrics as any).rtt_max || 0}
+          protocol={toolConfigs.hping3?.attack_mode?.toUpperCase() || 'ICMP'}
+        />
+      )}
 
-            <Grid size={{ xs: 12 }}>
-              <TacticalPanel
-                title={`${activeTab.toUpperCase()} THROUGHPUT LOAD`}
-                icon={<Zap size={18} color="#6be6c1" />}
-              >
-                <ReactECharts key={`rps-${activeTab}`} option={rpsOption} style={{ height: '350px' }} theme="dark" notMerge={true} />
-              </TacticalPanel>
-            </Grid>
+      {activeTab === 'locust' && (
+        <LocustDashboard
+          telemetry={filteredTelemetry}
+          totalUsers={((latestMetrics as any).total_users || 0)}
+          avgResponseTime={latestMetrics.avg_latency}
+          failureRate={((latestMetrics as any).error_rate || 0) * 100}
+          endpointCount={((latestMetrics as any).endpoint_count || 0)}
+          percentiles={((latestMetrics as any).percentiles || { p50: 0, p90: 0, p95: 0, p99: 0 })}
+        />
+      )}
 
-            <Grid size={{ xs: 12 }}>
-              <TacticalPanel title={`${activeTab.toUpperCase()} ENDPOINT SATURATION`} icon={<Server size={18} color="#facc15" />}>
-                <ReactECharts key={`heatmap-${activeTab}`} option={heatmapOption} style={{ height: '350px' }} theme="dark" notMerge={true} />
-              </TacticalPanel>
-            </Grid>
-          </Grid>
-        </Grid>
-
-        {/* Right Column: Telemetry Log (50% Width, matching height of stacked graphs) */}
-        <Grid size={{ xs: 12, lg: 6 }}>
-          <TacticalPanel
-            title={`${activeTab.toUpperCase()} TELEMETRY LOG`}
-            icon={<Terminal size={18} color={theme.palette.primary.main} />}
-            headerAction={
-              <Button
-                variant="outlined"
-                size="small"
-                startIcon={<Trash2 size={12} />}
-                onClick={clearTelemetry}
-                sx={{
-                  borderColor: alpha(theme.palette.error.main, 0.35),
-                  color: theme.palette.error.main,
-                  fontFamily: 'Orbitron',
-                  fontSize: '0.65rem',
-                  fontWeight: 800,
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: '6px',
-                  '&:hover': {
-                    borderColor: theme.palette.error.main,
-                    bgcolor: alpha(theme.palette.error.main, 0.1),
-                    boxShadow: `0 0 10px ${alpha(theme.palette.error.main, 0.35)}`
-                  }
-                }}
-              >
-                CLEAR LOGS
-              </Button>
-            }
-            sx={{
-              height: { xs: '500px', lg: '1240px' },
-              maxHeight: { xs: '500px', lg: '1240px' },
-              display: 'flex',
-              flexDirection: 'column',
-              '& .MuiCardContent-root': {
-                height: '100%',
-                display: 'flex',
-                flexDirection: 'column',
-                flexGrow: 1,
-                pb: '16px !important',
-                overflow: 'hidden'
-              }
-            }}
-          >
-            <Box
-              sx={{
-                flexGrow: 1,
-                overflowY: 'auto',
-                bgcolor: 'rgba(0,0,0,0.3)',
-                p: 1.5,
-                borderRadius: 2,
-                height: '100%',
-                minHeight: '400px',
-                display: 'flex',
-                flexDirection: 'column'
-              }}
-            >
-              <List dense sx={{ flexGrow: 1 }}>
-                {filteredTelemetry.slice(-150).reverse().map((p, i) => {
-                  if (p.type === 'command') {
-                    return (
-                      <ListItem
-                        key={i}
-                        sx={{
-                          bgcolor: alpha('#00f3ff', 0.05),
-                          borderLeft: '3px solid #00f3ff',
-                          borderBottom: `1px solid ${alpha(theme.palette.text.primary, 0.05)}`,
-                          mb: 0.5,
-                          py: 1
-                        }}
-                      >
-                        <ListItemIcon sx={{ minWidth: 30, color: '#00f3ff' }}>
-                          <Terminal size={14} />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={`[SYSTEM EXEC] > ${p.command}`}
-                          secondary={`Tool: ${p.tool ? p.tool.toUpperCase() : 'N/A'} | Target: ${p.endpoint || 'N/A'}`}
-                          slotProps={{
-                            primary: { sx: { fontSize: 10, color: '#00f3ff', fontFamily: 'monospace', fontWeight: 700, wordBreak: 'break-all' } },
-                            secondary: { sx: { fontSize: 9, color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' } }
-                          }}
-                        />
-                      </ListItem>
-                    );
-                  } else if (p.type === 'log') {
-                    return (
-                      <ListItem
-                        key={i}
-                        sx={{
-                          borderBottom: `1px solid ${alpha(theme.palette.text.primary, 0.02)}`,
-                          py: 0.2
-                        }}
-                      >
-                        <ListItemText
-                          primary={p.line}
-                          slotProps={{
-                            primary: { sx: { fontSize: 9, color: 'rgba(255,255,255,0.85)', fontFamily: 'monospace', whiteSpace: 'pre-wrap', pl: 3.5 } }
-                          }}
-                        />
-                      </ListItem>
-                    );
-                  } else {
-                    return (
-                      <ListItem key={i} sx={{ borderBottom: `1px solid ${alpha(theme.palette.text.primary, 0.05)}` }}>
-                        <ListItemIcon sx={{ minWidth: 30 }}>
-                          <Clock size={12} color={alpha(theme.palette.text.primary, 0.3)} />
-                        </ListItemIcon>
-                        <ListItemText
-                          primary={`${p.tool ? p.tool.toUpperCase() : 'N/A'} -> ${(p.endpoint || '').split('/').pop()}`}
-                          secondary={`Latency: ${p.avg_latency || p.latency || 0}ms | Throughput: ${p.throughput_rps || 0} RPS`}
-                          slotProps={{
-                            primary: { sx: { fontSize: 10, color: '#fff', fontFamily: 'monospace', fontWeight: 600 } },
-                            secondary: { sx: { fontSize: 9, color: alpha(theme.palette.text.primary, 0.4), fontFamily: 'monospace' } }
-                          }}
-                        />
-                      </ListItem>
-                    );
-                  }
-                })}
-                {filteredTelemetry.length === 0 && (
-                  <Box sx={{ py: 10, textAlign: 'center', opacity: 0.3 }}>
-                    <Terminal size={40} style={{ margin: '0 auto 16px', display: 'block' }} />
-                    <Typography variant="caption" sx={{ fontFamily: 'Orbitron', letterSpacing: 2 }}>
-                      WAITING FOR DATA STREAM...
-                    </Typography>
-                  </Box>
-                )}
-              </List>
-            </Box>
-          </TacticalPanel>
-        </Grid>
-      </Grid>
+      {activeTab === 'stressor' && (
+        <StressorDashboard
+          telemetry={filteredTelemetry}
+          attackMode={((latestMetrics as any).attack_mode || 'unknown')}
+          ppsPeak={((latestMetrics as any).pps_peak || 0)}
+          bpsPeak={((latestMetrics as any).bps_peak || 0)}
+          rpsPeak={((latestMetrics as any).rps_peak || 0)}
+          statusCodes={((latestMetrics as any).response_codes || {})}
+          protocolBreakdown={((latestMetrics as any).protocol_breakdown || {})}
+          responseRate={((latestMetrics as any).response_rate || 0)}
+          blockRate={((latestMetrics as any).block_rate || 0)}
+        />
+      )}
+      </Box>
 
       {/* Locust Specific Metrics Tables */}
       {activeTab === 'locust' && (latestMetrics as any).main_table && (latestMetrics as any).main_table.length > 0 && (
@@ -1084,7 +1013,14 @@ export const StressTestingPage: React.FC = () => {
               label="Default Duration (e.g. 30s, 1m)"
               fullWidth
               value={config.duration}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setConfig({ ...config, duration: e.target.value })}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                const val = e.target.value.trim();
+                if (val) {
+                  setConfig({ ...config, duration: val });
+                }
+              }}
+              error={!config.duration}
+              helperText={!config.duration ? "Duration is required (e.g., 30s, 1m)" : ""}
               slotProps={{ inputLabel: { style: { color: 'rgba(255,255,255,0.5)' } } }}
               sx={{ input: { color: '#fff' } }}
             />
@@ -1095,9 +1031,9 @@ export const StressTestingPage: React.FC = () => {
                 value={config.uses_tools}
                 onChange={(e) => setConfig({ ...config, uses_tools: typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value })}
                 input={<OutlinedInput label="Stress Tools to Expose" />}
-                renderValue={(selected) => (
+                renderValue={(selected: string[]) => (
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {selected.map((value) => (
+                    {selected.map((value: string) => (
                       <Chip key={value} label={value} sx={{ bgcolor: '#00f3ff', color: '#000', height: 20, fontSize: 10 }} />
                     ))}
                   </Box>
@@ -1116,9 +1052,9 @@ export const StressTestingPage: React.FC = () => {
                 value={selectedEndpoints}
                 onChange={(e) => setSelectedEndpoints(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
                 input={<OutlinedInput label="Target Specific Endpoints (Optional)" />}
-                renderValue={(selected) => (
+                renderValue={(selected: string[]) => (
                   <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {selected.map((value) => (
+                    {selected.map((value: string) => (
                       <Chip key={value} label={value} sx={{ bgcolor: '#ff5f1f', color: '#fff', height: 20, fontSize: 10 }} />
                     ))}
                   </Box>

@@ -832,43 +832,19 @@ def get_random_proxy():
 	# Shuffle the proxies to distribute traffic randomly
 	random.shuffle(proxies)
 
-	# Validate each proxy sequentially until we find a working, unauthenticated one.
-	# Limit checking to a maximum of 5 to prevent long sequential timeout loops (max 25s).
+	# Validate each proxy sequentially until we find a working one.
+	# Limit to 5 checks to cap worst-case wait (5 × timeout = 25 s).
 	checked_count = 0
 	for proxy_name in proxies:
 		if checked_count >= 5:
 			logger.warning('Reached maximum sequential proxy validation limit (5). Stopping checks.')
 			break
 		checked_count += 1
-		try:
-			logger.info(f'Validating proxy: {proxy_name}')
-			test_proxy = proxy_name
-			if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
-				test_proxy = 'http://' + test_proxy
-			# Perform a request with a short timeout to check availability
-			response = requests.get(
-				'http://google.com', 
-				proxies={'http': test_proxy, 'https': test_proxy}, 
-				timeout=5, 
-				allow_redirects=True
-			)
-			
-			# Check specifically for HTTP Status 407 (Proxy Authentication Required)
-			if response.status_code == 407 or 'Proxy-Authenticate' in response.headers or 'proxy-authenticate' in response.headers:
-				raise Exception("Proxy Authentication Required (Status 407)")
-			
-			# Check if "Proxy Authentication Required" is in the response body or headers (fallback logic)
-			if "Proxy Authentication Required" in response.text or "Proxy Authentication Required" in str(response.headers):
-				raise Exception("Proxy Authentication Required returned in response text/headers")
-			
-			# Ensure the response indicates a successful HTTP status code (2xx or 3xx)
-			if not (200 <= response.status_code < 400):
-				raise Exception(f"Proxy returned invalid status code: {response.status_code}")
-				
+		logger.info(f'Validating proxy: {proxy_name}')
+		if check_proxy_robust(proxy_name, timeout=5):
 			logger.warning('Using valid proxy: ' + proxy_name)
 			return proxy_name
-		except Exception as e:
-			logger.error(f'Proxy {proxy_name} validation failed: {e}')
+		logger.error(f'Proxy {proxy_name} validation failed.')
 
 	logger.error('No valid proxies found in the list!')
 	return ''
