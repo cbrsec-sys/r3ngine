@@ -754,17 +754,18 @@ def validate_proxies(proxy_text):
 	"""Concurrently validate newline-separated proxy strings.
 	Returns a newline-separated string of validated live proxies.
 	"""
-	from concurrent.futures import ThreadPoolExecutor
+	from concurrent.futures import ThreadPoolExecutor, as_completed
 	if not proxy_text:
 		return ''
 	raw_proxies = [line.strip() for line in proxy_text.splitlines() if line.strip()]
 	if not raw_proxies:
 		return ''
 	valid_proxies = []
-	max_workers = min(50, len(raw_proxies))
+	max_workers = min(500, len(raw_proxies))
 	with ThreadPoolExecutor(max_workers=max_workers) as executor:
-		results = executor.map(validate_single_proxy, raw_proxies)
-		for proxy_name, is_valid in results:
+		future_to_proxy = {executor.submit(validate_single_proxy, p): p for p in raw_proxies}
+		for future in as_completed(future_to_proxy):
+			proxy_name, is_valid = future.result()
 			if is_valid:
 				valid_proxies.append(proxy_name)
 	return '\n'.join(valid_proxies)
