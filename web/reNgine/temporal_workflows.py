@@ -588,6 +588,62 @@ class NucleiPlannerWorkflow:
         return {"status": "SUCCESS"}
 
 
+# Registry for SubScanWorkflow dispatch.
+# value=None means the scan type has special handling and is coded inline.
+# value=dict means standard dispatch: call `activity` with args from `args_builder`.
+_SUBSCAN_DISPATCH = {
+    "osint": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [
+            ctx, "osint", "OSINT Scan", {"host": ctx.get("subdomain_name", "")}
+        ],
+    },
+    "subdomain_discovery": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [
+            ctx, "subdomain_discovery", "Subdomain Discovery",
+            {"host": ctx.get("subdomain_name", "")},
+        ],
+    },
+    "port_scan": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [
+            ctx, "port_scan", "Port Scan",
+            {"hosts": [ctx.get("subdomain_name", "")]},
+        ],
+    },
+    "fetch_url": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [
+            ctx, "fetch_url", "Fetch URL",
+            {"urls": [ctx.get("subdomain_http_url") or f"http://{ctx.get('subdomain_name', '')}/"]},
+        ],
+    },
+    "dir_file_fuzz": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [ctx, "dir_file_fuzz", "Dir File Fuzz", {}],
+    },
+    "screenshot": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=1),
+        "args_builder": lambda ctx: [ctx, "screenshot", "Screenshot", {}],
+    },
+    "waf_detection": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(minutes=30),
+        "args_builder": lambda ctx: [ctx, "waf_detection", "WAF Detection", {}],
+    },
+    # Special cases — handled with inline logic in SubScanWorkflow.run():
+    "vulnerability_scan": None,  # Has Tier 7 post-steps (correlation, risk, APME)
+    "baddns": None,              # Modifies ctx before dispatch
+}
+
+
 @workflow.defn(name="SubScanWorkflow")
 class SubScanWorkflow:
     """Workflow orchestrating a target subdomain subscan.
@@ -629,99 +685,74 @@ class SubScanWorkflow:
             target_url = subdomain_http_url or f"http://{subdomain_name}/"
 
             # Execute the primary activity step
-            if scan_type == 'osint':
-                await workflow.execute_activity(
-                    "RunGenericTaskActivity",
-                    args=[ctx, "osint", "OSINT Scan", {"host": subdomain_name}],
-                    start_to_close_timeout=timedelta(hours=2),
-                    task_queue="python-orchestrator-queue"
-                )
-            elif scan_type == 'subdomain_discovery':
-                await workflow.execute_activity(
-                    "RunGenericTaskActivity",
-                    args=[ctx, "subdomain_discovery", "Subdomain Discovery", {"host": subdomain_name}],
-                    start_to_close_timeout=timedelta(hours=2),
-                    task_queue="python-orchestrator-queue"
-                )
-            elif scan_type == 'port_scan':
-                await workflow.execute_activity(
-                    "RunGenericTaskActivity",
-                    args=[ctx, "port_scan", "Port Scan", {"hosts": [subdomain_name]}],
-                    start_to_close_timeout=timedelta(hours=2),
-                    task_queue="python-orchestrator-queue"
-                )
-            elif scan_type == 'fetch_url':
-                await workflow.execute_activity(
-                    "RunGenericTaskActivity",
-                    args=[ctx, "fetch_url", "Fetch URL", {"urls": [target_url]}],
-                    start_to_close_timeout=timedelta(hours=2),
-                    task_queue="python-orchestrator-queue"
-                )
-            elif scan_type == 'vulnerability_scan':
-                # Run the main vulnerability scan
-                await workflow.execute_activity(
-                    "RunGenericTaskActivity",
-                    args=[ctx, "vulnerability_scan", "Vulnerability Scan", {"urls": [target_url]}],
-                    start_to_close_timeout=timedelta(hours=6),
-                    task_queue="python-orchestrator-queue"
-                )
+            dispatch = _SUBSCAN_DISPATCH.get(scan_type)
 
-                # Run post-scan correlation
-                await workflow.execute_activity(
-                    "CorrelateVulnerabilitiesActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(minutes=15),
-                    task_queue="python-orchestrator-queue"
-                )
-
-                await workflow.execute_activity(
-                    "CalculateRiskScoresActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(minutes=15),
-                    task_queue="python-orchestrator-queue"
-                )
-
-                # Attack Path Modeling Engine (APME)
-                apme_config = yaml_configuration.get('attack_path_modeling', {})
-                run_apme_enabled = apme_config.get('enabled', False)
-                if not run_apme_enabled:
-                    vuln_scan_config = yaml_configuration.get('vulnerability_scan', {})
-                    run_apme_enabled = vuln_scan_config.get('run_apme', False)
-
-                if run_apme_enabled:
-                    await workflow.execute_activity(
-                        "SyncGraphActivity",
-                        ctx,
-                        start_to_close_timeout=timedelta(minutes=30),
-                        task_queue="python-orchestrator-queue"
-                    )
-            elif scan_type == 'baddns':
-                # baddns runs inside subdomain_discovery; route there with single-tool override
-                # Passing the override dict explicitly instead of deep mutating the global ctx.
+            if scan_type == "baddns":
                 ctx_baddns = {
                     **ctx,
-                    'yaml_configuration': {
-                        **ctx.get('yaml_configuration', {}),
-                        'subdomain_discovery': {
-                            **ctx.get('yaml_configuration', {}).get('subdomain_discovery', {}),
-                            'uses_tools': ['baddns']
-                        }
-                    }
+                    "yaml_configuration": {
+                        **ctx.get("yaml_configuration", {}),
+                        "subdomain_discovery": {
+                            **ctx.get("yaml_configuration", {}).get("subdomain_discovery", {}),
+                            "uses_tools": ["baddns"],
+                        },
+                    },
                 }
                 await workflow.execute_activity(
                     "RunGenericTaskActivity",
                     args=[ctx_baddns, "subdomain_discovery", "Baddns Scan", {"host": subdomain_name}],
                     start_to_close_timeout=timedelta(hours=2),
-                    task_queue="python-orchestrator-queue"
+                    retry_policy=_RETRY_NETWORK_SCAN,
+                    task_queue="python-orchestrator-queue",
                 )
-            else:
-                # dir_file_fuzz, screenshot, waf_detection and other plugin/unknown tasks
-                # accept no extra arguments beyond ctx
+
+            elif scan_type == "vulnerability_scan":
                 await workflow.execute_activity(
                     "RunGenericTaskActivity",
-                    args=[ctx, scan_type, ' '.join(scan_type.split('_')).capitalize(), {}],
-                    start_to_close_timeout=timedelta(hours=2),
-                    task_queue="python-orchestrator-queue"
+                    args=[ctx, "vulnerability_scan", "Vulnerability Scan", {"urls": [target_url]}],
+                    start_to_close_timeout=timedelta(hours=6),
+                    retry_policy=_RETRY_LONG_SCAN,
+                    task_queue="python-orchestrator-queue",
+                )
+                await workflow.execute_activity(
+                    "CorrelateVulnerabilitiesActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(minutes=15),
+                    retry_policy=_RETRY_INTERNAL,
+                    task_queue="python-orchestrator-queue",
+                )
+                await workflow.execute_activity(
+                    "CalculateRiskScoresActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(minutes=15),
+                    retry_policy=_RETRY_INTERNAL,
+                    task_queue="python-orchestrator-queue",
+                )
+                apme_config = yaml_configuration.get("attack_path_modeling", {})
+                vuln_scan_config = yaml_configuration.get("vulnerability_scan", {})
+                if apme_config.get("enabled", False) or vuln_scan_config.get("run_apme", False):
+                    await workflow.execute_activity(
+                        "SyncGraphActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(minutes=30),
+                        retry_policy=_RETRY_NETWORK_SCAN,
+                        task_queue="python-orchestrator-queue",
+                    )
+
+            elif dispatch is not None:
+                args = dispatch["args_builder"](ctx)
+                await workflow.execute_activity(
+                    dispatch["activity"],
+                    args=args,
+                    start_to_close_timeout=dispatch["timeout"],
+                    retry_policy=_RETRY_NETWORK_SCAN,
+                    task_queue="python-orchestrator-queue",
+                )
+
+            else:
+                raise ValueError(
+                    f"Unknown subscan type: {scan_type!r}. "
+                    "Add it to _SUBSCAN_DISPATCH in temporal_workflows.py."
                 )
 
             success = True
