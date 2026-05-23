@@ -136,8 +136,11 @@ def store_domain(domain_name, project, description, h1_team_handle, starting_poi
 	existing_domain = Domain.objects.filter(name=domain_name).first()
 
 	if existing_domain:
-		logger.info(f'Domain {domain_name} already exists. skipping.')
-		return
+		logger.info(f'Domain {domain_name} already exists. Updating project if necessary.')
+		if existing_domain.project != project:
+			existing_domain.project = project
+			existing_domain.save()
+		return existing_domain
 	
 	current_time = timezone.now()
 
@@ -165,7 +168,10 @@ def store_url(url, project, description, h1_team_handle, starting_point_path=Non
 	domain = Domain.objects.filter(name=domain_name).first()
 
 	if domain:
-		logger.info(f'Domain {domain_name} already exists. skipping...')
+		logger.info(f'Domain {domain_name} already exists. Updating project if necessary.')
+		if domain.project != project:
+			domain.project = project
+			domain.save()
 
 	else:
 		domain = Domain.objects.create(
@@ -193,7 +199,10 @@ def store_ip(ip_address, project, description, h1_team_handle, starting_point_pa
 	domain = Domain.objects.filter(name=ip_address).first()
 	
 	if domain:
-		logger.info(f'Domain {ip_address} already exists. skipping...')
+		logger.info(f'Domain {ip_address} already exists. Updating project if necessary.')
+		if domain.project != project:
+			domain.project = project
+			domain.save()
 	else:
 		domain = Domain.objects.create(
 			name=ip_address,
@@ -221,7 +230,7 @@ def store_ip(ip_address, project, description, h1_team_handle, starting_point_pa
 		from reNgine.tasks import geo_localize
 		_threading.Thread(
 			target=geo_localize,
-			kwargs=dict(ip_address=ip_address, ip_id=ip.id, scan_id=None, activity_id=None),
+			kwargs=dict(host=ip_address, ip_id=ip.id, scan_id=None, activity_id=None),
 			daemon=True
 		).start()
 		

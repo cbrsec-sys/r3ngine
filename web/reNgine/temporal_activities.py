@@ -258,6 +258,18 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **k
 # Step 0 — Target Profiling & Checkpoint Management
 # ===========================================================================
 
+@activity.defn(name="LoadCheckpointActivity")
+def load_checkpoint_activity(ctx: dict) -> dict:
+    """Backward-compat no-op. Temporal's event history is the durable checkpoint."""
+    return {}
+
+
+@activity.defn(name="SaveCheckpointActivity")
+def save_checkpoint_activity(ctx: dict) -> None:
+    """Backward-compat no-op. Temporal's event history is the durable checkpoint."""
+    return
+
+
 @activity.defn(name="TargetProfilingActivity")
 def target_profiling_activity(ctx: dict) -> dict:
     """Validate the scan target and populate baseline scan context.

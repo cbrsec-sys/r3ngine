@@ -198,7 +198,7 @@ def dir_file_fuzz(self, ctx=None, description=None):
 		logger.warning(f'Fuzzing URLs: {urls}')
 
 		results = []
-		redis_client = Redis.from_url(os.environ.get('CELERY_BROKER', 'redis://redis:6379/0'))
+		redis_client = Redis.from_url(os.environ.get('REDIS_URL', 'redis://redis:6379/0'))
 		opsec = OpSecManager()
 
 		for target_url in urls:
@@ -374,8 +374,8 @@ def dir_file_fuzz(self, ctx=None, description=None):
 		# Crawl discovered URLs if enabled
 		if enable_http_crawl:
 			ctx['track'] = True
-			http_crawl(urls, ctx=ctx)
+			http_crawl(self, urls, ctx=ctx)
 
 		return results
 
-	return ensure_endpoints_crawled_and_execute(_execute_dir_file_fuzz, ctx, description)
+	return ensure_endpoints_crawled_and_execute(self, _execute_dir_file_fuzz, ctx, description)

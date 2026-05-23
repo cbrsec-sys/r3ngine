@@ -66,7 +66,9 @@ from reNgine.temporal_workflows import (
 from reNgine.temporal_activities import (
     run_generic_task_activity,
     finalize_subscan_activity,
-    # Step 0: Target Profiling
+    # Step 0: Target Profiling & backward-compat checkpoint stubs
+    load_checkpoint_activity,
+    save_checkpoint_activity,
     target_profiling_activity,
 
     # Tier 1: Discovery
@@ -249,6 +251,8 @@ class Command(BaseCommand):
                 finalize_subscan_activity,
 
                 # Step 0
+                load_checkpoint_activity,
+                save_checkpoint_activity,
                 target_profiling_activity,
 
                 # Tier 1

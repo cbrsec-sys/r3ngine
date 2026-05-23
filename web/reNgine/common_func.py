@@ -36,7 +36,7 @@ from reNgine.utilities import is_valid_url, replace_nulls
 
 
 logger = get_task_logger(__name__)
-DISCORD_WEBHOOKS_CACHE = redis.Redis.from_url(CELERY_BROKER_URL)
+DISCORD_WEBHOOKS_CACHE = redis.Redis.from_url(REDIS_URL)
 
 #------------------#
 # EngineType utils #
@@ -841,6 +841,11 @@ def get_random_proxy():
 			logger.warning('Reached maximum sequential proxy validation limit (5). Stopping checks.')
 			break
 		checked_count += 1
+		
+		# Ensure the proxy has a valid scheme before usage
+		if not proxy_name.startswith('http') and not proxy_name.startswith('socks'):
+			proxy_name = f"http://{proxy_name}"
+			
 		logger.info(f'Validating proxy: {proxy_name}')
 		if check_proxy_robust(proxy_name, timeout=5):
 			logger.warning('Using valid proxy: ' + proxy_name)

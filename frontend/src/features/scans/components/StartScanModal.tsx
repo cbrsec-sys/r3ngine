@@ -45,7 +45,6 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
     spiderfoot_scan: false,
     importSubdomainTextArea: '',
     outOfScopeSubdomainTextarea: '',
-    startingPointPath: '',
   });
 
   const { data: engines, isLoading: loadingEngines } = useEngines();
@@ -64,7 +63,6 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
       spiderfoot_scan: formData.spiderfoot_scan,
       importSubdomainTextArea: formData.importSubdomainTextArea.split('\n').filter(s => s.trim()),
       outOfScopeSubdomainTextarea: formData.outOfScopeSubdomainTextarea.split('\n').filter(s => s.trim()),
-      startingPointPath: formData.startingPointPath.trim(),
     }, {
       onSuccess: () => {
         onClose();
@@ -257,16 +255,6 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
                 ADVANCED SCOPE
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                <TextField
-                  label="Starting Point Path"
-                  fullWidth
-                  value={formData.startingPointPath}
-                  onChange={(e) => setFormData({ ...formData, startingPointPath: e.target.value })}
-                  placeholder="e.g. /api/v1/auth/login or /admin/dashboard"
-                  sx={fieldStyles}
-                  helperText="Define custom start directories or files for spider/crawler"
-                />
-
                 <TextField
                   label="Import Subdomains"
                   fullWidth

@@ -4449,7 +4449,7 @@ class GetSystemLogs(APIView):
 	permission_classes = [IsSysAdmin]
 	def get(self, request):
 		# SECURITY: Path is hardcoded and validated to prevent directory traversal
-		log_file = os.path.normpath(os.path.join(settings.BASE_DIR, 'celery.log'))
+		log_file = os.path.normpath(os.path.join(settings.BASE_DIR, 'scan.log'))
 		
 		# Ensure we only read from the allowed directory
 		if not log_file.startswith(os.path.normpath(settings.BASE_DIR)):

@@ -339,11 +339,11 @@ RUN playwright install-deps chromium && \
 # ---------------------------------------------------------------------------
 COPY web/ /usr/src/app/
 
-RUN mkdir -p /usr/src/app/frontend
-COPY frontend/ /usr/src/app/frontend/
-WORKDIR /usr/src/app/frontend
-RUN npm install
-WORKDIR /usr/src/app
+#RUN mkdir -p /usr/src/app/frontend
+#COPY frontend/ /usr/src/app/frontend/
+#WORKDIR /usr/src/app/frontend
+#RUN npm install
+#WORKDIR /usr/src/app
 
 # ---------------------------------------------------------------------------
 # Copy built frontend from frontend-builder
