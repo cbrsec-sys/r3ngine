@@ -70,10 +70,10 @@ FROM golang:1.22-bookworm AS executor-builder
 
 WORKDIR /build
 # Copy executor source from the repo root context
+COPY web/executor/go.mod web/executor/go.sum ./
+RUN go mod download
 COPY web/executor/ ./
-
-RUN go mod download && \
-    CGO_ENABLED=0 GO111MODULE=on go build -ldflags="-s -w" -o /usr/local/bin/r3ngine-executor . && \
+RUN CGO_ENABLED=0 GO111MODULE=on go build -ldflags="-s -w" -o /usr/local/bin/r3ngine-executor . && \
     rm -rf /root/.cache/go-build /go/pkg
 
 
