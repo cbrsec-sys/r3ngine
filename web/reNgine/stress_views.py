@@ -158,8 +158,8 @@ class StressReportGenerationAPI(APIView):
 
             from reNgine.report_tasks import generate_report_task
             threading.Thread(
-                target=generate_report_task.apply,
-                args=((report_obj.id,),),
+                target=generate_report_task,
+                args=(report_obj.id,),
                 daemon=True
             ).start()
 

@@ -111,6 +111,16 @@ class MasterScanWorkflow:
             task_queue="python-orchestrator-queue"
         )
 
+        # Backward-compat: preserve event-history position for workflows started
+        # before the checkpoint stubs were removed. No-op; returns immediately.
+        await workflow.execute_activity(
+            "LoadCheckpointActivity",
+            ctx,
+            start_to_close_timeout=timedelta(seconds=10),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue"
+        )
+
         tasks = ctx.get("tasks", [])
         yaml_config = ctx.get("yaml_configuration", {})
 
@@ -388,51 +398,49 @@ class MasterScanWorkflow:
         # ------------------------------------------------------------------
         # TIER 7: Post-Processing & Intelligence (sequential — ordering matters)
         # ------------------------------------------------------------------
-        # Determine which post-processing tasks are enabled based on the
-        # presence of vulnerability-producing tasks in the engine.
-        vuln_producing = {
-            'vulnerability_scan', 'dir_file_fuzz', 'web_api_discovery',
-            'brute_force_scan', 'osint'
-        }
-        has_vuln_tasks = any(t in tasks for t in vuln_producing)
+        # MANDATORY TASKS: These must run for ALL scans unconditionally.
+        
+        await workflow.execute_activity(
+            "CorrelateVulnerabilitiesActivity",
+            ctx,
+            start_to_close_timeout=timedelta(minutes=30),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue"
+        )
+        await workflow.execute_activity(
+            "CalculateRiskScoresActivity",
+            ctx,
+            start_to_close_timeout=timedelta(minutes=15),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue"
+        )
 
-        if has_vuln_tasks or "correlate_vulnerabilities" in tasks:
-            await workflow.execute_activity(
-                "CorrelateVulnerabilitiesActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
-            await workflow.execute_activity(
-                "CalculateRiskScoresActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=15),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
+        # AI Impact Assessment
+        await workflow.execute_activity(
+            "GenerateImpactAssessmentActivity",
+            ctx,
+            start_to_close_timeout=timedelta(minutes=30),
+            retry_policy=_RETRY_LLM,
+            task_queue="python-orchestrator-queue"
+        )
 
-        # AI Impact Assessment is gated by the engine config flag
-        if yaml_config.get("enable_ai_impact_analysis", False):
-            await workflow.execute_activity(
-                "GenerateImpactAssessmentActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                retry_policy=_RETRY_LLM,
-                task_queue="python-orchestrator-queue"
-            )
+        # Neo4j graph sync (must precede APME so graph nodes exist)
+        await workflow.execute_activity(
+            "SyncGraphActivity",
+            ctx,
+            start_to_close_timeout=timedelta(minutes=30),
+            retry_policy=_RETRY_NETWORK_SCAN,
+            task_queue="python-orchestrator-queue"
+        )
 
-        # APME / Neo4j graph sync
-        apme_config = yaml_config.get("attack_path_modeling", {})
-        vuln_config = yaml_config.get("vulnerability_scan", {})
-        if apme_config.get("enabled", False) or vuln_config.get("run_apme", False) or "run_apme" in tasks:
-            await workflow.execute_activity(
-                "SyncGraphActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                retry_policy=_RETRY_NETWORK_SCAN,
-                task_queue="python-orchestrator-queue"
-            )
+        # MANDATORY: Attack Path Modeling Engine — must be the final analysis step
+        await workflow.execute_activity(
+            "RunGenericTaskActivity",
+            args=[ctx, "run_apme", "Attack Path Modeling Engine"],
+            start_to_close_timeout=timedelta(minutes=30),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue"
+        )
 
         # ------------------------------------------------------------------
         # FINAL: Mark scan complete and send notification
@@ -692,30 +700,6 @@ class SubScanWorkflow:
                     retry_policy=_RETRY_LONG_SCAN,
                     task_queue="python-orchestrator-queue",
                 )
-                await workflow.execute_activity(
-                    "CorrelateVulnerabilitiesActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(minutes=15),
-                    retry_policy=_RETRY_INTERNAL,
-                    task_queue="python-orchestrator-queue",
-                )
-                await workflow.execute_activity(
-                    "CalculateRiskScoresActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(minutes=15),
-                    retry_policy=_RETRY_INTERNAL,
-                    task_queue="python-orchestrator-queue",
-                )
-                apme_config = yaml_configuration.get("attack_path_modeling", {})
-                vuln_scan_config = yaml_configuration.get("vulnerability_scan", {})
-                if apme_config.get("enabled", False) or vuln_scan_config.get("run_apme", False):
-                    await workflow.execute_activity(
-                        "SyncGraphActivity",
-                        ctx,
-                        start_to_close_timeout=timedelta(minutes=30),
-                        retry_policy=_RETRY_NETWORK_SCAN,
-                        task_queue="python-orchestrator-queue",
-                    )
 
             elif dispatch is not None:
                 args = dispatch["args_builder"](ctx)
@@ -740,6 +724,47 @@ class SubScanWorkflow:
             raise
 
         finally:
+            # First, run mandatory post-scan tasks for ALL subscans unconditionally
+            try:
+                await workflow.execute_activity(
+                    "CorrelateVulnerabilitiesActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(minutes=15),
+                    retry_policy=_RETRY_INTERNAL,
+                    task_queue="python-orchestrator-queue",
+                )
+                await workflow.execute_activity(
+                    "CalculateRiskScoresActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(minutes=15),
+                    retry_policy=_RETRY_INTERNAL,
+                    task_queue="python-orchestrator-queue",
+                )
+                await workflow.execute_activity(
+                    "GenerateImpactAssessmentActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(minutes=30),
+                    retry_policy=_RETRY_LLM,
+                    task_queue="python-orchestrator-queue"
+                )
+                await workflow.execute_activity(
+                    "SyncGraphActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(minutes=30),
+                    retry_policy=_RETRY_NETWORK_SCAN,
+                    task_queue="python-orchestrator-queue",
+                )
+                # MANDATORY: Attack Path Modeling Engine — required before subscan completes
+                await workflow.execute_activity(
+                    "RunGenericTaskActivity",
+                    args=[ctx, "run_apme", "Attack Path Modeling Engine"],
+                    start_to_close_timeout=timedelta(minutes=30),
+                    retry_policy=_RETRY_INTERNAL,
+                    task_queue="python-orchestrator-queue",
+                )
+            except Exception as post_e:
+                workflow.logger.error(f"SubScanWorkflow post-scan tasks failed: {post_e}")
+
             # Finalize SubScan record in the database
             await workflow.execute_activity(
                 "FinalizeSubScanActivity",

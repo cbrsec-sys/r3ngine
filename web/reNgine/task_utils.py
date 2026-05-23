@@ -271,8 +271,11 @@ def save_endpoint(
     if crawl:
         # Avoid circular import by importing here
         from reNgine.tasks import http_crawl
+        from reNgine.temporal_activities import TemporalTaskProxy
         ctx['track'] = False
+        proxy = TemporalTaskProxy(ctx, 'http_crawl', 'HTTP Crawl')
         results = http_crawl(
+            proxy,
             urls=[http_url],
             method='HEAD',
             ctx=ctx)
@@ -475,6 +478,21 @@ def stream_command(
 				command_obj.output = output.replace('\x00', '')
 				command_obj.save()
 
+				# Kill switch: abort the subprocess if the scan was stopped
+				if scan_id:
+					try:
+						from startScan.models import ScanHistory
+						from reNgine.definitions import ABORTED_TASK
+						_scan = ScanHistory.objects.filter(pk=scan_id).only('scan_status').first()
+						if _scan and _scan.scan_status == ABORTED_TASK:
+							logger.warning(
+								f"[stream_command] Scan {scan_id} aborted — killing subprocess."
+							)
+							process.kill()
+							break
+					except Exception:
+						pass
+
 		process.wait()
 		command_obj.output = output.replace('\x00', '')
 		command_obj.return_code = process.returncode
@@ -511,7 +529,7 @@ def stream_command(
 			os.remove(conf_path)
 
 
-def ensure_endpoints_crawled_and_execute(task_function, ctx, description=None, max_wait_time=300):
+def ensure_endpoints_crawled_and_execute(task_proxy, task_function, ctx, description=None, max_wait_time=300):
 	"""
 	Ensure endpoints are crawled before executing a task that needs alive endpoints.
 	
@@ -547,7 +565,7 @@ def ensure_endpoints_crawled_and_execute(task_function, ctx, description=None, m
 	custom_ctx['track'] = False  # Don't track this internal crawl
 
 	# Run synchronously — safe here because this function is called from Temporal activities
-	http_crawl(urls=uncrawled_endpoints[:50], ctx=custom_ctx)
+	http_crawl(task_proxy, urls=uncrawled_endpoints[:50], ctx=custom_ctx)
 
 	if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
 		logger.info(f'Found {len(alive_endpoints)} alive endpoints after crawl, executing {task_function.__name__}')

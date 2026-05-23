@@ -63,11 +63,13 @@ export const ProxySettingsPage: React.FC = () => {
 
   useEffect(() => {
     if (taskStatus?.status === 'SUCCESS' && taskStatus.result) {
-      setProxyList(taskStatus.result);
+      const resultData = taskStatus.result as any;
+      const proxyStr = typeof resultData === 'string' ? resultData : (resultData?.proxies || '');
+      setProxyList(proxyStr);
       setUseProxy(true);
       setSnackbar({
         open: true,
-        message: 'Proxy list updated from fetch task.',
+        message: 'Proxies automatically fetched and saved to database.',
         severity: 'success',
       });
       setCurrentTaskId(null);
@@ -358,7 +360,7 @@ export const ProxySettingsPage: React.FC = () => {
                 </Stack>
                 {taskStatus?.status === 'SUCCESS' && (
                   <Alert severity="success" sx={{ bgcolor: 'rgba(0, 255, 0, 0.05)', color: '#00ff00', border: '1px solid rgba(0, 255, 0, 0.2)' }}>
-                    Proxies fetched and verified. Review the list below and click SAVE to apply changes.
+                    Proxies fetched, verified, and automatically saved to the database.
                   </Alert>
                 )}
                 {taskStatus?.status === 'FAILURE' && (

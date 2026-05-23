@@ -23,7 +23,7 @@ from scanEngine.models import VulnerabilityReportSetting
 
 logger = logging.getLogger('reNgine.tasks')
 
-def generate_report_task(self, report_id):
+def generate_report_task(report_id):
     try:
         report_obj = ScanReport.objects.get(id=report_id)
         report_obj.status = 1 # Running
@@ -49,7 +49,7 @@ def generate_report_task(self, report_id):
             report_name = 'Stress Test Report'
 
         # Fetch stress results if needed
-        stress_results = []
+        stress_results = StressTestResult.objects.none()
         if report_type == 'stress_test' or report_template in ['stress_cyber_pro', 'stress_modern']:
             stress_results = StressTestResult.objects.filter(scan_history=scan).order_by('-timestamp')
 

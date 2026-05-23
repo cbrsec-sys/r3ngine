@@ -45,6 +45,7 @@ services:
       dockerfile: web/Dockerfile
     entrypoint: /usr/src/app/entrypoint.sh
     restart: always
+    init: true
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     environment:
       - DEBUG=0
@@ -192,6 +193,7 @@ services:
   temporal-python-orchestrator:
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     restart: always
+    init: true
     entrypoint: /usr/src/app/temporal-entrypoint.sh
     environment:
       - DEBUG=0
@@ -237,6 +239,7 @@ services:
   temporal-go-executor:
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     restart: always
+    init: true
     entrypoint: /usr/local/bin/r3ngine-executor
     environment:
       - TEMPORAL_HOST=temporal:7233
