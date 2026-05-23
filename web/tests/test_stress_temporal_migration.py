@@ -967,19 +967,16 @@ class TestStressTestControlAPIStart(DjangoTestCase):
         self.assertEqual(response.status_code, 200)
         mock_asyncio_run.assert_called_once()
 
-    @patch("reNgine.stress_testing_tasks.run_stress_testing")
     @patch("asyncio.run", side_effect=Exception("Temporal unavailable"))
-    def test_start_falls_back_to_celery_when_temporal_fails(self, mock_asyncio_run, mock_celery_task):
+    def test_start_returns_500_when_temporal_fails(self, mock_asyncio_run):
+        """When Temporal is unavailable, the API returns HTTP 500 — no Celery fallback."""
         from reNgine.stress_views import StressTestControlAPI
-
-        mock_celery_task.delay = MagicMock()
 
         request = self._authenticated_request({"action": "start", "config": {}})
         view = StressTestControlAPI.as_view()
         response = view(request, scan_id=self.scan.id)
 
-        self.assertIn(response.status_code, [200])
-        mock_celery_task.delay.assert_called_once()
+        self.assertEqual(response.status_code, 500)
 
     @patch("asyncio.run")
     def test_stop_action_sends_temporal_signal(self, mock_asyncio_run):
