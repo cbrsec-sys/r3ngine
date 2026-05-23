@@ -188,11 +188,21 @@ class TestPhase3C5TasksOsintOrchestrator(TestCase):
         self.assertNotIn('osint_orchestrator.delay(', body,
                          "finish_osint must not call osint_orchestrator.delay")
 
-    def test_finish_osint_uses_threading(self):
-        source = _read('reNgine/tasks.py')
-        body = self._get_function_body(source, 'finish_osint')
-        self.assertIn('threading.Thread', body,
-                      "finish_osint must use threading.Thread for osint_orchestrator")
+    def test_finish_osint_calls_osint_orchestrator_synchronously(self):
+        """3C-5: finish_osint must call osint_orchestrator synchronously, not in a daemon thread."""
+        import inspect
+        import reNgine.tasks as tasks_mod
+        body = inspect.getsource(tasks_mod.finish_osint)
+        self.assertNotIn(
+            'threading.Thread',
+            body,
+            "finish_osint must not spawn a daemon thread — call osint_orchestrator synchronously"
+        )
+        self.assertIn(
+            'osint_orchestrator',
+            body,
+            "finish_osint must call osint_orchestrator"
+        )
 
     def test_osint_task_no_osint_orchestrator_delay(self):
         source = _read('reNgine/tasks.py')
@@ -200,11 +210,24 @@ class TestPhase3C5TasksOsintOrchestrator(TestCase):
         self.assertNotIn('osint_orchestrator.delay(', body,
                          "osint task must not call osint_orchestrator.delay")
 
-    def test_osint_task_uses_threading(self):
-        source = _read('reNgine/tasks.py')
-        body = self._get_function_body(source, 'osint')
-        self.assertIn('threading.Thread', body,
-                      "osint task must use threading.Thread for osint_orchestrator")
+    def test_osint_task_calls_orchestrator_synchronously(self):
+        """3C-5: osint() task must call osint_orchestrator synchronously, not in a daemon thread."""
+        import inspect
+        import reNgine.tasks as tasks_mod
+        body = inspect.getsource(tasks_mod.osint)
+        # The daemon thread for osint_orchestrator must be gone
+        # (note: other daemon=True threads for unrelated tools are allowed — we check specifically for osint_orchestrator)
+        lines = body.split('\n')
+        thread_context = []
+        for i, line in enumerate(lines):
+            if 'daemon=True' in line:
+                context = '\n'.join(lines[max(0,i-3):i+2])
+                if 'osint_orchestrator' in context:
+                    thread_context.append(context)
+        self.assertEqual(
+            len(thread_context), 0,
+            f"osint() must not spawn a daemon thread for osint_orchestrator. Found: {thread_context}"
+        )
 
 
 class TestPhase3C6PluginManagementThreading(TestCase):

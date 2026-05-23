@@ -150,15 +150,15 @@ def finish_chord(results, description="Task"):
     return results
 
 def finish_osint(results, scan_history_id):
-    """Callback for OSINT tasks, triggers Deep Pursuit pipeline."""
+    """Trigger the Deep Pursuit OSINT pipeline after standard OSINT tasks complete.
+
+    Called synchronously from within the osint() Temporal activity. The
+    activity's heartbeat thread (started by _run_task) keeps Temporal alive
+    during the pipeline run.
+    """
     from reNgine.osint_tasks import osint_orchestrator
-    logger.info(f"OSINT discovery completed for scan {scan_history_id}")
-    logger.info('Starting Deep Pursuit OSINT Pipeline...')
-    threading.Thread(
-        target=osint_orchestrator,
-        kwargs={'scan_history_id': scan_history_id},
-        daemon=True
-    ).start()
+    logger.info(f"[finish_osint] Starting Deep Pursuit pipeline for scan {scan_history_id}")
+    osint_orchestrator(scan_history_id=scan_history_id)
     return results
 
 def finish_vulnerability_scan(results, scan_history_id):
@@ -1798,11 +1798,7 @@ def osint(self, host=None, ctx={}, description=None):
 
 	# Deep Pursuit OSINT Pipeline (holehe, maigret, LinkedInt)
 	logger.info('Starting Deep Pursuit OSINT Pipeline...')
-	threading.Thread(
-		target=osint_orchestrator,
-		kwargs={'scan_history_id': self.scan.id},
-		daemon=True
-	).start()
+	osint_orchestrator(scan_history_id=self.scan.id)
 
 	logger.info('OSINT Tasks finished...')
 
