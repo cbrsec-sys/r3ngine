@@ -106,17 +106,28 @@ class TestSubScanDispatchRegistry(TestCase):
 
 
 class TestCheckpointStubRemoval(TestCase):
-    def test_load_checkpoint_activity_removed(self):
-        """LoadCheckpointActivity stub must be removed — Temporal handles resumption."""
-        from reNgine import temporal_activities
-        self.assertFalse(
-            hasattr(temporal_activities, "load_checkpoint_activity"),
-            "load_checkpoint_activity must be removed; use Temporal event history for crash recovery",
-        )
+    def test_load_checkpoint_activity_is_noop(self):
+        """LoadCheckpointActivity must exist as a no-op backward-compat stub.
 
-    def test_save_checkpoint_activity_removed(self):
+        Workflows started before the checkpoint stubs were removed have
+        LoadCheckpointActivity in their event history. The worker must have
+        the activity registered so those histories can replay without a
+        TMPRL1100 nondeterminism error.  The stub must return {}.
+        """
         from reNgine import temporal_activities
-        self.assertFalse(
-            hasattr(temporal_activities, "save_checkpoint_activity"),
-            "save_checkpoint_activity must be removed; use Temporal event history for crash recovery",
+        self.assertTrue(
+            hasattr(temporal_activities, "load_checkpoint_activity"),
+            "load_checkpoint_activity backward-compat stub must exist for in-flight workflow replay",
         )
+        result = temporal_activities.load_checkpoint_activity({})
+        self.assertEqual(result, {})
+
+    def test_save_checkpoint_activity_is_noop(self):
+        """SaveCheckpointActivity must exist as a no-op backward-compat stub."""
+        from reNgine import temporal_activities
+        self.assertTrue(
+            hasattr(temporal_activities, "save_checkpoint_activity"),
+            "save_checkpoint_activity backward-compat stub must exist for in-flight workflow replay",
+        )
+        result = temporal_activities.save_checkpoint_activity({})
+        self.assertIsNone(result)
