@@ -29,6 +29,35 @@ with workflow.unsafe.imports_passed_through():
     from reNgine.temporal_activities import _PERMITTED_GENERIC_TASKS
 
 
+# Retry policy presets — applied explicitly to every execute_activity call.
+# Default Temporal policy (unlimited, backoff to 100s) is intentionally overridden.
+
+_RETRY_LONG_SCAN = RetryPolicy(
+    maximum_attempts=2,
+    initial_interval=timedelta(minutes=1),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(minutes=10),
+)
+_RETRY_NETWORK_SCAN = RetryPolicy(
+    maximum_attempts=3,
+    initial_interval=timedelta(seconds=30),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(minutes=5),
+)
+_RETRY_INTERNAL = RetryPolicy(
+    maximum_attempts=5,
+    initial_interval=timedelta(seconds=5),
+    backoff_coefficient=1.5,
+    maximum_interval=timedelta(seconds=30),
+)
+_RETRY_LLM = RetryPolicy(
+    maximum_attempts=3,
+    initial_interval=timedelta(seconds=30),
+    backoff_coefficient=2.0,
+    maximum_interval=timedelta(minutes=5),
+)
+
+
 @workflow.defn(name="MasterScanWorkflow")
 class MasterScanWorkflow:
     """Master workflow orchestrating the full 7-tier scan pipeline.
@@ -78,6 +107,7 @@ class MasterScanWorkflow:
             "TargetProfilingActivity",
             ctx,
             start_to_close_timeout=timedelta(minutes=5),
+            retry_policy=_RETRY_INTERNAL,
             task_queue="python-orchestrator-queue"
         )
 
@@ -106,6 +136,7 @@ class MasterScanWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_LONG_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -116,6 +147,7 @@ class MasterScanWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_LONG_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -126,6 +158,7 @@ class MasterScanWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(minutes=30),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_NETWORK_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -136,6 +169,7 @@ class MasterScanWorkflow:
                     args=[ctx, "osint", "OSINT Scan"],
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_LONG_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -146,6 +180,7 @@ class MasterScanWorkflow:
                     args=[ctx, "spiderfoot_scan", "SpiderFoot Attack Surface Intelligence"],
                     start_to_close_timeout=timedelta(hours=4),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_LONG_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -157,6 +192,7 @@ class MasterScanWorkflow:
                 "ParseDiscoveryResultsActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
 
@@ -175,12 +211,14 @@ class MasterScanWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=3),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_LONG_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
                 await workflow.execute_activity(
                     "ParseHTTPCrawlResultsActivity",
                     ctx,
                     start_to_close_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_INTERNAL,
                     task_queue="python-orchestrator-queue"
                 )
 
@@ -193,6 +231,7 @@ class MasterScanWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_LONG_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -203,6 +242,7 @@ class MasterScanWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=1),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_NETWORK_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -218,6 +258,7 @@ class MasterScanWorkflow:
                 ctx,
                 start_to_close_timeout=timedelta(hours=2),
                 heartbeat_timeout=timedelta(minutes=2),
+                retry_policy=_RETRY_LONG_SCAN,
                 task_queue="python-orchestrator-queue"
             )
 
@@ -230,12 +271,14 @@ class MasterScanWorkflow:
                 ctx,
                 start_to_close_timeout=timedelta(hours=4),
                 heartbeat_timeout=timedelta(minutes=2),
+                retry_policy=_RETRY_LONG_SCAN,
                 task_queue="python-orchestrator-queue"
             )
             await workflow.execute_activity(
                 "ParseFuzzResultsActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
 
@@ -244,6 +287,7 @@ class MasterScanWorkflow:
             "ParseEnumerationResultsActivity",
             ctx,
             start_to_close_timeout=timedelta(minutes=5),
+            retry_policy=_RETRY_INTERNAL,
             task_queue="python-orchestrator-queue"
         )
 
@@ -260,6 +304,7 @@ class MasterScanWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=1),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_NETWORK_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -270,6 +315,7 @@ class MasterScanWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(minutes=30),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_NETWORK_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -280,6 +326,7 @@ class MasterScanWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_LONG_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -290,6 +337,7 @@ class MasterScanWorkflow:
                 "ParseAnalysisResultsActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
 
@@ -317,6 +365,7 @@ class MasterScanWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=1),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_NETWORK_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -327,6 +376,7 @@ class MasterScanWorkflow:
                     ctx,
                     start_to_close_timeout=timedelta(hours=2),
                     heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_NETWORK_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )
@@ -337,6 +387,7 @@ class MasterScanWorkflow:
                 "ParseAssessmentResultsActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
 
@@ -358,12 +409,14 @@ class MasterScanWorkflow:
                 "CorrelateVulnerabilitiesActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=30),
+                retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
             await workflow.execute_activity(
                 "CalculateRiskScoresActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=15),
+                retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
 
@@ -373,6 +426,7 @@ class MasterScanWorkflow:
                 "GenerateImpactAssessmentActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=30),
+                retry_policy=_RETRY_LLM,
                 task_queue="python-orchestrator-queue"
             )
 
@@ -384,6 +438,7 @@ class MasterScanWorkflow:
                 "SyncGraphActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=30),
+                retry_policy=_RETRY_NETWORK_SCAN,
                 task_queue="python-orchestrator-queue"
             )
 
@@ -394,6 +449,7 @@ class MasterScanWorkflow:
             "SendScanNotificationActivity",
             ctx,
             start_to_close_timeout=timedelta(minutes=5),
+            retry_policy=_RETRY_INTERNAL,
             task_queue="python-orchestrator-queue"
         )
 
