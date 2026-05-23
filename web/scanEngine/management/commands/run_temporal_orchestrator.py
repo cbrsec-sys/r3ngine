@@ -59,6 +59,8 @@ from reNgine.temporal_workflows import (
     SubScanWorkflow,
     StressTestWorkflow,
     StartupSyncWorkflow,
+    ScheduledScanWorkflow,
+    MonitoringWorkflow,
 )
 
 # Activities (all Python-side activities are registered here)
@@ -114,6 +116,10 @@ from reNgine.temporal_activities import (
 
     # Startup sync
     run_startup_sync_activity,
+
+    # Scheduled scan setup
+    setup_scheduled_scan_activity,
+    run_monitoring_check_activity,
 )
 
 
@@ -287,6 +293,12 @@ class Command(BaseCommand):
 
                 # Startup sync
                 run_startup_sync_activity,
+
+                # Scheduled scan setup (Phase 4C)
+                setup_scheduled_scan_activity,
+
+                # Domain monitoring (Phase 4D)
+                run_monitoring_check_activity,
             ]
 
             # -------------------------------------------------------------------
@@ -298,11 +310,11 @@ class Command(BaseCommand):
                 plugin_activities = PluginTemporalRegistry.get_all_plugin_activities()
                 
                 # Append to existing
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow] + plugin_workflows
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow] + plugin_workflows
                 all_activities.extend(plugin_activities)
             except Exception as e:
                 logger.error(f"Failed to load dynamic plugin temporal exports: {e}")
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow]
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow]
 
             # -------------------------------------------------------------------
             # Start the Temporal Worker

@@ -1,3 +1,4 @@
+import logging
 import os
 import requests
 import json
@@ -7,9 +8,7 @@ import io
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from django.utils import timezone
-from celery.utils.log import get_task_logger
 
-from reNgine.celery import app
 from reNgine.definitions import *
 from reNgine.settings import *
 from reNgine.common_func import *
@@ -24,7 +23,7 @@ from scanEngine.models import EngineType
 from reNgine.parsers import SpiderFootBatchParser
 from redis import Redis
 
-logger = get_task_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def generate_reconx_config(domain_name, reconx_dir):
@@ -107,7 +106,6 @@ def _process_monitor_spiderfoot_batch(batch, domain, scan_history, ctx, new_disc
 		logger.error(f"Error processing SpiderFoot monitoring batch: {str(e)}")
 
 
-@app.task(name='monitor_target_task', queue='main_scan_queue')
 def monitor_target_task(domain_id):
 	try:
 		domain = Domain.objects.get(pk=domain_id)

@@ -1,4 +1,3 @@
-from celery import shared_task
 from django.conf import settings
 import subprocess
 import os
@@ -10,7 +9,6 @@ from startScan.models import ScanHistory, EndPoint, StressTestResult, Command
 from targetApp.models import Domain
 from reNgine.graph_utils import Neo4jManager
 from django.utils import timezone
-from reNgine.celery_custom_task import RengineTask
 from reNgine.parsers import K6Parser, WrkParser, Hping3Parser, LocustParser, TAStressorParser
 from reNgine.stress_telemetry import StressTelemetryPublisher
 from reNgine.stress_cmd_builder import build_stress_command
@@ -27,15 +25,12 @@ except:
     redis_client = None
 
 
-class StressTestTask(RengineTask):
-    """Dedicated task class for stress testing with specialized cleanup and telemetry."""
-    def on_failure(self, exc, task_id, args, kwargs, einfo):
-        super().on_failure(exc, task_id, args, kwargs, einfo)
-        # Ensure any orphan sub-processes are killed
+class StressTestTask:
+    """Task proxy for stress testing with specialized cleanup logic."""
+    def on_failure(self, exc, task_id, args, kwargs, einfo=None):
         scan_id = getattr(self, 'scan_id', None)
         if not scan_id and args:
             scan_id = args[0]
-        
         if scan_id:
             self.terminate_processes(scan_id)
 
@@ -53,7 +48,6 @@ def is_kill_switch_active(scan_id):
     return False
 
 
-@shared_task(name='stress_testing', queue='main_scan_queue', bind=True, base=StressTestTask)
 def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, **kwargs):
     # Extract config
     stress_config = yaml_config.get("stress_test", {})

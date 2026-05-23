@@ -30,24 +30,26 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
         # I'll implement a clean version here
         scan = self.get_object()
         try:
-            from reNgine.celery import app
+            from reNgine.temporal_client import TemporalClientProvider
             from startScan.models import ScanActivity, ABORTED_TASK, RUNNING_TASK
             from startScan.views import create_scan_activity
             from django.utils import timezone
 
-            for task_id in scan.celery_ids:
-                app.control.revoke(task_id, terminate=True, signal='SIGKILL')
-            
+            for te in scan.temporal_executions.filter(status="RUNNING"):
+                try:
+                    TemporalClientProvider.cancel_workflow(te.workflow_id)
+                    te.status = "CANCELLED"
+                    te.ended_at = timezone.now()
+                    te.save()
+                except Exception as cancel_err:
+                    logger.warning(f"Temporal cancel failed for workflow {te.workflow_id}: {cancel_err}")
             scan.scan_status = ABORTED_TASK
             scan.save()
-
             tasks = ScanActivity.objects.filter(scan_of=scan, status=RUNNING_TASK)
             for task in tasks:
-                app.control.revoke(task.celery_id, terminate=True, signal='SIGKILL')
                 task.status = ABORTED_TASK
                 task.time = timezone.now()
                 task.save()
-            
             create_scan_activity(scan.id, "Scan aborted via Tactical API", ABORTED_TASK)
             return Response({'status': True, 'message': 'Scan successfully stopped'})
         except Exception as e:
@@ -75,22 +77,27 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
         for scan in scans:
             # Reusing the stop logic
             try:
-                from reNgine.celery import app
+                from reNgine.temporal_client import TemporalClientProvider
                 from startScan.models import ScanActivity, ABORTED_TASK, RUNNING_TASK
                 from startScan.views import create_scan_activity
                 from django.utils import timezone
-                for task_id in scan.celery_ids:
-                    app.control.revoke(task_id, terminate=True, signal='SIGKILL')
+                for te in scan.temporal_executions.filter(status="RUNNING"):
+                    try:
+                        TemporalClientProvider.cancel_workflow(te.workflow_id)
+                        te.status = "CANCELLED"
+                        te.ended_at = timezone.now()
+                        te.save()
+                    except Exception:
+                        pass
                 scan.scan_status = ABORTED_TASK
                 scan.save()
                 tasks = ScanActivity.objects.filter(scan_of=scan, status=RUNNING_TASK)
                 for task in tasks:
-                    app.control.revoke(task.celery_id, terminate=True, signal='SIGKILL')
                     task.status = ABORTED_TASK
                     task.time = timezone.now()
                     task.save()
                 create_scan_activity(scan.id, "Scan aborted via Bulk Action", ABORTED_TASK)
-            except:
+            except Exception:
                 pass
         return Response({'status': True, 'message': f'{len(scans)} scans stopped'})
 

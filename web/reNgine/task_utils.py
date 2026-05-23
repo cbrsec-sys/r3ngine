@@ -2,13 +2,12 @@ import os
 import re
 import subprocess
 import threading
+import logging
 import validators
 import json
 from django.utils import timezone
-from celery.utils.log import get_task_logger
 
 from urllib.parse import urlparse
-from reNgine.celery import app
 from reNgine.opsec_utils import ProxychainsWrapper
 import redis
 from django.conf import settings
@@ -22,7 +21,7 @@ from reNgine.common_func import remove_ansi_escape_sequences, sanitize_url
 from reNgine.utilities import SubdomainScopeChecker, replace_nulls
 from reNgine.settings import RENGINE_RESULTS
 
-logger = get_task_logger(__name__)
+logger = logging.getLogger(__name__)
 
 def get_tool_color(cmd):
     """Returns the ANSI color code for a given command based on the tool name."""
@@ -52,7 +51,6 @@ def sanitize_command_for_db(cmd):
     cmd = re.sub(r'^(?:[/\w]*/)?proxychains4\s+-f\s+\S+\s+', '', cmd)
     return cmd
 
-@app.task(name='run_command', bind=False, queue='run_command_queue')
 def run_command(
         cmd, 
         cwd=None, 
@@ -186,8 +184,8 @@ def save_email(email_address, scan_history=None):
         scan_history.save()
         from reNgine.osint_tasks import enrich_identities_task
         threading.Thread(
-            target=enrich_identities_task.apply,
-            kwargs={'kwargs': {'identity': email_address, 'identity_type': 'email', 'scan_history_id': scan_history.id}},
+            target=enrich_identities_task,
+            kwargs={'identity': email_address, 'identity_type': 'email', 'scan_history_id': scan_history.id},
             daemon=True
         ).start()
 

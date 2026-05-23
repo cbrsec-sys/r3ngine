@@ -1,6 +1,37 @@
 # Changelog
 
-### [v3.2.0] - 2026-05-22
+### [v3.2.0] - 2026-05-23
+
+> **IMPORTANT — Existing installations must run the full upgrade script**
+>
+> v3.2.0 replaces Celery with Temporal. This is a breaking infrastructure change. Simply running `make up` on an existing install will leave stale Celery containers running and skip required database migrations.
+>
+> Run the full upgrade before starting services:
+>
+> ```bash
+> # Linux / macOS
+> git pull && make fullupgrade
+>
+> # Windows
+> git pull && make.bat fullupgrade
+> ```
+>
+> The script stops all containers, rebuilds all images from scratch, applies all migrations, and starts the updated stack. It will ask for explicit confirmation before making any changes.
+>
+> **Any scans running at upgrade time will be interrupted.**
+
+- **Celery → Temporal Migration (Complete)**: Fully removed Celery from the codebase and replaced all task orchestration with [Temporal](https://temporal.io). This is a complete, production-grade infrastructure migration spanning the entire scan pipeline.
+  - **Durable Workflow Execution**: All scans now run as `MasterScanWorkflow` instances on Temporal. Workflows survive container restarts, network blips, and worker crashes — execution resumes exactly where it left off with no data loss.
+  - **Full Execution History**: Every workflow and activity is recorded in Temporal's history. The Temporal UI at `localhost:8080` provides step-by-step replay of any scan, past or present.
+  - **Pause / Resume Signals**: Scans can be paused and resumed via Temporal signals without losing state.
+  - **Abort via Cancellation**: Scan termination (`stop_scan`, `stop_scans`) now calls `TemporalClientProvider.cancel_workflow()` instead of `app.control.revoke()`, ensuring clean, tracked cancellation backed by `TemporalWorkflowExecution` records.
+  - **Worker Health Check**: The system health API now verifies Temporal connectivity rather than polling Celery inspect.
+  - **Celery Infrastructure Removed**: Deleted `celery.py`, `celery_custom_task.py`, `celery-entrypoint.sh`, and `beat-entrypoint.sh`. Removed `celery==5.4.0` and `django-celery-beat==2.6.0` from `requirements.txt`. Removed the `celery` Docker service from `docker-compose.yml`.
+  - **Temporal Entrypoint**: Created `temporal-entrypoint.sh` — the new `temporal-python-orchestrator` container entrypoint that handles all one-time setup (wordlists, nuclei templates, kiterunner, gf-patterns, AI Map templates) previously owned by `celery-entrypoint.sh`, then starts the Temporal worker.
+  - **Settings Cleanup**: Replaced the `CELERY_*` config block in `settings.py` with `REDIS_URL`-based configuration. Removed all Celery log handlers.
+  - **Temporal Schedules**: Startup sync tasks (`sync_all_scans_to_graph`, `sync_cisa_kev_catalog`, `sync_semgrep_rules`) and domain monitoring schedules migrated from `django-celery-beat` `PeriodicTask` rows to native Temporal Schedules. Scheduled scan creation and management views updated accordingly.
+  - **Go Executor**: A lightweight Go-based Temporal activity worker (`web/executor/main.go`) handles subprocess tool execution on the `go-executor-queue`.
+  - **New Models**: `TemporalWorkflowExecution` and `TemporalSchedule` (migration `0026`) track running workflows and periodic schedules.
 
 - **Scan Result Recovery Tool**: Added `recover_scan_results` Django management command (`web/scanEngine/management/commands/recover_scan_results.py`). In the event of database corruption or loss, this command walks the `scan_results` volume and reconstructs the database from files on disk — recovering Domains, ScanHistory records, Subdomains, EndPoints, Ports/IpAddresses, Vulnerabilities (nmap + nuclei), and WAF associations.
   - **Dry-run by default**: run without flags to preview what would be recovered, with per-record output and a summary table. Pass `--apply` to commit.

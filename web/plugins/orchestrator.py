@@ -1,4 +1,3 @@
-from celery import chain, group
 from .models import Plugin
 import importlib
 import os
@@ -25,10 +24,9 @@ class PluginOrchestrator:
         module_name = f"{plugin_slug.replace('-', '_')}_tasks"
         try:
             module = importlib.import_module(module_name)
-            # Find the main task. By convention it should be named 'run' or the slug
             task_func = getattr(module, 'run', None) or getattr(module, plugin_slug.replace('-', '_'), None)
             if task_func:
-                return task_func.si(ctx=ctx)
+                return task_func
         except Exception as e:
             print(f"Error loading plugin task for {plugin_slug}: {str(e)}")
             
@@ -75,7 +73,4 @@ class PluginOrchestrator:
                 
         if not workflow:
             return None
-            
-        if len(workflow) > 1:
-            return chain(*workflow)
-        return workflow[0]
+        return workflow

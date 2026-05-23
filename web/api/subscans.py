@@ -6,8 +6,6 @@ from startScan.models import SubScan
 from .serializers import SubScanSerializer
 from .permissions import HasPermission
 from reNgine.definitions import PERM_INITATE_SCANS_SUBSCANS, ABORTED_TASK
-from reNgine.celery import app
-
 class SubScanViewSet(viewsets.ModelViewSet):
     queryset = SubScan.objects.all().order_by('-start_scan_date')
     serializer_class = SubScanSerializer
@@ -37,8 +35,6 @@ class SubScanViewSet(viewsets.ModelViewSet):
         
         subscans = SubScan.objects.filter(id__in=ids)
         for subscan in subscans:
-            for task_id in subscan.celery_ids:
-                app.control.revoke(task_id, terminate=True, signal='SIGKILL')
             subscan.status = ABORTED_TASK
             subscan.stop_scan_date = timezone.now()
             subscan.save()

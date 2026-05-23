@@ -8,7 +8,6 @@ from django.db.models import Count, Case, When, IntegerField
 from weasyprint import HTML, CSS
 from django.utils import timezone
 
-from reNgine.celery import app
 from reNgine.definitions import *
 from reNgine.llm import LLMReportGenerator
 from reNgine.charts import (
@@ -24,7 +23,6 @@ from scanEngine.models import VulnerabilityReportSetting
 
 logger = logging.getLogger('reNgine.tasks')
 
-@app.task(name='generate_report_task', bind=True, queue='report_queue')
 def generate_report_task(self, report_id):
     try:
         report_obj = ScanReport.objects.get(id=report_id)
