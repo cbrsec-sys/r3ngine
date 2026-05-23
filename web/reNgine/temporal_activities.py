@@ -198,12 +198,33 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **k
 
     def send_heartbeats():
         def _do_heartbeats():
+            from temporalio.exceptions import CancelledError as TemporalCancelledError
             while activity_running:
                 try:
                     activity.heartbeat(
                         f"Activity {task_name} running for {proxy.task_name}"
                     )
                     activity.logger.debug(f"[_run_task] Sent heartbeat for {task_name}")
+                except TemporalCancelledError:
+                    # Temporal has cancelled this activity — propagate by marking
+                    # the scan aborted so the stream_command kill switch fires.
+                    activity.logger.warning(
+                        f"[_run_task] Temporal cancellation received for {task_name}. "
+                        f"Marking scan {proxy.scan_id} as aborted."
+                    )
+                    try:
+                        from startScan.models import ScanHistory
+                        from reNgine.definitions import ABORTED_TASK
+                        if proxy.scan_id:
+                            _scan = ScanHistory.objects.filter(pk=proxy.scan_id).first()
+                            if _scan and _scan.scan_status != ABORTED_TASK:
+                                _scan.scan_status = ABORTED_TASK
+                                _scan.save()
+                    except Exception as mark_err:
+                        activity.logger.warning(
+                            f"[_run_task] Could not mark scan aborted: {mark_err}"
+                        )
+                    return  # stop heartbeating; kill switch will stop the subprocess
                 except Exception as hb_err:
                     activity.logger.warning(f"[_run_task] Heartbeat failed: {hb_err}")
 
@@ -606,13 +627,10 @@ def parse_fuzz_results_activity(ctx: dict) -> bool:
     from startScan.models import DirectoryFile
     from startScan.models import Subdomain
     scan_id = ctx.get('scan_history_id')
-    # Count DirectoryFile objects linked to this scan's subdomains
-    subdomain_ids = Subdomain.objects.filter(
-        scan_history_id=scan_id
-    ).values_list('id', flat=True)
+    # Count DirectoryFile objects linked to this scan's subscans
     fuzz_count = DirectoryFile.objects.filter(
-        directory_files__in=subdomain_ids
-    ).count()
+        directory_files__dir_subscan_ids__scan_history_id=scan_id
+    ).distinct().count()
     activity.logger.info(
         f"[ParseFuzzResultsActivity] scan_id={scan_id}: {fuzz_count} fuzz entries."
     )
@@ -709,89 +727,59 @@ def parse_analysis_results_activity(ctx: dict) -> bool:
 # Tier 6 — Assessment
 # ===========================================================================
 
-@activity.defn(name="RunVulnerabilityScanActivity")
-def run_vulnerability_scan_activity(ctx: dict) -> bool:
-    """Run full vulnerability assessment without dispatching via Celery.
+@activity.defn(name="RunNucleiActivity")
+def run_nuclei_activity(ctx: dict) -> bool:
+    from reNgine.tasks import nuclei_scan
+    activity.logger.info(f"[RunNucleiActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(nuclei_scan, ctx, task_name='nuclei_scan', description='Nuclei Scan', urls=ctx.get('urls', []))
 
-    Directly executes each enabled sub-scanner (Nuclei, CRLFuzz, Dalfox,
-    S3Scanner, Acunetix, cPanel, WPScan, React2Shell, Semgrep) via _run_task,
-    keeping all execution inside the Temporal activity context instead of
-    delegating to vulnerability_scan which uses group.apply_async().
+@activity.defn(name="RunCRLFuzzActivity")
+def run_crlfuzz_activity(ctx: dict) -> bool:
+    from reNgine.tasks import crlfuzz_scan
+    activity.logger.info(f"[RunCRLFuzzActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(crlfuzz_scan, ctx, task_name='crlfuzz_scan', description='CRLFuzz Scan', urls=ctx.get('urls', []))
 
-    Args:
-        ctx (dict): Temporal workflow context.
+@activity.defn(name="RunDalfoxActivity")
+def run_dalfox_activity(ctx: dict) -> bool:
+    from reNgine.tasks import dalfox_xss_scan
+    activity.logger.info(f"[RunDalfoxActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(dalfox_xss_scan, ctx, task_name='dalfox_xss_scan', description='Dalfox XSS Scan', urls=ctx.get('urls', []))
 
-    Returns:
-        bool: True on success.
-    """
-    import yaml as _yaml
-    from reNgine.tasks import (
-        nuclei_scan, crlfuzz_scan, dalfox_xss_scan, s3scanner,
-        acunetix_scan, semgrep_scan,
-    )
-    from reNgine.vulnerability_tasks import cpanel_scan, react2shell_scan
+@activity.defn(name="RunS3ScannerActivity")
+def run_s3scanner_activity(ctx: dict) -> bool:
+    from reNgine.tasks import s3scanner
+    activity.logger.info(f"[RunS3ScannerActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(s3scanner, ctx, task_name='s3scanner', description='S3 Bucket Scanner')
+
+@activity.defn(name="RunAcunetixActivity")
+def run_acunetix_activity(ctx: dict) -> bool:
+    from reNgine.tasks import acunetix_scan
+    activity.logger.info(f"[RunAcunetixActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(acunetix_scan, ctx, task_name='acunetix_scan', description='Acunetix Scan', domain_id=ctx.get('domain_id'), scan_history_id=ctx.get('scan_history_id'))
+
+@activity.defn(name="RunCpanelScanActivity")
+def run_cpanel_scan_activity(ctx: dict) -> bool:
+    from reNgine.vulnerability_tasks import cpanel_scan
+    activity.logger.info(f"[RunCpanelScanActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(cpanel_scan, ctx, task_name='cpanel_scan', description='cPanel Vulnerability Scan')
+
+@activity.defn(name="RunWpscanActivity")
+def run_wpscan_activity(ctx: dict) -> bool:
     from reNgine.wpscan_tasks import wpscan_scan
-    from reNgine.definitions import (
-        VULNERABILITY_SCAN,
-        RUN_NUCLEI, RUN_CRLFUZZ, RUN_DALFOX, RUN_S3SCANNER,
-        RUN_ACUNETIX, RUN_WPSCAN, RUN_CPANEL2SHELL, RUN_REACT2SHELL,
-    )
-    from scanEngine.models import EngineType
-    from dashboard.models import AcunetixAPIKey
+    activity.logger.info(f"[RunWpscanActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(wpscan_scan, ctx, task_name='wpscan_scan', description='WPScan', urls=ctx.get('urls', []))
 
-    scan_id = ctx.get('scan_history_id')
-    activity.logger.info(f"[RunVulnerabilityScanActivity] scan_id={scan_id}")
+@activity.defn(name="RunReact2ShellActivity")
+def run_react2shell_activity(ctx: dict) -> bool:
+    from reNgine.vulnerability_tasks import react2shell_scan
+    activity.logger.info(f"[RunReact2ShellActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(react2shell_scan, ctx, task_name='react2shell_scan', description='React Vulnerability Scan')
 
-    engine_id = ctx.get('engine_id')
-    engine = EngineType.objects.filter(pk=engine_id).first()
-    config = _yaml.safe_load(engine.yaml_configuration) if engine and engine.yaml_configuration else {}
-    vuln_config = config.get(VULNERABILITY_SCAN) or {}
-    urls = ctx.get('urls', [])
-
-    # --- Stage 1: Primary scanners ---
-    if vuln_config.get(RUN_NUCLEI, True):
-        _run_task(nuclei_scan, ctx, task_name='nuclei_scan',
-                  description='Nuclei Scan', urls=urls)
-
-    if vuln_config.get(RUN_CRLFUZZ, False):
-        _run_task(crlfuzz_scan, ctx, task_name='crlfuzz_scan',
-                  description='CRLFuzz Scan', urls=urls)
-
-    if vuln_config.get(RUN_DALFOX, False):
-        _run_task(dalfox_xss_scan, ctx, task_name='dalfox_xss_scan',
-                  description='Dalfox XSS Scan', urls=urls)
-
-    if vuln_config.get(RUN_S3SCANNER, True):
-        _run_task(s3scanner, ctx, task_name='s3scanner',
-                  description='S3 Bucket Scanner')
-
-    # --- Stage 2: Additional scanners ---
-    if vuln_config.get(RUN_ACUNETIX, False):
-        creds = AcunetixAPIKey.objects.first()
-        if creds and creds.server_url and creds.api_key:
-            _run_task(acunetix_scan, ctx, task_name='acunetix_scan',
-                      description='Acunetix Scan',
-                      domain_id=ctx.get('domain_id'),
-                      scan_history_id=scan_id)
-
-    cpanel_cfg = vuln_config.get('cpanel_scanner', {})
-    if cpanel_cfg.get(RUN_CPANEL2SHELL, True):
-        _run_task(cpanel_scan, ctx, task_name='cpanel_scan',
-                  description='cPanel Vulnerability Scan')
-
-    if vuln_config.get(RUN_WPSCAN, True):
-        _run_task(wpscan_scan, ctx, task_name='wpscan_scan',
-                  description='WPScan', urls=urls)
-
-    react_cfg = vuln_config.get('react_scanner', {})
-    if react_cfg.get(RUN_REACT2SHELL, True):
-        _run_task(react2shell_scan, ctx, task_name='react2shell_scan',
-                  description='React Vulnerability Scan')
-
-    _run_task(semgrep_scan, ctx, task_name='semgrep_scan',
-              description='Semgrep Vulnerability Scan', mode='vulnerability')
-
-    return True
+@activity.defn(name="RunSemgrepActivity")
+def run_semgrep_activity(ctx: dict) -> bool:
+    from reNgine.tasks import semgrep_scan
+    activity.logger.info(f"[RunSemgrepActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(semgrep_scan, ctx, task_name='semgrep_scan', description='Semgrep Vulnerability Scan', mode='vulnerability')
 
 
 @activity.defn(name="RunWAFBypassActivity")
@@ -1033,30 +1021,39 @@ def send_scan_notification_activity(ctx: dict) -> bool:
     return True
 
 
+_PERMITTED_GENERIC_TASKS = frozenset({
+    "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
+    "osint", "spiderfoot_scan", "http_crawl", "port_scan", "screenshot",
+    "fetch_url", "dir_file_fuzz", "web_api_discovery", "waf_detection",
+    "secret_scanning", "vulnerability_scan", "waf_bypass", "brute_force_scan",
+    "nuclei_scan", "crlfuzz_scan", "dalfox_xss_scan", "s3scanner",
+    "acunetix_scan", "cpanel_scan", "wpscan_scan", "react2shell_scan",
+    "semgrep_scan", "correlate_vulnerabilities", "calculate_risk_scores",
+    "generate_impact_assessment", "run_apme",
+})
+
+
 @activity.defn(name="RunGenericTaskActivity")
 def run_generic_task_activity(ctx: dict, task_name: str, description: str = None, extra_args: dict = None) -> bool:
-    """Execute any existing RengineTask-decorated task dynamically in a Temporal activity.
+    """Execute any permitted task function dynamically in a Temporal activity.
 
-    Imports the task function by name from `reNgine.tasks` (or globals),
-    constructs a TemporalTaskProxy, and executes it.
-
-    Args:
-        ctx (dict): Temporal workflow context.
-        task_name (str): The name of the Celery task function (e.g., 'osint').
-        description (str, optional): Description for the UI tracking.
-        extra_args (dict, optional): Extra keyword arguments for the task function.
+    Only tasks in _PERMITTED_GENERIC_TASKS may be dispatched. This prevents
+    arbitrary function execution from replayed workflow history events.
     """
+    if task_name not in _PERMITTED_GENERIC_TASKS:
+        raise ValueError(
+            f"[RunGenericTaskActivity] '{task_name}' is not in the permitted task list. "
+            f"Add it to _PERMITTED_GENERIC_TASKS to allow dispatch."
+        )
     import importlib
     activity.logger.info(f"[RunGenericTaskActivity] task={task_name} scan_id={ctx.get('scan_history_id')}")
 
-    # Import tasks dynamically
     tasks_module = importlib.import_module("reNgine.tasks")
     task_func = getattr(tasks_module, task_name, None)
 
     if not task_func:
         raise ValueError(f"Task function '{task_name}' not found in reNgine.tasks.")
 
-    # Call the unwrapped run method
     run_args = extra_args or {}
     return _run_task(
         task_func,
