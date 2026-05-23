@@ -79,7 +79,6 @@ class MasterScanWorkflow:
 
     def __init__(self) -> None:
         self._paused = False
-        self._checkpoint_state: Dict[str, Any] = {}
 
     @workflow.run
     async def run(self, ctx: ScanContext) -> Dict[str, Any]:
@@ -109,14 +108,6 @@ class MasterScanWorkflow:
             ctx,
             start_to_close_timeout=timedelta(minutes=5),
             retry_policy=_RETRY_INTERNAL,
-            task_queue="python-orchestrator-queue"
-        )
-
-        # Load any persisted checkpoint for crash resumption
-        self._checkpoint_state = await workflow.execute_activity(
-            "LoadCheckpointActivity",
-            ctx,
-            start_to_close_timeout=timedelta(seconds=30),
             task_queue="python-orchestrator-queue"
         )
 
@@ -489,34 +480,21 @@ class MasterScanWorkflow:
 
     @workflow.query(name="get_current_state")
     def get_current_state(self) -> Dict[str, Any]:
-        """Query handler: return the current workflow state for the frontend.
-
-        Returns:
-            dict: Current paused flag and checkpoint state.
-        """
-        return {
-            "paused": self._paused,
-            "checkpoint_state": self._checkpoint_state
-        }
+        """Query handler: return the current workflow state for the frontend."""
+        return {"paused": self._paused}
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
     async def _check_paused(self) -> None:
-        """Block workflow execution if a pause signal has been received.
+        """Block at a tier boundary if a pause signal was received.
 
-        Saves the current checkpoint state and waits until the 'resume'
-        signal arrives before returning.
+        Temporal's event history handles durability — no explicit checkpoint
+        is needed. The workflow simply waits for the resume signal.
         """
-        while self._paused:
-            workflow.logger.info("MasterScanWorkflow is PAUSED. Saving checkpoint...")
-            await workflow.execute_activity(
-                "SaveCheckpointActivity",
-                self._checkpoint_state,
-                start_to_close_timeout=timedelta(seconds=30),
-                task_queue="python-orchestrator-queue"
-            )
+        if self._paused:
+            workflow.logger.info("MasterScanWorkflow PAUSED — waiting for resume signal.")
             await workflow.wait_condition(lambda: not self._paused)
             workflow.logger.info("MasterScanWorkflow RESUMED.")
 

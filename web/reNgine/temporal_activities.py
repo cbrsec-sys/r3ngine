@@ -315,41 +315,6 @@ def target_profiling_activity(ctx: ScanContext) -> ScanContext:
     return ctx
 
 
-@activity.defn(name="LoadCheckpointActivity")
-def load_checkpoint_activity(ctx: ScanContext) -> dict:
-    """Load persisted workflow checkpoint state (if any) for resumability.
-
-    In a future implementation, this will query WorkflowCheckpoint DB records
-    so long-running scans can resume from the correct tier after a crash.
-    Currently returns an empty state dict.
-
-    Args:
-        ctx (dict): Temporal workflow context.
-
-    Returns:
-        dict: Checkpoint state dictionary (empty if no checkpoint exists).
-    """
-    scan_id = ctx.get('scan_history_id')
-    activity.logger.info(f"[LoadCheckpointActivity] Loading checkpoint for scan {scan_id}")
-    # TODO: query WorkflowCheckpoint.objects.filter(workflow_execution__scan_history_id=scan_id)
-    return {}
-
-
-@activity.defn(name="SaveCheckpointActivity")
-def save_checkpoint_activity(state: dict) -> bool:
-    """Persist the current workflow state to the database for crash recovery.
-
-    Args:
-        state (dict): Current workflow checkpoint state payload.
-
-    Returns:
-        bool: True on success.
-    """
-    activity.logger.info(f"[SaveCheckpointActivity] Saving checkpoint state: {list(state.keys())}")
-    # TODO: upsert WorkflowCheckpoint record
-    return True
-
-
 # ===========================================================================
 # Tier 1 — Discovery
 # ===========================================================================
