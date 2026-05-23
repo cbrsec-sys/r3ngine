@@ -6157,42 +6157,32 @@ def fetch_proxies_task(limit=1000, job_id=None):
     # Capture job_id here so inner threads can report progress without accessing self
     _job_id = job_id
 
-    N_THREADS = 4
-    WORKERS_PER_CHUNK = 13  # 4 * 13 ≈ 52 concurrent IO checks, matching original throughput
-    chunk_size = max(1, (total + N_THREADS - 1) // N_THREADS)
-    chunks = [unique_proxies[i:i + chunk_size] for i in range(0, total, chunk_size)]
+    MAX_WORKERS = min(1000, max(1, total))
 
-    def check_chunk(chunk):
-        with concurrent.futures.ThreadPoolExecutor(max_workers=WORKERS_PER_CHUNK) as pool:
-            future_map = {pool.submit(check_proxy_robust, p): p for p in chunk}
-            for future in concurrent.futures.as_completed(future_map):
-                proxy_str = future_map[future]
-                try:
-                    alive = future.result()
-                except Exception:
-                    alive = False
-                if alive:
-                    logger.info(f"Proxy LIVE: {proxy_str}")
-                    print(f"[PROXY LIVE] {proxy_str}", flush=True)
-                    with lock:
-                        live_proxies.append(proxy_str)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
+        future_map = {pool.submit(check_proxy_robust, p): p for p in unique_proxies}
+        for future in concurrent.futures.as_completed(future_map):
+            proxy_str = future_map[future]
+            try:
+                alive = future.result()
+            except Exception:
+                alive = False
+            if alive:
+                logger.info(f"Proxy LIVE: {proxy_str}")
+                print(f"[PROXY LIVE] {proxy_str}", flush=True)
                 with lock:
-                    completed_count[0] += 1
-                    done = completed_count[0]
-                if done % 50 == 0 or done == total:
-                    logger.info(f"Verification progress: {done}/{total} - Found {len(live_proxies)} live proxies so far.")
-                    progress = 30 + int((done / total) * 65)
-                    if _job_id:
-                        _update_job(
-                            _job_id, 'RUNNING', progress,
-                            f'Checking proxies: {done}/{total} ({len(live_proxies)} live)',
-                        )
-
-    threads = [threading.Thread(target=check_chunk, args=(chunk,), daemon=True) for chunk in chunks]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
+                    live_proxies.append(proxy_str)
+            with lock:
+                completed_count[0] += 1
+                done = completed_count[0]
+            if done % 50 == 0 or done == total:
+                logger.info(f"Verification progress: {done}/{total} - Found {len(live_proxies)} live proxies so far.")
+                progress = 30 + int((done / total) * 65)
+                if _job_id:
+                    _update_job(
+                        _job_id, 'RUNNING', progress,
+                        f'Checking proxies: {done}/{total} ({len(live_proxies)} live)',
+                    )
 
     logger.info(f"Proxy verification complete. Found {len(live_proxies)} live proxies out of {total} tested.")
     if job_id:
