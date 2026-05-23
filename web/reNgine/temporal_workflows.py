@@ -26,7 +26,7 @@ from temporalio.common import RetryPolicy
 # All imports that touch Django or any non-deterministic module must be wrapped
 # in workflow.unsafe.imports_passed_through() to prevent sandbox errors.
 with workflow.unsafe.imports_passed_through():
-    pass  # Django and Celery imports happen inside activities, not workflows.
+    from reNgine.temporal_activities import _PERMITTED_GENERIC_TASKS
 
 
 @workflow.defn(name="MasterScanWorkflow")
@@ -491,13 +491,40 @@ class NucleiPlannerWorkflow:
         workflow.logger.info(
             f"Starting NucleiPlannerWorkflow for scan_id={ctx.get('scan_history_id')}"
         )
-        await workflow.execute_activity(
-            "RunVulnerabilityScanActivity",
-            ctx,
-            start_to_close_timeout=timedelta(hours=6),
-            heartbeat_timeout=timedelta(minutes=5),
-            task_queue="python-orchestrator-queue"
-        )
+        
+        yaml_config = ctx.get('yaml_configuration', {})
+        vuln_config = yaml_config.get('vulnerability_scan', {})
+        
+        # --- Stage 1: Primary scanners ---
+        if vuln_config.get('nuclei', True):
+            await workflow.execute_activity("RunNucleiActivity", ctx, start_to_close_timeout=timedelta(hours=6), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+        
+        if vuln_config.get('crlfuzz', False):
+            await workflow.execute_activity("RunCRLFuzzActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            
+        if vuln_config.get('dalfox', False):
+            await workflow.execute_activity("RunDalfoxActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            
+        if vuln_config.get('s3scanner', True):
+            await workflow.execute_activity("RunS3ScannerActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            
+        # --- Stage 2: Additional scanners ---
+        if vuln_config.get('acunetix', False):
+            await workflow.execute_activity("RunAcunetixActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            
+        cpanel_cfg = vuln_config.get('cpanel_scanner', {})
+        if cpanel_cfg.get('run_cpanel_scanner', True):
+            await workflow.execute_activity("RunCpanelScanActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            
+        if vuln_config.get('wpscan', True):
+            await workflow.execute_activity("RunWpscanActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            
+        react_cfg = vuln_config.get('react_scanner', {})
+        if react_cfg.get('run_react_scanner', True):
+            await workflow.execute_activity("RunReact2ShellActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            
+        await workflow.execute_activity("RunSemgrepActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+
         workflow.logger.info(
             f"NucleiPlannerWorkflow COMPLETE for scan_id={ctx.get('scan_history_id')}"
         )
@@ -526,6 +553,14 @@ class SubScanWorkflow:
         workflow.logger.info(
             f"Starting SubScanWorkflow for subdomain_id={ctx.get('subdomain_id')} scan_type={scan_type}"
         )
+
+        # Validate scan_type against the permitted task list before any dispatch
+        known_explicit = {"osint", "subdomain_discovery", "port_scan", "fetch_url", "vulnerability_scan", "baddns"}
+        if scan_type not in known_explicit and scan_type not in _PERMITTED_GENERIC_TASKS:
+            raise ValueError(
+                f"[SubScanWorkflow] '{scan_type}' is not a recognized subscan type. "
+                f"Add it to _PERMITTED_GENERIC_TASKS in temporal_activities.py to enable dispatch."
+            )
 
         success = False
         try:
@@ -605,6 +640,7 @@ class SubScanWorkflow:
                     )
             elif scan_type == 'baddns':
                 # baddns runs inside subdomain_discovery; route there with single-tool override
+                # Passing the override dict explicitly instead of deep mutating the global ctx.
                 ctx_baddns = {
                     **ctx,
                     'yaml_configuration': {
@@ -621,7 +657,6 @@ class SubScanWorkflow:
                     start_to_close_timeout=timedelta(hours=2),
                     task_queue="python-orchestrator-queue"
                 )
-
             else:
                 # dir_file_fuzz, screenshot, waf_detection and other plugin/unknown tasks
                 # accept no extra arguments beyond ctx
@@ -671,6 +706,7 @@ class StressTestWorkflow:
 
     def __init__(self) -> None:
         self._kill_requested: bool = False
+        self._kill_event = asyncio.Event()
 
     @workflow.run
     async def run(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
@@ -722,17 +758,33 @@ class StressTestWorkflow:
 
                 tool_ctx = {**ctx, "current_endpoint": endpoint_url, "current_tool": tool}
                 try:
-                    metrics = await workflow.execute_activity(
-                        "RunStressToolActivity",
-                        tool_ctx,
-                        # Allow up to 15 minutes per slot:
-                        # longest supported duration is 10 min + 5 min overhead.
-                        start_to_close_timeout=timedelta(minutes=15),
-                        heartbeat_timeout=timedelta(seconds=30),
-                        # Stress tests are not idempotent — never auto-retry.
-                        retry_policy=RetryPolicy(maximum_attempts=1),
-                        task_queue="python-orchestrator-queue",
+                    activity_task = asyncio.create_task(
+                        workflow.execute_activity(
+                            "RunStressToolActivity",
+                            tool_ctx,
+                            # Allow up to 15 minutes per slot:
+                            # longest supported duration is 10 min + 5 min overhead.
+                            start_to_close_timeout=timedelta(minutes=15),
+                            heartbeat_timeout=timedelta(seconds=30),
+                            # Stress tests are not idempotent — never auto-retry.
+                            retry_policy=RetryPolicy(maximum_attempts=1),
+                            task_queue="python-orchestrator-queue",
+                        )
                     )
+                    kill_task = asyncio.create_task(self._kill_event.wait())
+                    
+                    done, pending = await asyncio.wait(
+                        [activity_task, kill_task],
+                        return_when=asyncio.FIRST_COMPLETED
+                    )
+                    
+                    if kill_task in done:
+                        activity_task.cancel()
+                        workflow.logger.info(f"[StressTestWorkflow] Kill signal received. Cancelling activity.")
+                        outer_break = True
+                        break
+                    
+                    metrics = activity_task.result()
                     aggregate["total_requests"] += metrics.get("total_requests", 0)
                     aggregate["successful_requests"] += metrics.get("successful_requests", 0)
                     aggregate["failed_requests"] += metrics.get("failed_requests", 0)
@@ -788,6 +840,7 @@ class StressTestWorkflow:
         """Signal the workflow to abort at the next endpoint/tool boundary."""
         workflow.logger.info("[StressTestWorkflow] KILL SWITCH signal received.")
         self._kill_requested = True
+        self._kill_event.set()
 
     @workflow.query(name="is_running")
     def is_running(self) -> bool:
