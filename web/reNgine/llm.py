@@ -108,7 +108,10 @@ class LLMBaseGenerator:
                 timeout=60
             )
             response.raise_for_status()
-            return response.json()['content'][0]['text']
+            block = response.json()['content'][0]
+            if block.get('type') != 'text':
+                raise ValueError(f"Unexpected Anthropic response content type: {block.get('type')}")
+            return block['text']
         except Exception as e:
             self.logger.error(f"Anthropic Error: {str(e)}")
             return f"Error: {str(e)}"
