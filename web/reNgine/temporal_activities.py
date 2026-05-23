@@ -109,7 +109,7 @@ class TemporalTaskProxy:
                 title=self.description,
                 time=timezone.now(),
                 status=RUNNING_TASK,
-                celery_id=f"temporal-{temporal_activity_id}"
+                execution_id=f"temporal-{temporal_activity_id}"
             )
             self.activity.save()
             self.activity_id = self.activity.id

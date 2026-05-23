@@ -345,7 +345,7 @@ def initiate_scan(
 			scan = ScanHistory.objects.get(pk=scan_history_id)
 		scan.scan_status = RUNNING_TASK
 		scan.scan_type = engine
-		scan.celery_ids = [initiate_scan.request.id]
+		scan.workflow_ids = [initiate_scan.request.id]
 		scan.domain = domain
 		scan.start_scan_date = timezone.now()
 		scan.tasks = engine.tasks
@@ -699,7 +699,7 @@ def initiate_scan(
 		# Run Celery chord
 		logger.info(f'Running Celery workflow with {len(workflow.tasks) + 1} tasks')
 		task = chain(workflow, callback).on_error(callback).delay()  # PHASE4: core pipeline chain
-		scan.celery_ids.append(task.id)
+		scan.workflow_ids.append(task.id)
 		scan.save()
 
 		return {
@@ -949,7 +949,7 @@ def initiate_scan_temporal(
 				'status': 'RUNNING',
 			}
 		)
-		scan.celery_ids = [started_workflow_id]
+		scan.workflow_ids = [started_workflow_id]
 		scan.save()
 
 		# Send start notification
@@ -1037,7 +1037,7 @@ def initiate_subscan_temporal(
 		# ---- Create scan activity of SubScan Model ----
 		subscan = SubScan(
 			start_scan_date=timezone.now(),
-			celery_ids=[], # Will store temporal workflow ID
+			workflow_ids=[], # Will store temporal workflow ID
 			scan_history=scan,
 			subdomain=subdomain,
 			type=scan_type,
@@ -1159,8 +1159,8 @@ def initiate_subscan_temporal(
 			f"for subscan_id={subscan.id} (type={scan_type})"
 		)
 
-		# Save workflow ID in subscan's celery_ids list for UI compatibility
-		subscan.celery_ids = [started_workflow_id]
+		# Save workflow ID in subscan's workflow_ids list
+		subscan.workflow_ids = [started_workflow_id]
 		subscan.save()
 
 		return {
@@ -1222,7 +1222,7 @@ def initiate_subscan(
 	# Create scan activity of SubScan Model
 	subscan = SubScan(
 		start_scan_date=timezone.now(),
-		celery_ids=[initiate_subscan.request.id],
+		workflow_ids=[initiate_subscan.request.id],
 		scan_history=scan,
 		subdomain=subdomain,
 		type=scan_type,
@@ -1339,7 +1339,7 @@ def initiate_subscan(
 
 	# Run Celery tasks
 	task = chain(workflow, callback).on_error(callback).delay()  # PHASE4: core subscan chain
-	subscan.celery_ids.append(task.id)
+	subscan.workflow_ids.append(task.id)
 	subscan.save()
 
 
@@ -1382,7 +1382,7 @@ def report(self, ctx={}, description=None):
 	# Get failed tasks
 	tasks = ScanActivity.objects.filter(scan_of=scan).all()
 	if subscan:
-		tasks = tasks.filter(celery_id__in=subscan.celery_ids)
+		tasks = tasks.filter(execution_id__in=subscan.workflow_ids)
 	failed_tasks = tasks.filter(status__in=[FAILED_TASK, ABORTED_TASK])
 
 	# Get task status
@@ -6925,8 +6925,20 @@ def fetch_proxies_task(limit=1000, job_id=None):
     final_list = [f"http://{p}" if not p.startswith('http') and not p.startswith('socks') else p for p in live_proxies]
 
     proxy_str = "\n".join(final_list)
+    try:
+        from scanEngine.models import Proxy
+        proxy_obj = Proxy.objects.first()
+        if not proxy_obj:
+            proxy_obj = Proxy.objects.create()
+        proxy_obj.proxies = proxy_str
+        proxy_obj.use_proxy = True
+        proxy_obj.save()
+        logger.info("Automatically saved live proxies to database.")
+    except Exception as e:
+        logger.error(f"Failed to auto-save proxies: {e}")
+
     if job_id:
-        _update_job(job_id, 'SUCCESS', 100, 'Proxy list updated', result={"count": len(final_list), "proxies": proxy_str})
+        _update_job(job_id, 'SUCCESS', 100, 'Proxy list updated and saved automatically', result={"count": len(final_list), "proxies": proxy_str})
     logger.info("Automated proxy fetch task finished successfully.")
     return proxy_str
 
@@ -7377,7 +7389,7 @@ def correlate_vulnerabilities(self, scan_history_id, ctx={}, description=None):
 	
 	if self.subscan:
 		running_scans = ScanActivity.objects.filter(
-			celery_id__in=self.subscan.celery_ids,
+			execution_id__in=self.subscan.workflow_ids,
 			status__in=[RUNNING_TASK, INITIATED_TASK]
 		).exclude(name__in=post_processing_names)
 	else:
@@ -7416,7 +7428,7 @@ def calculate_risk_scores(self, scan_history_id, ctx={}, description=None):
 	
 	if self.subscan:
 		running_scans = ScanActivity.objects.filter(
-			celery_id__in=self.subscan.celery_ids,
+			execution_id__in=self.subscan.workflow_ids,
 			status__in=[RUNNING_TASK, INITIATED_TASK]
 		).exclude(name__in=post_processing_names)
 	else:
@@ -7465,7 +7477,7 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 		
 		if self.subscan:
 			running_scans = ScanActivity.objects.filter(
-				celery_id__in=self.subscan.celery_ids,
+				execution_id__in=self.subscan.workflow_ids,
 				status__in=[RUNNING_TASK, INITIATED_TASK]
 			).exclude(name__in=post_processing_names)
 		else:
@@ -7837,7 +7849,7 @@ def run_apme(self, scan_history_id, ctx={}, description=None):
 	
 	if self.subscan:
 		running_scans = ScanActivity.objects.filter(
-			celery_id__in=self.subscan.celery_ids,
+			execution_id__in=self.subscan.workflow_ids,
 			status__in=[RUNNING_TASK, INITIATED_TASK]
 		).exclude(name__in=post_processing_names)
 	else:

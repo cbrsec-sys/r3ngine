@@ -375,7 +375,7 @@ CELERY_TASK_STATUS_MAP = {
     PARTIALLY_COMPLETE_TASK: 'PARTIALLY COMPLETE'
 }
 
-CELERY_TASK_STATUSES = (
+TASK_STATUSES = (
     (INITIATED_TASK, INITIATED_TASK),
     (FAILED_TASK, FAILED_TASK),
     (RUNNING_TASK, RUNNING_TASK),
@@ -383,6 +383,7 @@ CELERY_TASK_STATUSES = (
     (ABORTED_TASK, ABORTED_TASK),
     (PARTIALLY_COMPLETE_TASK, PARTIALLY_COMPLETE_TASK)
 )
+CELERY_TASK_STATUSES = TASK_STATUSES  # deprecated alias — remove after all references updated
 DYNAMIC_ID = -1
 
 ###############################################################################
