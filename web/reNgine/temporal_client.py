@@ -37,7 +37,6 @@ class TemporalClientProvider:
             workflow_id: The Temporal workflow execution ID to cancel.
         """
         loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
         try:
             async def _cancel():
                 client = await cls.get_client()
