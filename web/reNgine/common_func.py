@@ -18,7 +18,8 @@ import xmltodict
 from time import sleep
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
-from celery.utils.log import get_task_logger
+import logging as _logging
+get_task_logger = _logging.getLogger
 from discord_webhook import DiscordEmbed, DiscordWebhook
 from django.db.models import Q
 from dotted_dict import DottedDict

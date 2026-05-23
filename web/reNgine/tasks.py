@@ -26,9 +26,7 @@ from redis import Redis
 from datetime import datetime
 from urllib.parse import urlparse, parse_qs
 from api.serializers import SubdomainSerializer
-from celery import chain, chord, group
-from celery.result import allow_join_result
-from celery.utils.log import get_task_logger
+import logging
 from django.db import transaction
 from django.db.models import Count
 from dotted_dict import DottedDict
@@ -38,8 +36,6 @@ from pycvesearch import CVESearch
 from metafinder.extractor import extract_metadata_from_google_search
 
 from django.core.cache import cache
-from reNgine.celery import app
-from reNgine.celery_custom_task import RengineTask
 from reNgine.common_func import *
 from reNgine.definitions import *
 from reNgine.settings import *
@@ -138,7 +134,6 @@ SCAN_PIPELINE_DEFINITION = [
 #----------------------#
 
 
-@app.task(name='sync_all_scans_to_graph', queue='main_scan_queue', base=RengineTask, bind=True)
 def sync_all_scans_to_graph(self):
 	"""Sync all pre-existing scan results to Neo4j graph."""
 	print(">>> [GRAPH SYNC] Starting global graph synchronization...")
@@ -149,38 +144,33 @@ def sync_all_scans_to_graph(self):
 	logger.info("Global graph synchronization completed.")
 	print(">>> [GRAPH SYNC] Global graph synchronization completed.")
 
-@app.task(name='finish_chord', queue='main_scan_queue')
 def finish_chord(results, description="Task"):
     """Generic callback for Celery chords to mark a grouped operation as complete."""
     logger.info(f"Grouped task '{description}' completed.")
     return results
 
-@app.task(name='finish_osint', queue='main_scan_queue')
 def finish_osint(results, scan_history_id):
     """Callback for OSINT tasks, triggers Deep Pursuit pipeline."""
     from reNgine.osint_tasks import osint_orchestrator
     logger.info(f"OSINT discovery completed for scan {scan_history_id}")
     logger.info('Starting Deep Pursuit OSINT Pipeline...')
     threading.Thread(
-        target=osint_orchestrator.apply,
-        kwargs={'kwargs': {'scan_history_id': scan_history_id}},
+        target=osint_orchestrator,
+        kwargs={'scan_history_id': scan_history_id},
         daemon=True
     ).start()
     return results
 
-@app.task(name='finish_vulnerability_scan', queue='main_scan_queue')
 def finish_vulnerability_scan(results, scan_history_id):
     """Callback for vulnerability scan tasks."""
     logger.info(f"Vulnerability scan completed for scan {scan_history_id}")
     return results
 
-@app.task(name='finish_nuclei_scan', queue='main_scan_queue')
 def finish_nuclei_scan(results, scan_history_id):
     """Callback for Nuclei scan tasks."""
     logger.info(f"Nuclei scan completed for scan {scan_history_id}")
     return results
 
-@app.task(name='finish_osint_discovery', queue='main_scan_queue')
 def finish_osint_discovery(results, results_dir):
     """Callback for OSINT discovery tasks. Strips metadata from results."""
     from reNgine.opsec_utils import OpSecManager
@@ -282,7 +272,6 @@ def resolve_vulnerability_tasks(config, urls=[], ctx={}):
 
 
 
-@app.task(name='initiate_scan', bind=False, queue='initiate_scan_queue')
 def initiate_scan(
 		scan_history_id,
 		domain_id,
@@ -1178,7 +1167,6 @@ def initiate_subscan_temporal(
 		}
 
 
-@app.task(name='initiate_subscan', bind=False, queue='subscan_queue')
 def initiate_subscan(
 		scan_history_id,
 		subdomain_id,
@@ -1349,7 +1337,6 @@ def initiate_subscan(
 	}
 
 
-@app.task(name='report', bind=True, queue='report_queue')
 def report(self, ctx={}, description=None):
 	"""Report task running after all other tasks.
 	Mark ScanHistory or SubScan object as completed and update with final
@@ -1371,7 +1358,7 @@ def report(self, ctx={}, description=None):
 			scan_of_id=scan_id,
 			status__in=[RUNNING_TASK, INITIATED_TASK]
 		).exclude(name__in=post_processing_names)
-		if running_scans.exists():
+		if running_scans.exists() and not getattr(self, '_is_temporal_proxy', False):
 			running_names = list(running_scans.values_list('name', flat=True))
 			#logger.info(f"Scanning tasks are still running: {running_names}. Rescheduling report...")
 			raise self.retry(countdown=10, max_retries=1000)
@@ -1431,7 +1418,6 @@ def report(self, ctx={}, description=None):
 # Tracked reNgine tasks    #
 #--------------------------#
 
-@app.task(name='amass_intel_discovery', queue='main_scan_queue', base=RengineTask, bind=True)
 def amass_intel_discovery(self, host, ctx={}, description=None):
 	"""Infrastructure discovery using Amass Intel.
 	
@@ -1477,7 +1463,6 @@ def amass_intel_discovery(self, host, ctx={}, description=None):
 	return True
 
 
-@app.task(name='subdomain_discovery', queue='main_scan_queue', base=RengineTask, bind=True)
 def subdomain_discovery(
 		self,
 		host=None,
@@ -1757,7 +1742,6 @@ def subdomain_discovery(
 	return SubdomainSerializer(subdomains, many=True).data
 
 
-@app.task(name='osint', queue='main_scan_queue', base=RengineTask, bind=True)
 def osint(self, host=None, ctx={}, description=None):
 	"""Run Open-Source Intelligence tools on selected domain.
 
@@ -1770,42 +1754,41 @@ def osint(self, host=None, ctx={}, description=None):
 	config = self.yaml_configuration.get(OSINT) or OSINT_DEFAULT_CONFIG
 	results = {}
 
-	grouped_tasks = []
+	results = []
 
 	if 'discover' in config:
 		ctx['track'] = False
-		# results = osint_discovery(host=host, ctx=ctx)
-		_task = osint_discovery.si(
+		results.append(osint_discovery(
+			self,
 			config=config,
 			host=self.scan.domain.name,
 			scan_history_id=self.scan.id,
 			activity_id=self.activity_id,
 			results_dir=self.results_dir,
 			ctx=ctx
-		)
-		grouped_tasks.append(_task)
+		))
 
 	if OSINT_DORK in config or OSINT_CUSTOM_DORK in config or self.scan.cfg_custom_dorks:
-		_task = dorking.si(
+		results.append(dorking(
 			config=config,
 			host=self.scan.domain.name,
 			scan_history_id=self.scan.id,
 			activity_id=self.activity_id,
 			results_dir=self.results_dir,
 			raw_dorks=self.scan.cfg_custom_dorks
-		)
-		grouped_tasks.append(_task)
+		))
 
-	if grouped_tasks:
-		return self.replace(chord(grouped_tasks, finish_osint.s(scan_history_id=self.scan.id)))
+	if results:
+		finish_osint(results, scan_history_id=self.scan.id)
+		return True
 
 	logger.info('Standard OSINT Tasks finished...')
 
 	# Deep Pursuit OSINT Pipeline (holehe, maigret, LinkedInt)
 	logger.info('Starting Deep Pursuit OSINT Pipeline...')
 	threading.Thread(
-		target=osint_orchestrator.apply,
-		kwargs={'kwargs': {'scan_history_id': self.scan.id}},
+		target=osint_orchestrator,
+		kwargs={'scan_history_id': self.scan.id},
 		daemon=True
 	).start()
 
@@ -1817,7 +1800,6 @@ def osint(self, host=None, ctx={}, description=None):
 	# return results
 
 
-@app.task(name='osint_discovery', queue='main_scan_queue', base=RengineTask, bind=True)
 def osint_discovery(self, config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run OSINT discovery.
 
@@ -1864,10 +1846,9 @@ def osint_discovery(self, config, host, scan_history_id, activity_id, results_di
 		# 		})
 		# 		meta_info.append(save_metadata_info(meta_dict))
 
-	grouped_tasks = []
-
 	if 'emails' in osint_lookup:
-		_task = h8mail.si(
+		h8mail(
+			self,
 			config=config,
 			host=host,
 			scan_history_id=scan_history_id,
@@ -1875,11 +1856,11 @@ def osint_discovery(self, config, host, scan_history_id, activity_id, results_di
 			results_dir=results_dir,
 			ctx=ctx
 		)
-		grouped_tasks.append(_task)
 
 	if 'employees' in osint_lookup:
 		ctx['track'] = False
-		_task = theHarvester.si(
+		theHarvester(
+			self,
 			config=config,
 			host=host,
 			scan_history_id=scan_history_id,
@@ -1887,22 +1868,22 @@ def osint_discovery(self, config, host, scan_history_id, activity_id, results_di
 			results_dir=results_dir,
 			ctx=ctx
 		)
-		grouped_tasks.append(_task)
 
 	leaks_config = config.get(LEAKS_AND_SECRETS, {})
 	if leaks_config:
 		if leaks_config.get(LEAKLOOKUP):
-			_task = leaklookup.si(
+			leaklookup(
+				self,
 				host=host,
 				scan_history_id=scan_history_id,
 				activity_id=activity_id,
 				results_dir=results_dir,
 				ctx=ctx
 			)
-			grouped_tasks.append(_task)
 
 		if leaks_config.get(GITLEAKS) or leaks_config.get(TRUFFLEHOG):
-			_task = secret_scanning.si(
+			secret_scanning(
+				self,
 				config=leaks_config,
 				host=host,
 				scan_history_id=scan_history_id,
@@ -1910,10 +1891,8 @@ def osint_discovery(self, config, host, scan_history_id, activity_id, results_di
 				results_dir=results_dir,
 				ctx=ctx
 			)
-			grouped_tasks.append(_task)
 
-	if grouped_tasks:
-		return self.replace(chord(grouped_tasks, finish_osint_discovery.s(results_dir=results_dir)))
+	finish_osint_discovery([results], results_dir=results_dir)
 
 	# Strip metadata from OSINT results
 	from reNgine.opsec_utils import OpSecManager
@@ -1923,7 +1902,6 @@ def osint_discovery(self, config, host, scan_history_id, activity_id, results_di
 	return results
 
 
-@app.task(name='dorking', queue='main_scan_queue', base=RengineTask, bind=False)
 def dorking(config, host, scan_history_id, results_dir, activity_id=None, raw_dorks=None):
 	"""Run Google dorks.
 
@@ -2237,7 +2215,6 @@ def dorking(config, host, scan_history_id, results_dir, activity_id=None, raw_do
 	return results
 
 
-@app.task(name='theHarvester', queue='main_scan_queue', base=RengineTask, bind=True)
 def theHarvester(self, config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run theHarvester to get save emails, hosts, employees found in domain.
 
@@ -2354,7 +2331,6 @@ def theHarvester(self, config, host, scan_history_id, activity_id, results_dir, 
 	return data
 
 
-@app.task(name='h8mail', queue='main_scan_queue', base=RengineTask, bind=True)
 def h8mail(self, config, host, scan_history_id, activity_id, results_dir, ctx={}):
 	"""Run h8mail.
 
@@ -2407,7 +2383,6 @@ def h8mail(self, config, host, scan_history_id, activity_id, results_dir, ctx={}
 	return creds
 
 
-@app.task(name='leaklookup', queue='main_scan_queue', base=RengineTask, bind=True)
 def leaklookup(self, host=None, ctx=None, **kwargs):
 	"""Run LeakLookup and ProjectDiscovery query."""
 	leaklookup_api_key = get_leaklookup_key()
@@ -2492,7 +2467,6 @@ def leaklookup(self, host=None, ctx=None, **kwargs):
 	return " | ".join(results_summary)
 
 
-@app.task(name='secret_scanning', queue='main_scan_queue', base=RengineTask, bind=True)
 def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 	"""Scan for secrets in JS files and potentially other sources."""
 	if not self.scan:
@@ -2601,7 +2575,7 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 	# Run Semgrep Secret Scan (Default)
 	try:
 		logger.info('Running Semgrep Secret Scan...')
-		semgrep_scan.apply(kwargs={'ctx': ctx, 'mode': 'secret', 'description': 'Semgrep Secret Scan'})
+		semgrep_scan(self, ctx=ctx, mode='secret', description='Semgrep Secret Scan')
 	except Exception as e:
 		logger.error(f"Semgrep secret scan failed: {e}")
 
@@ -2611,7 +2585,6 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 	return f"Secret scanning completed. Found {findings_count} findings."
 
 
-@app.task(name='spiderfoot_scan', queue='spiderfoot_queue', base=RengineTask, bind=True)
 def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	"""Run SpiderFoot scan on selected domain with real-time batch parsing.
 	"""
@@ -2795,7 +2768,6 @@ def _process_spiderfoot_batch(self, batch, ctx, host):
 		logger.error(f"Error processing SpiderFoot batch: {str(e)}")
 
 
-@app.task(name='screenshot', queue='main_scan_queue', base=RengineTask, bind=True)
 def screenshot(self, ctx={}, description=None):
 	"""Embedded Playwright Screenshot task.
 	
@@ -2833,7 +2805,6 @@ def screenshot(self, ctx={}, description=None):
 
 
 
-@app.task(name='port_scan', queue='main_scan_queue', base=RengineTask, bind=True)
 def port_scan(self, hosts=[], ctx={}, description=None):
 	"""Run port scan.
 
@@ -3023,7 +2994,9 @@ def port_scan(self, hosts=[], ctx={}, description=None):
 			ctx_nmap['description'] = get_task_title(f'nmap_{host}', self.scan_id, self.subscan_id)
 			ctx_nmap['track'] = False
 			ctx_nmap['activity_id'] = self.activity_id
-			sig = nmap.si(
+			logger.info(f"Running nmap for {host} in port_scan.")
+			nmap(
+				self,
 				cmd=nmap_cmd,
 				ports=port_list,
 				host=host,
@@ -3031,13 +3004,10 @@ def port_scan(self, hosts=[], ctx={}, description=None):
 				script_args=nmap_script_args,
 				max_rate=rate_limit,
 				ctx=ctx_nmap)
-			logger.warning(f"APME: Running nmap task synchronously for {host} in port_scan to prevent Celery starvation/join deadlocks.")
-			sig.apply()
 
 	return ports_data
 
 
-@app.task(name='nmap', queue='main_scan_queue', base=RengineTask, bind=True)
 def nmap(
 		self,
 		cmd=None,
@@ -3201,14 +3171,13 @@ def nmap(
 		logger.warning(f'Detected Auth Portals on {host}. Triggering Brute Force Scan...')
 		from reNgine.tasks import brute_force_scan
 		try:
-			brute_force_scan.apply(kwargs={'targets': list(set(auth_targets)), 'ctx': ctx})
+			brute_force_scan(self, targets=list(set(auth_targets)), ctx=ctx)
 		except Exception as e:
 			logger.warning(f"Brute force scan failed for {host}: {e}")
 
 	return vulns
 
 
-@app.task(name='waf_detection', queue='main_scan_queue', base=RengineTask, bind=True)
 def waf_detection(self, ctx={}, description=None):
 	"""
 	Uses wafw00f to check for the presence of a WAF.
@@ -3301,7 +3270,6 @@ def waf_detection(self, ctx={}, description=None):
 	return wafs
 
 
-@app.task(name='waf_bypass', queue='main_scan_queue', base=RengineTask, bind=True)
 def waf_bypass(self, ctx={}, description=None):
 	"""
 	Tests various WAF bypass techniques.
@@ -3333,7 +3301,6 @@ def waf_bypass(self, ctx={}, description=None):
 # dir_file_fuzz has been refactored to fuzzing_tasks.py
 
 
-@app.task(name='fetch_url', queue='main_scan_queue', base=RengineTask, bind=True)
 def fetch_url(self, urls=[], ctx={}, description=None):
 	"""Fetch URLs using different tools like gauplus, gau, gospider, waybackurls ...
 
@@ -3593,7 +3560,6 @@ def parse_curl_output(response):
 
 
 
-@app.task(name='web_api_discovery', queue='main_scan_queue', base=RengineTask, bind=True)
 def web_api_discovery(self, urls=[], ctx={}, description=None):
 	"""Advanced Web App & API Discovery using Kiterunner, Arjun, LinkFinder, etc."""
 	logger.info('Running Web API Discovery Task')
@@ -3903,10 +3869,9 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 
 	# Trigger Intelligent Auth Candidate Extraction
 	from reNgine.auth_discovery_tasks import extract_auth_candidates
-	extract_auth_candidates.apply(kwargs={'ctx': ctx})
+	extract_auth_candidates(self, ctx=ctx)
 
 
-@app.task(name='vulnerability_scan', queue='main_scan_queue', bind=True, base=RengineTask)
 def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	"""This task serves as the entrypoint for vulnerability scans, spawning all enabled scanners.
 
@@ -3918,41 +3883,41 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	logger.info('Running Vulnerability Scan Queue')
 	config = self.yaml_configuration
 	
-	from celery.result import allow_join_result
-	from celery import group
+	# Note: vulnerability_scan is bypassed by RunVulnerabilityScanActivity in Temporal.
+	# This path handles any direct calls by dispatching each scanner sequentially.
+	vuln_config = config.get(VULNERABILITY_SCAN) or {}
+	from reNgine.definitions import RUN_NUCLEI, RUN_CRLFUZZ, RUN_DALFOX, RUN_S3SCANNER, RUN_ACUNETIX, RUN_WPSCAN, RUN_CPANEL2SHELL, RUN_REACT2SHELL
+	from reNgine.vulnerability_tasks import cpanel_scan, react2shell_scan
+	from reNgine.wpscan_tasks import wpscan_scan
 
-	# Stage 1: Primary vulnerability scans (rengine-ng compatible: Nuclei, CRLFuzz, Dalfox, S3Scanner)
-	primary_tasks = resolve_primary_vulnerability_tasks(config, urls, ctx)
-	if primary_tasks:
-		logger.info(f"Starting {len(primary_tasks)} primary vulnerability scan tasks (Stage 1)")
-		primary_group = group(primary_tasks)
-		primary_job = primary_group.apply_async()  # PHASE4: legacy vulnerability_scan group
-		
-		# Block synchronous worker execution until Stage 1 completes to prevent premature flow progression
-		with allow_join_result():
-			primary_job.get()
-		logger.info("Primary vulnerability scan tasks (Stage 1) completed.")
-	else:
-		logger.info("No primary vulnerability scan tasks to run for Stage 1.")
-
-	# Stage 2: Additional vulnerability scans (r3ngine-specific: Acunetix, cPanel, WPScan, React2Shell, Semgrep)
-	additional_tasks = resolve_additional_vulnerability_tasks(config, urls, ctx)
-	if additional_tasks:
-		logger.info(f"Starting {len(additional_tasks)} additional vulnerability scan tasks (Stage 2)")
-		additional_group = group(additional_tasks)
-		additional_job = additional_group.apply_async()  # PHASE4: legacy vulnerability_scan group
-		
-		# Block synchronous worker execution until Stage 2 completes to prevent premature flow progression
-		with allow_join_result():
-			additional_job.get()
-		logger.info("Additional vulnerability scan tasks (Stage 2) completed.")
-	else:
-		logger.info("No additional vulnerability scan tasks to run for Stage 2.")
+	if vuln_config.get(RUN_NUCLEI, True):
+		nuclei_scan(self, urls=urls, ctx=ctx, description='Nuclei Scan')
+	if vuln_config.get(RUN_CRLFUZZ, False):
+		crlfuzz_scan(self, urls=urls, ctx=ctx, description='CRLFuzz Scan')
+	if vuln_config.get(RUN_DALFOX, False):
+		dalfox_xss_scan(self, urls=urls, ctx=ctx, description='Dalfox XSS Scan')
+	if vuln_config.get(RUN_S3SCANNER, True):
+		s3scanner(self, ctx=ctx, description='S3 Bucket Scanner')
+	if vuln_config.get(RUN_ACUNETIX, False):
+		from dashboard.models import AcunetixAPIKey
+		creds = AcunetixAPIKey.objects.first()
+		if creds and creds.server_url and creds.api_key:
+			acunetix_scan(self, domain_id=ctx.get('domain_id'), scan_history_id=ctx.get('scan_history_id'), ctx=ctx)
+	cpanel_cfg = vuln_config.get('cpanel_scanner', {})
+	if cpanel_cfg.get(RUN_CPANEL2SHELL, True):
+		cpanel_scan(self, ctx=ctx, description='cPanel Vulnerability Scan')
+	if vuln_config.get(RUN_WPSCAN, True):
+		wpscan_scan(self, urls=urls, ctx=ctx, description='WPScan')
+	react_cfg = vuln_config.get('react_scanner', {})
+	if react_cfg.get(RUN_REACT2SHELL, True):
+		react2shell_scan(self, ctx=ctx, description='React Vulnerability Scan')
+	semgrep_scan(self, ctx=ctx, mode='vulnerability', description='Semgrep Vulnerability Scan')
+	logger.info("Primary vulnerability scan tasks (Stage 1) completed.")
+	logger.info("Additional vulnerability scan tasks (Stage 2) completed.")
 
 	logger.info('Vulnerability scan completed...')
 	return None
 
-@app.task(name='nuclei_individual_severity_module', queue='main_scan_queue', base=RengineTask, bind=True)
 def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, should_fetch_gpt_report, ctx={}, description=None):
 	'''
 		This celery task will run vulnerability scan for a specific severity.
@@ -4272,7 +4237,6 @@ def add_gpt_description_db(title, path, description, impact, remediation, refere
 			gpt_report.references.add(ref)
 		gpt_report.save()
 
-@app.task(name='nuclei_scan', queue='main_scan_queue', base=RengineTask, bind=True)
 def nuclei_scan(self, urls=[], ctx={}, description=None):
 	"""HTTP vulnerability scan using Nuclei
 
@@ -4463,23 +4427,20 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 			self.activity.title = f"Nuclei Scan - Severity: {severity}"
 			self.activity.save()
 		
-		# Invoke the nuclei_individual_severity_module synchronously via Celery apply
 		logger.warning(f'cmd: {cmd}')
-		nuclei_individual_severity_module.apply(
-			kwargs={
-				'cmd': cmd,
-				'severity': severity,
-				'enable_http_crawl': enable_http_crawl,
-				'should_fetch_gpt_report': should_fetch_gpt_report,
-				'ctx': ctx,
-				'description': f'Nuclei Scan with severity {severity}'
-			}
+		nuclei_individual_severity_module(
+			self,
+			cmd=cmd,
+			severity=severity,
+			enable_http_crawl=enable_http_crawl,
+			should_fetch_gpt_report=should_fetch_gpt_report,
+			ctx=ctx,
+			description=f'Nuclei Scan with severity {severity}'
 		)
 
 	logger.info('Vulnerability scan with all severities completed...')
 	return None
 
-@app.task(name='dalfox_xss_scan', queue='main_scan_queue', base=RengineTask, bind=True)
 def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	"""XSS Scan using dalfox
 
@@ -4619,7 +4580,6 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	return results
 
 
-@app.task(name='crlfuzz_scan', queue='main_scan_queue', base=RengineTask, bind=True)
 def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 	"""CRLF Fuzzing with CRLFuzz
 
@@ -4751,7 +4711,6 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 	return results
 
 
-@app.task(name='s3scanner', queue='main_scan_queue', base=RengineTask, bind=True)
 def s3scanner(self, ctx={}, description=None):
 	"""Bucket Scanner
 
@@ -4783,7 +4742,6 @@ def s3scanner(self, ctx={}, description=None):
 				logger.info(f"s3 bucket added {result['provider']}-{result['name']}-{result['region']}")
 
 
-@app.task(name='http_crawl', queue='main_scan_queue', base=RengineTask, bind=True)
 def http_crawl(
 		self,
 		urls=[],
@@ -5008,7 +4966,6 @@ def http_crawl(
 #---------------------#
 # Notifications tasks #
 #---------------------#
-@app.task(name='send_notif', bind=False, queue='send_notif_queue')
 def send_notif(
 		message,
 		scan_history_id=None,
@@ -5022,7 +4979,6 @@ def send_notif(
 	send_telegram_message(message)
 
 
-@app.task(name='send_scan_notif', bind=False, queue='send_scan_notif_queue')
 def send_scan_notif(
 		scan_history_id,
 		subscan_id=None,
@@ -5141,7 +5097,6 @@ def generate_inapp_notification(scan, subscan, status, engine, fields):
 	)
 
 
-@app.task(name='send_task_notif', bind=False, queue='send_task_notif_queue')
 def send_task_notif(
 		task_name,
 		status=None,
@@ -5235,7 +5190,6 @@ def send_task_notif(
 		**opts)
 
 
-@app.task(name='send_file_to_discord', bind=False, queue='send_file_to_discord_queue')
 def send_file_to_discord(file_path, title=None):
 	notif = Notification.objects.first()
 	do_send = notif and notif.send_to_discord and notif.discord_hook_url
@@ -5253,7 +5207,6 @@ def send_file_to_discord(file_path, title=None):
 	webhook.execute()
 
 
-@app.task(name='send_hackerone_report', bind=False, queue='send_hackerone_report_queue')
 def send_hackerone_report(vulnerability_id):
 	"""Send HackerOne vulnerability report.
 
@@ -5329,7 +5282,6 @@ def send_hackerone_report(vulnerability_id):
 # Utils tasks #
 #-------------#
 
-@app.task(name='parse_nmap_results', bind=False, queue='parse_nmap_results_queue')
 def parse_nmap_results(xml_file, output_file=None):
 	"""Parse results from nmap output file.
 
@@ -5929,7 +5881,6 @@ def parse_crlfuzz_result(url):
 
 
 
-@app.task(name='geo_localize', bind=False, queue='geo_localize_queue')
 def geo_localize(host, ip_id=None, scan_id=None, activity_id=None):
 	"""Uses geoiplookup to find location associated with host.
 
@@ -5997,7 +5948,6 @@ def geo_localize(host, ip_id=None, scan_id=None, activity_id=None):
 	return geo_object
 
 
-@app.task(name='query_whois', bind=False, queue='query_whois_queue')
 def query_whois(target, force_reload_whois=False, scan_id=None, activity_id=None):
 	"""Query WHOIS information for an IP or a domain name.
 
@@ -6193,7 +6143,6 @@ def fetch_whois_data_using_netlas(target, scan_id=None, activity_id=None):
 		}
 	
 
-@app.task(name='remove_duplicate_endpoints', bind=False, queue='remove_duplicate_endpoints_queue')
 def remove_duplicate_endpoints(
 		scan_history_id,
 		domain_id,
@@ -6745,7 +6694,6 @@ def save_imported_subdomains(subdomains, ctx={}):
 			output_file.write(f'{subdomain}\n')
 
 
-@app.task(name='query_reverse_whois', bind=False, queue='query_reverse_whois_queue')
 def query_reverse_whois(lookup_keyword):
 	"""Queries Reverse WHOIS information for an organization or email address.
 
@@ -6758,7 +6706,6 @@ def query_reverse_whois(lookup_keyword):
 	return reverse_whois(lookup_keyword)
 
 
-@app.task(name='query_ip_history', bind=False, queue='query_ip_history_queue')
 def query_ip_history(domain):
 	"""Queries the IP history for a domain
 
@@ -6771,7 +6718,6 @@ def query_ip_history(domain):
 	return get_domain_historical_ip_address(domain)
 
 
-@app.task(name='llm_vulnerability_description', bind=False, queue='llm_queue')
 def llm_vulnerability_description(vulnerability_id):
 	"""Generate and store Vulnerability Description using GPT.
 
@@ -6789,7 +6735,6 @@ def llm_vulnerability_description(vulnerability_id):
 		}
 
 
-@app.task(name='fetch_proxies_task', bind=True, queue='main_scan_queue')
 def fetch_proxies_task(self, limit=1000, job_id=None):
     """Scrape proxies concurrently from a large list of public sources,
     verify their validity against robust target APIs, and return the live ones.
@@ -7079,7 +7024,6 @@ def parse_sslscan_results(xml_file):
 		return f"Error parsing SSLScan XML: {str(e)}"
 
 
-@app.task(name='firewall_vpn_scan', queue='main_scan_queue', base=RengineTask, bind=True)
 def firewall_vpn_scan(self, ctx={}, description=None):
 	"""
 	Specialized scan for Firewalls and VPNs (Sophos focus).
@@ -7150,14 +7094,13 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 		logger.warning(f'Triggering Brute Force Scan for potential Sophos Portals on {target}')
 		from reNgine.tasks import brute_force_scan
 		try:
-			brute_force_scan.apply(kwargs={'targets': auth_targets, 'ctx': ctx})
+			brute_force_scan(self, targets=auth_targets, ctx=ctx)
 		except Exception as e:
 			logger.warning(f"Brute force scan failed for {target}: {e}")
 
 	return True
 
 
-@app.task(name='brute_force_scan', queue='main_scan_queue', base=RengineTask, bind=True)
 def brute_force_scan(self, targets=[], ctx={}, description=None):
 	"""
 	Perform centralized brute-force orchestration.
@@ -7168,8 +7111,8 @@ def brute_force_scan(self, targets=[], ctx={}, description=None):
 	
 	# Prerequisite: Run Intelligent Form Extraction (Tier 3)
 	from reNgine.auth_discovery_tasks import extract_auth_candidates
-	extract_auth_candidates.apply(kwargs={'ctx': ctx})
-	
+	extract_auth_candidates(self, ctx=ctx)
+
 	# Initialize Orchestrator
 	from reNgine.opsec_utils import BruteForceOrchestrator
 	orchestrator = BruteForceOrchestrator(self.scan)
@@ -7209,7 +7152,6 @@ def brute_force_scan(self, targets=[], ctx={}, description=None):
 	logger.info(f"Brute Force Orchestration completed. Credentials Found: {total_found}")
 	return True
 
-@app.task(name='pull_ollama_model', queue='main_scan_queue')
 def pull_ollama_model(model_name):
     """
     Pulls a model from Ollama and stores progress in cache for live terminal.
@@ -7273,7 +7215,6 @@ def map_acunetix_severity(severity):
 	return mapping.get(severity, 0)
 
 
-@app.task(name='acunetix_scan', queue='main_scan_queue', base=RengineTask, bind=True)
 def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=None):
 	"""
 	Run Acunetix (AWVS) scan for the given domain.
@@ -7411,7 +7352,6 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 		return False
 
 
-@app.task(name='correlate_vulnerabilities', queue='main_scan_queue', base=RengineTask, bind=True)
 def correlate_vulnerabilities(self, scan_history_id, ctx={}, description=None):
 	"""Correlate discovered technologies with known CVEs and update the graph database.
 
@@ -7451,7 +7391,6 @@ def correlate_vulnerabilities(self, scan_history_id, ctx={}, description=None):
 		nm.close()
 
 
-@app.task(name='calculate_risk_scores', queue='main_scan_queue', base=RengineTask, bind=True)
 def calculate_risk_scores(self, scan_history_id, ctx={}, description=None):
 	"""Calculate a weighted risk score for discovered vulnerabilities.
 
@@ -7486,7 +7425,6 @@ def calculate_risk_scores(self, scan_history_id, ctx={}, description=None):
 	correlator.correlate_findings()
 
 
-@app.task(name='generate_impact_assessment', queue='main_scan_queue', base=RengineTask, bind=True)
 def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None, ctx={}, description=None):
 	"""Generate an AI-powered impact assessment for vulnerabilities.
 
@@ -7566,7 +7504,6 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 		vuln.save()
 
 
-@app.task(name='sync_cisa_kev_catalog', queue='main_scan_queue', bind=False)
 def sync_cisa_kev_catalog():
 	"""
 	Syncs CISA KEV catalog and updates CVE records.
@@ -7586,7 +7523,6 @@ def sync_cisa_kev_catalog():
 		logger.error(f"Error syncing CISA KEV catalog: {e}")
 
 
-@app.task(name='sync_semgrep_rules', queue='main_scan_queue', bind=False)
 def sync_semgrep_rules():
 	"""
 	Synchronizes Semgrep rules from the public registry to the local filesystem.
@@ -7621,7 +7557,6 @@ def sync_semgrep_rules():
 			logger.error(f"Failed to sync Semgrep rule set {config}: {e}")
 
 
-@app.task(name='semgrep_scan', queue='main_scan_queue', bind=True, base=RengineTask)
 def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 	"""
 	Runs Semgrep static analysis on fetched files.
@@ -7873,7 +7808,6 @@ def save_semgrep_secret_finding(result, ctx, base_dir):
 		logger.error(f"Error saving Semgrep secret: {e}")
 
 
-@app.task(name='run_apme', queue='main_scan_queue', base=RengineTask, bind=True)
 def run_apme(self, scan_history_id, ctx={}, description=None):
 	"""Run the Attack Path Modeling Engine (APME).
 

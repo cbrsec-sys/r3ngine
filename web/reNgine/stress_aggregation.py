@@ -5,7 +5,6 @@ Converts real-time Redis stream data to persistent database records.
 import json
 import logging
 import redis
-from celery import shared_task
 from django.conf import settings
 from django.utils import timezone
 from startScan.models import ScanHistory, StressTestResult, StressTelemetryPoint, StressToolConfiguration, EndPoint
@@ -13,8 +12,7 @@ from startScan.models import ScanHistory, StressTestResult, StressTelemetryPoint
 logger = logging.getLogger(__name__)
 
 
-@shared_task(name='aggregate_stress_telemetry', queue='background_queue', bind=True)
-def aggregate_stress_telemetry(self, stress_result_id):
+def aggregate_stress_telemetry(stress_result_id):
     """
     Aggregates real-time Redis stream data into persistent database records.
     Called after stress test completion.

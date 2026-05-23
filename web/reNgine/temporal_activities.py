@@ -167,7 +167,7 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **k
     success/failure and returns the task's result.
 
     Args:
-        task_func (callable): The unwrapped task function (e.g. subdomain_discovery.run).
+        task_func (callable): The task function (e.g. subdomain_discovery).
         ctx (dict): Temporal workflow context dictionary.
         task_name (str): Short task name for DB tracking.
         description (str, optional): Human-readable description.
@@ -217,8 +217,7 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **k
     heartbeat_thread.start()
 
     try:
-        # task_func is typically celery_task_instance.run — a bound method where
-        # self is already the Celery task instance. Unwrap it so proxy is used as self.
+        # task_func is the plain function (self/proxy is passed as first positional arg).
         raw_func = task_func.__func__ if hasattr(task_func, '__func__') else task_func
         raw_func(proxy, ctx=ctx, description=description, **kwargs)
         proxy.update_scan_activity(SUCCESS_TASK)
@@ -349,7 +348,7 @@ def run_subdomain_discovery_activity(ctx: dict) -> bool:
     from reNgine.tasks import subdomain_discovery
     activity.logger.info(f"[RunSubdomainDiscoveryActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        subdomain_discovery.run,
+        subdomain_discovery,
         ctx,
         task_name='subdomain_discovery',
         description='Subdomain Discovery'
@@ -375,7 +374,7 @@ def run_amass_intel_discovery_activity(ctx: dict) -> bool:
     host = scan.domain.name if scan else ctx.get('domain_name', '')
     activity.logger.info(f"[RunAmassIntelDiscoveryActivity] host={host}")
     return _run_task(
-        amass_intel_discovery.run,
+        amass_intel_discovery,
         ctx,
         task_name='amass_intel_discovery',
         description='Infrastructure Discovery',
@@ -398,7 +397,7 @@ def run_firewall_vpn_scan_activity(ctx: dict) -> bool:
     from reNgine.tasks import firewall_vpn_scan
     activity.logger.info(f"[RunFirewallVPNScanActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        firewall_vpn_scan.run,
+        firewall_vpn_scan,
         ctx,
         task_name='firewall_vpn_scan',
         description='Firewall & VPN Scan'
@@ -450,7 +449,7 @@ def run_http_crawl_activity(ctx: dict) -> bool:
     from reNgine.tasks import http_crawl
     activity.logger.info(f"[RunHTTPCrawlActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        http_crawl.run,
+        http_crawl,
         ctx,
         task_name='http_crawl',
         description='HTTP Crawl'
@@ -497,7 +496,7 @@ def run_port_scan_activity(ctx: dict) -> bool:
     from reNgine.tasks import port_scan
     activity.logger.info(f"[RunPortScanActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        port_scan.run,
+        port_scan,
         ctx,
         task_name='port_scan',
         description='Port Scan'
@@ -519,7 +518,7 @@ def run_screenshot_activity(ctx: dict) -> bool:
     from reNgine.tasks import screenshot
     activity.logger.info(f"[RunScreenshotActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        screenshot.run,
+        screenshot,
         ctx,
         task_name='screenshot',
         description='Screenshot'
@@ -541,7 +540,7 @@ def run_fetch_url_activity(ctx: dict) -> bool:
     from reNgine.tasks import fetch_url
     activity.logger.info(f"[RunFetchURLActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        fetch_url.run,
+        fetch_url,
         ctx,
         task_name='fetch_url',
         description='Fetch URL'
@@ -587,7 +586,7 @@ def run_dir_file_fuzz_activity(ctx: dict) -> bool:
     from reNgine.fuzzing_tasks import dir_file_fuzz
     activity.logger.info(f"[RunDirFileFuzzActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        dir_file_fuzz.run,
+        dir_file_fuzz,
         ctx,
         task_name='dir_file_fuzz',
         description='Directory & File Fuzz'
@@ -639,7 +638,7 @@ def run_web_api_discovery_activity(ctx: dict) -> bool:
     from reNgine.tasks import web_api_discovery
     activity.logger.info(f"[RunWebAPIDiscoveryActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        web_api_discovery.run,
+        web_api_discovery,
         ctx,
         task_name='web_api_discovery',
         description='Web API Discovery'
@@ -661,7 +660,7 @@ def run_waf_detection_activity(ctx: dict) -> bool:
     from reNgine.tasks import waf_detection
     activity.logger.info(f"[RunWAFDetectionActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        waf_detection.run,
+        waf_detection,
         ctx,
         task_name='waf_detection',
         description='WAF Detection'
@@ -683,7 +682,7 @@ def run_secret_scanning_activity(ctx: dict) -> bool:
     from reNgine.tasks import secret_scanning
     activity.logger.info(f"[RunSecretScanningActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        secret_scanning.run,
+        secret_scanning,
         ctx,
         task_name='secret_scanning',
         description='Secrets & Leaks Scan'
@@ -751,45 +750,45 @@ def run_vulnerability_scan_activity(ctx: dict) -> bool:
 
     # --- Stage 1: Primary scanners ---
     if vuln_config.get(RUN_NUCLEI, True):
-        _run_task(nuclei_scan.run, ctx, task_name='nuclei_scan',
+        _run_task(nuclei_scan, ctx, task_name='nuclei_scan',
                   description='Nuclei Scan', urls=urls)
 
     if vuln_config.get(RUN_CRLFUZZ, False):
-        _run_task(crlfuzz_scan.run, ctx, task_name='crlfuzz_scan',
+        _run_task(crlfuzz_scan, ctx, task_name='crlfuzz_scan',
                   description='CRLFuzz Scan', urls=urls)
 
     if vuln_config.get(RUN_DALFOX, False):
-        _run_task(dalfox_xss_scan.run, ctx, task_name='dalfox_xss_scan',
+        _run_task(dalfox_xss_scan, ctx, task_name='dalfox_xss_scan',
                   description='Dalfox XSS Scan', urls=urls)
 
     if vuln_config.get(RUN_S3SCANNER, True):
-        _run_task(s3scanner.run, ctx, task_name='s3scanner',
+        _run_task(s3scanner, ctx, task_name='s3scanner',
                   description='S3 Bucket Scanner')
 
     # --- Stage 2: Additional scanners ---
     if vuln_config.get(RUN_ACUNETIX, False):
         creds = AcunetixAPIKey.objects.first()
         if creds and creds.server_url and creds.api_key:
-            _run_task(acunetix_scan.run, ctx, task_name='acunetix_scan',
+            _run_task(acunetix_scan, ctx, task_name='acunetix_scan',
                       description='Acunetix Scan',
                       domain_id=ctx.get('domain_id'),
                       scan_history_id=scan_id)
 
     cpanel_cfg = vuln_config.get('cpanel_scanner', {})
     if cpanel_cfg.get(RUN_CPANEL2SHELL, True):
-        _run_task(cpanel_scan.run, ctx, task_name='cpanel_scan',
+        _run_task(cpanel_scan, ctx, task_name='cpanel_scan',
                   description='cPanel Vulnerability Scan')
 
     if vuln_config.get(RUN_WPSCAN, True):
-        _run_task(wpscan_scan.run, ctx, task_name='wpscan_scan',
+        _run_task(wpscan_scan, ctx, task_name='wpscan_scan',
                   description='WPScan', urls=urls)
 
     react_cfg = vuln_config.get('react_scanner', {})
     if react_cfg.get(RUN_REACT2SHELL, True):
-        _run_task(react2shell_scan.run, ctx, task_name='react2shell_scan',
+        _run_task(react2shell_scan, ctx, task_name='react2shell_scan',
                   description='React Vulnerability Scan')
 
-    _run_task(semgrep_scan.run, ctx, task_name='semgrep_scan',
+    _run_task(semgrep_scan, ctx, task_name='semgrep_scan',
               description='Semgrep Vulnerability Scan', mode='vulnerability')
 
     return True
@@ -810,7 +809,7 @@ def run_waf_bypass_activity(ctx: dict) -> bool:
     from reNgine.tasks import waf_bypass
     activity.logger.info(f"[RunWAFBypassActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        waf_bypass.run,
+        waf_bypass,
         ctx,
         task_name='waf_bypass',
         description='WAF Bypass'
@@ -832,7 +831,7 @@ def run_brute_force_scan_activity(ctx: dict) -> bool:
     from reNgine.tasks import brute_force_scan
     activity.logger.info(f"[RunBruteForceScanActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(
-        brute_force_scan.run,
+        brute_force_scan,
         ctx,
         task_name='brute_force_scan',
         description='Brute Force Scan'
@@ -880,7 +879,7 @@ def correlate_vulnerabilities_activity(ctx: dict) -> bool:
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[CorrelateVulnerabilitiesActivity] scan_id={scan_id}")
     return _run_task(
-        correlate_vulnerabilities.run,
+        correlate_vulnerabilities,
         ctx,
         task_name='correlate_vulnerabilities',
         description='Correlate Vulnerabilities',
@@ -904,7 +903,7 @@ def calculate_risk_scores_activity(ctx: dict) -> bool:
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[CalculateRiskScoresActivity] scan_id={scan_id}")
     return _run_task(
-        calculate_risk_scores.run,
+        calculate_risk_scores,
         ctx,
         task_name='calculate_risk_scores',
         description='Calculate Risk Scores',
@@ -928,7 +927,7 @@ def generate_impact_assessment_activity(ctx: dict) -> bool:
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[GenerateImpactAssessmentActivity] scan_id={scan_id}")
     return _run_task(
-        generate_impact_assessment.run,
+        generate_impact_assessment,
         ctx,
         task_name='generate_impact_assessment',
         description='AI Impact Assessment',
@@ -955,7 +954,7 @@ def sync_graph_activity(ctx: dict) -> bool:
 
     # Run APME
     _run_task(
-        run_apme.run,
+        run_apme,
         ctx,
         task_name='run_apme',
         description='Attack Path Modeling',
@@ -1060,7 +1059,7 @@ def run_generic_task_activity(ctx: dict, task_name: str, description: str = None
     # Call the unwrapped run method
     run_args = extra_args or {}
     return _run_task(
-        task_func.run,
+        task_func,
         ctx,
         task_name=task_name,
         description=description or ' '.join(task_name.split('_')).capitalize(),
@@ -1535,8 +1534,7 @@ def run_startup_sync_activity(task_name: str) -> None:
     activity.logger.info(f"[RunStartupSyncActivity] Starting: {task_name}")
     if task_name == 'sync_all_scans_to_graph':
         from reNgine.tasks import sync_all_scans_to_graph
-        # bind=True task; self is unused in the function body
-        sync_all_scans_to_graph.run(None)
+        sync_all_scans_to_graph(None)
     elif task_name == 'sync_cisa_kev_catalog':
         from reNgine.tasks import sync_cisa_kev_catalog
         sync_cisa_kev_catalog()
@@ -1546,3 +1544,146 @@ def run_startup_sync_activity(task_name: str) -> None:
     else:
         raise ValueError(f"[RunStartupSyncActivity] Unknown task: {task_name}")
     activity.logger.info(f"[RunStartupSyncActivity] Completed: {task_name}")
+
+
+@activity.defn(name="RunMonitoringCheckActivity")
+def run_monitoring_check_activity(domain_id: int) -> None:
+    """Execute a monitoring check for a domain. Called by MonitoringWorkflow on schedule.
+
+    Delegates to monitor_target_task which handles subdomain discovery, change
+    detection, notifications, and conditional scan initiation.
+    """
+    activity.logger.info(f"[RunMonitoringCheckActivity] Checking domain_id={domain_id}")
+    from reNgine.monitor_tasks import monitor_target_task
+    monitor_target_task(domain_id)
+    activity.logger.info(f"[RunMonitoringCheckActivity] Completed domain_id={domain_id}")
+
+
+@activity.defn(name="SetupScheduledScanActivity")
+def setup_scheduled_scan_activity(params: dict) -> dict:
+    """Create a ScanHistory record and build a full workflow ctx for a scheduled scan.
+
+    Mirrors the setup portion of initiate_scan_temporal (DB record creation,
+    directory setup, initial subdomain/endpoint) without starting any workflow.
+    The returned ctx is passed directly to MasterScanWorkflow as a child workflow.
+
+    Args:
+        params: Dict with keys: domain_id, engine_id, scan_type, initiated_by_id,
+                imported_subdomains, out_of_scope_subdomains, starting_point_path,
+                excluded_paths, enable_spiderfoot_scan.
+
+    Returns:
+        dict: Complete Temporal workflow ctx ready for MasterScanWorkflow.
+    """
+    import os
+    import yaml
+    from django.utils import timezone
+    from reNgine.common_func import (
+        create_scan_object, save_imported_subdomains, save_subdomain, save_endpoint
+    )
+    from reNgine.definitions import (
+        RUNNING_TASK, SCHEDULED_SCAN,
+        ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL,
+        GF_PATTERNS, WEB_API_DISCOVERY, USES_TOOLS, KITERUNNER_WORDLIST,
+    )
+    from reNgine.settings import RENGINE_RESULTS
+    from scanEngine.models import EngineType
+    from startScan.models import ScanHistory
+    from targetApp.models import Domain
+
+    domain_id = params['domain_id']
+    engine_id = params['engine_id']
+    initiated_by_id = params.get('initiated_by_id')
+    imported_subdomains = params.get('imported_subdomains') or []
+    out_of_scope_subdomains = params.get('out_of_scope_subdomains') or []
+    starting_point_path = (params.get('starting_point_path') or '').rstrip('/')
+    excluded_paths = params.get('excluded_paths') or []
+    enable_spiderfoot_scan = params.get('enable_spiderfoot_scan', False)
+
+    engine = EngineType.objects.get(pk=engine_id)
+    domain = Domain.objects.get(pk=domain_id)
+    config = yaml.safe_load(engine.yaml_configuration) or {}
+
+    scan_history_id = create_scan_object(
+        host_id=domain_id,
+        engine_id=engine_id,
+        initiated_by_id=initiated_by_id,
+    )
+    scan = ScanHistory.objects.get(pk=scan_history_id)
+
+    tasks = list(engine.tasks)
+    if 'waf_bypass' in tasks and 'waf_detection' not in tasks:
+        tasks.insert(tasks.index('waf_bypass'), 'waf_detection')
+    if enable_spiderfoot_scan and 'spiderfoot_scan' not in tasks:
+        tasks.append('spiderfoot_scan')
+
+    scan.scan_status = RUNNING_TASK
+    scan.scan_type = engine
+    scan.domain = domain
+    scan.start_scan_date = timezone.now()
+    scan.tasks = tasks
+    scan.results_dir = f'{RENGINE_RESULTS}/{domain.name}_{scan.id}'
+    scan.cfg_starting_point_path = starting_point_path
+    scan.cfg_excluded_paths = excluded_paths
+    scan.cfg_out_of_scope_subdomains = out_of_scope_subdomains
+    scan.cfg_imported_subdomains = imported_subdomains
+    scan.save()
+
+    os.makedirs(scan.results_dir, exist_ok=True)
+
+    ctx_bootstrap = {
+        'scan_history_id': scan.id,
+        'engine_id': engine_id,
+        'domain_id': domain.id,
+        'results_dir': scan.results_dir,
+        'starting_point_path': starting_point_path,
+        'out_of_scope_subdomains': out_of_scope_subdomains,
+    }
+    save_imported_subdomains(imported_subdomains, ctx=ctx_bootstrap)
+
+    enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
+    subdomain, _ = save_subdomain(domain.name, ctx=ctx_bootstrap)
+    http_url = f'{domain.name}{starting_point_path}' if starting_point_path else domain.name
+    endpoint, _ = save_endpoint(
+        http_url,
+        ctx=ctx_bootstrap,
+        crawl=enable_http_crawl,
+        is_default=True,
+        subdomain=subdomain,
+    )
+    if endpoint and endpoint.is_alive:
+        subdomain.http_url = endpoint.http_url
+        subdomain.http_status = endpoint.http_status
+        subdomain.response_time = endpoint.response_time
+        subdomain.page_title = endpoint.page_title
+        subdomain.content_type = endpoint.content_type
+        subdomain.content_length = endpoint.content_length
+        for tech in endpoint.techs.all():
+            subdomain.technologies.add(tech)
+        subdomain.save()
+
+    gf_patterns = config.get(GF_PATTERNS, [])
+    api_discovery_config = config.get(WEB_API_DISCOVERY, {})
+    api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
+    kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
+
+    if gf_patterns and 'fetch_url' in tasks:
+        scan.used_gf_patterns = ','.join(gf_patterns)
+        scan.save(update_fields=['used_gf_patterns'])
+
+    activity.logger.info(
+        f"[SetupScheduledScanActivity] Created scan_id={scan.id} for domain={domain.name}"
+    )
+    return {
+        'scan_history_id': scan.id,
+        'engine_id': engine_id,
+        'domain_id': domain.id,
+        'results_dir': scan.results_dir,
+        'starting_point_path': starting_point_path,
+        'excluded_paths': excluded_paths,
+        'yaml_configuration': config,
+        'out_of_scope_subdomains': out_of_scope_subdomains,
+        'api_discovery_tools': api_discovery_tools,
+        'kr_wordlist': kr_wordlist,
+        'tasks': tasks,
+    }

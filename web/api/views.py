@@ -30,7 +30,6 @@ from django.core.cache import cache
 
 from dashboard.models import *
 from recon_note.models import *
-from reNgine.celery import app
 from reNgine.common_func import *
 from reNgine.database_utils import *
 from reNgine.definitions import (
@@ -1619,19 +1618,24 @@ class StopScan(APIView):
 		response = {'status': False}
 
 		def abort_scan(scan):
+			from reNgine.temporal_client import TemporalClientProvider
 			response = {}
 			logger.info(f'Aborting scan History')
 			try:
 				logger.info(f"Setting scan {scan} status to ABORTED_TASK")
-				task_ids = scan.celery_ids
 				scan.scan_status = ABORTED_TASK
 				scan.stop_scan_date = timezone.now()
 				scan.aborted_by = request.user
 				scan.save()
-				for task_id in task_ids:
-					app.control.revoke(task_id, terminate=True, signal='SIGKILL')
+				for te in scan.temporal_executions.filter(status="RUNNING"):
+					try:
+						TemporalClientProvider.cancel_workflow(te.workflow_id)
+						te.status = "CANCELLED"
+						te.ended_at = timezone.now()
+						te.save()
+					except Exception as cancel_err:
+						logger.warning(f"Temporal cancel failed for {te.workflow_id}: {cancel_err}")
 
-				# Also abort associated subscans
 				subscans = SubScan.objects.filter(scan_history=scan, status=RUNNING_TASK)
 				for subscan in subscans:
 					abort_subscan(subscan)
@@ -1643,7 +1647,6 @@ class StopScan(APIView):
 					.order_by('-pk')
 				)
 				for task in tasks:
-					app.control.revoke(task.celery_id, terminate=True, signal='SIGKILL')
 					task.status = ABORTED_TASK
 					task.time = timezone.now()
 					task.save()
@@ -1665,11 +1668,6 @@ class StopScan(APIView):
 			logger.info(f'Aborting subscan')
 			try:
 				logger.info(f"Setting scan {subscan} status to ABORTED_TASK")
-				task_ids = subscan.celery_ids
-
-				for task_id in task_ids:
-					app.control.revoke(task_id, terminate=True, signal='SIGKILL')
-
 				subscan.status = ABORTED_TASK
 				subscan.stop_scan_date = timezone.now()
 				subscan.save()
@@ -4352,7 +4350,6 @@ class SystemHealthAPIView(APIView):
 		import os
 		import time
 		from django.db import connection
-		from reNgine.celery import app
 
 		# 1. Database Health
 		db_start = time.time()
@@ -4364,12 +4361,18 @@ class SystemHealthAPIView(APIView):
 			db_up = False
 		db_latency = int((time.time() - db_start) * 1000)
 
-		# 2. Worker Status
+		# 2. Worker Status (Temporal orchestrator)
 		try:
-			inspect = app.control.inspect()
-			active_workers = inspect.active()
-			worker_count = len(active_workers) if active_workers else 0
-			workers_online = worker_count > 0
+			import asyncio
+			from reNgine.temporal_client import TemporalClientProvider
+			_loop = asyncio.new_event_loop()
+			asyncio.set_event_loop(_loop)
+			try:
+				_client = _loop.run_until_complete(TemporalClientProvider.get_client())
+				workers_online = _client is not None
+			finally:
+				_loop.close()
+			worker_count = 1 if workers_online else 0
 		except Exception:
 			workers_online = False
 			worker_count = 0

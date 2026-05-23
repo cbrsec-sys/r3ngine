@@ -62,6 +62,20 @@ class TemporalClientProvider:
         return cls._client
 
     @classmethod
+    def cancel_workflow(cls, workflow_id: str) -> None:
+        """Cancel a running Temporal workflow synchronously (safe for Django views)."""
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            async def _cancel():
+                client = await cls.get_client()
+                handle = client.get_workflow_handle(workflow_id)
+                await handle.cancel()
+            loop.run_until_complete(_cancel())
+        finally:
+            loop.close()
+
+    @classmethod
     def reset(cls) -> None:
         """Reset the cached client (useful in tests or after connection failure).
 

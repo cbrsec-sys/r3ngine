@@ -38,7 +38,7 @@
 </p>
 <h4>r3ngine 3.2.0: The Phoenix Rebirth</h4>
 <p>
-  r3ngine 3.2.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity - and for those a little less excentric there is a more toned-down theme as well. Also we have introduced <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
+  r3ngine 3.2.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Most significantly, v3.2.0 completes the full migration from Celery to <b>Temporal</b> — replacing the legacy at-most-once task broker with a durable workflow engine that provides crash-safe scan execution, full replay history, and pause/resume signaling. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
 </p>
 
 <h4>Attack Path Modeling Engine<h4>
@@ -48,6 +48,37 @@
 
 <img src="https://img.shields.io/badge/r3ngine--mobile-1.2.0-orange.svg?logo=none" alt="r3ngine Mobile SOC" />
 <h5><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3ngine Mobile SOC</a>: Beta Release Out Now</h5>
+
+![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
+
+> **IMPORTANT — Upgrading to v3.2.0 from an existing installation**
+>
+> v3.2.0 replaces Celery with Temporal as the scan orchestration engine. This is a **breaking infrastructure change** — the old `celery` and `celery-beat` containers are removed, new `temporal`, `temporal-python-orchestrator`, and `temporal-go-executor` containers are added, and database migrations must be applied to create the new Temporal models and remove legacy Celery Beat tables.
+>
+> **You must run the full upgrade script before starting services:**
+>
+> ```bash
+> # Linux / macOS
+> git pull
+> make fullupgrade
+>
+> # Windows
+> git pull
+> make.bat fullupgrade
+> ```
+>
+> The script will:
+> - Warn you of all changes and ask for explicit confirmation before proceeding
+> - Stop and remove all existing containers (including any running `celery` / `celery-beat` services)
+> - Rebuild all images from scratch with `--no-cache`
+> - Apply database migrations (`TemporalWorkflowExecution`, `TemporalSchedule`, removal of `django_celery_beat_*` tables)
+> - Start the full updated stack
+>
+> **Your data is safe.** All Docker volumes (`scan_results`, `postgres_data`, `nuclei_templates`, `wordlist`, etc.) are fully preserved. Only containers and images are rebuilt — no volume data is deleted or modified.
+>
+> **Do not run `make up` or `docker compose up` directly** on an existing v3.1.x install — the old Celery containers will conflict and migrations will not be applied automatically.
+>
+> Any scans running at the time of upgrade **will be interrupted**. Ensure no critical scans are in progress before upgrading.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -80,10 +111,10 @@ reNgine now features a high-performance stress testing suite, enabling users to 
 
 ### ⚡ Resource Management & Efficiency
 Optimization is a first-class citizen in v3, ensuring high-performance reconnaissance even on resource-constrained host machines.
-*   **Worker Consolidation Architecture**: Replaced the legacy multi-worker sprawl with 4 highly optimized worker groups (Core, Service, LLM, and OSINT). This reduces base memory overhead by ~80% (approx. 3.2GB RAM recovery).
-*   **Intelligent Process Recycling**: Native integration of `CELERY_WORKER_MAX_TASKS_PER_CHILD` and `CELERY_WORKER_MAX_MEMORY_PER_CHILD` to automatically recycle worker processes, preventing memory bloat from long-running scans.
+*   **Temporal Workflow Engine**: Replaced Celery with [Temporal](https://temporal.io) for all scan orchestration. Workflows survive container restarts, support pause/resume signaling, and provide a full execution history UI. A single `temporal-python-orchestrator` container replaces the old multi-worker sprawl, reducing base memory overhead significantly.
+*   **Durable Execution**: Scan activities are automatically retried on failure with configurable backoff. No more lost scans due to worker crashes or Redis broker blips.
 *   **Global Redis Caching**: Migrated from per-process local memory caching to a unified Redis-backed caching layer, ensuring shared state efficiency and reduced RAM footprint.
-*   **Deterministic Resource Limits**: All production services (Celery, Ollama, Neo4j, Web) now feature native Docker `deploy.resources` limits and reservations, preventing system-wide resource starvation.
+*   **Deterministic Resource Limits**: All production services (Temporal, Ollama, Neo4j, Web) now feature native Docker `deploy.resources` limits and reservations, preventing system-wide resource starvation.
 
 ### 🕵️ Surgical Recon & API Discovery
 The reconnaissance pipeline has been deepened to handle modern, API-centric web architectures.
@@ -183,7 +214,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **Attack Path Modeling Engine (APME)**: Sophisticated graph-based visualization of multi-stage attack vectors using Neo4j and AI-driven path discovery.
 *   **Adaptive Stress & Resilience Engine (ASRE)**: High-performance real-time stress testing dashboard integrated with `k6`, `wrk`, `hping3`, and `Locust` for endpoint saturation analysis.
 *   **Exploit Readiness Layer (ERL)**: Hardened automated vulnerability verification system with multi-scanner support and stealthy OpSec guardrails.
-*   **Autonomous Recon Orchestration**: Next-generation Celery-based task pipeline with non-blocking orchestration and non-destructive tool execution.
+*   **Autonomous Recon Orchestration**: Temporal-powered durable workflow pipeline with non-blocking orchestration, crash-safe execution, and full replay history.
 *   **Vulnerability Correlation Engine**: Multi-tool unification mapping findings from Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, and more.
 *   **Autonomous Tooling & Plugin System**: Background tool management ensures all plugin dependencies (e.g., sqlmap, XSStrike) are installed and verified automatically at runtime. **v3-Hardening**: Integrated native **proxy rotation** and **OpSec compliance** (User-Agent randomization, custom headers) directly into the ERL adapter layer, ensuring stealthy validation of all discovered vulnerabilities.
 *   **Continuous Monitoring**: Periodic discovery of new subdomains, endpoints, and data changes with automated diffing.
@@ -268,27 +299,22 @@ The r3ngine v3 frontend is built with a "Safety-First" philosophy, enforcing str
 
     * `DJANGO_SUPERUSER_PASSWORD`: web interface admin password (used to login to the web interface).
 
-1. Adjust Celery worker scaling in `.env`
+1. Configure Temporal worker concurrency in `.env` (optional)
 
     ```bash
-    MAX_CONCURRENCY=80
-    MIN_CONCURRENCY=10
+    TEMPORAL_MAX_CONCURRENT_ACTIVITIES=20
+    TEMPORAL_MAX_CONCURRENT_WORKFLOWS=10
     ```
 
-    `MAX_CONCURRENCY`: This parameter specifies the maximum number of reNgine's concurrent Celery worker processes that can be spawned. In this case, it's set to 80, meaning that the application can utilize up to 80 concurrent worker processes to execute tasks concurrently. This is useful for handling a high volume of scans or when you want to scale up processing power during periods of high demand. If you have more CPU cores, you will need to increase this for maximised performance.
+    r3ngine v3.2.0 uses [Temporal](https://temporal.io) for all scan orchestration. The `temporal-python-orchestrator` container runs a single worker that polls for workflow and activity tasks. Concurrency is controlled by the variables above; the defaults are sensible for most machines.
 
-    `MIN_CONCURRENCY`: On the other hand, MIN_CONCURRENCY specifies the minimum number of concurrent worker processes that should be maintained, even during periods of lower demand. In this example, it's set to 10, which means that even when there are fewer tasks to process, at least 10 worker processes will be kept running. This helps ensure that the application can respond promptly to incoming tasks without the overhead of repeatedly starting and stopping worker processes.
+    Recommended values by available RAM:
 
-    These settings allow for dynamic scaling of Celery workers, ensuring that the application efficiently manages its workload by adjusting the number of concurrent workers based on the workload's size and complexity.
+    * 4GB: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=10`
+    * 8GB: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=20`
+    * 16GB+: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=40`
 
-    Here is the ideal value for `MIN_CONCURRENCY` and `MAX_CONCURRENCY` depending on the number of RAM your machine has:
-
-    * 4GB: `MAX_CONCURRENCY=10`
-    * 8GB: `MAX_CONCURRENCY=30`
-    * 16GB: `MAX_CONCURRENCY=50`
-
-    This is just an ideal value which developers have tested and tried out and works! But feel free to play around with the values.
-    Maximum number of scans is determined by various factors, your network bandwidth, RAM, number of CPUs available. etc
+    The Temporal UI is available at `http://localhost:8080` for workflow inspection, history replay, and manual intervention.
 
 1. Run the installation script:
 
@@ -348,7 +374,7 @@ If the database is lost or corrupted but the `scan_results` Docker volume is int
 | Vulnerabilities | `*_nmap_vulns.json`, `#id_nuclei_*_module.txt` |
 | WAF associations | `#id_waf_detection.txt` linked to matching subdomains |
 
-**Usage** (run inside the `web` or `celery` container):
+**Usage** (run inside the `web` container):
 
 ```bash
 # Dry-run — preview what would be recovered without writing anything
@@ -367,7 +393,7 @@ python manage.py recover_scan_results --apply --results-root /alt/path/scan_resu
 **Docker Compose shortcut:**
 
 ```bash
-docker-compose exec celery python manage.py recover_scan_results --apply
+docker-compose exec web python manage.py recover_scan_results --apply
 ```
 
 The command is **idempotent** — scans already tracked in the database are skipped on every run, so it is safe to re-run after partial recoveries.
@@ -471,9 +497,9 @@ When submitting issues, provide as much valuable information as possible to help
 
 3. Example Debug Output:
     ```
-    web_1          |   File "/usr/local/lib/python3.10/dist-packages/celery/app/task.py", line 411, in __call__
-    web_1          |     return self.run(*args, **kwargs)
     web_1          | TypeError: run_command() got an unexpected keyword argument 'echo'
+    web_1          |   File "/usr/src/app/reNgine/tasks.py", line 42, in run_command
+    web_1          |     subprocess.run(cmd, **kwargs)
     ```
 
 4. Submit Your Issue:

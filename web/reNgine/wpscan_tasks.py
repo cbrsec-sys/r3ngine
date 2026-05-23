@@ -1,10 +1,8 @@
+import logging
 import os
 import json
 import time
-from celery.utils.log import get_task_logger
 
-from reNgine.celery import app
-from reNgine.celery_custom_task import RengineTask
 from reNgine.definitions import *
 from reNgine.common_func import (
     get_random_proxy,
@@ -15,7 +13,7 @@ from reNgine.common_func import (
 from dashboard.models import WpScanAPIKey
 from startScan.models import ScanHistory, Subdomain, Vulnerability
 
-logger = get_task_logger(__name__)
+logger = logging.getLogger(__name__)
 
 def parse_wpscan_results(task_instance, output_file, subdomain):
     """
@@ -98,7 +96,6 @@ def save_finding(task_instance, finding, subdomain, default_title):
         **vuln_data
     )
 
-@app.task(name='wpscan_scan', queue='main_scan_queue', base=RengineTask, bind=True)
 def wpscan_scan(self, urls=[], ctx={}, description=None):
     """
     WPScan task for WordPress vulnerability scanning.

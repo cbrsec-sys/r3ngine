@@ -771,6 +771,56 @@ class StressTestWorkflow:
         return not self._kill_requested
 
 
+@workflow.defn(name="MonitoringWorkflow")
+class MonitoringWorkflow:
+    """Periodic workflow launched by a Temporal Schedule for domain monitoring.
+
+    Runs RunMonitoringCheckActivity for a single domain on the configured
+    frequency (hourly/daily/weekly/monthly). The schedule is created/deleted
+    by manage_monitoring_task() in targetApp/views.py.
+    """
+
+    @workflow.run
+    async def run(self, domain_id: int) -> None:
+        await workflow.execute_activity(
+            "RunMonitoringCheckActivity",
+            args=[domain_id],
+            start_to_close_timeout=timedelta(hours=6),
+            # Don't retry — if a monitoring check fails, wait for next scheduled run
+            retry_policy=RetryPolicy(maximum_attempts=1),
+            task_queue="python-orchestrator-queue",
+        )
+
+
+@workflow.defn(name="ScheduledScanWorkflow")
+class ScheduledScanWorkflow:
+    """Durable workflow launched by a Temporal Schedule for periodic/clocked scans.
+
+    Step 1: SetupScheduledScanActivity creates ScanHistory + initial subdomain/endpoint
+            and returns a complete workflow ctx.
+    Step 2: MasterScanWorkflow runs the full scan pipeline as a child workflow.
+    """
+
+    @workflow.run
+    async def run(self, params: dict) -> dict:
+        ctx = await workflow.execute_activity(
+            "SetupScheduledScanActivity",
+            args=[params],
+            start_to_close_timeout=timedelta(minutes=10),
+            retry_policy=RetryPolicy(maximum_attempts=3),
+            task_queue="python-orchestrator-queue",
+        )
+        scan_id = ctx.get("scan_history_id", "unknown")
+        result = await workflow.execute_child_workflow(
+            "MasterScanWorkflow",
+            args=[ctx],
+            id=f"scheduled-master-{scan_id}",
+            task_queue="python-orchestrator-queue",
+            execution_timeout=timedelta(days=30),
+        )
+        return result
+
+
 @workflow.defn(name="StartupSyncWorkflow")
 class StartupSyncWorkflow:
     """One-shot workflow that runs a single named startup sync task as an activity.

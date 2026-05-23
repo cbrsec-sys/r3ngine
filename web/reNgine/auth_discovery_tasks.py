@@ -1,3 +1,4 @@
+import logging
 import os
 import json
 import re
@@ -5,15 +6,11 @@ import requests
 from urllib.parse import urlparse
 from django.conf import settings
 from startScan.models import EndPoint, AuthCandidate, Subdomain
-from reNgine.celery import app
-from reNgine.celery_custom_task import RengineTask
 from reNgine.utilities import save_auth_candidate
 from reNgine.common_func import get_random_proxy
-from celery.utils.log import get_task_logger
 
-logger = get_task_logger(__name__)
+logger = logging.getLogger(__name__)
 
-@app.task(name='extract_auth_candidates', queue='main_scan_queue', base=RengineTask, bind=True)
 def extract_auth_candidates(self, ctx={}, description=None):
     """
     Tier 3 Auth Discovery: Extract login forms from endpoints using httpx and regex

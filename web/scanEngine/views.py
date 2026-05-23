@@ -18,7 +18,6 @@ from rolepermissions.decorators import has_permission_decorator
 from reNgine.common_func import *
 from reNgine.tasks import (run_command, send_discord_message, send_slack_message,send_lark_message, send_telegram_message, fetch_proxies_task)
 from django.core.cache import cache
-from reNgine.celery import app
 from reNgine.llm_utils import LLMModelManager
 from dashboard.models import LLMConfig
 from scanEngine.forms import *
@@ -928,7 +927,7 @@ def add_tool(request, slug):
                 install_command = install_command + ' ' + github_clone_path + ' && pip3 install -r ' + github_clone_path + '/requirements.txt'
 
             import threading as _threading
-            _threading.Thread(target=run_command.run, args=(install_command,), daemon=True).start()
+            _threading.Thread(target=run_command, args=(install_command,), daemon=True).start()
             saved_form = form.save()
             if github_clone_path:
                 tool = InstalledExternalTool.objects.get(id=saved_form.pk)
@@ -987,7 +986,7 @@ def update_github_tool(request, slug, id):
         if tool.update_command:
              update_command = tool.update_command
         import threading as _threading
-        _threading.Thread(target=run_command.run, args=(update_command,), daemon=True).start()
+        _threading.Thread(target=run_command, args=(update_command,), daemon=True).start()
         messages.add_message(request, messages.INFO, f'Update started for {tool.name}')
     return http.HttpResponseRedirect(reverse('tool_arsenal', kwargs={'slug': slug}))
 

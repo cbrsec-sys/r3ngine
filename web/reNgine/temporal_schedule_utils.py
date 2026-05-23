@@ -211,3 +211,171 @@ def _create_clocked_temporal_schedule(
     )
     logger.info(f"[ScheduleUtils] Created clocked schedule '{schedule_id}' at {clocked_dt}")
     return record
+
+
+def _delete_temporal_schedule_by_id(schedule_id: str) -> None:
+    """Delete a Temporal Schedule by ID. Silently ignores not-found errors."""
+    async def _delete():
+        client = await TemporalClientProvider.get_client()
+        try:
+            handle = client.get_schedule_handle(schedule_id)
+            await handle.delete()
+        except Exception:
+            pass
+
+    TemporalClientProvider.reset()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_delete())
+    finally:
+        loop.close()
+    logger.info(f"[ScheduleUtils] Deleted schedule '{schedule_id}'")
+
+
+def _pause_temporal_schedule(schedule_id: str) -> None:
+    """Pause a Temporal Schedule (stops future firings without deleting it)."""
+    async def _pause():
+        client = await TemporalClientProvider.get_client()
+        handle = client.get_schedule_handle(schedule_id)
+        await handle.pause(note="Paused via r3ngine UI")
+
+    TemporalClientProvider.reset()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_pause())
+    finally:
+        loop.close()
+    logger.info(f"[ScheduleUtils] Paused schedule '{schedule_id}'")
+
+
+def _unpause_temporal_schedule(schedule_id: str) -> None:
+    """Unpause a Temporal Schedule (resumes future firings)."""
+    async def _unpause():
+        client = await TemporalClientProvider.get_client()
+        handle = client.get_schedule_handle(schedule_id)
+        await handle.unpause(note="Unpaused via r3ngine UI")
+
+    TemporalClientProvider.reset()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_unpause())
+    finally:
+        loop.close()
+    logger.info(f"[ScheduleUtils] Unpaused schedule '{schedule_id}'")
+
+
+_MONITORING_FREQUENCY_SECONDS = {
+    'hourly': 3600,
+    'daily': 86400,
+    'weekly': 7 * 86400,
+    'monthly': 30 * 86400,
+}
+
+
+def _upsert_monitoring_temporal_schedule(domain) -> object:
+    """Create or replace the Temporal Schedule for domain monitoring.
+
+    Uses a deterministic schedule_id keyed on domain.id so the same domain
+    always has a single well-known schedule. On update (e.g. frequency change),
+    the old schedule is deleted and a fresh one is created.
+
+    Args:
+        domain: Domain model instance (is_monitored=True, monitor_frequency set).
+
+    Returns:
+        TemporalSchedule: The DB record (created or updated).
+    """
+    from startScan.models import TemporalSchedule
+
+    interval_seconds = _MONITORING_FREQUENCY_SECONDS.get(
+        domain.monitor_frequency, 86400
+    )
+    schedule_id = f"monitoring-{domain.id}"
+    workflow_args = domain.id  # MonitoringWorkflow.run(domain_id: int)
+
+    async def _recreate():
+        client = await TemporalClientProvider.get_client()
+        # Delete stale schedule if present (frequency may have changed)
+        try:
+            handle = client.get_schedule_handle(schedule_id)
+            await handle.delete()
+        except Exception:
+            pass
+        await client.create_schedule(
+            schedule_id,
+            Schedule(
+                action=ScheduleActionStartWorkflow(
+                    "MonitoringWorkflow",
+                    args=[workflow_args],
+                    id=f"{schedule_id}-run",
+                    task_queue="python-orchestrator-queue",
+                    id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
+                ),
+                spec=ScheduleSpec(
+                    intervals=[ScheduleIntervalSpec(
+                        every=datetime.timedelta(seconds=interval_seconds)
+                    )],
+                ),
+                policy=SchedulePolicy(overlap=ScheduleOverlapPolicy.SKIP),
+                state=ScheduleState(note=f"Monitoring: {domain.name}"),
+            ),
+        )
+
+    TemporalClientProvider.reset()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_recreate())
+    finally:
+        loop.close()
+
+    # Update existing DB record or create new one
+    record, _ = TemporalSchedule.objects.update_or_create(
+        schedule_id=schedule_id,
+        defaults=dict(
+            name=f"Monitoring: {domain.name}",
+            workflow_type='MonitoringWorkflow',
+            workflow_args={'domain_id': domain.id},
+            interval_seconds=interval_seconds,
+            is_active=True,
+            domain=domain,
+        ),
+    )
+    logger.info(
+        f"[ScheduleUtils] Upserted monitoring schedule '{schedule_id}' "
+        f"every {interval_seconds}s for domain={domain.name}"
+    )
+    return record
+
+
+def _delete_monitoring_temporal_schedule(domain) -> None:
+    """Delete the Temporal Schedule for domain monitoring and clean up the DB record.
+
+    Args:
+        domain: Domain model instance whose monitoring is being disabled.
+    """
+    from startScan.models import TemporalSchedule
+
+    schedule_id = f"monitoring-{domain.id}"
+
+    async def _delete():
+        client = await TemporalClientProvider.get_client()
+        try:
+            handle = client.get_schedule_handle(schedule_id)
+            await handle.delete()
+        except Exception:
+            pass  # Already deleted or never existed
+
+    TemporalClientProvider.reset()
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        loop.run_until_complete(_delete())
+    finally:
+        loop.close()
+
+    TemporalSchedule.objects.filter(schedule_id=schedule_id).delete()
+    logger.info(f"[ScheduleUtils] Deleted monitoring schedule '{schedule_id}' for domain={domain.name}")

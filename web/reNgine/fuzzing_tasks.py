@@ -1,3 +1,4 @@
+import logging
 import os
 import base64
 import json
@@ -5,10 +6,7 @@ from urllib.parse import urlparse
 from django.utils import timezone
 from redis import Redis
 from django.conf import settings
-from celery.utils.log import get_task_logger
 
-from reNgine.celery import app
-from reNgine.celery_custom_task import RengineTask
 from reNgine.definitions import (
 	DIR_FILE_FUZZ,
 	ENABLE_HTTP_CRAWL,
@@ -49,10 +47,9 @@ from reNgine.task_utils import (
 )
 from startScan.models import DirectoryScan, DirectoryFile, Subdomain
 
-logger = get_task_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
-@app.task(name='dir_file_fuzz', queue='main_scan_queue', base=RengineTask, bind=True)
 def dir_file_fuzz(self, ctx=None, description=None):
 	"""Perform directory and file fuzzing using FFUF and Dirsearch.
 

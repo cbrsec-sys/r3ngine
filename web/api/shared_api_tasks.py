@@ -4,10 +4,8 @@ import requests
 
 from reNgine.common_func import create_inappnotification, get_hackerone_key_username
 from reNgine.definitions import PROJECT_LEVEL_NOTIFICATION, HACKERONE_ALLOWED_ASSET_TYPES
-from reNgine.celery import app
 from reNgine.database_utils import bulk_import_targets
 
-@app.task(name='import_hackerone_programs_task', bind=False, queue='api_queue')
 def import_hackerone_programs_task(handles, project_slug, is_sync = False):
 	"""
 	Runs in the background to import programs from HackerOne
@@ -129,7 +127,6 @@ def import_hackerone_programs_task(handles, project_slug, is_sync = False):
 	)
 
 
-@app.task(name='sync_bookmarked_programs_task', bind=False, queue='api_queue')
 def sync_bookmarked_programs_task(project_slug):
 	"""
 		Runs in the background to sync bookmarked programs from HackerOne

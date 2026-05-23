@@ -39,80 +39,6 @@ services:
         reservations:
           memory: 512M
 
-  celery:
-    image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
-    restart: always
-    entrypoint: /usr/src/app/celery-entrypoint.sh
-    command: celery -A reNgine worker -Q main_scan_queue,background_queue,report_queue,celery --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l INFO
-    volumes:
-      - ./web:/usr/src/app
-      #- ./frontend:/usr/src/app/frontend
-      - github_repos:/usr/src/github
-      - wordlist:/usr/src/wordlist
-      - scan_results:/usr/src/scan_results
-      - gf_patterns:/root/.gf
-      - nuclei_templates:/root/nuclei-templates
-      - tool_config:/root/.config
-      - static_volume:/usr/src/app/staticfiles/
-      #- plugins_data:/usr/src/app/plugins_data
-    environment:
-      - DEBUG=0
-      - CELERY_BROKER=redis://redis:6379/0
-      - CELERY_BACKEND=redis://redis:6379/0
-      - DOMAIN_NAME=${DOMAIN_NAME}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - MAX_CONCURRENCY=${MAX_CONCURRENCY}
-      - MIN_CONCURRENCY=${MIN_CONCURRENCY}
-    depends_on:
-      - db
-      - redis
-    networks:
-      - r3ngine_network
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-        reservations:
-          memory: 4G
-
-  celery-beat:
-    image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
-    entrypoint: /usr/src/app/beat-entrypoint.sh
-    command: celery -A reNgine beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
-    environment:
-      - DEBUG=0
-      - CELERY_BROKER=redis://redis:6379/0
-      - CELERY_BACKEND=redis://redis:6379/0
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_HOST=${POSTGRES_HOST}
-    depends_on:
-      - celery
-      - db
-    volumes:
-      - ./web:/usr/src/app
-      - github_repos:/usr/src/github
-      - wordlist:/usr/src/wordlist
-      - scan_results:/usr/src/scan_results
-      - gf_patterns:/root/.gf
-      - nuclei_templates:/root/nuclei-templates
-      - tool_config:/root/.config
-      #- plugins_data:/usr/src/app/plugins_data
-    networks:
-      - r3ngine_network
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
-
   web:
     build:
       context: .
@@ -122,8 +48,7 @@ services:
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     environment:
       - DEBUG=0
-      - CELERY_BROKER=redis://redis:6379/0
-      - CELERY_BACKEND=redis://redis:6379/0
+      - REDIS_URL=redis://redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -148,8 +73,7 @@ services:
       - "5173:5173"
     depends_on:
       - db
-      - celery
-      - celery-beat
+      - redis
     networks:
       r3ngine_network:
         aliases:
@@ -268,7 +192,7 @@ services:
   temporal-python-orchestrator:
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     restart: always
-    entrypoint: python3 /usr/src/app/manage.py run_temporal_orchestrator
+    entrypoint: /usr/src/app/temporal-entrypoint.sh
     environment:
       - DEBUG=0
       - TEMPORAL_HOST=temporal:7233

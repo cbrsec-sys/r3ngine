@@ -183,12 +183,6 @@ class Domain(models.Model):
 		default='targeted'
 	)
 	last_monitored = models.DateTimeField(null=True, blank=True)
-	monitor_periodic_task = models.ForeignKey(
-		'django_celery_beat.PeriodicTask',
-		on_delete=models.SET_NULL,
-		null=True,
-		blank=True
-	)
 	temporal_schedule = models.ForeignKey(
 		'startScan.TemporalSchedule',
 		on_delete=models.SET_NULL,
