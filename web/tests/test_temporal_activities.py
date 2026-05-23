@@ -103,3 +103,20 @@ class TestSubScanDispatchRegistry(TestCase):
             self.assertIn("activity", entry, f"{scan_type}: missing 'activity' key")
             self.assertIn("timeout", entry, f"{scan_type}: missing 'timeout' key")
             self.assertIn("args_builder", entry, f"{scan_type}: missing 'args_builder' key")
+
+
+class TestCheckpointStubRemoval(TestCase):
+    def test_load_checkpoint_activity_removed(self):
+        """LoadCheckpointActivity stub must be removed — Temporal handles resumption."""
+        from reNgine import temporal_activities
+        self.assertFalse(
+            hasattr(temporal_activities, "load_checkpoint_activity"),
+            "load_checkpoint_activity must be removed; use Temporal event history for crash recovery",
+        )
+
+    def test_save_checkpoint_activity_removed(self):
+        from reNgine import temporal_activities
+        self.assertFalse(
+            hasattr(temporal_activities, "save_checkpoint_activity"),
+            "save_checkpoint_activity must be removed; use Temporal event history for crash recovery",
+        )

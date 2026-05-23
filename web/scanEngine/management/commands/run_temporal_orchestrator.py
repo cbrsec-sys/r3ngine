@@ -33,7 +33,6 @@ from temporalio.client import (
     ScheduleSpec,
     ScheduleState,
 )
-from temporalio.common import WorkflowIDReusePolicy
 from temporalio.worker import Worker, UnsandboxedWorkflowRunner
 
 logger = logging.getLogger(__name__)
@@ -67,10 +66,8 @@ from reNgine.temporal_workflows import (
 from reNgine.temporal_activities import (
     run_generic_task_activity,
     finalize_subscan_activity,
-    # Step 0: Target Profiling & Checkpoint Management
+    # Step 0: Target Profiling
     target_profiling_activity,
-    load_checkpoint_activity,
-    save_checkpoint_activity,
 
     # Tier 1: Discovery
     run_subdomain_discovery_activity,
@@ -97,7 +94,15 @@ from reNgine.temporal_activities import (
     parse_analysis_results_activity,
 
     # Tier 6: Assessment
-    run_vulnerability_scan_activity,
+    run_nuclei_activity,
+    run_crlfuzz_activity,
+    run_dalfox_activity,
+    run_s3scanner_activity,
+    run_acunetix_activity,
+    run_cpanel_scan_activity,
+    run_react2shell_activity,
+    run_wpscan_activity,
+    run_semgrep_activity,
     run_waf_bypass_activity,
     run_brute_force_scan_activity,
     parse_assessment_results_activity,
@@ -135,7 +140,7 @@ async def _register_startup_schedule(client: Client, task_name: str, today: str)
 
     The schedule is deleted first so each orchestrator restart gets a fresh one-shot
     trigger. The workflow ID embeds today's date so successful runs are not repeated
-    within the same calendar day (WorkflowIDReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY).
+    within the same calendar day (workflow ID embeds today's date).
     """
     schedule_id = f"startup-sync-{task_name.replace('_', '-')}"
     workflow_id = f"{schedule_id}-{today}"
@@ -155,7 +160,6 @@ async def _register_startup_schedule(client: Client, task_name: str, today: str)
                 args=[task_name],
                 id=workflow_id,
                 task_queue="python-orchestrator-queue",
-                id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE_FAILED_ONLY,
             ),
             spec=ScheduleSpec(
                 intervals=[ScheduleIntervalSpec(every=datetime.timedelta(seconds=30))],
@@ -246,8 +250,6 @@ class Command(BaseCommand):
 
                 # Step 0
                 target_profiling_activity,
-                load_checkpoint_activity,
-                save_checkpoint_activity,
 
                 # Tier 1
                 run_subdomain_discovery_activity,
@@ -274,7 +276,15 @@ class Command(BaseCommand):
                 parse_analysis_results_activity,
 
                 # Tier 6
-                run_vulnerability_scan_activity,
+                run_nuclei_activity,
+                run_crlfuzz_activity,
+                run_dalfox_activity,
+                run_s3scanner_activity,
+                run_acunetix_activity,
+                run_cpanel_scan_activity,
+                run_react2shell_activity,
+                run_wpscan_activity,
+                run_semgrep_activity,
                 run_waf_bypass_activity,
                 run_brute_force_scan_activity,
                 parse_assessment_results_activity,
