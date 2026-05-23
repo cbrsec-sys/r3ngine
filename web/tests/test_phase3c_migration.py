@@ -175,16 +175,18 @@ class TestPhase3C4OsintFanouts(TestCase):
 class TestPhase3C5TasksOsintOrchestrator(TestCase):
     """3C-5: osint_orchestrator.delay() in tasks.py must be replaced with threading.Thread."""
 
-    def _get_function_body(self, source, func_name):
-        start = source.find(f'def {func_name}(')
-        if start == -1:
-            return ''
-        next_task = source.find('\n@app.task', start + 1)
-        return source[start:next_task if next_task != -1 else len(source)]
+    def _get_function_body(self, source_module_name, func_name):
+        """Return the source code of a top-level function from the named module."""
+        import inspect
+        import importlib
+        module = importlib.import_module(source_module_name)
+        func = getattr(module, func_name, None)
+        if func is None:
+            return ""
+        return inspect.getsource(func)
 
     def test_finish_osint_no_osint_orchestrator_delay(self):
-        source = _read('reNgine/tasks.py')
-        body = self._get_function_body(source, 'finish_osint')
+        body = self._get_function_body('reNgine.tasks', 'finish_osint')
         self.assertNotIn('osint_orchestrator.delay(', body,
                          "finish_osint must not call osint_orchestrator.delay")
 
@@ -205,8 +207,7 @@ class TestPhase3C5TasksOsintOrchestrator(TestCase):
         )
 
     def test_osint_task_no_osint_orchestrator_delay(self):
-        source = _read('reNgine/tasks.py')
-        body = self._get_function_body(source, 'osint')
+        body = self._get_function_body('reNgine.tasks', 'osint')
         self.assertNotIn('osint_orchestrator.delay(', body,
                          "osint task must not call osint_orchestrator.delay")
 
