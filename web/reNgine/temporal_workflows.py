@@ -81,7 +81,7 @@ class MasterScanWorkflow:
         self._paused = False
 
     @workflow.run
-    async def run(self, ctx: ScanContext) -> Dict[str, Any]:
+    async def run(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the full scan pipeline.
 
         Args:
@@ -514,7 +514,7 @@ class NucleiPlannerWorkflow:
     """
 
     @workflow.run
-    async def run(self, ctx: ScanContext) -> Dict[str, Any]:
+    async def run(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
         """Execute the full vulnerability scan pipeline.
 
         Args:
@@ -631,7 +631,7 @@ class SubScanWorkflow:
     """
 
     @workflow.run
-    async def run(self, ctx: ScanContext, scan_type: str) -> Dict[str, Any]:
+    async def run(self, ctx: Dict[str, Any], scan_type: str) -> Dict[str, Any]:
         """Execute the subscan workflow.
 
         Args:
@@ -775,7 +775,7 @@ class StressTestWorkflow:
         self._kill_event = asyncio.Event()
 
     @workflow.run
-    async def run(self, ctx: ScanContext) -> Dict[str, Any]:
+    async def run(self, ctx: Dict[str, Any]) -> Dict[str, Any]:
         scan_id = ctx.get("scan_history_id")
         workflow.logger.info(f"[StressTestWorkflow] Starting for scan_id={scan_id}")
 
