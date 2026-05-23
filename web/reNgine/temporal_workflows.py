@@ -624,6 +624,50 @@ _SUBSCAN_DISPATCH = {
         "timeout": timedelta(minutes=30),
         "args_builder": lambda ctx: [ctx, "waf_detection", "WAF Detection", {}],
     },
+    "http_crawl": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [
+            ctx, "http_crawl", "HTTP Crawl",
+            {"urls": [ctx.get("subdomain_http_url") or f"http://{ctx.get('subdomain_name', '')}/"]},
+        ],
+    },
+    "web_api_discovery": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [
+            ctx, "web_api_discovery", "Web API Discovery",
+            {"urls": [ctx.get("subdomain_http_url") or f"http://{ctx.get('subdomain_name', '')}/"]},
+        ],
+    },
+    "waf_bypass": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=1),
+        "args_builder": lambda ctx: [ctx, "waf_bypass", "WAF Bypass", {}],
+    },
+    "brute_force_scan": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [
+            ctx, "brute_force_scan", "Brute Force Scan",
+            {"targets": [ctx.get("subdomain_name", "")]},
+        ],
+    },
+    "firewall_vpn_scan": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=1),
+        "args_builder": lambda ctx: [ctx, "firewall_vpn_scan", "Firewall/VPN Scan", {}],
+    },
+    "spiderfoot_scan": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=4),
+        "args_builder": lambda ctx: [ctx, "spiderfoot_scan", "SpiderFoot Scan", {}],
+    },
+    "secret_scanning": {
+        "activity": "RunGenericTaskActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [ctx, "secret_scanning", "Secret Scanning", {}],
+    },
     # Special cases — handled with inline logic in SubScanWorkflow.run():
     "vulnerability_scan": None,  # Has Tier 7 post-steps (correlation, risk, APME)
     "baddns": None,              # Modifies ctx before dispatch
@@ -712,9 +756,15 @@ class SubScanWorkflow:
                 )
 
             else:
-                raise ValueError(
-                    f"Unknown subscan type: {scan_type!r}. "
-                    "Add it to _SUBSCAN_DISPATCH in temporal_workflows.py."
+                # Generic fallback: any _PERMITTED_GENERIC_TASKS entry not in the
+                # explicit dispatch table runs with ctx only. The task function
+                # derives its target from yaml_configuration / ctx internals.
+                await workflow.execute_activity(
+                    "RunGenericTaskActivity",
+                    args=[ctx, scan_type, scan_type.replace("_", " ").title()],
+                    start_to_close_timeout=timedelta(hours=2),
+                    retry_policy=_RETRY_NETWORK_SCAN,
+                    task_queue="python-orchestrator-queue",
                 )
 
             success = True
