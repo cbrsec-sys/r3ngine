@@ -47,7 +47,7 @@ class TemporalTaskProxy:
         description (str, optional): Human-readable description for the UI.
     """
 
-    def __init__(self, ctx: ScanContext, task_name: str, description: str = None):
+    def __init__(self, ctx: dict, task_name: str, description: str = None):
         from startScan.models import ScanHistory, SubScan, ScanActivity
         from scanEngine.models import EngineType
         from targetApp.models import Domain
@@ -159,7 +159,7 @@ class TemporalTaskProxy:
 # Helper: run a RengineTask function via TemporalTaskProxy
 # ---------------------------------------------------------------------------
 
-def _run_task(task_func, ctx: ScanContext, task_name: str, description: str = None, **kwargs):
+def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **kwargs):
     """Execute an existing RengineTask-decorated function inside a Temporal activity.
 
     Spawns a heartbeat thread that sends signals to Temporal every 30 seconds
@@ -259,7 +259,7 @@ def _run_task(task_func, ctx: ScanContext, task_name: str, description: str = No
 # ===========================================================================
 
 @activity.defn(name="TargetProfilingActivity")
-def target_profiling_activity(ctx: ScanContext) -> ScanContext:
+def target_profiling_activity(ctx: dict) -> dict:
     """Validate the scan target and populate baseline scan context.
 
     Reads the ScanHistory record, resolves the domain, loads and caches the
@@ -320,7 +320,7 @@ def target_profiling_activity(ctx: ScanContext) -> ScanContext:
 # ===========================================================================
 
 @activity.defn(name="RunSubdomainDiscoveryActivity")
-def run_subdomain_discovery_activity(ctx: ScanContext) -> bool:
+def run_subdomain_discovery_activity(ctx: dict) -> bool:
     """Execute subdomain discovery tools (subfinder, amass, etc.) against the target.
 
     Delegates to the existing `subdomain_discovery` Celery task function which
@@ -344,7 +344,7 @@ def run_subdomain_discovery_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="RunAmassIntelDiscoveryActivity")
-def run_amass_intel_discovery_activity(ctx: ScanContext) -> bool:
+def run_amass_intel_discovery_activity(ctx: dict) -> bool:
     """Run Amass Intel infrastructure discovery against the target domain.
 
     Delegates to the existing `amass_intel_discovery` task to find related
@@ -371,7 +371,7 @@ def run_amass_intel_discovery_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="RunFirewallVPNScanActivity")
-def run_firewall_vpn_scan_activity(ctx: ScanContext) -> bool:
+def run_firewall_vpn_scan_activity(ctx: dict) -> bool:
     """Detect firewall and VPN infrastructure protecting the target.
 
     Delegates to the existing `firewall_vpn_scan` task.
@@ -393,7 +393,7 @@ def run_firewall_vpn_scan_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="ParseDiscoveryResultsActivity")
-def parse_discovery_results_activity(ctx: ScanContext) -> bool:
+def parse_discovery_results_activity(ctx: dict) -> bool:
     """Parse and persist discovery tier results to the database.
 
     After all Tier 1 tools finish, this activity consolidates output files,
@@ -422,7 +422,7 @@ def parse_discovery_results_activity(ctx: ScanContext) -> bool:
 # ===========================================================================
 
 @activity.defn(name="RunHTTPCrawlActivity")
-def run_http_crawl_activity(ctx: ScanContext) -> bool:
+def run_http_crawl_activity(ctx: dict) -> bool:
     """Run httpx HTTP crawl across all discovered subdomains.
 
     Delegates to the existing `http_crawl` task which probes all discovered
@@ -445,7 +445,7 @@ def run_http_crawl_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="ParseHTTPCrawlResultsActivity")
-def parse_http_crawl_results_activity(ctx: ScanContext) -> bool:
+def parse_http_crawl_results_activity(ctx: dict) -> bool:
     """Verify HTTP crawl results are persisted correctly after http_crawl runs.
 
     Args:
@@ -470,7 +470,7 @@ def parse_http_crawl_results_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="RunPortScanActivity")
-def run_port_scan_activity(ctx: ScanContext) -> bool:
+def run_port_scan_activity(ctx: dict) -> bool:
     """Run port scanning (naabu, nmap) across all discovered subdomains.
 
     Delegates to the existing `port_scan` task.
@@ -492,7 +492,7 @@ def run_port_scan_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="RunScreenshotActivity")
-def run_screenshot_activity(ctx: ScanContext) -> bool:
+def run_screenshot_activity(ctx: dict) -> bool:
     """Capture screenshots of all live HTTP endpoints.
 
     Delegates to the existing `screenshot` task.
@@ -514,7 +514,7 @@ def run_screenshot_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="RunFetchURLActivity")
-def run_fetch_url_activity(ctx: ScanContext) -> bool:
+def run_fetch_url_activity(ctx: dict) -> bool:
     """Fetch and collect all URLs across the target using gau, waybackurls, etc.
 
     Delegates to the existing `fetch_url` task.
@@ -536,7 +536,7 @@ def run_fetch_url_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="ParseEnumerationResultsActivity")
-def parse_enumeration_results_activity(ctx: ScanContext) -> bool:
+def parse_enumeration_results_activity(ctx: dict) -> bool:
     """Verify enumeration tier (ports, screenshots, URLs) results are persisted.
 
     Args:
@@ -560,7 +560,7 @@ def parse_enumeration_results_activity(ctx: ScanContext) -> bool:
 # ===========================================================================
 
 @activity.defn(name="RunDirFileFuzzActivity")
-def run_dir_file_fuzz_activity(ctx: ScanContext) -> bool:
+def run_dir_file_fuzz_activity(ctx: dict) -> bool:
     """Run directory and file fuzzing (dirsearch, ffuf) across all endpoints.
 
     Delegates to the existing `dir_file_fuzz` task.
@@ -582,7 +582,7 @@ def run_dir_file_fuzz_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="ParseFuzzResultsActivity")
-def parse_fuzz_results_activity(ctx: ScanContext) -> bool:
+def parse_fuzz_results_activity(ctx: dict) -> bool:
     """Verify fuzzing results are persisted to the database.
 
     Args:
@@ -609,7 +609,7 @@ def parse_fuzz_results_activity(ctx: ScanContext) -> bool:
 # ===========================================================================
 
 @activity.defn(name="RunWebAPIDiscoveryActivity")
-def run_web_api_discovery_activity(ctx: ScanContext) -> bool:
+def run_web_api_discovery_activity(ctx: dict) -> bool:
     """Discover web API endpoints and routes using kiterunner.
 
     Delegates to the existing `web_api_discovery` task.
@@ -631,7 +631,7 @@ def run_web_api_discovery_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="RunWAFDetectionActivity")
-def run_waf_detection_activity(ctx: ScanContext) -> bool:
+def run_waf_detection_activity(ctx: dict) -> bool:
     """Detect Web Application Firewalls protecting the target.
 
     Delegates to the existing `waf_detection` task.
@@ -653,7 +653,7 @@ def run_waf_detection_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="RunSecretScanningActivity")
-def run_secret_scanning_activity(ctx: ScanContext) -> bool:
+def run_secret_scanning_activity(ctx: dict) -> bool:
     """Scan for exposed secrets, credentials, and API keys using Semgrep/trufflehog.
 
     Delegates to the existing `secret_scanning` task.
@@ -675,7 +675,7 @@ def run_secret_scanning_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="ParseAnalysisResultsActivity")
-def parse_analysis_results_activity(ctx: ScanContext) -> bool:
+def parse_analysis_results_activity(ctx: dict) -> bool:
     """Verify analysis tier results (WAF, API routes, secrets) are persisted.
 
     Args:
@@ -695,62 +695,62 @@ def parse_analysis_results_activity(ctx: ScanContext) -> bool:
 # ===========================================================================
 
 @activity.defn(name="RunNucleiActivity")
-def run_nuclei_activity(ctx: ScanContext) -> bool:
+def run_nuclei_activity(ctx: dict) -> bool:
     from reNgine.tasks import nuclei_scan
     activity.logger.info(f"[RunNucleiActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(nuclei_scan, ctx, task_name='nuclei_scan', description='Nuclei Scan', urls=ctx.get('urls', []))
 
 @activity.defn(name="RunCRLFuzzActivity")
-def run_crlfuzz_activity(ctx: ScanContext) -> bool:
+def run_crlfuzz_activity(ctx: dict) -> bool:
     from reNgine.tasks import crlfuzz_scan
     activity.logger.info(f"[RunCRLFuzzActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(crlfuzz_scan, ctx, task_name='crlfuzz_scan', description='CRLFuzz Scan', urls=ctx.get('urls', []))
 
 @activity.defn(name="RunDalfoxActivity")
-def run_dalfox_activity(ctx: ScanContext) -> bool:
+def run_dalfox_activity(ctx: dict) -> bool:
     from reNgine.tasks import dalfox_xss_scan
     activity.logger.info(f"[RunDalfoxActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(dalfox_xss_scan, ctx, task_name='dalfox_xss_scan', description='Dalfox XSS Scan', urls=ctx.get('urls', []))
 
 @activity.defn(name="RunS3ScannerActivity")
-def run_s3scanner_activity(ctx: ScanContext) -> bool:
+def run_s3scanner_activity(ctx: dict) -> bool:
     from reNgine.tasks import s3scanner
     activity.logger.info(f"[RunS3ScannerActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(s3scanner, ctx, task_name='s3scanner', description='S3 Bucket Scanner')
 
 @activity.defn(name="RunAcunetixActivity")
-def run_acunetix_activity(ctx: ScanContext) -> bool:
+def run_acunetix_activity(ctx: dict) -> bool:
     from reNgine.tasks import acunetix_scan
     activity.logger.info(f"[RunAcunetixActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(acunetix_scan, ctx, task_name='acunetix_scan', description='Acunetix Scan', domain_id=ctx.get('domain_id'), scan_history_id=ctx.get('scan_history_id'))
 
 @activity.defn(name="RunCpanelScanActivity")
-def run_cpanel_scan_activity(ctx: ScanContext) -> bool:
+def run_cpanel_scan_activity(ctx: dict) -> bool:
     from reNgine.vulnerability_tasks import cpanel_scan
     activity.logger.info(f"[RunCpanelScanActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(cpanel_scan, ctx, task_name='cpanel_scan', description='cPanel Vulnerability Scan')
 
 @activity.defn(name="RunWpscanActivity")
-def run_wpscan_activity(ctx: ScanContext) -> bool:
+def run_wpscan_activity(ctx: dict) -> bool:
     from reNgine.wpscan_tasks import wpscan_scan
     activity.logger.info(f"[RunWpscanActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(wpscan_scan, ctx, task_name='wpscan_scan', description='WPScan', urls=ctx.get('urls', []))
 
 @activity.defn(name="RunReact2ShellActivity")
-def run_react2shell_activity(ctx: ScanContext) -> bool:
+def run_react2shell_activity(ctx: dict) -> bool:
     from reNgine.vulnerability_tasks import react2shell_scan
     activity.logger.info(f"[RunReact2ShellActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(react2shell_scan, ctx, task_name='react2shell_scan', description='React Vulnerability Scan')
 
 @activity.defn(name="RunSemgrepActivity")
-def run_semgrep_activity(ctx: ScanContext) -> bool:
+def run_semgrep_activity(ctx: dict) -> bool:
     from reNgine.tasks import semgrep_scan
     activity.logger.info(f"[RunSemgrepActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(semgrep_scan, ctx, task_name='semgrep_scan', description='Semgrep Vulnerability Scan', mode='vulnerability')
 
 
 @activity.defn(name="RunWAFBypassActivity")
-def run_waf_bypass_activity(ctx: ScanContext) -> bool:
+def run_waf_bypass_activity(ctx: dict) -> bool:
     """Attempt to bypass detected WAF protections to find unprotected origins.
 
     Delegates to the existing `waf_bypass` task.
@@ -772,7 +772,7 @@ def run_waf_bypass_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="RunBruteForceScanActivity")
-def run_brute_force_scan_activity(ctx: ScanContext) -> bool:
+def run_brute_force_scan_activity(ctx: dict) -> bool:
     """Run brute force attacks against discovered login endpoints.
 
     Delegates to the existing `brute_force_scan` task.
@@ -794,7 +794,7 @@ def run_brute_force_scan_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="ParseAssessmentResultsActivity")
-def parse_assessment_results_activity(ctx: ScanContext) -> bool:
+def parse_assessment_results_activity(ctx: dict) -> bool:
     """Verify assessment tier (vulnerability) results are persisted.
 
     Args:
@@ -818,7 +818,7 @@ def parse_assessment_results_activity(ctx: ScanContext) -> bool:
 # ===========================================================================
 
 @activity.defn(name="CorrelateVulnerabilitiesActivity")
-def correlate_vulnerabilities_activity(ctx: ScanContext) -> bool:
+def correlate_vulnerabilities_activity(ctx: dict) -> bool:
     """Correlate discovered vulnerabilities with CVE databases and Neo4j graph.
 
     Delegates to the existing `correlate_vulnerabilities` task which syncs
@@ -843,7 +843,7 @@ def correlate_vulnerabilities_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="CalculateRiskScoresActivity")
-def calculate_risk_scores_activity(ctx: ScanContext) -> bool:
+def calculate_risk_scores_activity(ctx: dict) -> bool:
     """Calculate weighted risk scores for all discovered vulnerabilities.
 
     Delegates to the existing `calculate_risk_scores` task.
@@ -867,7 +867,7 @@ def calculate_risk_scores_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="GenerateImpactAssessmentActivity")
-def generate_impact_assessment_activity(ctx: ScanContext) -> bool:
+def generate_impact_assessment_activity(ctx: dict) -> bool:
     """Run AI-powered vulnerability impact assessment (if enabled in config).
 
     Delegates to the existing `generate_impact_assessment` task.
@@ -891,7 +891,7 @@ def generate_impact_assessment_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="SyncGraphActivity")
-def sync_graph_activity(ctx: ScanContext) -> bool:
+def sync_graph_activity(ctx: dict) -> bool:
     """Synchronize all scan results to the Neo4j Attack Path Modeling graph.
 
     Delegates to `run_apme` task and additionally runs `Neo4jManager.sync_scan_results`.
@@ -931,7 +931,7 @@ def sync_graph_activity(ctx: ScanContext) -> bool:
 
 
 @activity.defn(name="SendScanNotificationActivity")
-def send_scan_notification_activity(ctx: ScanContext) -> bool:
+def send_scan_notification_activity(ctx: dict) -> bool:
     """Mark the scan as completed and send the final scan status notification.
 
     Calls the `report` task function to update ScanHistory.scan_status to
@@ -1001,7 +1001,7 @@ _PERMITTED_GENERIC_TASKS = frozenset({
 
 
 @activity.defn(name="RunGenericTaskActivity")
-def run_generic_task_activity(ctx: ScanContext, task_name: str, description: str = None, extra_args: dict = None) -> bool:
+def run_generic_task_activity(ctx: dict, task_name: str, description: str = None, extra_args: dict = None) -> bool:
     """Execute any permitted task function dynamically in a Temporal activity.
 
     Only tasks in _PERMITTED_GENERIC_TASKS may be dispatched. This prevents
@@ -1032,7 +1032,7 @@ def run_generic_task_activity(ctx: ScanContext, task_name: str, description: str
 
 
 @activity.defn(name="FinalizeSubScanActivity")
-def finalize_subscan_activity(ctx: ScanContext, success: bool) -> bool:
+def finalize_subscan_activity(ctx: dict, success: bool) -> bool:
     """Mark the subscan as completed and update its status.
 
     Args:
@@ -1082,7 +1082,7 @@ def finalize_subscan_activity(ctx: ScanContext, success: bool) -> bool:
 # ===========================================================================
 
 @activity.defn(name="InitStressTestActivity")
-def init_stress_test_activity(ctx: ScanContext) -> ScanContext:
+def init_stress_test_activity(ctx: dict) -> dict:
     """Resolve target endpoints and create the StressTestResult DB record.
 
     Mirrors the target profiling + endpoint query block from run_stress_testing.
@@ -1155,7 +1155,7 @@ def init_stress_test_activity(ctx: ScanContext) -> ScanContext:
 
 
 @activity.defn(name="RunStressToolActivity")
-def run_stress_tool_activity(ctx: ScanContext) -> dict:
+def run_stress_tool_activity(ctx: dict) -> dict:
     """Execute a single stress tool against a single endpoint.
 
     Corresponds to the inner (endpoint × tool) loop of run_stress_testing.
@@ -1417,7 +1417,7 @@ def run_stress_tool_activity(ctx: ScanContext) -> dict:
 
 
 @activity.defn(name="FinalizeStressTestActivity")
-def finalize_stress_test_activity(ctx: ScanContext) -> bool:
+def finalize_stress_test_activity(ctx: dict) -> bool:
     """Aggregate metrics, update StressTestResult + ScanHistory, send notification.
 
     Mirrors the post-loop finalisation block in run_stress_testing and always
