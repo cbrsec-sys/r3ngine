@@ -27,7 +27,8 @@ class TestLLMSSLAndSecurity(TestCase):
         }
         with patch("requests.post", return_value=mock_response) as mock_post:
             gen._call_openai("sys", "user")
-        call_kwargs = mock_post.call_args[1]
+        mock_response.raise_for_status.assert_called_once()
+        call_kwargs = mock_post.call_args.kwargs
         self.assertNotIn("verify", call_kwargs,
                          "verify=False must not be passed — default (True) must apply")
         self.assertNotIn("proxies", call_kwargs,
@@ -39,11 +40,12 @@ class TestLLMSSLAndSecurity(TestCase):
         gen = self._make_generator(ANTHROPIC)
         mock_response = MagicMock()
         mock_response.json.return_value = {
-            "content": [{"text": "test"}]
+            "content": [{"type": "text", "text": "test"}]
         }
         with patch("requests.post", return_value=mock_response) as mock_post:
             gen._call_anthropic("my system prompt", "my user message")
-        payload = mock_post.call_args[1]["json"]
+        mock_response.raise_for_status.assert_called_once()
+        payload = mock_post.call_args.kwargs["json"]
         self.assertIn("system", payload, "Anthropic payload must have top-level 'system' key")
         self.assertEqual(payload["system"], "my system prompt")
         self.assertEqual(payload["messages"], [{"role": "user", "content": "my user message"}])
@@ -53,10 +55,11 @@ class TestLLMSSLAndSecurity(TestCase):
         from reNgine.definitions import ANTHROPIC
         gen = self._make_generator(ANTHROPIC)
         mock_response = MagicMock()
-        mock_response.json.return_value = {"content": [{"text": "test"}]}
+        mock_response.json.return_value = {"content": [{"type": "text", "text": "test"}]}
         with patch("requests.post", return_value=mock_response) as mock_post:
             gen._call_anthropic("sys", "user")
-        call_kwargs = mock_post.call_args[1]
+        mock_response.raise_for_status.assert_called_once()
+        call_kwargs = mock_post.call_args.kwargs
         self.assertNotIn("verify", call_kwargs)
         self.assertNotIn("proxies", call_kwargs)
 
@@ -70,8 +73,9 @@ class TestLLMSSLAndSecurity(TestCase):
         }
         with patch("requests.post", return_value=mock_response) as mock_post:
             gen._call_gemini("sys", "user")
-        url = mock_post.call_args[0][0]
-        headers = mock_post.call_args[1].get("headers", {})
+        mock_response.raise_for_status.assert_called_once()
+        url = mock_post.call_args.args[0]
+        headers = mock_post.call_args.kwargs.get("headers", {})
         self.assertNotIn("key=", url, "API key must not appear in URL query string")
         self.assertIn("x-goog-api-key", headers, "API key must be in x-goog-api-key header")
         self.assertEqual(headers["x-goog-api-key"], "test-api-key")
