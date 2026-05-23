@@ -5,7 +5,7 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
-from reNgine.definitions import (CELERY_TASK_STATUSES,
+from reNgine.definitions import (TASK_STATUSES,
 								 NUCLEI_REVERSE_SEVERITY_MAP)
 from reNgine.utilities import *
 from scanEngine.models import EngineType
@@ -34,11 +34,11 @@ class hybrid_property:
 class ScanHistory(models.Model):
 	id = models.AutoField(primary_key=True)
 	start_scan_date = models.DateTimeField()
-	scan_status = models.IntegerField(choices=CELERY_TASK_STATUSES, default=-1)
+	scan_status = models.IntegerField(choices=TASK_STATUSES, default=-1)
 	results_dir = models.CharField(max_length=100, blank=True)
 	domain = models.ForeignKey(Domain, on_delete=models.CASCADE)
 	scan_type = models.ForeignKey(EngineType, on_delete=models.CASCADE)
-	celery_ids = ArrayField(models.CharField(max_length=100), blank=True, default=list)
+	workflow_ids = ArrayField(models.CharField(max_length=100), blank=True, default=list)
 	tasks = ArrayField(models.CharField(max_length=200), null=True)
 	stop_scan_date = models.DateTimeField(null=True, blank=True)
 	used_gf_patterns = models.CharField(max_length=500, null=True, blank=True)
@@ -368,7 +368,7 @@ class SubScan(models.Model):
 	type = models.CharField(max_length=100, blank=True, null=True)
 	start_scan_date = models.DateTimeField()
 	status = models.IntegerField()
-	celery_ids = ArrayField(models.CharField(max_length=100), blank=True, default=list)
+	workflow_ids = ArrayField(models.CharField(max_length=100), blank=True, default=list)
 	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE)
 	subdomain = models.ForeignKey(Subdomain, on_delete=models.CASCADE)
 	stop_scan_date = models.DateTimeField(null=True, blank=True)
@@ -664,7 +664,7 @@ class ScanActivity(models.Model):
 	status = models.IntegerField()
 	error_message = models.CharField(max_length=300, blank=True, null=True)
 	traceback = models.TextField(blank=True, null=True)
-	celery_id = models.CharField(max_length=100, blank=True, null=True)
+	execution_id = models.CharField(max_length=100, blank=True, null=True)
 
 	def __str__(self):
 		return str(self.title)
@@ -1048,7 +1048,7 @@ class ScanReport(models.Model):
 	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, related_name='reports')
 	report_type = models.CharField(max_length=50) # full, vulnerability
 	report_template = models.CharField(max_length=50) # default, modern, enterprise
-	status = models.IntegerField(choices=CELERY_TASK_STATUSES, default=-1)
+	status = models.IntegerField(choices=TASK_STATUSES, default=-1)
 	report_file = models.FileField(upload_to='reports/', null=True, blank=True)
 	error_message = models.TextField(null=True, blank=True)
 	params = models.JSONField(default=dict, blank=True)

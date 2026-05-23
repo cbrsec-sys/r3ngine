@@ -152,9 +152,9 @@ class TestTemporalOrchestration(TestCase):
         temporal_ctx, scan_type = workflow_args
         self.assertEqual(scan_type, 'port_scan')
 
-        # Verify SubScan DB entry has correct status and workflow ID mapped to celery_ids
+        # Verify SubScan DB entry has correct status and workflow ID stored in workflow_ids
         subscan = SubScan.objects.filter(subdomain=subdomain).first()
         self.assertIsNotNone(subscan)
         self.assertEqual(temporal_ctx['subscan_id'], subscan.id)
         self.assertEqual(temporal_ctx['subdomain_id'], subdomain.id)
-        self.assertEqual(subscan.celery_ids, ['mock-subscan-workflow-id'])
+        self.assertEqual(subscan.workflow_ids, ['mock-subscan-workflow-id'])
