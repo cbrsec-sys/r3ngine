@@ -1,18 +1,15 @@
 """
 Temporal Client Provider for r3ngine.
 
-Provides a shared, cached Temporal client instance for use in synchronous
-Django view and task code. The client is created once per process and reused
-across all subsequent calls to avoid repeated TCP handshakes to the Temporal
-server.
-
-This module is safe to import from both synchronous and asynchronous contexts.
+Creates a fresh Temporal client per operation. Callers wrap operations in
+asyncio.new_event_loop(); a temporalio Client is bound to the event loop it
+was created in, so caching across loop boundaries raises gRPC errors. The
+SDK manages its own gRPC channel pool — per-operation Client() costs ~5ms
+locally and is the correct pattern for synchronous Django callers.
 """
-
 import asyncio
 import logging
 import os
-from typing import Optional
 
 from temporalio.client import Client
 
@@ -20,50 +17,25 @@ logger = logging.getLogger(__name__)
 
 
 class TemporalClientProvider:
-    """Singleton provider for a shared Temporal client.
+    """Factory for Temporal client connections.
 
-    The client is lazily initialized on first use and cached for subsequent
-    calls within the same process. Thread-safe for concurrent Django requests
-    because client creation is idempotent and we use asyncio event loops
-    correctly.
-
-    Usage in synchronous contexts (Django views, tasks):
-        client = asyncio.run(TemporalClientProvider.get_client())
-
-    Usage in asynchronous contexts (workers, management commands):
-        client = await TemporalClientProvider.get_client()
+    Always creates a fresh connection. Do not add caching — see module
+    docstring for why caching fails across asyncio.run() boundaries.
     """
-
-    _client: Optional[Client] = None
 
     @classmethod
     async def get_client(cls) -> Client:
-        """Return a connected Temporal client, creating one if needed.
-
-        Connects to the Temporal server at the TEMPORAL_HOST environment
-        variable (default: temporal:7233) in the TEMPORAL_NAMESPACE (default:
-        default).
-
-        Returns:
-            Client: A connected Temporal client instance.
-
-        Raises:
-            Exception: If connection to the Temporal server fails.
-        """
-        if cls._client is None:
-            temporal_host = os.environ.get("TEMPORAL_HOST", "temporal:7233")
-            namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
-            logger.info(
-                f"[TemporalClientProvider] Connecting to {temporal_host} "
-                f"namespace={namespace}..."
-            )
-            cls._client = await Client.connect(temporal_host, namespace=namespace)
-            logger.info("[TemporalClientProvider] Connected successfully.")
-        return cls._client
+        temporal_host = os.environ.get("TEMPORAL_HOST", "temporal:7233")
+        namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
+        return await Client.connect(temporal_host, namespace=namespace)
 
     @classmethod
     def cancel_workflow(cls, workflow_id: str) -> None:
-        """Cancel a running Temporal workflow synchronously (safe for Django views)."""
+        """Cancel a running Temporal workflow synchronously (safe for Django views).
+
+        Args:
+            workflow_id: The Temporal workflow execution ID to cancel.
+        """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -74,12 +46,3 @@ class TemporalClientProvider:
             loop.run_until_complete(_cancel())
         finally:
             loop.close()
-
-    @classmethod
-    def reset(cls) -> None:
-        """Reset the cached client (useful in tests or after connection failure).
-
-        Clears the cached client so the next call to get_client() will create
-        a fresh connection.
-        """
-        cls._client = None

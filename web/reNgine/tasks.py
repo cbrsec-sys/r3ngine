@@ -926,7 +926,6 @@ def initiate_scan_temporal(
 					)
 					await asyncio.sleep(wait_time)
 
-		TemporalClientProvider.reset()
 		loop = asyncio.new_event_loop()
 		asyncio.set_event_loop(loop)
 		try:
@@ -938,6 +937,20 @@ def initiate_scan_temporal(
 			f'Started MasterScanWorkflow id={started_workflow_id} '
 			f'for scan_history_id={scan.id}'
 		)
+
+		# Track workflow execution so cancel_workflow can find it
+		from startScan.models import TemporalWorkflowExecution
+		TemporalWorkflowExecution.objects.get_or_create(
+			workflow_id=started_workflow_id,
+			defaults={
+				'scan_history': scan,
+				'run_id': started_workflow_id,
+				'workflow_type': 'MasterScanWorkflow',
+				'status': 'RUNNING',
+			}
+		)
+		scan.celery_ids = [started_workflow_id]
+		scan.save()
 
 		# Send start notification
 		try:
@@ -1134,7 +1147,6 @@ def initiate_subscan_temporal(
 					)
 					await asyncio.sleep(wait_time)
 
-		TemporalClientProvider.reset()
 		loop = asyncio.new_event_loop()
 		asyncio.set_event_loop(loop)
 		try:
@@ -6492,7 +6504,10 @@ def save_endpoint(
 			return None, False
 	if crawl:
 		ctx['track'] = False
+		from reNgine.temporal_activities import TemporalTaskProxy
+		proxy = TemporalTaskProxy(ctx, 'http_crawl', 'HTTP Crawl')
 		results = http_crawl(
+			proxy,
 			urls=[http_url],
 			method='HEAD',
 			ctx=ctx)
@@ -6627,7 +6642,7 @@ def save_ip_address(ip_address, subdomain=None, subscan=None, scan_id=None, acti
 		import threading as _threading
 		_threading.Thread(
 			target=geo_localize,
-			kwargs=dict(ip_address=ip_address, ip_id=ip.id, scan_id=scan_id, activity_id=activity_id),
+			kwargs=dict(host=ip_address, ip_id=ip.id, scan_id=scan_id, activity_id=activity_id),
 			daemon=True
 		).start()
 
@@ -6735,12 +6750,11 @@ def llm_vulnerability_description(vulnerability_id):
 		}
 
 
-def fetch_proxies_task(self, limit=1000, job_id=None):
+def fetch_proxies_task(limit=1000, job_id=None):
     """Scrape proxies concurrently from a large list of public sources,
     verify their validity against robust target APIs, and return the live ones.
 
     Args:
-        self: The task instance bind.
         limit (int, optional): Maximum number of raw proxies to scrape and check. Defaults to 1000.
 
     Returns:

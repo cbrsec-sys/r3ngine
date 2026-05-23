@@ -26,8 +26,6 @@ from temporalio.client import (
     ScheduleSpec,
     ScheduleState,
 )
-from temporalio.common import WorkflowIDReusePolicy
-
 from reNgine.temporal_client import TemporalClientProvider
 
 logger = logging.getLogger(__name__)
@@ -80,7 +78,6 @@ def _create_periodic_temporal_schedule(
                     args=[workflow_args],
                     id=f"{schedule_id}-run",
                     task_queue="python-orchestrator-queue",
-                    id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
                 ),
                 spec=ScheduleSpec(
                     intervals=[ScheduleIntervalSpec(
@@ -92,7 +89,6 @@ def _create_periodic_temporal_schedule(
             ),
         )
 
-    TemporalClientProvider.reset()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -163,7 +159,6 @@ def _create_clocked_temporal_schedule(
                     args=[workflow_args],
                     id=f"{schedule_id}-run",
                     task_queue="python-orchestrator-queue",
-                    id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
                 ),
                 spec=ScheduleSpec(
                     calendars=[ScheduleCalendarSpec(
@@ -183,7 +178,6 @@ def _create_clocked_temporal_schedule(
             ),
         )
 
-    TemporalClientProvider.reset()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -223,7 +217,6 @@ def _delete_temporal_schedule_by_id(schedule_id: str) -> None:
         except Exception:
             pass
 
-    TemporalClientProvider.reset()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -240,7 +233,6 @@ def _pause_temporal_schedule(schedule_id: str) -> None:
         handle = client.get_schedule_handle(schedule_id)
         await handle.pause(note="Paused via r3ngine UI")
 
-    TemporalClientProvider.reset()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -257,7 +249,6 @@ def _unpause_temporal_schedule(schedule_id: str) -> None:
         handle = client.get_schedule_handle(schedule_id)
         await handle.unpause(note="Unpaused via r3ngine UI")
 
-    TemporalClientProvider.reset()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -312,7 +303,6 @@ def _upsert_monitoring_temporal_schedule(domain) -> object:
                     args=[workflow_args],
                     id=f"{schedule_id}-run",
                     task_queue="python-orchestrator-queue",
-                    id_reuse_policy=WorkflowIDReusePolicy.ALLOW_DUPLICATE,
                 ),
                 spec=ScheduleSpec(
                     intervals=[ScheduleIntervalSpec(
@@ -324,7 +314,6 @@ def _upsert_monitoring_temporal_schedule(domain) -> object:
             ),
         )
 
-    TemporalClientProvider.reset()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
@@ -369,7 +358,6 @@ def _delete_monitoring_temporal_schedule(domain) -> None:
         except Exception:
             pass  # Already deleted or never existed
 
-    TemporalClientProvider.reset()
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     try:
