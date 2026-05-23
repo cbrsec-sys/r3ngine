@@ -1803,7 +1803,13 @@ class InitiateSubTask(APIView):
 		data = req.data
 		engine_id = data.get('engine_id')
 		scan_types = data['tasks']
-		for subdomain_id in data['subdomain_ids']:
+		# Accept both subdomain_ids (list) and subdomain_id (single int) for mobile compatibility
+		subdomain_ids = data.get('subdomain_ids') or []
+		if not subdomain_ids:
+			single = data.get('subdomain_id')
+			if single:
+				subdomain_ids = [single]
+		for subdomain_id in subdomain_ids:
 			logger.info(f'Running subscans {scan_types} on subdomain "{subdomain_id}" ...')
 			for stype in scan_types:
 				ctx = {
