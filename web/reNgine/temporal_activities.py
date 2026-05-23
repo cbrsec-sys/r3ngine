@@ -47,7 +47,7 @@ class TemporalTaskProxy:
         description (str, optional): Human-readable description for the UI.
     """
 
-    def __init__(self, ctx: dict, task_name: str, description: str = None):
+    def __init__(self, ctx: ScanContext, task_name: str, description: str = None):
         from startScan.models import ScanHistory, SubScan, ScanActivity
         from scanEngine.models import EngineType
         from targetApp.models import Domain
@@ -159,7 +159,7 @@ class TemporalTaskProxy:
 # Helper: run a RengineTask function via TemporalTaskProxy
 # ---------------------------------------------------------------------------
 
-def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **kwargs):
+def _run_task(task_func, ctx: ScanContext, task_name: str, description: str = None, **kwargs):
     """Execute an existing RengineTask-decorated function inside a Temporal activity.
 
     Spawns a heartbeat thread that sends signals to Temporal every 30 seconds
