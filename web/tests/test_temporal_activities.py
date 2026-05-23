@@ -82,3 +82,24 @@ class TestScanContext(TestCase):
             "subdomain_id": 5,
         }
         self.assertEqual(ctx["tasks"], ["osint", "port_scan"])
+
+
+class TestSubScanDispatchRegistry(TestCase):
+    def test_all_known_scan_types_in_registry(self):
+        from reNgine.temporal_workflows import _SUBSCAN_DISPATCH
+        required = {
+            "osint", "subdomain_discovery", "port_scan", "fetch_url",
+            "dir_file_fuzz", "screenshot", "waf_detection",
+            "vulnerability_scan", "baddns",
+        }
+        for t in required:
+            self.assertIn(t, _SUBSCAN_DISPATCH, f"'{t}' is missing from _SUBSCAN_DISPATCH")
+
+    def test_regular_entry_has_required_keys(self):
+        from reNgine.temporal_workflows import _SUBSCAN_DISPATCH
+        for scan_type, entry in _SUBSCAN_DISPATCH.items():
+            if entry is None:
+                continue  # special-case — handled inline
+            self.assertIn("activity", entry, f"{scan_type}: missing 'activity' key")
+            self.assertIn("timeout", entry, f"{scan_type}: missing 'timeout' key")
+            self.assertIn("args_builder", entry, f"{scan_type}: missing 'args_builder' key")
