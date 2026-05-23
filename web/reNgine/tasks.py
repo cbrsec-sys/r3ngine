@@ -1801,6 +1801,7 @@ def osint(self, host=None, ctx={}, description=None):
 	osint_orchestrator(scan_history_id=self.scan.id)
 
 	logger.info('OSINT Tasks finished...')
+	return True
 
 	# with open(self.output_path, 'w') as f:
 	# 	json.dump(results, f, indent=4)
