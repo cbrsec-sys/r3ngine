@@ -668,7 +668,7 @@ class SubScanWorkflow:
         )
 
         # Validate scan_type against the permitted task list before any dispatch
-        known_explicit = {"osint", "subdomain_discovery", "port_scan", "fetch_url", "vulnerability_scan", "baddns"}
+        known_explicit = set(_SUBSCAN_DISPATCH.keys())
         if scan_type not in known_explicit and scan_type not in _PERMITTED_GENERIC_TASKS:
             raise ValueError(
                 f"[SubScanWorkflow] '{scan_type}' is not a recognized subscan type. "
