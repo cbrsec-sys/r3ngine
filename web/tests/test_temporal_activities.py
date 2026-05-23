@@ -60,3 +60,25 @@ class TestRunGenericTaskAllowlist(TestCase):
                 except ValueError:
                     pass
         mock_import.assert_not_called()
+
+
+class TestScanContext(TestCase):
+    def test_required_fields_accepted(self):
+        from reNgine.scan_context import ScanContext
+        ctx: ScanContext = {
+            "scan_history_id": 1,
+            "engine_id": 2,
+            "domain_id": 3,
+        }
+        self.assertEqual(ctx["scan_history_id"], 1)
+
+    def test_optional_fields_accepted(self):
+        from reNgine.scan_context import ScanContext
+        ctx: ScanContext = {
+            "scan_history_id": 1,
+            "engine_id": 2,
+            "domain_id": 3,
+            "tasks": ["osint", "port_scan"],
+            "subdomain_id": 5,
+        }
+        self.assertEqual(ctx["tasks"], ["osint", "port_scan"])
