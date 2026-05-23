@@ -90,10 +90,13 @@ class MasterScanWorkflow:
         )
 
         tasks = ctx.get("tasks", [])
+        yaml_config = ctx.get("yaml_configuration", {})
 
         # ------------------------------------------------------------------
         # TIER 1: Discovery (parallel — all discovery tools run concurrently)
         # All must complete before Tier 2 begins (subdomains must be in DB).
+        # osint runs in this group (mirrors Celery t1_background parallel group).
+        # spiderfoot_scan runs here only when its YAML config block is present.
         # ------------------------------------------------------------------
         discovery_futures = []
         if "subdomain_discovery" in tasks:
@@ -126,6 +129,26 @@ class MasterScanWorkflow:
                     task_queue="python-orchestrator-queue"
                 )
             )
+        if "osint" in tasks:
+            discovery_futures.append(
+                workflow.execute_activity(
+                    "RunGenericTaskActivity",
+                    args=[ctx, "osint", "OSINT Scan"],
+                    start_to_close_timeout=timedelta(hours=2),
+                    heartbeat_timeout=timedelta(minutes=2),
+                    task_queue="python-orchestrator-queue"
+                )
+            )
+        if "spiderfoot_scan" in tasks and yaml_config.get("spiderfoot_scan"):
+            discovery_futures.append(
+                workflow.execute_activity(
+                    "RunGenericTaskActivity",
+                    args=[ctx, "spiderfoot_scan", "SpiderFoot Attack Surface Intelligence"],
+                    start_to_close_timeout=timedelta(hours=4),
+                    heartbeat_timeout=timedelta(minutes=2),
+                    task_queue="python-orchestrator-queue"
+                )
+            )
 
         if discovery_futures:
             await asyncio.gather(*discovery_futures)
@@ -140,17 +163,12 @@ class MasterScanWorkflow:
         await self._check_paused()
 
         # ------------------------------------------------------------------
-        # TIER 2 & 3/4: Enumeration, Crawling, and Fuzzing
+        # TIER 2: HTTP Crawl + Port Scan + Screenshot (all parallel)
         #
-        # Structure:
-        #   Branch A: fetch_url (independent, runs in parallel with Branch B)
-        #   Branch B: http_crawl → dir_file_fuzz (sequential dependency chain)
-        #   Others:   port_scan, screenshot (parallel, no inter-dependency)
-        # All branches in Tier 2 start simultaneously and must complete before
-        # Tier 5 begins.
+        # http_crawl is a global config — it runs here and populates the
+        # endpoint DB, which Tier 3 and Tier 4 depend on.
         # ------------------------------------------------------------------
-        async def _crawl_and_fuzz_branch():
-            """Sequential branch: http_crawl must complete before dir_file_fuzz."""
+        async def _http_crawl_branch():
             if "http_crawl" in tasks:
                 await workflow.execute_activity(
                     "RunHTTPCrawlActivity",
@@ -165,22 +183,8 @@ class MasterScanWorkflow:
                     start_to_close_timeout=timedelta(minutes=5),
                     task_queue="python-orchestrator-queue"
                 )
-            if "dir_file_fuzz" in tasks:
-                await workflow.execute_activity(
-                    "RunDirFileFuzzActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(hours=4),
-                    heartbeat_timeout=timedelta(minutes=2),
-                    task_queue="python-orchestrator-queue"
-                )
-                await workflow.execute_activity(
-                    "ParseFuzzResultsActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(minutes=5),
-                    task_queue="python-orchestrator-queue"
-                )
 
-        tier2_futures = [_crawl_and_fuzz_branch()]
+        tier2_futures = [_http_crawl_branch()]
 
         if "port_scan" in tasks:
             tier2_futures.append(
@@ -202,20 +206,40 @@ class MasterScanWorkflow:
                     task_queue="python-orchestrator-queue"
                 )
             )
-        if "fetch_url" in tasks:
-            tier2_futures.append(
-                workflow.execute_activity(
-                    "RunFetchURLActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(hours=2),
-                    heartbeat_timeout=timedelta(minutes=2),
-                    task_queue="python-orchestrator-queue"
-                )
-            )
 
         await asyncio.gather(*tier2_futures)
 
-        # Consolidation: log total endpoint count after Tier 2 completes
+        # ------------------------------------------------------------------
+        # TIER 3: URL Fetching (sequential — needs Tier 2 http_crawl endpoints)
+        # ------------------------------------------------------------------
+        if "fetch_url" in tasks:
+            await workflow.execute_activity(
+                "RunFetchURLActivity",
+                ctx,
+                start_to_close_timeout=timedelta(hours=2),
+                heartbeat_timeout=timedelta(minutes=2),
+                task_queue="python-orchestrator-queue"
+            )
+
+        # ------------------------------------------------------------------
+        # TIER 4: Directory & File Fuzzing (sequential — needs Tier 3 URLs)
+        # ------------------------------------------------------------------
+        if "dir_file_fuzz" in tasks:
+            await workflow.execute_activity(
+                "RunDirFileFuzzActivity",
+                ctx,
+                start_to_close_timeout=timedelta(hours=4),
+                heartbeat_timeout=timedelta(minutes=2),
+                task_queue="python-orchestrator-queue"
+            )
+            await workflow.execute_activity(
+                "ParseFuzzResultsActivity",
+                ctx,
+                start_to_close_timeout=timedelta(minutes=5),
+                task_queue="python-orchestrator-queue"
+            )
+
+        # Consolidation: log total endpoint count after Tiers 2-4 complete
         await workflow.execute_activity(
             "ParseEnumerationResultsActivity",
             ctx,
@@ -344,7 +368,7 @@ class MasterScanWorkflow:
             )
 
         # AI Impact Assessment is gated by the engine config flag
-        if ctx.get("yaml_configuration", {}).get("enable_ai_impact_analysis", False):
+        if yaml_config.get("enable_ai_impact_analysis", False):
             await workflow.execute_activity(
                 "GenerateImpactAssessmentActivity",
                 ctx,
@@ -353,8 +377,8 @@ class MasterScanWorkflow:
             )
 
         # APME / Neo4j graph sync
-        apme_config = ctx.get("yaml_configuration", {}).get("attack_path_modeling", {})
-        vuln_config = ctx.get("yaml_configuration", {}).get("vulnerability_scan", {})
+        apme_config = yaml_config.get("attack_path_modeling", {})
+        vuln_config = yaml_config.get("vulnerability_scan", {})
         if apme_config.get("enabled", False) or vuln_config.get("run_apme", False) or "run_apme" in tasks:
             await workflow.execute_activity(
                 "SyncGraphActivity",
