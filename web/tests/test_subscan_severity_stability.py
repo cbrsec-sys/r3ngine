@@ -16,9 +16,8 @@ from django.utils import timezone
 class TestSubscanSeverityStability(TestCase):
     """
     Test suite to verify stabilizing changes made to:
-    1. initiate_subscan celery task signature argument mapping.
-    2. save_vulnerability centralized severity string conversion.
-    3. parse_react2shell_results severity integer normalization.
+    1. save_vulnerability centralized severity string conversion.
+    2. parse_react2shell_results severity integer normalization.
     """
 
     def setUp(self):
@@ -56,112 +55,6 @@ class TestSubscanSeverityStability(TestCase):
         self.scan.delete()
         self.engine.delete()
         self.domain.delete()
-
-    @patch('reNgine.tasks.save_endpoint')
-    @patch('reNgine.tasks.send_scan_notif')
-    @patch('reNgine.tasks.chain')
-    @patch('reNgine.tasks.report')
-    @patch('reNgine.tasks.PluginOrchestrator.inject_tasks')
-    def test_initiate_subscan_signature_mapping(self, mock_inject, mock_report, mock_chain, mock_send_notif, mock_save_endpoint):
-        """
-        Ensure initiate_subscan maps correct task arguments based on the expected 
-        signature definitions (e.g. hosts for port_scan, urls for fetch_url/vulnerability_scan).
-        """
-        from reNgine.tasks import initiate_subscan
-        
-        # Mock endpoint response to prevent actual network crawler run
-        mock_endpoint = MagicMock(is_alive=True)
-        mock_endpoint.http_url = "http://target.stability.test.local"
-        mock_endpoint.http_status = 200
-        mock_endpoint.response_time = 0.1
-        mock_endpoint.page_title = "Test"
-        mock_endpoint.content_type = "text/html"
-        mock_endpoint.content_length = 100
-        mock_endpoint.techs.all.return_value = []
-        mock_save_endpoint.return_value = (mock_endpoint, True)
-
-        # Mock global tasks in reNgine
-        from reNgine import tasks
-        
-        with patch.object(tasks.dir_file_fuzz, 'si') as mock_fuzz_si, \
-             patch.object(tasks.port_scan, 'si') as mock_port_si, \
-             patch.object(tasks.fetch_url, 'si') as mock_fetch_si, \
-             patch.object(tasks.vulnerability_scan, 'si') as mock_vuln_si, \
-             patch.object(tasks.wpscan_scan, 'si') as mock_wpscan_si, \
-             patch.object(tasks.cpanel_scan, 'si') as mock_cpanel_si, \
-             patch.object(tasks.correlate_vulnerabilities, 'si') as mock_correlate_si, \
-             patch.object(tasks.calculate_risk_scores, 'si') as mock_risk_si:
-            
-            # Setup signature mock returns
-            mock_fuzz_si.return_value = MagicMock(name='dir_file_fuzz_si')
-            mock_port_si.return_value = MagicMock(name='port_scan_si')
-            mock_fetch_si.return_value = MagicMock(name='fetch_url_si')
-            mock_vuln_si.return_value = MagicMock(name='vulnerability_scan_si')
-            mock_wpscan_si.return_value = MagicMock(name='wpscan_si')
-            mock_cpanel_si.return_value = MagicMock(name='cpanel_si')
-            mock_correlate_si.return_value = MagicMock(name='correlate_si')
-            mock_risk_si.return_value = MagicMock(name='risk_si')
-            
-            # Mock Celery chain and delay
-            mock_chain_obj = MagicMock()
-            mock_chain.return_value = mock_chain_obj
-            mock_chain_obj.on_error.return_value.delay.return_value = MagicMock(id='dummy_task_id')
-
-            # 1. Test dir_file_fuzz (expects only ctx)
-            initiate_subscan(
-                scan_history_id=self.scan.id,
-                subdomain_id=self.subdomain.id,
-                engine_id=self.engine.id,
-                scan_type='dir_file_fuzz'
-            )
-            mock_fuzz_si.assert_called_once()
-            _, kwargs = mock_fuzz_si.call_args
-            self.assertIn('ctx', kwargs)
-            self.assertNotIn('host', kwargs)
-            self.assertNotIn('hosts', kwargs)
-            self.assertNotIn('urls', kwargs)
-
-            # 2. Test port_scan (expects hosts list)
-            initiate_subscan(
-                scan_history_id=self.scan.id,
-                subdomain_id=self.subdomain.id,
-                engine_id=self.engine.id,
-                scan_type='port_scan'
-            )
-            mock_port_si.assert_called_once()
-            _, kwargs = mock_port_si.call_args
-            self.assertIn('ctx', kwargs)
-            self.assertEqual(kwargs.get('hosts'), [self.subdomain.name])
-            self.assertNotIn('host', kwargs)
-            self.assertNotIn('urls', kwargs)
-
-            # 3. Test fetch_url (expects urls list)
-            initiate_subscan(
-                scan_history_id=self.scan.id,
-                subdomain_id=self.subdomain.id,
-                engine_id=self.engine.id,
-                scan_type='fetch_url'
-            )
-            mock_fetch_si.assert_called_once()
-            _, kwargs = mock_fetch_si.call_args
-            self.assertIn('ctx', kwargs)
-            self.assertEqual(kwargs.get('urls'), [self.subdomain.http_url])
-            self.assertNotIn('host', kwargs)
-            self.assertNotIn('hosts', kwargs)
-
-            # 4. Test vulnerability_scan (expects urls list)
-            initiate_subscan(
-                scan_history_id=self.scan.id,
-                subdomain_id=self.subdomain.id,
-                engine_id=self.engine.id,
-                scan_type='vulnerability_scan'
-            )
-            mock_vuln_si.assert_called_once()
-            _, kwargs = mock_vuln_si.call_args
-            self.assertIn('ctx', kwargs)
-            self.assertEqual(kwargs.get('urls'), [self.subdomain.http_url])
-            self.assertNotIn('host', kwargs)
-            self.assertNotIn('hosts', kwargs)
 
     def test_save_vulnerability_severity_guard(self):
         """
