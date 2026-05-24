@@ -102,7 +102,8 @@ class TestDynamicPluginURLDiscovery(TestCase):
         """Once the plugin is installed, /api/plugins/active_directory/ must resolve."""
         from django.urls import reverse, NoReverseMatch
         try:
-            url = reverse('active_directory:ad-assessment-list')
+            # Plugin URLs are nested under the 'api' namespace in api/urls.py
+            url = reverse('api:active_directory:ad-assessment-list')
             self.assertTrue(url.startswith('/api/plugins/active_directory/'))
         except NoReverseMatch:
             self.skipTest(
