@@ -137,3 +137,110 @@ class TestLDAPParser(TestCase):
             self.assertIn('groups', summary)
             self.assertEqual(summary['users'], 1)
             self.assertEqual(summary['groups'], 1)
+
+
+class TestBloodHoundParser(TestCase):
+
+    SAMPLE_BH_USERS = {
+        "data": [
+            {
+                "Properties": {
+                    "name": "JDOE@CORP.EXAMPLE.COM",
+                    "domain": "CORP.EXAMPLE.COM",
+                    "enabled": True,
+                    "admincount": True,
+                    "email": "jdoe@corp.example.com",
+                    "lastlogon": 133000000000,
+                    "objectid": "S-1-5-21-1234-5678-9012-1001",
+                },
+                "PrimaryGroupSid": "S-1-5-21-1234-5678-9012-513",
+            }
+        ],
+        "meta": {"type": "users", "count": 1}
+    }
+
+    SAMPLE_BH_GROUPS = {
+        "data": [
+            {
+                "Properties": {
+                    "name": "DOMAIN ADMINS@CORP.EXAMPLE.COM",
+                    "domain": "CORP.EXAMPLE.COM",
+                    "objectid": "S-1-5-21-1234-5678-9012-512",
+                    "admincount": True,
+                },
+                "Members": [
+                    {"MemberId": "S-1-5-21-1234-5678-9012-1001",
+                     "MemberType": "User"}
+                ]
+            }
+        ],
+        "meta": {"type": "groups", "count": 1}
+    }
+
+    def _get_parser(self):
+        try:
+            from plugins_data.active_directory.backend.ingestion.bloodhound_parser import BloodHoundParser
+            return BloodHoundParser
+        except ImportError:
+            self.skipTest("Plugin not installed")
+
+    def test_parse_users_returns_normalised_dict(self):
+        Parser = self._get_parser()
+        users = Parser.parse_users(self.SAMPLE_BH_USERS['data'])
+        self.assertEqual(len(users), 1)
+        self.assertEqual(users[0]['sam_account_name'], 'JDOE')
+        self.assertTrue(users[0]['admin_count'] > 0)
+
+    def test_parse_groups_detects_admin_group(self):
+        Parser = self._get_parser()
+        groups = Parser.parse_groups(self.SAMPLE_BH_GROUPS['data'])
+        self.assertEqual(len(groups), 1)
+        self.assertTrue(groups[0]['admin_group'])
+
+    def test_parse_groups_returns_member_edges(self):
+        Parser = self._get_parser()
+        groups = Parser.parse_groups(self.SAMPLE_BH_GROUPS['data'])
+        self.assertIn('members', groups[0])
+        self.assertEqual(len(groups[0]['members']), 1)
+
+
+class TestExposureCorrelationEngine(TestCase):
+
+    def _get_engine(self):
+        try:
+            from plugins_data.active_directory.backend.correlation.engine import ExposureCorrelationEngine
+            return ExposureCorrelationEngine
+        except ImportError:
+            self.skipTest("Plugin not installed")
+
+    def test_classify_exposure_type_adfs(self):
+        Engine = self._get_engine()
+        result = Engine.classify_hostname('adfs.corp.example.com')
+        self.assertEqual(result, 'ADFS')
+
+    def test_classify_exposure_type_owa(self):
+        Engine = self._get_engine()
+        result = Engine.classify_hostname('owa.corp.example.com')
+        self.assertEqual(result, 'OWA')
+
+    def test_classify_exposure_type_vpn(self):
+        Engine = self._get_engine()
+        result = Engine.classify_hostname('vpn.corp.example.com')
+        self.assertEqual(result, 'VPN')
+
+    def test_classify_returns_other_for_unknown(self):
+        Engine = self._get_engine()
+        result = Engine.classify_hostname('www.corp.example.com')
+        self.assertEqual(result, 'OTHER')
+
+    def test_score_exposure_adfs_is_high(self):
+        Engine = self._get_engine()
+        score = Engine.score_exposure('ADFS', is_internet_facing=True,
+                                       has_domain_correlation=True)
+        self.assertGreaterEqual(score, 70.0)
+
+    def test_score_exposure_other_no_correlation_is_low(self):
+        Engine = self._get_engine()
+        score = Engine.score_exposure('OTHER', is_internet_facing=False,
+                                       has_domain_correlation=False)
+        self.assertLess(score, 30.0)
