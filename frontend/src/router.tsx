@@ -1,8 +1,9 @@
-import { createRootRouteWithContext, createRoute, createRouter, Outlet, Link, redirect, lazyRouteComponent } from "@tanstack/react-router";
+import { createRootRouteWithContext, createRoute, createRouter, Outlet, Link, redirect, lazyRouteComponent, useParams } from "@tanstack/react-router";
 import { Shell } from "./components/Shell";
 // Lazy loaded components below
 
-import { Box, Typography, Button } from "@mui/material";
+import { Box, Typography, Button, CircularProgress } from "@mui/material";
+import PluginPageLoader from './features/plugins/components/PluginPageLoader';
 import { AlertCircle, Home, RefreshCw } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 import { LoginPage } from "./features/auth/components/LoginPage";
@@ -468,6 +469,75 @@ const pluginsRoute = createRoute({
   component: PluginManagementPage,
 });
 
+// Active Directory Intelligence Plugin Routes
+const adAssessmentsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "active-directory",
+  component: function ADAssessmentsPage() {
+    return <PluginPageLoader pluginSlug="active_directory" exportName="ADAssessmentsPage" />;
+  },
+});
+
+const adAssessmentDetailRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "active-directory/assessment/$assessmentId",
+  component: function ADAssessmentDetailPage() {
+    const { assessmentId } = useParams({ strict: false });
+    return (
+      <PluginPageLoader
+        pluginSlug="active_directory"
+        exportName="ADAssessmentDetailPage"
+        assessmentId={Number(assessmentId)}
+      />
+    );
+  },
+});
+
+const adGraphRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "active-directory/assessment/$assessmentId/graph",
+  component: function ADGraphPage() {
+    const { assessmentId } = useParams({ strict: false });
+    return (
+      <PluginPageLoader
+        pluginSlug="active_directory"
+        exportName="ADGraphExplorerPage"
+        assessmentId={Number(assessmentId)}
+      />
+    );
+  },
+});
+
+const adTrustsRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "active-directory/assessment/$assessmentId/trusts",
+  component: function ADTrustsPage() {
+    const { assessmentId } = useParams({ strict: false });
+    return (
+      <PluginPageLoader
+        pluginSlug="active_directory"
+        exportName="ADTrustAnalyticsPage"
+        assessmentId={Number(assessmentId)}
+      />
+    );
+  },
+});
+
+const adExposuresRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "active-directory/assessment/$assessmentId/exposures",
+  component: function ADExposuresPage() {
+    const { assessmentId } = useParams({ strict: false });
+    return (
+      <PluginPageLoader
+        pluginSlug="active_directory"
+        exportName="ADExposureDashboardPage"
+        assessmentId={Number(assessmentId)}
+      />
+    );
+  },
+});
+
 // Login Route
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -522,6 +592,11 @@ const routeTree = rootRoute.addChildren([
     bountyHubRoute,
     searchRoute,
     pluginsRoute,
+    adAssessmentsRoute,
+    adAssessmentDetailRoute,
+    adGraphRoute,
+    adTrustsRoute,
+    adExposuresRoute,
   ]),
   loginRoute,
   logoutRoute,
