@@ -1,4 +1,8 @@
 # web/tests/test_ad_plugin_graph.py
+import json
+import os
+import tempfile
+
 from django.test import TestCase
 
 
@@ -64,3 +68,72 @@ class TestADGraphManager(TestCase):
             self.assertTrue(
                 hasattr(Mgr, method),
                 f"ADGraphManager missing method: {method}")
+
+
+class TestLDAPParser(TestCase):
+
+    SAMPLE_USERS = [
+        {
+            "attributes": {
+                "sAMAccountName": ["jdoe"],
+                "displayName": ["John Doe"],
+                "mail": ["jdoe@corp.example.com"],
+                "userAccountControl": [512],
+                "adminCount": [1],
+                "objectSid": ["S-1-5-21-1234-5678-9012-1001"],
+                "lastLogon": ["2026-01-01T00:00:00"],
+            }
+        }
+    ]
+
+    SAMPLE_GROUPS = [
+        {
+            "attributes": {
+                "sAMAccountName": ["Domain Admins"],
+                "objectSid": ["S-1-5-21-1234-5678-9012-512"],
+                "member": ["CN=jdoe,DC=corp,DC=example,DC=com"],
+            }
+        }
+    ]
+
+    def _get_parser(self):
+        try:
+            from plugins_data.active_directory.backend.ingestion.ldap_parser import LDAPParser
+            return LDAPParser
+        except ImportError:
+            self.skipTest("Plugin not installed")
+
+    def test_parse_users_extracts_sam_account_name(self):
+        Parser = self._get_parser()
+        users = Parser.parse_users(self.SAMPLE_USERS)
+        self.assertEqual(len(users), 1)
+        self.assertEqual(users[0]['sam_account_name'], 'jdoe')
+
+    def test_parse_users_detects_admin(self):
+        Parser = self._get_parser()
+        users = Parser.parse_users(self.SAMPLE_USERS)
+        self.assertEqual(users[0]['admin_count'], 1)
+
+    def test_parse_groups_extracts_name(self):
+        Parser = self._get_parser()
+        groups = Parser.parse_groups(self.SAMPLE_GROUPS)
+        self.assertEqual(len(groups), 1)
+        self.assertEqual(groups[0]['name'], 'Domain Admins')
+
+    def test_parse_groups_detects_admin_group(self):
+        Parser = self._get_parser()
+        groups = Parser.parse_groups(self.SAMPLE_GROUPS)
+        self.assertTrue(groups[0]['admin_group'])
+
+    def test_ingest_from_directory_returns_summary(self):
+        Parser = self._get_parser()
+        with tempfile.TemporaryDirectory() as tmpdir:
+            with open(os.path.join(tmpdir, 'domain_users.json'), 'w') as f:
+                json.dump(self.SAMPLE_USERS, f)
+            with open(os.path.join(tmpdir, 'domain_groups.json'), 'w') as f:
+                json.dump(self.SAMPLE_GROUPS, f)
+            summary = Parser.ingest_from_directory(tmpdir, assessment_id=0, db_write=False)
+            self.assertIn('users', summary)
+            self.assertIn('groups', summary)
+            self.assertEqual(summary['users'], 1)
+            self.assertEqual(summary['groups'], 1)
