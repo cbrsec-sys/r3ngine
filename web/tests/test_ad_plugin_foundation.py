@@ -44,3 +44,32 @@ class TestADPluginModels(TestCase):
         choices = [c[0] for c in Finding._meta.get_field('severity').choices]
         self.assertIn('CRITICAL', choices)
         self.assertIn('HIGH', choices)
+
+
+class TestADTemporalExports(TestCase):
+
+    def _import_exports(self):
+        try:
+            import importlib
+            return importlib.import_module(
+                'plugins_data.active_directory.backend.temporal_exports')
+        except (ImportError, ModuleNotFoundError):
+            self.skipTest("Plugin not yet installed into plugins_data/")
+
+    def test_workflow_class_is_registered(self):
+        mod = self._import_exports()
+        self.assertTrue(hasattr(mod, 'ADAssessmentWorkflow'))
+
+    def test_all_activity_functions_exist(self):
+        mod = self._import_exports()
+        expected = [
+            'initialize_assessment_activity',
+            'run_dns_discovery_activity',
+            'run_cert_discovery_activity',
+            'run_trust_analysis_activity',
+            'run_exposure_correlation_activity',
+            'run_neo4j_sync_activity',
+            'finalize_assessment_activity',
+        ]
+        for name in expected:
+            self.assertTrue(hasattr(mod, name), f"Missing activity: {name}")
