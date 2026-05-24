@@ -1,5 +1,6 @@
 # web/tests/test_ad_plugin_foundation.py
 from django.test import TestCase
+from unittest.mock import patch, MagicMock
 
 
 class TestADPluginAppConfig(TestCase):
@@ -73,3 +74,23 @@ class TestADTemporalExports(TestCase):
         ]
         for name in expected:
             self.assertTrue(hasattr(mod, name), f"Missing activity: {name}")
+
+
+class TestADAssessmentAPI(TestCase):
+
+    def _get_view(self):
+        try:
+            from plugins_data.active_directory.backend.api import ADAssessmentViewSet
+            return ADAssessmentViewSet
+        except (ImportError, ModuleNotFoundError):
+            self.skipTest("Plugin not installed")
+
+    def test_viewset_has_required_actions(self):
+        ViewSet = self._get_view()
+        self.assertTrue(hasattr(ViewSet, 'start'))
+        self.assertTrue(hasattr(ViewSet, 'cancel'))
+        self.assertTrue(hasattr(ViewSet, 'ingest'))
+        self.assertTrue(hasattr(ViewSet, 'findings'))
+        self.assertTrue(hasattr(ViewSet, 'exposures'))
+        self.assertTrue(hasattr(ViewSet, 'trusts'))
+        self.assertTrue(hasattr(ViewSet, 'graph_snapshot'))
