@@ -40,3 +40,27 @@ class TestADGraphSchema(TestCase):
         self.assertGreater(len(constraints), 0)
         for stmt in constraints:
             self.assertIn('CREATE CONSTRAINT', stmt)
+
+
+class TestADGraphManager(TestCase):
+
+    def _get_manager(self):
+        try:
+            from plugins_data.active_directory.backend.graph.manager import ADGraphManager
+            return ADGraphManager
+        except (ImportError, ModuleNotFoundError):
+            self.skipTest("Plugin not installed")
+
+    def test_manager_has_required_methods(self):
+        Mgr = self._get_manager()
+        required = [
+            'ensure_schema', 'upsert_domain', 'upsert_user', 'upsert_group',
+            'upsert_computer', 'upsert_exposure', 'upsert_finding',
+            'create_trust_relationship', 'create_membership_relationship',
+            'get_domain_graph', 'get_exposure_paths', 'get_trust_graph',
+            'find_shortest_path',
+        ]
+        for method in required:
+            self.assertTrue(
+                hasattr(Mgr, method),
+                f"ADGraphManager missing method: {method}")
