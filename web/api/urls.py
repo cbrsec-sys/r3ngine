@@ -442,4 +442,30 @@ urlpatterns = [
 ]
 
 
+# Dynamic plugin API URL discovery
+# Each plugin may provide backend/api_urls.py to expose plugin-specific endpoints
+# at /api/plugins/{plugin_slug}/
+import importlib
+import os as _os
+from django.conf import settings as _settings
+
+_plugins_data_dir = _os.path.join(_settings.BASE_DIR, 'plugins_data')
+if _os.path.exists(_plugins_data_dir):
+    for _plugin_slug in _os.listdir(_plugins_data_dir):
+        _plugin_api_module = f"plugins_data.{_plugin_slug}.backend.api_urls"
+        try:
+            importlib.import_module(_plugin_api_module)
+            urlpatterns.append(
+                path(f'plugins/{_plugin_slug}/', include(
+                    (_plugin_api_module, _plugin_slug),
+                    namespace=_plugin_slug,
+                ))
+            )
+        except ImportError:
+            pass
+        except Exception as _e:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                f"Failed to load plugin URLs for {_plugin_slug}: {_e}")
+
 urlpatterns += router.urls

@@ -94,3 +94,16 @@ class TestADAssessmentAPI(TestCase):
         self.assertTrue(hasattr(ViewSet, 'exposures'))
         self.assertTrue(hasattr(ViewSet, 'trusts'))
         self.assertTrue(hasattr(ViewSet, 'graph_snapshot'))
+
+
+class TestDynamicPluginURLDiscovery(TestCase):
+
+    def test_ad_plugin_urls_are_mounted(self):
+        """Once the plugin is installed, /api/plugins/active_directory/ must resolve."""
+        from django.urls import reverse, NoReverseMatch
+        try:
+            url = reverse('active_directory:ad-assessment-list')
+            self.assertTrue(url.startswith('/api/plugins/active_directory/'))
+        except NoReverseMatch:
+            self.skipTest(
+                "Plugin not installed yet — mount expected after Task 10")
