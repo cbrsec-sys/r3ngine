@@ -8,7 +8,7 @@ import json
 from django.utils import timezone
 
 from urllib.parse import urlparse
-from reNgine.opsec_utils import ProxychainsWrapper
+from reNgine.utils.opsec import ProxychainsWrapper
 import redis
 from django.conf import settings
 from startScan.models import ScanHistory, Email, Employee, Command, Subdomain, EndPoint, Parameter

@@ -77,7 +77,7 @@ class TestSanitize(unittest.TestCase):
     """sanitize() blocks shell-unsafe characters and handles edge cases."""
 
     def setUp(self):
-        from reNgine.stress_cmd_builder import sanitize
+        from reNgine.stress.cmd_builder import sanitize
         self.sanitize = sanitize
 
     def test_safe_value_passes_through(self):
@@ -112,7 +112,7 @@ class TestSanitize(unittest.TestCase):
 
 class TestBuildStressCommandK6(unittest.TestCase):
     def setUp(self):
-        from reNgine.stress_cmd_builder import build_stress_command
+        from reNgine.stress.cmd_builder import build_stress_command
         self.build = build_stress_command
 
     def tearDown(self):
@@ -181,7 +181,7 @@ class TestBuildStressCommandK6(unittest.TestCase):
 
 class TestBuildStressCommandWrk(unittest.TestCase):
     def setUp(self):
-        from reNgine.stress_cmd_builder import build_stress_command
+        from reNgine.stress.cmd_builder import build_stress_command
         self.build = build_stress_command
 
     def test_wrk_returns_wrk_prefix(self):
@@ -224,7 +224,7 @@ class TestBuildStressCommandWrk(unittest.TestCase):
 
 class TestBuildStressCommandHping3(unittest.TestCase):
     def setUp(self):
-        from reNgine.stress_cmd_builder import build_stress_command
+        from reNgine.stress.cmd_builder import build_stress_command
         self.build = build_stress_command
 
     def test_hping3_syn_mode(self):
@@ -268,7 +268,7 @@ class TestBuildStressCommandHping3(unittest.TestCase):
 
 class TestBuildStressCommandLocust(unittest.TestCase):
     def setUp(self):
-        from reNgine.stress_cmd_builder import build_stress_command
+        from reNgine.stress.cmd_builder import build_stress_command
         self.build = build_stress_command
 
     def tearDown(self):
@@ -320,10 +320,10 @@ class TestBuildStressCommandLocust(unittest.TestCase):
 
 class TestBuildStressCommandStressor(unittest.TestCase):
     def setUp(self):
-        from reNgine.stress_cmd_builder import build_stress_command
+        from reNgine.stress.cmd_builder import build_stress_command
         self.build = build_stress_command
 
-    @patch("reNgine.stress_cmd_builder._build_stressor_cmd")
+    @patch("reNgine.stress.cmd_builder._build_stressor_cmd")
     def test_stressor_dispatches_correctly(self, mock_builder):
         mock_builder.return_value = (["python3", "stressor.py", "GET", "example.com:80", "10", "5"], [])
         cmd_str, temp_files = self.build(
@@ -353,8 +353,8 @@ class TestBuildStressCommandStressor(unittest.TestCase):
 
     def test_returns_string_not_list(self):
         """build_stress_command must return a str cmd_str, not a list."""
-        from reNgine.stress_cmd_builder import build_stress_command
-        with patch("reNgine.stress_cmd_builder._build_wrk_cmd") as mock_wrk:
+        from reNgine.stress.cmd_builder import build_stress_command
+        with patch("reNgine.stress.cmd_builder._build_wrk_cmd") as mock_wrk:
             mock_wrk.return_value = (["wrk", "-t", "2", "http://x.com"], [])
             cmd_str, _ = build_stress_command(
                 tool="wrk",
@@ -388,8 +388,8 @@ class TestInitStressTestActivity(DjangoTestCase):
         self.engine.delete()
         self.domain.delete()
 
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.clear_stream")
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.clear_stream")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
     def test_creates_stress_result_record(self, mock_publish, mock_clear):
         from reNgine.temporal_activities import init_stress_test_activity
 
@@ -410,8 +410,8 @@ class TestInitStressTestActivity(DjangoTestCase):
         self.assertIsNotNone(db_result)
         self.assertEqual(db_result.scan_history_id, self.scan.id)
 
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.clear_stream")
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.clear_stream")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
     def test_resolves_endpoints(self, mock_publish, mock_clear):
         from reNgine.temporal_activities import init_stress_test_activity
 
@@ -431,8 +431,8 @@ class TestInitStressTestActivity(DjangoTestCase):
         self.assertIsInstance(result_ctx["resolved_endpoints"], list)
         self.assertGreater(len(result_ctx["resolved_endpoints"]), 0)
 
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.clear_stream")
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.clear_stream")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
     def test_clear_stream_called(self, mock_publish, mock_clear):
         from reNgine.temporal_activities import init_stress_test_activity
 
@@ -446,8 +446,8 @@ class TestInitStressTestActivity(DjangoTestCase):
 
         mock_clear.assert_called_once()
 
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.clear_stream")
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.clear_stream")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
     def test_publishes_running_status(self, mock_publish, mock_clear):
         from reNgine.temporal_activities import init_stress_test_activity
 
@@ -465,8 +465,8 @@ class TestInitStressTestActivity(DjangoTestCase):
         ]
         self.assertTrue(len(running_calls) >= 1)
 
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.clear_stream")
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.clear_stream")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
     def test_no_endpoints_returns_empty_list(self, mock_publish, mock_clear):
         from reNgine.temporal_activities import init_stress_test_activity
 
@@ -510,7 +510,7 @@ class TestFinalizeStressTestActivity(DjangoTestCase):
         self.domain.delete()
 
     @patch("reNgine.tasks.send_scan_notif")
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
     def test_updates_stress_result_metrics(self, mock_publish, mock_notif):
         from reNgine.temporal_activities import finalize_stress_test_activity
 
@@ -537,7 +537,7 @@ class TestFinalizeStressTestActivity(DjangoTestCase):
         self.assertAlmostEqual(updated.max_requests_per_second, 333.3, places=1)
 
     @patch("reNgine.tasks.send_scan_notif")
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
     def test_sets_scan_status_success(self, mock_publish, mock_notif):
         from reNgine.temporal_activities import finalize_stress_test_activity
         from reNgine.definitions import SUCCESS_TASK
@@ -561,7 +561,7 @@ class TestFinalizeStressTestActivity(DjangoTestCase):
         self.assertEqual(self.scan.scan_status, SUCCESS_TASK)
 
     @patch("reNgine.tasks.send_scan_notif")
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
     def test_sets_scan_status_aborted(self, mock_publish, mock_notif):
         from reNgine.temporal_activities import finalize_stress_test_activity
         from reNgine.definitions import ABORTED_TASK
@@ -585,7 +585,7 @@ class TestFinalizeStressTestActivity(DjangoTestCase):
         self.assertEqual(self.scan.scan_status, ABORTED_TASK)
 
     @patch("reNgine.tasks.send_scan_notif")
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
     def test_publishes_completed_status(self, mock_publish, mock_notif):
         from reNgine.temporal_activities import finalize_stress_test_activity
 
@@ -611,7 +611,7 @@ class TestFinalizeStressTestActivity(DjangoTestCase):
         self.assertTrue(len(completed_calls) >= 1, "Expected 'completed' status published")
 
     @patch("reNgine.tasks.send_scan_notif")
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
     def test_marks_kill_switch_triggered_when_aborted(self, mock_publish, mock_notif):
         from reNgine.temporal_activities import finalize_stress_test_activity
 
@@ -685,11 +685,11 @@ class TestRunStressToolActivity(DjangoTestCase):
         mock_proc.wait.return_value = 0
         return mock_proc
 
-    @patch("reNgine.opsec_utils.ProxychainsWrapper.should_wrap", return_value=False)
+    @patch("reNgine.utils.opsec.ProxychainsWrapper.should_wrap", return_value=False)
     @patch("reNgine.common_func.get_random_user_agent", return_value="TestAgent/1.0")
     @patch("reNgine.common_func.get_random_proxy", return_value=None)
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
-    @patch("reNgine.stress_cmd_builder.build_stress_command")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.cmd_builder.build_stress_command")
     @patch("subprocess.Popen")
     def test_returns_metrics_dict(
         self, mock_popen, mock_build, mock_publish, mock_proxy,
@@ -706,11 +706,11 @@ class TestRunStressToolActivity(DjangoTestCase):
         self.assertIsInstance(result, dict)
         self.assertIn("total_requests", result)
 
-    @patch("reNgine.opsec_utils.ProxychainsWrapper.should_wrap", return_value=False)
+    @patch("reNgine.utils.opsec.ProxychainsWrapper.should_wrap", return_value=False)
     @patch("reNgine.common_func.get_random_user_agent", return_value="TestAgent/1.0")
     @patch("reNgine.common_func.get_random_proxy", return_value=None)
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
-    @patch("reNgine.stress_cmd_builder.build_stress_command")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.cmd_builder.build_stress_command")
     @patch("subprocess.Popen")
     def test_kills_process_when_redis_kill_switch_active(
         self, mock_popen, mock_build, mock_publish, mock_proxy,
@@ -735,11 +735,11 @@ class TestRunStressToolActivity(DjangoTestCase):
                 run_stress_tool_activity(ctx)
                 mock_killpg.assert_called()
 
-    @patch("reNgine.opsec_utils.ProxychainsWrapper.should_wrap", return_value=False)
+    @patch("reNgine.utils.opsec.ProxychainsWrapper.should_wrap", return_value=False)
     @patch("reNgine.common_func.get_random_user_agent", return_value="TestAgent/1.0")
     @patch("reNgine.common_func.get_random_proxy", return_value=None)
-    @patch("reNgine.stress_telemetry.StressTelemetryPublisher.publish")
-    @patch("reNgine.stress_cmd_builder.build_stress_command")
+    @patch("reNgine.stress.telemetry.StressTelemetryPublisher.publish")
+    @patch("reNgine.stress.cmd_builder.build_stress_command")
     @patch("subprocess.Popen")
     def test_temp_files_cleaned_up(
         self, mock_popen, mock_build, mock_publish, mock_proxy,
@@ -762,7 +762,7 @@ class TestRunStressToolActivity(DjangoTestCase):
 
         self.assertFalse(os.path.exists(temp_path), "Temp file should have been removed")
 
-    @patch("reNgine.stress_cmd_builder.build_stress_command")
+    @patch("reNgine.stress.cmd_builder.build_stress_command")
     def test_unknown_tool_raises_value_error(self, mock_build):
         from reNgine.temporal_activities import run_stress_tool_activity
 
@@ -954,23 +954,26 @@ class TestStressTestControlAPIStart(DjangoTestCase):
         force_authenticate(request, user=self.user)
         return request
 
-    @patch("asyncio.run")
-    def test_start_action_calls_temporal(self, mock_asyncio_run):
-        from reNgine.stress_views import StressTestControlAPI
-
-        mock_asyncio_run.return_value = None
+    @patch("reNgine.stress.views._start_stress_workflow", new_callable=AsyncMock)
+    def test_start_action_calls_temporal(self, mock_start):
+        from reNgine.stress.views import StressTestControlAPI
 
         request = self._authenticated_request({"action": "start", "config": {}})
         view = StressTestControlAPI.as_view()
         response = view(request, scan_id=self.scan.id)
 
         self.assertEqual(response.status_code, 200)
-        mock_asyncio_run.assert_called_once()
+        mock_start.assert_called_once_with({
+            "scan_history_id": self.scan.id,
+            "target_domain_name": self.domain.name,
+            "stress_config": {},
+        }, self.scan.id)
 
-    @patch("asyncio.run", side_effect=Exception("Temporal unavailable"))
-    def test_start_returns_500_when_temporal_fails(self, mock_asyncio_run):
+    @patch("reNgine.stress.views._start_stress_workflow", new_callable=AsyncMock)
+    def test_start_returns_500_when_temporal_fails(self, mock_start):
         """When Temporal is unavailable, the API returns HTTP 500 — no Celery fallback."""
-        from reNgine.stress_views import StressTestControlAPI
+        from reNgine.stress.views import StressTestControlAPI
+        mock_start.side_effect = Exception("Temporal unavailable")
 
         request = self._authenticated_request({"action": "start", "config": {}})
         view = StressTestControlAPI.as_view()
@@ -978,21 +981,19 @@ class TestStressTestControlAPIStart(DjangoTestCase):
 
         self.assertEqual(response.status_code, 500)
 
-    @patch("asyncio.run")
-    def test_stop_action_sends_temporal_signal(self, mock_asyncio_run):
-        from reNgine.stress_views import StressTestControlAPI
-
-        mock_asyncio_run.return_value = None
+    @patch("reNgine.stress.views._signal_stress_workflow", new_callable=AsyncMock)
+    def test_stop_action_sends_temporal_signal(self, mock_signal):
+        from reNgine.stress.views import StressTestControlAPI
 
         request = self._authenticated_request({"action": "stop"})
         view = StressTestControlAPI.as_view()
         response = view(request, scan_id=self.scan.id)
 
         self.assertEqual(response.status_code, 200)
-        mock_asyncio_run.assert_called_once()
+        mock_signal.assert_called_once_with(self.scan.id)
 
     def test_invalid_action_returns_400(self):
-        from reNgine.stress_views import StressTestControlAPI
+        from reNgine.stress.views import StressTestControlAPI
 
         request = self._authenticated_request({"action": "explode"})
         view = StressTestControlAPI.as_view()
@@ -1001,7 +1002,7 @@ class TestStressTestControlAPIStart(DjangoTestCase):
         self.assertEqual(response.status_code, 400)
 
     def test_start_with_unknown_scan_returns_404(self):
-        from reNgine.stress_views import StressTestControlAPI
+        from reNgine.stress.views import StressTestControlAPI
 
         request = self._authenticated_request({"action": "start", "config": {}})
         view = StressTestControlAPI.as_view()

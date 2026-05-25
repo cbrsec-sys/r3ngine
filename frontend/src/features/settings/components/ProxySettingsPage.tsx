@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
-  Card, 
-  CardContent, 
-  Switch, 
-  FormControlLabel, 
-  TextField, 
-  Button, 
+import {
+  Box,
+  Typography,
+  Card,
+  CardContent,
+  Switch,
+  FormControlLabel,
+  TextField,
+  Button,
   LinearProgress,
   Alert,
   Stack,
@@ -15,10 +15,10 @@ import {
   CircularProgress,
   Checkbox
 } from '@mui/material';
-import { 
-  Settings, 
-  Shield, 
-  Save, 
+import {
+  Settings,
+  Shield,
+  Save,
   RefreshCw,
   AlertCircle,
   CheckCircle2
@@ -33,7 +33,7 @@ export const ProxySettingsPage: React.FC = () => {
   const { data: settings, isLoading: isSettingsLoading } = useProxySettings(projectSlug);
   const updateSettings = useUpdateProxySettings(projectSlug);
   const fetchProxies = useFetchProxies(projectSlug);
-  
+
   const [useProxy, setUseProxy] = useState(false);
   const [useProxychains, setUseProxychains] = useState(false);
   const [proxyList, setProxyList] = useState('');
@@ -41,6 +41,7 @@ export const ProxySettingsPage: React.FC = () => {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [fetchLimit, setFetchLimit] = useState<number | 'custom'>(1000);
   const [customLimit, setCustomLimit] = useState<string>('2000');
+  const [validateOnSave, setValidateOnSave] = useState(false);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -88,7 +89,12 @@ export const ProxySettingsPage: React.FC = () => {
   };
 
   const handleSave = () => {
-    updateSettings.mutate({ use_proxy: useProxy, use_proxychains: useProxychains, proxies: proxyList }, {
+    updateSettings.mutate({
+      use_proxy: useProxy,
+      use_proxychains: useProxychains,
+      proxies: proxyList,
+      skip_validation: !validateOnSave
+    }, {
       onSuccess: () => {
         setSnackbar({
           open: true,
@@ -121,9 +127,9 @@ export const ProxySettingsPage: React.FC = () => {
       message: 'Initiating proxy fetch task...',
       severity: 'success'
     });
-    
+
     const finalLimit = fetchLimit === 'custom' ? parseInt(customLimit, 10) || 1000 : fetchLimit;
-    
+
     fetchProxies.mutate(finalLimit, {
       onSuccess: (data) => {
         setCurrentTaskId(data.task_id);
@@ -149,10 +155,10 @@ export const ProxySettingsPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
         <Box>
-          <Typography variant="h4" sx={{ 
-            fontFamily: 'Orbitron', 
-            fontWeight: 900, 
-            letterSpacing: 2, 
+          <Typography variant="h4" sx={{
+            fontFamily: 'Orbitron',
+            fontWeight: 900,
+            letterSpacing: 2,
             color: '#fff',
             textShadow: '0 0 20px rgba(0, 243, 255, 0.5)',
             mb: 1
@@ -169,17 +175,17 @@ export const ProxySettingsPage: React.FC = () => {
       </Box>
 
       <Stack spacing={3}>
-        <Alert 
-          severity="info" 
+        <Alert
+          severity="info"
           icon={<Shield size={20} />}
-          sx={{ 
-            bgcolor: 'rgba(0, 243, 255, 0.05)', 
+          sx={{
+            bgcolor: 'rgba(0, 243, 255, 0.05)',
             color: '#00f3ff',
             border: '1px solid rgba(0, 243, 255, 0.2)',
             '& .MuiAlert-icon': { color: '#00f3ff' }
           }}
         >
-          Every website has a limit to requests. Exceeding it results in blocks. 
+          Every website has a limit to requests. Exceeding it results in blocks.
           Using proxies is highly recommended for reliable recon and OSINT.
         </Alert>
 
@@ -188,8 +194,8 @@ export const ProxySettingsPage: React.FC = () => {
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
               <FormControlLabel
                 control={
-                  <Switch 
-                    checked={useProxy} 
+                  <Switch
+                    checked={useProxy}
                     onChange={(e) => setUseProxy(e.target.checked)}
                     sx={{
                       '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
@@ -206,8 +212,8 @@ export const ProxySettingsPage: React.FC = () => {
 
               <FormControlLabel
                 control={
-                  <Switch 
-                    checked={useProxychains} 
+                  <Switch
+                    checked={useProxychains}
                     onChange={(e) => setUseProxychains(e.target.checked)}
                     disabled={!useProxy}
                     sx={{
@@ -228,7 +234,7 @@ export const ProxySettingsPage: React.FC = () => {
                 }
               />
             </Box>
-            
+
             <Box sx={{
               mt: 3, p: 2,
               bgcolor: 'rgba(255, 255, 255, 0.02)',
@@ -244,12 +250,12 @@ export const ProxySettingsPage: React.FC = () => {
                   AUTOMATED PROXY FETCH LIMIT
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
-                  Select the maximum number of raw proxies to scrape and check for liveness.
+                  Select the maximum number of raw proxies to scrape and check for liveness. (Note: It may take a while to complete. Validation rate: +-1/3%)
                 </Typography>
               </Box>
 
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexShrink: 0, flexWrap: 'nowrap' }}>
-                {([500, 1000, 5000] as const).map((n) => (
+                {([5000, 10000, 25000] as const).map((n) => (
                   <FormControlLabel
                     key={n}
                     control={
@@ -343,15 +349,15 @@ export const ProxySettingsPage: React.FC = () => {
                     <Typography variant="subtitle2" sx={{ color: '#fff', fontFamily: 'Orbitron', mb: 0.5 }}>
                       {taskStatus?.message || 'Initializing task...'}
                     </Typography>
-                    <LinearProgress 
-                      variant="determinate" 
-                      value={taskStatus?.progress || 0} 
-                      sx={{ 
-                        height: 6, 
+                    <LinearProgress
+                      variant="determinate"
+                      value={taskStatus?.progress || 0}
+                      sx={{
+                        height: 6,
                         borderRadius: 3,
                         bgcolor: 'rgba(255, 255, 255, 0.05)',
                         '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' }
-                      }} 
+                      }}
                     />
                   </Box>
                   <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)', fontFamily: 'Orbitron' }}>
@@ -388,22 +394,42 @@ export const ProxySettingsPage: React.FC = () => {
                 FETCH & UPDATE
               </Button>
 
-              <Button
-                variant="contained"
-                startIcon={<Save size={18} />}
-                onClick={handleSave}
-                disabled={updateSettings.isPending}
-                sx={{
-                  bgcolor: 'rgba(0, 243, 255, 0.1)',
-                  color: '#00f3ff',
-                  border: '1px solid rgba(0, 243, 255, 0.3)',
-                  fontFamily: 'Orbitron',
-                  fontWeight: 800,
-                  '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)', boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)' }
-                }}
-              >
-                {updateSettings.isPending ? 'SAVING...' : 'SAVE PROXIES'}
-              </Button>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={validateOnSave}
+                      onChange={(e) => setValidateOnSave(e.target.checked)}
+                      size="small"
+                      sx={{
+                        '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                      }}
+                    />
+                  }
+                  label={
+                    <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>
+                      VALIDATE ON SAVE
+                    </Typography>
+                  }
+                />
+                <Button
+                  variant="contained"
+                  startIcon={<Save size={18} />}
+                  onClick={handleSave}
+                  disabled={updateSettings.isPending}
+                  sx={{
+                    bgcolor: 'rgba(0, 243, 255, 0.1)',
+                    color: '#00f3ff',
+                    border: '1px solid rgba(0, 243, 255, 0.3)',
+                    fontFamily: 'Orbitron',
+                    fontWeight: 800,
+                    '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)', boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)' }
+                  }}
+                >
+                  {updateSettings.isPending ? 'SAVING...' : 'SAVE PROXIES'}
+                </Button>
+              </Box>
             </Box>
           </Box>
         </TacticalPanel>
@@ -420,18 +446,18 @@ export const ProxySettingsPage: React.FC = () => {
         confirmText="INITIATE FETCH"
       />
 
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
           variant="filled"
-          sx={{ 
-            fontFamily: 'Orbitron', 
+          sx={{
+            fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
             bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',

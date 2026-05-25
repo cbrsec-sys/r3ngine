@@ -9,8 +9,8 @@ import threading
 from reNgine.common_func import (
     get_random_proxy,
 )
-from reNgine.task_utils import save_email, save_employee
-from reNgine.opsec_utils import OpSecManager, ProxychainsWrapper
+from reNgine.utils.task import save_email, save_employee
+from reNgine.utils.opsec import OpSecManager, ProxychainsWrapper
 from startScan.models import ScanHistory, Email, Employee
 from reNgine.definitions import *
 from reNgine.osint.linkedin_intelligence import LinkedInScraper

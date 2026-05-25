@@ -333,18 +333,22 @@ class LocustParserTest(TestCase):
 
     def test_locust_aggregated_stats(self):
         """Test parsing locust aggregated statistics."""
+        header = "Type Name # reqs # fails"
         line = "Aggregated    100    0(0.00%)  |      45      12     120     30   |    2.50    0.00"
+        self.parser.parse_line(header)
         self.parser.parse_line(line)
 
-        self.assertEqual(self.parser.aggregated_stats.get('total_requests'), 100)
-        self.assertEqual(self.parser.aggregated_stats.get('error_rate'), 0.0)
+        self.assertEqual(self.parser.metrics.get('total_requests'), 100)
+        self.assertEqual(self.parser.metrics.get('error_rate'), 0.0)
 
     def test_locust_final_metrics(self):
         """Test get_final_metrics() returns standardized output."""
-        self.parser.aggregated_stats = {
+        self.parser.metrics = {
             'total_requests': 100,
+            'failed_requests': 0,
             'error_rate': 0.0,
-            'throughput_rps': 2.5
+            'throughput_rps': 2.5,
+            'avg_latency': 45.0
         }
 
         final = self.parser.get_final_metrics()

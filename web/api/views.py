@@ -31,7 +31,7 @@ from django.core.cache import cache
 from dashboard.models import *
 from recon_note.models import *
 from reNgine.common_func import *
-from reNgine.database_utils import *
+from reNgine.utils.database import *
 from reNgine.definitions import (
 	ABORTED_TASK,
 	RUNNING_TASK,
@@ -52,7 +52,7 @@ from targetApp.models import *
 from api.shared_api_tasks import import_hackerone_programs_task, sync_bookmarked_programs_task
 from api.permissions import *
 from api.serializers import *
-from reNgine.graph_utils import Neo4jManager
+from reNgine.utils.graph import Neo4jManager
 
 
 logger = logging.getLogger(__name__)
@@ -1992,7 +1992,8 @@ class ProxySettingsAPIView(APIView):
 			proxy = Proxy.objects.create()
 		data = request.data.copy()
 		message = 'Proxies updated successfully'
-		if data.get('use_proxy') and data.get('proxies'):
+		skip_validation = request.data.get('skip_validation') == 'true'
+		if data.get('use_proxy') and data.get('proxies') and not skip_validation:
 			from reNgine.common_func import validate_proxies
 			original_count = len([line for line in data['proxies'].splitlines() if line.strip()])
 			validated = validate_proxies(data['proxies'])

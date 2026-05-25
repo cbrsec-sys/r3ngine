@@ -244,6 +244,15 @@ class WrkParser(BaseParser):
             # Recompute error rate
             if self.metrics["total_requests"] > 0:
                 self.metrics["error_rate"] = total_errors / self.metrics["total_requests"]
+        else:
+            alt_errors_match = re.search(r"([0-9]+)\s+socket errors,\s+([0-9]+)\s+timeouts", line)
+            if alt_errors_match:
+                self.metrics["socket_errors"] = int(alt_errors_match.group(1))
+                self.metrics["timeout_errors"] = int(alt_errors_match.group(2))
+                total_errors = self.metrics["socket_errors"] + self.metrics["timeout_errors"]
+                has_update = True
+                if self.metrics["total_requests"] > 0:
+                    self.metrics["error_rate"] = total_errors / self.metrics["total_requests"]
 
         return self.metrics if has_update else None
 
@@ -286,6 +295,12 @@ class Hping3Parser(BaseParser):
         self.min_rtt = float('inf')
         self.max_rtt = float('-inf')
         self.sum_rtt = 0.0
+        self.metrics = {
+            "sent_packets": 0,
+            "received_packets": 0,
+            "packet_loss_rate": 0.0,
+            "rtt_avg": 0.0
+        }
 
     def parse_line(self, line):
         """Parse a single line of hping3 output.
@@ -304,7 +319,7 @@ class Hping3Parser(BaseParser):
             self.last_calc_time = now
             
         # len=46 ip=1.2.3.4 ttl=64 id=1234 sport=80 flags=SA seq=0 win=512 rtt=12.3 ms
-        rtt_match = re.search(r"rtt=([0-9.]+)\s+ms", line)
+        rtt_match = re.search(r"rtt=([0-9.]+)\s*ms", line)
         if rtt_match:
             lat = float(rtt_match.group(1))
             self.latencies.append(lat)
@@ -319,6 +334,7 @@ class Hping3Parser(BaseParser):
             metrics["rtt_min"] = self.min_rtt
             metrics["rtt_max"] = self.max_rtt
             metrics["rtt_avg"] = self.sum_rtt / len(self.latencies)
+            self.metrics["rtt_avg"] = metrics["rtt_avg"]
             
             self.packets_in_window += 1
             
@@ -335,6 +351,9 @@ class Hping3Parser(BaseParser):
                 metrics["packets_sent"] = packets_sent
                 metrics["packets_received"] = packets_received
                 metrics["packet_loss"] = ((packets_sent - packets_received) / packets_sent) * 100
+                self.metrics["sent_packets"] = packets_sent
+                self.metrics["received_packets"] = packets_received
+                self.metrics["packet_loss_rate"] = metrics["packet_loss"] / 100.0
         
         # 100 packets transmitted, 100 packets received, 0% packet loss
         loss_match = re.search(r"([0-9]+)\s+packets\s+transmitted,\s+([0-9]+)\s+packets\s+received,\s+([0-9.]+)%\s+packet\s+loss", line)
@@ -346,6 +365,9 @@ class Hping3Parser(BaseParser):
             metrics["packet_loss"] = self.packet_loss
             metrics["packets_sent"] = self.total_packets
             metrics["packets_received"] = received
+            self.metrics["sent_packets"] = self.total_packets
+            self.metrics["received_packets"] = received
+            self.metrics["packet_loss_rate"] = self.packet_loss / 100.0
             
         # Calculate live RPS every 1 second
         if now - self.last_calc_time >= 1.0:
@@ -365,15 +387,15 @@ class Hping3Parser(BaseParser):
         Returns:
             dict: Standardized dictionary containing total/success/failed requests, latencies, and max RPS.
         """
-        avg_lat = sum(self.latencies) / len(self.latencies) if self.latencies else 0.0
+        avg_lat = sum(self.latencies) / len(self.latencies) if self.latencies else self.metrics.get("rtt_avg", 0.0)
         sorted_lats = sorted(self.latencies)
-        p95 = sorted_lats[int(len(sorted_lats) * 0.95)] if sorted_lats else 0.0
-        p99 = sorted_lats[int(len(sorted_lats) * 0.99)] if sorted_lats else 0.0
+        p95 = sorted_lats[int(len(sorted_lats) * 0.95)] if sorted_lats else avg_lat
+        p99 = sorted_lats[int(len(sorted_lats) * 0.99)] if sorted_lats else avg_lat
         
         # If loss match was not encountered or packet stats not captured yet, estimate from RTT list
-        total = self.total_packets
-        if total == 0 and self.latencies:
-            total = len(self.latencies)
+        total = self.total_packets or self.metrics.get("sent_packets", 0)
+        received = (self.total_packets - self.failed_packets) if self.total_packets else self.metrics.get("received_packets", 0)
+        failed = self.failed_packets if self.total_packets else (total - received)
             
         # RPS over the entire run
         total_time = time.time() - (self.start_time or time.time())
@@ -381,8 +403,8 @@ class Hping3Parser(BaseParser):
             
         return {
             "total_requests": total,
-            "successful_requests": total - self.failed_packets,
-            "failed_requests": self.failed_packets,
+            "successful_requests": received,
+            "failed_requests": failed,
             "avg_latency_ms": avg_lat,
             "p95_latency_ms": p95,
             "p99_latency_ms": p99,
@@ -749,6 +771,11 @@ class TAStressorParser(BaseParser):
             "total_requests": 0,
             "failed_requests": 0,
             "total_bytes": 0,
+            "mode": "L7",
+            "response_rate": 1.0,
+            "pps": 0.0,
+            "bps": 0.0,
+            "rps": 0.0,
         }
 
     def parse_line(self, line):
@@ -792,27 +819,51 @@ class TAStressorParser(BaseParser):
             self.metrics["throughput_rps"] = val
             self.metrics["pps"] = val
             self.metrics["rps"] = val
+            self.metrics["mode"] = "L4"
             # Accumulate requests dynamically (since logs output rate every 1 second)
             self.metrics["total_requests"] += int(val)
             has_update = True
             
         # Regex to capture BPS (Bytes per second)
-        bps_match = re.search(r"BPS:\s*([0-9.]+)\s*([kmgtp]?b)", clean_line, re.IGNORECASE)
+        bps_match = re.search(r"BPS:\s*([0-9.]+)(?:\s*([kmgtp]?b))?", clean_line, re.IGNORECASE)
         if bps_match:
             val = float(bps_match.group(1))
-            unit = bps_match.group(2).lower()
-            if unit == 'kb':
-                val *= 1_000
-            elif unit == 'mb':
-                val *= 1_000_000
-            elif unit == 'gb':
-                val *= 1_000_000_000
-            elif unit == 'tb':
-                val *= 1_000_000_000_000
+            if bps_match.group(2):
+                unit = bps_match.group(2).lower()
+                if unit == 'kb':
+                    val *= 1_000
+                elif unit == 'mb':
+                    val *= 1_000_000
+                elif unit == 'gb':
+                    val *= 1_000_000_000
+                elif unit == 'tb':
+                    val *= 1_000_000_000_000
                 
             self.metrics["throughput_bps"] = val
             self.metrics["bps"] = val
             self.metrics["total_bytes"] += int(val)
+            self.metrics["mode"] = "L4"
+            has_update = True
+
+        # Regex to capture RPS
+        rps_match = re.search(r"RPS:\s*([0-9.]+)([kmgtp]?)", clean_line, re.IGNORECASE)
+        if rps_match:
+            val = float(rps_match.group(1))
+            unit = rps_match.group(2).lower()
+            if unit == 'k': val *= 1_000
+            elif unit == 'm': val *= 1_000_000
+            self.metrics["throughput_rps"] = val
+            self.metrics["rps"] = val
+            self.metrics["mode"] = "L7"
+            self.metrics["total_requests"] += int(val)
+            has_update = True
+
+        # Regex to capture Response Rate
+        resp_rate_match = re.search(r"Response\s+Rate:\s*([0-9.]+)%", clean_line, re.IGNORECASE)
+        if resp_rate_match:
+            rate = float(resp_rate_match.group(1)) / 100.0
+            self.metrics["response_rate"] = rate
+            self.metrics["error_rate"] = 1.0 - rate
             has_update = True
             
         # Parse failed count if present (for future-proofing)
@@ -844,6 +895,11 @@ class TAStressorParser(BaseParser):
             failed = int(total * error_rate)
             
         success = max(0, total - failed)
+
+        response_rate = self.metrics.get("response_rate", 1.0)
+        if total > 0 and "response_rate" not in self.metrics:
+            response_rate = success / total
+
         return {
             "total_requests": total,
             "successful_requests": success,
@@ -851,7 +907,9 @@ class TAStressorParser(BaseParser):
             "avg_latency_ms": 0.0,
             "p95_latency_ms": 0.0,
             "p99_latency_ms": 0.0,
-            "max_requests_per_second": self.metrics.get("throughput_rps", 0.0)
+            "max_requests_per_second": self.metrics.get("throughput_rps", 0.0),
+            "mode": self.metrics.get("mode", "L7"),
+            "response_rate": response_rate
         }
 
 

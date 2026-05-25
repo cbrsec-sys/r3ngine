@@ -159,14 +159,14 @@ class TestSubscanSeverityStability(TestCase):
             if os.path.exists(temp_file):
                 os.remove(temp_file)
 
-    @patch('reNgine.task_utils.Command')
-    @patch('reNgine.task_utils.SOCConfiguration')
+    @patch('reNgine.utils.task.Command')
+    @patch('reNgine.utils.task.SOCConfiguration')
     def test_stream_command_watchdog_timeout(self, mock_soc_config, mock_command_model):
         """
         Verify that stream_command properly enforces a watchdog timeout,
         killing hung subprocesses using the background watchdog thread.
         """
-        from reNgine.task_utils import stream_command
+        from reNgine.utils.task import stream_command
         import time
 
         # Mock SOCConfiguration

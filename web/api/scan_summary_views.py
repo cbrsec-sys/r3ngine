@@ -28,6 +28,16 @@ class ScanSummaryAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request, slug, id):
+        """Fetch and return summary information for a specific scan.
+
+        Args:
+            request (Request): Django REST Framework request object.
+            slug (str): Project slug identifier.
+            id (int): Scan history ID.
+
+        Returns:
+            Response: API Response containing scan metrics, status, timeline, vulnerabilities, and target domain details.
+        """
         try:
             project = Project.objects.get(slug=slug)
             scan = ScanHistory.objects.get(id=id, domain__project=project)
@@ -128,6 +138,7 @@ class ScanSummaryAPIView(APIView):
                 },
                 'dns_records': list(di.dns_records.all().values('type', 'name'))[:20],
                 'name_servers': list(di.name_servers.all().values('name'))[:10],
+                'nameservers': [ns.name for ns in di.name_servers.all()][:10],
                 'historical_ips': list(di.historical_ips.all().values('ip', 'location', 'owner', 'last_seen'))[:10],
             }
 

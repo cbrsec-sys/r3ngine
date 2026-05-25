@@ -24,7 +24,7 @@ from reNgine.tasks import create_scan_activity, initiate_scan_temporal, run_comm
 from scanEngine.models import EngineType
 from startScan.models import *
 from targetApp.models import *
-from reNgine.graph_utils import Neo4jManager
+from reNgine.utils.graph import Neo4jManager
 
 logger = logging.getLogger(__name__)
 

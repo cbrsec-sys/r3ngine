@@ -11,7 +11,8 @@ from startScan.models import (
     ScanHistory, Domain, StressTestResult, StressTelemetryPoint,
     StressToolConfiguration, EndPoint, ScanReport
 )
-from reNgine.stress_report_builder import StressReportBuilder
+from scanEngine.models import EngineType
+from reNgine.stress.report_builder import StressReportBuilder
 from reNgine.charts import (
     generate_stress_latency_distribution_chart,
     generate_stress_response_code_chart,
@@ -32,11 +33,12 @@ class StressReportBuilderTestCase(TestCase):
             description='Test domain'
         )
 
+        self.engine = EngineType.objects.create(engine_name='quick_scan')
         self.scan = ScanHistory.objects.create(
             domain=self.domain,
-            scan_type='quick_scan',
+            scan_type=self.engine,
             start_scan_date=datetime.now(),
-            status='completed',
+            scan_status=2,
             initiated_by=self.user
         )
 
@@ -194,9 +196,10 @@ class StressChartGenerationTestCase(TestCase):
     def setUp(self):
         """Create test data."""
         self.domain = Domain.objects.create(name='example.com')
+        self.engine = EngineType.objects.create(engine_name='quick_scan')
         self.scan = ScanHistory.objects.create(
             domain=self.domain,
-            scan_type='quick_scan',
+            scan_type=self.engine,
             start_scan_date=datetime.now()
         )
 
@@ -283,9 +286,10 @@ class StressReportGenerationAPITestCase(TestCase):
         self.client = Client()
         self.user = User.objects.create_user(username='testuser', password='pass123')
         self.domain = Domain.objects.create(name='example.com')
+        self.engine = EngineType.objects.create(engine_name='quick_scan')
         self.scan = ScanHistory.objects.create(
             domain=self.domain,
-            scan_type='quick_scan',
+            scan_type=self.engine,
             start_scan_date=datetime.now(),
             initiated_by=self.user
         )
@@ -363,9 +367,10 @@ class StressReportTemplateTestCase(TestCase):
         from django.template import Template, Context
 
         domain = Domain.objects.create(name='example.com')
+        engine = EngineType.objects.create(engine_name='quick_scan')
         scan = ScanHistory.objects.create(
             domain=domain,
-            scan_type='quick_scan',
+            scan_type=engine,
             start_scan_date=datetime.now()
         )
 
@@ -395,9 +400,10 @@ class StressReportTemplateTestCase(TestCase):
     def test_stress_cyber_pro_template_context(self):
         """Test that stress_cyber_pro template has required context."""
         domain = Domain.objects.create(name='example.com')
+        engine = EngineType.objects.create(engine_name='quick_scan')
         scan = ScanHistory.objects.create(
             domain=domain,
-            scan_type='quick_scan',
+            scan_type=engine,
             start_scan_date=datetime.now()
         )
 

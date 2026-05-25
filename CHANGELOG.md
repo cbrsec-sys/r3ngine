@@ -2,6 +2,20 @@
 
 ### [v3.2.0] - 2026-05-23
 
+- **Target Information Nameservers and History Tabs Fix**:
+  - Resolved the empty Nameservers tab on the Scan Detail page by introducing the `nameservers` field (list of strings) in `ScanSummaryAPIView` and `TargetSummaryAPIView` to match the frontend component's requirements.
+  - Implemented the missing rendering logic for the Nameservers (infoTab === 3) and History (infoTab === 4) tabs on the Target Summary page.
+  - Added the missing History tab rendering logic on the Scan Detail page to display historical IP resolution details.
+
+- **Screenshot Pipeline Optimization**:
+  - Moved the visual screenshotting task (`screenshot`) from Tier 2 (parallel to HTTP Crawl & Port Scanning) to Tier 6 (parallel to Vulnerability Scanning).
+  - This ensures that crawling, URL fetching, and directory/file fuzzing have completely finished execution, allowing a comprehensive set of alive endpoints to be gathered before screenshots are captured.
+
+- **Code Restructuring and Utility Sub-Package Migration**:
+  - Relocated stress testing python files (`stress_views.py`, `stress_cmd_builder.py`, `stress_report_builder.py`, `stress_telemetry.py`, `stress_aggregation.py`, `stress_testing_tasks.py`) from the root of `web/reNgine/` to `web/reNgine/stress/`, dropping redundant prefixes.
+  - Relocated general utility scripts (`database_utils.py`, `graph_utils.py`, `llm_utils.py`, `opsec_utils.py`, `task_utils.py`, `waf_utils.py`) from the root of `web/reNgine/` to a dedicated `web/reNgine/utils/` sub-package, stripping redundant suffixes.
+  - Updated all imports and mock references across the Django views, background tasks, plugins, and unit tests to align with the new sub-packages.
+
 - **Exploit Readiness Layer (ERL) Dedicated Dashboard & Routing Standardization**:
   - Replaced component-level override hijacking with a standardized dynamic plugin page routing system.
   - Added support for dynamic wildcard page loading at `/p/$pluginSlug` and `/p/$pluginSlug/$pageName` in the host router without requiring core codebase updates.
@@ -52,10 +66,18 @@
     python manage.py recover_scan_results --apply   # write to DB
     python manage.py recover_scan_results --apply --scan-dir /usr/src/scan_results/defijn.io_108
     ```
-- **Stress Testing Telemetry & Activity Stability**:
+- **Stress Testing Telemetry, Security Hardening & Restructuring**:
   - Fixed a Temporal heartbeat context issue inside `RunStressToolActivity` by propagating the `contextvars` context to the background heartbeat loop thread, resolving `RuntimeError: Not in activity context` and allowing real-time status/cancellation detection.
   - Hardened process cleanup by switching process termination to send SIGTERM/SIGKILL to the entire process group (`os.killpg`) to ensure that orphaned background processes are cleanly terminated when a scan is stopped or aborted.
   - Resolved Vite dev server WebSocket configuration by proxying `/ws` paths to Daphne on port 8000, allowing the frontend telemetry component to receive real-time ECharts metrics and log lines during development.
+  - **Security Audit & Hardening**:
+    - Protected load testing tool command execution from command injection vulnerabilities by strictly escaping subprocess execution lists using `shlex.quote` in `cmd_builder.py`.
+    - Hardened asynchronous report PDF generation against Server-Side Request Forgery (SSRF) and Local File Inclusion (LFI) by wrapping WeasyPrint HTML instances in a `secure_url_fetcher` that restricts fetches to data URIs, local files inside `BASE_DIR`/`MEDIA_ROOT`, and Google Fonts.
+    - Prevented DB connection leaks in background threads by ensuring `close_old_connections()` is executed on thread finalization.
+  - **Code Restructuring & Sub-Package Migration**:
+    - Restructured and moved all stress testing Python scripts (`stress_views.py`, `stress_cmd_builder.py`, `stress_report_builder.py`, `stress_telemetry.py`, `stress_testing_tasks.py`, `stress_aggregation.py`) to the clean, dedicated sub-package directory [reNgine/stress/](file:///d:/Repos/r3ngine/web/reNgine/stress/) as `views.py`, `cmd_builder.py`, `report_builder.py`, `telemetry.py`, `testing_tasks.py`, and `aggregation.py`.
+    - Updated all import definitions, mock patches, and test configurations to reference the new package paths.
+    - Resolved `RuntimeWarning: coroutine ... was never awaited` test warnings by replacing global `asyncio.run` mocks with targeted helper patches.
 - **Locust Path Splitting & K6 Telemetry Fixes**:
   - Fixed Locust target URL parsing in `_build_locust_cmd` by utilizing `urllib.parse.urlparse` to dynamically split target URLs into host and path components. This avoids trailing slash errors (such as `GET /xmlrpc.php/` returning `400 Bad Request`) and ensures Locust script generation properly separates the request path from the base host.
   - Resolved K6 real-time dashboard updates by adding dynamic `throughput_rps` calculation to `K6Parser`. It extracts elapsed minutes and seconds from K6's progress output via regex and divides total requests by elapsed seconds, resolving static or missing real-time telemetry metrics.

@@ -4,7 +4,7 @@ import requests
 
 from reNgine.common_func import create_inappnotification, get_hackerone_key_username
 from reNgine.definitions import PROJECT_LEVEL_NOTIFICATION, HACKERONE_ALLOWED_ASSET_TYPES
-from reNgine.database_utils import bulk_import_targets
+from reNgine.utils.database import bulk_import_targets
 
 def import_hackerone_programs_task(handles, project_slug, is_sync = False):
 	"""
