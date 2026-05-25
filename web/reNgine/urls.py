@@ -8,7 +8,8 @@ from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 
-from reNgine import stress_views, views as rengine_views
+from reNgine import views as rengine_views
+from reNgine.stress import views as stress_views
 from dashboard import views as dashboard_views
 from .openapi_info import info
 

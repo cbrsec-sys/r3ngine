@@ -914,7 +914,7 @@ def sync_graph_activity(ctx: dict) -> bool:
     Returns:
         bool: True on success.
     """
-    from reNgine.graph_utils import Neo4jManager
+    from reNgine.utils.graph import Neo4jManager
     from reNgine.tasks import run_apme
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[SyncGraphActivity] Syncing scan_id={scan_id} to Neo4j")
@@ -1101,7 +1101,7 @@ def init_stress_test_activity(ctx: dict) -> dict:
     from startScan.models import ScanHistory, EndPoint, StressTestResult
     from targetApp.models import Domain
     from reNgine.definitions import RUNNING_TASK
-    from reNgine.stress_telemetry import StressTelemetryPublisher
+    from reNgine.stress.telemetry import StressTelemetryPublisher
 
     scan_id = ctx["scan_history_id"]
     target_domain = ctx["target_domain_name"]
@@ -1188,10 +1188,10 @@ def run_stress_tool_activity(ctx: dict) -> dict:
     from django.utils import timezone
     from startScan.models import Command
     from reNgine.parsers import K6Parser, WrkParser, Hping3Parser, LocustParser, TAStressorParser
-    from reNgine.stress_telemetry import StressTelemetryPublisher
-    from reNgine.stress_cmd_builder import build_stress_command
+    from reNgine.stress.telemetry import StressTelemetryPublisher
+    from reNgine.stress.cmd_builder import build_stress_command
     from reNgine.common_func import get_random_proxy, get_random_user_agent
-    from reNgine.opsec_utils import ProxychainsWrapper
+    from reNgine.utils.opsec import ProxychainsWrapper
 
     scan_id = ctx["scan_history_id"]
     target_domain = ctx["target_domain_name"]
@@ -1438,7 +1438,7 @@ def finalize_stress_test_activity(ctx: dict) -> bool:
     from django.utils import timezone
     from startScan.models import ScanHistory, StressTestResult
     from reNgine.definitions import SUCCESS_TASK, ABORTED_TASK
-    from reNgine.stress_telemetry import StressTelemetryPublisher
+    from reNgine.stress.telemetry import StressTelemetryPublisher
     from reNgine.tasks import send_scan_notif
 
     scan_id = ctx["scan_history_id"]

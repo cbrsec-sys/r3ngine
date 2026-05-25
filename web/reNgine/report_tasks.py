@@ -7,6 +7,7 @@ from django.template.loader import get_template
 from django.db.models import Count, Case, When, IntegerField
 from weasyprint import HTML, CSS
 from django.utils import timezone
+from reNgine.utilities import secure_url_fetcher
 
 from reNgine.definitions import *
 from reNgine.llm import LLMReportGenerator
@@ -15,9 +16,9 @@ from reNgine.charts import (
     generate_vulnerability_chart_by_severity,
     generate_attack_surface_map
 )
-from reNgine.graph_utils import Neo4jManager
+from reNgine.utils.graph import Neo4jManager
 from reNgine.common_func import get_interesting_subdomains
-from reNgine.stress_report_builder import StressReportBuilder
+from reNgine.stress.report_builder import StressReportBuilder
 from startScan.models import ScanHistory, Subdomain, Vulnerability, IpAddress, ScanReport, StressTestResult
 from scanEngine.models import VulnerabilityReportSetting
 
@@ -297,7 +298,7 @@ def generate_report_task(report_id):
             template = get_template('report/default.html')
 
         html = template.render(data)
-        pdf = HTML(string=html).write_pdf()
+        pdf = HTML(string=html, url_fetcher=secure_url_fetcher).write_pdf()
 
         target_name = scan.domain.name
         date_str = datetime.now().strftime('%Y-%m-%d')
@@ -313,8 +314,14 @@ def generate_report_task(report_id):
         logger.error(f"Error generating report: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
-        report_obj = ScanReport.objects.get(id=report_id)
-        report_obj.status = 0 # Failed
-        report_obj.error_message = str(e)
-        report_obj.save()
+        try:
+            report_obj = ScanReport.objects.get(id=report_id)
+            report_obj.status = 0 # Failed
+            report_obj.error_message = str(e)
+            report_obj.save()
+        except ScanReport.DoesNotExist:
+            logger.error(f"ScanReport with id {report_id} does not exist. Cannot save failed status.")
+    finally:
+        from django.db import close_old_connections
+        close_old_connections()
 

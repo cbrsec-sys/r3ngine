@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.utils import timezone
 from startScan.models import Subdomain, WafBypassFinding
 from dashboard.models import ShodanAPIKey, CensysAPIKey
-from reNgine.opsec_utils import OpSecManager
+from reNgine.utils.opsec import OpSecManager
 
 logger = logging.getLogger(__name__)
 

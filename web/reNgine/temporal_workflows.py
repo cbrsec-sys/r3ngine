@@ -237,17 +237,6 @@ class MasterScanWorkflow:
                     task_queue="python-orchestrator-queue"
                 )
             )
-        if "screenshot" in tasks:
-            tier2_futures.append(
-                workflow.execute_activity(
-                    "RunScreenshotActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(hours=1),
-                    heartbeat_timeout=timedelta(minutes=2),
-                    retry_policy=_RETRY_NETWORK_SCAN,
-                    task_queue="python-orchestrator-queue"
-                )
-            )
 
         await asyncio.gather(*tier2_futures)
 
@@ -357,6 +346,17 @@ class MasterScanWorkflow:
                     "NucleiPlannerWorkflow",
                     ctx,
                     id=f"{workflow.info().workflow_id}-nuclei",
+                    task_queue="python-orchestrator-queue"
+                )
+            )
+        if "screenshot" in tasks:
+            assessment_futures.append(
+                workflow.execute_activity(
+                    "RunScreenshotActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(hours=1),
+                    heartbeat_timeout=timedelta(minutes=2),
+                    retry_policy=_RETRY_NETWORK_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
             )

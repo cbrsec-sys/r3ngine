@@ -45,11 +45,11 @@ class TestPhase3C1ViewLayerThreading(TestCase):
         )
 
     def test_stress_views_generate_report_no_delay(self):
-        source = _read('reNgine/stress_views.py')
+        source = _read('reNgine/stress/views.py')
         self.assertNotIn(
             'generate_report_task.delay(',
             source,
-            "stress_views.py must not call generate_report_task.delay"
+            "stress/views.py must not call generate_report_task.delay"
         )
 
     def test_scanengine_pull_ollama_no_delay(self):
@@ -162,12 +162,12 @@ class TestPhase3C4OsintFanouts(TestCase):
                       "osint_tasks.py must use threading.Thread for OSINT fan-outs")
 
     def test_task_utils_no_enrich_delay(self):
-        source = _read('reNgine/task_utils.py')
+        source = _read('reNgine/utils/task.py')
         self.assertNotIn('enrich_identities_task.delay(', source,
                          "task_utils.py must not call enrich_identities_task.delay")
 
     def test_task_utils_uses_threading(self):
-        source = _read('reNgine/task_utils.py')
+        source = _read('reNgine/utils/task.py')
         self.assertIn('threading.Thread', source,
                       "task_utils.py must use threading.Thread for enrich_identities_task")
 

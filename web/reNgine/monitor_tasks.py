@@ -16,7 +16,7 @@ from django.db import transaction
 import yaml
 import subprocess
 import signal
-from reNgine.task_utils import save_subdomain, stream_command
+from reNgine.utils.task import save_subdomain, stream_command
 from targetApp.models import Domain
 from startScan.models import ScanHistory, Subdomain, EndPoint, MonitoringDiscovery
 from scanEngine.models import EngineType
@@ -186,7 +186,7 @@ def monitor_target_task(domain_id):
 					# Detect login and status
 					status, title, is_login = detect_login_and_status(url)
 					
-					from reNgine.task_utils import save_endpoint
+					from reNgine.utils.task import save_endpoint
 					endpoint_data = {
 						'http_status': status,
 						'page_title': title,

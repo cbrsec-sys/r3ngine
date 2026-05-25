@@ -47,6 +47,7 @@ export interface ProxySettings {
   use_proxy: boolean;
   proxies: string;
   use_proxychains: boolean;
+  skip_validation?: boolean;
 }
 
 export interface ProxyTaskStatus {
@@ -176,6 +177,9 @@ export const useUpdateProxySettings = (slug: string) => {
         formData.append('use_proxychains', 'on');
       }
       formData.append('proxies', data.proxies);
+      if (data.skip_validation) {
+        formData.append('skip_validation', 'true');
+      }
 
       const response = await axios.post(`/scanEngine/${slug}/proxy_settings`, formData, {
         headers: {

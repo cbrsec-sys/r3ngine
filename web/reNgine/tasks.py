@@ -41,20 +41,20 @@ from reNgine.definitions import *
 from reNgine.settings import *
 from reNgine.llm import *
 from reNgine.utilities import *
-from reNgine.opsec_utils import OpSecManager, BruteForceOrchestrator, ProxychainsWrapper
-from reNgine.waf_utils import OriginDiscoveryManager, WafBypassOrchestrator
+from reNgine.utils.opsec import OpSecManager, BruteForceOrchestrator, ProxychainsWrapper
+from reNgine.utils.waf import OriginDiscoveryManager, WafBypassOrchestrator
 from scanEngine.models import (EngineType, InstalledExternalTool, Notification, Proxy, OpSec)
 from startScan.models import *
 from startScan.models import EndPoint, Subdomain, Vulnerability, Parameter
 from targetApp.models import Domain
 from dashboard.models import AcunetixAPIKey
 from reNgine.monitor_tasks import *
-from reNgine.graph_utils import Neo4jManager
+from reNgine.utils.graph import Neo4jManager
 from reNgine.vulnerability_tasks import *
 from reNgine.fuzzing_tasks import *
-from reNgine.stress_testing_tasks import run_stress_testing
+from reNgine.stress.testing_tasks import run_stress_testing
 from reNgine.osint_tasks import *
-from reNgine.task_utils import (
+from reNgine.utils.task import (
     run_command, stream_command, save_email, save_employee, save_subdomain, save_endpoint, save_parameter,
     sanitize_command_for_db, get_tool_color, ensure_endpoints_crawled_and_execute, save_fuzzing_file,
     parse_custom_header_to_list, save_subdomain_metadata
@@ -158,7 +158,7 @@ def finish_osint(results, scan_history_id):
 
 def finish_osint_discovery(results, results_dir):
     """Callback for OSINT discovery tasks. Strips metadata from results."""
-    from reNgine.opsec_utils import OpSecManager
+    from reNgine.utils.opsec import OpSecManager
     opsec = OpSecManager()
     opsec.strip_directory(results_dir)
     logger.info(f"OSINT discovery completed and cleaned up in {results_dir}")
@@ -1181,7 +1181,7 @@ def osint_discovery(self, config, host, scan_history_id, activity_id, results_di
 	finish_osint_discovery([results], results_dir=results_dir)
 
 	# Strip metadata from OSINT results
-	from reNgine.opsec_utils import OpSecManager
+	from reNgine.utils.opsec import OpSecManager
 	opsec = OpSecManager()
 	opsec.strip_directory(results_dir)
 
@@ -6412,7 +6412,7 @@ def brute_force_scan(self, targets=[], ctx={}, description=None):
 	extract_auth_candidates(self, ctx=ctx)
 
 	# Initialize Orchestrator
-	from reNgine.opsec_utils import BruteForceOrchestrator
+	from reNgine.utils.opsec import BruteForceOrchestrator
 	orchestrator = BruteForceOrchestrator(self.scan)
 	
 	# Extract allowed services from config

@@ -18,7 +18,7 @@ from rolepermissions.decorators import has_permission_decorator
 from reNgine.common_func import *
 from reNgine.tasks import (run_command, send_discord_message, send_slack_message,send_lark_message, send_telegram_message, fetch_proxies_task)
 from django.core.cache import cache
-from reNgine.llm_utils import LLMModelManager
+from reNgine.utils.llm import LLMModelManager
 from dashboard.models import LLMConfig
 from scanEngine.forms import *
 from scanEngine.forms import ConfigurationForm

@@ -35,9 +35,9 @@ from reNgine.settings import (
 	DEFAULT_HTTP_TIMEOUT,
 	DEFAULT_THREADS
 )
-from reNgine.opsec_utils import OpSecManager
+from reNgine.utils.opsec import OpSecManager
 from reNgine.common_func import get_http_urls, get_subdomain_from_url, extract_path_from_url, get_random_proxy
-from reNgine.task_utils import (
+from reNgine.utils.task import (
 	run_command,
 	stream_command,
 	save_endpoint,

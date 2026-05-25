@@ -7,11 +7,11 @@ import logging
 import time
 from startScan.models import ScanHistory, EndPoint, StressTestResult, Command
 from targetApp.models import Domain
-from reNgine.graph_utils import Neo4jManager
+from reNgine.utils.graph import Neo4jManager
 from django.utils import timezone
 from reNgine.parsers import K6Parser, WrkParser, Hping3Parser, LocustParser, TAStressorParser
-from reNgine.stress_telemetry import StressTelemetryPublisher
-from reNgine.stress_cmd_builder import build_stress_command
+from reNgine.stress.telemetry import StressTelemetryPublisher
+from reNgine.stress.cmd_builder import build_stress_command
 from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, RUNNING_TASK, ABORTED_TASK
 
 logger = logging.getLogger(__name__)
@@ -128,7 +128,7 @@ def run_stress_testing(self, scan_history_id, target_domain_name, yaml_config, *
             duration=duration,
         )
 
-        from reNgine.opsec_utils import ProxychainsWrapper
+        from reNgine.utils.opsec import ProxychainsWrapper
         from reNgine.common_func import get_random_proxy, get_random_user_agent
         
         proxy_wrapper = ProxychainsWrapper()

@@ -15,6 +15,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import tempfile
 import time
 
@@ -93,13 +94,13 @@ def _build_k6_cmd(tool_config, endpoint_url, scan_id, concurrency, duration,
             f"        default: {{\n"
             f"            executor: 'constant-vus',\n"
             f"            vus: {k6_vus},\n"
-            f"            duration: '{k6_duration}',\n"
-            f"            env: {{ HTTP_PROXY: '{_p}', HTTPS_PROXY: '{_p}' }},\n"
+            f"            duration: {json.dumps(k6_duration)},\n"
+            f"            env: {{ HTTP_PROXY: {json.dumps(_p)}, HTTPS_PROXY: {json.dumps(_p)} }},\n"
             f"        }},\n"
             f"    }},"
         )
     else:
-        k6_proxy_block = f"\n    vus: {k6_vus},\n    duration: '{k6_duration}',"
+        k6_proxy_block = f"\n    vus: {k6_vus},\n    duration: {json.dumps(k6_duration)},"
 
     script_path = f"/tmp/k6_script_{scan_id}_{int(time.time())}.js"
 
@@ -121,7 +122,7 @@ export default function () {{
         timeout: '30s',
     }};
     try {{
-        const res = http.get('{endpoint_url}', params);
+        const res = http.get({json.dumps(endpoint_url)}, params);
         check(res, {{'status is 200-399': (r) => r.status >= 200 && r.status < 400}});
         sleep(10);
     }} catch (e) {{
@@ -144,7 +145,7 @@ export default function () {{
             'Accept-Language': 'en-US,en;q=0.5',
         }},
     }};
-    const res = http.get('{endpoint_url}', params);
+    const res = http.get({json.dumps(endpoint_url)}, params);
     check(res, {{'status is 200-399': (r) => r.status >= 200 && r.status < 400}});
     sleep(0.5);
 }}
@@ -190,11 +191,11 @@ def _build_wrk_cmd(tool_config, endpoint_url, concurrency, duration, k6_user_age
         cmd += ["--latency"]
     if wrk_timeout:
         cmd += ["--timeout", wrk_timeout]
-    cmd += ["-H", f'"User-Agent: {ua}"']
+    cmd += ["-H", f"User-Agent: {ua}"]
     for header in wrk_headers:
         san_hdr = sanitize(header, allowed_chars=r"^[a-zA-Z0-9.\-_/:=%\s]+$")
         if san_hdr:
-            cmd += ["-H", f'"{san_hdr}"']
+            cmd += ["-H", san_hdr]
     cmd += [endpoint_url]
 
     return cmd, []
@@ -510,5 +511,5 @@ def build_stress_command(tool, tool_config, endpoint_url, target_domain, scan_id
     else:
         raise ValueError(f"Unsupported stress tool: {tool!r}")
 
-    cmd_str = " ".join(str(c) for c in cmd)
+    cmd_str = " ".join(shlex.quote(str(c)) for c in cmd)
     return cmd_str, temps
