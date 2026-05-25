@@ -919,15 +919,6 @@ def sync_graph_activity(ctx: dict) -> bool:
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[SyncGraphActivity] Syncing scan_id={scan_id} to Neo4j")
 
-    # Run APME
-    _run_task(
-        run_apme,
-        ctx,
-        task_name='run_apme',
-        description='Attack Path Modeling',
-        scan_history_id=scan_id
-    )
-
     # Also run raw graph sync
     nm = Neo4jManager()
     try:
