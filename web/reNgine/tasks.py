@@ -2196,7 +2196,7 @@ def port_scan(self, hosts=[], ctx={}, description=None):
 			http_url = f'{host}:{port_number}'
 			endpoint, _ = save_endpoint(
 				http_url,
-				crawl=enable_http_crawl,
+				crawl=False,
 				ctx=ctx,
 				subdomain=subdomain)
 			if endpoint:
@@ -2633,7 +2633,7 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 
 	# Domain regex
 	host = self.domain.name if self.domain else urlparse(urls[0]).netloc
-	host_regex = f"\'https?://([a-zA-Z0-9_-]+[.])*{host}.*\'"
+	host_regex = f"\'https?://([a-zA-Z0-9_-]+[.])*{host}[^\\s\\\"\\`\\>\\<\\]\\[]*\'"
 
 	# Tools cmds
 	base_cmd_map = {
@@ -3135,7 +3135,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 								'status_code': page_data.get('status_code'),
 								'screenshot_path': screenshot_file,
 								'html_path': html_file,
-								'technologies': page_data.get('tags', []), # Aquatone uses tags for tech
+								'technologies': page_data.get('tags') or [], # Aquatone uses tags for tech
 							}
 						)
 						# Also update the subdomain's screenshot_path if not set
@@ -6855,6 +6855,70 @@ def sync_semgrep_rules():
 			logger.error(f"Failed to sync Semgrep rule set {config}: {e}")
 
 
+def clean_and_validate_url(url, base_domain=None):
+	"""Cleans and validates a URL by stripping metadata and enforcing domain matching.
+
+	Args:
+		url (str): The raw URL string to clean and validate.
+		base_domain (str, optional): The target domain name to scope check against.
+
+	Returns:
+		str: The cleaned, fully qualified URL, or None if invalid/out-of-scope.
+	"""
+	from urllib.parse import urlparse
+	
+	url = url.strip()
+	if not url:
+		return None
+
+	# Strip any trailing metadata often present in raw discovery tool outputs
+	# (e.g. "url] - metadata", "url [javascript]", "url - text/html")
+	if ' ' in url:
+		parts = url.split()
+		# Find the first part that looks like a URL or relative path
+		for p in parts:
+			if p.startswith('http://') or p.startswith('https://') or p.startswith('//') or '/' in p:
+				url = p
+				break
+		else:
+			url = parts[0]
+
+	# Extract only the URL content before any trailing brackets or brackets metadata
+	url = url.split(']')[0].split('[')[0].strip()
+
+	if not url:
+		return None
+
+	# Normalize the scheme
+	parsed = urlparse(url)
+	if not parsed.scheme:
+		if base_domain:
+			if url.startswith('//'):
+				url = f"https:{url}"
+			else:
+				url = f"https://{base_domain}/{url.lstrip('/')}"
+		else:
+			url = f"https://{url.lstrip('/')}"
+		parsed = urlparse(url)
+
+	hostname = parsed.hostname
+	if not hostname:
+		return None
+
+	# Filter out external/third-party domains to maintain strict scan scoping
+	if base_domain:
+		base_domain_lower = base_domain.lower()
+		hostname_lower = hostname.lower()
+		if not (hostname_lower == base_domain_lower or hostname_lower.endswith('.' + base_domain_lower)):
+			return None
+
+	# Ensure it is a valid HTTP/HTTPS protocol URL
+	if not (url.startswith('http://') or url.startswith('https://')):
+		return None
+
+	return url
+
+
 def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 	"""
 	Runs Semgrep static analysis on fetched files.
@@ -6910,10 +6974,8 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 		return
 
 	# Retrieve proxies configuration from database
-	downloaded_count = 0
 	available_proxies = []
 	use_proxy = False
-	current_proxy_index = 0
 	
 	try:
 		if Proxy.objects.all().exists():
@@ -6939,87 +7001,96 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 	if 'User-Agent' not in headers_dict:
 		headers_dict['User-Agent'] = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
+	base_domain = self.domain.name if self.domain else None
+
+	# Clean, validate, and deduplicate all URLs
+	unique_targets = set()
 	for url in target_urls:
-		try:
-			# Normalize URL if relative or missing scheme
-			base_domain = self.domain.name if self.domain else None
-			full_url = url.strip()
-			if not full_url:
-				continue
-			
-			parsed_url = urlparse(full_url)
-			if not parsed_url.scheme:
-				if base_domain:
-					if full_url.startswith('//'):
-						full_url = f"https:{full_url}"
-					else:
-						full_url = f"https://{base_domain}/{full_url.lstrip('/')}"
+		clean_url = clean_and_validate_url(url, base_domain)
+		if clean_url:
+			unique_targets.add(clean_url)
+	unique_targets = list(unique_targets)
+
+	# Cap the maximum files to scan to prevent infinite stalls on huge targets
+	MAX_SEMGREP_FILES = 500
+	if len(unique_targets) > MAX_SEMGREP_FILES:
+		logger.warning(f"Capping Semgrep target URLs from {len(unique_targets)} to {MAX_SEMGREP_FILES} to prevent stalling.")
+		unique_targets = unique_targets[:MAX_SEMGREP_FILES]
+
+	downloaded_count = 0
+
+	# Define download worker function
+	def download_file(full_url):
+		# Create a safe filename from URL
+		safe_name = "".join([c if c.isalnum() else "_" for c in full_url])
+		ext = os.path.splitext(urlparse(full_url).path)[1]
+		if not ext:
+			ext = ".js"
+		filename = f"{safe_name}{ext}"
+		filepath = os.path.join(semgrep_dir, filename)
+
+		if os.path.exists(filepath):
+			return True, filepath # Already downloaded
+
+		# Try downloading the URL, with proxy cycling on failure (capped at max 5 to prevent stalls)
+		max_retries = min(5, len(available_proxies)) if use_proxy and available_proxies else 1
+		if max_retries < 1:
+			max_retries = 1
+		attempt = 0
+		current_proxy_index = random.randint(0, len(available_proxies) - 1) if available_proxies else 0
+
+		while attempt < max_retries:
+			proxies = None
+			current_proxy_name = None
+			if use_proxy and available_proxies:
+				current_proxy_name = available_proxies[current_proxy_index % len(available_proxies)]
+				proxies = {
+					'http': current_proxy_name,
+					'https': current_proxy_name
+				}
+
+			try:
+				# Stream response to enforce maximum download file size of 5MB
+				resp = requests.get(full_url, headers=headers_dict, proxies=proxies, timeout=10, verify=False, stream=True)
+				if resp.status_code == 200:
+					content = b""
+					max_bytes = 5 * 1024 * 1024  # 5MB
+					for chunk in resp.iter_content(chunk_size=8192):
+						if len(content) + len(chunk) > max_bytes:
+							content += chunk[:max_bytes - len(content)]
+							break
+						content += chunk
+					
+					with open(filepath, 'wb') as f:
+						f.write(content)
+					return True, filepath
+				elif resp.status_code in [407, 502, 503, 504]:
+					# Proxy connection/auth issues, cycle and retry
+					raise requests.exceptions.ProxyError(f"Proxy returned status code {resp.status_code}")
 				else:
-					full_url = f"https://{full_url.lstrip('/')}"
-			
-			# Create a safe filename from URL
-			safe_name = "".join([c if c.isalnum() else "_" for c in url])
-			# Preserve extension if possible
-			ext = os.path.splitext(urlparse(full_url).path)[1]
-			if not ext:
-				ext = ".js"
-			filename = f"{safe_name}{ext}"
-			filepath = os.path.join(semgrep_dir, filename)
-			
-			if os.path.exists(filepath):
-				continue # Skip if already exists
-			
-			# Try downloading the URL, with proxy cycling on failure (capped at max 5 to prevent stalls)
-			max_retries = min(5, len(available_proxies)) if use_proxy and available_proxies else 1
-			if max_retries < 1:
-				max_retries = 1
-			attempt = 0
-			download_success = False
-
-			while attempt < max_retries:
-				proxies = None
-				current_proxy_name = None
-				if use_proxy and available_proxies:
-					current_proxy_name = available_proxies[current_proxy_index % len(available_proxies)]
-					proxies = {
-						'http': current_proxy_name,
-						'https': current_proxy_name
-					}
-
-				try:
-					resp = requests.get(full_url, headers=headers_dict, proxies=proxies, timeout=10, verify=False)
-					if resp.status_code == 200:
-						with open(filepath, 'w', encoding='utf-8') as f:
-							f.write(resp.text)
-						downloaded_count += 1
-						download_success = True
-						break  # Successfully downloaded
-					elif resp.status_code in [407, 502, 503, 504]:
-						# Proxy connection or authentication error code, cycle and retry
-						raise requests.exceptions.ProxyError(f"Proxy returned status code {resp.status_code}")
-					else:
-						logger.debug(f"Semgrep downloader got status {resp.status_code} for {full_url}")
-						# Other response codes (e.g. 404/403) are verified responses from the target host itself
-						break
-				except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
-					attempt += 1
-					if use_proxy and available_proxies:
-						old_proxy = current_proxy_name
-						current_proxy_index += 1
-						new_proxy = available_proxies[current_proxy_index % len(available_proxies)]
-						logger.warning(
-							f"Proxy failure using {old_proxy} for {full_url}. "
-							f"Cycling to next proxy: {new_proxy} (Attempt {attempt}/{max_retries}). Error: {e}"
-						)
-					else:
-						logger.debug(f"Semgrep downloader network failure for {full_url}: {e}")
-						break
-				except Exception as e:
-					logger.debug(f"Semgrep downloader got non-network error for {url} (full: {full_url}): {e}")
+					logger.debug(f"Semgrep downloader got status {resp.status_code} for {full_url}")
 					break
+			except (requests.exceptions.ProxyError, requests.exceptions.ConnectionError, requests.exceptions.Timeout) as e:
+				attempt += 1
+				current_proxy_index += 1
+			except Exception as e:
+				logger.debug(f"Semgrep downloader got non-network error for {full_url}: {e}")
+				break
+		return False, None
 
-		except Exception as e:
-			logger.debug(f"Semgrep downloader loop error for {url}: {e}")
+	# Execute downloads in parallel using a ThreadPoolExecutor
+	if unique_targets:
+		from concurrent.futures import ThreadPoolExecutor, as_completed
+		logger.info(f"Downloading {len(unique_targets)} files for Semgrep scan in parallel...")
+		with ThreadPoolExecutor(max_workers=10) as executor:
+			futures = {executor.submit(download_file, url): url for url in unique_targets}
+			for future in as_completed(futures):
+				try:
+					success, _ = future.result()
+					if success:
+						downloaded_count += 1
+				except Exception as e:
+					logger.error(f"Error in download thread: {e}")
 
 	if downloaded_count == 0:
 		logger.warning("No files could be downloaded for Semgrep scan.")

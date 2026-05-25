@@ -2,6 +2,10 @@
 
 ### [v3.2.0] - 2026-05-23
 
+- **Temporal Activity & Scan Stability Fixes**:
+  - Disabled inline synchronous HTTP crawling in the `port_scan` activity to prevent concurrent file/database collisions, process lockups, and eventual `CancelledError` activity cancellations.
+  - Hardened the Aquatone session parser in `web_api_discovery` to handle cases where technology `tags` are `null` in the JSON output, avoiding database `NOT NULL` constraint violations on `Screenshot.technologies`.
+
 - **Target Information Nameservers and History Tabs Fix**:
   - Resolved the empty Nameservers tab on the Scan Detail page by introducing the `nameservers` field (list of strings) in `ScanSummaryAPIView` and `TargetSummaryAPIView` to match the frontend component's requirements.
   - Implemented the missing rendering logic for the Nameservers (infoTab === 3) and History (infoTab === 4) tabs on the Target Summary page.
