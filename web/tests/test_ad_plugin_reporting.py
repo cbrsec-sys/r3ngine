@@ -44,3 +44,32 @@ class TestReportingEngine(TestCase):
         from plugins_data.active_directory.backend.reporting.engine import ReportingEngine
         report = ReportingEngine.compile(self.assessment.id)
         self.assertEqual(report['executive_summary']['finding_counts']['HIGH'], 1)
+
+
+class TestJSONRenderer(TestCase):
+
+    def setUp(self):
+        _skip_if_not_installed(self)
+        from plugins_data.active_directory.backend.models import ADAssessment
+        self.assessment = ADAssessment.objects.create(
+            name="JSON Test", target_domain="json.test.local", status="COMPLETED"
+        )
+
+    def tearDown(self):
+        self.assessment.delete()
+
+    def test_render_produces_valid_json(self):
+        import json
+        from plugins_data.active_directory.backend.reporting.engine import ReportingEngine
+        from plugins_data.active_directory.backend.reporting.json_renderer import JSONRenderer
+        report = ReportingEngine.compile(self.assessment.id)
+        raw = JSONRenderer.render(report)
+        parsed = json.loads(raw)
+        self.assertIn('metadata', parsed)
+
+    def test_render_returns_bytes(self):
+        from plugins_data.active_directory.backend.reporting.engine import ReportingEngine
+        from plugins_data.active_directory.backend.reporting.json_renderer import JSONRenderer
+        report = ReportingEngine.compile(self.assessment.id)
+        raw = JSONRenderer.render(report)
+        self.assertIsInstance(raw, bytes)
