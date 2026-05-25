@@ -2,6 +2,13 @@
 
 ### [v3.2.0] - 2026-05-23
 
+- **Exploit Readiness Layer (ERL) Dedicated Dashboard & Routing Standardization**:
+  - Replaced component-level override hijacking with a standardized dynamic plugin page routing system.
+  - Added support for dynamic wildcard page loading at `/p/$pluginSlug` and `/p/$pluginSlug/$pageName` in the host router without requiring core codebase updates.
+  - Implemented the Exploit Readiness Center split-pane dashboard under the `erl_temporal` plugin UI featuring KPI metrics, a compact project-wide vulnerability queue, and a detailed ERL intelligence panel (Evidence logs, Cytoscape attack path visualization, and AI impact assessments).
+  - Updated the left navigation sidebar in the host shell to dynamically construct link paths from the enabled plugins registry configuration.
+  - Standardized plugin bundle build configurations to export barrel-structured ESM components (`src/index.ts`) for dynamic loading via `PluginPageLoader`.
+
 > **IMPORTANT — Existing installations must run the full upgrade script**
 >
 > v3.2.0 replaces Celery with Temporal. This is a breaking infrastructure change. Simply running `make up` on an existing install will leave stale Celery containers running and skip required database migrations.
@@ -53,9 +60,10 @@
   - Fixed Locust target URL parsing in `_build_locust_cmd` by utilizing `urllib.parse.urlparse` to dynamically split target URLs into host and path components. This avoids trailing slash errors (such as `GET /xmlrpc.php/` returning `400 Bad Request`) and ensures Locust script generation properly separates the request path from the base host.
   - Resolved K6 real-time dashboard updates by adding dynamic `throughput_rps` calculation to `K6Parser`. It extracts elapsed minutes and seconds from K6's progress output via regex and divides total requests by elapsed seconds, resolving static or missing real-time telemetry metrics.
   - Fixed WrkParser final metrics aggregation by summing both socket errors and timeout errors to represent the correct count of failed requests.
-
-
-
+- **Dalfox Scanner Enhancements & Stabilization**:
+  - Resolved a missing findings issue caused by the `--only-poc r` filter overriding genuine verified payloads (`v`) by expanding the filter to `--only-poc v,r`.
+  - Upgraded Dalfox execution to support optional Deep Scan (`--deep-scan`), remote payload dictionaries (`--remote-payloads`), remote parameter wordlists (`--remote-wordlists`), and automatic WAF bypassing (`--waf-bypass auto`) for deeper detection coverage.
+  - Added a configurable scan timeout parameter (`--scan-timeout`) to prevent scan stagnation on heavily-parametrised endpoints, and removed the obsolete `--skip-bav` flag.
 ### [v3.1.0] - 2026-05-20
 
 - **Scan Pipeline**: fully fixed and stabilized. All tools now working to their full capabilities again.

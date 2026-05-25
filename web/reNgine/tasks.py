@@ -3748,6 +3748,10 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	if custom_header:
 		custom_headers.append(custom_header)
 	is_waf_evasion = dalfox_config.get(WAF_EVASION, False)
+	use_deep_scan = dalfox_config.get('DEEP_SCAN', False)
+	use_remote_payloads = dalfox_config.get('REMOTE_PAYLOADS', False)
+	use_remote_wordlists = dalfox_config.get('REMOTE_WORDLISTS', False)
+	scan_timeout = dalfox_config.get('SCAN_TIMEOUT', 300)
 	blind_xss_server = dalfox_config.get(BLIND_XSS_SERVER)
 	user_agent = dalfox_config.get(USER_AGENT) or self.yaml_configuration.get(USER_AGENT)
 	timeout = dalfox_config.get(TIMEOUT)
@@ -3773,17 +3777,21 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	proxy = get_random_proxy()
 	opsec = OpSecManager()
 	cmd = 'dalfox --silence --no-color --no-spinner'
-	cmd += f' --only-poc r '
+	cmd += f' --only-poc v,r '
 	cmd += f' --ignore-return 302,404,403'
 	
 	cmd = opsec.apply_stealth('dalfox', cmd, proxy=proxy)
-	cmd += f' --skip-bav'
 	cmd += f' file {input_path}'
 	cmd += f' --proxy {proxy}' if proxy else ''
 	cmd += f' --waf-evasion' if is_waf_evasion else ''
+	cmd += f' --waf-bypass auto'
+	cmd += f' --deep-scan' if use_deep_scan else ''
+	cmd += f' --remote-payloads portswigger,payloadbox' if use_remote_payloads else ''
+	cmd += f' --remote-wordlists burp,assetnote' if use_remote_wordlists else ''
 	cmd += f' -b {blind_xss_server}' if blind_xss_server else ''
 	cmd += f' --delay {delay}' if delay else ''
 	cmd += f' --timeout {timeout}' if timeout else ''
+	cmd += f' --scan-timeout {scan_timeout}' if scan_timeout else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
 		cmd += formatted_headers

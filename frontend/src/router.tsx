@@ -4,6 +4,8 @@ import { Shell } from "./components/Shell";
 
 import { Box, Typography, Button, CircularProgress } from "@mui/material";
 import PluginPageLoader from './features/plugins/components/PluginPageLoader';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 import { AlertCircle, Home, RefreshCw } from "lucide-react";
 import { useRouterState } from "@tanstack/react-router";
 import { LoginPage } from "./features/auth/components/LoginPage";
@@ -538,6 +540,70 @@ const adExposuresRoute = createRoute({
   },
 });
 
+// Generic Dynamic Plugin Routes
+const pluginMainRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "p/$pluginSlug",
+  component: function PluginMainPage() {
+    const { pluginSlug, projectSlug } = useParams({ strict: false });
+
+    if (!pluginSlug) {
+      return (
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Typography color="error" variant="body2">Invalid plugin slug parameter.</Typography>
+        </Box>
+      );
+    }
+
+    const { data: pluginsRegistry, isLoading, error } = useQuery<any[]>({
+      queryKey: ['pluginsRegistry'],
+      queryFn: async () => {
+        const res = await axios.get('/api/plugins/registry/');
+        return res.data;
+      }
+    });
+
+    if (isLoading) {
+      return (
+        <Box sx={{ p: 10, display: 'flex', justifyContent: 'center' }}>
+          <CircularProgress size={24} sx={{ color: '#00f3ff' }} />
+        </Box>
+      );
+    }
+
+    if (error || !pluginsRegistry) {
+      return (
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Typography color="error" variant="body2">Failed to load plugin registry.</Typography>
+        </Box>
+      );
+    }
+
+    const plugin = pluginsRegistry.find(p => p.slug === pluginSlug);
+    const entryExport = plugin?.components?.entry_export || 'IndexPage';
+
+    return <PluginPageLoader pluginSlug={pluginSlug} exportName={entryExport} projectSlug={projectSlug || 'default'} />;
+  },
+});
+
+const pluginSubpageRoute = createRoute({
+  getParentRoute: () => projectRoute,
+  path: "p/$pluginSlug/$pageName",
+  component: function PluginSubpage() {
+    const { pluginSlug, pageName, projectSlug } = useParams({ strict: false });
+    
+    if (!pluginSlug || !pageName) {
+      return (
+        <Box sx={{ p: 4, textAlign: 'center' }}>
+          <Typography color="error" variant="body2">Invalid plugin or page parameters.</Typography>
+        </Box>
+      );
+    }
+    
+    return <PluginPageLoader pluginSlug={pluginSlug} exportName={pageName} projectSlug={projectSlug || 'default'} />;
+  },
+});
+
 // Login Route
 const loginRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -597,6 +663,8 @@ const routeTree = rootRoute.addChildren([
     adGraphRoute,
     adTrustsRoute,
     adExposuresRoute,
+    pluginMainRoute,
+    pluginSubpageRoute,
   ]),
   loginRoute,
   logoutRoute,
