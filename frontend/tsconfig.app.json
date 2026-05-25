@@ -20,16 +20,17 @@
     "noEmit": true,
     "jsx": "react-jsx",
     /* Linting */
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     },
     "noFallthroughCasesInSwitch": true,
-    "ignoreDeprecations": "6.0"
-
+    "ignoreDeprecations": "5.0"
   },
   "include": [
     "src"

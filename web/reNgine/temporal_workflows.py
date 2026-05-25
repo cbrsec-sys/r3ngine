@@ -436,7 +436,7 @@ class MasterScanWorkflow:
         # MANDATORY: Attack Path Modeling Engine — must be the final analysis step
         await workflow.execute_activity(
             "RunGenericTaskActivity",
-            args=[ctx, "run_apme", "Attack Path Modeling Engine"],
+            args=[ctx, "run_apme", "Attack Path Modeling Engine", {"scan_history_id": ctx.get("scan_history_id")}],
             start_to_close_timeout=timedelta(minutes=30),
             retry_policy=_RETRY_INTERNAL,
             task_queue="python-orchestrator-queue"
@@ -807,7 +807,7 @@ class SubScanWorkflow:
                 # MANDATORY: Attack Path Modeling Engine — required before subscan completes
                 await workflow.execute_activity(
                     "RunGenericTaskActivity",
-                    args=[ctx, "run_apme", "Attack Path Modeling Engine"],
+                    args=[ctx, "run_apme", "Attack Path Modeling Engine", {"scan_history_id": ctx.get("scan_history_id")}],
                     start_to_close_timeout=timedelta(minutes=30),
                     retry_policy=_RETRY_INTERNAL,
                     task_queue="python-orchestrator-queue",

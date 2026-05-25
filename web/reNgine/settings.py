@@ -145,6 +145,7 @@ if os.path.exists(PLUGINS_DIR):
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'reNgine.middleware.SystemVersionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
