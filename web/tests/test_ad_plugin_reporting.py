@@ -73,3 +73,24 @@ class TestJSONRenderer(TestCase):
         report = ReportingEngine.compile(self.assessment.id)
         raw = JSONRenderer.render(report)
         self.assertIsInstance(raw, bytes)
+
+
+class TestPDFRenderer(TestCase):
+
+    def setUp(self):
+        _skip_if_not_installed(self)
+        from plugins_data.active_directory.backend.models import ADAssessment
+        self.assessment = ADAssessment.objects.create(
+            name="PDF Test", target_domain="pdf.test.local", status="COMPLETED"
+        )
+
+    def tearDown(self):
+        self.assessment.delete()
+
+    def test_render_returns_bytes_starting_with_pdf_magic(self):
+        from plugins_data.active_directory.backend.reporting.engine import ReportingEngine
+        from plugins_data.active_directory.backend.reporting.pdf_renderer import PDFRenderer
+        report = ReportingEngine.compile(self.assessment.id)
+        pdf_bytes = PDFRenderer.render(report)
+        self.assertIsInstance(pdf_bytes, bytes)
+        self.assertTrue(pdf_bytes.startswith(b'%PDF'), "Output is not a valid PDF")
