@@ -705,6 +705,7 @@ class SubScanWorkflow:
                 f"Add it to _PERMITTED_GENERIC_TASKS in temporal_activities.py to enable dispatch."
             )
 
+        is_cancelled = False
         success = False
         try:
             subdomain_name = ctx.get('subdomain_name', '')
@@ -768,60 +769,65 @@ class SubScanWorkflow:
                 )
 
             success = True
+        except asyncio.CancelledError:
+            workflow.logger.info("SubScanWorkflow was cancelled. Skipping post-scan tasks.")
+            is_cancelled = True
+            raise
         except Exception as e:
             workflow.logger.error(f"SubScanWorkflow failed during execution: {e}")
             success = False
             raise
 
         finally:
-            # First, run mandatory post-scan tasks for ALL subscans unconditionally
-            try:
+            if not is_cancelled:
+                # First, run mandatory post-scan tasks for ALL subscans unconditionally
+                try:
+                    await workflow.execute_activity(
+                        "CorrelateVulnerabilitiesActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(minutes=15),
+                        retry_policy=_RETRY_INTERNAL,
+                        task_queue="python-orchestrator-queue",
+                    )
+                    await workflow.execute_activity(
+                        "CalculateRiskScoresActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(minutes=15),
+                        retry_policy=_RETRY_INTERNAL,
+                        task_queue="python-orchestrator-queue",
+                    )
+                    await workflow.execute_activity(
+                        "GenerateImpactAssessmentActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(minutes=30),
+                        retry_policy=_RETRY_LLM,
+                        task_queue="python-orchestrator-queue"
+                    )
+                    await workflow.execute_activity(
+                        "SyncGraphActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(minutes=30),
+                        retry_policy=_RETRY_NETWORK_SCAN,
+                        task_queue="python-orchestrator-queue",
+                    )
+                    # MANDATORY: Attack Path Modeling Engine — required before subscan completes
+                    await workflow.execute_activity(
+                        "RunGenericTaskActivity",
+                        args=[ctx, "run_apme", "Attack Path Modeling Engine", {"scan_history_id": ctx.get("scan_history_id")}],
+                        start_to_close_timeout=timedelta(minutes=30),
+                        retry_policy=_RETRY_INTERNAL,
+                        task_queue="python-orchestrator-queue",
+                    )
+                except Exception as post_e:
+                    workflow.logger.error(f"SubScanWorkflow post-scan tasks failed: {post_e}")
+    
+                # Finalize SubScan record in the database
                 await workflow.execute_activity(
-                    "CorrelateVulnerabilitiesActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(minutes=15),
-                    retry_policy=_RETRY_INTERNAL,
-                    task_queue="python-orchestrator-queue",
-                )
-                await workflow.execute_activity(
-                    "CalculateRiskScoresActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(minutes=15),
-                    retry_policy=_RETRY_INTERNAL,
-                    task_queue="python-orchestrator-queue",
-                )
-                await workflow.execute_activity(
-                    "GenerateImpactAssessmentActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(minutes=30),
-                    retry_policy=_RETRY_LLM,
+                    "FinalizeSubScanActivity",
+                    args=[ctx, success],
+                    start_to_close_timeout=timedelta(seconds=60),
                     task_queue="python-orchestrator-queue"
                 )
-                await workflow.execute_activity(
-                    "SyncGraphActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(minutes=30),
-                    retry_policy=_RETRY_NETWORK_SCAN,
-                    task_queue="python-orchestrator-queue",
-                )
-                # MANDATORY: Attack Path Modeling Engine — required before subscan completes
-                await workflow.execute_activity(
-                    "RunGenericTaskActivity",
-                    args=[ctx, "run_apme", "Attack Path Modeling Engine", {"scan_history_id": ctx.get("scan_history_id")}],
-                    start_to_close_timeout=timedelta(minutes=30),
-                    retry_policy=_RETRY_INTERNAL,
-                    task_queue="python-orchestrator-queue",
-                )
-            except Exception as post_e:
-                workflow.logger.error(f"SubScanWorkflow post-scan tasks failed: {post_e}")
-
-            # Finalize SubScan record in the database
-            await workflow.execute_activity(
-                "FinalizeSubScanActivity",
-                args=[ctx, success],
-                start_to_close_timeout=timedelta(seconds=60),
-                task_queue="python-orchestrator-queue"
-            )
 
         return {"status": "SUCCESS"}
 

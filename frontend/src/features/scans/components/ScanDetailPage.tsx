@@ -849,12 +849,14 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
 const SubScanWidget: React.FC<{ subscans: SubScan[], targetName: string }> = ({ subscans, targetName }) => {
   return (
     <Stack spacing={1.5}>
-      <Typography sx={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', fontWeight: 900, color: '#ff00ff', mb: 1, textTransform: 'uppercase', letterSpacing: 1.5 }}>
-        SUB SCAN HISTORY FOR &nbsp;
-        <Box component="span" sx={{ px: 2, py: 0.4, border: '1px solid #ff00ff', borderRadius: '20px', color: '#ff00ff', fontSize: '0.7rem', bgcolor: 'rgba(255,0,255,0.05)' }}>
+      <Box sx={{ mb: 1 }}>
+        <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#ff00ff', mb: 1, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+          SUB SCAN HISTORY FOR
+        </Typography>
+        <Box component="span" sx={{ display: 'inline-block', px: 2, py: 0.4, border: '1px solid #ff00ff', borderRadius: '20px', color: '#ff00ff', fontSize: '0.7rem', bgcolor: 'rgba(255,0,255,0.05)' }}>
           {targetName}
         </Box>
-      </Typography>
+      </Box>
       {subscans?.map((sub: SubScan) => (
         <Box key={sub.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
           <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, bgcolor: sub.status === 2 ? '#00ff62' : '#ffc107', borderRadius: '4px 0 0 4px' }} />

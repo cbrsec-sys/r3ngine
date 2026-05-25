@@ -6,6 +6,11 @@ from targetApp.models import Domain
 
 logger = logging.getLogger(__name__)
 
+# Suppress Neo4j notification logs (like CartesianProduct) unless DEBUG is enabled
+import os
+if os.environ.get("DEBUG", "0") != "1":
+    logging.getLogger("neo4j.notifications").setLevel(logging.WARNING)
+
 
 class Neo4jManager:
     def __init__(self):
