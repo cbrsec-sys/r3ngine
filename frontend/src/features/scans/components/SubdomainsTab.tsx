@@ -255,7 +255,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
       const res = await fetch('/api/action/ad-assessment/from-subdomain/', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() ?? '' },
         body: JSON.stringify({ subdomain_id: selectedId }),
       });
       const json = await res.json();
