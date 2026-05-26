@@ -1628,6 +1628,8 @@ class StopScan(APIView):
 	permission_required = PERM_INITATE_SCANS_SUBSCANS
 
 	def post(self, request):
+		from reNgine.utils.scan_cancellation import abort_scan_history, abort_subscan
+
 		req = self.request
 		data = req.data
 		scan_ids = data.get('scan_ids', [])
@@ -1638,83 +1640,17 @@ class StopScan(APIView):
 
 		response = {'status': False}
 
-		def abort_scan(scan):
-			from reNgine.temporal_client import TemporalClientProvider
-			response = {}
-			logger.info(f'Aborting scan History')
-			try:
-				logger.info(f"Setting scan {scan} status to ABORTED_TASK")
-				scan.scan_status = ABORTED_TASK
-				scan.stop_scan_date = timezone.now()
-				scan.aborted_by = request.user
-				scan.save()
-				for te in scan.temporal_executions.filter(status="RUNNING"):
-					try:
-						TemporalClientProvider.cancel_workflow(te.workflow_id)
-						te.status = "CANCELLED"
-						te.ended_at = timezone.now()
-						te.save()
-					except Exception as cancel_err:
-						logger.warning(f"Temporal cancel failed for {te.workflow_id}: {cancel_err}")
-
-				subscans = SubScan.objects.filter(scan_history=scan, status=RUNNING_TASK)
-				for subscan in subscans:
-					abort_subscan(subscan)
-
-				tasks = (
-					ScanActivity.objects
-					.filter(scan_of=scan)
-					.filter(status=RUNNING_TASK)
-					.order_by('-pk')
-				)
-				for task in tasks:
-					task.status = ABORTED_TASK
-					task.time = timezone.now()
-					task.save()
-
-				create_scan_activity(
-					scan.id,
-					"Scan aborted",
-					ABORTED_TASK
-				)
-				response['status'] = True
-			except Exception as e:
-				logger.error(e)
-				response = {'status': False, 'message': str(e)}
-
-			return response
-
-		def abort_subscan(subscan):
-			response = {}
-			logger.info(f'Aborting subscan')
-			try:
-				logger.info(f"Setting scan {subscan} status to ABORTED_TASK")
-				subscan.status = ABORTED_TASK
-				subscan.stop_scan_date = timezone.now()
-				subscan.save()
-				create_scan_activity(
-					subscan.scan_history.id,
-					f'Subscan aborted',
-					ABORTED_TASK
-				)
-				response['status'] = True
-			except Exception as e:
-				logger.error(e)
-				response = {'status': False, 'message': str(e)}
-
-			return response
-
 		for scan_id in scan_ids:
 			try:
 				scan = ScanHistory.objects.get(id=scan_id)
 				# if scan is already successful or aborted then do nothing
 				if scan.scan_status == SUCCESS_TASK or scan.scan_status == ABORTED_TASK:
 					continue
-				response = abort_scan(scan)
+				response = abort_scan_history(scan, aborted_by=request.user)
 			except Exception as e:
 				logger.error(e)
 				response = {'status': False, 'message': str(e)}
-			
+
 		for subscan_id in subscan_ids:
 			try:
 				subscan = SubScan.objects.get(id=subscan_id)
