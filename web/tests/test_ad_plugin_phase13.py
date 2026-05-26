@@ -20,9 +20,15 @@ class TestLaunchADAssessmentEndpoint(TestCase):
     def tearDown(self):
         self.user.delete()
 
-    def test_endpoint_exists(self):
+    def test_view_has_correct_permission(self):
         from api.views import LaunchADAssessmentFromSubdomain
-        self.assertTrue(callable(LaunchADAssessmentFromSubdomain))
+        from api.permissions import HasPermission
+        from reNgine.definitions import PERM_INITATE_SCANS_SUBSCANS
+        self.assertIn(HasPermission, LaunchADAssessmentFromSubdomain.permission_classes)
+        self.assertEqual(
+            LaunchADAssessmentFromSubdomain.permission_required,
+            PERM_INITATE_SCANS_SUBSCANS,
+        )
 
     def test_missing_subdomain_id_returns_400(self):
         from api.views import LaunchADAssessmentFromSubdomain
@@ -68,3 +74,42 @@ class TestLaunchADAssessmentEndpoint(TestCase):
                 response = view_instance.post(req)
         self.assertEqual(response.status_code, 400)
         self.assertIn('plugin', response.data['error'].lower())
+
+    def test_successful_creation_returns_201(self):
+        from api.views import LaunchADAssessmentFromSubdomain
+        from unittest.mock import MagicMock, patch
+
+        req = RequestFactory().post(
+            '/api/action/ad-assessment/from-subdomain/',
+            data={'subdomain_id': 1},
+            content_type='application/json',
+        )
+        req.user = self.user
+
+        mock_sub = MagicMock()
+        mock_sub.scan_history.domain.name = 'corp.local'
+
+        mock_assessment = MagicMock()
+        mock_assessment.id = 42
+        mock_assessment.name = 'AD Assessment — corp.local'
+
+        mock_ad_class = MagicMock()
+        mock_ad_class.objects.create.return_value = mock_assessment
+
+        view_instance = LaunchADAssessmentFromSubdomain()
+        view_instance.request = req
+
+        with patch('api.views.Subdomain.objects.select_related') as mock_sr, \
+             patch.dict('sys.modules', {
+                 'plugins_data': MagicMock(),
+                 'plugins_data.active_directory': MagicMock(),
+                 'plugins_data.active_directory.backend': MagicMock(),
+                 'plugins_data.active_directory.backend.models': MagicMock(ADAssessment=mock_ad_class),
+             }):
+            mock_sr.return_value.get.return_value = mock_sub
+            response = view_instance.post(req)
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data['assessment_id'], 42)
+        self.assertEqual(response.data['target_domain'], 'corp.local')
+        self.assertEqual(response.data['status'], 'created')

@@ -4539,7 +4539,7 @@ class LaunchADAssessmentFromSubdomain(APIView):
 		except Subdomain.DoesNotExist:
 			return Response(
 				{'error': f'Subdomain {subdomain_id} not found.'},
-				status=HTTP_400_BAD_REQUEST,
+				status=status.HTTP_404_NOT_FOUND,
 			)
 
 		target_domain = subdomain.scan_history.domain.name
@@ -4552,12 +4552,19 @@ class LaunchADAssessmentFromSubdomain(APIView):
 				status=HTTP_400_BAD_REQUEST,
 			)
 
-		assessment = _ADAssessment.objects.create(
-			name=f'AD Assessment — {target_domain}',
-			target_domain=target_domain,
-			status='PENDING',
-			created_by=request.user,
-		)
+		try:
+			assessment = _ADAssessment.objects.create(
+				name=f'AD Assessment — {target_domain}',
+				target_domain=target_domain,
+				status='PENDING',
+				created_by=request.user,
+			)
+		except Exception as exc:
+			logger.error(f'[AD Bridge] Failed to create ADAssessment: {exc}')
+			return Response(
+				{'error': 'Failed to create assessment.'},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)
 		return Response({
 			'assessment_id': assessment.id,
 			'assessment_name': assessment.name,
