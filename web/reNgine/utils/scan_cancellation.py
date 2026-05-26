@@ -2,7 +2,7 @@ import logging
 
 from django.utils import timezone
 
-from startScan.models import ScanActivity, ScanHistory, SubScan
+from startScan.models import ScanActivity, SubScan
 from reNgine.temporal_client import TemporalClientProvider
 from reNgine.definitions import ABORTED_TASK, RUNNING_TASK
 
@@ -11,15 +11,17 @@ logger = logging.getLogger(__name__)
 
 def abort_subscan(subscan):
     try:
-        subscan.status = ABORTED_TASK
-        subscan.stop_scan_date = timezone.now()
-        subscan.save()
-
+        # Cancel all workflows FIRST, then update DB state
         for wf_id in subscan.workflow_ids:
             try:
                 TemporalClientProvider.cancel_workflow(wf_id)
             except Exception as e:
                 logger.error(f"Failed to cancel workflow {wf_id} for subscan {subscan.id}: {e}")
+
+        # Now update DB state after workflows are cancelled
+        subscan.status = ABORTED_TASK
+        subscan.stop_scan_date = timezone.now()
+        subscan.save()
 
         from reNgine.tasks import create_scan_activity
         create_scan_activity(subscan.scan_history.id, "Subscan aborted", ABORTED_TASK)
