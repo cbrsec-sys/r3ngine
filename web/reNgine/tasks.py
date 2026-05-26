@@ -55,7 +55,7 @@ from reNgine.fuzzing_tasks import *
 from reNgine.stress.testing_tasks import run_stress_testing
 from reNgine.osint_tasks import *
 from reNgine.utils.task import (
-    run_command, stream_command, save_email, save_employee, save_subdomain, save_endpoint, save_parameter,
+    run_command, run_command_with_retry, stream_command, save_email, save_employee, save_subdomain, save_endpoint, save_parameter,
     sanitize_command_for_db, get_tool_color, ensure_endpoints_crawled_and_execute, save_fuzzing_file,
     parse_custom_header_to_list, save_subdomain_metadata
 )
@@ -298,9 +298,11 @@ def initiate_scan_temporal(
 			'out_of_scope_subdomains': out_of_scope_subdomains,
 		}
 		subdomain, _ = save_subdomain(domain.name, ctx=ctx_bootstrap)
-		http_url = f'{domain.name}{starting_point_path}' if starting_point_path else domain.name
+		_root = f'{domain.name}{starting_point_path}' if starting_point_path else domain.name
+		if not _root.startswith(('http://', 'https://')):
+			_root = f'http://{_root}'
 		endpoint, _ = save_endpoint(
-			http_url,
+			_root,
 			ctx=ctx_bootstrap,
 			crawl=enable_http_crawl,
 			is_default=True,
@@ -817,6 +819,8 @@ def subdomain_discovery(
 	# Make exception for amass since tool name is amass, but command is amass-active/passive
 	default_subdomain_tools.append('amass-passive')
 	default_subdomain_tools.append('amass-active')
+	# Append baddns so it is always registered as a supported default subdomain discovery tool
+	default_subdomain_tools.append('baddns')
 
 	# Run tools
 	opsec = OpSecManager()
@@ -825,12 +829,14 @@ def subdomain_discovery(
 
 	for tool in tools:
 		cmd = None
+		results_file = None
 		logger.info(f'Scanning subdomains for {host} with {tool}')
 		proxy = get_random_proxy()
 		if tool in default_subdomain_tools:
 			if tool == 'amass-passive':
 				use_amass_config = config.get(USE_AMASS_CONFIG, False)
-				cmd = f'amass enum -passive -d {host} -o {self.results_dir}/subdomains_amass.txt'
+				results_file = f'{self.results_dir}/subdomains_amass.txt'
+				cmd = f'amass enum -passive -d {host} -o {results_file}'
 				cmd += ' -config /root/.config/amass.ini' if use_amass_config else ''
 				#if proxy:
 				#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
@@ -839,17 +845,20 @@ def subdomain_discovery(
 				use_amass_config = config.get(USE_AMASS_CONFIG, False)
 				amass_wordlist_name = config.get(AMASS_WORDLIST, 'deepmagic.com-prefixes-top50000')
 				wordlist_path = f'/usr/src/wordlist/{amass_wordlist_name}.txt'
-				cmd = f'amass enum -active -d {host} -o {self.results_dir}/subdomains_amass_active.txt'
+				results_file = f'{self.results_dir}/subdomains_amass_active.txt'
+				cmd = f'amass enum -active -d {host} -o {results_file}'
 				cmd += ' -config /root/.config/amass.ini' if use_amass_config else ''
 				cmd += f' -brute -w {wordlist_path}'
 				#if proxy:
 				#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 
 			elif tool == 'sublist3r':
-				cmd = f'python3 /usr/src/github/Sublist3r/sublist3r.py -d {host} -t {threads} -o {self.results_dir}/subdomains_sublister.txt'
+				results_file = f'{self.results_dir}/subdomains_sublister.txt'
+				cmd = f'python3 /usr/src/github/Sublist3r/sublist3r.py -d {host} -t {threads} -o {results_file}'
 
 			elif tool == 'subfinder':
-				cmd = f'subfinder -d {host} -all -o {self.results_dir}/subdomains_subfinder.txt'
+				results_file = f'{self.results_dir}/subdomains_subfinder.txt'
+				cmd = f'subfinder -d {host} -all -o {results_file}'
 				use_subfinder_config = config.get(USE_SUBFINDER_CONFIG, False)
 				cmd += ' -config /root/.config/subfinder/config.yaml' if use_subfinder_config else ''
 				#cmd += f' -proxy {proxy}' if proxy else ''
@@ -858,8 +867,9 @@ def subdomain_discovery(
 				cmd += f' -silent'
 
 			elif tool == 'oneforall':
+				results_file = f'{self.results_dir}/subdomains_oneforall.txt'
 				cmd = f'python3 /usr/src/github/OneForAll/oneforall.py --target {host} run'
-				cmd_extract = f'cut -d\',\' -f6 /usr/src/github/OneForAll/results/{host}.csv | tail -n +2 > {self.results_dir}/subdomains_oneforall.txt'
+				cmd_extract = f'cut -d\',\' -f6 /usr/src/github/OneForAll/results/{host}.csv | tail -n +2 > {results_file}'
 				cmd_rm = f'rm -rf /usr/src/github/OneForAll/results/{host}.csv'
 				cmd += f' && {cmd_extract} && {cmd_rm}'
 
@@ -912,9 +922,9 @@ def subdomain_discovery(
 				logger.error(f'Missing {{OUTPUT}} placeholders in {tool} configuration. Skipping.')
 				continue
 
-			
+			results_file = f'{self.results_dir}/subdomains_{tool}.txt'
 			cmd = cmd.replace('{TARGET}', host)
-			cmd = cmd.replace('{OUTPUT}', f'{self.results_dir}/subdomains_{tool}.txt')
+			cmd = cmd.replace('{OUTPUT}', results_file)
 			cmd = cmd.replace('{PATH}', custom_tool.github_clone_path) if '{PATH}' in cmd else cmd
 		else:
 			logger.warning(
@@ -924,17 +934,18 @@ def subdomain_discovery(
 		# Apply OpSec stealth
 		cmd = opsec.apply_stealth(tool, cmd, proxy=proxy)
 
-		# Run tool
+		# Run tool (with empty-file retry up to 3 attempts)
 		try:
 			logger.warning(f'Running {tool} with command: {cmd}')
-			run_command(
+			run_command_with_retry(
 				cmd,
+				results_file=results_file,
 				shell=True,
 				history_file=self.history_file,
 				scan_id=self.scan_id,
 				activity_id=self.activity_id,
 				proxy=proxy if tool not in ['amass-passive', 'amass-active', 'subfinder'] else None)
-			
+
 		except Exception as e:
 			logger.error(
 				f'Subdomain discovery tool "{tool}" raised an exception')
@@ -1013,11 +1024,15 @@ def subdomain_discovery(
 	# Bulk crawl subdomains - removed to avoid collisions; delegated to next stage in pipeline
 	url_filter = ctx.get('url_filter')
 
-	# Find root subdomain endpoints and save default endpoints
+	# Find root subdomain endpoints and save default endpoints.
+	# save_endpoint requires a scheme — bare hostnames (no http://) are rejected
+	# silently, which left http_crawl and fetch_url with nothing to process.
 	for subdomain in subdomains:
-		http_url = f'{subdomain.name}{url_filter}' if url_filter else subdomain.name
+		raw_url = f'{subdomain.name}{url_filter}' if url_filter else subdomain.name
+		if not raw_url.startswith(('http://', 'https://')):
+			raw_url = f'http://{raw_url}'
 		endpoint, _ = save_endpoint(
-			http_url,
+			raw_url,
 			ctx=ctx,
 			is_default=True,
 			subdomain=subdomain
@@ -2426,6 +2441,7 @@ def nmap(
 			scan_history=self.scan,
 			subscan=self.subscan,
 			endpoint=endpoint,
+			dedup_fields=['name', 'http_url', 'scan_history'],
 			**vuln_data)
 		vulns_str += f'• {str(vuln)}\n'
 		if created:
@@ -2718,11 +2734,13 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 				elif tool == 'hakrawler': tool_cmd += ';;'.join(header for header in custom_headers)
 				elif tool == 'katana': tool_cmd += formatted_headers
 
-			full_cmd = f'cat {input_path} | {tool_cmd} | grep -Eo {host_regex} | tee {self.results_dir}/urls_{tool}.txt'
+			url_results_file = f'{self.results_dir}/urls_{tool}.txt'
+			full_cmd = f'cat {input_path} | {tool_cmd} | grep -Eo {host_regex} | tee {url_results_file}'
 			logger.info(f'Running {tool}')
 			logger.warning(f'{tool} command: {full_cmd}')
-			run_command(
+			run_command_with_retry(
 				full_cmd,
+				results_file=url_results_file,
 				shell=True,
 				scan_id=self.scan_id,
 				activity_id=self.activity_id
