@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Box,
   Card,
@@ -12,10 +12,31 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  Chip
+  Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  CircularProgress,
+  Divider,
 } from '@mui/material';
 import Chart from 'react-apexcharts';
 import type { DashboardData } from '../api';
+
+interface CWEInfo {
+  name: string;
+  description: string;
+  impact: string;
+  remediation: string;
+  examples: string[];
+  severity: string;
+}
+
+const CWE_COLORS = [
+  '#7000ff', '#9020f0', '#b040ff', '#5500cc',
+  '#c060ff', '#4400aa', '#d080ff', '#330088',
+];
 
 const ChartCard: React.FC<{ title: string; children: React.ReactNode; height?: number | string }> = ({ title, children, height }) => (
   <Card sx={{ height: height || '100%', minHeight: 320, bgcolor: 'rgba(5, 5, 15, 0.6)', backdropFilter: 'blur(10px)', border: '1px solid rgba(0, 243, 255, 0.1)' }}>
@@ -62,6 +83,35 @@ const SeverityBadge: React.FC<{ severity: number | string; label?: string }> = (
 
 export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) => {
   const theme = useTheme();
+  const [cweDialogOpen, setCweDialogOpen] = useState(false);
+  const [selectedCwe, setSelectedCwe] = useState<string | null>(null);
+  const [cweInfo, setCweInfo] = useState<CWEInfo | null>(null);
+  const [cweLoading, setCweLoading] = useState(false);
+  const [cweError, setCweError] = useState<string | null>(null);
+
+  const handleCweClick = async (cweName: string) => {
+    setSelectedCwe(cweName);
+    setCweInfo(null);
+    setCweError(null);
+    setCweLoading(true);
+    setCweDialogOpen(true);
+
+    try {
+      const response = await fetch(`/api/cwe-info/?name=${encodeURIComponent(cweName)}`, {
+        credentials: 'include',
+      });
+      const json = await response.json();
+      if (json.status) {
+        setCweInfo(json as CWEInfo);
+      } else {
+        setCweError(json.error || 'Failed to load CWE information.');
+      }
+    } catch {
+      setCweError('Network error fetching CWE information.');
+    } finally {
+      setCweLoading(false);
+    }
+  };
 
   const donutOptions: any = {
     chart: { type: 'donut' as any, background: 'transparent' },
@@ -235,11 +285,78 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Most Common CWE">
             <Chart
-              options={getBarOptions(data.most_common_cwe.slice(0, 8).map(c => c.name), '#7000ff')}
-              series={[{ name: 'Occurrences', data: data.most_common_cwe.slice(0, 8).map(c => c.count) }]}
-              type="bar"
-              height={240}
+              options={{
+                chart: {
+                  type: 'treemap' as any,
+                  toolbar: { show: false },
+                  background: 'transparent',
+                  events: {
+                    dataPointSelection: (_e: any, _ctx: any, config: any) => {
+                      const idx = config.dataPointIndex;
+                      const cweItem = data.most_common_cwe.slice(0, 8)[idx];
+                      if (cweItem) handleCweClick(cweItem.name);
+                    },
+                  },
+                },
+                dataLabels: {
+                  enabled: true,
+                  style: { fontSize: '10px', fontFamily: 'Inter, sans-serif', colors: ['#ffffffcc'] },
+                  formatter: (text: string, op: any) => [text, `×${op.value}`],
+                },
+                plotOptions: {
+                  treemap: {
+                    distributed: true,
+                    enableShades: true,
+                    shadeIntensity: 0.3,
+                    colorScale: {
+                      ranges: [
+                        { from: 0, to: 9999, color: '#7000ff' },
+                      ],
+                    },
+                  },
+                },
+                colors: CWE_COLORS,
+                tooltip: {
+                  theme: 'dark',
+                  y: { formatter: (v: number) => `${v} occurrence${v !== 1 ? 's' : ''}` },
+                },
+                legend: { show: false },
+                theme: { mode: 'dark' as any },
+              }}
+              series={[{
+                data: data.most_common_cwe.slice(0, 8).map((c, i) => ({
+                  x: c.name,
+                  y: c.count,
+                  fillColor: CWE_COLORS[i % CWE_COLORS.length],
+                })),
+              }]}
+              type="treemap"
+              height={170}
             />
+            {/* Clickable legend */}
+            <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+              {data.most_common_cwe.slice(0, 8).map((c, i) => (
+                <Chip
+                  key={c.name}
+                  label={`${c.name} (${c.count})`}
+                  size="small"
+                  onClick={() => handleCweClick(c.name)}
+                  sx={{
+                    height: 20,
+                    fontSize: '0.6rem',
+                    fontWeight: 700,
+                    fontFamily: 'Inter',
+                    cursor: 'pointer',
+                    bgcolor: `${CWE_COLORS[i % CWE_COLORS.length]}18`,
+                    color: CWE_COLORS[i % CWE_COLORS.length],
+                    border: `1px solid ${CWE_COLORS[i % CWE_COLORS.length]}44`,
+                    '&:hover': {
+                      bgcolor: `${CWE_COLORS[i % CWE_COLORS.length]}35`,
+                    },
+                  }}
+                />
+              ))}
+            </Box>
           </ChartCard>
         </Grid>
 
@@ -254,6 +371,124 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
           </ChartCard>
         </Grid>
       </Grid>
+
+      {/* CWE Detail Modal */}
+      <Dialog
+        open={cweDialogOpen}
+        onClose={() => setCweDialogOpen(false)}
+        maxWidth="sm"
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            bgcolor: 'rgba(5, 5, 15, 0.97)',
+            border: '1px solid rgba(112, 0, 255, 0.4)',
+            backdropFilter: 'blur(20px)',
+            borderRadius: 2,
+          },
+        }}
+      >
+        <DialogTitle sx={{ pb: 1 }}>
+          <Typography variant="h6" sx={{ fontFamily: 'Orbitron', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: '#7000ff' }}>
+            {selectedCwe}
+          </Typography>
+          {cweInfo && (
+            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter', display: 'block', mt: 0.25 }}>
+              {cweInfo.name}
+            </Typography>
+          )}
+        </DialogTitle>
+
+        <DialogContent sx={{ pt: 0 }}>
+          {cweLoading && (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
+              <CircularProgress size={20} sx={{ color: '#7000ff' }} />
+              <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter', fontSize: '0.8rem' }}>
+                Generating CWE intelligence...
+              </Typography>
+            </Box>
+          )}
+
+          {cweError && (
+            <Typography variant="body2" sx={{ color: '#ff003c', fontFamily: 'Inter', fontSize: '0.8rem', py: 2 }}>
+              {cweError}
+            </Typography>
+          )}
+
+          {cweInfo && !cweLoading && (
+            <Box>
+              {cweInfo.severity && (
+                <Box sx={{ mb: 2 }}>
+                  <SeverityBadge severity={cweInfo.severity.toLowerCase()} label={cweInfo.severity.toUpperCase()} />
+                </Box>
+              )}
+
+              <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#7000ff', mb: 0.5 }}>
+                Description
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.6, mb: 2 }}>
+                {cweInfo.description}
+              </Typography>
+
+              <Divider sx={{ borderColor: 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
+
+              <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#ff9f00', mb: 0.5 }}>
+                Impact
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.6, mb: 2 }}>
+                {cweInfo.impact}
+              </Typography>
+
+              <Divider sx={{ borderColor: 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
+
+              <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#00ff62', mb: 0.5 }}>
+                Remediation
+              </Typography>
+              <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.6, mb: 2 }}>
+                {cweInfo.remediation}
+              </Typography>
+
+              {cweInfo.examples && cweInfo.examples.length > 0 && (
+                <>
+                  <Divider sx={{ borderColor: 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
+                  <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#00f3ff', mb: 1 }}>
+                    Examples
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                    {cweInfo.examples.map((ex, i) => (
+                      <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
+                        <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: '#00f3ff', mt: 0.8, flexShrink: 0 }} />
+                        <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.78rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                          {ex}
+                        </Typography>
+                      </Box>
+                    ))}
+                  </Box>
+                </>
+              )}
+            </Box>
+          )}
+        </DialogContent>
+
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => setCweDialogOpen(false)}
+            size="small"
+            sx={{
+              fontFamily: 'Orbitron',
+              fontSize: '0.65rem',
+              fontWeight: 800,
+              textTransform: 'uppercase',
+              letterSpacing: 1,
+              color: '#7000ff',
+              border: '1px solid rgba(112, 0, 255, 0.4)',
+              px: 2,
+              '&:hover': { bgcolor: 'rgba(112, 0, 255, 0.1)' },
+            }}
+          >
+            Close
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

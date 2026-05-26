@@ -137,7 +137,7 @@ services:
     image: neo4j:5.12.0
     restart: always
     ports:
-      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:8474:7474"
       - "127.0.0.1:7687:7687"
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}

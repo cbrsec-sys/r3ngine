@@ -100,6 +100,18 @@ class MasterScanWorkflow:
             f"Starting MasterScanWorkflow for scan_id={ctx.get('scan_history_id')}"
         )
 
+        while True:
+            can_proceed = await workflow.execute_activity(
+                "CheckScanQueueStatusActivity",
+                args=[ctx.get('scan_history_id'), "main"],
+                start_to_close_timeout=timedelta(minutes=1),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue"
+            )
+            if can_proceed:
+                break
+            await workflow.sleep(timedelta(seconds=30))
+
         # ------------------------------------------------------------------
         # STEP 0: Target Profiling — validate scan, enrich context, set up dirs
         # ------------------------------------------------------------------
@@ -734,6 +746,18 @@ class SubScanWorkflow:
         workflow.logger.info(
             f"Starting SubScanWorkflow for subdomain_id={ctx.get('subdomain_id')} tasks={tasks}"
         )
+
+        while True:
+            can_proceed = await workflow.execute_activity(
+                "CheckScanQueueStatusActivity",
+                args=[ctx.get('subscan_id'), "subscan"],
+                start_to_close_timeout=timedelta(minutes=1),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue"
+            )
+            if can_proceed:
+                break
+            await workflow.sleep(timedelta(seconds=30))
 
         # Validate tasks against the permitted task list before any dispatch
         known_explicit = set(_SUBSCAN_DISPATCH.keys())

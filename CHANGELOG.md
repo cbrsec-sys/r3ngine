@@ -123,6 +123,46 @@
   - Resolved a missing findings issue caused by the `--only-poc r` filter overriding genuine verified payloads (`v`) by expanding the filter to `--only-poc v,r`.
   - Upgraded Dalfox execution to support optional Deep Scan (`--deep-scan`), remote payload dictionaries (`--remote-payloads`), remote parameter wordlists (`--remote-wordlists`), and automatic WAF bypassing (`--waf-bypass auto`) for deeper detection coverage.
   - Added a configurable scan timeout parameter (`--scan-timeout`) to prevent scan stagnation on heavily-parametrised endpoints, and removed the obsolete `--skip-bav` flag.
+
+- **Active Directory Intelligence Plugin (Phases 7–12)**:
+  - **Reporting Engine**: Implemented `ReportingEngine.compile()` producing 7-section AD intelligence reports covering executive summary, domain users, groups, computers, trusts, exposures, and recommendations. Exports to both JSON and PDF via `JSONRenderer` and `PDFRenderer` (WeasyPrint).
+  - **Paginated Findings API**: All findings, trusts, and exposure endpoints now return paginated results (50 records per page) with `page`/`total_pages` metadata, preventing browser memory exhaustion against large Active Directory environments.
+  - **Graph Scalability**: `graph_domains` endpoint enforces a `?limit=300` default node cap with a truncation warning banner and user-triggered "Load All" confirmation to prevent browser hangs on domains with thousands of objects.
+  - **Performance Guardrails**: Cytoscape animations are automatically disabled for graphs exceeding 400 nodes; layout computation is deferred to a web worker to prevent UI thread blocking.
+  - **Cytoscape Graph Layouts**: Added 5 named layout presets — `hierarchical` (KLay), `radial` (Concentric), `force` (CoSE-Bilkent), `bipartite` (Grid), and `cluster` (COSE) — selectable from the graph toolbar without page reload.
+  - **Semantic Node Styling**: Domain controllers, trust bridges, exposed accounts, and disabled objects each carry distinct node shapes, border weights, and color families to allow at-a-glance risk triage.
+  - **Real-Time WebSocket Streaming**: Backend emits graph and findings events through Django Channels with 150 ms client-side batching to coalesce burst updates during large LDAP/BloodHound ingests.
+  - **Search, Focus & Node Detail Panel**: Graph toolbar includes live search with node focus/highlight; clicking any node opens a slide-over detail panel showing all attributes, related trust paths, and linked exposures.
+  - **RBAC & Evidence Logs**: All sensitive assessment actions (launch, export, delete) require the `can_run_ad_assessment` permission; every action is written to an immutable evidence log accessible from the assessment detail view.
+  - **AD Assessment from Subdomain**: Added API endpoint and subdomain list UI action to launch an AD assessment directly from any subdomain record, automatically pre-populating the target domain from the selected subdomain's resolved FQDN.
+  - **AD Report Templates**: Added `ad_modern` and `cyber_pro` PDF report templates; `ADReportModal` component provides in-app template selection and one-click PDF download.
+
+- **Scan Workflow Reliability & Cancellation Hardening**:
+  - **Centralized Abort Utility** (`web/reNgine/utils/scan_cancellation.py`): Introduced `abort_scan_history(scan, aborted_by)` and `abort_subscan(subscan)` as the canonical abort path across all API surfaces. Workflow cancellation now always occurs *before* database status is updated to prevent a race where a resumed worker sees ABORTED state and skips cleanup.
+  - **Child Subscan Propagation**: `abort_scan_history` now recursively aborts all child subscans in RUNNING state, ensuring no orphaned subscan workflows outlive a stopped parent scan.
+  - **Fixed `StopScan` API** (`api/views.py`): Removed duplicate 68-line inline `abort_scan`/`abort_subscan` closures; endpoint now delegates entirely to the centralized utility.
+  - **Fixed `stop_scans` Bulk Stop** (`startScan/views.py`): The bulk stop endpoint was cancelling Temporal workflows but never writing `scan.scan_status = ABORTED_TASK` to the database, leaving scans permanently shown as RUNNING in the UI.
+  - **Fixed Queryset Bulk Delete Signal Bypass** (`api/subscans.py`): `SubScan.objects.filter(…).delete()` does not fire `pre_delete` signals and therefore never triggered workflow cancellation. Replaced with a per-instance loop that calls `abort_subscan(subscan)` before each deletion.
+  - **Fixed `delete_all_scan_results` Signal Bypass** (`startScan/views.py`): Same queryset bypass issue affected the "Delete All Scans" action. Replaced `ScanHistory.objects.all().delete()` with a materialised loop that calls `abort_scan_history(scan)` and removes results directories before each `scan.delete()`.
+  - **Fixed `scan_history` Bulk Stop Missing Child Cancellation** (`api/scan_history.py`): `stop_scan` and `bulk_stop` handlers had duplicated inline Temporal cancellation logic that never cancelled child subscans. Both now delegate to `abort_scan_history`.
+  - **Workflow Execution Retry Cap**: Added `RetryPolicy(maximum_attempts=10)` to `MasterScanWorkflow` and `SubScanWorkflow` start calls in `tasks.py`. After 10 consecutive activity failures the workflow transitions to FAILED state in Temporal rather than retrying indefinitely. Users can re-trigger execution via the existing **Resume** button, which starts a fresh workflow from the last persisted checkpoint.
+  - **Workflow Flush Utility** (`web/scripts/flush_workflows.py`): Added a one-shot maintenance script that terminates all running scan/subscan Temporal workflows and marks corresponding database records as ABORTED/CANCELLED. System scheduler workflows (`temporal-sys-scheduler:*`) are intentionally skipped. Run from inside the web container: `python3 scripts/flush_workflows.py`.
+
+- **Dynamic Plugin Routing**:
+  - Replaced 5 individually hard-coded Active Directory route definitions in the host router with a single dynamic entry via `ADPluginApp`, resolving the discrepancy between plugin slug registration and frontend route matching.
+  - Plugin page routing now follows the established wildcard pattern (`/p/$pluginSlug` and `/p/$pluginSlug/$pageName`) so future plugin pages are automatically reachable without core router changes.
+
+- **Plugin System Fixes**:
+  - Fixed the plugin installer sync step to copy only the compiled `ui/dist/` output into `MEDIA_ROOT`, preventing unintentional inclusion of plugin source trees, `node_modules`, or private configuration files in the served static asset directory.
+
+- **CSRF Security Fixes**:
+  - Fixed a `TypeError: Cannot read properties of null` crash in `SubdomainsTab` caused by a null CSRF token on initial page load; token is now coerced to an empty string before use.
+  - Fixed CSRF token not being included in AD plugin API requests (`adApi`); all mutating API calls now read the token from the Django cookie and attach it as the `X-CSRFToken` header.
+
+- **Crash Recovery Improvements**:
+  - `recover_stuck_scans` now correctly identifies `RUNNING_TASK` scans whose associated Temporal workflow no longer exists (e.g. after a container restart with no checkpoint), marks them as `ABORTED_TASK`, and surfaces them in the REST API recovery endpoint.
+  - Added a hard cap to the REST API recovery endpoint: at most 50 scans are recovered per invocation to prevent a single recovery pass from overwhelming the Temporal task queue on large installations.
+
 ### [v3.1.0] - 2026-05-20
 
 - **Scan Pipeline**: fully fixed and stabilized. All tools now working to their full capabilities again.
