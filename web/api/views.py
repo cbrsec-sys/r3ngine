@@ -4489,14 +4489,14 @@ class GetSystemLogs(APIView):
 	def get(self, request):
 		# SECURITY: Path is hardcoded and validated to prevent directory traversal
 		log_file = os.path.normpath(os.path.join(settings.BASE_DIR, 'scan.log'))
-		
+
 		# Ensure we only read from the allowed directory
 		if not log_file.startswith(os.path.normpath(settings.BASE_DIR)):
 			return Response({'status': False, 'message': 'Forbidden log path'}, status=403)
 
 		if not os.path.exists(log_file):
 			return Response({'status': False, 'message': 'Log file not found'}, status=404)
-		
+
 		try:
 			with open(log_file, 'r') as f:
 				# Efficiently read last ~50KB (~500 lines)
@@ -4512,3 +4512,55 @@ class GetSystemLogs(APIView):
 		except Exception as e:
 			logger.error(f"Error reading system logs: {str(e)}")
 			return Response({'status': False, 'message': 'Internal error reading logs'}, status=500)
+
+
+class LaunchADAssessmentFromSubdomain(APIView):
+	"""Create an ADAssessment pre-populated from a Subdomain's root domain.
+
+	The AD Intelligence plugin must be installed. The assessment is created
+	in PENDING state; users start it explicitly from the AD plugin dashboard.
+	This view intentionally does NOT start the workflow automatically to avoid
+	unintended automated enumeration activity.
+	"""
+	permission_classes = [HasPermission]
+	permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+	def post(self, request):
+		subdomain_id = request.data.get('subdomain_id')
+		if not subdomain_id:
+			return Response(
+				{'error': 'subdomain_id is required.'},
+				status=HTTP_400_BAD_REQUEST,
+			)
+		try:
+			subdomain = Subdomain.objects.select_related(
+				'scan_history__domain'
+			).get(id=subdomain_id)
+		except Subdomain.DoesNotExist:
+			return Response(
+				{'error': f'Subdomain {subdomain_id} not found.'},
+				status=HTTP_400_BAD_REQUEST,
+			)
+
+		target_domain = subdomain.scan_history.domain.name
+
+		try:
+			from plugins_data.active_directory.backend.models import ADAssessment as _ADAssessment
+		except ImportError:
+			return Response(
+				{'error': 'AD Intelligence plugin is not installed.'},
+				status=HTTP_400_BAD_REQUEST,
+			)
+
+		assessment = _ADAssessment.objects.create(
+			name=f'AD Assessment — {target_domain}',
+			target_domain=target_domain,
+			status='PENDING',
+			created_by=request.user,
+		)
+		return Response({
+			'assessment_id': assessment.id,
+			'assessment_name': assessment.name,
+			'target_domain': target_domain,
+			'status': 'created',
+		}, status=status.HTTP_201_CREATED)
