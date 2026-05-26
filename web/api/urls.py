@@ -18,6 +18,7 @@ from .users import UserManageViewSet
 from .stress_testing_views import StressTestingAPIView, StressTestingHistoryAPIView
 from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView
 from .scan_configuration import ScanConfigurationAPI
+from .config_migration_views import ExportConfig, ImportConfig
 
 
 app_name = 'api'
@@ -360,6 +361,16 @@ urlpatterns = [
         'report-settings/',
         ReportSettingsAPIView.as_view(),
         name='report_settings'
+    ),
+    path(
+        'settings/export/',
+        ExportConfig.as_view(),
+        name='settings_export'
+    ),
+    path(
+        'settings/import/',
+        ImportConfig.as_view(),
+        name='settings_import'
     ),
     path(
         'dashboard/<slug:slug>/',

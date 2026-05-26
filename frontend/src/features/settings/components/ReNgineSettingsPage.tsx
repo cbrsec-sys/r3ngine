@@ -18,9 +18,12 @@ import {
   Database,
   Image as ImageIcon,
   AlertTriangle,
-  HardDrive
+  HardDrive,
+  Download,
+  Upload
 } from 'lucide-react';
 import Chart from 'react-apexcharts';
+import axios from 'axios';
 import {
   useRengineSystemSettings,
   useDeleteAllScanResults,
@@ -43,6 +46,11 @@ export const ReNgineSettingsPage: React.FC = () => {
     message: '',
     severity: 'success',
   });
+
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [overwriteConfigs, setOverwriteConfigs] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
@@ -100,6 +108,53 @@ export const ReNgineSettingsPage: React.FC = () => {
         message: 'Failed to update scan queueing setting.',
         severity: 'error',
       });
+    }
+  };
+
+  const handleExportConfig = async () => {
+    try {
+      setIsExporting(true);
+      const response = await axios.get('/api/settings/export/', {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'r3ngine_config_backup.zip');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setSnackbar({ open: true, message: 'Configuration exported successfully', severity: 'success' });
+    } catch (err) {
+      setSnackbar({ open: true, message: 'Failed to export configuration', severity: 'error' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportConfig = async () => {
+    if (!importFile) return;
+    try {
+      setIsImporting(true);
+      const formData = new FormData();
+      formData.append('file', importFile);
+      formData.append('overwrite_existing', overwriteConfigs ? 'true' : 'false');
+      
+      const response = await axios.post('/api/settings/import/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        }
+      });
+      if (response.data.status) {
+        setSnackbar({ open: true, message: 'Configuration imported successfully', severity: 'success' });
+        setImportFile(null);
+      } else {
+        setSnackbar({ open: true, message: response.data.message || 'Import failed', severity: 'error' });
+      }
+    } catch (err) {
+      setSnackbar({ open: true, message: 'Failed to import configuration', severity: 'error' });
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -213,6 +268,117 @@ export const ReNgineSettingsPage: React.FC = () => {
                 </Box>
               }
             />
+          </Box>
+        </TacticalPanel>
+
+        <TacticalPanel title="CONFIGURATION EXPORT / IMPORT">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography sx={{ color: '#00f3ff', fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
+                  Export Configuration
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                  Download a ZIP containing all configured API keys, tool configs, custom scan engines, and custom wordlists.
+                </Typography>
+              </Box>
+              <Button
+                variant="outlined"
+                color="info"
+                onClick={handleExportConfig}
+                disabled={isExporting}
+                startIcon={isExporting ? <CircularProgress size={18} /> : <Download size={18} />}
+                sx={{
+                  borderColor: '#00f3ff',
+                  color: '#00f3ff',
+                  fontFamily: 'Orbitron',
+                  fontWeight: 900,
+                  px: 3,
+                  '&:hover': {
+                    bgcolor: 'rgba(0, 243, 255, 0.1)',
+                    borderColor: '#00f3ff'
+                  }
+                }}
+              >
+                {isExporting ? 'EXPORTING...' : 'DOWNLOAD BACKUP'}
+              </Button>
+            </Box>
+
+            <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ color: '#00ff9d', fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
+                  Import Configuration
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1 }}>
+                  Upload a previously exported ZIP backup to restore API keys, engines, tools, and wordlists.
+                </Typography>
+                <Stack direction="row" spacing={2} alignItems="center">
+                  <Button
+                    variant="contained"
+                    component="label"
+                    sx={{
+                      bgcolor: '#00ff9d',
+                      color: '#000',
+                      fontFamily: 'Orbitron',
+                      fontWeight: 900,
+                      '&:hover': { bgcolor: '#00cc7d' }
+                    }}
+                  >
+                    SELECT ZIP
+                    <input
+                      type="file"
+                      accept=".zip"
+                      hidden
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setImportFile(e.target.files[0]);
+                        }
+                      }}
+                    />
+                  </Button>
+                  {importFile && (
+                    <Typography variant="body2" sx={{ color: '#fff' }}>
+                      {importFile.name}
+                    </Typography>
+                  )}
+                </Stack>
+                <Box sx={{ mt: 1 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={overwriteConfigs}
+                        onChange={(e) => setOverwriteConfigs(e.target.checked)}
+                        color="success"
+                      />
+                    }
+                    label={<Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>Overwrite existing configurations</Typography>}
+                  />
+                </Box>
+              </Box>
+
+              <Button
+                variant="outlined"
+                color="success"
+                onClick={handleImportConfig}
+                disabled={!importFile || isImporting}
+                startIcon={isImporting ? <CircularProgress size={18} /> : <Upload size={18} />}
+                sx={{
+                  borderColor: '#00ff9d',
+                  color: '#00ff9d',
+                  fontFamily: 'Orbitron',
+                  fontWeight: 900,
+                  px: 3,
+                  '&:hover': {
+                    bgcolor: 'rgba(0, 255, 157, 0.1)',
+                    borderColor: '#00ff9d'
+                  }
+                }}
+              >
+                {isImporting ? 'IMPORTING...' : 'UPLOAD BACKUP'}
+              </Button>
+            </Box>
           </Box>
         </TacticalPanel>
 
