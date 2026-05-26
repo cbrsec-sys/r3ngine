@@ -322,9 +322,11 @@ def get_http_urls(
 		query = query.filter(is_default=True)
 
 	# If is_uncrawled is True, select only endpoints that have not been crawled
-	# yet (no status)
+	# yet (no status). EndPoint.http_status defaults to 0, so we match both
+	# 0 (newly seeded) and NULL (explicitly unset).
 	if is_uncrawled:
-		query = query.filter(http_status__isnull=True)
+		from django.db.models import Q
+		query = query.filter(Q(http_status__isnull=True) | Q(http_status=0))
 
 	# If a path is passed, select only endpoints that contains it
 	if url_filter and domain:
@@ -522,7 +524,7 @@ def record_exists(model, data, exclude_keys=[]):
 	# Return True if a record exists based on the lookup fields, False otherwise
 	return model.objects.filter(**lookup_fields).exists()
 
-def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, **kwargs):
+def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, dedup_fields=None, **kwargs):
 	# Support both positional and keyword arguments for backward compatibility
 	if vuln_data and isinstance(vuln_data, dict):
 		vuln_data.update(kwargs)
@@ -585,8 +587,14 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, **
 	if is_suppressed:
 		vuln_data['is_suppressed'] = True
 
-	# Create vulnerability
-	vuln, created = Vulnerability.objects.get_or_create(**vuln_data)
+	# Create vulnerability — use narrower dedup key when caller specifies one,
+	# so volatile fields like description don't cause duplicate rows on re-scan.
+	if dedup_fields:
+		lookup = {k: vuln_data.pop(k) for k in dedup_fields if k in vuln_data}
+		vuln, created = Vulnerability.objects.update_or_create(defaults=vuln_data, **lookup)
+		vuln_data.update(lookup)  # restore for use below (tags, auth-candidate, etc.)
+	else:
+		vuln, created = Vulnerability.objects.get_or_create(**vuln_data)
 	if created:
 		vuln.discovered_date = timezone.now()
 		vuln.open_status = True
