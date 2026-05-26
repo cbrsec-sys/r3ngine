@@ -121,10 +121,21 @@ The reconnaissance pipeline has been deepened to handle modern, API-centric web 
 *   **Deep Pursuit OSINT Engine**: A modernized, high-performance intelligence pipeline that replaces heavy Spiderfoot scans with surgical discovery. Featuring **holehe** for email pivots, **maigret** for cross-platform social profile mapping, and a custom **Internal Social Intelligence Engine** for advanced LinkedIn discovery.
 *   **OSINT Intelligence Dashboard**: Aggregated view of emails, leaks, employees, dorks, and document metadata.
 
+### 🗂️ Active Directory Intelligence Plugin
+r3ngine v3.2.0 introduces a dedicated **Active Directory Intelligence** plugin for internal network reconnaissance and AD attack surface analysis.
+*   **Graph Visualization**: Interactive Cytoscape.js graph with 5 layout presets (hierarchical, radial, force, bipartite, cluster), semantic node styling for domain controllers, trust bridges, and exposed accounts, plus an animated real-time ingest mode.
+*   **Scalability Guardrails**: Graph enforces a 300-node default cap with user-triggered "Load All"; animations automatically disable above 400 nodes to maintain UI responsiveness.
+*   **Findings & Trust Enumeration**: Paginated API endpoints (50 records/page) for all AD objects — users, groups, computers, trusts, and exposures — with inline search and column-level filtering.
+*   **Real-Time WebSocket Streaming**: Backend emits graph and findings events through Django Channels with 150 ms client-side batching during large LDAP/BloodHound ingests.
+*   **7-Section Intelligence Reports**: `ReportingEngine` compiles executive summary, domain inventory, trust topology, exposure analysis, and recommendations into PDF (`cyber_pro`, `ad_modern` templates) or JSON exports.
+*   **RBAC & Evidence Logs**: All assessment actions require `can_run_ad_assessment` permission and are written to an immutable evidence log.
+*   **Subdomain-Triggered Assessment**: Launch an AD assessment directly from any subdomain record in the subdomain management table.
+
 ### 🥷 Stealth, OpSec & Infrastructure
 Operational security is no longer an afterthought; it is baked into every execution.
 *   **Enhanced Proxy Orchestration**: Per-tool rotating proxy support across all discovery modules to bypass rate-limiting and WAF blocks.
-*   **Proper Scan Termination**: Resolved critical failures in scan termination by aligning frontend and backend to a unified `StopScan` API, ensuring all sub-tasks and child processes are killed immediately.
+*   **Hardened Scan Termination**: Centralized `abort_scan_history()` / `abort_subscan()` utility ensures all child subscans and Temporal workflows are cancelled before database status is updated, eliminating orphaned workflows and stuck RUNNING scan records. Fixes applied across `StopScan`, `stop_scans`, `bulk_stop`, `delete_all_scan_results`, and `bulk_delete` endpoints.
+*   **Workflow Retry Cap**: `MasterScanWorkflow` and `SubScanWorkflow` now enforce a maximum of 10 retry attempts. After 10 failures the workflow transitions to FAILED state; users can re-trigger execution via the **Resume** button which replays from the last checkpoint.
 *   **Hydra & Medusa Integration**: High-performance authentication brute-forcing with automated service mapping and stealthy, batched execution via **Proxychains4**.
 *   **WAF Bypass & OpSec Presets**: Advanced stealth configuration including User-Agent rotation, custom DNS resolvers, and WAF bypass headers.
 *   **Automated Startup Sync**: A Redis-locked sequence ensures Attack Surface graphs and CISA KEV (Known Exploited Vulnerabilities) catalogs are synchronized immediately upon boot.
@@ -316,10 +327,11 @@ flowchart TD
 *   **Natural Language Querying**: Perform complex database lookups using intuitive, human-like operators.
 
 ### 🛠️ Advanced Scan Engines
+*   **Active Directory Intelligence**: Full AD attack surface analysis plugin with Cytoscape graph visualization (5 layouts), trust enumeration, exposure analysis, 7-section PDF/JSON reports, real-time WebSocket streaming, and RBAC-gated evidence logs.
 *   **Attack Path Modeling Engine (APME)**: Sophisticated graph-based visualization of multi-stage attack vectors using Neo4j and AI-driven path discovery.
 *   **Adaptive Stress & Resilience Engine (ASRE)**: High-performance real-time stress testing dashboard integrated with `k6`, `wrk`, `hping3`, and `Locust` for endpoint saturation analysis.
 *   **Exploit Readiness Layer (ERL)**: Hardened automated vulnerability verification system with multi-scanner support and stealthy OpSec guardrails.
-*   **Autonomous Recon Orchestration**: Temporal-powered durable workflow pipeline with non-blocking orchestration, crash-safe execution, and full replay history.
+*   **Autonomous Recon Orchestration**: Temporal-powered durable workflow pipeline with non-blocking orchestration, crash-safe execution, full replay history, and a 10-attempt retry cap (FAILED workflows are resumable via the UI).
 *   **Vulnerability Correlation Engine**: Multi-tool unification mapping findings from Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, and more.
 *   **Autonomous Tooling & Plugin System**: Background tool management ensures all plugin dependencies (e.g., sqlmap, XSStrike) are installed and verified automatically at runtime. **v3-Hardening**: Integrated native **proxy rotation** and **OpSec compliance** (User-Agent randomization, custom headers) directly into the ERL adapter layer, ensuring stealthy validation of all discovered vulnerabilities.
 *   **Continuous Monitoring**: Periodic discovery of new subdomains, endpoints, and data changes with automated diffing.

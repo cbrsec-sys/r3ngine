@@ -9,20 +9,23 @@ import {
   Alert,
   CircularProgress,
   Grid,
-  Snackbar
+  Snackbar,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
-import { 
-  Trash2, 
-  Database, 
-  Image as ImageIcon, 
+import {
+  Trash2,
+  Database,
+  Image as ImageIcon,
   AlertTriangle,
   HardDrive
 } from 'lucide-react';
 import Chart from 'react-apexcharts';
-import { 
-  useRengineSystemSettings, 
-  useDeleteAllScanResults, 
-  useDeleteAllScreenshots 
+import {
+  useRengineSystemSettings,
+  useDeleteAllScanResults,
+  useDeleteAllScreenshots,
+  useToggleScanQueueing
 } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 
@@ -30,6 +33,7 @@ export const ReNgineSettingsPage: React.FC = () => {
   const { data: systemInfo, isLoading } = useRengineSystemSettings();
   const deleteScanResults = useDeleteAllScanResults();
   const deleteScreenshots = useDeleteAllScreenshots();
+  const toggleScanQueueing = useToggleScanQueueing();
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -79,6 +83,23 @@ export const ReNgineSettingsPage: React.FC = () => {
           severity: 'error',
         });
       }
+    }
+  };
+
+  const handleToggleQueueing = async () => {
+    try {
+      await toggleScanQueueing.mutateAsync();
+      setSnackbar({
+        open: true,
+        message: 'Scan queueing setting updated.',
+        severity: 'success',
+      });
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: 'Failed to update scan queueing setting.',
+        severity: 'error',
+      });
     }
   };
 
@@ -170,26 +191,51 @@ export const ReNgineSettingsPage: React.FC = () => {
           </Typography>
         </Box>
 
+        <TacticalPanel title="SCAN CONFIGURATION">
+          <Box sx={{ p: 2 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={systemInfo?.enable_scan_queueing || false}
+                  onChange={handleToggleQueueing}
+                  disabled={toggleScanQueueing.isPending}
+                  color="info"
+                />
+              }
+              label={
+                <Box>
+                  <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontWeight: 600 }}>
+                    Enable Scan Queueing
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                    When enabled, running main scans and subscans will queue rather than running concurrently, allowing max 1 main scan and 1 specific subscan at a time.
+                  </Typography>
+                </Box>
+              }
+            />
+          </Box>
+        </TacticalPanel>
+
         <TacticalPanel title="STORAGE METRICS">
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: { xs: 'column', md: 'row' }, 
-            alignItems: 'center', 
+          <Box sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: 'center',
             justifyContent: 'center',
             gap: { xs: 4, md: 8 }
           }}>
             <Box sx={{ width: 300, display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
-              <Chart 
-                options={chartOptions} 
-                series={series} 
-                type="radialBar" 
+              <Chart
+                options={chartOptions}
+                series={series}
+                type="radialBar"
                 height={320}
               />
               <Box sx={{ position: 'absolute', bottom: 10, textAlign: 'center' }}>
-                <Typography sx={{ 
-                  fontFamily: 'Orbitron', 
-                  fontSize: '0.6rem', 
-                  fontWeight: 900, 
+                <Typography sx={{
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.6rem',
+                  fontWeight: 900,
                   color: gaugeColor,
                   letterSpacing: 2,
                   textTransform: 'uppercase'
@@ -198,29 +244,29 @@ export const ReNgineSettingsPage: React.FC = () => {
                 </Typography>
               </Box>
             </Box>
-            
+
             <Box sx={{ flex: '0 1 auto' }}>
               <Grid container spacing={3}>
-                <Grid size={{xs: 12, sm: 4}} >
-                  <MetricCard 
-                    label="TOTAL STORAGE" 
-                    value={`${systemInfo?.total || 0} GB`} 
-                    icon={<Database size={20} color="#ffd600" />} 
+                <Grid size={{ xs: 12, sm: 4 }} >
+                  <MetricCard
+                    label="TOTAL STORAGE"
+                    value={`${systemInfo?.total || 0} GB`}
+                    icon={<Database size={20} color="#ffd600" />}
                   />
                 </Grid>
-                <Grid size={{xs: 12, sm: 4}} >
-                  <MetricCard 
-                    label="USED SPACE" 
-                    value={`${systemInfo?.used || 0} GB`} 
-                    icon={<HardDrive size={20} color={gaugeColor} />} 
+                <Grid size={{ xs: 12, sm: 4 }} >
+                  <MetricCard
+                    label="USED SPACE"
+                    value={`${systemInfo?.used || 0} GB`}
+                    icon={<HardDrive size={20} color={gaugeColor} />}
                     statusColor={gaugeColor}
                   />
                 </Grid>
-                <Grid size={{xs: 12, sm: 4}} >
-                  <MetricCard 
-                    label="FREE SPACE" 
-                    value={`${systemInfo?.free || 0} GB`} 
-                    icon={<Database size={20} color="#00ff9d" />} 
+                <Grid size={{ xs: 12, sm: 4 }} >
+                  <MetricCard
+                    label="FREE SPACE"
+                    value={`${systemInfo?.free || 0} GB`}
+                    icon={<Database size={20} color="#00ff9d" />}
                     statusColor="#00ff9d"
                   />
                 </Grid>
@@ -231,14 +277,14 @@ export const ReNgineSettingsPage: React.FC = () => {
 
         <TacticalPanel title="DANGER ZONE" borderColor="rgba(255, 0, 85, 0.3)">
           <Stack spacing={0} divider={<Divider sx={{ borderColor: 'rgba(255,0,85,0.1)' }} />}>
-            <MaintenanceRow 
+            <MaintenanceRow
               title="Delete all scan results"
               description="Permanently remove all scan history, findings, and logs across all projects. This action is irreversible."
               onAction={handleDeleteScanResults}
               isLoading={deleteScanResults.isPending}
               buttonLabel="PURGE ALL SCANS"
             />
-            <MaintenanceRow 
+            <MaintenanceRow
               title="Delete all screenshots"
               description="Remove all captured website screenshots to free up disk space. Scan reports will no longer show visual evidence."
               onAction={handleDeleteScreenshots}
@@ -248,11 +294,11 @@ export const ReNgineSettingsPage: React.FC = () => {
           </Stack>
         </TacticalPanel>
 
-        <Alert 
-          severity="info" 
+        <Alert
+          severity="info"
           icon={<AlertTriangle size={20} />}
-          sx={{ 
-            bgcolor: 'rgba(0, 243, 255, 0.05)', 
+          sx={{
+            bgcolor: 'rgba(0, 243, 255, 0.05)',
             color: '#00f3ff',
             border: '1px solid rgba(0, 243, 255, 0.2)',
             '& .MuiAlert-icon': { color: '#00f3ff' }
@@ -262,18 +308,18 @@ export const ReNgineSettingsPage: React.FC = () => {
         </Alert>
       </Stack>
 
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
           variant="filled"
-          sx={{ 
-            fontFamily: 'Orbitron', 
+          sx={{
+            fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
             bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
@@ -289,9 +335,9 @@ export const ReNgineSettingsPage: React.FC = () => {
 };
 
 const MetricCard: React.FC<{ label: string; value: string; icon: React.ReactNode; statusColor?: string }> = ({ label, value, icon, statusColor }) => (
-  <Paper sx={{ 
-    p: 2, 
-    bgcolor: 'rgba(255,255,255,0.02)', 
+  <Paper sx={{
+    p: 2,
+    bgcolor: 'rgba(255,255,255,0.02)',
     border: '1px solid',
     borderColor: statusColor ? `${statusColor}33` : 'rgba(255,255,255,0.05)',
     display: 'flex',
@@ -315,10 +361,10 @@ const MetricCard: React.FC<{ label: string; value: string; icon: React.ReactNode
   </Paper>
 );
 
-const MaintenanceRow: React.FC<{ 
-  title: string; 
-  description: string; 
-  onAction: () => void; 
+const MaintenanceRow: React.FC<{
+  title: string;
+  description: string;
+  onAction: () => void;
   isLoading: boolean;
   buttonLabel: string;
 }> = ({ title, description, onAction, isLoading, buttonLabel }) => (
@@ -337,8 +383,8 @@ const MaintenanceRow: React.FC<{
       onClick={onAction}
       disabled={isLoading}
       startIcon={<Trash2 size={18} />}
-      sx={{ 
-        borderColor: '#ff0055', 
+      sx={{
+        borderColor: '#ff0055',
         color: '#ff0055',
         fontFamily: 'Orbitron',
         fontWeight: 900,

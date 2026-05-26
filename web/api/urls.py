@@ -7,7 +7,7 @@ from rest_framework_simplejwt.views import (
 )
 
 from .views import *
-from .dashboard_views import DashboardAPIView
+from .dashboard_views import DashboardAPIView, CWEInfoAPIView
 from .target_summary_views import TargetSummaryAPIView
 from .scan_summary_views import ScanSummaryAPIView
 
@@ -347,6 +347,11 @@ urlpatterns = [
         name='toggle_bug_bounty_mode'
     ),
     path(
+        'toggle-scan-queueing-mode/', 
+        ToggleScanQueueingView.as_view(), 
+        name='toggle_scan_queueing_mode'
+    ),
+    path(
         'update-theme/',
         UpdateThemeView.as_view(),
         name='update_theme'
@@ -360,6 +365,11 @@ urlpatterns = [
         'dashboard/<slug:slug>/',
         DashboardAPIView.as_view(),
         name='dashboard_api'
+    ),
+    path(
+        'cwe-info/',
+        CWEInfoAPIView.as_view(),
+        name='cwe_info_api'
     ),
     path(
         'system/health/',

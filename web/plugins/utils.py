@@ -110,7 +110,9 @@ class PluginManager:
             if field not in manifest:
                 raise Exception(f"Missing required field '{field}' in manifest.yaml")
                 
-        # Validate runtime keys
+        # Validate runtime keys.
+        # Valid anchor values: any real scan task name (e.g. "subdomain_discovery")
+        # or "standalone" for plugins that operate independently of the main scan pipeline.
         runtime = manifest.get('runtime', {})
         if not any(k in runtime for k in ['run after', 'run before']):
             raise Exception("Manifest must specify 'run after' or 'run before' in runtime section.")

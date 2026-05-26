@@ -1972,3 +1972,51 @@ def fetch_proxies_activity(limit: int, job_id: str) -> None:
     from reNgine.tasks import fetch_proxies_task
     fetch_proxies_task(limit=limit, job_id=job_id)
 
+
+@activity.defn(name="CheckScanQueueStatusActivity")
+def check_scan_queue_status_activity(scan_id: int, queue_type: str) -> bool:
+    """Check if the given scan is allowed to proceed based on the queue settings.
+    
+    Args:
+        scan_id (int): ScanHistory ID (for main) or SubScan ID (for subscan).
+        queue_type (str): 'main' or 'subscan'.
+    
+    Returns:
+        bool: True if it is allowed to proceed (queueing is off, or it's first in line).
+    """
+    from dashboard.models import UserPreferences
+    from startScan.models import ScanHistory, SubScan
+    from reNgine.definitions import RUNNING_TASK
+    
+    # Get the global queuing setting. If there are multiple preferences, just grab the first.
+    prefs = UserPreferences.objects.first()
+    if not prefs or not getattr(prefs, 'enable_scan_queueing', False):
+        return True
+        
+    if queue_type == "main":
+        # Check running main scans (ordered by start date)
+        running_scans = list(ScanHistory.objects.filter(
+            scan_status=RUNNING_TASK
+        ).order_by('start_scan_date').values_list('id', flat=True))
+        
+        # If the scan is the first in the list, it's its turn
+        if running_scans and running_scans[0] == scan_id:
+            return True
+        elif not running_scans:
+            return True
+            
+        return False
+        
+    elif queue_type == "subscan":
+        running_subscans = list(SubScan.objects.filter(
+            status=RUNNING_TASK
+        ).order_by('start_scan_date').values_list('id', flat=True))
+        
+        if running_subscans and running_subscans[0] == scan_id:
+            return True
+        elif not running_subscans:
+            return True
+            
+        return False
+
+    return True

@@ -73,6 +73,20 @@ class ToggleBugBountyModeView(APIView):
 		}, status=status.HTTP_200_OK)
 
 
+class ToggleScanQueueingView(APIView):
+	permission_classes = [IsAuthenticated]
+	"""
+		This class manages the user scan queuing mode
+	"""
+	def post(self, request, *args, **kwargs):
+		user_preferences = get_object_or_404(UserPreferences, user=request.user)
+		user_preferences.enable_scan_queueing = not getattr(user_preferences, 'enable_scan_queueing', False)
+		user_preferences.save()
+		return Response({
+			'enable_scan_queueing': user_preferences.enable_scan_queueing
+		}, status=status.HTTP_200_OK)
+
+
 class UpdateThemeView(APIView):
 	permission_classes = [IsAuthenticated]
 	"""
@@ -1966,11 +1980,17 @@ class RengineSystemSettingsAPIView(APIView):
 		free_gb = total_gb - used_gb
 		consumed_percent = int(100 * float(used_gb) / float(total_gb)) if total_gb > 0 else 0
 
+		user_preferences = getattr(request.user, 'user_preferences', None)
+		if not user_preferences:
+			from dashboard.models import UserPreferences
+			user_preferences, _ = UserPreferences.objects.get_or_create(user=request.user)
+
 		return Response({
 			'total': total_gb,
 			'used': used_gb,
 			'free': free_gb,
-			'consumed_percent': consumed_percent
+			'consumed_percent': consumed_percent,
+			'enable_scan_queueing': user_preferences.enable_scan_queueing
 		})
 
 
