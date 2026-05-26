@@ -496,7 +496,8 @@ def run_http_crawl_activity(ctx: dict) -> bool:
         bool: True on success.
     """
     from reNgine.tasks import http_crawl
-    activity.logger.info(f"[RunHTTPCrawlActivity] scan_id={ctx.get('scan_history_id')}")
+    seed_count = len(ctx.get('seed_urls', []))
+    activity.logger.info(f"[RunHTTPCrawlActivity] scan_id={ctx.get('scan_history_id')} seed_count={seed_count}")
     return _run_task(
         http_crawl,
         ctx,

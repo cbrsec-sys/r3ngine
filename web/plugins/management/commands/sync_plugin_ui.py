@@ -15,13 +15,20 @@ class Command(BaseCommand):
         for plugin in active_plugins:
             self.stdout.write(f"Syncing UI assets for: {plugin.name}...")
             
-            # Source: only the built dist/ directory (not the full source tree)
+            # Source: only the built files (from dist or root ui folder)
             plugin_data_dir = os.path.join(PluginManager.BASE_PLUGINS_DIR, plugin.slug)
             ui_dist_src = os.path.join(plugin_data_dir, 'ui', 'dist')
+            ui_src = os.path.join(plugin_data_dir, 'ui')
 
-            if not os.path.exists(ui_dist_src):
+            src_to_copy = None
+            if os.path.exists(ui_dist_src):
+                src_to_copy = ui_dist_src
+            elif os.path.exists(ui_src):
+                src_to_copy = ui_src
+
+            if not src_to_copy:
                 self.stdout.write(self.style.WARNING(
-                    f"  No 'ui/dist' directory found for {plugin.name}. "
+                    f"  No 'ui' or 'ui/dist' directory found for {plugin.name}. "
                     "Build the plugin UI first: npm run build"
                 ))
                 continue
@@ -41,8 +48,8 @@ class Command(BaseCommand):
                     else:
                         shutil.rmtree(media_ui_target)
 
-                # Copy only the built dist/ files
-                shutil.copytree(ui_dist_src, media_ui_target)
+                # Copy only the built files
+                shutil.copytree(src_to_copy, media_ui_target)
                 self.stdout.write(self.style.SUCCESS(f"  Successfully synced UI assets for {plugin.name}"))
                 synced_count += 1
             except Exception as e:
