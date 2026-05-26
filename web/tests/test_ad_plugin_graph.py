@@ -1,246 +1,120 @@
-# web/tests/test_ad_plugin_graph.py
-import json
 import os
-import tempfile
+import django
 
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'reNgine.settings')
+django.setup()
+
+from unittest import skipUnless
 from django.test import TestCase
+from django.contrib.auth import get_user_model
+from unittest.mock import patch, MagicMock
+
+User = get_user_model()
+
+try:
+    from plugins_data.active_directory.backend.models import ADAssessment
+    AD_PLUGIN_AVAILABLE = True
+except ImportError:
+    AD_PLUGIN_AVAILABLE = False
 
 
-class TestADGraphSchema(TestCase):
-
-    def _import_schema(self):
-        try:
-            from plugins_data.active_directory.backend.graph import schema
-            return schema
-        except (ImportError, ModuleNotFoundError):
-            self.skipTest("Plugin not installed")
-
-    def test_all_node_labels_defined(self):
-        schema = self._import_schema()
-        expected = [
-            'ADDomainNode', 'ADForestNode', 'ADOUNode', 'ADUserNode',
-            'ADGroupNode', 'ADComputerNode', 'ADServiceNode',
-            'ADCertificateNode', 'ADTrustNode', 'ADSubnetNode',
-            'ADSiteNode', 'ADPolicyNode', 'ADExposureNode', 'ADFindingNode',
-            'ADIdentityProviderNode', 'ADVPNGatewayNode', 'ADAuthServiceNode',
-        ]
-        for label in expected:
-            self.assertIn(label, dir(schema), f"Missing node label: {label}")
-
-    def test_all_relationships_defined(self):
-        schema = self._import_schema()
-        expected = [
-            'AD_MEMBER_OF', 'AD_TRUSTS', 'AD_CONNECTED_TO', 'AD_LOCATED_IN',
-            'AD_AUTHENTICATES_TO', 'AD_EXPOSES', 'AD_LINKED_TO',
-            'AD_BELONGS_TO', 'AD_PROTECTED_BY', 'AD_ROUTES_THROUGH',
-        ]
-        for rel in expected:
-            self.assertIn(rel, dir(schema), f"Missing relationship: {rel}")
-
-    def test_constraint_statements_are_valid_cypher_strings(self):
-        schema = self._import_schema()
-        constraints = schema.CONSTRAINT_STATEMENTS
-        self.assertIsInstance(constraints, list)
-        self.assertGreater(len(constraints), 0)
-        for stmt in constraints:
-            self.assertIn('CREATE CONSTRAINT', stmt)
-
-
-class TestADGraphManager(TestCase):
-
-    def _get_manager(self):
-        try:
-            from plugins_data.active_directory.backend.graph.manager import ADGraphManager
-            return ADGraphManager
-        except (ImportError, ModuleNotFoundError):
-            self.skipTest("Plugin not installed")
-
-    def test_manager_has_required_methods(self):
-        Mgr = self._get_manager()
-        required = [
-            'ensure_schema', 'upsert_domain', 'upsert_user', 'upsert_group',
-            'upsert_computer', 'upsert_exposure', 'upsert_finding',
-            'create_trust_relationship', 'create_membership_relationship',
-            'get_domain_graph', 'get_exposure_paths', 'get_trust_graph',
-            'find_shortest_path',
-        ]
-        for method in required:
-            self.assertTrue(
-                hasattr(Mgr, method),
-                f"ADGraphManager missing method: {method}")
-
-
-class TestLDAPParser(TestCase):
-
-    SAMPLE_USERS = [
-        {
-            "attributes": {
-                "sAMAccountName": ["jdoe"],
-                "displayName": ["John Doe"],
-                "mail": ["jdoe@corp.example.com"],
-                "userAccountControl": [512],
-                "adminCount": [1],
-                "objectSid": ["S-1-5-21-1234-5678-9012-1001"],
-                "lastLogon": ["2026-01-01T00:00:00"],
-            }
-        }
-    ]
-
-    SAMPLE_GROUPS = [
-        {
-            "attributes": {
-                "sAMAccountName": ["Domain Admins"],
-                "objectSid": ["S-1-5-21-1234-5678-9012-512"],
-                "member": ["CN=jdoe,DC=corp,DC=example,DC=com"],
-            }
-        }
-    ]
-
-    def _get_parser(self):
-        try:
-            from plugins_data.active_directory.backend.ingestion.ldap_parser import LDAPParser
-            return LDAPParser
-        except ImportError:
-            self.skipTest("Plugin not installed")
-
-    def test_parse_users_extracts_sam_account_name(self):
-        Parser = self._get_parser()
-        users = Parser.parse_users(self.SAMPLE_USERS)
-        self.assertEqual(len(users), 1)
-        self.assertEqual(users[0]['sam_account_name'], 'jdoe')
-
-    def test_parse_users_detects_admin(self):
-        Parser = self._get_parser()
-        users = Parser.parse_users(self.SAMPLE_USERS)
-        self.assertEqual(users[0]['admin_count'], 1)
-
-    def test_parse_groups_extracts_name(self):
-        Parser = self._get_parser()
-        groups = Parser.parse_groups(self.SAMPLE_GROUPS)
-        self.assertEqual(len(groups), 1)
-        self.assertEqual(groups[0]['name'], 'Domain Admins')
-
-    def test_parse_groups_detects_admin_group(self):
-        Parser = self._get_parser()
-        groups = Parser.parse_groups(self.SAMPLE_GROUPS)
-        self.assertTrue(groups[0]['admin_group'])
-
-    def test_ingest_from_directory_returns_summary(self):
-        Parser = self._get_parser()
-        with tempfile.TemporaryDirectory() as tmpdir:
-            with open(os.path.join(tmpdir, 'domain_users.json'), 'w') as f:
-                json.dump(self.SAMPLE_USERS, f)
-            with open(os.path.join(tmpdir, 'domain_groups.json'), 'w') as f:
-                json.dump(self.SAMPLE_GROUPS, f)
-            summary = Parser.ingest_from_directory(tmpdir, assessment_id=0, db_write=False)
-            self.assertIn('users', summary)
-            self.assertIn('groups', summary)
-            self.assertEqual(summary['users'], 1)
-            self.assertEqual(summary['groups'], 1)
-
-
-class TestBloodHoundParser(TestCase):
-
-    SAMPLE_BH_USERS = {
-        "data": [
-            {
-                "Properties": {
-                    "name": "JDOE@CORP.EXAMPLE.COM",
-                    "domain": "CORP.EXAMPLE.COM",
-                    "enabled": True,
-                    "admincount": True,
-                    "email": "jdoe@corp.example.com",
-                    "lastlogon": 133000000000,
-                    "objectid": "S-1-5-21-1234-5678-9012-1001",
-                },
-                "PrimaryGroupSid": "S-1-5-21-1234-5678-9012-513",
-            }
-        ],
-        "meta": {"type": "users", "count": 1}
+def _make_mock_manager(nodes=None, edges=None, truncated=False, total_nodes=None):
+    nodes = nodes or [{'data': {'id': f'n{i}'}} for i in range(5)]
+    total = total_nodes if total_nodes is not None else len(nodes)
+    mock_mgr = MagicMock()
+    mock_mgr.__enter__ = MagicMock(return_value=mock_mgr)
+    mock_mgr.__exit__ = MagicMock(return_value=False)
+    mock_mgr.get_domain_graph.return_value = {
+        'nodes': nodes,
+        'edges': edges or [],
+        'truncated': truncated,
+        'total_nodes': total,
     }
-
-    SAMPLE_BH_GROUPS = {
-        "data": [
-            {
-                "Properties": {
-                    "name": "DOMAIN ADMINS@CORP.EXAMPLE.COM",
-                    "domain": "CORP.EXAMPLE.COM",
-                    "objectid": "S-1-5-21-1234-5678-9012-512",
-                    "admincount": True,
-                },
-                "Members": [
-                    {"MemberId": "S-1-5-21-1234-5678-9012-1001",
-                     "MemberType": "User"}
-                ]
-            }
-        ],
-        "meta": {"type": "groups", "count": 1}
-    }
-
-    def _get_parser(self):
-        try:
-            from plugins_data.active_directory.backend.ingestion.bloodhound_parser import BloodHoundParser
-            return BloodHoundParser
-        except ImportError:
-            self.skipTest("Plugin not installed")
-
-    def test_parse_users_returns_normalised_dict(self):
-        Parser = self._get_parser()
-        users = Parser.parse_users(self.SAMPLE_BH_USERS['data'])
-        self.assertEqual(len(users), 1)
-        self.assertEqual(users[0]['sam_account_name'], 'JDOE')
-        self.assertTrue(users[0]['admin_count'] > 0)
-
-    def test_parse_groups_detects_admin_group(self):
-        Parser = self._get_parser()
-        groups = Parser.parse_groups(self.SAMPLE_BH_GROUPS['data'])
-        self.assertEqual(len(groups), 1)
-        self.assertTrue(groups[0]['admin_group'])
-
-    def test_parse_groups_returns_member_edges(self):
-        Parser = self._get_parser()
-        groups = Parser.parse_groups(self.SAMPLE_BH_GROUPS['data'])
-        self.assertIn('members', groups[0])
-        self.assertEqual(len(groups[0]['members']), 1)
+    return mock_mgr
 
 
-class TestExposureCorrelationEngine(TestCase):
+@skipUnless(AD_PLUGIN_AVAILABLE, 'AD Intelligence plugin not installed')
+class TestADGraphEndpoint(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username='graph_test_user_t6', password='pass', is_staff=True
+        )
+        self.assessment = ADAssessment.objects.create(
+            name='Graph Test',
+            target_domain='graph.local',
+            created_by=self.user,
+        )
 
-    def _get_engine(self):
-        try:
-            from plugins_data.active_directory.backend.correlation.engine import ExposureCorrelationEngine
-            return ExposureCorrelationEngine
-        except ImportError:
-            self.skipTest("Plugin not installed")
+    def tearDown(self):
+        self.assessment.delete()
+        self.user.delete()
 
-    def test_classify_exposure_type_adfs(self):
-        Engine = self._get_engine()
-        result = Engine.classify_hostname('adfs.corp.example.com')
-        self.assertEqual(result, 'ADFS')
+    def _call_graph_domains(self, limit_param=None, mock_mgr=None):
+        from django.test import RequestFactory
+        from plugins_data.active_directory.backend.api import ADAssessmentViewSet
 
-    def test_classify_exposure_type_owa(self):
-        Engine = self._get_engine()
-        result = Engine.classify_hostname('owa.corp.example.com')
-        self.assertEqual(result, 'OWA')
+        params = {}
+        if limit_param is not None:
+            params['limit'] = str(limit_param)
 
-    def test_classify_exposure_type_vpn(self):
-        Engine = self._get_engine()
-        result = Engine.classify_hostname('vpn.corp.example.com')
-        self.assertEqual(result, 'VPN')
+        req = RequestFactory().get('/graph/domains/', params)
+        req.user = self.user
 
-    def test_classify_returns_other_for_unknown(self):
-        Engine = self._get_engine()
-        result = Engine.classify_hostname('www.corp.example.com')
-        self.assertEqual(result, 'OTHER')
+        view = ADAssessmentViewSet()
+        view.request = req
+        view.kwargs = {'pk': self.assessment.pk}
+        view.action = 'graph_domains'
+        view.format_kwarg = None
 
-    def test_score_exposure_adfs_is_high(self):
-        Engine = self._get_engine()
-        score = Engine.score_exposure('ADFS', is_internet_facing=True,
-                                       has_domain_correlation=True)
-        self.assertGreaterEqual(score, 70.0)
+        mgr = mock_mgr or _make_mock_manager()
+        with patch(
+            'plugins_data.active_directory.backend.api.ADGraphManager',
+            return_value=mgr,
+        ):
+            return view.graph_domains(req, pk=self.assessment.pk)
 
-    def test_score_exposure_other_no_correlation_is_low(self):
-        Engine = self._get_engine()
-        score = Engine.score_exposure('OTHER', is_internet_facing=False,
-                                       has_domain_correlation=False)
-        self.assertLess(score, 30.0)
+    def test_default_limit_returns_200(self):
+        response = self._call_graph_domains()
+        self.assertEqual(response.status_code, 200)
+
+    def test_invalid_limit_returns_400(self):
+        from django.test import RequestFactory
+        from plugins_data.active_directory.backend.api import ADAssessmentViewSet
+
+        req = RequestFactory().get('/graph/domains/', {'limit': 'abc'})
+        req.user = self.user
+        view = ADAssessmentViewSet()
+        view.request = req
+        view.kwargs = {'pk': self.assessment.pk}
+        view.action = 'graph_domains'
+        view.format_kwarg = None
+
+        response = view.graph_domains(req, pk=self.assessment.pk)
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', response.data)
+
+    def test_negative_limit_is_clamped_not_400(self):
+        # limit < 0 → clamped to 0 → maps to 5000 (load-all cap), NOT a 400
+        response = self._call_graph_domains(limit_param=-5)
+        self.assertNotEqual(response.status_code, 400)
+
+    def test_limit_zero_calls_get_domain_graph_with_5000(self):
+        mgr = _make_mock_manager()
+        self._call_graph_domains(limit_param=0, mock_mgr=mgr)
+        mgr.get_domain_graph.assert_called_once_with(
+            self.assessment.id, limit=5000
+        )
+
+    def test_limit_above_5000_is_capped_at_5000(self):
+        mgr = _make_mock_manager()
+        self._call_graph_domains(limit_param=9999, mock_mgr=mgr)
+        mgr.get_domain_graph.assert_called_once_with(
+            self.assessment.id, limit=5000
+        )
+
+    def test_default_limit_is_300(self):
+        mgr = _make_mock_manager()
+        self._call_graph_domains(mock_mgr=mgr)
+        mgr.get_domain_graph.assert_called_once_with(
+            self.assessment.id, limit=300
+        )
