@@ -23,9 +23,17 @@ class SubScanViewSet(viewsets.ModelViewSet):
         ids = request.data.get('ids', [])
         if not ids:
             return Response({'status': False, 'message': 'No IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
-        
-        SubScan.objects.filter(id__in=ids).delete()
-        return Response({'status': True, 'message': f'Successfully deleted {len(ids)} subscans'})
+
+        from reNgine.utils.scan_cancellation import abort_subscan
+        subscans = SubScan.objects.filter(id__in=ids)
+        count = subscans.count()
+        for subscan in subscans:
+            try:
+                abort_subscan(subscan)
+            except Exception:
+                pass
+            subscan.delete()
+        return Response({'status': True, 'message': f'Successfully deleted {count} subscans'})
 
     @action(detail=False, methods=['post'])
     def bulk_stop(self, request):
