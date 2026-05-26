@@ -1744,7 +1744,9 @@ class ResumeScan(APIView):
 			scan = ScanHistory.objects.get(id=scan_id)
 			if scan.scan_status == SUCCESS_TASK:
 				return Response({'status': False, 'message': 'Scan is already completed.'})
-			
+			if scan.recovery_count >= 3:
+				return Response({'status': False, 'message': 'Max recovery limit (3) exceeded. Use the manual Resume button to override.'})
+
 			from reNgine.tasks import resume_scan_temporal
 			resume_scan_temporal(scan.id)
 			

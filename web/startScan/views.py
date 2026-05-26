@@ -579,15 +579,6 @@ def resume_scan(request, id):
         try:
             from reNgine.tasks import resume_scan_temporal
             scan = get_object_or_404(ScanHistory, id=id)
-            if scan.recovery_count >= 3:
-                response = {'status': False}
-                messages.add_message(
-                    request,
-                    messages.ERROR,
-                    f'Scan cannot be resumed. Max recovery limit (3) exceeded.'
-                )
-                return JsonResponse(response)
-                
             resume_scan_temporal(scan.id)
             response = {'status': True}
             messages.add_message(

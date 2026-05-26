@@ -7344,26 +7344,69 @@ def resume_scan_temporal(scan_id):
 
 
 def recover_stuck_scans():
-	"""Recover scans that are stuck in FAILED_TASK state due to a crash.
-	
-	This is called on orchestrator startup. If the scan's recovery_count < 3,
-	it attempts to automatically resume the scan.
+	"""Recover scans stuck due to a crash or Temporal state loss.
+
+	Called on orchestrator startup. Handles two cases:
+	  1. FAILED_TASK scans — workflow terminated, Django already reflects it.
+	  2. RUNNING_TASK scans — Django thinks they're running but Temporal has no
+	     active workflow (happens when Temporal's DB is wiped on restart).
+
+	Auto-recovery is capped at recovery_count < 3.
 	"""
-	from startScan.models import ScanHistory
-	from reNgine.definitions import FAILED_TASK
-	from django.db.models import Q
-	
-	# Only recover FAILED_TASK scans (crashed). RUNNING_TASK scans might still be
-	# actively running in Temporal, so we leave them alone.
-	stuck_scans = ScanHistory.objects.filter(
-		scan_status=FAILED_TASK,
-		recovery_count__lt=3
-	)
-	
-	for scan in stuck_scans:
-		logger.info(f"Auto-recovering stuck scan {scan.id} (recovery_count: {scan.recovery_count})")
+	import asyncio
+	from startScan.models import ScanHistory, TemporalWorkflowExecution
+	from reNgine.definitions import FAILED_TASK, RUNNING_TASK
+	from reNgine.temporal_client import TemporalClientProvider
+
+	async def _is_workflow_active(workflow_id):
+		from temporalio.client import WorkflowExecutionStatus
+		try:
+			client = await TemporalClientProvider.get_client()
+			handle = client.get_workflow_handle(workflow_id)
+			desc = await handle.describe()
+			return desc.status == WorkflowExecutionStatus.RUNNING
+		except Exception:
+			return False
+
+	# --- Pass 1: FAILED_TASK scans ---
+	for scan in ScanHistory.objects.filter(scan_status=FAILED_TASK, recovery_count__lt=3):
+		logger.info(f"Auto-recovering failed scan {scan.id} (recovery_count={scan.recovery_count})")
 		try:
 			resume_scan_temporal(scan.id)
 		except Exception as e:
 			logger.error(f"Failed to auto-recover scan {scan.id}: {e}")
+
+	# --- Pass 2: RUNNING_TASK scans whose Temporal workflow is gone ---
+	for scan in ScanHistory.objects.filter(scan_status=RUNNING_TASK, recovery_count__lt=3):
+		# Prefer the TemporalWorkflowExecution record; fall back to workflow_ids array.
+		latest_exec = (
+			TemporalWorkflowExecution.objects
+			.filter(scan_history=scan, status='RUNNING')
+			.order_by('-started_at')
+			.first()
+		)
+		workflow_id = (
+			latest_exec.workflow_id if latest_exec
+			else (scan.workflow_ids[-1] if scan.workflow_ids else None)
+		)
+
+		loop = asyncio.new_event_loop()
+		try:
+			is_active = loop.run_until_complete(_is_workflow_active(workflow_id)) if workflow_id else False
+		finally:
+			loop.close()
+
+		if is_active:
+			continue
+
+		logger.info(
+			f"RUNNING_TASK scan {scan.id} workflow '{workflow_id}' not active in Temporal — recovering "
+			f"(recovery_count={scan.recovery_count})"
+		)
+		scan.scan_status = FAILED_TASK
+		scan.save(update_fields=['scan_status'])
+		try:
+			resume_scan_temporal(scan.id)
+		except Exception as e:
+			logger.error(f"Failed to auto-recover stuck running scan {scan.id}: {e}")
 
