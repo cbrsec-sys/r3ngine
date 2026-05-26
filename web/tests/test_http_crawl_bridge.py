@@ -52,4 +52,4 @@ class TestGetHttpUrlsUncrawledFilter(TestCase):
         call_args_list = mock_qs.filter.call_args_list
         filter_kwargs = [str(c) for c in call_args_list]
         combined = ' '.join(filter_kwargs)
-        self.assertIn('http_status', combined)
+        self.assertIn('http_status=0', combined)

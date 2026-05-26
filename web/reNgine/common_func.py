@@ -325,7 +325,6 @@ def get_http_urls(
 	# yet (no status). EndPoint.http_status defaults to 0, so we match both
 	# 0 (newly seeded) and NULL (explicitly unset).
 	if is_uncrawled:
-		from django.db.models import Q
 		query = query.filter(Q(http_status__isnull=True) | Q(http_status=0))
 
 	# If a path is passed, select only endpoints that contains it
