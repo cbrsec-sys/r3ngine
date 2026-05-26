@@ -1,5 +1,6 @@
 import os
 import re
+import signal
 import subprocess
 import threading
 import logging
@@ -183,7 +184,8 @@ def run_command(
                 stderr=subprocess.STDOUT,
                 cwd=cwd,
                 universal_newlines=True,
-                errors='replace')
+                errors='replace',
+                preexec_fn=os.setsid)
             output = ''
             for stdout_line in iter(popen.stdout.readline, ""):
                 item = stdout_line.strip()
@@ -193,7 +195,10 @@ def run_command(
             try:
                 popen.wait(timeout=7200)
             except subprocess.TimeoutExpired:
-                popen.kill()
+                try:
+                    os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
+                except (ProcessLookupError, OSError):
+                    pass
                 return_code = 124 # Timeout
                 output += "\nCommand timed out."
             else:
@@ -206,8 +211,8 @@ def run_command(
             logger.error(f"BaseException raised during command execution: {str(e)}")
             if popen:
                 try:
-                    popen.kill()
-                except Exception:
+                    os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
+                except (ProcessLookupError, OSError):
                     pass
             raise
         finally:
@@ -219,11 +224,17 @@ def run_command(
                     pass
                 try:
                     if popen.poll() is None:
-                        popen.terminate()
+                        try:
+                            os.killpg(os.getpgid(popen.pid), signal.SIGTERM)
+                        except (ProcessLookupError, OSError):
+                            pass
                         try:
                             popen.wait(timeout=5)
                         except subprocess.TimeoutExpired:
-                            popen.kill()
+                            try:
+                                os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
+                            except (ProcessLookupError, OSError):
+                                pass
                     else:
                         popen.wait()
                 except Exception as ex:
@@ -250,6 +261,34 @@ def run_command(
         output = remove_ansi_escape_sequences(output)
         
     return return_code, output
+
+def run_command_with_retry(cmd, results_file, max_retries=3, **kwargs):
+    """Run a command and retry up to max_retries times if results_file is empty.
+
+    Args:
+        cmd (str): Command to run.
+        results_file (str): Path to the output file to check for emptiness.
+        max_retries (int): Maximum number of attempts (default 3).
+        **kwargs: Passed through to run_command.
+    Returns:
+        tuple: (return_code, output) from the last attempt.
+    """
+    tool_name = os.path.basename(cmd.split()[0]) if cmd else 'unknown'
+    return_code, output = run_command(cmd, **kwargs)
+
+    for attempt in range(2, max_retries + 1):
+        if results_file and os.path.exists(results_file) and os.path.getsize(results_file) > 0:
+            break
+        logger.warning(
+            f'{tool_name}: results file "{results_file}" is empty after attempt {attempt - 1}/{max_retries}. Retrying...'
+        )
+        return_code, output = run_command(cmd, **kwargs)
+
+    if not results_file or not os.path.exists(results_file) or os.path.getsize(results_file) == 0:
+        logger.warning(f'{tool_name}: results file "{results_file}" still empty after {max_retries} attempts. Moving on.')
+
+    return return_code, output
+
 
 def save_email(email_address, scan_history=None):
     if not validators.email(email_address):
@@ -575,7 +614,8 @@ def stream_command(
 		stderr=subprocess.STDOUT,
 		universal_newlines=True,
 		errors='replace',
-		shell=shell)
+		shell=shell,
+		preexec_fn=os.setsid)
 
 	# Start a watchdog thread to terminate the command if it runs too long
 	import threading
@@ -586,7 +626,9 @@ def stream_command(
 		if proc.poll() is None:
 			logger.error(f"Watchdog: Command timed out after {limit_sec} seconds. Killing process: {cmd}")
 			try:
-				proc.kill()
+				os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+			except (ProcessLookupError, OSError):
+				pass
 			except Exception as ex:
 				logger.error(f"Watchdog: Failed to kill process: {ex}")
 
@@ -671,7 +713,10 @@ def stream_command(
 							logger.warning(
 								f"[stream_command] Scan {scan_id} aborted — killing subprocess."
 							)
-							process.kill()
+							try:
+								os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+							except (ProcessLookupError, OSError):
+								pass
 							break
 					except Exception:
 						pass
@@ -686,8 +731,8 @@ def stream_command(
 			logger.error(f"Error in stream_command: {str(e)}")
 		if process:
 			try:
-				process.kill()
-			except Exception:
+				os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+			except (ProcessLookupError, OSError):
 				pass
 		raise
 	finally:
@@ -699,11 +744,17 @@ def stream_command(
 					pass
 			try:
 				if process.poll() is None:
-					process.terminate()
+					try:
+						os.killpg(os.getpgid(process.pid), signal.SIGTERM)
+					except (ProcessLookupError, OSError):
+						pass
 					try:
 						process.wait(timeout=5)
 					except subprocess.TimeoutExpired:
-						process.kill()
+						try:
+							os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+						except (ProcessLookupError, OSError):
+							pass
 				else:
 					process.wait()
 			except Exception as ex:
