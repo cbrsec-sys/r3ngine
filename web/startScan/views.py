@@ -601,31 +601,13 @@ def resume_scan(request, id):
 @has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
 def stop_scans(request, slug):
     if request.method == "POST":
+        from reNgine.utils.scan_cancellation import abort_scan_history
         for key, value in request.POST.items():
             if key == 'scan_history_table_length' or key == 'csrfmiddlewaretoken':
                 continue
             scan = get_object_or_404(ScanHistory, id=value)
             try:
-                from reNgine.temporal_client import TemporalClientProvider
-                for te in scan.temporal_executions.filter(status="RUNNING"):
-                    try:
-                        TemporalClientProvider.cancel_workflow(te.workflow_id)
-                        te.status = "CANCELLED"
-                        te.ended_at = timezone.now()
-                        te.save()
-                    except Exception as cancel_err:
-                        logger.warning(f"Temporal cancel failed for workflow {te.workflow_id}: {cancel_err}")
-                tasks = (
-                    ScanActivity.objects
-                    .filter(scan_of=scan)
-                    .filter(status=RUNNING_TASK)
-                    .order_by('-pk')
-                )
-                for task in tasks:
-                    task.status = ABORTED_TASK
-                    task.time = timezone.now()
-                    task.save()
-                create_scan_activity(scan.id, "Scan aborted", ABORTED_TASK)
+                abort_scan_history(scan, aborted_by=request.user)
                 messages.add_message(
                     request,
                     messages.INFO,
