@@ -103,6 +103,10 @@
     python manage.py recover_scan_results --apply   # write to DB
     python manage.py recover_scan_results --apply --scan-dir /usr/src/scan_results/defijn.io_108
     ```
+- **Configuration Export & Import**: Added a complete backup and restore system for custom user settings.
+  - **Export System**: Added the `/api/settings/export/` endpoint that dynamically generates a single `.zip` backup containing API keys, custom wordlists (from `/usr/src/wordlist/`), tool configurations, and custom scan engines.
+  - **Import System**: Added the `/api/settings/import/` endpoint that accepts the zipped backup payload, safely extracting custom wordlists back to the filesystem and re-populating the database. Features an "Overwrite existing configurations" toggle.
+  - **UI Integration**: Added a sleek, tactical **Configuration Export / Import** panel to the Settings page. This allows users to download a snapshot of their environment before clean installations and restore it effortlessly.
 - **Stress Testing Telemetry, Security Hardening & Restructuring**:
   - Fixed a Temporal heartbeat context issue inside `RunStressToolActivity` by propagating the `contextvars` context to the background heartbeat loop thread, resolving `RuntimeError: Not in activity context` and allowing real-time status/cancellation detection.
   - Hardened process cleanup by switching process termination to send SIGTERM/SIGKILL to the entire process group (`os.killpg`) to ensure that orphaned background processes are cleanly terminated when a scan is stopped or aborted.

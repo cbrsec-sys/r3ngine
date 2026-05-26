@@ -368,6 +368,7 @@ flowchart TD
 *   **HackerOne Integration**: Direct reporting of vulnerabilities to bug bounty platforms.
 *   **Screenshot Gallery**: Automated visual captures with advanced filtering and tagging.
 *   **Export/Import**: Interoperable with other tools via JSON, CSV, and TXT.
+*   **Configuration Portability**: Export your custom API keys, tool configurations, scan engines, and wordlists to a single backup zip, and effortlessly restore them on a fresh installation.
 *   **Integrated Tools**: Chaos, TLSX, CTFR, Netlas, Katana, Medusa, baddns, betterleaks, gosearch, username-anarchy.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
