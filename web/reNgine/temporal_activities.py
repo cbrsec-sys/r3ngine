@@ -430,6 +430,54 @@ def parse_discovery_results_activity(ctx: dict) -> bool:
     return True
 
 
+@activity.defn(name="SeedEndpointsForCrawlActivity")
+def seed_endpoints_for_crawl_activity(ctx: dict) -> dict:
+    """Ensure every discovered subdomain has a default EndPoint before http_crawl runs.
+
+    Mirrors rengine-ng's pre_crawl step. Queries all Subdomain records for the
+    current scan and creates EndPoint(is_default=True, http_status=0) for any
+    subdomain that does not yet have a default endpoint. Returns an updated ctx
+    with a 'seed_urls' list that RunHTTPCrawlActivity can log and use.
+    """
+    from startScan.models import Subdomain, EndPoint
+    from reNgine.utils.task import save_endpoint
+
+    scan_id = ctx.get('scan_history_id')
+    url_filter = ctx.get('starting_point_path', '')
+
+    subdomains = Subdomain.objects.filter(scan_history_id=scan_id)
+    seed_urls = []
+
+    for subdomain in subdomains:
+        raw_url = f'{subdomain.name}{url_filter}' if url_filter else subdomain.name
+        if not raw_url.startswith(('http://', 'https://')):
+            raw_url = f'http://{raw_url}'
+
+        existing = EndPoint.objects.filter(
+            scan_history_id=scan_id,
+            http_url=raw_url,
+            is_default=True,
+        ).first()
+
+        if existing:
+            seed_urls.append(existing.http_url)
+        else:
+            endpoint, _ = save_endpoint(
+                raw_url,
+                ctx=ctx,
+                is_default=True,
+                subdomain=subdomain,
+            )
+            if endpoint:
+                seed_urls.append(endpoint.http_url)
+
+    activity.logger.info(
+        f"[SeedEndpointsForCrawlActivity] scan_id={scan_id}: "
+        f"seeded {len(seed_urls)} endpoint(s) for http_crawl."
+    )
+    return {**ctx, 'seed_urls': seed_urls}
+
+
 # ===========================================================================
 # Tier 2 — Enumeration
 # ===========================================================================
@@ -1666,9 +1714,11 @@ def setup_scheduled_scan_activity(params: dict) -> dict:
 
     enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
     subdomain, _ = save_subdomain(domain.name, ctx=ctx_bootstrap)
-    http_url = f'{domain.name}{starting_point_path}' if starting_point_path else domain.name
+    _root = f'{domain.name}{starting_point_path}' if starting_point_path else domain.name
+    if not _root.startswith(('http://', 'https://')):
+        _root = f'http://{_root}'
     endpoint, _ = save_endpoint(
-        http_url,
+        _root,
         ctx=ctx_bootstrap,
         crawl=enable_http_crawl,
         is_default=True,
@@ -1763,137 +1813,6 @@ def parse_port_scan_results_activity(ctx: dict, stdout: str) -> dict:
     raw_func = port_scan.__func__ if hasattr(port_scan, '__func__') else port_scan
     res = raw_func(proxy, ctx=ctx, parse_only=stdout)
     return {"ports_data": res}
-
-
-@activity.defn(name="PrepareFuzzUrlsActivity")
-def prepare_fuzz_urls_activity(ctx: dict) -> dict:
-    """Extract and validate directories and URLs that require directory fuzzing.
-
-    Args:
-        ctx (dict): Scan context with input subdomain targets.
-
-    Returns:
-        dict: Set of URLs to fuzz along with base ffuf and dirsearch commands.
-    """
-    from reNgine.fuzzing_tasks import dir_file_fuzz
-
-    proxy = TemporalTaskProxy(ctx, 'dir_file_fuzz', 'Directory & File Fuzz', track=False)
-    raw_func = dir_file_fuzz.__func__ if hasattr(dir_file_fuzz, '__func__') else dir_file_fuzz
-    res = raw_func(proxy, ctx=ctx, prepare_only=True)
-    return res
-
-
-@activity.defn(name="PrepareFuzzCommandActivity")
-def prepare_fuzz_command_activity(ctx: dict, target_url: str, ffuf_base_cmd: str, dirsearch_base_cmd: str) -> dict:
-    """Construct specific fuzzing commands (ffuf & dirsearch) for an individual target URL.
-
-    Args:
-        ctx (dict): Scan context.
-        target_url (str): The target endpoint URL to fuzz.
-        ffuf_base_cmd (str): Base template command for FFUF.
-        dirsearch_base_cmd (str): Base template command for dirsearch.
-
-    Returns:
-        dict: Detailed commands, command DB record IDs, and DirectoryScan model IDs.
-    """
-    from reNgine.common_func import get_subdomain_from_url, get_random_proxy
-    from startScan.models import DirectoryScan, Command, Subdomain
-    from django.utils import timezone
-    from reNgine.utils.opsec import OpSecManager
-
-    proxy = TemporalTaskProxy(ctx, 'dir_file_fuzz', 'Directory & File Fuzz', track=False)
-
-    proxy_str = get_random_proxy()
-    if proxy_str:
-        if not any(proxy_str.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
-            proxy_str = 'http://' + proxy_str
-
-    fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json -s'
-    fcmd += f' -x {proxy_str}' if proxy_str else ''
-    opsec = OpSecManager()
-    fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=proxy_str)
-
-    dirscan = DirectoryScan.objects.create(
-        scanned_date=timezone.now(),
-        command_line=fcmd
-    )
-    subdomain_name = get_subdomain_from_url(target_url)
-    subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history_id=proxy.scan_id).first()
-    if not subdomain and ctx.get('subdomain_id', 0) > 0:
-        subdomain = Subdomain.objects.filter(id=ctx['subdomain_id']).first()
-    if subdomain:
-        subdomain.directories.add(dirscan)
-        subdomain.save()
-
-    cmd_record_ffuf = Command.objects.create(
-        command=fcmd,
-        time=timezone.now(),
-        scan_history_id=proxy.scan_id,
-        activity_id=proxy.activity_id
-    )
-
-    target_url_stripped = target_url.rstrip('/')
-    dirsearch_output = f'{proxy.results_dir}/dirsearch_{subdomain_name}.json'
-    dcmd = f'{dirsearch_base_cmd} -u {target_url_stripped} --format=json -o {dirsearch_output} --no-color'
-    if proxy_str:
-        dcmd += f' --proxy={proxy_str}'
-    dcmd = opsec.apply_stealth('dirsearch', dcmd, proxy=proxy_str)
-
-    dirscan_ds = DirectoryScan.objects.create(
-        scanned_date=timezone.now(),
-        command_line=dcmd
-    )
-    if subdomain:
-        subdomain.directories.add(dirscan_ds)
-        subdomain.save()
-
-    cmd_record_ds = Command.objects.create(
-        command=dcmd,
-        time=timezone.now(),
-        scan_history_id=proxy.scan_id,
-        activity_id=proxy.activity_id
-    )
-
-    return {
-        "target_url": target_url,
-        "fcmd": fcmd,
-        "dcmd": dcmd,
-        "ffuf_command_id": cmd_record_ffuf.id,
-        "ds_command_id": cmd_record_ds.id,
-        "dirscan_id": dirscan.id,
-        "dirscan_ds_id": dirscan_ds.id,
-    }
-
-
-@activity.defn(name="ParseFuzzResultsActivity")
-def parse_fuzz_results_activity(ctx: dict, prep_res: dict, ffuf_stdout: str) -> bool:
-    """Parse fuzz results from ffuf (via stdout) and dirsearch (via disk output files).
-
-    Args:
-        ctx (dict): Scan context.
-        prep_res (dict): Command and target URL configurations prepared previously.
-        ffuf_stdout (str): Raw stdout string from the ffuf execution.
-
-    Returns:
-        bool: True if findings are successfully parsed and saved.
-    """
-    from reNgine.fuzzing_tasks import dir_file_fuzz
-
-    proxy = TemporalTaskProxy(ctx, 'dir_file_fuzz', 'Directory & File Fuzz')
-    raw_func = dir_file_fuzz.__func__ if hasattr(dir_file_fuzz, '__func__') else dir_file_fuzz
-    target_url = prep_res['target_url']
-
-    parse_only = {
-        'ffuf': {
-            target_url: ffuf_stdout
-        }
-    }
-    custom_ctx = {
-        **ctx,
-        "urls_override": [target_url]
-    }
-    raw_func(proxy, ctx=custom_ctx, parse_only=parse_only)
-    return True
 
 
 @activity.defn(name="FinalizeFailedScanActivity")

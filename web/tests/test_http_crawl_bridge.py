@@ -53,3 +53,61 @@ class TestGetHttpUrlsUncrawledFilter(TestCase):
         filter_kwargs = [str(c) for c in call_args_list]
         combined = ' '.join(filter_kwargs)
         self.assertIn('http_status=0', combined)
+
+
+class TestSeedEndpointsForCrawlActivity(TestCase):
+    """seed_endpoints_for_crawl_activity ensures every subdomain has a default EndPoint."""
+
+    def _make_ctx(self):
+        return {
+            'scan_history_id': 10,
+            'domain_id': 5,
+            'results_dir': '/tmp/results',
+            'yaml_configuration': {},
+        }
+
+    @patch('reNgine.temporal_activities.activity')
+    def test_activity_creates_missing_endpoints(self, mock_activity):
+        """For each subdomain without a default endpoint, save_endpoint is called."""
+        from reNgine.temporal_activities import seed_endpoints_for_crawl_activity
+
+        mock_sub1 = MagicMock()
+        mock_sub1.name = 'sub1.example.com'
+        mock_sub2 = MagicMock()
+        mock_sub2.name = 'sub2.example.com'
+
+        with patch('startScan.models.Subdomain') as MockSub, \
+             patch('startScan.models.EndPoint') as MockEP, \
+             patch('reNgine.utils.task.save_endpoint') as mock_save_ep:
+
+            MockSub.objects.filter.return_value = [mock_sub1, mock_sub2]
+            MockEP.objects.filter.return_value.first.return_value = None
+            mock_save_ep.return_value = (MagicMock(), True)
+
+            result = seed_endpoints_for_crawl_activity(self._make_ctx())
+
+        self.assertEqual(mock_save_ep.call_count, 2)
+        self.assertIn('seed_urls', result)
+        self.assertIsInstance(result['seed_urls'], list)
+
+    @patch('reNgine.temporal_activities.activity')
+    def test_activity_skips_existing_endpoints(self, mock_activity):
+        """Subdomains that already have a default endpoint are not re-seeded."""
+        from reNgine.temporal_activities import seed_endpoints_for_crawl_activity
+
+        mock_sub = MagicMock()
+        mock_sub.name = 'already.example.com'
+
+        with patch('startScan.models.Subdomain') as MockSub, \
+             patch('startScan.models.EndPoint') as MockEP, \
+             patch('reNgine.utils.task.save_endpoint') as mock_save_ep:
+
+            MockSub.objects.filter.return_value = [mock_sub]
+            mock_existing_ep = MagicMock()
+            mock_existing_ep.http_url = 'http://already.example.com'
+            MockEP.objects.filter.return_value.first.return_value = mock_existing_ep
+
+            result = seed_endpoints_for_crawl_activity(self._make_ctx())
+
+        mock_save_ep.assert_not_called()
+        self.assertIn('http://already.example.com', result['seed_urls'])
