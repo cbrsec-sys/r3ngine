@@ -78,12 +78,14 @@ from reNgine.temporal_activities import (
     load_checkpoint_activity,
     save_checkpoint_activity,
     target_profiling_activity,
+    check_scan_queue_status_activity,
 
     # Tier 1: Discovery
     run_subdomain_discovery_activity,
     run_amass_intel_discovery_activity,
     run_firewall_vpn_scan_activity,
     parse_discovery_results_activity,
+    seed_endpoints_for_crawl_activity,
 
     # Tier 2: Enumeration
     run_http_crawl_activity,
@@ -270,12 +272,14 @@ class Command(BaseCommand):
                 load_checkpoint_activity,
                 save_checkpoint_activity,
                 target_profiling_activity,
+                check_scan_queue_status_activity,
 
                 # Tier 1
                 run_subdomain_discovery_activity,
                 run_amass_intel_discovery_activity,
                 run_firewall_vpn_scan_activity,
                 parse_discovery_results_activity,
+                seed_endpoints_for_crawl_activity,
 
                 # Tier 2
                 run_http_crawl_activity,

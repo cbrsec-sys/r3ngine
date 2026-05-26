@@ -1,6 +1,18 @@
 # Changelog
 
-### [v3.2.0] - 2026-05-25
+### [v3.2.0] - 2026-05-26
+
+- **baddns Scan Pipeline Integration**:
+  - Registered `baddns` as a default subdomain discovery tool inside `subdomain_discovery` in `tasks.py` by appending it to the `default_subdomain_tools` list, resolving the issue where baddns execution was skipped with an unsupported warning.
+  - Added support for executing `baddns` as a standalone discovery task inside the main scan workflow (`MasterScanWorkflow`) in `temporal_workflows.py`.
+
+- **Scan Queueing Feature**:
+  - Implemented an optional queueing mechanism (`UserPreferences.enable_scan_queueing`) to restrict scan concurrency.
+  - Limits execution to a maximum of 1 main scan and 1 subscan concurrently. Additional scans block in a Temporal polling loop (`check_scan_queue_status_activity`) and check again every 30 seconds.
+  - Added backend APIs to get and toggle the queueing state (`ToggleScanQueueingView`).
+  - Added a dedicated "SCAN CONFIGURATION" control panel with a toggle switch on the global Settings page.
+  - Registered `CheckScanQueueStatusActivity` in the Temporal python worker commands (`run_temporal_orchestrator.py`).
+  - Fixed a TypeScript syntax error regarding `PaperProps` typing in `DistributionCharts.tsx` for production builds.
 
 - **Backend Architecture & Code Quality Remediation**:
   - Implemented a centralized, singleton-cached `TemporalClientProvider` to manage Temporal workflow client connections efficiently and prevent connection pool exhaustion.

@@ -139,7 +139,7 @@ export const ReNgineSettingsPage: React.FC = () => {
       const formData = new FormData();
       formData.append('file', importFile);
       formData.append('overwrite_existing', overwriteConfigs ? 'true' : 'false');
-      
+
       const response = await axios.post('/api/settings/import/', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
@@ -314,7 +314,7 @@ export const ReNgineSettingsPage: React.FC = () => {
                 <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1 }}>
                   Upload a previously exported ZIP backup to restore API keys, engines, tools, and wordlists.
                 </Typography>
-                <Stack direction="row" spacing={2} alignItems="center">
+                <Stack direction="row" sx={{ spacing: 2, alignItems: 'center' }}>
                   <Button
                     variant="contained"
                     component="label"

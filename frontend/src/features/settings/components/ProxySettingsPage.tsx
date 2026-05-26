@@ -169,9 +169,24 @@ export const ProxySettingsPage: React.FC = () => {
             TRAFFIC ANONYMIZATION & RATE LIMIT BYPASS
           </Typography>
         </Box>
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron' }}>
-          SETTINGS {'>'} <span style={{ color: '#00f3ff' }}>PROXY</span>
-        </Typography>
+        <Box sx={{ textAlign: 'right' }}>
+          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', display: 'block', mb: 1 }}>
+            SETTINGS {'>'} <span style={{ color: '#00f3ff' }}>PROXY</span>
+          </Typography>
+          <Box sx={{ 
+            display: 'inline-flex', 
+            alignItems: 'center', 
+            bgcolor: 'rgba(0, 243, 255, 0.1)', 
+            px: 1.5, 
+            py: 0.5, 
+            borderRadius: 1, 
+            border: '1px solid rgba(0, 243, 255, 0.3)' 
+          }}>
+            <Typography variant="caption" sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontWeight: 700, letterSpacing: 1 }}>
+              TOTAL PROXIES: {proxyList.split('\n').filter(p => p.trim() !== '').length}
+            </Typography>
+          </Box>
+        </Box>
       </Box>
 
       <Stack spacing={3}>
