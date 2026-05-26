@@ -199,6 +199,27 @@ class MasterScanWorkflow:
                         task_queue="python-orchestrator-queue"
                     )
                 )
+            if "baddns" in tasks:
+                ctx_baddns = {
+                    **ctx,
+                    "yaml_configuration": {
+                        **ctx.get("yaml_configuration", {}),
+                        "subdomain_discovery": {
+                            **ctx.get("yaml_configuration", {}).get("subdomain_discovery", {}),
+                            "uses_tools": ["baddns"],
+                        },
+                    },
+                }
+                discovery_futures.append(
+                    workflow.execute_activity(
+                        "RunGenericTaskActivity",
+                        args=[ctx_baddns, "subdomain_discovery", "Baddns Scan"],
+                        start_to_close_timeout=timedelta(hours=2),
+                        heartbeat_timeout=timedelta(minutes=2),
+                        retry_policy=_RETRY_LONG_SCAN,
+                        task_queue="python-orchestrator-queue"
+                    )
+                )
 
             if discovery_futures:
                 await asyncio.gather(*discovery_futures)
@@ -221,6 +242,14 @@ class MasterScanWorkflow:
             # ------------------------------------------------------------------
             async def _http_crawl_branch():
                 if "http_crawl" in tasks:
+                    nonlocal ctx
+                    ctx = await workflow.execute_activity(
+                        "SeedEndpointsForCrawlActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_INTERNAL,
+                        task_queue="python-orchestrator-queue"
+                    )
                     await workflow.execute_activity(
                         "RunHTTPCrawlActivity",
                         ctx,
@@ -782,15 +811,17 @@ class SubScanWorkflow:
             subscans_info = ctx.get('subscans_info', [])
             subscan_id_map = {item['type']: item['id'] for item in subscans_info}
 
-            async def execute_single_task(t: str) -> None:
+            async def execute_single_task(t: str, custom_ctx: Dict[str, Any] = None) -> None:
                 """Helper to execute a single task with its matching subscan context.
 
                 Args:
                     t (str): Short name of the task to execute.
+                    custom_ctx (dict, optional): Custom context dictionary to use instead of workflow's ctx.
                 """
+                base_ctx = custom_ctx if custom_ctx is not None else ctx
                 # Resolve task-specific subscan_id to set in activity context
-                subscan_id = subscan_id_map.get(t) or ctx.get('subscan_id')
-                ctx_task = {**ctx, "subscan_id": subscan_id} if subscan_id else ctx
+                subscan_id = subscan_id_map.get(t) or base_ctx.get('subscan_id')
+                ctx_task = {**base_ctx, "subscan_id": subscan_id} if subscan_id else base_ctx
 
                 dispatch = _SUBSCAN_DISPATCH.get(t)
                 if t == "baddns":
@@ -837,14 +868,15 @@ class SubScanWorkflow:
                         task_queue="python-orchestrator-queue",
                     )
 
-            async def run_and_track_task(t: str) -> None:
+            async def run_and_track_task(t: str, custom_ctx: Dict[str, Any] = None) -> None:
                 """Wrap task execution to track its outcome in the task_success registry.
 
                 Args:
                     t (str): Task type string.
+                    custom_ctx (dict, optional): Custom context dictionary to pass to the task.
                 """
                 try:
-                    await execute_single_task(t)
+                    await execute_single_task(t, custom_ctx)
                     task_success[t] = True
                 except Exception as task_err:
                     task_success[t] = False
@@ -909,10 +941,17 @@ class SubScanWorkflow:
                         async def _http_crawl_branch_tracked(_ctx=_http_ctx):
                             """Run http_crawl then parse results; flips task_success on parse failure."""
                             try:
-                                await run_and_track_task("http_crawl")
+                                _ctx_seeded = await workflow.execute_activity(
+                                    "SeedEndpointsForCrawlActivity",
+                                    _ctx,
+                                    start_to_close_timeout=timedelta(minutes=5),
+                                    retry_policy=_RETRY_INTERNAL,
+                                    task_queue="python-orchestrator-queue"
+                                )
+                                await run_and_track_task("http_crawl", _ctx_seeded)
                                 await workflow.execute_activity(
                                     "ParseHTTPCrawlResultsActivity",
-                                    _ctx,
+                                    _ctx_seeded,
                                     start_to_close_timeout=timedelta(minutes=5),
                                     retry_policy=_RETRY_INTERNAL,
                                     task_queue="python-orchestrator-queue"

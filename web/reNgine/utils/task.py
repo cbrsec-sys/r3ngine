@@ -31,6 +31,117 @@ ROUTED_TOOLS = {
     'sslscan', 'ike-scan', 'hping3', 'wrk', 'k6', 'brutus', 'wpscan'
 }
 
+
+def _execute_go_workflow(cmd, scan_id, command_obj_id, tool):
+    """Start a GoExecutorTaskWorkflow and wait for it, cancelling on scan abort.
+
+    Polls ScanHistory.scan_status every 5 s in the background. If the scan is
+    marked ABORTED_TASK the child GoExecutorTaskWorkflow is cancelled (which
+    sends SIGKILL to the tool subprocess inside the Go executor) and this
+    function returns an aborted result dict instead of blocking forever.
+
+    Args:
+        cmd: Full command string to execute.
+        scan_id: ScanHistory pk for abort polling (may be None).
+        command_obj_id: Command record pk used to build the Temporal workflow ID.
+        tool: Binary name used as part of the workflow ID.
+
+    Returns:
+        dict with keys 'exit_code', 'stdout', 'stderr'.
+
+    Raises:
+        Exception: If the workflow fails for any reason other than an abort.
+    """
+    import asyncio
+    import time
+
+    wf_id = f"go-exec-{tool}-{command_obj_id or int(time.time())}"
+
+    async def _start():
+        from reNgine.temporal_client import TemporalClientProvider
+        client = await TemporalClientProvider.get_client()
+        await client.start_workflow(
+            "GoExecutorTaskWorkflow",
+            {"command": [cmd], "scan_id": scan_id or 0, "command_id": command_obj_id or 0},
+            id=wf_id,
+            task_queue="python-orchestrator-queue",
+        )
+
+    async def _fetch_result():
+        from reNgine.temporal_client import TemporalClientProvider
+        client = await TemporalClientProvider.get_client()
+        return await client.get_workflow_handle(wf_id).result()
+
+    asyncio.run(_start())
+
+    # Wait for the workflow result in a background thread so the main thread
+    # can keep polling for scan abort without blocking the asyncio loop.
+    result_box = [None, None]  # [value, error]
+    done = threading.Event()
+
+    def _wait():
+        try:
+            result_box[0] = asyncio.run(_fetch_result())
+        except Exception as exc:
+            result_box[1] = exc
+        finally:
+            done.set()
+
+    threading.Thread(target=_wait, daemon=True).start()
+
+    cancelled = False
+    while not done.wait(timeout=5.0):
+        if scan_id:
+            try:
+                from reNgine.definitions import ABORTED_TASK
+                status = ScanHistory.objects.filter(pk=scan_id).values_list('scan_status', flat=True).first()
+                if status == ABORTED_TASK:
+                    logger.warning(f"[_execute_go_workflow] Scan {scan_id} aborted — cancelling {wf_id}")
+                    from reNgine.temporal_client import TemporalClientProvider
+                    TemporalClientProvider.cancel_workflow(wf_id)
+                    cancelled = True
+                    break
+            except Exception as poll_err:
+                logger.debug(f"[_execute_go_workflow] Abort poll error: {poll_err}")
+
+    # Allow the result thread time to react to the cancellation before returning.
+    done.wait(timeout=15.0)
+
+    if cancelled:
+        return {"exit_code": -1, "stdout": "", "stderr": f"Scan {scan_id} aborted"}
+    if result_box[1]:
+        raise result_box[1]
+    return result_box[0] or {"exit_code": -1, "stdout": "", "stderr": "No result returned"}
+
+
+def _subprocess_abort_watchdog(proc, scan_id):
+    """Kill a subprocess process group when its scan is marked ABORTED_TASK.
+
+    Runs in a daemon thread. Checks the DB every 5 s and sends SIGKILL to
+    the process group when an abort is detected, so the readline() call in the
+    calling thread unblocks and the scan stops promptly.
+    """
+    import time
+    while proc.poll() is None:
+        time.sleep(5)
+        if proc.poll() is not None:
+            break
+        if not scan_id:
+            continue
+        try:
+            from reNgine.definitions import ABORTED_TASK
+            status = ScanHistory.objects.filter(pk=scan_id).values_list('scan_status', flat=True).first()
+            if status == ABORTED_TASK:
+                logger.warning(f"[_subprocess_abort_watchdog] Scan {scan_id} aborted — killing subprocess")
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except (ProcessLookupError, OSError):
+                    pass
+                return
+        except Exception as e:
+            logger.debug(f"[_subprocess_abort_watchdog] Poll error: {e}")
+
+
 def get_tool_color(cmd):
     """Returns the ANSI color code for a given command based on the tool name."""
     sanitized = sanitize_command_for_db(cmd)
