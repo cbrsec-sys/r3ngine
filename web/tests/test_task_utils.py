@@ -32,7 +32,9 @@ class TestProcessGroupKill(unittest.TestCase):
         mock_cmd_obj.output = ''
         mock_cmd_obj.return_code = 0
         with patch('subprocess.Popen', side_effect=self._make_mock_popen(captured)), \
-             patch('reNgine.utils.task.Command.objects.create', return_value=mock_cmd_obj):
+             patch('reNgine.utils.task.Command.objects.create', return_value=mock_cmd_obj), \
+             patch('reNgine.utils.task.SOCConfiguration.objects.get_or_create',
+                   return_value=(MagicMock(enable_live_log_streaming=False, log_retention_count=1000), False)):
             from reNgine.utils.task import stream_command
             list(stream_command('echo hello', scan_id=None))
         self.assertIn('preexec_fn', captured, "stream_command Popen must pass preexec_fn=os.setsid")
