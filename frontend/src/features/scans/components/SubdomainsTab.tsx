@@ -55,6 +55,7 @@ import {
   X,
   Folder
 } from 'lucide-react';
+import { getCsrfToken } from '../../../api/axiosConfig';
 
 
 import { 
@@ -254,7 +255,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
       const res = await fetch('/api/action/ad-assessment/from-subdomain/', {
         method: 'POST',
         credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
         body: JSON.stringify({ subdomain_id: selectedId }),
       });
       const json = await res.json();
