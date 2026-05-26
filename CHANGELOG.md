@@ -2,9 +2,16 @@
 
 ### [v3.2.0] - 2026-05-26
 
+- **URL Gathering Tools Regex Fix**:
+  - Corrected a critical POSIX regular expression syntax error (`host_regex`) in the URL fetching task (`fetch_url`) of `tasks.py` that caused all output from `gau`, `waybackurls`, `hakrawler`, `katana`, and `gospider` to produce zero results.
+  - Implemented a POSIX-compliant character class `[^][[:space:]\\\"\\`><]*` to correctly exclude brackets, whitespace, quotes, and backticks without causing syntax errors or early bracket terminations in POSIX `grep` execution.
+
 - **baddns Scan Pipeline Integration**:
   - Registered `baddns` as a default subdomain discovery tool inside `subdomain_discovery` in `tasks.py` by appending it to the `default_subdomain_tools` list, resolving the issue where baddns execution was skipped with an unsupported warning.
   - Added support for executing `baddns` as a standalone discovery task inside the main scan workflow (`MasterScanWorkflow`) in `temporal_workflows.py`.
+  - Fixed invalid CLI arguments (removed unrecognized `-d` and `-o` parameters) and refactored command to run in silent mode with output redirected to a results file (`baddns -s {host} > {results_file}`).
+  - Added subdomain extraction logic to parse JSON findings and save newly discovered domains/subdomains to `subdomains_baddns_extracted.txt`.
+  - Refactored the takeover validation parser in `tasks.py` to correctly check the JSON findings format instead of expecting plain-text labels.
 
 - **Scan Queueing Feature**:
   - Implemented an optional queueing mechanism (`UserPreferences.enable_scan_queueing`) to restrict scan concurrency.

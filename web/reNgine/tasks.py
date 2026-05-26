@@ -904,8 +904,8 @@ def subdomain_discovery(
 
 			elif tool == 'baddns':
 				results_file = self.results_dir + '/subdomains_baddns.txt'
-				# baddns -d domain -o output
-				cmd = f'baddns -d {host} -o {results_file}'
+				# Run baddns in silent mode (JSON format) and redirect stdout to results_file
+				cmd = f'baddns -s {host} > {results_file}'
 
 
 		elif tool in custom_subdomain_tools:
@@ -945,6 +945,47 @@ def subdomain_discovery(
 				scan_id=self.scan_id,
 				activity_id=self.activity_id,
 				proxy=proxy if tool not in ['amass-passive', 'amass-active', 'subfinder'] else None)
+
+			# If the tool is baddns, extract discovered subdomains from the JSON results
+			if tool == 'baddns' and os.path.exists(results_file):
+				import re
+				extracted_file = self.results_dir + '/subdomains_baddns_extracted.txt'
+				discovered_subs = set()
+				try:
+					with open(results_file, 'r') as f:
+						for line in f:
+							line = line.strip()
+							if not line:
+								continue
+							try:
+								data = json.loads(line)
+								# Extract target and trigger fields which can contain subdomains/domains
+								for key in ['target', 'trigger']:
+									val = data.get(key)
+									if val and isinstance(val, str):
+										# Clean wildcard or prefix (like _dmarc.example.com -> example.com)
+										val = re.sub(r'^_[\w\-]+\.', '', val)
+										val = val.strip().lower()
+										# Check if it's a valid domain/IP
+										if validators.domain(val) or validators.ipv4(val) or validators.ipv6(val):
+											# Ensure it belongs to the target domain scope (host)
+											if host in val:
+												discovered_subs.add(val)
+							except json.JSONDecodeError:
+								# Fallback: if not JSON, try to extract domain-like strings from plain text line
+								for part in line.split():
+									part = part.strip().lower()
+									if host in part and (validators.domain(part) or validators.ipv4(part)):
+										discovered_subs.add(part)
+					
+					if discovered_subs:
+						with open(extracted_file, 'w') as f_out:
+							for sub in sorted(discovered_subs):
+								f_out.write(f'{sub}\n')
+						logger.info(f"Extracted {len(discovered_subs)} subdomains from baddns output: {discovered_subs}")
+				except Exception as parse_err:
+					logger.error(f"Error parsing baddns output to extract subdomains: {parse_err}")
+					logger.exception(parse_err)
 
 		except Exception as e:
 			logger.error(
@@ -1004,20 +1045,49 @@ def subdomain_discovery(
 			if os.path.exists(baddns_report):
 				with open(baddns_report, 'r') as f:
 					for b_line in f:
-						if subdomain_name in b_line and '[takeover]' in b_line.lower():
-							subdomain.is_important = True
-							subdomain.save()
-							# Create Critical Vulnerability
-							save_vulnerability(
-								name=f"Subdomain Takeover on {subdomain_name}",
-								description=f"baddns detected a potential subdomain takeover on {subdomain_name}. Line: {b_line.strip()}",
-								severity='critical',
-								type='Subdomain Takeover',
-								subdomain=subdomain,
-								scan_history=self.scan,
-								target_domain=self.domain,
-								validation_status='unverified'
-							)
+						b_line = b_line.strip()
+						if not b_line:
+							continue
+						if subdomain_name in b_line:
+							is_takeover = False
+							# Try parsing as JSON first
+							try:
+								data = json.loads(b_line)
+								desc = data.get('description', '').lower()
+								sig = data.get('signature', '').lower()
+								mod = data.get('module', '').lower()
+								# Check if it's a takeover finding
+								if 'takeover' in desc or 'takeover' in sig or mod in ['cname', 'ns', 'mx']:
+									# Exclude non-takeover DNS findings like DMARC, SPF, etc.
+									if not any(x in desc or x in sig for x in ['dmarc', 'spf', 'mta-sts', 'nsec', 'zonetransfer']):
+										is_takeover = True
+							except Exception:
+								# Fallback to plain text check
+								if '[takeover]' in b_line.lower() or 'takeover' in b_line.lower():
+									is_takeover = True
+
+							if is_takeover:
+								subdomain.is_important = True
+								subdomain.save()
+								# Create Critical Vulnerability
+								description_text = f"baddns detected a potential subdomain takeover on {subdomain_name}."
+								try:
+									data = json.loads(b_line)
+									if data.get('description'):
+										description_text = f"baddns: {data.get('description')}"
+								except Exception:
+									pass
+								
+								save_vulnerability(
+									name=f"Subdomain Takeover on {subdomain_name}",
+									description=f"{description_text} Line: {b_line}",
+									severity='critical',
+									type='Subdomain Takeover',
+									subdomain=subdomain,
+									scan_history=self.scan,
+									target_domain=self.domain,
+									validation_status='unverified'
+								)
 			subdomains.append(subdomain)
 			urls.append(subdomain.name)
 
@@ -2697,7 +2767,7 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 
 	# Domain regex
 	host = self.domain.name if self.domain else urlparse(urls[0]).netloc
-	host_regex = f"\'https?://([a-zA-Z0-9_-]+[.])*{host}[^\\s\\\"\\`\\>\\<\\]\\[]*\'"
+	host_regex = f"\'https?://([a-zA-Z0-9_-]+[.])*{host}[^][[:space:]\\\"\\`><]*\'"
 
 	# Tools cmds
 	base_cmd_map = {
