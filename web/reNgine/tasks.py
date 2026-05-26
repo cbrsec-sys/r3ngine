@@ -337,6 +337,7 @@ def initiate_scan_temporal(
 		from reNgine.temporal_client import TemporalClientProvider
 		from datetime import timedelta
 		from temporalio.exceptions import ServerError as TemporalServiceError
+		from temporalio.common import RetryPolicy
 
 		workflow_id = f"scan-{scan.id}-{uuid.uuid4().hex[:8]}"
 		max_retries = 3
@@ -359,6 +360,7 @@ def initiate_scan_temporal(
 						execution_timeout=timedelta(days=30),
 						run_timeout=timedelta(days=30),
 						task_timeout=timedelta(hours=1),
+						retry_policy=RetryPolicy(maximum_attempts=10),
 					)
 					return handle.id
 				except TemporalServiceError as e:
@@ -574,6 +576,7 @@ def initiate_subscan_temporal(
 		from reNgine.temporal_client import TemporalClientProvider
 		from datetime import timedelta
 		from temporalio.exceptions import ServerError as TemporalServiceError
+		from temporalio.common import RetryPolicy
 
 		workflow_id = f"subscan-{first_subscan_id}-{uuid.uuid4().hex[:8]}"
 		max_retries = 3
@@ -596,6 +599,7 @@ def initiate_subscan_temporal(
 						execution_timeout=timedelta(days=7),
 						run_timeout=timedelta(days=7),
 						task_timeout=timedelta(hours=1),
+						retry_policy=RetryPolicy(maximum_attempts=10),
 					)
 					return handle.id
 				except TemporalServiceError as e:
@@ -4344,7 +4348,7 @@ def generate_inapp_notification(scan, subscan, status, engine, fields):
 		status = 'SUCCESS'
 
 	scan_type = "Subscan" if subscan else "Scan"
-	domain = subscan.domain.name if subscan else scan.domain.name
+	domain = subscan.subdomain.name if subscan else scan.domain.name
 	duration_msg = None
 	redirect_link = None
 	title = f"Scan Status Update"
@@ -4383,7 +4387,7 @@ def generate_inapp_notification(scan, subscan, status, engine, fields):
 		duration_msg = f'Partially completed in {fields.get("Duration")}'
 
 	description += f"<br>Engine: {engine.engine_name if engine else 'N/A'}"
-	slug = scan.domain.project.slug if scan else subscan.history.domain.project.slug
+	slug = scan.domain.project.slug if scan else subscan.scan_history.domain.project.slug
 	if duration_msg:
 		description += f"<br>{duration_msg}"
 
@@ -7314,12 +7318,18 @@ def resume_scan_temporal(scan_id):
 	
 	# Spawn new MasterScanWorkflow
 	async def _start():
+		from temporalio.common import RetryPolicy
+		from datetime import timedelta
 		client = await TemporalClientProvider.get_client()
 		await client.start_workflow(
 			"MasterScanWorkflow",
 			args=[ctx],
 			id=workflow_id,
-			task_queue="python-orchestrator-queue"
+			task_queue="python-orchestrator-queue",
+			execution_timeout=timedelta(days=30),
+			run_timeout=timedelta(days=30),
+			task_timeout=timedelta(hours=1),
+			retry_policy=RetryPolicy(maximum_attempts=10),
 		)
 	
 	loop = asyncio.new_event_loop()
