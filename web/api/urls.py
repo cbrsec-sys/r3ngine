@@ -407,6 +407,11 @@ urlpatterns = [
         name='apme_trigger'
     ),
     path(
+        'action/ad-assessment/from-subdomain/',
+        LaunchADAssessmentFromSubdomain.as_view(),
+        name='launch_ad_assessment_from_subdomain'
+    ),
+    path(
         'auth/token/',
         TokenObtainPairView.as_view(),
         name='token_obtain_pair'
