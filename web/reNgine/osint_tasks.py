@@ -243,6 +243,14 @@ def enrich_identities_task(identity, identity_type, scan_history_id, ctx={}):
     
     return f"Enrichment completed for {full_name}"
 
+def db_conn_safe_wrapper(target_func, *args, **kwargs):
+    from django.db import connections
+    try:
+        return target_func(*args, **kwargs)
+    finally:
+        connections.close_all()
+
+
 def osint_orchestrator(scan_history_id):
     """
     Orchestrate the OSINT pipeline.
@@ -250,40 +258,64 @@ def osint_orchestrator(scan_history_id):
     scan_history = ScanHistory.objects.get(pk=scan_history_id)
     domain = scan_history.domain.name
     
+    threads = []
+    
     # 1. Get already discovered emails
     emails = scan_history.emails.all()
     for email in emails:
-        threading.Thread(
-            target=run_holehe,
+        t1 = threading.Thread(
+            target=db_conn_safe_wrapper,
+            args=(run_holehe,),
             kwargs={'email_address': email.address, 'scan_history_id': scan_history_id},
             daemon=True
-        ).start()
-        threading.Thread(
-            target=enrich_identities_task,
+        )
+        t1.start()
+        threads.append(t1)
+        
+        t2 = threading.Thread(
+            target=db_conn_safe_wrapper,
+            args=(enrich_identities_task,),
             kwargs={'identity': email.address, 'identity_type': 'email', 'scan_history_id': scan_history_id},
             daemon=True
-        ).start()
+        )
+        t2.start()
+        threads.append(t2)
 
     # 2. Get already discovered employees/usernames
     employees = scan_history.employees.all()
     for employee in employees:
         if employee.name:
             if ' ' not in employee.name:
-                threading.Thread(
-                    target=run_maigret,
+                t3 = threading.Thread(
+                    target=db_conn_safe_wrapper,
+                    args=(run_maigret,),
                     kwargs={'username': employee.name, 'scan_history_id': scan_history_id},
                     daemon=True
-                ).start()
-            threading.Thread(
-                target=enrich_identities_task,
+                )
+                t3.start()
+                threads.append(t3)
+            
+            t4 = threading.Thread(
+                target=db_conn_safe_wrapper,
+                args=(enrich_identities_task,),
                 kwargs={'identity': employee.name, 'identity_type': 'employee', 'scan_history_id': scan_history_id},
                 daemon=True
-            ).start()
+            )
+            t4.start()
+            threads.append(t4)
 
     # 3. LinkedInt for the domain/company
     company_name = domain.split('.')[0]
-    threading.Thread(
-        target=run_linkedint,
+    t5 = threading.Thread(
+        target=db_conn_safe_wrapper,
+        args=(run_linkedint,),
         kwargs={'company_name': company_name, 'scan_history_id': scan_history_id},
         daemon=True
-    ).start()
+    )
+    t5.start()
+    threads.append(t5)
+
+    # Wait for all threads to complete to ensure the Temporal activity blocks appropriately
+    for t in threads:
+        t.join()
+

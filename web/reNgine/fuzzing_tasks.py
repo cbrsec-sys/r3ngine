@@ -315,7 +315,9 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 
 					dirscan.directory_files.add(dfile)
 					if self.subscan:
-						dirscan.dir_subscan_ids.add(self.subscan)
+						from startScan.models import SubScan
+						if SubScan.objects.filter(pk=self.subscan.pk).exists():
+							dirscan.dir_subscan_ids.add(self.subscan)
 
 				dirscan.save()
 
@@ -393,7 +395,9 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 
 								dirscan_ds.directory_files.add(dfile)
 								if self.subscan:
-									dirscan_ds.dir_subscan_ids.add(self.subscan)
+									from startScan.models import SubScan
+									if SubScan.objects.filter(pk=self.subscan.pk).exists():
+										dirscan_ds.dir_subscan_ids.add(self.subscan)
 					except Exception as e:
 						logger.error(f'Error parsing dirsearch results for {base_url}: {e}')
 

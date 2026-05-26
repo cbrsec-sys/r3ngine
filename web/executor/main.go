@@ -94,7 +94,10 @@ func (a *Activities) SubprocessActivity(ctx context.Context, input ToolExecution
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		defer pr.Close()
 		scanner := bufio.NewScanner(pr)
+		buf := make([]byte, 0, 64*1024)
+		scanner.Buffer(buf, 1024*1024) // 1MB maximum line buffer
 		for scanner.Scan() {
 			line := scanner.Text()
 			if a.rdb != nil && input.ScanID > 0 {
@@ -119,6 +122,9 @@ func (a *Activities) SubprocessActivity(ctx context.Context, input ToolExecution
 					}
 				}
 			}
+		}
+		if err := scanner.Err(); err != nil {
+			activity.GetLogger(ctx).Error("Scanner error in executor", "error", err)
 		}
 	}()
 

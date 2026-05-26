@@ -226,13 +226,23 @@ def store_ip(ip_address, project, description, h1_team_handle, starting_point_pa
 	
 	# Trigger geo localization
 	if created or ip.geo_iso is None:
-		import threading as _threading
-		from reNgine.tasks import geo_localize
-		_threading.Thread(
-			target=geo_localize,
-			kwargs=dict(host=ip_address, ip_id=ip.id, scan_id=None, activity_id=None),
-			daemon=True
-		).start()
+		from reNgine.temporal_client import TemporalClientProvider
+		import asyncio
+		async def _start():
+			client = await TemporalClientProvider.get_client()
+			await client.start_workflow(
+				"GeoLocalizeWorkflow",
+				args=[ip_address, ip.id, None, None],
+				id=f"geo-localize-{ip.id}-{int(timezone.now().timestamp())}",
+				task_queue="python-orchestrator-queue"
+			)
+		loop = asyncio.new_event_loop()
+		try:
+			loop.run_until_complete(_start())
+		except Exception as e:
+			logger.warning(f"Failed to start GeoLocalizeWorkflow for IP {ip_address}: {e}")
+		finally:
+			loop.close()
 		
 	ip.save()
 

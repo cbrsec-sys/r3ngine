@@ -132,10 +132,9 @@ def run_command(
             Returns:
                 dict: The workflow execution result containing exit_code, stdout, and stderr
             """
-            temporal_host = os.environ.get("TEMPORAL_HOST", "temporal:7233")
-            namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
+            from reNgine.temporal_client import TemporalClientProvider
             # Connect to the Temporal cluster
-            client = await Client.connect(temporal_host, namespace=namespace)
+            client = await TemporalClientProvider.get_client()
             # Execute GoExecutorTaskWorkflow on the python-orchestrator task queue which routes
             # the subprocess activity to the go-executor-queue
             result = await client.execute_workflow(
@@ -183,7 +182,8 @@ def run_command(
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 cwd=cwd,
-                universal_newlines=True)
+                universal_newlines=True,
+                errors='replace')
             output = ''
             for stdout_line in iter(popen.stdout.readline, ""):
                 item = stdout_line.strip()
@@ -324,9 +324,11 @@ def save_subdomain(subdomain_name, ctx={}):
     
     if created:
         subdomain.discovered_date = timezone.now()
-        if subscan_id:
-            subdomain.subdomain_subscan_ids.add(subscan_id)
         subdomain.save()
+        if subscan_id:
+            from startScan.models import SubScan
+            if SubScan.objects.filter(pk=subscan_id).exists():
+                subdomain.subdomain_subscan_ids.add(subscan_id)
     return subdomain, created
 
 def save_endpoint(
@@ -398,7 +400,9 @@ def save_endpoint(
         endpoint.save()
         subscan_id = ctx.get('subscan_id')
         if subscan_id:
-            endpoint.endpoint_subscan_ids.add(subscan_id)
+            from startScan.models import SubScan
+            if SubScan.objects.filter(pk=subscan_id).exists():
+                endpoint.endpoint_subscan_ids.add(subscan_id)
             endpoint.save()
 
     return endpoint, created
@@ -491,9 +495,8 @@ def stream_command(
 			Returns:
 				dict: The workflow execution result containing exit_code, stdout, and stderr
 			"""
-			temporal_host = os.environ.get("TEMPORAL_HOST", "temporal:7233")
-			namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
-			client = await Client.connect(temporal_host, namespace=namespace)
+			from reNgine.temporal_client import TemporalClientProvider
+			client = await TemporalClientProvider.get_client()
 			result = await client.execute_workflow(
 				"GoExecutorTaskWorkflow",
 				{
@@ -571,6 +574,7 @@ def stream_command(
 		stdout=subprocess.PIPE,
 		stderr=subprocess.STDOUT,
 		universal_newlines=True,
+		errors='replace',
 		shell=shell)
 
 	# Start a watchdog thread to terminate the command if it runs too long

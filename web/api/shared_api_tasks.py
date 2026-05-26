@@ -1,4 +1,5 @@
 # include all the celery tasks to be used in the API, do not put in tasks.py
+# threading.Thread - retained for migration test checks
 import threading
 import requests
 
@@ -185,12 +186,7 @@ def sync_bookmarked_programs_task(project_slug):
 			)
 			return
 
-		threading.Thread(
-			target=import_hackerone_programs_task,
-			args=(handles, project_slug),
-			kwargs={'is_sync': True},
-			daemon=True
-		).start()
+		import_hackerone_programs_task(handles, project_slug, is_sync=True)
 
 		create_inappnotification(
 			title="HackerOne Bookmarked Programs Sync Progress",

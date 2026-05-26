@@ -40,7 +40,7 @@ if [ ! -f "/usr/src/wordlist/raft-large-directories.txt" ]; then
   wget -q https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/Web-Content/raft-large-directories.txt -O /usr/src/wordlist/raft-large-directories.txt
 fi
 
-if [ ! -f /usr/src/wordlist/deepmagic.com-prefixes-top50000.txt ]; then
+if [ ! -f "/usr/src/wordlist/deepmagic.com-prefixes-top50000.txt" ]; then
   echo "Downloading Deepmagic top 50000 Wordlist..."
   wget -q https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/deepmagic.com-prefixes-top50000.txt -O /usr/src/wordlist/deepmagic.com-prefixes-top50000.txt
 fi
@@ -91,30 +91,30 @@ else
   git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/geeknik_nuclei_templates
 fi
 
-if [ ! -f ~/nuclei-templates/ssrf_nagli.yaml ]; then
+if [ ! -f "~/nuclei-templates/ssrf_nagli.yaml" ]; then
   echo "Downloading ssrf_nagli for Nuclei..."
   wget -q https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml -O ~/nuclei-templates/ssrf_nagli.yaml
 fi
 
 # AI Map Templates
 echo "Checking for AI Map Templates..."
-if [ ! -f ~/nuclei-templates/langserve-detect.yaml ]; then
+if [ ! -f "~/nuclei-templates/langserve-detect.yaml" ]; then
   wget -q https://raw.githubusercontent.com/BishopFox/aimap/refs/heads/main/templates/langserve-detect.yaml -O ~/nuclei-templates/langserve-detect.yaml
 fi
 
-if [ ! -f ~/nuclei-templates/mcp-server-detect.yaml ]; then
+if [ ! -f "~/nuclei-templates/mcp-server-detect.yaml" ]; then
   wget -q https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/mcp-server-detect.yaml -O ~/nuclei-templates/mcp-server-detect.yaml
 fi
 
-if [ ! -f ~/nuclei-templates/mcp-tool-enum.yaml ]; then
+if [ ! -f "~/nuclei-templates/mcp-tool-enum.yaml" ]; then
   wget -q https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/mcp-tool-enum.yaml -O ~/nuclei-templates/mcp-tool-enum.yaml
 fi
 
-if [ ! -f ~/nuclei-templates/openai-compat-detect.yaml ]; then
+if [ ! -f "~/nuclei-templates/openai-compat-detect.yaml" ]; then
   wget -q https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/openai-compat-detect.yaml -O ~/nuclei-templates/openai-compat-detect.yaml
 fi
 
-if [ ! -f ~/nuclei-templates/prompt-leak.yaml ]; then
+if [ ! -f "~/nuclei-templates/prompt-leak.yaml" ]; then
   wget -q https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/prompt-leak.yaml -O ~/nuclei-templates/prompt-leak.yaml
 fi
 

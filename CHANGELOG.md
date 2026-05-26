@@ -2,6 +2,16 @@
 
 ### [v3.2.0] - 2026-05-25
 
+- **Backend Architecture & Code Quality Remediation**:
+  - Implemented a centralized, singleton-cached `TemporalClientProvider` to manage Temporal workflow client connections efficiently and prevent connection pool exhaustion.
+  - Replaced unmanaged daemon threads and synchronous inline operations in Views and Celery tasks with durable Temporal workflows and registered 6 new workflows and activities (`HackerOneImportWorkflow`, `HackerOneSyncBookmarkedWorkflow`, `ProxyFetchWorkflow`, `ApmeTaskWorkflow`, `GeoLocalizeWorkflow`, `SubScanWorkflow`).
+  - Added deferred reader closes and a 1MB scanner buffer limit configuration in the Go Executor (`web/executor/main.go`) to prevent subprocess scanner crashes and reader pipe resource leaks.
+  - Wrapped multi-threaded OSINT tasks with `db_conn_safe_wrapper` to ensure safe database connection closure on thread finalization and joined them to block during activity run, resolving database lockups and resource exhaustion.
+  - Rewrote the vulnerability correlation and impact assessment lookups in `correlation.py` to preload subdomains, CVEs, and assessments, performing duplicate verification in-memory and batching database writes (reducing query footprint from ~5,000 to ~5 queries for 1,000 processed findings).
+  - Configured Django `pre_delete` signals on `ScanHistory` and `SubScan` to cleanly cancel associated workflows in Temporal and cleanup directories on disk.
+  - Wrapped `UserPreferences` middleware lookup inside a `SimpleLazyObject` to prevent redundant queries on static asset requests.
+  - Fixed subscan `bulk_stop` cancellation to correctly cancel workflows in Temporal.
+
 - **Subscan Tiered Execution Steps Alignment**:
   - Refactored `SubScanWorkflow` to group and execute subdomain subscans in sequence-enforced execution tiers (Discovery -> HTTP Crawl & Port Scan -> URL Fetching -> Fuzzing -> Analysis -> Security Assessment), strictly mirroring the main scan (`MasterScanWorkflow`).
   - Modified the `InitiateSubTask` API view and `initiate_subscan_temporal` scan task helper to batch-create `SubScan` database records and trigger a single, unified `SubScanWorkflow` execution per subdomain rather than running separate concurrent workflows for each individual task.
