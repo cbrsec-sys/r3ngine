@@ -158,3 +158,73 @@ class TestTemporalOrchestration(TestCase):
         self.assertEqual(temporal_ctx['subscan_id'], subscan.id)
         self.assertEqual(temporal_ctx['subdomain_id'], subdomain.id)
         self.assertEqual(subscan.workflow_ids, ['mock-subscan-workflow-id'])
+
+    @patch('reNgine.temporal_client.TemporalClientProvider.get_client', new_callable=AsyncMock)
+    @patch('reNgine.tasks.save_endpoint')
+    @patch('reNgine.tasks.send_scan_notif')
+    def test_initiate_multiple_subscans_temporal(self, mock_send_notif, mock_save_endpoint, mock_get_client):
+        """Test that initiating subscans with multiple tasks creates multiple SubScan records
+
+        but starts only a single SubScanWorkflow, correctly associating the workflow ID
+        across all of them and passing the complete task list to Temporal.
+        """
+        from reNgine.tasks import initiate_subscan_temporal
+
+        # Setup subdomain
+        subdomain = Subdomain.objects.create(
+            name='multi.temporal-test.local',
+            target_domain=self.domain,
+            scan_history=self.scan
+        )
+
+        # Mock Temporal Client and Workflow Handle
+        mock_handle = MagicMock()
+        mock_handle.id = "mock-multi-subscan-workflow-id"
+        mock_client = AsyncMock()
+        mock_client.start_workflow.return_value = mock_handle
+        mock_get_client.return_value = mock_client
+
+        # Mock Endpoint save
+        mock_endpoint = MagicMock(is_alive=True)
+        mock_endpoint.http_url = "http://multi.temporal-test.local"
+        mock_endpoint.http_status = 200
+        mock_endpoint.response_time = 0.4
+        mock_endpoint.page_title = "Temporal Multi Subscan Test"
+        mock_endpoint.content_type = "text/html"
+        mock_endpoint.content_length = 9999
+        mock_endpoint.techs.all.return_value = []
+        mock_save_endpoint.return_value = (mock_endpoint, True)
+
+        # Target multiple tasks
+        tasks = ['port_scan', 'fetch_url', 'vulnerability_scan']
+
+        # Trigger subscan initiation
+        result = initiate_subscan_temporal(
+            scan_history_id=self.scan.id,
+            subdomain_id=subdomain.id,
+            engine_id=self.engine.id,
+            scan_type=tasks
+        )
+
+        # Verify output success status and workflow ID
+        self.assertTrue(result['success'])
+        self.assertEqual(result['workflow_id'], 'mock-multi-subscan-workflow-id')
+
+        # Verify start_workflow was called exactly once
+        mock_client.start_workflow.assert_called_once()
+        args, kwargs = mock_client.start_workflow.call_args
+        self.assertEqual(args[0], "SubScanWorkflow")
+        
+        # Verify arguments passed to SubScanWorkflow
+        workflow_args = kwargs['args']
+        self.assertEqual(len(workflow_args), 2)
+        temporal_ctx, scan_type = workflow_args
+        self.assertEqual(scan_type, tasks)
+
+        # Verify multiple SubScan DB entries are created
+        subscans = SubScan.objects.filter(subdomain=subdomain)
+        self.assertEqual(subscans.count(), 3)
+
+        # Verify all subscans have same workflow ID stored
+        for subscan in subscans:
+            self.assertEqual(subscan.workflow_ids, ['mock-multi-subscan-workflow-id'])

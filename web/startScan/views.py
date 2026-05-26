@@ -574,6 +574,40 @@ def stop_scan(request, id):
 
 
 @has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
+def resume_scan(request, id):
+    if request.method == "POST":
+        try:
+            from reNgine.tasks import resume_scan_temporal
+            scan = get_object_or_404(ScanHistory, id=id)
+            if scan.recovery_count >= 3:
+                response = {'status': False}
+                messages.add_message(
+                    request,
+                    messages.ERROR,
+                    f'Scan cannot be resumed. Max recovery limit (3) exceeded.'
+                )
+                return JsonResponse(response)
+                
+            resume_scan_temporal(scan.id)
+            response = {'status': True}
+            messages.add_message(
+                request,
+                messages.INFO,
+                'Scan successfully resumed!'
+            )
+        except Exception as e:
+            logger.error(e)
+            response = {'status': False}
+            messages.add_message(
+                request,
+                messages.ERROR,
+                f'Scan failed to resume ! Error: {str(e)}'
+            )
+        return JsonResponse(response)
+    return scan_history(request)
+
+
+@has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
 def stop_scans(request, slug):
     if request.method == "POST":
         for key, value in request.POST.items():

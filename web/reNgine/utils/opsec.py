@@ -133,7 +133,7 @@ class OpSecManager:
             flags.append(f"-rl {self.settings.max_rps}")
         
         if self.settings.http_protocol == "http2":
-            flags.append("-h2")
+            flags.append("-fh2")
         
         if self.settings.custom_dns_servers:
             dns = ",".join(self.settings.custom_dns_servers.splitlines())

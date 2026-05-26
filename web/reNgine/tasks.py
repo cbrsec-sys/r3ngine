@@ -439,20 +439,20 @@ def initiate_subscan_temporal(
 	):
 	"""Initiate a new subscan using Temporal durable workflow orchestration.
 
-	This function performs the same subdomain scan setup as `initiate_subscan`
-	(creates the SubScan record, results directory, initial subdomain and endpoint
-	objects) but delegates execution to a `SubScanWorkflow` on the Temporal cluster
-	instead of building a Celery chain.
+	This function performs the subdomain scan setup (creates the SubScan records,
+	results directory, and initial endpoint objects) and triggers a single
+	`SubScanWorkflow` on the Temporal cluster to execute all requested tasks
+	in tiered execution order.
 
 	Args:
-		scan_history_id (int): ScanHistory id.
-		subdomain_id (int): Subdomain id.
+		scan_history_id (int): ScanHistory ID.
+		subdomain_id (int): Target Subdomain ID.
 		engine_id (int, optional): Engine ID.
-		scan_type (str, optional): Scan type (e.g. 'osint', 'port_scan', etc.).
+		scan_type (str or list, optional): Subscan type or list of subscan types to run.
 		results_dir (str, optional): Results directory root.
-		starting_point_path (str, optional): URL path. Default: ''.
-		excluded_paths (list, optional): Excluded paths. Default: [].
-		custom_dorks (str, optional): Custom dorks. Default: None.
+		starting_point_path (str, optional): URL path filter. Default: ''.
+		excluded_paths (list, optional): URL paths to exclude. Default: [].
+		custom_dorks (str, optional): Custom dorks to run. Default: None.
 
 	Returns:
 		dict: {'success': True, 'workflow_id': str} on success.
@@ -460,8 +460,14 @@ def initiate_subscan_temporal(
 	import asyncio
 	import uuid
 
-	logger.info(f"Initiating subdomain subscan '{scan_type}' via Temporal workflow orchestrator")
-	subscan = None
+	# Normalize scan_type to list of tasks
+	if isinstance(scan_type, str):
+		scan_types = [scan_type]
+	else:
+		scan_types = list(scan_type)
+
+	logger.info(f"Initiating subdomain subscans '{scan_types}' via Temporal workflow orchestrator")
+	created_subscans = []
 	try:
 		# ---- Get Subdomain, Domain and ScanHistory ----
 		subdomain = Subdomain.objects.get(pk=subdomain_id)
@@ -481,32 +487,42 @@ def initiate_subscan_temporal(
 		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
 		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
 
-		# ---- Create scan activity of SubScan Model ----
-		subscan = SubScan(
-			start_scan_date=timezone.now(),
-			workflow_ids=[], # Will store temporal workflow ID
-			scan_history=scan,
-			subdomain=subdomain,
-			type=scan_type,
-			status=RUNNING_TASK,
-			engine=engine
-		)
-		subscan.save()
+		# ---- Create scan activity records of SubScan Model ----
+		subscans_info = []
+		for stype in scan_types:
+			subscan = SubScan(
+				start_scan_date=timezone.now(),
+				workflow_ids=[],
+				scan_history=scan,
+				subdomain=subdomain,
+				type=stype,
+				status=RUNNING_TASK,
+				engine=engine
+			)
+			subscan.save()
+			created_subscans.append(subscan)
+			subscans_info.append({
+				'id': subscan.id,
+				'type': stype
+			})
 
 		# ---- Create results directory ----
-		subscan_results_dir = f'{scan.results_dir}/subscans/{subscan.id}'
+		# Anchor the directory to the first subscan record's ID
+		first_subscan_id = created_subscans[0].id
+		subscan_results_dir = f'{scan.results_dir}/subscans/{first_subscan_id}'
 		os.makedirs(subscan_results_dir, exist_ok=True)
 
 		# ---- Update scan's tasks list ----
-		if scan_type not in scan.tasks:
-			scan.tasks.append(scan_type)
-			scan.save()
+		for stype in scan_types:
+			if stype not in scan.tasks:
+				scan.tasks.append(stype)
+		scan.save()
 
 		# ---- Send start notification ----
 		try:
 			send_scan_notif(
 				scan.id,
-				subscan_id=subscan.id,
+				subscan_id=first_subscan_id,
 				engine_id=engine_id,
 				status='RUNNING'
 			)
@@ -516,7 +532,8 @@ def initiate_subscan_temporal(
 		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
 		temporal_ctx = {
 			'scan_history_id': scan.id,
-			'subscan_id': subscan.id,
+			'subscan_id': first_subscan_id,
+			'subscans_info': subscans_info,
 			'engine_id': engine_id,
 			'domain_id': domain.id,
 			'subdomain_id': subdomain.id,
@@ -531,7 +548,6 @@ def initiate_subscan_temporal(
 		}
 
 		# ---- Create initial endpoints in DB ----
-		# Find domain HTTP endpoint so that HTTP crawling can start somewhere
 		base_url = f'{subdomain.name}{starting_point_path}' if starting_point_path else subdomain.name
 		endpoint, _ = save_endpoint(
 			base_url,
@@ -559,7 +575,7 @@ def initiate_subscan_temporal(
 		from datetime import timedelta
 		from temporalio.exceptions import ServerError as TemporalServiceError
 
-		workflow_id = f"subscan-{subscan.id}-{uuid.uuid4().hex[:8]}"
+		workflow_id = f"subscan-{first_subscan_id}-{uuid.uuid4().hex[:8]}"
 		max_retries = 3
 		backoff_base = 2
 
@@ -574,7 +590,7 @@ def initiate_subscan_temporal(
 					)
 					handle = await client.start_workflow(
 						"SubScanWorkflow",
-						args=[temporal_ctx, scan_type],
+						args=[temporal_ctx, scan_types],
 						id=workflow_id,
 						task_queue="python-orchestrator-queue",
 						execution_timeout=timedelta(days=7),
@@ -603,12 +619,13 @@ def initiate_subscan_temporal(
 
 		logger.info(
 			f"Started SubScanWorkflow id={started_workflow_id} "
-			f"for subscan_id={subscan.id} (type={scan_type})"
+			f"for subscan_id={first_subscan_id} (types={scan_types})"
 		)
 
-		# Save workflow ID in subscan's workflow_ids list
-		subscan.workflow_ids = [started_workflow_id]
-		subscan.save()
+		# Save workflow ID in all subscans' workflow_ids list
+		for subscan in created_subscans:
+			subscan.workflow_ids = [started_workflow_id]
+			subscan.save()
 
 		return {
 			'success': True,
@@ -617,7 +634,7 @@ def initiate_subscan_temporal(
 
 	except Exception as e:
 		logger.exception(e)
-		if subscan:
+		for subscan in created_subscans:
 			subscan.status = FAILED_TASK
 			subscan.save()
 		return {
@@ -2091,7 +2108,7 @@ def screenshot(self, ctx={}, description=None):
 
 
 
-def port_scan(self, hosts=[], ctx={}, description=None):
+def port_scan(self, hosts=[], ctx={}, description=None, prepare_only=False, parse_only=None):
 	"""Run port scan.
 
 	Args:
@@ -2157,17 +2174,42 @@ def port_scan(self, hosts=[], ctx={}, description=None):
 	cmd += f' -exclude-ports {exclude_ports_str}' if exclude_ports else ''
 	cmd += f' -silent'
 
+	if prepare_only:
+		return {
+			"cmd": cmd,
+			"input_file": input_file,
+			"hosts": hosts,
+			"nmap_enabled": nmap_enabled,
+			"nmap_cmd": nmap_cmd,
+			"nmap_script": nmap_script,
+			"nmap_script_args": nmap_script_args,
+			"rate_limit": rate_limit,
+		}
+
 	# Execute cmd and gather results
 	results = []
 	urls = []
 	ports_data = {}
-	for line in stream_command(
+
+	if parse_only is not None:
+		line_source = []
+		for raw_line in parse_only.splitlines():
+			raw_line = raw_line.strip()
+			if not raw_line:
+				continue
+			try:
+				line_source.append(json.loads(raw_line))
+			except Exception:
+				line_source.append(raw_line)
+	else:
+		line_source = stream_command(
 			cmd,
 			shell=True,
 			history_file=self.history_file,
 			scan_id=self.scan_id,
-			activity_id=self.activity_id):
+			activity_id=self.activity_id)
 
+	for line in line_source:
 		if not isinstance(line, dict):
 			continue
 		results.append(line)
@@ -3204,228 +3246,8 @@ def vulnerability_scan(self, urls=[], ctx={}, description=None):
 	logger.info('Vulnerability scan completed...')
 	return None
 
-def nuclei_individual_severity_module(self, cmd, severity, enable_http_crawl, should_fetch_gpt_report, ctx={}, description=None):
-	'''
-		This celery task will run vulnerability scan for a specific severity.
-		All severities run sequentially to optimize resource utilization and prevent worker crashes.
-	'''
-	results = []
-	logger.info(f'Running vulnerability scan with severity: {severity}')
-	cmd += f' -severity {severity}'
-	proxy = get_random_proxy()
-	if proxy:
-		if not any(proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
-			proxy = 'http://' + proxy
-		cmd += f' -proxy {proxy}'
-	# Send start notification
-	notif = Notification.objects.first()
-	send_status = notif.send_scan_status_notif if notif else False
-
-	for line in stream_command(
-			cmd,
-			history_file=self.history_file,
-			scan_id=self.scan_id,
-			activity_id=self.activity_id):
-
-		if not isinstance(line, dict):
-			continue
-
-		results.append(line)
-
-		# Gather nuclei results
-		vuln_data = parse_nuclei_result(line)
-
-		# Get corresponding subdomain
-		http_url = sanitize_url(line.get('matched-at'))
-		subdomain_name = get_subdomain_from_url(http_url)
-
-		# TODO: this should be get only
-		subdomain, _ = Subdomain.objects.get_or_create(
-			name=subdomain_name,
-			scan_history=self.scan,
-			target_domain=self.domain
-		)
-
-		# Look for duplicate vulnerabilities by excluding records that might change but are irrelevant.
-		object_comparison_exclude = ['response', 'curl_command', 'tags', 'references', 'cve_ids', 'cwe_ids']
-
-		# Add subdomain and target domain to the duplicate check
-		vuln_data_copy = vuln_data.copy()
-		vuln_data_copy['subdomain'] = subdomain
-		vuln_data_copy['target_domain'] = self.domain
-
-		# Check if record exists, if exists do not save it
-		if record_exists(Vulnerability, data=vuln_data_copy, exclude_keys=object_comparison_exclude):
-			logger.warning(f'Nuclei vulnerability of severity {severity} : {vuln_data_copy["name"]} for {subdomain_name} already exists')
-			continue
-
-		# Get or create EndPoint object
-		response = line.get('response')
-		httpx_crawl = False if response else enable_http_crawl # avoid yet another httpx crawl
-		endpoint, _ = save_endpoint(
-			http_url,
-			crawl=httpx_crawl,
-			subdomain=subdomain,
-			ctx=ctx)
-		if endpoint:
-			http_url = endpoint.http_url
-			if not httpx_crawl:
-				output = parse_curl_output(response)
-				endpoint.http_status = output['http_status']
-				endpoint.save()
-
-		# Register Auth Candidate if Nuclei flagged it as login or auth
-		tags = line.get('info', {}).get('tags', []) or []
-		if any(tag in tags for tag in ['login', 'auth', 'admin', 'default-login', 'bruteforce', 'panel']):
-			from reNgine.utilities import save_auth_candidate
-			save_auth_candidate(
-				scan_history=self.scan,
-				target=http_url,
-				protocol='http',
-				port=int(urlparse(http_url).port or (443 if 'https' in http_url else 80)),
-				source_tool='Nuclei',
-				metadata={'tags': tags, 'template_id': line.get('template-id')},
-				subdomain=subdomain,
-				endpoint=endpoint
-			)
-
-		# Get or create Vulnerability object
-		vuln, _ = save_vulnerability(
-			target_domain=self.domain,
-			http_url=http_url,
-			scan_history=self.scan,
-			subscan=self.subscan,
-			subdomain=subdomain,
-			**vuln_data)
-		if not vuln:
-			continue
-
-		# Print vuln
-		severity = line['info'].get('severity', 'unknown')
-		logger.warning(str(vuln))
 
 
-		# Send notification for all vulnerabilities except info
-		url = vuln.http_url or vuln.subdomain
-		send_vuln = (
-			notif and
-			notif.send_vuln_notif and
-			vuln and
-			severity in ['low', 'medium', 'high', 'critical'])
-		if send_vuln:
-			fields = {
-				'Severity': f'**{severity.upper()}**',
-				'URL': http_url,
-				'Subdomain': subdomain_name,
-				'Name': vuln.name,
-				'Type': vuln.type,
-				'Description': vuln.description,
-				'Template': vuln.template_url,
-				'Tags': vuln.get_tags_str() or "N/A",
-				'CVEs': vuln.get_cve_str(),
-				'CWEs': vuln.get_cwe_str(),
-				'References': vuln.get_refs_str()
-			}
-			severity_map = {
-				'low': 'info',
-				'medium': 'warning',
-				'high': 'error',
-				'critical': 'error'
-			}
-			self.notify(
-				f'vulnerability_scan_#{vuln.id}',
-				severity_map[severity],
-				fields,
-				add_meta_info=False)
-
-		"""
-			Send report to hackerone when
-			1. send_report is True from Hackerone model in ScanEngine
-			2. username and key is set in HackerOneAPIKey in Dashboard
-			3. severity is not info or low
-		"""
-		hackerone_query = Hackerone.objects.filter(send_report=True)
-		api_key_check_query = HackerOneAPIKey.objects.filter(
-			Q(username__isnull=False) & Q(key__isnull=False)
-		)
-
-		send_report = (
-			hackerone_query.exists() and
-			api_key_check_query.exists() and
-			severity not in ('info', 'low') and
-			vuln.target_domain.h1_team_handle
-		)
-
-		if send_report:
-			hackerone = hackerone_query.first()
-			try:
-				if hackerone.send_critical and severity == 'critical':
-					send_hackerone_report(vuln.id)
-				elif hackerone.send_high and severity == 'high':
-					send_hackerone_report(vuln.id)
-				elif hackerone.send_medium and severity == 'medium':
-					send_hackerone_report(vuln.id)
-			except Exception as e:
-				logger.warning(f"HackerOne report send failed for vuln {vuln.id}: {e}")
-
-	# Write results to JSON file
-	with open(self.output_path, 'w') as f:
-		json.dump(results, f, indent=4)
-
-	# Send finish notif
-	if send_status:
-		vulns = Vulnerability.objects.filter(scan_history__id=self.scan_id)
-		info_count = vulns.filter(severity=0).count()
-		low_count = vulns.filter(severity=1).count()
-		medium_count = vulns.filter(severity=2).count()
-		high_count = vulns.filter(severity=3).count()
-		critical_count = vulns.filter(severity=4).count()
-		unknown_count = vulns.filter(severity=-1).count()
-		vulnerability_count = info_count + low_count + medium_count + high_count + critical_count + unknown_count
-		fields = {
-			'Total': vulnerability_count,
-			'Critical': critical_count,
-			'High': high_count,
-			'Medium': medium_count,
-			'Low': low_count,
-			'Info': info_count,
-			'Unknown': unknown_count
-		}
-		self.notify(fields=fields)
-
-	# after vulnerability scan is done, we need to run gpt if
-	# should_fetch_gpt_report and openapi key exists
-
-	if should_fetch_gpt_report and OpenAiAPIKey.objects.all().first():
-		logger.info('Getting Vulnerability GPT Report')
-		vulns = Vulnerability.objects.filter(
-			scan_history__id=self.scan_id
-		).filter(
-			source=NUCLEI
-		).exclude(
-			severity=0
-		)
-		# find all unique vulnerabilities based on path and title
-		# all unique vulnerability will go thru gpt function and get report
-		# once report is got, it will be matched with other vulnerabilities and saved
-		unique_vulns = set()
-		for vuln in vulns:
-			unique_vulns.add((vuln.name, vuln.get_path()))
-
-		unique_vulns = list(unique_vulns)
-
-		with concurrent.futures.ThreadPoolExecutor(max_workers=DEFAULT_THREADS) as executor:
-			future_to_gpt = {executor.submit(get_vulnerability_gpt_report, vuln): vuln for vuln in unique_vulns}
-
-			# Wait for all tasks to complete
-			for future in concurrent.futures.as_completed(future_to_gpt):
-				gpt = future_to_gpt[future]
-				try:
-					future.result()
-				except Exception as e:
-					logger.error(f"Exception for Vulnerability {gpt}: {e}")
-
-		return None
 
 
 def get_vulnerability_gpt_report(vuln, vulnerability_id=None):
@@ -3523,7 +3345,7 @@ def add_gpt_description_db(title, path, description, impact, remediation, refere
 			gpt_report.references.add(ref)
 		gpt_report.save()
 
-def nuclei_scan(self, urls=[], ctx={}, description=None):
+def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, parse_only=None):
 	"""HTTP vulnerability scan using Nuclei
 
 	Args:
@@ -3557,6 +3379,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 	should_fetch_gpt_report = config.get(FETCH_GPT_REPORT, DEFAULT_GET_GPT_REPORT)
 	nuclei_specific_config = config.get('nuclei', {})
 	use_nuclei_conf = nuclei_specific_config.get(USE_NUCLEI_CONFIG, False)
+	auto_update_templates = nuclei_specific_config.get('auto_update_templates', True)
 	severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
 	tags = nuclei_specific_config.get(NUCLEI_TAGS, [])
 	
@@ -3644,12 +3467,13 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 		else:
 			wordfence_exists = True
 
-	run_command(
-		'nuclei -update-templates',
-		shell=True,
-		history_file=self.history_file,
-		scan_id=self.scan_id,
-		activity_id=self.activity_id)
+	if auto_update_templates:
+		run_command(
+			'nuclei -update-templates',
+			shell=True,
+			history_file=self.history_file,
+			scan_id=self.scan_id,
+			activity_id=self.activity_id)
 	templates = []
 	if not (nuclei_templates or custom_nuclei_templates):
 		templates.append(NUCLEI_DEFAULT_TEMPLATES_PATH)
@@ -3687,9 +3511,11 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 
 	cmd += f' -retries {retries}' if retries > 0 else ''
 	cmd += f' -rl {rate_limit}' if rate_limit > 0 else ''
-	# cmd += f' -severity {severities_str}'
+	if severities_str:
+		cmd += f' -severity {severities_str}'
 	cmd += f' -timeout {str(timeout)}' if timeout and timeout > 0 else ''
-	cmd += f' -tags {tags}' if tags else ''
+	if tags:
+		cmd += f' -tags {tags}'
 	cmd += f' -silent'
 	for tpl in templates:
 		cmd += f' -t {tpl}'
@@ -3704,27 +3530,211 @@ def nuclei_scan(self, urls=[], ctx={}, description=None):
 			cmd += " -tags candidate"
 		else:
 			cmd += " -tags production"
+	logger.info("Running Nuclei vulnerabilities scan")
+	if hasattr(self, 'activity') and self.activity:
+		self.activity.title = "Nuclei Scan"
+		self.activity.save()
+	
+	logger.warning(f'cmd: {cmd}')
+	
+	results = []
+	notif = Notification.objects.first()
+	send_status = notif.send_scan_status_notif if notif else False
 
+	import json
+	line_source = stream_command(
+		cmd,
+		history_file=self.history_file,
+		scan_id=self.scan_id,
+		activity_id=self.activity_id)
 
-	# Run each severity sequentially inside the same nuclei_scan task
-	for severity in severities:
-		logger.info(f"Running Nuclei severity: {severity}")
-		if hasattr(self, 'activity') and self.activity:
-			self.activity.title = f"Nuclei Scan - Severity: {severity}"
-			self.activity.save()
-		
-		logger.warning(f'cmd: {cmd}')
-		nuclei_individual_severity_module(
-			self,
-			cmd=cmd,
-			severity=severity,
-			enable_http_crawl=enable_http_crawl,
-			should_fetch_gpt_report=should_fetch_gpt_report,
-			ctx=ctx,
-			description=f'Nuclei Scan with severity {severity}'
+	for line in line_source:
+		if not isinstance(line, dict):
+			continue
+
+		results.append(line)
+
+		# Gather nuclei results
+		vuln_data = parse_nuclei_result(line)
+
+		# Get corresponding subdomain
+		http_url = sanitize_url(line.get('matched-at'))
+		subdomain_name = get_subdomain_from_url(http_url)
+
+		# TODO: this should be get only
+		subdomain, _ = Subdomain.objects.get_or_create(
+			name=subdomain_name,
+			scan_history=self.scan,
+			target_domain=self.domain
 		)
 
-	logger.info('Vulnerability scan with all severities completed...')
+		# Look for duplicate vulnerabilities by excluding records that might change but are irrelevant.
+		object_comparison_exclude = ['response', 'curl_command', 'tags', 'references', 'cve_ids', 'cwe_ids']
+
+		# Add subdomain and target domain to the duplicate check
+		vuln_data_copy = vuln_data.copy()
+		vuln_data_copy['subdomain'] = subdomain
+		vuln_data_copy['target_domain'] = self.domain
+
+		# Check if record exists, if exists do not save it
+		severity_value = line['info'].get('severity', 'unknown')
+		if record_exists(Vulnerability, data=vuln_data_copy, exclude_keys=object_comparison_exclude):
+			logger.warning(f'Nuclei vulnerability of severity {severity_value} : {vuln_data_copy["name"]} for {subdomain_name} already exists')
+			continue
+
+		# Get or create EndPoint object
+		response = line.get('response')
+		httpx_crawl = False if response else enable_http_crawl # avoid yet another httpx crawl
+		endpoint, _ = save_endpoint(
+			http_url,
+			crawl=httpx_crawl,
+			subdomain=subdomain,
+			ctx=ctx)
+		if endpoint:
+			http_url = endpoint.http_url
+			if not httpx_crawl:
+				output = parse_curl_output(response)
+				endpoint.http_status = output['http_status']
+				endpoint.save()
+
+		# Register Auth Candidate if Nuclei flagged it as login or auth
+		tags_list = line.get('info', {}).get('tags', []) or []
+		if any(tag in tags_list for tag in ['login', 'auth', 'admin', 'default-login', 'bruteforce', 'panel']):
+			from reNgine.utilities import save_auth_candidate
+			save_auth_candidate(
+				scan_history=self.scan,
+				target=http_url,
+				protocol='http',
+				port=int(urlparse(http_url).port or (443 if 'https' in http_url else 80)),
+				source_tool='Nuclei',
+				metadata={'tags': tags_list, 'template_id': line.get('template-id')},
+				subdomain=subdomain,
+				endpoint=endpoint
+			)
+
+		# Get or create Vulnerability object
+		vuln, _ = save_vulnerability(
+			target_domain=self.domain,
+			http_url=http_url,
+			scan_history=self.scan,
+			subscan=self.subscan,
+			subdomain=subdomain,
+			**vuln_data)
+		if not vuln:
+			continue
+
+		# Print vuln
+		logger.warning(str(vuln))
+
+		# Send notification for all vulnerabilities except info
+		url = vuln.http_url or vuln.subdomain
+		send_vuln = (
+			notif and
+			notif.send_vuln_notif and
+			vuln and
+			severity_value in ['low', 'medium', 'high', 'critical'])
+		if send_vuln:
+			fields = {
+				'Severity': f'**{severity_value.upper()}**',
+				'URL': http_url,
+				'Subdomain': subdomain_name,
+				'Name': vuln.name,
+				'Type': vuln.type,
+				'Description': vuln.description,
+				'Template': vuln.template_url,
+				'Tags': vuln.get_tags_str() or "N/A",
+				'CVEs': vuln.get_cve_str(),
+				'CWEs': vuln.get_cwe_str(),
+				'References': vuln.get_refs_str()
+			}
+			severity_map = {
+				'low': 'info',
+				'medium': 'warning',
+				'high': 'error',
+				'critical': 'error'
+			}
+			self.notify(
+				f'vulnerability_scan_#{vuln.id}',
+				severity_map[severity_value],
+				fields,
+				add_meta_info=False)
+
+		# Send report to hackerone
+		hackerone_query = Hackerone.objects.filter(send_report=True)
+		api_key_check_query = HackerOneAPIKey.objects.filter(
+			Q(username__isnull=False) & Q(key__isnull=False)
+		)
+
+		send_report = (
+			hackerone_query.exists() and
+			api_key_check_query.exists() and
+			severity_value not in ('info', 'low') and
+			vuln.target_domain.h1_team_handle
+		)
+
+		if send_report:
+			hackerone = hackerone_query.first()
+			try:
+				if hackerone.send_critical and severity_value == 'critical':
+					send_hackerone_report(vuln.id)
+				elif hackerone.send_high and severity_value == 'high':
+					send_hackerone_report(vuln.id)
+				elif hackerone.send_medium and severity_value == 'medium':
+					send_hackerone_report(vuln.id)
+			except Exception as e:
+				logger.warning(f"HackerOne report send failed for vuln {vuln.id}: {e}")
+
+	# Write results to JSON file
+	with open(self.output_path, 'w') as f:
+		json.dump(results, f, indent=4)
+
+	# Send finish notif
+	if send_status:
+		vulns = Vulnerability.objects.filter(scan_history__id=self.scan_id)
+		info_count = vulns.filter(severity=0).count()
+		low_count = vulns.filter(severity=1).count()
+		medium_count = vulns.filter(severity=2).count()
+		high_count = vulns.filter(severity=3).count()
+		critical_count = vulns.filter(severity=4).count()
+		unknown_count = vulns.filter(severity=-1).count()
+		vulnerability_count = info_count + low_count + medium_count + high_count + critical_count + unknown_count
+		fields = {
+			'Total': vulnerability_count,
+			'Critical': critical_count,
+			'High': high_count,
+			'Medium': medium_count,
+			'Low': low_count,
+			'Info': info_count,
+			'Unknown': unknown_count
+		}
+		self.notify(fields=fields)
+
+	if should_fetch_gpt_report and OpenAiAPIKey.objects.all().first():
+		logger.info('Getting Vulnerability GPT Report')
+		vulns = Vulnerability.objects.filter(
+			scan_history__id=self.scan_id
+		).filter(
+			source=NUCLEI
+		).exclude(
+			severity=0
+		)
+		unique_vulns = set()
+		for vuln in vulns:
+			unique_vulns.add((vuln.name, vuln.get_path()))
+
+		unique_vulns = list(unique_vulns)
+
+		import concurrent.futures
+		with concurrent.futures.ThreadPoolExecutor(max_workers=DEFAULT_THREADS) as executor:
+			future_to_gpt = {executor.submit(get_vulnerability_gpt_report, vuln): vuln for vuln in unique_vulns}
+			for future in concurrent.futures.as_completed(future_to_gpt):
+				gpt = future_to_gpt[future]
+				try:
+					future.result()
+				except Exception as e:
+					logger.error(f"Exception for Vulnerability {gpt}: {e}")
+
+	logger.info('Vulnerability scan completed...')
 	return None
 
 def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
@@ -7230,3 +7240,93 @@ def run_apme(self, scan_history_id, ctx={}, description=None):
 	except Exception as exc:
 		logger.error(f"APME: Task failed for scan {scan_history_id}: {exc}", exc_info=True)
 		return {"error": str(exc), "total_paths": 0, "returned_paths": 0, "paths": []}
+
+
+def resume_scan_temporal(scan_id):
+	"""Resume a scan from the last completed task.
+	
+	1. Identifies completed tasks by checking ScanActivity records.
+	2. Spawns MasterScanWorkflow with only the remaining tasks.
+	"""
+	from startScan.models import ScanHistory, ScanActivity
+	from reNgine.definitions import RUNNING_TASK, SUCCESS_TASK, FAILED_TASK, INITIATED_TASK
+	from reNgine.temporal_utils import execute_workflow_async
+	
+	scan = ScanHistory.objects.get(id=scan_id)
+	
+	# Mark old running activities as failed if any
+	scan.scanactivity_set.filter(status__in=[RUNNING_TASK, INITIATED_TASK]).update(status=FAILED_TASK)
+	
+	# Calculate completed tasks
+	completed_activities = scan.scanactivity_set.filter(status=SUCCESS_TASK).values_list('name', flat=True)
+	completed_tasks = set(completed_activities)
+	
+	# Filter the scan's original task list
+	remaining_tasks = [t for t in scan.tasks if t not in completed_tasks]
+	
+	if not remaining_tasks:
+		logger.info(f"Scan {scan_id} has no remaining tasks to resume.")
+		scan.scan_status = SUCCESS_TASK
+		scan.stop_scan_date = timezone.now()
+		scan.save()
+		return
+		
+	# Update scan status and recovery count
+	scan.scan_status = RUNNING_TASK
+	scan.error_message = None
+	scan.recovery_count += 1
+	scan.tasks = remaining_tasks
+	scan.save()
+	
+	# Rebuild ctx
+	yaml_config = yaml.safe_load(scan.scan_type.yaml_configuration)
+	ctx = {
+		'scan_history_id': scan.id,
+		'engine_id': scan.scan_type.id,
+		'domain_id': scan.domain.id,
+		'results_dir': scan.results_dir,
+		'yaml_configuration': yaml_config,
+	}
+	
+	workflow_id = f"master-scan-{scan.id}-run-{scan.recovery_count}"
+	
+	# Append the new workflow ID to the scan
+	workflow_ids = scan.workflow_ids or []
+	workflow_ids.append(workflow_id)
+	scan.workflow_ids = workflow_ids
+	scan.save()
+	
+	# Spawn new MasterScanWorkflow
+	execute_workflow_async(
+		"MasterScanWorkflow",
+		args=[ctx],
+		id=workflow_id,
+		task_queue="python-orchestrator-queue"
+	)
+	logger.info(f"Resumed scan {scan_id} with remaining tasks: {remaining_tasks}")
+
+
+def recover_stuck_scans():
+	"""Recover scans that are stuck in FAILED_TASK state due to a crash.
+	
+	This is called on orchestrator startup. If the scan's recovery_count < 3,
+	it attempts to automatically resume the scan.
+	"""
+	from startScan.models import ScanHistory
+	from reNgine.definitions import FAILED_TASK
+	from django.db.models import Q
+	
+	# Only recover FAILED_TASK scans (crashed). RUNNING_TASK scans might still be
+	# actively running in Temporal, so we leave them alone.
+	stuck_scans = ScanHistory.objects.filter(
+		scan_status=FAILED_TASK,
+		recovery_count__lt=3
+	)
+	
+	for scan in stuck_scans:
+		logger.info(f"Auto-recovering stuck scan {scan.id} (recovery_count: {scan.recovery_count})")
+		try:
+			resume_scan_temporal(scan.id)
+		except Exception as e:
+			logger.error(f"Failed to auto-recover scan {scan.id}: {e}")
+

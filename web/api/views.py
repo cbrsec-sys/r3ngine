@@ -1707,6 +1707,37 @@ class StopScan(APIView):
 		return Response(response)
 
 
+class ResumeScan(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+	def post(self, request):
+		data = request.data
+		scan_id = data.get('scan_id')
+
+		response = {'status': False}
+		if not scan_id:
+			return Response({'status': False, 'message': 'Scan ID required.'})
+
+		try:
+			scan = ScanHistory.objects.get(id=scan_id)
+			if scan.scan_status == SUCCESS_TASK:
+				return Response({'status': False, 'message': 'Scan is already completed.'})
+			
+			from reNgine.tasks import resume_scan_temporal
+			resume_scan_temporal(scan.id)
+			
+			response['status'] = True
+			response['message'] = 'Scan resumption initiated successfully.'
+		except ScanHistory.DoesNotExist:
+			response['message'] = 'Scan not found'
+		except Exception as e:
+			logger.error(f'Error resuming scan {scan_id}: {e}')
+			response['message'] = str(e)
+		
+		return Response(response)
+
+
 class InitiateScan(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_INITATE_SCANS_SUBSCANS
@@ -1799,6 +1830,14 @@ class InitiateSubTask(APIView):
 	permission_required = PERM_INITATE_SCANS_SUBSCANS
 
 	def post(self, request):
+		"""Initiate a set of subscans on one or more subdomains.
+
+		Args:
+			request (HttpRequest): Django HTTP request containing:
+				- engine_id (int): Engine configuration ID to use.
+				- tasks (list[str]): Task names to execute (e.g. 'port_scan', 'fetch_url').
+				- subdomain_ids (list[int]): Subdomain IDs to run subtasks on.
+		"""
 		req = self.request
 		data = req.data
 		engine_id = data.get('engine_id')
@@ -1811,14 +1850,13 @@ class InitiateSubTask(APIView):
 				subdomain_ids = [single]
 		for subdomain_id in subdomain_ids:
 			logger.info(f'Running subscans {scan_types} on subdomain "{subdomain_id}" ...')
-			for stype in scan_types:
-				ctx = {
-					'scan_history_id': None,
-					'subdomain_id': subdomain_id,
-					'scan_type': stype,
-					'engine_id': engine_id
-				}
-				initiate_subscan_temporal(**ctx)
+			ctx = {
+				'scan_history_id': None,
+				'subdomain_id': subdomain_id,
+				'scan_type': scan_types,
+				'engine_id': engine_id
+			}
+			initiate_subscan_temporal(**ctx)
 		return Response({'status': True})
 
 

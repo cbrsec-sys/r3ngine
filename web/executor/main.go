@@ -1,23 +1,28 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"syscall"
 	"time"
+	"sync"
 
+	"github.com/redis/go-redis/v9"
 	"go.temporal.io/sdk/activity"
 	"go.temporal.io/sdk/client"
 	"go.temporal.io/sdk/worker"
 )
 
 type ToolExecutionInput struct {
-	Command []string `json:"command"`
-	ScanID  int      `json:"scan_id"`
+	Command   []string `json:"command"`
+	ScanID    int      `json:"scan_id"`
+	CommandID int      `json:"command_id"`
 }
 
 type ToolExecutionResult struct {
@@ -27,24 +32,41 @@ type ToolExecutionResult struct {
 	TimeTakenS float64 `json:"time_taken_s"`
 }
 
-// SubprocessActivity executes the tool and sends heartbeats back to Temporal
-func SubprocessActivity(ctx context.Context, input ToolExecutionInput) (ToolExecutionResult, error) {
+type RedisLogPayload struct {
+	Line      string `json:"line"`
+	Timestamp string `json:"timestamp"`
+	CommandID int    `json:"command_id"`
+}
+
+type Activities struct {
+	rdb *redis.Client
+}
+
+// SubprocessActivity executes the tool and sends heartbeats back to Temporal, while streaming logs to Redis
+func (a *Activities) SubprocessActivity(ctx context.Context, input ToolExecutionInput) (ToolExecutionResult, error) {
 	activity.GetLogger(ctx).Info("Starting subprocess tool execution", "command", input.Command)
 
 	if len(input.Command) == 0 {
 		return ToolExecutionResult{ExitCode: 1}, fmt.Errorf("empty command")
 	}
 
-	cmd := exec.CommandContext(ctx, input.Command[0], input.Command[1:]...)
+	var cmd *exec.Cmd
+	if len(input.Command) == 1 {
+		cmd = exec.CommandContext(ctx, "/bin/bash", "-c", input.Command[0])
+	} else {
+		cmd = exec.CommandContext(ctx, input.Command[0], input.Command[1:]...)
+	}
 
 	var stdoutBuf, stderrBuf bytes.Buffer
-	
-	// MultiWriter to write to both the buffer and os.Stdout/os.Stderr (so they appear in docker logs)
-	cmd.Stdout = io.MultiWriter(&stdoutBuf, os.Stdout)
-	cmd.Stderr = io.MultiWriter(&stderrBuf, os.Stderr)
+	pr, pw := io.Pipe()
+
+	// MultiWriter to write to both the buffer, the Redis stream pipe, and os.Stdout/os.Stderr
+	cmd.Stdout = io.MultiWriter(&stdoutBuf, pw, os.Stdout)
+	cmd.Stderr = io.MultiWriter(&stderrBuf, pw, os.Stderr)
 
 	start := time.Now()
 	if err := cmd.Start(); err != nil {
+		pw.Close()
 		return ToolExecutionResult{
 			Stderr:   err.Error(),
 			ExitCode: -1,
@@ -67,8 +89,43 @@ func SubprocessActivity(ctx context.Context, input ToolExecutionInput) (ToolExec
 	}()
 	defer close(stopHeartbeat)
 
+	// Goroutine to read from pipe line-by-line and send to Redis stream
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		scanner := bufio.NewScanner(pr)
+		for scanner.Scan() {
+			line := scanner.Text()
+			if a.rdb != nil && input.ScanID > 0 {
+				streamKey := fmt.Sprintf("scan:logs:%d", input.ScanID)
+				payload := RedisLogPayload{
+					Line:      line,
+					Timestamp: time.Now().UTC().Format(time.RFC3339),
+					CommandID: input.CommandID,
+				}
+				jsonBytes, err := json.Marshal(payload)
+				if err == nil {
+					err = a.rdb.XAdd(ctx, &redis.XAddArgs{
+						Stream: streamKey,
+						MaxLen: 1000,
+						Approx: true,
+						Values: map[string]interface{}{
+							"data": string(jsonBytes),
+						},
+					}).Err()
+					if err != nil {
+						activity.GetLogger(ctx).Warn("Failed to publish log to Redis", "error", err)
+					}
+				}
+			}
+		}
+	}()
+
 	// Wait for tool completion
 	err := cmd.Wait()
+	pw.Close() // Trigger EOF for scanner
+	wg.Wait()  // Ensure all logs are read and streamed
 	timeTaken := time.Since(start).Seconds()
 
 	var exitCode int
@@ -99,8 +156,27 @@ func main() {
 		namespace = "default"
 	}
 
+	// Connect to Redis
+	redisURL := os.Getenv("REDIS_URL")
+	if redisURL == "" {
+		redisURL = "redis://redis:6379/0"
+	}
+	var rdb *redis.Client
+	opt, err := redis.ParseURL(redisURL)
+	if err == nil {
+		rdb = redis.NewClient(opt)
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := rdb.Ping(ctx).Err(); err != nil {
+			fmt.Printf("Warning: Failed to ping Redis at %s: %v\n", redisURL, err)
+		} else {
+			fmt.Printf("Connected to Redis at %s\n", redisURL)
+		}
+	} else {
+		fmt.Printf("Warning: Failed to parse Redis URL %s: %v\n", redisURL, err)
+	}
+
 	var c client.Client
-	var err error
 	maxRetries := 30
 	retryInterval := 2 * time.Second
 
@@ -122,8 +198,10 @@ func main() {
 
 	w := worker.New(c, "go-executor-queue", worker.Options{})
 
+	activities := &Activities{rdb: rdb}
+
 	// Register subprocess command worker activity
-	w.RegisterActivityWithOptions(SubprocessActivity, activity.RegisterOptions{
+	w.RegisterActivityWithOptions(activities.SubprocessActivity, activity.RegisterOptions{
 		Name: "RunToolSubprocessActivity",
 	})
 
