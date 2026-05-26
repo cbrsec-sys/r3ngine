@@ -317,14 +317,19 @@ class AtomicInstaller:
                     except Exception as e:
                         logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
 
-                # 7. Copy UI assets to MEDIA_ROOT
+                # 7. Copy built UI assets (ui/dist/ only) to MEDIA_ROOT
                 if os.path.exists(media_plugin_dir):
                     shutil.rmtree(media_plugin_dir)
-                
-                ui_src = os.path.join(final_dir, 'ui')
-                if os.path.exists(ui_src):
-                    os.makedirs(media_plugin_dir, exist_ok=True)
-                    shutil.copytree(ui_src, os.path.join(media_plugin_dir, 'ui'))
+
+                ui_dist_src = os.path.join(final_dir, 'ui', 'dist')
+                if os.path.exists(ui_dist_src):
+                    media_ui_target = os.path.join(media_plugin_dir, 'ui')
+                    shutil.copytree(ui_dist_src, media_ui_target)
+                else:
+                    logger.warning(
+                        f"No ui/dist/ found for {plugin_slug}. "
+                        "UI unavailable until plugin is built and re-installed."
+                    )
                 
                 # 8. Cleanup backups on success
                 if backup_fs_dir and os.path.exists(backup_fs_dir):
