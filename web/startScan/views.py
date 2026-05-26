@@ -1,6 +1,7 @@
 import markdown
 import requests
 import logging
+import os
 import threading
 from django.conf import settings
 
@@ -833,7 +834,20 @@ def fetch_exploit_source(request, id):
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def delete_all_scan_results(request):
     if request.method == 'POST':
-        ScanHistory.objects.all().delete()
+        from reNgine.utils.scan_cancellation import abort_scan_history
+        scans = list(ScanHistory.objects.all())
+        for scan in scans:
+            try:
+                abort_scan_history(scan)
+            except Exception:
+                pass
+            try:
+                if scan.results_dir and os.path.exists(scan.results_dir):
+                    import shutil
+                    shutil.rmtree(scan.results_dir)
+            except Exception:
+                pass
+            scan.delete()
         messageData = {'status': 'true'}
         messages.add_message(
             request,
