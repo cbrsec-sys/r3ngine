@@ -69,6 +69,7 @@ class TemporalTaskProxy:
         self.domain_id = ctx.get('domain_id')
         self.subdomain_id = ctx.get('subdomain_id')
         self.results_dir = ctx.get('results_dir', RENGINE_RESULTS)
+        os.makedirs(self.results_dir, exist_ok=True)
         self.yaml_configuration = ctx.get('yaml_configuration', {})
         self.out_of_scope_subdomains = ctx.get('out_of_scope_subdomains', [])
         self.starting_point_path = ctx.get('starting_point_path', '')
@@ -1921,3 +1922,53 @@ def finalize_failed_scan_activity(ctx: dict, error_msg: str) -> None:
         scan.scanactivity_set.filter(status=0).update(status=FAILED_TASK, error_message=scan.error_message)
     except Exception as e:
         logger.error(f"Failed to finalize crashed scan {scan_id}: {e}")
+
+
+@activity.defn(name="RunLlmApmeActivity")
+def run_llm_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
+    from apme.apme_tasks import run_llm_apme
+    from reNgine.job_tracker import update_job
+    
+    update_job(job_id, "RUNNING", 10, "Initializing LLM Attack Path modeling...") if job_id else None
+    try:
+        result = run_llm_apme(None, scan_history_id)
+        if result.get("status") == "success":
+            update_job(job_id, "SUCCESS", 100, "Attack Path Modeling completed.", result) if job_id else None
+        else:
+            update_job(job_id, "FAILED", 100, f"Failed: {result.get('error')}", result) if job_id else None
+        return result
+    except Exception as e:
+        update_job(job_id, "FAILED", 100, f"Error: {str(e)}") if job_id else None
+        raise
+
+
+@activity.defn(name="EnrichIdentitiesActivity")
+def enrich_identities_activity(identity: str, identity_type: str, scan_history_id: int, ctx: dict) -> str:
+    from reNgine.osint_tasks import enrich_identities_task
+    # Run synchronously inside the Django threadpool executor worker
+    return enrich_identities_task(identity, identity_type, scan_history_id, ctx)
+
+
+@activity.defn(name="GeoLocalizeActivity")
+def geo_localize_activity(host: str, ip_id: int, scan_id: int = None, activity_id: int = None) -> None:
+    from reNgine.tasks import geo_localize
+    geo_localize(host, ip_id=ip_id, scan_id=scan_id, activity_id=activity_id)
+
+
+@activity.defn(name="ImportHackerOneProgramsActivity")
+def import_hackerone_programs_activity(handles: list, project_slug: str, is_sync: bool = False) -> None:
+    from api.shared_api_tasks import import_hackerone_programs_task
+    import_hackerone_programs_task(handles, project_slug, is_sync=is_sync)
+
+
+@activity.defn(name="SyncBookmarkedProgramsActivity")
+def sync_bookmarked_programs_activity(project_slug: str) -> None:
+    from api.shared_api_tasks import sync_bookmarked_programs_task
+    sync_bookmarked_programs_task(project_slug)
+
+
+@activity.defn(name="FetchProxiesActivity")
+def fetch_proxies_activity(limit: int, job_id: str) -> None:
+    from reNgine.tasks import fetch_proxies_task
+    fetch_proxies_task(limit=limit, job_id=job_id)
+

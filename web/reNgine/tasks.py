@@ -2229,7 +2229,9 @@ def port_scan(self, hosts=[], ctx={}, description=None, prepare_only=False, pars
 		# Add IP DB
 		ip, _ = save_ip_address(ip_address, subdomain, subscan=self.subscan, scan_id=self.scan_id, activity_id=self.activity_id)
 		if self.subscan:
-			ip.ip_subscan_ids.add(self.subscan)
+			from startScan.models import SubScan
+			if SubScan.objects.filter(pk=self.subscan.pk).exists():
+				ip.ip_subscan_ids.add(self.subscan)
 			ip.save()
 
 		# Add endpoint to DB
@@ -5865,7 +5867,9 @@ def save_endpoint(
 				logger.error(f"Error registering AuthCandidate from endpoint {http_url}: {e}")
 		subscan_id = ctx.get('subscan_id')
 		if subscan_id:
-			endpoint.endpoint_subscan_ids.add(subscan_id)
+			from startScan.models import SubScan
+			if SubScan.objects.filter(pk=subscan_id).exists():
+				endpoint.endpoint_subscan_ids.add(subscan_id)
 			endpoint.save()
 
 	return endpoint, created
@@ -5914,9 +5918,11 @@ def save_subdomain(subdomain_name, ctx={}):
 	if created:
 		# logger.warning(f'Found new subdomain {subdomain_name}')
 		subdomain.discovered_date = timezone.now()
-		if subscan_id:
-			subdomain.subdomain_subscan_ids.add(subscan_id)
 		subdomain.save()
+		if subscan_id:
+			from startScan.models import SubScan
+			if SubScan.objects.filter(pk=subscan_id).exists():
+				subdomain.subdomain_subscan_ids.add(subscan_id)
 	return subdomain, created
 
 
@@ -5931,12 +5937,23 @@ def save_ip_address(ip_address, subdomain=None, subscan=None, scan_id=None, acti
 
 	# Trigger geo localization if newly created OR if geo_iso is null
 	if created or ip.geo_iso is None:
-		import threading as _threading
-		_threading.Thread(
-			target=geo_localize,
-			kwargs=dict(host=ip_address, ip_id=ip.id, scan_id=scan_id, activity_id=activity_id),
-			daemon=True
-		).start()
+		from reNgine.temporal_client import TemporalClientProvider
+		import asyncio
+		async def _start():
+			client = await TemporalClientProvider.get_client()
+			await client.start_workflow(
+				"GeoLocalizeWorkflow",
+				args=[ip_address, ip.id, scan_id, activity_id],
+				id=f"geo-localize-{ip.id}-{int(timezone.now().timestamp())}",
+				task_queue="python-orchestrator-queue"
+			)
+		loop = asyncio.new_event_loop()
+		try:
+			loop.run_until_complete(_start())
+		except Exception as e:
+			logger.warning(f"Failed to start GeoLocalizeWorkflow for IP {ip_address} in scan {scan_id}: {e}")
+		finally:
+			loop.close()
 
 	# Set extra attributes
 	for key, value in kwargs.items():
@@ -7248,9 +7265,8 @@ def resume_scan_temporal(scan_id):
 	1. Identifies completed tasks by checking ScanActivity records.
 	2. Spawns MasterScanWorkflow with only the remaining tasks.
 	"""
-	from startScan.models import ScanHistory, ScanActivity
-	from reNgine.definitions import RUNNING_TASK, SUCCESS_TASK, FAILED_TASK, INITIATED_TASK
-	from reNgine.temporal_utils import execute_workflow_async
+	from reNgine.temporal_client import TemporalClientProvider
+	import asyncio
 	
 	scan = ScanHistory.objects.get(id=scan_id)
 	
@@ -7297,12 +7313,33 @@ def resume_scan_temporal(scan_id):
 	scan.save()
 	
 	# Spawn new MasterScanWorkflow
-	execute_workflow_async(
-		"MasterScanWorkflow",
-		args=[ctx],
-		id=workflow_id,
-		task_queue="python-orchestrator-queue"
+	async def _start():
+		client = await TemporalClientProvider.get_client()
+		await client.start_workflow(
+			"MasterScanWorkflow",
+			args=[ctx],
+			id=workflow_id,
+			task_queue="python-orchestrator-queue"
+		)
+	
+	loop = asyncio.new_event_loop()
+	try:
+		loop.run_until_complete(_start())
+	finally:
+		loop.close()
+
+	# Track workflow execution so cancel_workflow can find it
+	from startScan.models import TemporalWorkflowExecution
+	TemporalWorkflowExecution.objects.get_or_create(
+		workflow_id=workflow_id,
+		defaults={
+			'scan_history': scan,
+			'run_id': workflow_id,
+			'workflow_type': 'MasterScanWorkflow',
+			'status': 'RUNNING',
+		}
 	)
+	
 	logger.info(f"Resumed scan {scan_id} with remaining tasks: {remaining_tasks}")
 
 

@@ -148,9 +148,8 @@ class TestTemporalOrchestration(TestCase):
         
         # Verify arguments passed to SubScanWorkflow
         workflow_args = kwargs['args']
-        self.assertEqual(len(workflow_args), 2)
-        temporal_ctx, scan_type = workflow_args
-        self.assertEqual(scan_type, 'port_scan')
+        temporal_ctx, scan_types = workflow_args
+        self.assertEqual(scan_types, ['port_scan'])
 
         # Verify SubScan DB entry has correct status and workflow ID stored in workflow_ids
         subscan = SubScan.objects.filter(subdomain=subdomain).first()

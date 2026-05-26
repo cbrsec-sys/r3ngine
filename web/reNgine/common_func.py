@@ -654,8 +654,11 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, **
 
 	# Save subscan id in vuln object
 	if subscan:
-		vuln.vuln_subscan_ids.add(subscan)
-		vuln.save()
+		from startScan.models import SubScan
+		subscan_pk = subscan.pk if hasattr(subscan, 'pk') else subscan
+		if SubScan.objects.filter(pk=subscan_pk).exists():
+			vuln.vuln_subscan_ids.add(subscan)
+			vuln.save()
 
 	return vuln, created
 

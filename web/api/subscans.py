@@ -33,8 +33,15 @@ class SubScanViewSet(viewsets.ModelViewSet):
         if not ids:
             return Response({'status': False, 'message': 'No IDs provided'}, status=status.HTTP_400_BAD_REQUEST)
         
+        from reNgine.temporal_client import TemporalClientProvider
         subscans = SubScan.objects.filter(id__in=ids)
         for subscan in subscans:
+            if subscan.workflow_ids:
+                for wf_id in subscan.workflow_ids:
+                    try:
+                        TemporalClientProvider.cancel_workflow(wf_id)
+                    except Exception:
+                        pass
             subscan.status = ABORTED_TASK
             subscan.stop_scan_date = timezone.now()
             subscan.save()

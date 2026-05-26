@@ -61,6 +61,12 @@ from reNgine.temporal_workflows import (
     ScheduledScanWorkflow,
     MonitoringWorkflow,
     GoExecutorTaskWorkflow,
+    ApmeTaskWorkflow,
+    IdentityEnrichmentWorkflow,
+    GeoLocalizeWorkflow,
+    HackerOneImportWorkflow,
+    HackerOneSyncBookmarkedWorkflow,
+    ProxyFetchWorkflow,
 )
 
 # Activities (all Python-side activities are registered here)
@@ -129,6 +135,12 @@ from reNgine.temporal_activities import (
     # Scheduled scan setup
     setup_scheduled_scan_activity,
     run_monitoring_check_activity,
+    run_llm_apme_activity,
+    enrich_identities_activity,
+    geo_localize_activity,
+    import_hackerone_programs_activity,
+    sync_bookmarked_programs_activity,
+    fetch_proxies_activity,
 )
 
 
@@ -317,6 +329,14 @@ class Command(BaseCommand):
 
                 # Domain monitoring (Phase 4D)
                 run_monitoring_check_activity,
+                
+                # New utility / integration activities
+                run_llm_apme_activity,
+                enrich_identities_activity,
+                geo_localize_activity,
+                import_hackerone_programs_activity,
+                sync_bookmarked_programs_activity,
+                fetch_proxies_activity,
             ]
 
             # -------------------------------------------------------------------
@@ -330,11 +350,11 @@ class Command(BaseCommand):
                 plugin_activities = await sync_to_async(PluginTemporalRegistry.get_all_plugin_activities)()
                 
                 # Append to existing
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow] + plugin_workflows
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow] + plugin_workflows
                 all_activities.extend(plugin_activities)
             except Exception as e:
                 logger.error(f"Failed to load dynamic plugin temporal exports: {e}")
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow]
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow]
 
             # -------------------------------------------------------------------
             # Start the Temporal Worker

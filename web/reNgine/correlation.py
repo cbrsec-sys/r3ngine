@@ -32,10 +32,64 @@ class VulnerabilityCorrelationEngine:
             
         vulns = Vulnerability.objects.filter(query).prefetch_related('cve_ids', 'cwe_ids')
         
-        for vuln in vulns:
-            self._process_single_vuln(vuln)
+        # In-memory prefetch optimization for duplicate findings search (L90)
+        subdomain_ids = {v.subdomain_id for v in vulns if v.subdomain_id}
+        subdomain_cve_map = {}
+        if subdomain_ids:
+            all_subdomain_vulns = Vulnerability.objects.filter(
+                subdomain_id__in=subdomain_ids
+            ).prefetch_related('cve_ids')
+            for v in all_subdomain_vulns:
+                if not v.subdomain_id:
+                    continue
+                for cve in v.cve_ids.all():
+                    key = (v.subdomain_id, cve.name)
+                    if key not in subdomain_cve_map:
+                        subdomain_cve_map[key] = []
+                    subdomain_cve_map[key].append(v)
 
-    def _process_single_vuln(self, vuln):
+        # In-memory prefetch optimization for ImpactAssessment records
+        vuln_ids = [v.id for v in vulns]
+        from startScan.models import ImpactAssessment
+        existing_assessments = ImpactAssessment.objects.filter(vulnerability_id__in=vuln_ids)
+        
+        assessments_by_vuln = {}
+        for assessment in existing_assessments:
+            if assessment.vulnerability_id not in assessments_by_vuln:
+                assessments_by_vuln[assessment.vulnerability_id] = []
+            assessments_by_vuln[assessment.vulnerability_id].append(assessment)
+
+        # Batch accumulators to minimize write database hits
+        vulns_to_update = []
+        assessments_to_create = []
+        assessments_to_update = []
+        assessment_ids_to_delete = []
+        
+        for vuln in vulns:
+            self._process_single_vuln(
+                vuln,
+                subdomain_cve_map=subdomain_cve_map,
+                assessments_by_vuln=assessments_by_vuln,
+                vulns_to_update=vulns_to_update,
+                assessments_to_create=assessments_to_create,
+                assessments_to_update=assessments_to_update,
+                assessment_ids_to_delete=assessment_ids_to_delete
+            )
+
+        # Perform bulk write operations
+        if vulns_to_update:
+            Vulnerability.objects.bulk_update(vulns_to_update, ['correlation_score', 'validation_status'])
+            
+        if assessment_ids_to_delete:
+            ImpactAssessment.objects.filter(id__in=assessment_ids_to_delete).delete()
+            
+        if assessments_to_create:
+            ImpactAssessment.objects.bulk_create(assessments_to_create)
+            
+        if assessments_to_update:
+            ImpactAssessment.objects.bulk_update(assessments_to_update, ['potential_attack_chain', 'scan_history', 'subdomain'])
+
+    def _process_single_vuln(self, vuln, subdomain_cve_map, assessments_by_vuln, vulns_to_update, assessments_to_create, assessments_to_update, assessment_ids_to_delete):
         """
         Calculates the correlation score for a single vulnerability based on multi-tool evidence.
         """
@@ -46,14 +100,14 @@ class VulnerabilityCorrelationEngine:
         score += severity_score * self.weights['severity']
         
         # 2. Multi-Tool Match (SCA vs DAST vs SAST)
-        match_boost, tools = self._calculate_tool_match_boost(vuln)
+        match_boost, tools = self._calculate_tool_match_boost(vuln, subdomain_cve_map)
         score += match_boost * self.weights['multi_tool_match']
         
-        # 3. Exploitability (Check CISA KEV)
+        # 3. Exploitability (Check CISA KEV - Optimized using in-memory list instead of filter)
         exploit_score = 0.5
         if vuln.exploit_url:
             exploit_score = 1.0
-        elif vuln.cve_ids.filter(is_cisa_kev=True).exists():
+        elif any(cve.is_cisa_kev for cve in vuln.cve_ids.all()):
             exploit_score = 1.0
             logger.info(f"Vulnerability {vuln.id} ({vuln.name}) boosted due to CISA KEV status.")
         
@@ -72,25 +126,36 @@ class VulnerabilityCorrelationEngine:
         if vuln.correlation_score > 85 and vuln.validation_status == 'unverified':
             vuln.validation_status = 'verified'
             
-        vuln.save()
+        vulns_to_update.append(vuln)
         
         # Generate Potential Attack Chain
-        self._generate_attack_chain(vuln, tools)
+        self._generate_attack_chain(
+            vuln,
+            tools,
+            assessments_by_vuln=assessments_by_vuln,
+            assessments_to_create=assessments_to_create,
+            assessments_to_update=assessments_to_update,
+            assessment_ids_to_delete=assessment_ids_to_delete
+        )
 
-    def _calculate_tool_match_boost(self, vuln):
+    def _calculate_tool_match_boost(self, vuln, subdomain_cve_map):
         """
-        Checks if other tools confirmed this finding.
+        Checks if other tools confirmed this finding (Optimized using in-memory map instead of query loop).
         Returns (boost_score, list_of_tools)
         """
         tools = ['Nuclei'] # Default
         boost = 0.5
         cve_ids = list(vuln.cve_ids.values_list('name', flat=True))
         
-        # Find other vulnerabilities on the same asset with same identifiers
-        other_findings = Vulnerability.objects.filter(
-            subdomain=vuln.subdomain,
-            cve_ids__name__in=cve_ids
-        ).exclude(id=vuln.id)
+        other_findings = []
+        if vuln.subdomain_id:
+            seen_ids = set()
+            for name in cve_ids:
+                key = (vuln.subdomain_id, name)
+                for other in subdomain_cve_map.get(key, []):
+                    if other.id != vuln.id and other.id not in seen_ids:
+                        other_findings.append(other)
+                        seen_ids.add(other.id)
         
         for other in other_findings:
             tool_name = self._infer_tool_name(other)
@@ -111,9 +176,9 @@ class VulnerabilityCorrelationEngine:
         if 'nuclei' in name: return 'Nuclei'
         return 'Other'
 
-    def _generate_attack_chain(self, vuln, tools):
+    def _generate_attack_chain(self, vuln, tools, assessments_by_vuln, assessments_to_create, assessments_to_update, assessment_ids_to_delete):
         """
-        Populates the potential_attack_chain in ImpactAssessment.
+        Populates the potential_attack_chain in ImpactAssessment (Optimized using in-memory batch maps).
         """
         from startScan.models import ImpactAssessment
         
@@ -134,46 +199,34 @@ class VulnerabilityCorrelationEngine:
         
         chain['steps'].append({'phase': 'Post-Exploitation', 'description': "Pivot to internal network or access sensitive data"})
         
-        # Check if an APME path already exists to avoid overwriting it with a generic heuristic.
-        # Use filter() instead of get() to safely handle the case where multiple ImpactAssessment
-        # rows exist for the same vulnerability (can occur when APME and correlation both create rows).
-        existing_qs = ImpactAssessment.objects.filter(vulnerability=vuln)
-        existing = existing_qs.order_by('-updated_at').first()
+        existing_list = assessments_by_vuln.get(vuln.id, [])
+        if existing_list:
+            existing_list.sort(key=lambda x: x.updated_at or x.id, reverse=True)
+        existing = existing_list[0] if existing_list else None
+        
         if existing and existing.potential_attack_chain and 'apme_path_id' in existing.potential_attack_chain:
             logger.info(f"Correlation: Skipping heuristic chain for vuln {vuln.id}, APME path already exists.")
             return
 
-        # Deduplicate: if more than one row exists for this vulnerability, delete the extras
-        # keeping only the most recent. This handles pre-existing duplicates without crashing.
-        if existing_qs.count() > 1:
+        # Deduplicate
+        if len(existing_list) > 1:
             logger.warning(
-                f"Correlation: Found {existing_qs.count()} ImpactAssessment rows for vuln {vuln.id}. "
+                f"Correlation: Found {len(existing_list)} ImpactAssessment rows for vuln {vuln.id}. "
                 f"Deduplicating — keeping most recent record."
             )
-            # Keep the most recent record, delete all others
-            ids_to_delete = existing_qs.order_by('-updated_at').values_list('id', flat=True)[1:]
-            ImpactAssessment.objects.filter(id__in=list(ids_to_delete)).delete()
+            assessment_ids_to_delete.extend([x.id for x in existing_list[1:]])
 
-        # Now safely perform an update-or-create using the single canonical record
+        # Safely perform updates/creates via batch lists
         if existing:
             existing.potential_attack_chain = chain
             existing.scan_history = self.scan_history
             existing.subdomain = vuln.subdomain
-            existing.save()
+            assessments_to_update.append(existing)
         else:
-            try:
-                ImpactAssessment.objects.create(
-                    vulnerability=vuln,
-                    potential_attack_chain=chain,
-                    scan_history=self.scan_history,
-                    subdomain=vuln.subdomain
-                )
-            except IntegrityError:
-                # Handle concurrent creation by another task to prevent unique violation IntegrityError
-                logger.warning(f"Correlation: ImpactAssessment for vuln {vuln.id} was created concurrently. Updating instead.")
-                ImpactAssessment.objects.filter(vulnerability=vuln).update(
-                    potential_attack_chain=chain,
-                    scan_history=self.scan_history,
-                    subdomain=vuln.subdomain
-                )
-
+            assessment = ImpactAssessment(
+                vulnerability=vuln,
+                potential_attack_chain=chain,
+                scan_history=self.scan_history,
+                subdomain=vuln.subdomain
+            )
+            assessments_to_create.append(assessment)

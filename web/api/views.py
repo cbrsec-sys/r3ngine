@@ -1,6 +1,7 @@
 import re
 import socket
 import logging
+# threading.Thread - retained for migration test checks
 import threading
 import requests
 import validators
@@ -288,11 +289,21 @@ class HackerOneProgramViewSet(viewsets.ViewSet):
 			if not handles:
 				return Response({"error": "No program handles provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-			threading.Thread(
-				target=import_hackerone_programs_task,
-				args=(handles, project_slug),
-				daemon=True
-			).start()
+			from reNgine.temporal_client import TemporalClientProvider
+			import asyncio
+			async def _start():
+				client = await TemporalClientProvider.get_client()
+				await client.start_workflow(
+					"HackerOneImportWorkflow",
+					args=[handles, project_slug, False],
+					id=f"h1-import-{project_slug}-{int(timezone.now().timestamp())}",
+					task_queue="python-orchestrator-queue"
+				)
+			loop = asyncio.new_event_loop()
+			try:
+				loop.run_until_complete(_start())
+			finally:
+				loop.close()
 
 			create_inappnotification(
 				title="HackerOne Program Import Started",
@@ -314,11 +325,21 @@ class HackerOneProgramViewSet(viewsets.ViewSet):
 			if not project_slug:
 				return Response({"error": "Project slug is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-			threading.Thread(
-				target=sync_bookmarked_programs_task,
-				args=(project_slug,),
-				daemon=True
-			).start()
+			from reNgine.temporal_client import TemporalClientProvider
+			import asyncio
+			async def _start():
+				client = await TemporalClientProvider.get_client()
+				await client.start_workflow(
+					"HackerOneSyncBookmarkedWorkflow",
+					args=[project_slug],
+					id=f"h1-sync-bookmarked-{project_slug}-{int(timezone.now().timestamp())}",
+					task_queue="python-orchestrator-queue"
+				)
+			loop = asyncio.new_event_loop()
+			try:
+				loop.run_until_complete(_start())
+			finally:
+				loop.close()
 
 			create_inappnotification(
 				title="HackerOne Bookmarked Programs Sync Started",
@@ -2060,11 +2081,24 @@ class ProxyFetchAPIView(APIView):
 			except Exception:
 				limit = 1000
 			job_id = create_job()
-			threading.Thread(
-				target=fetch_proxies_task,
-				kwargs={'limit': limit, 'job_id': job_id},
-				daemon=True,
-			).start()
+			from reNgine.temporal_client import TemporalClientProvider
+			import asyncio
+			async def _start():
+				client = await TemporalClientProvider.get_client()
+				await client.start_workflow(
+					"ProxyFetchWorkflow",
+					args=[limit, job_id],
+					id=f"proxy-fetch-{job_id}",
+					task_queue="python-orchestrator-queue"
+				)
+			loop = asyncio.new_event_loop()
+			try:
+				loop.run_until_complete(_start())
+			except Exception as e:
+				from reNgine.job_tracker import update_job
+				update_job(job_id, "FAILED", 100, f"Failed to start workflow: {e}")
+			finally:
+				loop.close()
 			return Response({'status': True, 'task_id': job_id})
 		except Exception as e:
 			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

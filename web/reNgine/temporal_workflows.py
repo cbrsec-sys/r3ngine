@@ -1309,3 +1309,94 @@ class GoExecutorTaskWorkflow:
             heartbeat_timeout=timedelta(minutes=5),
             task_queue="go-executor-queue"
         )
+
+
+@workflow.defn(name="ApmeTaskWorkflow")
+class ApmeTaskWorkflow:
+    """Workflow to execute LLM Attack Path modeling on scan findings."""
+
+    @workflow.run
+    async def run(self, scan_history_id: int, job_id: str = None) -> dict:
+        return await workflow.execute_activity(
+            "RunLlmApmeActivity",
+            args=[scan_history_id, job_id],
+            start_to_close_timeout=timedelta(hours=1),
+            retry_policy=_RETRY_LLM,
+            task_queue="python-orchestrator-queue",
+        )
+
+
+@workflow.defn(name="IdentityEnrichmentWorkflow")
+class IdentityEnrichmentWorkflow:
+    """Workflow to run identity (names and emails) enrichment OSINT tools."""
+
+    @workflow.run
+    async def run(self, identity: str, identity_type: str, scan_history_id: int, ctx: dict = None) -> str:
+        return await workflow.execute_activity(
+            "EnrichIdentitiesActivity",
+            args=[identity, identity_type, scan_history_id, ctx or {}],
+            start_to_close_timeout=timedelta(hours=2),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+
+
+@workflow.defn(name="GeoLocalizeWorkflow")
+class GeoLocalizeWorkflow:
+    """Workflow to run geolocation lookup for discovered IP addresses."""
+
+    @workflow.run
+    async def run(self, host: str, ip_id: int, scan_id: int = None, activity_id: int = None) -> None:
+        await workflow.execute_activity(
+            "GeoLocalizeActivity",
+            args=[host, ip_id, scan_id, activity_id],
+            start_to_close_timeout=timedelta(minutes=5),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+
+
+@workflow.defn(name="HackerOneImportWorkflow")
+class HackerOneImportWorkflow:
+    """Workflow to import program scopes from HackerOne."""
+
+    @workflow.run
+    async def run(self, handles: list, project_slug: str, is_sync: bool = False) -> None:
+        await workflow.execute_activity(
+            "ImportHackerOneProgramsActivity",
+            args=[handles, project_slug, is_sync],
+            start_to_close_timeout=timedelta(hours=4),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+
+
+@workflow.defn(name="HackerOneSyncBookmarkedWorkflow")
+class HackerOneSyncBookmarkedWorkflow:
+    """Workflow to sync bookmarked programs from HackerOne."""
+
+    @workflow.run
+    async def run(self, project_slug: str) -> None:
+        await workflow.execute_activity(
+            "SyncBookmarkedProgramsActivity",
+            args=[project_slug],
+            start_to_close_timeout=timedelta(hours=4),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+
+
+@workflow.defn(name="ProxyFetchWorkflow")
+class ProxyFetchWorkflow:
+    """Workflow to fetch and validate proxy lists."""
+
+    @workflow.run
+    async def run(self, limit: int, job_id: str) -> None:
+        await workflow.execute_activity(
+            "FetchProxiesActivity",
+            args=[limit, job_id],
+            start_to_close_timeout=timedelta(hours=1),
+            retry_policy=_RETRY_NETWORK_SCAN,
+            task_queue="python-orchestrator-queue",
+        )
+
