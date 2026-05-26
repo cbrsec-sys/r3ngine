@@ -11,6 +11,8 @@
   - Configured Django `pre_delete` signals on `ScanHistory` and `SubScan` to cleanly cancel associated workflows in Temporal and cleanup directories on disk.
   - Wrapped `UserPreferences` middleware lookup inside a `SimpleLazyObject` to prevent redundant queries on static asset requests.
   - Fixed subscan `bulk_stop` cancellation to correctly cancel workflows in Temporal.
+  - Upgraded `temporalio` Python SDK dependency to version `1.7.0` to resolve `Ignoring add command while deleting` eviction failures incorrectly logging as workflow crashes.
+
 
 - **Subscan Tiered Execution Steps Alignment**:
   - Refactored `SubScanWorkflow` to group and execute subdomain subscans in sequence-enforced execution tiers (Discovery -> HTTP Crawl & Port Scan -> URL Fetching -> Fuzzing -> Analysis -> Security Assessment), strictly mirroring the main scan (`MasterScanWorkflow`).
