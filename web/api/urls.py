@@ -309,6 +309,10 @@ urlpatterns = [
         StopScan.as_view(),
         name='stop_scan'),
     path(
+        'action/resume/scan/',
+        ResumeScan.as_view(),
+        name='resume_scan'),
+    path(
         'fetch/results/subscan/',
         FetchSubscanResults.as_view(),
         name='fetch_subscan_results'),

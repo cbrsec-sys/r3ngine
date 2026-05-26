@@ -43,6 +43,7 @@ class ScanHistory(models.Model):
 	stop_scan_date = models.DateTimeField(null=True, blank=True)
 	used_gf_patterns = models.CharField(max_length=500, null=True, blank=True)
 	error_message = models.CharField(max_length=300, blank=True, null=True)
+	recovery_count = models.IntegerField(default=0)
 	emails = models.ManyToManyField('Email', related_name='emails', blank=True)
 	employees = models.ManyToManyField('Employee', related_name='employees', blank=True)
 	buckets = models.ManyToManyField('S3Bucket', related_name='buckets', blank=True)

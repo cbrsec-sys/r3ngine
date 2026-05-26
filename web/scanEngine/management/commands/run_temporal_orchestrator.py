@@ -60,12 +60,14 @@ from reNgine.temporal_workflows import (
     StartupSyncWorkflow,
     ScheduledScanWorkflow,
     MonitoringWorkflow,
+    GoExecutorTaskWorkflow,
 )
 
 # Activities (all Python-side activities are registered here)
 from reNgine.temporal_activities import (
     run_generic_task_activity,
     finalize_subscan_activity,
+    finalize_failed_scan_activity,
     # Step 0: Target Profiling & backward-compat checkpoint stubs
     load_checkpoint_activity,
     save_checkpoint_activity,
@@ -134,6 +136,7 @@ _STARTUP_SYNC_TASKS = [
     "sync_all_scans_to_graph",
     "sync_cisa_kev_catalog",
     "sync_semgrep_rules",
+    "recover_stuck_scans",
 ]
 
 
@@ -249,6 +252,7 @@ class Command(BaseCommand):
                 # Generic & Dynamic
                 run_generic_task_activity,
                 finalize_subscan_activity,
+                finalize_failed_scan_activity,
 
                 # Step 0
                 load_checkpoint_activity,
@@ -316,19 +320,21 @@ class Command(BaseCommand):
             ]
 
             # -------------------------------------------------------------------
+            # -------------------------------------------------------------------
             # Load dynamic plugins from the Temporal Registry
             # -------------------------------------------------------------------
+            from asgiref.sync import sync_to_async
             from plugins.temporal_registry import PluginTemporalRegistry
             try:
-                plugin_workflows = PluginTemporalRegistry.get_all_plugin_workflows()
-                plugin_activities = PluginTemporalRegistry.get_all_plugin_activities()
+                plugin_workflows = await sync_to_async(PluginTemporalRegistry.get_all_plugin_workflows)()
+                plugin_activities = await sync_to_async(PluginTemporalRegistry.get_all_plugin_activities)()
                 
                 # Append to existing
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow] + plugin_workflows
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow] + plugin_workflows
                 all_activities.extend(plugin_activities)
             except Exception as e:
                 logger.error(f"Failed to load dynamic plugin temporal exports: {e}")
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow]
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow]
 
             # -------------------------------------------------------------------
             # Start the Temporal Worker

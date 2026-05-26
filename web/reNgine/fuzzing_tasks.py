@@ -50,7 +50,7 @@ from startScan.models import DirectoryScan, DirectoryFile, Subdomain
 logger = logging.getLogger(__name__)
 
 
-def dir_file_fuzz(self, ctx=None, description=None):
+def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_only=None):
 	"""Perform directory and file fuzzing using FFUF and Dirsearch.
 
 	This wrapper ensures that any endpoints are crawled first by delegating to
@@ -66,7 +66,7 @@ def dir_file_fuzz(self, ctx=None, description=None):
 	if ctx is None:
 		ctx = {}
 
-	def _execute_dir_file_fuzz(ctx, description):
+	def _execute_dir_file_fuzz(ctx, description, prepare_only=False, parse_only=None):
 		"""Inner execution logic for FFUF and Dirsearch fuzzing.
 
 		Args:
@@ -160,42 +160,53 @@ def dir_file_fuzz(self, ctx=None, description=None):
 			if 'cookie' in header.lower() or 'authorization' in header.lower():
 				logger.warning(f'Authenticated Dirsearch fuzzing enabled via header: {header}')
 
-		# Grab URLs to fuzz
-		raw_urls = get_http_urls(
-			is_alive=True,
-			ignore_files=False,
-			write_filepath=input_path,
-			get_only_default_urls=False,
-			ctx=ctx
-		)
-		if not raw_urls:
-			logger.error('No alive URLs found for directory fuzzing. Skipping.')
-			return []
-			
-		# Group by base_url and extract unique directories up to depth 2
-		base_url_map = {}
-		for u in raw_urls:
-			parsed = urlparse(u)
-			base = f"{parsed.scheme}://{parsed.netloc}"
-			if base not in base_url_map:
-				base_url_map[base] = set()
+		if ctx.get("urls_override"):
+			urls = ctx["urls_override"]
+		else:
+			# Grab URLs to fuzz
+			raw_urls = get_http_urls(
+				is_alive=True,
+				ignore_files=False,
+				write_filepath=input_path,
+				get_only_default_urls=False,
+				ctx=ctx
+			)
+			if not raw_urls:
+				logger.error('No alive URLs found for directory fuzzing. Skipping.')
+				return []
 				
-			path = parsed.path
-			if path and '.' in path.split('/')[-1]:
-				path = '/'.join(path.split('/')[:-1])
-			if not path.endswith('/'):
-				path += '/'
-				
-			segments = [s for s in path.strip('/').split('/') if s]
-			if len(segments) <= 2:
-				base_url_map[base].add(path)
-				
-		urls = []
-		for base, paths in base_url_map.items():
-			for path in list(paths)[:10]:
-				urls.append(f"{base}{path}")
+			# Group by base_url and extract unique directories up to depth 2
+			base_url_map = {}
+			for u in raw_urls:
+				parsed = urlparse(u)
+				base = f"{parsed.scheme}://{parsed.netloc}"
+				if base not in base_url_map:
+					base_url_map[base] = set()
+					
+				path = parsed.path
+				if path and '.' in path.split('/')[-1]:
+					path = '/'.join(path.split('/')[:-1])
+				if not path.endswith('/'):
+					path += '/'
+					
+				segments = [s for s in path.strip('/').split('/') if s]
+				if len(segments) <= 2:
+					base_url_map[base].add(path)
+					
+			urls = []
+			for base, paths in base_url_map.items():
+				for path in list(paths)[:10]:
+					urls.append(f"{base}{path}")
 
 		logger.warning(f'Fuzzing URLs: {urls}')
+
+		if prepare_only:
+			return {
+				"urls": urls,
+				"ffuf_base_cmd": ffuf_base_cmd,
+				"dirsearch_base_cmd": dirsearch_base_cmd,
+				"enable_http_crawl": enable_http_crawl,
+			}
 
 		results = []
 		redis_client = Redis.from_url(os.environ.get('REDIS_URL', 'redis://redis:6379/0'))
@@ -234,13 +245,28 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 				logger.info(f'Running ffuf for {base_url}')
 				logger.warning(f'ffuf command: {fcmd}')
-				for line in stream_command(
+
+				if parse_only is not None and target_url in parse_only.get('ffuf', {}):
+					import json
+					ffuf_stdout = parse_only['ffuf'][target_url]
+					line_source = []
+					for raw_line in ffuf_stdout.splitlines():
+						raw_line = raw_line.strip()
+						if not raw_line:
+							continue
+						try:
+							line_source.append(json.loads(raw_line))
+						except Exception:
+							line_source.append(raw_line)
+				else:
+					line_source = stream_command(
 						fcmd,
 						shell=True,
 						history_file=self.history_file,
 						scan_id=self.scan_id,
-						activity_id=self.activity_id):
+						activity_id=self.activity_id)
 
+				for line in line_source:
 					if not isinstance(line, dict):
 						continue
 
@@ -314,13 +340,15 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 				logger.info(f'Running dirsearch for {target_url}')
 				logger.warning(f'dirsearch command: {dcmd}')
-				run_command(
-					dcmd,
-					shell=True,
-					history_file=self.history_file,
-					scan_id=self.scan_id,
-					activity_id=self.activity_id
-				)
+
+				if parse_only is None:
+					run_command(
+						dcmd,
+						shell=True,
+						history_file=self.history_file,
+						scan_id=self.scan_id,
+						activity_id=self.activity_id
+					)
 				
 				# Parse dirsearch results from output file
 				if os.path.exists(dirsearch_output):
@@ -378,4 +406,9 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 		return results
 
-	return ensure_endpoints_crawled_and_execute(self, _execute_dir_file_fuzz, ctx, description)
+	return ensure_endpoints_crawled_and_execute(
+		self, 
+		lambda ctx, description: _execute_dir_file_fuzz(ctx, description, prepare_only=prepare_only, parse_only=parse_only), 
+		ctx, 
+		description
+	)

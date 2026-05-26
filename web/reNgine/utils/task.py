@@ -23,6 +23,13 @@ from reNgine.settings import RENGINE_RESULTS
 
 logger = logging.getLogger(__name__)
 
+ROUTED_TOOLS = {
+    'semgrep', 'nuclei', 'ffuf', 'naabu', 'amass', 'subfinder', 'httpx',
+    'dalfox', 'crlfuzz', 's3scanner', 'dirsearch', 'gospider', 'gau',
+    'waybackurls', 'hakrawler', 'tlsx', 'katana', 'aquatone', 'nmap',
+    'sslscan', 'ike-scan', 'hping3', 'wrk', 'k6', 'brutus', 'wpscan'
+}
+
 def get_tool_color(cmd):
     """Returns the ANSI color code for a given command based on the tool name."""
     sanitized = sanitize_command_for_db(cmd)
@@ -95,62 +102,134 @@ def run_command(
         logger.warning(f"Could not create Command object in DB (scan or activity may have been deleted/rolled back): {e}")
         command_obj = None
 
-    # Run the command using subprocess
-    popen = None
-    try:
-        popen = subprocess.Popen(
-            cmd if shell else cmd.split(),
-            shell=shell,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            cwd=cwd,
-            universal_newlines=True)
-        output = ''
-        for stdout_line in iter(popen.stdout.readline, ""):
-            item = stdout_line.strip()
-            output += '\n' + item
-            logger.info(f"{COLOR_WHITE}{item}{COLOR_RESET}")
-        popen.stdout.close()
+    # Check if the command is a routed tool (vulnerability or secret scan, etc.)
+    should_route = False
+    tool = ""
+    clean_cmd = sanitize_command_for_db(cmd)
+    if clean_cmd:
+        binary = clean_cmd.split()[0]
+        tool = os.path.basename(binary).lower()
+        if tool.endswith(('.py', '.sh', '.nse')):
+            tool = tool.rsplit('.', 1)[0]
+        if tool in ROUTED_TOOLS:
+            should_route = True
+
+    if should_route:
+        # Route execution transparently to the temporal-go-executor worker
+        logger.info(f"Routing {tool} command execution to Go executor: {cmd}")
+        import asyncio
+        import time
+        from temporalio.client import Client
+
+        async def _execute_remote_command(command_str, scan_history_id, command_rec_id):
+            """Asynchronously invoke the Temporal workflow to run a command on the Go executor.
+
+            Args:
+                command_str (str): The full command string to execute (e.g. semgrep scan ...)
+                scan_history_id (int): Associated Scan History ID
+                command_rec_id (int): Database record Command ID to log stdout/stderr to
+
+            Returns:
+                dict: The workflow execution result containing exit_code, stdout, and stderr
+            """
+            temporal_host = os.environ.get("TEMPORAL_HOST", "temporal:7233")
+            namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
+            # Connect to the Temporal cluster
+            client = await Client.connect(temporal_host, namespace=namespace)
+            # Execute GoExecutorTaskWorkflow on the python-orchestrator task queue which routes
+            # the subprocess activity to the go-executor-queue
+            result = await client.execute_workflow(
+                "GoExecutorTaskWorkflow",
+                {
+                    "command": [command_str],
+                    "scan_id": scan_history_id or 0,
+                    "command_id": command_rec_id or 0
+                },
+                id=f"go-exec-{tool}-{command_rec_id or int(time.time())}",
+                task_queue="python-orchestrator-queue"
+            )
+            return result
+
         try:
-            popen.wait(timeout=7200)
-        except subprocess.TimeoutExpired:
-            popen.kill()
-            return_code = 124 # Timeout
-            output += "\nCommand timed out."
-        else:
-            return_code = popen.returncode
-    except Exception as e:
-        logger.error(f"Error executing command {cmd}: {str(e)}")
-        output = f"Error executing command: {str(e)}"
-        return_code = 127 # Command not found / error
-    except BaseException as e:
-        logger.error(f"BaseException raised during command execution: {str(e)}")
-        if popen:
+            command_obj_id = command_obj.id if command_obj else 0
             try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+
+            # Route sync-to-async boundary safely depending on event loop state
+            if loop.is_running():
+                import concurrent.futures
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    future = pool.submit(asyncio.run, _execute_remote_command(cmd, scan_id, command_obj_id))
+                    exec_res = future.result()
+            else:
+                exec_res = loop.run_until_complete(_execute_remote_command(cmd, scan_id, command_obj_id))
+
+            return_code = exec_res.get("exit_code", 0)
+            output = exec_res.get("stdout", "") + "\n" + exec_res.get("stderr", "")
+        except Exception as e:
+            logger.error(f"Error executing remote command: {e}")
+            output = f"Error executing remote command: {e}"
+            return_code = 127
+    else:
+        # Run the command using subprocess locally for other tools
+        popen = None
+        try:
+            popen = subprocess.Popen(
+                cmd if shell else cmd.split(),
+                shell=shell,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                cwd=cwd,
+                universal_newlines=True)
+            output = ''
+            for stdout_line in iter(popen.stdout.readline, ""):
+                item = stdout_line.strip()
+                output += '\n' + item
+                logger.info(f"{COLOR_WHITE}{item}{COLOR_RESET}")
+            popen.stdout.close()
+            try:
+                popen.wait(timeout=7200)
+            except subprocess.TimeoutExpired:
                 popen.kill()
-            except Exception:
-                pass
-        raise
-    finally:
-        if popen:
-            try:
-                if popen.stdout:
-                    popen.stdout.close()
-            except Exception:
-                pass
-            try:
-                if popen.poll() is None:
-                    popen.terminate()
-                    try:
-                        popen.wait(timeout=5)
-                    except subprocess.TimeoutExpired:
-                        popen.kill()
-                else:
-                    popen.wait()
-            except Exception as ex:
-                logger.error(f"Error reaping process in run_command: {ex}")
-        if conf_path and os.path.exists(conf_path):
-            os.remove(conf_path)
+                return_code = 124 # Timeout
+                output += "\nCommand timed out."
+            else:
+                return_code = popen.returncode
+        except Exception as e:
+            logger.error(f"Error executing command {cmd}: {str(e)}")
+            output = f"Error executing command: {str(e)}"
+            return_code = 127 # Command not found / error
+        except BaseException as e:
+            logger.error(f"BaseException raised during command execution: {str(e)}")
+            if popen:
+                try:
+                    popen.kill()
+                except Exception:
+                    pass
+            raise
+        finally:
+            if popen:
+                try:
+                    if popen.stdout:
+                        popen.stdout.close()
+                except Exception:
+                    pass
+                try:
+                    if popen.poll() is None:
+                        popen.terminate()
+                        try:
+                            popen.wait(timeout=5)
+                        except subprocess.TimeoutExpired:
+                            popen.kill()
+                    else:
+                        popen.wait()
+                except Exception as ex:
+                    logger.error(f"Error reaping process in run_command: {ex}")
+            if conf_path and os.path.exists(conf_path):
+                os.remove(conf_path)
 
     if command_obj:
         logger.warning(f"Command {command_obj.id} finished with return code {return_code}")
@@ -382,6 +461,106 @@ def stream_command(
 		time=timezone.now(),
 		scan_history_id=scan_id,
 		activity_id=activity_id)
+
+	# Check if the command is a routed tool
+	should_route = False
+	tool = ""
+	clean_cmd = sanitize_command_for_db(cmd)
+	if clean_cmd:
+		binary = clean_cmd.split()[0]
+		tool = os.path.basename(binary).lower()
+		if tool.endswith(('.py', '.sh', '.nse')):
+			tool = tool.rsplit('.', 1)[0]
+		if tool in ROUTED_TOOLS:
+			should_route = True
+
+	if should_route:
+		logger.info(f"Routing {tool} command execution to Go executor: {cmd}")
+		import asyncio
+		import time
+		from temporalio.client import Client
+
+		async def _execute_remote_command(command_str, scan_history_id, command_rec_id):
+			"""Asynchronously invoke the Temporal workflow to run a command on the Go executor.
+
+			Args:
+				command_str (str): The full command string to execute
+				scan_history_id (int): Associated Scan History ID
+				command_rec_id (int): Database record Command ID to log stdout/stderr to
+
+			Returns:
+				dict: The workflow execution result containing exit_code, stdout, and stderr
+			"""
+			temporal_host = os.environ.get("TEMPORAL_HOST", "temporal:7233")
+			namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
+			client = await Client.connect(temporal_host, namespace=namespace)
+			result = await client.execute_workflow(
+				"GoExecutorTaskWorkflow",
+				{
+					"command": [command_str],
+					"scan_id": scan_history_id or 0,
+					"command_id": command_rec_id or 0
+				},
+				id=f"go-exec-{tool}-{command_rec_id or int(time.time())}",
+				task_queue="python-orchestrator-queue"
+			)
+			return result
+
+		try:
+			command_obj_id = command_obj.id if command_obj else 0
+			try:
+				loop = asyncio.get_event_loop()
+			except RuntimeError:
+				loop = asyncio.new_event_loop()
+				asyncio.set_event_loop(loop)
+
+			# Route sync-to-async boundary safely depending on event loop state
+			if loop.is_running():
+				import concurrent.futures
+				with concurrent.futures.ThreadPoolExecutor() as pool:
+					future = pool.submit(asyncio.run, _execute_remote_command(cmd, scan_id, command_obj_id))
+					exec_res = future.result()
+			else:
+				exec_res = loop.run_until_complete(_execute_remote_command(cmd, scan_id, command_obj_id))
+
+			return_code = exec_res.get("exit_code", 0)
+			stdout = exec_res.get("stdout", "")
+			stderr = exec_res.get("stderr", "")
+			output = stdout + "\n" + stderr
+		except Exception as e:
+			logger.error(f"Error executing remote command: {e}")
+			output = f"Error executing remote command: {e}"
+			return_code = 127
+			stdout = ""
+			stderr = output
+
+		if command_obj:
+			command_obj.output = output.replace('\x00', '')
+			command_obj.return_code = return_code
+			command_obj.save()
+
+		if history_file:
+			mode = 'a'
+			if not os.path.exists(history_file):
+				mode = 'w'
+			with open(history_file, mode) as f:
+				f.write(f'\n{cmd}\n{return_code}\n{output}\n------------------\n')
+
+		# Yield stdout line by line
+		for line in stdout.splitlines():
+			line = line.replace('\x00', '').strip()
+			if not line:
+				continue
+			item = line
+			try:
+				item = json.loads(line)
+			except json.JSONDecodeError:
+				pass
+			yield item
+
+		if conf_path and os.path.exists(conf_path):
+			os.remove(conf_path)
+		return
 
 	# Sanitize the cmd
 	command = cmd if shell else cmd.split()

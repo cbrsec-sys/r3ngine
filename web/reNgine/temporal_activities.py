@@ -708,9 +708,59 @@ def parse_analysis_results_activity(ctx: dict) -> bool:
 
 @activity.defn(name="RunNucleiActivity")
 def run_nuclei_activity(ctx: dict) -> bool:
+    """Run Nuclei vulnerability scan against all live endpoints discovered for this scan.
+
+    Performs a pre-flight check against the EndPoint table before invoking nuclei_scan.
+    If no endpoints have been crawled yet (e.g. http_crawl was not in the task list or
+    found no alive hosts), falls back to the root domain URL so Nuclei has at least one
+    target rather than silently writing an empty input file and producing zero results.
+
+    Args:
+        ctx (dict): Temporal workflow context containing scan_history_id and engine config.
+
+    Returns:
+        bool: True on success (including graceful skip when no domain is found).
+    """
     from reNgine.tasks import nuclei_scan
-    activity.logger.info(f"[RunNucleiActivity] scan_id={ctx.get('scan_history_id')}")
-    return _run_task(nuclei_scan, ctx, task_name='nuclei_scan', description='Nuclei Scan', urls=ctx.get('urls', []))
+    from startScan.models import EndPoint, ScanHistory
+
+    scan_id = ctx.get('scan_history_id')
+    activity.logger.info(f"[RunNucleiActivity] scan_id={scan_id}")
+
+    # Pre-flight: count endpoints in DB for this scan
+    endpoint_count = EndPoint.objects.filter(scan_history_id=scan_id).count()
+
+    if endpoint_count == 0:
+        # No endpoints from http_crawl — derive the root URL from the ScanHistory domain
+        # and use it as a minimum target so Nuclei always has something to scan.
+        scan = ScanHistory.objects.filter(pk=scan_id).first()
+        if scan and scan.domain:
+            root_url = f"https://{scan.domain.name}"
+            activity.logger.warning(
+                f"[RunNucleiActivity] No endpoints found in DB for scan_id={scan_id}. "
+                f"Falling back to root URL: {root_url}"
+            )
+            urls = [root_url]
+        else:
+            activity.logger.error(
+                f"[RunNucleiActivity] No endpoints and no domain found for scan_id={scan_id}. "
+                f"Skipping Nuclei scan."
+            )
+            return True
+    else:
+        activity.logger.info(
+            f"[RunNucleiActivity] {endpoint_count} endpoints in DB for scan_id={scan_id}. "
+            f"Nuclei will query get_http_urls() from DB."
+        )
+        # Let nuclei_scan call get_http_urls() to filter alive endpoints from DB
+        urls = []
+
+    return _run_task(
+        nuclei_scan, ctx,
+        task_name='nuclei_scan',
+        description='Nuclei Scan',
+        urls=urls
+    )
 
 @activity.defn(name="RunCRLFuzzActivity")
 def run_crlfuzz_activity(ctx: dict) -> bool:
@@ -999,7 +1049,7 @@ _PERMITTED_GENERIC_TASKS = frozenset({
     "nuclei_scan", "crlfuzz_scan", "dalfox_xss_scan", "s3scanner",
     "acunetix_scan", "cpanel_scan", "wpscan_scan", "react2shell_scan",
     "semgrep_scan", "correlate_vulnerabilities", "calculate_risk_scores",
-    "generate_impact_assessment", "run_apme",
+    "generate_impact_assessment", "run_apme", "attack_path_modeling",
 })
 
 
@@ -1035,18 +1085,20 @@ def run_generic_task_activity(ctx: dict, task_name: str, description: str = None
 
 
 @activity.defn(name="FinalizeSubScanActivity")
-def finalize_subscan_activity(ctx: dict, success: bool) -> bool:
+def finalize_subscan_activity(ctx: dict, success: bool, subscan_id: int = None) -> bool:
     """Mark the subscan as completed and update its status.
 
     Args:
         ctx (dict): Temporal workflow context.
         success (bool): True if all subscan steps succeeded, False otherwise.
+        subscan_id (int, optional): Specific subscan ID to finalize.
     """
     from startScan.models import SubScan
     from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
     from reNgine.tasks import send_scan_notif
 
-    subscan_id = ctx.get('subscan_id')
+    if subscan_id is None:
+        subscan_id = ctx.get('subscan_id')
     scan_id = ctx.get('scan_history_id')
     engine_id = ctx.get('engine_id')
 
@@ -1508,6 +1560,9 @@ def run_startup_sync_activity(task_name: str) -> None:
     elif task_name == 'sync_semgrep_rules':
         from reNgine.tasks import sync_semgrep_rules
         sync_semgrep_rules()
+    elif task_name == 'recover_stuck_scans':
+        from reNgine.tasks import recover_stuck_scans
+        recover_stuck_scans()
     else:
         raise ValueError(f"[RunStartupSyncActivity] Unknown task: {task_name}")
     activity.logger.info(f"[RunStartupSyncActivity] Completed: {task_name}")
@@ -1654,3 +1709,215 @@ def setup_scheduled_scan_activity(params: dict) -> dict:
         'kr_wordlist': kr_wordlist,
         'tasks': tasks,
     }
+
+
+# ===========================================================================
+# Distributed Heavy Scan Activities (Go Executor Integration)
+# ===========================================================================
+
+@activity.defn(name="PreparePortScanActivity")
+def prepare_port_scan_activity(ctx: dict) -> dict:
+    """Prepare a port scan execution environment and construct the tool command.
+
+    Args:
+        ctx (dict): Scan context containing target host information, engine settings,
+                    and activity descriptors.
+
+    Returns:
+        dict: Prepared configuration details containing the generated command line,
+              input paths, and a unique command identifier stored in the database.
+    """
+    from reNgine.tasks import port_scan
+    from startScan.models import Command
+    from django.utils import timezone
+
+    proxy = TemporalTaskProxy(ctx, 'port_scan', 'Port Scan', track=False)
+    raw_func = port_scan.__func__ if hasattr(port_scan, '__func__') else port_scan
+    res = raw_func(proxy, ctx=ctx, prepare_only=True)
+
+    cmd_record = Command.objects.create(
+        command=res['cmd'],
+        time=timezone.now(),
+        scan_history_id=proxy.scan_id,
+        activity_id=proxy.activity_id
+    )
+    res['command_id'] = cmd_record.id
+    return res
+
+
+@activity.defn(name="ParsePortScanResultsActivity")
+def parse_port_scan_results_activity(ctx: dict, stdout: str) -> dict:
+    """Parse port scan tool outputs and persist discovered ports/hosts to the database.
+
+    Args:
+        ctx (dict): Scan context with history IDs and metadata.
+        stdout (str): Raw string output containing JSON lines generated during tool execution.
+
+    Returns:
+        dict: Wrapped port details indicating scan outcomes.
+    """
+    from reNgine.tasks import port_scan
+
+    proxy = TemporalTaskProxy(ctx, 'port_scan', 'Port Scan')
+    raw_func = port_scan.__func__ if hasattr(port_scan, '__func__') else port_scan
+    res = raw_func(proxy, ctx=ctx, parse_only=stdout)
+    return {"ports_data": res}
+
+
+@activity.defn(name="PrepareFuzzUrlsActivity")
+def prepare_fuzz_urls_activity(ctx: dict) -> dict:
+    """Extract and validate directories and URLs that require directory fuzzing.
+
+    Args:
+        ctx (dict): Scan context with input subdomain targets.
+
+    Returns:
+        dict: Set of URLs to fuzz along with base ffuf and dirsearch commands.
+    """
+    from reNgine.fuzzing_tasks import dir_file_fuzz
+
+    proxy = TemporalTaskProxy(ctx, 'dir_file_fuzz', 'Directory & File Fuzz', track=False)
+    raw_func = dir_file_fuzz.__func__ if hasattr(dir_file_fuzz, '__func__') else dir_file_fuzz
+    res = raw_func(proxy, ctx=ctx, prepare_only=True)
+    return res
+
+
+@activity.defn(name="PrepareFuzzCommandActivity")
+def prepare_fuzz_command_activity(ctx: dict, target_url: str, ffuf_base_cmd: str, dirsearch_base_cmd: str) -> dict:
+    """Construct specific fuzzing commands (ffuf & dirsearch) for an individual target URL.
+
+    Args:
+        ctx (dict): Scan context.
+        target_url (str): The target endpoint URL to fuzz.
+        ffuf_base_cmd (str): Base template command for FFUF.
+        dirsearch_base_cmd (str): Base template command for dirsearch.
+
+    Returns:
+        dict: Detailed commands, command DB record IDs, and DirectoryScan model IDs.
+    """
+    from reNgine.common_func import get_subdomain_from_url, get_random_proxy
+    from startScan.models import DirectoryScan, Command, Subdomain
+    from django.utils import timezone
+    from reNgine.utils.opsec import OpSecManager
+
+    proxy = TemporalTaskProxy(ctx, 'dir_file_fuzz', 'Directory & File Fuzz', track=False)
+
+    proxy_str = get_random_proxy()
+    if proxy_str:
+        if not any(proxy_str.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
+            proxy_str = 'http://' + proxy_str
+
+    fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json -s'
+    fcmd += f' -x {proxy_str}' if proxy_str else ''
+    opsec = OpSecManager()
+    fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=proxy_str)
+
+    dirscan = DirectoryScan.objects.create(
+        scanned_date=timezone.now(),
+        command_line=fcmd
+    )
+    subdomain_name = get_subdomain_from_url(target_url)
+    subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history_id=proxy.scan_id).first()
+    if not subdomain and ctx.get('subdomain_id', 0) > 0:
+        subdomain = Subdomain.objects.filter(id=ctx['subdomain_id']).first()
+    if subdomain:
+        subdomain.directories.add(dirscan)
+        subdomain.save()
+
+    cmd_record_ffuf = Command.objects.create(
+        command=fcmd,
+        time=timezone.now(),
+        scan_history_id=proxy.scan_id,
+        activity_id=proxy.activity_id
+    )
+
+    target_url_stripped = target_url.rstrip('/')
+    dirsearch_output = f'{proxy.results_dir}/dirsearch_{subdomain_name}.json'
+    dcmd = f'{dirsearch_base_cmd} -u {target_url_stripped} --format=json -o {dirsearch_output} --no-color'
+    if proxy_str:
+        dcmd += f' --proxy={proxy_str}'
+    dcmd = opsec.apply_stealth('dirsearch', dcmd, proxy=proxy_str)
+
+    dirscan_ds = DirectoryScan.objects.create(
+        scanned_date=timezone.now(),
+        command_line=dcmd
+    )
+    if subdomain:
+        subdomain.directories.add(dirscan_ds)
+        subdomain.save()
+
+    cmd_record_ds = Command.objects.create(
+        command=dcmd,
+        time=timezone.now(),
+        scan_history_id=proxy.scan_id,
+        activity_id=proxy.activity_id
+    )
+
+    return {
+        "target_url": target_url,
+        "fcmd": fcmd,
+        "dcmd": dcmd,
+        "ffuf_command_id": cmd_record_ffuf.id,
+        "ds_command_id": cmd_record_ds.id,
+        "dirscan_id": dirscan.id,
+        "dirscan_ds_id": dirscan_ds.id,
+    }
+
+
+@activity.defn(name="ParseFuzzResultsActivity")
+def parse_fuzz_results_activity(ctx: dict, prep_res: dict, ffuf_stdout: str) -> bool:
+    """Parse fuzz results from ffuf (via stdout) and dirsearch (via disk output files).
+
+    Args:
+        ctx (dict): Scan context.
+        prep_res (dict): Command and target URL configurations prepared previously.
+        ffuf_stdout (str): Raw stdout string from the ffuf execution.
+
+    Returns:
+        bool: True if findings are successfully parsed and saved.
+    """
+    from reNgine.fuzzing_tasks import dir_file_fuzz
+
+    proxy = TemporalTaskProxy(ctx, 'dir_file_fuzz', 'Directory & File Fuzz')
+    raw_func = dir_file_fuzz.__func__ if hasattr(dir_file_fuzz, '__func__') else dir_file_fuzz
+    target_url = prep_res['target_url']
+
+    parse_only = {
+        'ffuf': {
+            target_url: ffuf_stdout
+        }
+    }
+    custom_ctx = {
+        **ctx,
+        "urls_override": [target_url]
+    }
+    raw_func(proxy, ctx=custom_ctx, parse_only=parse_only)
+    return True
+
+
+@activity.defn(name="FinalizeFailedScanActivity")
+def finalize_failed_scan_activity(ctx: dict, error_msg: str) -> None:
+    """Mark a scan as FAILED_TASK due to a workflow crash or unhandled exception.
+    
+    This ensures that the Django database reflects the crash and allows the user
+    to manually resume the scan later.
+    """
+    from startScan.models import ScanHistory
+    from reNgine.definitions import FAILED_TASK
+    
+    scan_id = ctx.get('scan_history_id')
+    if not scan_id:
+        return
+        
+    try:
+        scan = ScanHistory.objects.get(pk=scan_id)
+        scan.scan_status = FAILED_TASK
+        scan.error_message = error_msg[:300] if error_msg else "Scan workflow crashed."
+        scan.stop_scan_date = timezone.now()
+        scan.save()
+        logger.info(f"Scan {scan_id} marked as FAILED_TASK due to workflow crash.")
+        
+        # Also update running activities
+        scan.scanactivity_set.filter(status=0).update(status=FAILED_TASK, error_message=scan.error_message)
+    except Exception as e:
+        logger.error(f"Failed to finalize crashed scan {scan_id}: {e}")

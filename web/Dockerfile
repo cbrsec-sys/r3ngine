@@ -66,7 +66,7 @@ RUN git clone --depth 1 https://github.com/betterleaks/betterleaks /tmp/betterle
 # Compiles the Temporal Go activity worker binary (r3ngine-executor).
 # The executor is a pure-Go project (no CGo) so no special libs needed.
 # ===========================================================================
-FROM golang:1.22-bookworm AS executor-builder
+FROM golang:1.25-bookworm AS executor-builder
 
 WORKDIR /build
 # Copy executor source from the repo root context

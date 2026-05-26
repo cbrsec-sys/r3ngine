@@ -1,6 +1,19 @@
 # Changelog
 
-### [v3.2.0] - 2026-05-23
+### [v3.2.0] - 2026-05-25
+
+- **Subscan Tiered Execution Steps Alignment**:
+  - Refactored `SubScanWorkflow` to group and execute subdomain subscans in sequence-enforced execution tiers (Discovery -> HTTP Crawl & Port Scan -> URL Fetching -> Fuzzing -> Analysis -> Security Assessment), strictly mirroring the main scan (`MasterScanWorkflow`).
+  - Modified the `InitiateSubTask` API view and `initiate_subscan_temporal` scan task helper to batch-create `SubScan` database records and trigger a single, unified `SubScanWorkflow` execution per subdomain rather than running separate concurrent workflows for each individual task.
+  - Implemented logic in `SubScanWorkflow` to run matching verification parse activities (e.g. `ParseDiscoveryResultsActivity`, `ParseHTTPCrawlResultsActivity`, etc.) as soon as the respective tiers finish.
+  - Optimized post-processing execution (vulnerability correlation/scoring and graph synchronization/APME) by only running them if their corresponding triggering task types were selected.
+  - Added optional `subscan_id` support to `FinalizeSubScanActivity` to support granular database updates for each subscan task in the batch.
+
+- **Semgrep Scan Pipeline Optimization & Stalling Mitigation**:
+  - Refactored the raw URL file downloader loop in `semgrep_scan` to download files in parallel using a `ThreadPoolExecutor` (10 concurrent workers).
+  - Implemented `clean_and_validate_url` to strip tool-specific trailing metadata (like `] - text/html`) from raw `gospider`/`hakrawler` outputs and filter out out-of-scope third-party CDN/external domains.
+  - Added size and quantity guardrails by capping individual file downloads at **5MB** via streaming chunks and limiting total files scanned per domain to **500**.
+  - Refactored the `host_regex` URL pattern in `fetch_url` to exclude whitespace, quotes, backticks, and brackets to prevent matching trailing metadata suffixes.
 
 - **Temporal Activity & Scan Stability Fixes**:
   - Disabled inline synchronous HTTP crawling in the `port_scan` activity to prevent concurrent file/database collisions, process lockups, and eventual `CancelledError` activity cancellations.
@@ -14,6 +27,14 @@
 - **Screenshot Pipeline Optimization**:
   - Moved the visual screenshotting task (`screenshot`) from Tier 2 (parallel to HTTP Crawl & Port Scanning) to Tier 6 (parallel to Vulnerability Scanning).
   - This ensures that crawling, URL fetching, and directory/file fuzzing have completely finished execution, allowing a comprehensive set of alive endpoints to be gathered before screenshots are captured.
+
+- **Nuclei Scan Optimization & Stability**:
+  - Optimized the `nuclei_scan` engine to execute in a single concurrent pass, replacing the inefficient 6-pass sequential severity loop.
+  - Re-enabled the `-tags` parameter which was previously dropped, ensuring only relevant checks are executed against the target stack.
+  - Implemented dynamic fallback to the target root domain in the event that `Subdomain` queries return empty results during parameter resolution.
+  - Gated the intensive `nuclei -update-templates` step behind the `auto_update_templates` boolean configuration.
+  - Added explicit execution and run timeouts (`execution_timeout`, `run_timeout`) to the `NucleiPlannerWorkflow` child execution.
+  - Removed obsolete parsing and preparation Temporal activities (`PrepareNucleiActivity`, `ParseNucleiResultsActivity`) resulting in a leaner execution graph.
 
 - **Code Restructuring and Utility Sub-Package Migration**:
   - Relocated stress testing python files (`stress_views.py`, `stress_cmd_builder.py`, `stress_report_builder.py`, `stress_telemetry.py`, `stress_aggregation.py`, `stress_testing_tasks.py`) from the root of `web/reNgine/` to `web/reNgine/stress/`, dropping redundant prefixes.

@@ -5,29 +5,7 @@
 # Ensure OpenSSL compatibility
 pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
 
-# apply existing migrations
-python3 manage.py migrate
-
-# make migrations for specific apps
-apps=(
-    "targetApp"
-    "scanEngine"
-    "startScan"
-    "dashboard"
-    "recon_note"
-    "plugins"
-    "apme"
-)
-
-for app in "${apps[@]}"; do
-    echo "Creating migrations for $app..."
-    python3 manage.py makemigrations $app
-done
-
-python3 manage.py migrate
-
-python3 manage.py collectstatic --no-input --clear
-
+# Removed migrations and collectstatic per user request
 # Load default fixtures
 python3 manage.py loaddata fixtures/default_scan_engines.yaml --app scanEngine.EngineType
 python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.InterestingLookupModel
@@ -113,8 +91,8 @@ if [ ! -d "/usr/src/scan_results" ]; then
 fi
 
 # test tools, required for configuration
-naabu && subfinder && amass
-nuclei
+naabu -version && subfinder -version && amass -version
+nuclei -version
 
 if [ ! -d "/root/nuclei-templates/geeknik_nuclei_templates" ]; then
   echo "Installing Geeknik Nuclei templates"
