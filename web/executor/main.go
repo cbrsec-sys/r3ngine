@@ -56,6 +56,10 @@ func (a *Activities) SubprocessActivity(ctx context.Context, input ToolExecution
 	} else {
 		cmd = exec.CommandContext(ctx, input.Command[0], input.Command[1:]...)
 	}
+	// Place the subprocess in its own process group so all children (nuclei, amass, etc.)
+	// receive SIGKILL when the Temporal context is cancelled, not just the bash shell.
+	// setCmdProcessGroup is defined in pgid_linux.go (Linux) / pgid_other.go (other OS).
+	setCmdProcessGroup(cmd)
 
 	var stdoutBuf, stderrBuf bytes.Buffer
 	pr, pw := io.Pipe()
