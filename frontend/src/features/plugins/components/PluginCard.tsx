@@ -9,7 +9,9 @@ import {
   Chip,
   Avatar,
   Button,
-  CircularProgress
+  CircularProgress,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import { 
   Settings as SettingsIcon, 
@@ -18,7 +20,12 @@ import {
   Check as InstalledIcon
 } from '@mui/icons-material';
 import type { Plugin, MarketplacePlugin } from '../api/pluginsApi';
-import { useTogglePlugin, useDeletePlugin, useInstallMarketplacePlugin } from '../api/pluginsApi';
+import { 
+  useTogglePlugin, 
+  useDeletePlugin, 
+  useInstallMarketplacePlugin,
+  useRestartOrchestrator
+} from '../api/pluginsApi';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface Props {
@@ -30,7 +37,19 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
   const toggleMutation = useTogglePlugin();
   const deleteMutation = useDeletePlugin();
   const installMutation = useInstallMarketplacePlugin();
+  const restartMutation = useRestartOrchestrator();
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
+  const [isRestartDialogOpen, setIsRestartDialogOpen] = React.useState(false);
+  const [restartSnackbar, setRestartSnackbar] = React.useState(false);
+
+  const handleRestart = () => {
+    restartMutation.mutate(undefined, {
+      onSuccess: () => {
+        setIsRestartDialogOpen(false);
+        setRestartSnackbar(true);
+      }
+    });
+  };
 
   // If we have an installed plugin, use its data
   // Otherwise, if we have a marketplace plugin, use its data
@@ -145,7 +164,32 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
               sx={{ borderColor: 'rgba(255, 255, 255, 0.1)', color: 'rgba(255,255,255,0.4)', fontSize: '10px' }} 
             />
             {!isMarketplace && (
-              <Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                {plugin?.needs_restart && plugin?.is_enabled && (
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    color="warning"
+                    onClick={() => setIsRestartDialogOpen(true)}
+                    sx={{ 
+                      fontSize: '10px', 
+                      fontFamily: 'Orbitron', 
+                      fontWeight: 900,
+                      color: '#ff9800',
+                      borderColor: 'rgba(255, 152, 0, 0.5)',
+                      px: 1.5,
+                      py: 0.5,
+                      minWidth: 'auto',
+                      height: '24px',
+                      '&:hover': {
+                        borderColor: '#ff9800',
+                        bgcolor: 'rgba(255, 152, 0, 0.05)'
+                      }
+                    }}
+                  >
+                    RESTART
+                  </Button>
+                )}
                 <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.3)' }}>
                   <SettingsIcon fontSize="small" />
                 </IconButton>
@@ -173,6 +217,41 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
         isDestructive={true}
         isLoading={deleteMutation.isPending}
       />
+
+      <ConfirmDialog
+        open={isRestartDialogOpen}
+        onClose={() => setIsRestartDialogOpen(false)}
+        onConfirm={handleRestart}
+        title="Restart Orchestrator"
+        message={`The orchestrator container needs to be restarted to load and register the workflow/activity changes for "${plugin?.name}". You can restart it manually via your CLI, or click "RESTART NOW" to automatically restart the container now.`}
+        confirmText="RESTART NOW"
+        cancelText="RESTART LATER"
+        isDestructive={false}
+        type="warning"
+        isLoading={restartMutation.isPending}
+      />
+
+      <Snackbar
+        open={restartSnackbar}
+        autoHideDuration={6000}
+        onClose={() => setRestartSnackbar(false)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert 
+          onClose={() => setRestartSnackbar(false)} 
+          severity="success" 
+          variant="filled"
+          sx={{ 
+            fontFamily: 'Orbitron', 
+            fontWeight: 800,
+            bgcolor: '#00f3ff',
+            color: '#000',
+            borderRadius: 0
+          }}
+        >
+          Orchestrator restart initiated. The container will reload in a few seconds.
+        </Alert>
+      </Snackbar>
     </>
   );
 };

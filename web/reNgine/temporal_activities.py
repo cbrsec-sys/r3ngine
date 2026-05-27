@@ -1014,6 +1014,8 @@ def sync_graph_activity(ctx: dict) -> bool:
     """Synchronize all scan results to the Neo4j Attack Path Modeling graph.
 
     Delegates to `run_apme` task and additionally runs `Neo4jManager.sync_scan_results`.
+    Sends a heartbeat before the sync so Temporal knows the activity is alive even
+    if Neo4j is slow to accept the initial connection.
 
     Args:
         ctx (dict): Temporal workflow context.
@@ -1022,11 +1024,12 @@ def sync_graph_activity(ctx: dict) -> bool:
         bool: True on success.
     """
     from reNgine.utils.graph import Neo4jManager
-    from reNgine.tasks import run_apme
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[SyncGraphActivity] Syncing scan_id={scan_id} to Neo4j")
+    # Heartbeat before the Neo4j connection attempt so Temporal sees the
+    # activity is alive even if driver init is slow.
+    activity.heartbeat(f"SyncGraphActivity starting neo4j sync for scan_id={scan_id}")
 
-    # Also run raw graph sync
     nm = Neo4jManager()
     try:
         nm.sync_scan_results(scan_id)

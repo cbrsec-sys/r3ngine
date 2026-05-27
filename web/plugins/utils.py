@@ -319,6 +319,10 @@ class AtomicInstaller:
                     except Exception as e:
                         logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
 
+                # Set needs_restart to True in cache
+                from django.core.cache import cache
+                cache.set(f"plugin_{plugin_slug}_needs_restart", True, timeout=None)
+
                 # 7. Copy built UI assets (ui/dist/ or ui/ directly) to MEDIA_ROOT
                 if os.path.exists(media_plugin_dir):
                     shutil.rmtree(media_plugin_dir)

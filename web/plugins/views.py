@@ -42,6 +42,22 @@ class PluginViewSet(viewsets.ModelViewSet):
                 os.remove(temp_zip_path)
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        from django.core.cache import cache
+        cache.set(f"plugin_{instance.slug}_needs_restart", True, timeout=None)
+
+    @action(detail=False, methods=['post'], url_path='restart-orchestrator')
+    def restart_orchestrator(self, request):
+        import redis
+        from django.conf import settings
+        try:
+            rdb = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
+            rdb.publish('orchestrator_control', 'restart')
+            return Response({'success': True, 'message': 'Restart command sent to orchestrator.'})
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     @action(detail=False, methods=['get'], url_path='registry')
     def registry(self, request):
         """Returns the UI component registry for the frontend."""

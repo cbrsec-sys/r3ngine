@@ -1,6 +1,17 @@
 # Changelog
 
-### [v3.2.0] - 2026-05-26
+### [v3.2.0] - 2026-05-27
+
+- **Mobile Task Log Streaming Restoration**:
+  - Restored real-time stream log output for scan tasks in the mobile application by capturing and publishing stdout/stderr lines from the Python orchestrator.
+  - Implemented `_init_redis_logging` and `_publish_to_redis_log` helpers in `task.py` to cache configurations and stream logs to Redis for both local subprocess and Go-routed scan task executions.
+  - Refactored `ScanLogConsumer` in `consumers.py` to start stream listening from ID `0` (instead of `$`), enabling historical log replay when connecting.
+
+- **Mobile Scan In-Progress Indicator**:
+  - Implemented `AnimatedActivityBadge` next to the alert bell in the mobile app dashboard header.
+  - Configured a looping pulse/scale animation running at 60fps on the native driver.
+  - Added polling logic via `/mapi/scan_status/` running every 30 seconds to toggle the badge visibility when scans are active, and configured routing to redirect the user to the scans tab on click.
+  - Documented the new component in `r3ngine-mobile/documentation/AnimatedActivityBadge.md`.
 
 - **URL Gathering Tools Regex Fix**:
   - Corrected a critical POSIX regular expression syntax error (`host_regex`) in the URL fetching task (`fetch_url`) of `tasks.py` that caused all output from `gau`, `waybackurls`, `hakrawler`, `katana`, and `gospider` to produce zero results.

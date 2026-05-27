@@ -170,6 +170,59 @@ def sanitize_command_for_db(cmd):
     cmd = re.sub(r'^(?:[/\w]*/)?proxychains4\s+-f\s+\S+\s+', '', cmd)
     return cmd
 
+
+def _publish_to_redis_log(redis_client, soc_config, scan_id, command_id, line):
+    """Publish a single line of log output to the Redis stream for scan tracking.
+
+    Args:
+        redis_client (redis.StrictRedis): The instantiated Redis client.
+        soc_config (SOCConfiguration): The active SOC configuration object.
+        scan_id (int): The associated Scan History ID.
+        command_id (int): The Command record ID associated with the log.
+        line (str): The log line content.
+    """
+    if not redis_client or not soc_config or not scan_id:
+        return
+    try:
+        stream_key = f"scan:logs:{scan_id}"
+        log_payload = {
+            "data": json.dumps({
+                "line": line,
+                "timestamp": str(timezone.now()),
+                "command_id": command_id
+            })
+        }
+        redis_client.xadd(stream_key, log_payload)
+        redis_client.xtrim(stream_key, maxlen=soc_config.log_retention_count, approximate=True)
+    except Exception as e:
+        logger.error(f"Failed to publish log to Redis: {e}")
+
+
+def _init_redis_logging(scan_id):
+    """Retrieve the SOC configuration and initialize a Redis client for log streaming if enabled.
+
+    Args:
+        scan_id (int): Associated Scan History ID.
+
+    Returns:
+        tuple: (redis_client, soc_config) if log streaming is enabled, otherwise (None, None).
+    """
+    if not scan_id:
+        return None, None
+    try:
+        soc_config, _ = SOCConfiguration.objects.get_or_create(id=1)
+        if soc_config.enable_live_log_streaming:
+            r = redis.StrictRedis(
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                db=0
+            )
+            return r, soc_config
+    except Exception as e:
+        logger.error(f"Failed to initialize Redis logging configuration: {e}")
+    return None, None
+
+
 def run_command(
         cmd, 
         cwd=None, 
@@ -213,6 +266,9 @@ def run_command(
     except IntegrityError as e:
         logger.warning(f"Could not create Command object in DB (scan or activity may have been deleted/rolled back): {e}")
         command_obj = None
+
+    redis_client, soc_config = _init_redis_logging(scan_id)
+    command_obj_id = command_obj.id if command_obj else 0
 
     # Check if the command is a routed tool (vulnerability or secret scan, etc.)
     should_route = False
@@ -262,7 +318,6 @@ def run_command(
             return result
 
         try:
-            command_obj_id = command_obj.id if command_obj else 0
             try:
                 loop = asyncio.get_event_loop()
             except RuntimeError:
@@ -279,7 +334,14 @@ def run_command(
                 exec_res = loop.run_until_complete(_execute_remote_command(cmd, scan_id, command_obj_id))
 
             return_code = exec_res.get("exit_code", 0)
-            output = exec_res.get("stdout", "") + "\n" + exec_res.get("stderr", "")
+            stdout = exec_res.get("stdout", "")
+            stderr = exec_res.get("stderr", "")
+            output = stdout + "\n" + stderr
+            if redis_client and soc_config:
+                for line in stdout.splitlines():
+                    _publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, line)
+                for line in stderr.splitlines():
+                    _publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, line)
         except Exception as e:
             logger.error(f"Error executing remote command: {e}")
             output = f"Error executing remote command: {e}"
@@ -302,6 +364,8 @@ def run_command(
                 item = stdout_line.strip()
                 output += '\n' + item
                 logger.info(f"{COLOR_WHITE}{item}{COLOR_RESET}")
+                if redis_client and soc_config:
+                    _publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, item)
             popen.stdout.close()
             try:
                 popen.wait(timeout=7200)
@@ -616,6 +680,9 @@ def stream_command(
 		scan_history_id=scan_id,
 		activity_id=activity_id)
 
+	redis_client, soc_config = _init_redis_logging(scan_id)
+	command_obj_id = command_obj.id if command_obj else 0
+
 	# Check if the command is a routed tool
 	should_route = False
 	tool = ""
@@ -660,7 +727,6 @@ def stream_command(
 			return result
 
 		try:
-			command_obj_id = command_obj.id if command_obj else 0
 			try:
 				loop = asyncio.get_event_loop()
 			except RuntimeError:
@@ -680,6 +746,11 @@ def stream_command(
 			stdout = exec_res.get("stdout", "")
 			stderr = exec_res.get("stderr", "")
 			output = stdout + "\n" + stderr
+			if redis_client and soc_config:
+				for line in stdout.splitlines():
+					_publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, line)
+				for line in stderr.splitlines():
+					_publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, line)
 		except Exception as e:
 			logger.error(f"Error executing remote command: {e}")
 			output = f"Error executing remote command: {e}"
@@ -784,28 +855,8 @@ def stream_command(
 			yield item
 			
 			# Real-time log streaming to Redis if enabled
-			try:
-				soc_config = SOCConfiguration.objects.get_or_create(id=1)[0]
-				if soc_config.enable_live_log_streaming and scan_id:
-					r = redis.StrictRedis(
-						host=settings.REDIS_HOST, 
-						port=settings.REDIS_PORT, 
-						db=0
-					)
-					stream_key = f"scan:logs:{scan_id}"
-					log_payload = {
-						"data": json.dumps({
-							"line": line,
-							"timestamp": str(timezone.now()),
-							"command_id": command_obj.id
-						})
-					}
-					r.xadd(stream_key, log_payload)
-					# Limit stream length
-					r.xtrim(stream_key, maxlen=soc_config.log_retention_count, approximate=True)
-			except Exception as e:
-				# Log but don't fail the command if streaming fails
-				logger.error(f"Failed to publish log to Redis: {e}")
+			if redis_client and soc_config:
+				_publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, line)
 
 			# Update output
 			output += '\n' + line
