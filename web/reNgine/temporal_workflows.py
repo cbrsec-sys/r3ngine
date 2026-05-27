@@ -448,6 +448,7 @@ class MasterScanWorkflow:
                 "CorrelateVulnerabilitiesActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=30),
+                heartbeat_timeout=timedelta(minutes=2),
                 retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
@@ -455,6 +456,7 @@ class MasterScanWorkflow:
                 "CalculateRiskScoresActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=15),
+                heartbeat_timeout=timedelta(minutes=2),
                 retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
@@ -464,6 +466,7 @@ class MasterScanWorkflow:
                 "GenerateImpactAssessmentActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=30),
+                heartbeat_timeout=timedelta(minutes=2),
                 retry_policy=_RETRY_LLM,
                 task_queue="python-orchestrator-queue"
             )
@@ -473,6 +476,7 @@ class MasterScanWorkflow:
                 "SyncGraphActivity",
                 ctx,
                 start_to_close_timeout=timedelta(minutes=30),
+                heartbeat_timeout=timedelta(minutes=2),
                 retry_policy=_RETRY_NETWORK_SCAN,
                 task_queue="python-orchestrator-queue"
             )
@@ -482,6 +486,7 @@ class MasterScanWorkflow:
                 "RunGenericTaskActivity",
                 args=[ctx, "run_apme", "Attack Path Modeling Engine", {"scan_history_id": ctx.get("scan_history_id")}],
                 start_to_close_timeout=timedelta(minutes=30),
+                heartbeat_timeout=timedelta(minutes=2),
                 retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
@@ -1043,6 +1048,7 @@ class SubScanWorkflow:
                                 "CorrelateVulnerabilitiesActivity",
                                 ctx,
                                 start_to_close_timeout=timedelta(minutes=15),
+                                heartbeat_timeout=timedelta(minutes=2),
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue",
                             )
@@ -1050,6 +1056,7 @@ class SubScanWorkflow:
                                 "CalculateRiskScoresActivity",
                                 ctx,
                                 start_to_close_timeout=timedelta(minutes=15),
+                                heartbeat_timeout=timedelta(minutes=2),
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue",
                             )
@@ -1057,6 +1064,7 @@ class SubScanWorkflow:
                                 "GenerateImpactAssessmentActivity",
                                 ctx,
                                 start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=2),
                                 retry_policy=_RETRY_LLM,
                                 task_queue="python-orchestrator-queue"
                             )
@@ -1072,6 +1080,7 @@ class SubScanWorkflow:
                                 "SyncGraphActivity",
                                 ctx,
                                 start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=2),
                                 retry_policy=_RETRY_NETWORK_SCAN,
                                 task_queue="python-orchestrator-queue",
                             )
@@ -1079,6 +1088,7 @@ class SubScanWorkflow:
                                 "RunGenericTaskActivity",
                                 args=[ctx, "run_apme", "Attack Path Modeling Engine", {"scan_history_id": ctx.get("scan_history_id")}],
                                 start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=2),
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue",
                             )
