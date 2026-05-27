@@ -471,16 +471,6 @@ const pluginsRoute = createRoute({
   component: PluginManagementPage,
 });
 
-// Active Directory Intelligence Plugin Route
-// ADPluginApp handles all internal navigation via its own mini-router (state-based).
-const adPluginRoute = createRoute({
-  getParentRoute: () => projectRoute,
-  path: "active-directory",
-  component: function ADPlugin() {
-    return <PluginPageLoader pluginSlug="active_directory" exportName="ADPluginApp" />;
-  },
-});
-
 // Generic Dynamic Plugin Routes
 const pluginMainRoute = createRoute({
   getParentRoute: () => projectRoute,
@@ -520,10 +510,11 @@ const pluginMainRoute = createRoute({
       );
     }
 
-    const plugin = pluginsRegistry.find(p => p.slug === pluginSlug);
+    const normalizedSlug = pluginSlug.replace(/-/g, '_');
+    const plugin = pluginsRegistry.find(p => p.slug === normalizedSlug || p.slug === pluginSlug);
     const entryExport = plugin?.components?.entry_export || 'IndexPage';
 
-    return <PluginPageLoader pluginSlug={pluginSlug} exportName={entryExport} projectSlug={projectSlug || 'default'} />;
+    return <PluginPageLoader pluginSlug={normalizedSlug} exportName={entryExport} projectSlug={projectSlug || 'default'} />;
   },
 });
 
@@ -541,7 +532,8 @@ const pluginSubpageRoute = createRoute({
       );
     }
     
-    return <PluginPageLoader pluginSlug={pluginSlug} exportName={pageName} projectSlug={projectSlug || 'default'} />;
+    const normalizedSlug = pluginSlug.replace(/-/g, '_');
+    return <PluginPageLoader pluginSlug={normalizedSlug} exportName={pageName} projectSlug={projectSlug || 'default'} />;
   },
 });
 
@@ -599,7 +591,6 @@ const routeTree = rootRoute.addChildren([
     bountyHubRoute,
     searchRoute,
     pluginsRoute,
-    adPluginRoute,
     pluginMainRoute,
     pluginSubpageRoute,
   ]),
