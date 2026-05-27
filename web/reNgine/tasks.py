@@ -2788,7 +2788,7 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			if p:
 				if tool == 'katana': tool_cmd += f' -proxy "{p}"'
 				elif tool == 'gospider': tool_cmd += f' -p {p}'
-				elif tool == 'hakrawler': tool_cmd += f' -proxy {p}'
+				#elif tool == 'hakrawler': tool_cmd += f' -proxy {p}'
 				elif tool == 'gau': tool_cmd += f' --proxy {p}'
 			
 			# Apply threads
