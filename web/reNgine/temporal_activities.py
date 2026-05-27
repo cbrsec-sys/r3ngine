@@ -441,6 +441,7 @@ def seed_endpoints_for_crawl_activity(ctx: dict) -> dict:
     """
     from startScan.models import Subdomain, EndPoint
     from reNgine.utils.task import save_endpoint
+    from reNgine.common_func import sanitize_url
 
     scan_id = ctx.get('scan_history_id')
     url_filter = ctx.get('starting_point_path', '')
@@ -449,9 +450,14 @@ def seed_endpoints_for_crawl_activity(ctx: dict) -> dict:
     seed_urls = []
 
     for subdomain in subdomains:
-        raw_url = f'{subdomain.name}{url_filter}' if url_filter else subdomain.name
+        if url_filter:
+            path = url_filter if url_filter.startswith('/') else f'/{url_filter}'
+            raw_url = f'{subdomain.name}{path}'
+        else:
+            raw_url = subdomain.name
         if not raw_url.startswith(('http://', 'https://')):
             raw_url = f'http://{raw_url}'
+        raw_url = sanitize_url(raw_url)
 
         existing = EndPoint.objects.filter(
             scan_history_id=scan_id,
@@ -465,6 +471,7 @@ def seed_endpoints_for_crawl_activity(ctx: dict) -> dict:
             endpoint, _ = save_endpoint(
                 raw_url,
                 ctx=ctx,
+                crawl=False,
                 is_default=True,
                 subdomain=subdomain,
             )
