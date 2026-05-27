@@ -31,33 +31,33 @@ class TestLaunchADAssessmentEndpoint(TestCase):
         )
 
     def test_missing_subdomain_id_returns_400(self):
+        from rest_framework.test import APIRequestFactory
         from api.views import LaunchADAssessmentFromSubdomain
-        req = RequestFactory().post(
+        req = APIRequestFactory().post(
             '/api/action/ad-assessment/from-subdomain/',
             data={},
-            content_type='application/json',
+            format='json'
         )
         req.user = self.user
-        view = LaunchADAssessmentFromSubdomain.as_view()
         # Bypass permission check for unit test
         with patch.object(LaunchADAssessmentFromSubdomain, 'permission_classes', []):
+            view = LaunchADAssessmentFromSubdomain.as_view()
             response = view(req)
         self.assertEqual(response.status_code, 400)
         self.assertIn('error', response.data)
 
     def test_plugin_not_installed_returns_400(self):
+        from rest_framework.test import APIRequestFactory
         from api.views import LaunchADAssessmentFromSubdomain
         from startScan.models import Subdomain
         from unittest.mock import MagicMock
-        req = RequestFactory().post(
+        req = APIRequestFactory().post(
             '/api/action/ad-assessment/from-subdomain/',
             data={'subdomain_id': 99999},
-            content_type='application/json',
+            format='json'
         )
         req.user = self.user
-        req.data = {'subdomain_id': 99999}
-        view_instance = LaunchADAssessmentFromSubdomain()
-        view_instance.request = req
+        
         # Patch Subdomain.objects.get to return a mock subdomain
         mock_sub = MagicMock()
         mock_sub.scan_history.domain.name = 'corp.local'
@@ -70,19 +70,23 @@ class TestLaunchADAssessmentEndpoint(TestCase):
                 if 'plugins_data.active_directory.backend.models' in name:
                     raise ImportError('not installed')
                 return real_import(name, *args, **kwargs)
-            with patch('builtins.__import__', side_effect=mock_import):
-                response = view_instance.post(req)
+            
+            with patch('builtins.__import__', side_effect=mock_import), \
+                 patch.object(LaunchADAssessmentFromSubdomain, 'permission_classes', []):
+                view = LaunchADAssessmentFromSubdomain.as_view()
+                response = view(req)
         self.assertEqual(response.status_code, 400)
         self.assertIn('plugin', response.data['error'].lower())
 
     def test_successful_creation_returns_201(self):
+        from rest_framework.test import APIRequestFactory
         from api.views import LaunchADAssessmentFromSubdomain
         from unittest.mock import MagicMock, patch
 
-        req = RequestFactory().post(
+        req = APIRequestFactory().post(
             '/api/action/ad-assessment/from-subdomain/',
             data={'subdomain_id': 1},
-            content_type='application/json',
+            format='json'
         )
         req.user = self.user
 
@@ -96,18 +100,17 @@ class TestLaunchADAssessmentEndpoint(TestCase):
         mock_ad_class = MagicMock()
         mock_ad_class.objects.create.return_value = mock_assessment
 
-        view_instance = LaunchADAssessmentFromSubdomain()
-        view_instance.request = req
-
         with patch('api.views.Subdomain.objects.select_related') as mock_sr, \
              patch.dict('sys.modules', {
                  'plugins_data': MagicMock(),
                  'plugins_data.active_directory': MagicMock(),
                  'plugins_data.active_directory.backend': MagicMock(),
                  'plugins_data.active_directory.backend.models': MagicMock(ADAssessment=mock_ad_class),
-             }):
+             }), \
+             patch.object(LaunchADAssessmentFromSubdomain, 'permission_classes', []):
             mock_sr.return_value.get.return_value = mock_sub
-            response = view_instance.post(req)
+            view = LaunchADAssessmentFromSubdomain.as_view()
+            response = view(req)
 
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data['assessment_id'], 42)

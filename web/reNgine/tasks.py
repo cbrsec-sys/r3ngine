@@ -2787,9 +2787,9 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			# Apply proxy
 			if p:
 				if tool == 'katana': tool_cmd += f' -proxy "{p}"'
-				#elif tool == 'gospider': tool_cmd += f' -p {p}'
-				#elif tool == 'hakrawler': tool_cmd += f' -proxy {p}'
-				#elif tool == 'katana': tool_cmd += f' -proxy {p}'
+				elif tool == 'gospider': tool_cmd += f' -p {p}'
+				elif tool == 'hakrawler': tool_cmd += f' -proxy {p}'
+				elif tool == 'gau': tool_cmd += f' --proxy {p}'
 			
 			# Apply threads
 			if threads > 0:
@@ -3094,7 +3094,9 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			if proxy:
 				cmd = f"paramspider --domain {subdomain_name} --proxy {proxy} | tee {ps_output}"
 			logger.warning(f'Running ParamSpider command: {cmd}')
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
+			# proxy already embedded via --proxy flag above; don't also pass proxy= kwarg
+			# or run_command would double-wrap with proxychains when use_proxychains=True
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(ps_output):
 				try:
 					with open(ps_output, 'r') as f:
@@ -3151,7 +3153,9 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			proxy = get_random_proxy()
 			if proxy:
 				cmd += f" -p {proxy}"
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=proxy)
+			# proxy already embedded via -p flag above; don't also pass proxy= kwarg
+			# or run_command would double-wrap with proxychains when use_proxychains=True
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			# Parse InQL results
 			if os.path.exists(inql_output):
 				try:
@@ -5752,13 +5756,14 @@ def get_and_save_dork_results(lookup_target, results_dir, type, lookup_keywords=
 	history_file = f'{results_dir}/commands.txt'
 
 	try:
+		# proxy already embedded via -r flag above; don't also pass proxy= kwarg
+		# or run_command would double-wrap with proxychains when use_proxychains=True
 		run_command(
 			gofuzz_command,
 			shell=True, # Use shell=True to handle quoted arguments correctly
 			history_file=history_file,
 			scan_id=scan_history.id if scan_history else None,
 			activity_id=activity_id,
-			proxy=proxy
 		)
 
 		if not os.path.isfile(output_file):
