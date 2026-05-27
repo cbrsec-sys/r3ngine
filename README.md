@@ -241,15 +241,15 @@ flowchart TD
     PDR --> CP1{{"⏸ Pause Checkpoint"}}
 
     CP1 --> F2(( ))
-    F2 --> HC & PS & SS
+    F2 --> HC & PS
 
-    subgraph T2["🌐 Tier 2 — HTTP Crawl · Port Scan · Screenshot  ·  all parallel"]
+    subgraph T2["🌐 Tier 2 — HTTP Crawl · Port Scan ·  all parallel"]
         direction TB
         HC["RunHTTPCrawlActivity\n─ global config · feeds Tiers 3 & 4"] --> PHC[ParseHTTPCrawlResultsActivity]
         PS[RunPortScanActivity]
     end
 
-    PHC & PS & SS --> J2(( ))
+    PHC & PS --> J2(( ))
     J2 --> FU
 
     subgraph T3["🔗 Tier 3 — URL Fetching  ·  sequential"]
@@ -282,9 +282,9 @@ flowchart TD
     PAR --> CP3{{"⏸ Pause Checkpoint"}}
 
     CP3 --> F4(( ))
-    F4 --> NUC & WB & BF
+    F4 --> NUC & WB & BF & SS
 
-    subgraph T6["🎯 Tier 6 — Assessment  ·  all parallel"]
+    subgraph T6["🎯 Tier 6 — Assessment · BruteForcing · WAFBypass · Nuclei · Screenshot   ·  all parallel"]
         direction TB
         subgraph NP["NucleiPlannerWorkflow · child workflow"]
             direction TB
@@ -295,7 +295,7 @@ flowchart TD
         SS[RunScreenshotActivity]
     end
 
-    NUC & WB & BF --> J4(( ))
+    SS & NUC & WB & BF --> J4(( ))
     J4 --> PASM[ParseAssessmentResultsActivity]
     PASM --> CP4{{"⏸ Pause Checkpoint"}}
 
