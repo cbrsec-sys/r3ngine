@@ -2,7 +2,21 @@
 # Ensure OpenSSL compatibility before running any management commands
 pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
 
-# Collect static files
+# Install/update frontend dependencies (ensures packages match package.json in both modes)
+echo "Installing frontend dependencies..."
+cd /usr/src/app/frontend && npm install
+
+if [ "$DEBUG" = "1" ]; then
+    echo "Development mode: Starting Vite dev server..."
+    npm run dev -- --host 0.0.0.0 &
+else
+    echo "Production mode: Building frontend..."
+    npm run build
+fi
+
+cd /usr/src/app
+
+# Collect static files (includes built frontend assets)
 echo "Collecting static files..."
 python3 manage.py collectstatic --noinput --clear
 
@@ -19,18 +33,6 @@ echo "Loading default fixtures..."
 python3 manage.py loaddata fixtures/default_scan_engines.yaml
 python3 manage.py loaddata fixtures/external_tools.yaml
 python3 manage.py loaddata fixtures/default_keywords.yaml
-
-# Load custom engines if any
-#echo "Loading custom engines..."
-#mkdir -p /usr/src/app/custom_engines
-#python3 manage.py loadcustomengines
-
-# Start Vite development server if DEBUG is enabled
-if [ "$DEBUG" = "1" ]; then
-    echo "Starting Vite development server..."
-    cd /usr/src/app/frontend && npm run dev -- --host 0.0.0.0 &
-    cd /usr/src/app
-fi
 
 # Start the server
 echo "Starting reNgine server..."

@@ -18,7 +18,8 @@ import xmltodict
 from time import sleep
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
-from celery.utils.log import get_task_logger
+import logging as _logging
+get_task_logger = _logging.getLogger
 from discord_webhook import DiscordEmbed, DiscordWebhook
 from django.db.models import Q
 from dotted_dict import DottedDict
@@ -35,7 +36,7 @@ from reNgine.utilities import is_valid_url, replace_nulls
 
 
 logger = get_task_logger(__name__)
-DISCORD_WEBHOOKS_CACHE = redis.Redis.from_url(CELERY_BROKER_URL)
+DISCORD_WEBHOOKS_CACHE = redis.Redis.from_url(REDIS_URL)
 
 #------------------#
 # EngineType utils #
@@ -321,9 +322,10 @@ def get_http_urls(
 		query = query.filter(is_default=True)
 
 	# If is_uncrawled is True, select only endpoints that have not been crawled
-	# yet (no status)
+	# yet (no status). EndPoint.http_status defaults to 0, so we match both
+	# 0 (newly seeded) and NULL (explicitly unset).
 	if is_uncrawled:
-		query = query.filter(http_status__isnull=True)
+		query = query.filter(Q(http_status__isnull=True) | Q(http_status=0))
 
 	# If a path is passed, select only endpoints that contains it
 	if url_filter and domain:
@@ -521,7 +523,7 @@ def record_exists(model, data, exclude_keys=[]):
 	# Return True if a record exists based on the lookup fields, False otherwise
 	return model.objects.filter(**lookup_fields).exists()
 
-def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, **kwargs):
+def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, dedup_fields=None, **kwargs):
 	# Support both positional and keyword arguments for backward compatibility
 	if vuln_data and isinstance(vuln_data, dict):
 		vuln_data.update(kwargs)
@@ -584,8 +586,14 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, **
 	if is_suppressed:
 		vuln_data['is_suppressed'] = True
 
-	# Create vulnerability
-	vuln, created = Vulnerability.objects.get_or_create(**vuln_data)
+	# Create vulnerability — use narrower dedup key when caller specifies one,
+	# so volatile fields like description don't cause duplicate rows on re-scan.
+	if dedup_fields:
+		lookup = {k: vuln_data.pop(k) for k in dedup_fields if k in vuln_data}
+		vuln, created = Vulnerability.objects.update_or_create(defaults=vuln_data, **lookup)
+		vuln_data.update(lookup)  # restore for use below (tags, auth-candidate, etc.)
+	else:
+		vuln, created = Vulnerability.objects.get_or_create(**vuln_data)
 	if created:
 		vuln.discovered_date = timezone.now()
 		vuln.open_status = True
@@ -653,8 +661,11 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, **
 
 	# Save subscan id in vuln object
 	if subscan:
-		vuln.vuln_subscan_ids.add(subscan)
-		vuln.save()
+		from startScan.models import SubScan
+		subscan_pk = subscan.pk if hasattr(subscan, 'pk') else subscan
+		if SubScan.objects.filter(pk=subscan_pk).exists():
+			vuln.vuln_subscan_ids.add(subscan)
+			vuln.save()
 
 	return vuln, created
 
@@ -750,20 +761,25 @@ def validate_single_proxy(proxy_name):
 
 
 def validate_proxies(proxy_text):
-	"""Concurrently validate newline-separated proxy strings.
+	"""Concurrently validate newline-separated proxy strings using the same robust logic as the fetch task.
 	Returns a newline-separated string of validated live proxies.
 	"""
-	from concurrent.futures import ThreadPoolExecutor
+	from concurrent.futures import ThreadPoolExecutor, as_completed
 	if not proxy_text:
 		return ''
 	raw_proxies = [line.strip() for line in proxy_text.splitlines() if line.strip()]
 	if not raw_proxies:
 		return ''
 	valid_proxies = []
-	max_workers = min(50, len(raw_proxies))
+	max_workers = min(1000, max(1, len(raw_proxies)))
 	with ThreadPoolExecutor(max_workers=max_workers) as executor:
-		results = executor.map(validate_single_proxy, raw_proxies)
-		for proxy_name, is_valid in results:
+		future_to_proxy = {executor.submit(check_proxy_robust, p, 10): p for p in raw_proxies}
+		for future in as_completed(future_to_proxy):
+			proxy_name = future_to_proxy[future]
+			try:
+				is_valid = future.result()
+			except Exception:
+				is_valid = False
 			if is_valid:
 				valid_proxies.append(proxy_name)
 	return '\n'.join(valid_proxies)
@@ -832,43 +848,24 @@ def get_random_proxy():
 	# Shuffle the proxies to distribute traffic randomly
 	random.shuffle(proxies)
 
-	# Validate each proxy sequentially until we find a working, unauthenticated one.
-	# Limit checking to a maximum of 5 to prevent long sequential timeout loops (max 25s).
+	# Validate each proxy sequentially until we find a working one.
+	# Limit to 5 checks to cap worst-case wait (5 × timeout = 25 s).
 	checked_count = 0
 	for proxy_name in proxies:
-		if checked_count >= 5:
+		if checked_count >= 25:
 			logger.warning('Reached maximum sequential proxy validation limit (5). Stopping checks.')
 			break
 		checked_count += 1
-		try:
-			logger.info(f'Validating proxy: {proxy_name}')
-			test_proxy = proxy_name
-			if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
-				test_proxy = 'http://' + test_proxy
-			# Perform a request with a short timeout to check availability
-			response = requests.get(
-				'http://google.com', 
-				proxies={'http': test_proxy, 'https': test_proxy}, 
-				timeout=5, 
-				allow_redirects=True
-			)
+		
+		# Ensure the proxy has a valid scheme before usage
+		if not proxy_name.startswith('http') and not proxy_name.startswith('socks'):
+			proxy_name = f"http://{proxy_name}"
 			
-			# Check specifically for HTTP Status 407 (Proxy Authentication Required)
-			if response.status_code == 407 or 'Proxy-Authenticate' in response.headers or 'proxy-authenticate' in response.headers:
-				raise Exception("Proxy Authentication Required (Status 407)")
-			
-			# Check if "Proxy Authentication Required" is in the response body or headers (fallback logic)
-			if "Proxy Authentication Required" in response.text or "Proxy Authentication Required" in str(response.headers):
-				raise Exception("Proxy Authentication Required returned in response text/headers")
-			
-			# Ensure the response indicates a successful HTTP status code (2xx or 3xx)
-			if not (200 <= response.status_code < 400):
-				raise Exception(f"Proxy returned invalid status code: {response.status_code}")
-				
+		logger.info(f'Validating proxy: {proxy_name}')
+		if check_proxy_robust(proxy_name, timeout=5):
 			logger.warning('Using valid proxy: ' + proxy_name)
 			return proxy_name
-		except Exception as e:
-			logger.error(f'Proxy {proxy_name} validation failed: {e}')
+		logger.error(f'Proxy {proxy_name} validation failed.')
 
 	logger.error('No valid proxies found in the list!')
 	return ''

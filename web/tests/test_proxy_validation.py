@@ -18,6 +18,7 @@ class ProxyValidationTests(TestCase):
                 mock_response.status_code = 200
                 mock_response.text = 'OK'
                 mock_response.headers = {}
+                mock_response.json.return_value = {"ip": "1.2.3.4", "query": "1.2.3.4"}
                 return mock_response
             else:
                 raise Exception("Connection Refused")

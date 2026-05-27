@@ -117,6 +117,7 @@ class UserPreferences(models.Model):
 	)
 	user = models.OneToOneField(User, on_delete=models.CASCADE)
 	bug_bounty_mode = models.BooleanField(default=True)
+	enable_scan_queueing = models.BooleanField(default=False)
 	ui_version = models.CharField(max_length=2, choices=UI_VERSIONS, default='v2')
 	v3_intensity = models.CharField(max_length=20, choices=V3_INTENSITIES, default='clean')
 

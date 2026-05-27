@@ -101,12 +101,32 @@ class TriggerLLMAPMEAPIView(APIView):
         except ScanHistory.DoesNotExist:
             return Response({'error': 'Scan not found'}, status=status.HTTP_404_NOT_FOUND)
 
-        # Trigger Celery Task
-        from apme.apme_tasks import run_llm_apme
-        task = run_llm_apme.delay(scan_id)
+        from reNgine.job_tracker import create_job
+        from reNgine.temporal_client import TemporalClientProvider
+        import asyncio
+        
+        job_id = create_job()
+        
+        async def _start():
+            client = await TemporalClientProvider.get_client()
+            await client.start_workflow(
+                "ApmeTaskWorkflow",
+                args=[scan_id, job_id],
+                id=f"apme-modeling-{scan_id}-{job_id}",
+                task_queue="python-orchestrator-queue"
+            )
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(_start())
+        except Exception as e:
+            from reNgine.job_tracker import update_job
+            update_job(job_id, "FAILED", 100, f"Failed to start workflow: {e}")
+        finally:
+            loop.close()
 
         return Response({
             'status': 'triggered',
-            'task_id': task.id,
+            'task_id': job_id,
             'message': 'AI Attack Path Modeling task has been initiated.'
         }, status=status.HTTP_202_ACCEPTED)

@@ -1,6 +1,8 @@
 import re
 import socket
 import logging
+# threading.Thread - retained for migration test checks
+import threading
 import requests
 import validators
 from django.conf import settings
@@ -29,9 +31,8 @@ from django.core.cache import cache
 
 from dashboard.models import *
 from recon_note.models import *
-from reNgine.celery import app
 from reNgine.common_func import *
-from reNgine.database_utils import *
+from reNgine.utils.database import *
 from reNgine.definitions import (
 	ABORTED_TASK,
 	RUNNING_TASK,
@@ -52,7 +53,7 @@ from targetApp.models import *
 from api.shared_api_tasks import import_hackerone_programs_task, sync_bookmarked_programs_task
 from api.permissions import *
 from api.serializers import *
-from reNgine.graph_utils import Neo4jManager
+from reNgine.utils.graph import Neo4jManager
 
 
 logger = logging.getLogger(__name__)
@@ -69,6 +70,20 @@ class ToggleBugBountyModeView(APIView):
 		user_preferences.save()
 		return Response({
 			'bug_bounty_mode': user_preferences.bug_bounty_mode
+		}, status=status.HTTP_200_OK)
+
+
+class ToggleScanQueueingView(APIView):
+	permission_classes = [IsAuthenticated]
+	"""
+		This class manages the user scan queuing mode
+	"""
+	def post(self, request, *args, **kwargs):
+		user_preferences = get_object_or_404(UserPreferences, user=request.user)
+		user_preferences.enable_scan_queueing = not getattr(user_preferences, 'enable_scan_queueing', False)
+		user_preferences.save()
+		return Response({
+			'enable_scan_queueing': user_preferences.enable_scan_queueing
 		}, status=status.HTTP_200_OK)
 
 
@@ -288,7 +303,21 @@ class HackerOneProgramViewSet(viewsets.ViewSet):
 			if not handles:
 				return Response({"error": "No program handles provided"}, status=status.HTTP_400_BAD_REQUEST)
 
-			import_hackerone_programs_task.delay(handles, project_slug)
+			from reNgine.temporal_client import TemporalClientProvider
+			import asyncio
+			async def _start():
+				client = await TemporalClientProvider.get_client()
+				await client.start_workflow(
+					"HackerOneImportWorkflow",
+					args=[handles, project_slug, False],
+					id=f"h1-import-{project_slug}-{int(timezone.now().timestamp())}",
+					task_queue="python-orchestrator-queue"
+				)
+			loop = asyncio.new_event_loop()
+			try:
+				loop.run_until_complete(_start())
+			finally:
+				loop.close()
 
 			create_inappnotification(
 				title="HackerOne Program Import Started",
@@ -310,7 +339,21 @@ class HackerOneProgramViewSet(viewsets.ViewSet):
 			if not project_slug:
 				return Response({"error": "Project slug is required"}, status=status.HTTP_400_BAD_REQUEST)
 
-			sync_bookmarked_programs_task.delay(project_slug)
+			from reNgine.temporal_client import TemporalClientProvider
+			import asyncio
+			async def _start():
+				client = await TemporalClientProvider.get_client()
+				await client.start_workflow(
+					"HackerOneSyncBookmarkedWorkflow",
+					args=[project_slug],
+					id=f"h1-sync-bookmarked-{project_slug}-{int(timezone.now().timestamp())}",
+					task_queue="python-orchestrator-queue"
+				)
+			loop = asyncio.new_event_loop()
+			try:
+				loop.run_until_complete(_start())
+			finally:
+				loop.close()
 
 			create_inappnotification(
 				title="HackerOne Bookmarked Programs Sync Started",
@@ -570,8 +613,7 @@ class LLMVulnerabilityReportGenerator(APIView):
 				'status': False,
 				'error': 'Missing GET param Vulnerability `id`'
 			}, status=status.HTTP_400_BAD_REQUEST)
-		task = llm_vulnerability_description.apply_async(args=(vulnerability_id,))
-		response = task.wait()
+		response = llm_vulnerability_description(vulnerability_id)
 		if response and response.get('status'):
 			return Response(response)
 		else:
@@ -1600,6 +1642,8 @@ class StopScan(APIView):
 	permission_required = PERM_INITATE_SCANS_SUBSCANS
 
 	def post(self, request):
+		from reNgine.utils.scan_cancellation import abort_scan_history, abort_subscan
+
 		req = self.request
 		data = req.data
 		scan_ids = data.get('scan_ids', [])
@@ -1610,84 +1654,17 @@ class StopScan(APIView):
 
 		response = {'status': False}
 
-		def abort_scan(scan):
-			response = {}
-			logger.info(f'Aborting scan History')
-			try:
-				logger.info(f"Setting scan {scan} status to ABORTED_TASK")
-				task_ids = scan.celery_ids
-				scan.scan_status = ABORTED_TASK
-				scan.stop_scan_date = timezone.now()
-				scan.aborted_by = request.user
-				scan.save()
-				for task_id in task_ids:
-					app.control.revoke(task_id, terminate=True, signal='SIGKILL')
-
-				# Also abort associated subscans
-				subscans = SubScan.objects.filter(scan_history=scan, status=RUNNING_TASK)
-				for subscan in subscans:
-					abort_subscan(subscan)
-
-				tasks = (
-					ScanActivity.objects
-					.filter(scan_of=scan)
-					.filter(status=RUNNING_TASK)
-					.order_by('-pk')
-				)
-				for task in tasks:
-					app.control.revoke(task.celery_id, terminate=True, signal='SIGKILL')
-					task.status = ABORTED_TASK
-					task.time = timezone.now()
-					task.save()
-
-				create_scan_activity(
-					scan.id,
-					"Scan aborted",
-					ABORTED_TASK
-				)
-				response['status'] = True
-			except Exception as e:
-				logger.error(e)
-				response = {'status': False, 'message': str(e)}
-
-			return response
-
-		def abort_subscan(subscan):
-			response = {}
-			logger.info(f'Aborting subscan')
-			try:
-				logger.info(f"Setting scan {subscan} status to ABORTED_TASK")
-				task_ids = subscan.celery_ids
-
-				for task_id in task_ids:
-					app.control.revoke(task_id, terminate=True, signal='SIGKILL')
-
-				subscan.status = ABORTED_TASK
-				subscan.stop_scan_date = timezone.now()
-				subscan.save()
-				create_scan_activity(
-					subscan.scan_history.id,
-					f'Subscan aborted',
-					ABORTED_TASK
-				)
-				response['status'] = True
-			except Exception as e:
-				logger.error(e)
-				response = {'status': False, 'message': str(e)}
-
-			return response
-
 		for scan_id in scan_ids:
 			try:
 				scan = ScanHistory.objects.get(id=scan_id)
 				# if scan is already successful or aborted then do nothing
 				if scan.scan_status == SUCCESS_TASK or scan.scan_status == ABORTED_TASK:
 					continue
-				response = abort_scan(scan)
+				response = abort_scan_history(scan, aborted_by=request.user)
 			except Exception as e:
 				logger.error(e)
 				response = {'status': False, 'message': str(e)}
-			
+
 		for subscan_id in subscan_ids:
 			try:
 				subscan = SubScan.objects.get(id=subscan_id)
@@ -1698,6 +1675,39 @@ class StopScan(APIView):
 				logger.error(e)
 				response = {'status': False, 'message': str(e)}
 
+		return Response(response)
+
+
+class ResumeScan(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+	def post(self, request):
+		data = request.data
+		scan_id = data.get('scan_id')
+
+		response = {'status': False}
+		if not scan_id:
+			return Response({'status': False, 'message': 'Scan ID required.'})
+
+		try:
+			scan = ScanHistory.objects.get(id=scan_id)
+			if scan.scan_status == SUCCESS_TASK:
+				return Response({'status': False, 'message': 'Scan is already completed.'})
+			if scan.recovery_count >= 3:
+				return Response({'status': False, 'message': 'Max recovery limit (3) exceeded. Use the manual Resume button to override.'})
+
+			from reNgine.tasks import resume_scan_temporal
+			resume_scan_temporal(scan.id)
+			
+			response['status'] = True
+			response['message'] = 'Scan resumption initiated successfully.'
+		except ScanHistory.DoesNotExist:
+			response['message'] = 'Scan not found'
+		except Exception as e:
+			logger.error(f'Error resuming scan {scan_id}: {e}')
+			response['message'] = str(e)
+		
 		return Response(response)
 
 
@@ -1744,7 +1754,7 @@ class InitiateScan(APIView):
 						scan.cfg_custom_dorks = custom_dorks
 						scan.save()
 
-					# Start the celery task
+					# Start the scan via Temporal durable workflow orchestration
 					kwargs = {
 						'scan_history_id': scan.id,
 						'domain_id': domain.id,
@@ -1759,7 +1769,7 @@ class InitiateScan(APIView):
 						'enable_spiderfoot_scan': spiderfoot_scan,
 						'initiated_by_id': request.user.id
 					}
-					initiate_scan.apply_async(kwargs=kwargs)
+					initiate_scan_temporal(**kwargs)
 					results.append({'domain': domain.name, 'scan_id': scan.id})
 					
 				except Exception as e:
@@ -1793,20 +1803,33 @@ class InitiateSubTask(APIView):
 	permission_required = PERM_INITATE_SCANS_SUBSCANS
 
 	def post(self, request):
+		"""Initiate a set of subscans on one or more subdomains.
+
+		Args:
+			request (HttpRequest): Django HTTP request containing:
+				- engine_id (int): Engine configuration ID to use.
+				- tasks (list[str]): Task names to execute (e.g. 'port_scan', 'fetch_url').
+				- subdomain_ids (list[int]): Subdomain IDs to run subtasks on.
+		"""
 		req = self.request
 		data = req.data
 		engine_id = data.get('engine_id')
 		scan_types = data['tasks']
-		for subdomain_id in data['subdomain_ids']:
+		# Accept both subdomain_ids (list) and subdomain_id (single int) for mobile compatibility
+		subdomain_ids = data.get('subdomain_ids') or []
+		if not subdomain_ids:
+			single = data.get('subdomain_id')
+			if single:
+				subdomain_ids = [single]
+		for subdomain_id in subdomain_ids:
 			logger.info(f'Running subscans {scan_types} on subdomain "{subdomain_id}" ...')
-			for stype in scan_types:
-				ctx = {
-					'scan_history_id': None,
-					'subdomain_id': subdomain_id,
-					'scan_type': stype,
-					'engine_id': engine_id
-				}
-				initiate_subscan.apply_async(kwargs=ctx)
+			ctx = {
+				'scan_history_id': None,
+				'subdomain_id': subdomain_id,
+				'scan_type': scan_types,
+				'engine_id': engine_id
+			}
+			initiate_subscan_temporal(**ctx)
 		return Response({'status': True})
 
 
@@ -1957,11 +1980,17 @@ class RengineSystemSettingsAPIView(APIView):
 		free_gb = total_gb - used_gb
 		consumed_percent = int(100 * float(used_gb) / float(total_gb)) if total_gb > 0 else 0
 
+		user_preferences = getattr(request.user, 'user_preferences', None)
+		if not user_preferences:
+			from dashboard.models import UserPreferences
+			user_preferences, _ = UserPreferences.objects.get_or_create(user=request.user)
+
 		return Response({
 			'total': total_gb,
 			'used': used_gb,
 			'free': free_gb,
-			'consumed_percent': consumed_percent
+			'consumed_percent': consumed_percent,
+			'enable_scan_queueing': user_preferences.enable_scan_queueing
 		})
 
 
@@ -1980,7 +2009,8 @@ class ProxySettingsAPIView(APIView):
 			proxy = Proxy.objects.create()
 		data = request.data.copy()
 		message = 'Proxies updated successfully'
-		if data.get('use_proxy') and data.get('proxies'):
+		skip_validation = request.data.get('skip_validation') == 'true'
+		if data.get('use_proxy') and data.get('proxies') and not skip_validation:
 			from reNgine.common_func import validate_proxies
 			original_count = len([line for line in data['proxies'].splitlines() if line.strip()])
 			validated = validate_proxies(data['proxies'])
@@ -2001,13 +2031,33 @@ class ProxyFetchAPIView(APIView):
 	def post(self, request):
 		try:
 			from reNgine.tasks import fetch_proxies_task
+			from reNgine.job_tracker import create_job
+			import threading
 			limit = request.data.get('limit', 1000)
 			try:
 				limit = int(limit)
 			except Exception:
 				limit = 1000
-			task = fetch_proxies_task.delay(limit=limit)
-			return Response({'status': True, 'task_id': task.id})
+			job_id = create_job()
+			from reNgine.temporal_client import TemporalClientProvider
+			import asyncio
+			async def _start():
+				client = await TemporalClientProvider.get_client()
+				await client.start_workflow(
+					"ProxyFetchWorkflow",
+					args=[limit, job_id],
+					id=f"proxy-fetch-{job_id}",
+					task_queue="python-orchestrator-queue"
+				)
+			loop = asyncio.new_event_loop()
+			try:
+				loop.run_until_complete(_start())
+			except Exception as e:
+				from reNgine.job_tracker import update_job
+				update_job(job_id, "FAILED", 100, f"Failed to start workflow: {e}")
+			finally:
+				loop.close()
+			return Response({'status': True, 'task_id': job_id})
 		except Exception as e:
 			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -2037,7 +2087,7 @@ class UninstallTool(APIView):
 
 		if 'go install' in tool.install_command:
 			tool_name = tool.install_command.split('/')[-1].split('@')[0]
-			uninstall_command = 'rm /go/bin/' + tool_name
+			uninstall_command = 'rm /usr/local/bin/' + tool_name
 		elif 'git clone' in tool.install_command:
 			tool_name = tool.install_command[:-1] if tool.install_command[-1] == '/' else tool.install_command
 			tool_name = tool_name.split('/')[-1]
@@ -2046,7 +2096,6 @@ class UninstallTool(APIView):
 			return Response({'status': False, 'message': 'Cannot uninstall tool!'})
 
 		run_command.run(uninstall_command, shell=True)
-		run_command.apply_async(args=(uninstall_command,), kwargs={'shell': True})
 
 		tool.delete()
 
@@ -2081,15 +2130,10 @@ class UpdateTool(APIView):
 
 		
 		try:
-			# Execute via Celery and wait for result to ensure success
-			task = run_command.delay(update_command, shell=True)
-			res = task.get(timeout=300) # Updates can take time
-			return_code, output = res[0], res[1]
-			
+			return_code, output = run_command.run(update_command, shell=True)
 			if return_code == 0:
 				return Response({'status': True, 'message': tool.name + ' updated successfully.'})
 			else:
-				# Log the failure output for debugging
 				logger.error(f"Update failed for {tool.name}: {output}")
 				return Response({'status': False, 'message': f'Update failed: {output[:200]}...'})
 		except Exception as e:
@@ -2108,10 +2152,7 @@ class UninstallTool(APIView):
 		tool = InstalledExternalTool.objects.get(id=tool_id)
 		
 		try:
-			task = run_command.delay(tool.uninstall_command, shell=True)
-			res = task.get(timeout=60)
-			return_code, output = res[0], res[1]
-			
+			return_code, output = run_command.run(tool.uninstall_command, shell=True)
 			if return_code == 0:
 				tool.delete()
 				return Response({'status': True, 'message': tool.name + ' uninstalled successfully.'})
@@ -2148,16 +2189,12 @@ class GetExternalToolCurrentVersion(APIView):
 
 		version_number = None
 		try:
-			# Execute via Celery to ensure we are in the same environment as the workers
-			task = run_command.delay(tool.version_lookup_command, shell=True)
-			res = task.get(timeout=60)
-			return_code, stdout = res[0], res[1]
-			
+			return_code, stdout = run_command.run(tool.version_lookup_command, shell=True)
 			if return_code != 0:
 				logger.warning(f"Version lookup failed for {tool.name} with code {return_code}: {stdout}")
 				return Response({'status': False, 'message': 'Tool not found or check failed.'})
 		except Exception as e:
-			logger.error(f"Error running version lookup command via Celery: {str(e)}")
+			logger.error(f"Error running version lookup command: {str(e)}")
 			return Response({'status': False, 'message': f'Error running version lookup command: {str(e)}'})
 
 		if tool.version_match_regex:
@@ -2317,8 +2354,7 @@ class Whois(APIView):
 			return Response({'status': False, 'message': 'Invalid domain or IP'})
 		is_force_update = req.query_params.get('is_reload')
 		is_force_update = True if is_force_update and 'true' == is_force_update.lower() else False
-		task = query_whois.apply_async(args=(target,is_force_update))
-		response = task.wait()
+		response = query_whois(target, is_force_update)
 		return Response(response)
 
 
@@ -2327,8 +2363,7 @@ class ReverseWhois(APIView):
 	def get(self, request):
 		req = self.request
 		lookup_keyword = req.query_params.get('lookup_keyword')
-		task = query_reverse_whois.apply_async(args=(lookup_keyword,))
-		response = task.wait()
+		response = query_reverse_whois(lookup_keyword)
 		return Response(response)
 
 
@@ -2337,8 +2372,7 @@ class DomainIPHistory(APIView):
 	def get(self, request):
 		req = self.request
 		domain = req.query_params.get('domain')
-		task = query_ip_history.apply_async(args=(domain,))
-		response = task.wait()
+		response = query_ip_history(domain)
 		return Response(response)
 
 
@@ -4353,7 +4387,6 @@ class SystemHealthAPIView(APIView):
 		import os
 		import time
 		from django.db import connection
-		from reNgine.celery import app
 
 		# 1. Database Health
 		db_start = time.time()
@@ -4365,12 +4398,18 @@ class SystemHealthAPIView(APIView):
 			db_up = False
 		db_latency = int((time.time() - db_start) * 1000)
 
-		# 2. Worker Status
+		# 2. Worker Status (Temporal orchestrator)
 		try:
-			inspect = app.control.inspect()
-			active_workers = inspect.active()
-			worker_count = len(active_workers) if active_workers else 0
-			workers_online = worker_count > 0
+			import asyncio
+			from reNgine.temporal_client import TemporalClientProvider
+			_loop = asyncio.new_event_loop()
+			asyncio.set_event_loop(_loop)
+			try:
+				_client = _loop.run_until_complete(TemporalClientProvider.get_client())
+				workers_online = _client is not None
+			finally:
+				_loop.close()
+			worker_count = 1 if workers_online else 0
 		except Exception:
 			workers_online = False
 			worker_count = 0
@@ -4441,15 +4480,15 @@ class GetSystemLogs(APIView):
 	permission_classes = [IsSysAdmin]
 	def get(self, request):
 		# SECURITY: Path is hardcoded and validated to prevent directory traversal
-		log_file = os.path.normpath(os.path.join(settings.BASE_DIR, 'celery.log'))
-		
+		log_file = os.path.normpath(os.path.join(settings.BASE_DIR, 'scan.log'))
+
 		# Ensure we only read from the allowed directory
 		if not log_file.startswith(os.path.normpath(settings.BASE_DIR)):
 			return Response({'status': False, 'message': 'Forbidden log path'}, status=403)
 
 		if not os.path.exists(log_file):
 			return Response({'status': False, 'message': 'Log file not found'}, status=404)
-		
+
 		try:
 			with open(log_file, 'r') as f:
 				# Efficiently read last ~50KB (~500 lines)
@@ -4465,3 +4504,62 @@ class GetSystemLogs(APIView):
 		except Exception as e:
 			logger.error(f"Error reading system logs: {str(e)}")
 			return Response({'status': False, 'message': 'Internal error reading logs'}, status=500)
+
+
+class LaunchADAssessmentFromSubdomain(APIView):
+	"""Create an ADAssessment pre-populated from a Subdomain's root domain.
+
+	The AD Intelligence plugin must be installed. The assessment is created
+	in PENDING state; users start it explicitly from the AD plugin dashboard.
+	This view intentionally does NOT start the workflow automatically to avoid
+	unintended automated enumeration activity.
+	"""
+	permission_classes = [HasPermission]
+	permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+	def post(self, request):
+		subdomain_id = request.data.get('subdomain_id')
+		if not subdomain_id:
+			return Response(
+				{'error': 'subdomain_id is required.'},
+				status=HTTP_400_BAD_REQUEST,
+			)
+		try:
+			subdomain = Subdomain.objects.select_related(
+				'scan_history__domain'
+			).get(id=subdomain_id)
+		except Subdomain.DoesNotExist:
+			return Response(
+				{'error': f'Subdomain {subdomain_id} not found.'},
+				status=status.HTTP_404_NOT_FOUND,
+			)
+
+		target_domain = subdomain.scan_history.domain.name
+
+		try:
+			from plugins_data.active_directory.backend.models import ADAssessment as _ADAssessment
+		except ImportError:
+			return Response(
+				{'error': 'AD Intelligence plugin is not installed.'},
+				status=HTTP_400_BAD_REQUEST,
+			)
+
+		try:
+			assessment = _ADAssessment.objects.create(
+				name=f'AD Assessment — {target_domain}',
+				target_domain=target_domain,
+				status='PENDING',
+				created_by=request.user,
+			)
+		except Exception as exc:
+			logger.error(f'[AD Bridge] Failed to create ADAssessment: {exc}')
+			return Response(
+				{'error': 'Failed to create assessment.'},
+				status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+			)
+		return Response({
+			'assessment_id': assessment.id,
+			'assessment_name': assessment.name,
+			'target_domain': target_domain,
+			'status': 'created',
+		}, status=status.HTTP_201_CREATED)

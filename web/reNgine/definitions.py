@@ -233,7 +233,7 @@ DORKS_DEFAULT_NAMES = [
 ]
 
 # ffuf
-FFUF_DEFAULT_WORDLIST_PATH = '/usr/src/wordlist/dicc.txt'
+FFUF_DEFAULT_WORDLIST_PATH = '/usr/src/wordlist/raft-large-directories.txt'
 FFUF_DEFAULT_MATCH_HTTP_STATUS = [200, 204]
 FFUF_DEFAULT_RECURSIVE_LEVEL = 2
 FFUF_DEFAULT_FOLLOW_REDIRECT = False
@@ -375,7 +375,7 @@ CELERY_TASK_STATUS_MAP = {
     PARTIALLY_COMPLETE_TASK: 'PARTIALLY COMPLETE'
 }
 
-CELERY_TASK_STATUSES = (
+TASK_STATUSES = (
     (INITIATED_TASK, INITIATED_TASK),
     (FAILED_TASK, FAILED_TASK),
     (RUNNING_TASK, RUNNING_TASK),
@@ -383,6 +383,7 @@ CELERY_TASK_STATUSES = (
     (ABORTED_TASK, ABORTED_TASK),
     (PARTIALLY_COMPLETE_TASK, PARTIALLY_COMPLETE_TASK)
 )
+CELERY_TASK_STATUSES = TASK_STATUSES  # deprecated alias — remove after all references updated
 DYNAMIC_ID = -1
 
 ###############################################################################
@@ -753,6 +754,23 @@ Instead of focusing on specific threat actors, focus on the **Potential Attack C
 Describe how this vulnerability fits into a broader attack path (e.g., Initial Access -> Lateral Movement -> Data Exfiltration).
 Provide a prioritized list of business consequences.
 Format the response clearly with sections for 'Potential Attack Chain' and 'Impact Summary'.
+"""
+
+
+CWE_INFO_SYSTEM_PROMPT = """
+You are an expert application security engineer. Given a CWE (Common Weakness Enumeration) identifier, provide a concise but thorough security reference in JSON format.
+
+Return ONLY valid JSON with these exact keys:
+{
+  "name": "short CWE name (e.g. Cross-Site Scripting)",
+  "description": "2-3 sentence technical description of the weakness",
+  "impact": "1-2 sentence description of the security impact to systems and data",
+  "remediation": "2-3 concrete, actionable remediation steps as a single string",
+  "examples": ["brief real-world example 1", "brief real-world example 2"],
+  "severity": "Critical|High|Medium|Low"
+}
+
+Be precise and technical. Do not include markdown, code blocks, or any text outside the JSON object.
 """
 
 

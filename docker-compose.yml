@@ -13,6 +13,12 @@ services:
       - postgres_data:/var/lib/postgresql/data/
     networks:
       - r3ngine_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     deploy:
       resources:
         limits:
@@ -33,95 +39,17 @@ services:
         reservations:
           memory: 512M
 
-  celery:
-    build:
-      context: .
-      dockerfile: web/Dockerfile
-    restart: always
-    entrypoint: /usr/src/app/celery-entrypoint.sh
-    command: celery -A reNgine worker --autoscale=${MAX_CONCURRENCY},${MIN_CONCURRENCY} -l WARNING
-    volumes:
-      - ./web:/usr/src/app
-      #- ./frontend:/usr/src/app/frontend
-      - github_repos:/usr/src/github
-      - wordlist:/usr/src/wordlist
-      - scan_results:/usr/src/scan_results
-      - gf_patterns:/root/.gf
-      - nuclei_templates:/root/nuclei-templates
-      - tool_config:/root/.config
-      - static_volume:/usr/src/app/staticfiles/
-      #- plugins_data:/usr/src/app/plugins_data
-    environment:
-      - DEBUG=0
-      - CELERY_BROKER=redis://redis:6379/0
-      - CELERY_BACKEND=redis://redis:6379/0
-      - DOMAIN_NAME=${DOMAIN_NAME}
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_HOST=${POSTGRES_HOST}
-      - MAX_CONCURRENCY=${MAX_CONCURRENCY}
-      - MIN_CONCURRENCY=${MIN_CONCURRENCY}
-    depends_on:
-      - db
-      - redis
-    networks:
-      - r3ngine_network
-    deploy:
-      resources:
-        limits:
-          memory: 8G
-        reservations:
-          memory: 4G
-
-  celery-beat:
-    build:
-      context: .
-      dockerfile: web/Dockerfile
-    entrypoint: /usr/src/app/beat-entrypoint.sh
-    command: celery -A reNgine beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler
-    environment:
-      - DEBUG=0
-      - CELERY_BROKER=redis://redis:6379/0
-      - CELERY_BACKEND=redis://redis:6379/0
-      - POSTGRES_DB=${POSTGRES_DB}
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_PORT=${POSTGRES_PORT}
-      - POSTGRES_HOST=${POSTGRES_HOST}
-    depends_on:
-      - celery
-      - db
-    volumes:
-      - ./web:/usr/src/app
-      - github_repos:/usr/src/github
-      - wordlist:/usr/src/wordlist
-      - scan_results:/usr/src/scan_results
-      - gf_patterns:/root/.gf
-      - nuclei_templates:/root/nuclei-templates
-      - tool_config:/root/.config
-      #- plugins_data:/usr/src/app/plugins_data
-    networks:
-      - r3ngine_network
-    deploy:
-      resources:
-        limits:
-          memory: 2G
-        reservations:
-          memory: 1G
-      
   web:
     build:
       context: .
       dockerfile: web/Dockerfile
     entrypoint: /usr/src/app/entrypoint.sh
     restart: always
+    init: true
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     environment:
       - DEBUG=0
-      - CELERY_BROKER=redis://redis:6379/0
-      - CELERY_BACKEND=redis://redis:6379/0
+      - REDIS_URL=redis://redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -131,8 +59,8 @@ services:
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
     volumes:
       - ./web:/usr/src/app
-      #- ./frontend:/usr/src/app/frontend
-      #- /usr/src/app/frontend/node_modules
+      - ./frontend:/usr/src/app/frontend
+      - /usr/src/app/frontend/node_modules
       - github_repos:/usr/src/github
       - wordlist:/usr/src/wordlist
       - scan_results:/usr/src/scan_results
@@ -146,8 +74,7 @@ services:
       - "5173:5173"
     depends_on:
       - db
-      - celery
-      - celery-beat
+      - redis
     networks:
       r3ngine_network:
         aliases:
@@ -210,7 +137,7 @@ services:
     image: neo4j:5.12.0
     restart: always
     ports:
-      - "127.0.0.1:7474:7474"
+      - "127.0.0.1:8474:7474"
       - "127.0.0.1:7687:7687"
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
@@ -219,6 +146,12 @@ services:
       - neo4j_data:/data
     networks:
       - r3ngine_network
+    healthcheck:
+      test: [ "CMD", "wget", "-O", "/dev/null", "-q", "http://localhost:7474" ]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
     deploy:
       resources:
         limits:
@@ -226,13 +159,132 @@ services:
         reservations:
           memory: 1G
 
+  temporal:
+    image: temporalio/auto-setup:1.22.4
+    restart: always
+    ports:
+      - "127.0.0.1:7233:7233"
+      - "127.0.0.1:8233:8233"
+    environment:
+      - DB=postgresql
+      - DB_PORT=5432
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PWD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_SEEDS=db
+    depends_on:
+      - db
+      #  condition: service_healthy
+    networks:
+      - r3ngine_network
+    healthcheck:
+      test: [ "CMD", "tctl", "namespace", "list" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  temporal-python-orchestrator:
+    image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
+    restart: always
+    init: true
+    entrypoint: /usr/src/app/temporal-entrypoint.sh
+    environment:
+      - DEBUG=0
+      - TEMPORAL_HOST=temporal:7233
+      - TEMPORAL_NAMESPACE=default
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+    depends_on:
+      #temporal:
+      #  condition: service_healthy
+      db:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    volumes:
+      - ./web:/usr/src/app
+      - github_repos:/usr/src/github
+      - wordlist:/usr/src/wordlist
+      - scan_results:/usr/src/scan_results
+      - gf_patterns:/root/.gf
+      - nuclei_templates:/root/nuclei-templates
+      - tool_config:/root/.config
+      - static_volume:/usr/src/app/staticfiles/
+    networks:
+      - r3ngine_network
+    healthcheck:
+      test: [ "CMD-SHELL", "pgrep -f run_temporal_orchestrator || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  temporal-go-executor:
+    image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
+    restart: always
+    init: true
+    entrypoint: /usr/src/app/executor-entrypoint.sh
+    environment:
+      - TEMPORAL_HOST=temporal:7233
+      - TEMPORAL_NAMESPACE=default
+      - REDIS_URL=redis://redis:6379/0
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_HOST=${POSTGRES_HOST}
+      - POSTGRES_PORT=${POSTGRES_PORT}
+    depends_on:
+      #temporal:
+      #  condition: service_healthy
+      db:
+        condition: service_healthy
+    volumes:
+      - ./web:/usr/src/app
+      - github_repos:/usr/src/github
+      - wordlist:/usr/src/wordlist
+      - scan_results:/usr/src/scan_results
+      - gf_patterns:/root/.gf
+      - nuclei_templates:/root/nuclei-templates
+      - tool_config:/root/.config
+      - static_volume:/usr/src/app/staticfiles/
+    networks:
+      - r3ngine_network
+    healthcheck:
+      test: [ "CMD", "pgrep", "-f", "r3ngine-executor" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
 networks:
   r3ngine_network:
 
 volumes:
   tool_config:
     name: r3ngine_tool_config
-    
   postgres_data:
     name: r3ngine_postgres_data
   gf_patterns:
@@ -253,7 +305,6 @@ volumes:
     name: r3ngine_neo4j_data
   plugins_data:
     name: r3ngine_plugins_data
-
 
 secrets:
   proxy.ca:

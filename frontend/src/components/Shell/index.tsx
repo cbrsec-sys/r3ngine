@@ -65,6 +65,8 @@ import {
   CVELookupModal,
   WAFDetectorModal
 } from '../../features/tools/components/ToolboxModals';
+import { useQuery } from '@tanstack/react-query';
+import axios from 'axios';
 import { NotificationsDropdown } from '../../features/notifications/components/NotificationsDropdown';
 import { useUnreadCount } from '../../features/notifications/api';
 import { ScanHistoryDrawer } from '../../features/scans/components/ScanHistoryDrawer';
@@ -105,11 +107,24 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: unreadData } = useUnreadCount(projectSlug);
 
+  const { data: pluginsRegistry } = useQuery({
+    queryKey: ['pluginsRegistry'],
+    queryFn: async () => {
+      const res = await axios.get('/api/plugins/registry/');
+      return res.data;
+    }
+  });
+
+  const pluginMenuChildren = (pluginsRegistry || [])
+    .filter((p: any) => p.components?.menu_item)
+    .map((p: any) => ({
+      title: p.components.menu_item,
+      path: `/${projectSlug}${p.components.menu_path}`
+    }));
+
   const navItems: NavItem[] = [
     { title: 'Dashboard', icon: <Home size={20} />, path: `/${projectSlug}/dashboard`, color: theme.palette.primary.main },
     { title: 'Projects', icon: <Folder size={20} />, path: `/${projectSlug}/projects`, color: theme.palette.primary.main },
-
-
     { title: 'Targets', icon: <Target size={20} />, path: `/${projectSlug}/targets`, color: theme.palette.primary.main },
     { title: 'Monitoring', icon: <Monitor size={20} />, path: `/${projectSlug}/monitoring`, color: theme.palette.primary.main },
     {
@@ -129,7 +144,16 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     { title: 'Todo', icon: <CheckSquare size={20} />, path: `/${projectSlug}/todo`, color: theme.palette.primary.main },
     { title: 'Organization', icon: <Briefcase size={20} />, path: `/${projectSlug}/org`, color: theme.palette.primary.main },
     { title: 'Scan Engine', icon: <Cpu size={20} />, path: `/${projectSlug}/engines`, color: theme.palette.primary.main },
-    { title: 'Plugins', icon: <LayoutGrid size={20} />, path: `/${projectSlug}/plugins`, color: theme.palette.primary.main },
+    { 
+      title: 'Plugins', 
+      icon: <LayoutGrid size={20} />, 
+      path: `/${projectSlug}/plugins`, 
+      color: theme.palette.primary.main,
+      children: pluginMenuChildren.length > 0 ? [
+        { title: 'Manage Plugins', path: `/${projectSlug}/plugins` },
+        ...pluginMenuChildren
+      ] : undefined
+    },
     { title: 'Bounty Hub', icon: <Command size={20} />, path: `/${projectSlug}/bounty`, color: theme.palette.primary.main },
     {
       title: 'Settings',

@@ -1,5 +1,191 @@
 # Changelog
 
+### [v3.2.0] - 2026-05-26
+
+- **URL Gathering Tools Regex Fix**:
+  - Corrected a critical POSIX regular expression syntax error (`host_regex`) in the URL fetching task (`fetch_url`) of `tasks.py` that caused all output from `gau`, `waybackurls`, `hakrawler`, `katana`, and `gospider` to produce zero results.
+  - Implemented a POSIX-compliant character class `[^][[:space:]\\\"\\`><]*` to correctly exclude brackets, whitespace, quotes, and backticks without causing syntax errors or early bracket terminations in POSIX `grep` execution.
+
+- **baddns Scan Pipeline Integration**:
+  - Registered `baddns` as a default subdomain discovery tool inside `subdomain_discovery` in `tasks.py` by appending it to the `default_subdomain_tools` list, resolving the issue where baddns execution was skipped with an unsupported warning.
+  - Added support for executing `baddns` as a standalone discovery task inside the main scan workflow (`MasterScanWorkflow`) in `temporal_workflows.py`.
+  - Fixed invalid CLI arguments (removed unrecognized `-d` and `-o` parameters) and refactored command to run in silent mode with output redirected to a results file (`baddns -s {host} > {results_file}`).
+  - Added subdomain extraction logic to parse JSON findings and save newly discovered domains/subdomains to `subdomains_baddns_extracted.txt`.
+  - Refactored the takeover validation parser in `tasks.py` to correctly check the JSON findings format instead of expecting plain-text labels.
+
+- **Scan Queueing Feature**:
+  - Implemented an optional queueing mechanism (`UserPreferences.enable_scan_queueing`) to restrict scan concurrency.
+  - Limits execution to a maximum of 1 main scan and 1 subscan concurrently. Additional scans block in a Temporal polling loop (`check_scan_queue_status_activity`) and check again every 30 seconds.
+  - Added backend APIs to get and toggle the queueing state (`ToggleScanQueueingView`).
+  - Added a dedicated "SCAN CONFIGURATION" control panel with a toggle switch on the global Settings page.
+  - Registered `CheckScanQueueStatusActivity` in the Temporal python worker commands (`run_temporal_orchestrator.py`).
+  - Fixed a TypeScript syntax error regarding `PaperProps` typing in `DistributionCharts.tsx` for production builds.
+
+- **Backend Architecture & Code Quality Remediation**:
+  - Implemented a centralized, singleton-cached `TemporalClientProvider` to manage Temporal workflow client connections efficiently and prevent connection pool exhaustion.
+  - Replaced unmanaged daemon threads and synchronous inline operations in Views and Celery tasks with durable Temporal workflows and registered 6 new workflows and activities (`HackerOneImportWorkflow`, `HackerOneSyncBookmarkedWorkflow`, `ProxyFetchWorkflow`, `ApmeTaskWorkflow`, `GeoLocalizeWorkflow`, `SubScanWorkflow`).
+  - Added deferred reader closes and a 1MB scanner buffer limit configuration in the Go Executor (`web/executor/main.go`) to prevent subprocess scanner crashes and reader pipe resource leaks.
+  - Wrapped multi-threaded OSINT tasks with `db_conn_safe_wrapper` to ensure safe database connection closure on thread finalization and joined them to block during activity run, resolving database lockups and resource exhaustion.
+  - Rewrote the vulnerability correlation and impact assessment lookups in `correlation.py` to preload subdomains, CVEs, and assessments, performing duplicate verification in-memory and batching database writes (reducing query footprint from ~5,000 to ~5 queries for 1,000 processed findings).
+  - Configured Django `pre_delete` signals on `ScanHistory` and `SubScan` to cleanly cancel associated workflows in Temporal and cleanup directories on disk.
+  - Wrapped `UserPreferences` middleware lookup inside a `SimpleLazyObject` to prevent redundant queries on static asset requests.
+  - Fixed subscan `bulk_stop` cancellation to correctly cancel workflows in Temporal.
+  - Upgraded `temporalio` Python SDK dependency to version `1.7.0` to resolve `Ignoring add command while deleting` eviction failures incorrectly logging as workflow crashes.
+
+
+- **Subscan Tiered Execution Steps Alignment**:
+  - Refactored `SubScanWorkflow` to group and execute subdomain subscans in sequence-enforced execution tiers (Discovery -> HTTP Crawl & Port Scan -> URL Fetching -> Fuzzing -> Analysis -> Security Assessment), strictly mirroring the main scan (`MasterScanWorkflow`).
+  - Modified the `InitiateSubTask` API view and `initiate_subscan_temporal` scan task helper to batch-create `SubScan` database records and trigger a single, unified `SubScanWorkflow` execution per subdomain rather than running separate concurrent workflows for each individual task.
+  - Implemented logic in `SubScanWorkflow` to run matching verification parse activities (e.g. `ParseDiscoveryResultsActivity`, `ParseHTTPCrawlResultsActivity`, etc.) as soon as the respective tiers finish.
+  - Optimized post-processing execution (vulnerability correlation/scoring and graph synchronization/APME) by only running them if their corresponding triggering task types were selected.
+  - Added optional `subscan_id` support to `FinalizeSubScanActivity` to support granular database updates for each subscan task in the batch.
+
+- **Semgrep Scan Pipeline Optimization & Stalling Mitigation**:
+  - Refactored the raw URL file downloader loop in `semgrep_scan` to download files in parallel using a `ThreadPoolExecutor` (10 concurrent workers).
+  - Implemented `clean_and_validate_url` to strip tool-specific trailing metadata (like `] - text/html`) from raw `gospider`/`hakrawler` outputs and filter out out-of-scope third-party CDN/external domains.
+  - Added size and quantity guardrails by capping individual file downloads at **5MB** via streaming chunks and limiting total files scanned per domain to **500**.
+  - Refactored the `host_regex` URL pattern in `fetch_url` to exclude whitespace, quotes, backticks, and brackets to prevent matching trailing metadata suffixes.
+
+- **Temporal Activity & Scan Stability Fixes**:
+  - Disabled inline synchronous HTTP crawling in the `port_scan` activity to prevent concurrent file/database collisions, process lockups, and eventual `CancelledError` activity cancellations.
+  - Hardened the Aquatone session parser in `web_api_discovery` to handle cases where technology `tags` are `null` in the JSON output, avoiding database `NOT NULL` constraint violations on `Screenshot.technologies`.
+
+- **Target Information Nameservers and History Tabs Fix**:
+  - Resolved the empty Nameservers tab on the Scan Detail page by introducing the `nameservers` field (list of strings) in `ScanSummaryAPIView` and `TargetSummaryAPIView` to match the frontend component's requirements.
+  - Implemented the missing rendering logic for the Nameservers (infoTab === 3) and History (infoTab === 4) tabs on the Target Summary page.
+  - Added the missing History tab rendering logic on the Scan Detail page to display historical IP resolution details.
+
+- **Screenshot Pipeline Optimization**:
+  - Moved the visual screenshotting task (`screenshot`) from Tier 2 (parallel to HTTP Crawl & Port Scanning) to Tier 6 (parallel to Vulnerability Scanning).
+  - This ensures that crawling, URL fetching, and directory/file fuzzing have completely finished execution, allowing a comprehensive set of alive endpoints to be gathered before screenshots are captured.
+
+- **Nuclei Scan Optimization & Stability**:
+  - Optimized the `nuclei_scan` engine to execute in a single concurrent pass, replacing the inefficient 6-pass sequential severity loop.
+  - Re-enabled the `-tags` parameter which was previously dropped, ensuring only relevant checks are executed against the target stack.
+  - Implemented dynamic fallback to the target root domain in the event that `Subdomain` queries return empty results during parameter resolution.
+  - Gated the intensive `nuclei -update-templates` step behind the `auto_update_templates` boolean configuration.
+  - Added explicit execution and run timeouts (`execution_timeout`, `run_timeout`) to the `NucleiPlannerWorkflow` child execution.
+  - Removed obsolete parsing and preparation Temporal activities (`PrepareNucleiActivity`, `ParseNucleiResultsActivity`) resulting in a leaner execution graph.
+
+- **Code Restructuring and Utility Sub-Package Migration**:
+  - Relocated stress testing python files (`stress_views.py`, `stress_cmd_builder.py`, `stress_report_builder.py`, `stress_telemetry.py`, `stress_aggregation.py`, `stress_testing_tasks.py`) from the root of `web/reNgine/` to `web/reNgine/stress/`, dropping redundant prefixes.
+  - Relocated general utility scripts (`database_utils.py`, `graph_utils.py`, `llm_utils.py`, `opsec_utils.py`, `task_utils.py`, `waf_utils.py`) from the root of `web/reNgine/` to a dedicated `web/reNgine/utils/` sub-package, stripping redundant suffixes.
+  - Updated all imports and mock references across the Django views, background tasks, plugins, and unit tests to align with the new sub-packages.
+
+- **Exploit Readiness Layer (ERL) Dedicated Dashboard & Routing Standardization**:
+  - Replaced component-level override hijacking with a standardized dynamic plugin page routing system.
+  - Added support for dynamic wildcard page loading at `/p/$pluginSlug` and `/p/$pluginSlug/$pageName` in the host router without requiring core codebase updates.
+  - Implemented the Exploit Readiness Center split-pane dashboard under the `erl_temporal` plugin UI featuring KPI metrics, a compact project-wide vulnerability queue, and a detailed ERL intelligence panel (Evidence logs, Cytoscape attack path visualization, and AI impact assessments).
+  - Updated the left navigation sidebar in the host shell to dynamically construct link paths from the enabled plugins registry configuration.
+  - Standardized plugin bundle build configurations to export barrel-structured ESM components (`src/index.ts`) for dynamic loading via `PluginPageLoader`.
+
+> **IMPORTANT — Existing installations must run the full upgrade script**
+>
+> v3.2.0 replaces Celery with Temporal. This is a breaking infrastructure change. Simply running `make up` on an existing install will leave stale Celery containers running and skip required database migrations.
+>
+> Run the full upgrade before starting services:
+>
+> ```bash
+> # Linux / macOS
+> git pull && make fullupgrade
+>
+> # Windows
+> git pull && make.bat fullupgrade
+> ```
+>
+> The script stops all containers, rebuilds all images from scratch, applies all migrations, and starts the updated stack. It will ask for explicit confirmation before making any changes.
+>
+> **Any scans running at upgrade time will be interrupted.**
+
+- **Celery → Temporal Migration (Complete)**: Fully removed Celery from the codebase and replaced all task orchestration with [Temporal](https://temporal.io). This is a complete, production-grade infrastructure migration spanning the entire scan pipeline.
+  - **Durable Workflow Execution**: All scans now run as `MasterScanWorkflow` instances on Temporal. Workflows survive container restarts, network blips, and worker crashes — execution resumes exactly where it left off with no data loss.
+  - **Full Execution History**: Every workflow and activity is recorded in Temporal's history. The Temporal UI at `localhost:8080` provides step-by-step replay of any scan, past or present.
+  - **Pause / Resume Signals**: Scans can be paused and resumed via Temporal signals without losing state.
+  - **Abort via Cancellation**: Scan termination (`stop_scan`, `stop_scans`) now calls `TemporalClientProvider.cancel_workflow()` instead of `app.control.revoke()`, ensuring clean, tracked cancellation backed by `TemporalWorkflowExecution` records.
+  - **Worker Health Check**: The system health API now verifies Temporal connectivity rather than polling Celery inspect.
+  - **Celery Infrastructure Removed**: Deleted `celery.py`, `celery_custom_task.py`, `celery-entrypoint.sh`, and `beat-entrypoint.sh`. Removed `celery==5.4.0` and `django-celery-beat==2.6.0` from `requirements.txt`. Removed the `celery` Docker service from `docker-compose.yml`.
+  - **Temporal Entrypoint**: Created `temporal-entrypoint.sh` — the new `temporal-python-orchestrator` container entrypoint that handles all one-time setup (wordlists, nuclei templates, kiterunner, gf-patterns, AI Map templates) previously owned by `celery-entrypoint.sh`, then starts the Temporal worker.
+  - **Settings Cleanup**: Replaced the `CELERY_*` config block in `settings.py` with `REDIS_URL`-based configuration. Removed all Celery log handlers.
+  - **Temporal Schedules**: Startup sync tasks (`sync_all_scans_to_graph`, `sync_cisa_kev_catalog`, `sync_semgrep_rules`) and domain monitoring schedules migrated from `django-celery-beat` `PeriodicTask` rows to native Temporal Schedules. Scheduled scan creation and management views updated accordingly.
+  - **Go Executor**: A lightweight Go-based Temporal activity worker (`web/executor/main.go`) handles subprocess tool execution on the `go-executor-queue`.
+  - **New Models**: `TemporalWorkflowExecution` and `TemporalSchedule` (migration `0026`) track running workflows and periodic schedules.
+
+- **Scan Result Recovery Tool**: Added `recover_scan_results` Django management command (`web/scanEngine/management/commands/recover_scan_results.py`). In the event of database corruption or loss, this command walks the `scan_results` volume and reconstructs the database from files on disk — recovering Domains, ScanHistory records, Subdomains, EndPoints, Ports/IpAddresses, Vulnerabilities (nmap + nuclei), and WAF associations.
+  - **Dry-run by default**: run without flags to preview what would be recovered, with per-record output and a summary table. Pass `--apply` to commit.
+  - **Idempotent**: scans whose `results_dir` already exists in the database are silently skipped — safe to re-run at any time.
+  - **Dual port-scan format support**: handles both the modern naabu JSONL format (`{"host":…,"port":…}` per line) and the legacy JSON-object format (`{"host": [port, …]}`).
+  - **Targeted recovery**: use `--scan-dir /path/to/scan` to recover a single folder, or `--results-root /alt/path` to point at a non-default results volume.
+  - **Usage**:
+    ```bash
+    # Inside the web or celery container:
+    python manage.py recover_scan_results           # dry-run
+    python manage.py recover_scan_results --apply   # write to DB
+    python manage.py recover_scan_results --apply --scan-dir /usr/src/scan_results/defijn.io_108
+    ```
+- **Configuration Export & Import**: Added a complete backup and restore system for custom user settings.
+  - **Export System**: Added the `/api/settings/export/` endpoint that dynamically generates a single `.zip` backup containing API keys, custom wordlists (from `/usr/src/wordlist/`), tool configurations, and custom scan engines.
+  - **Import System**: Added the `/api/settings/import/` endpoint that accepts the zipped backup payload, safely extracting custom wordlists back to the filesystem and re-populating the database. Features an "Overwrite existing configurations" toggle.
+  - **UI Integration**: Added a sleek, tactical **Configuration Export / Import** panel to the Settings page. This allows users to download a snapshot of their environment before clean installations and restore it effortlessly.
+- **Stress Testing Telemetry, Security Hardening & Restructuring**:
+  - Fixed a Temporal heartbeat context issue inside `RunStressToolActivity` by propagating the `contextvars` context to the background heartbeat loop thread, resolving `RuntimeError: Not in activity context` and allowing real-time status/cancellation detection.
+  - Hardened process cleanup by switching process termination to send SIGTERM/SIGKILL to the entire process group (`os.killpg`) to ensure that orphaned background processes are cleanly terminated when a scan is stopped or aborted.
+  - Resolved Vite dev server WebSocket configuration by proxying `/ws` paths to Daphne on port 8000, allowing the frontend telemetry component to receive real-time ECharts metrics and log lines during development.
+  - **Security Audit & Hardening**:
+    - Protected load testing tool command execution from command injection vulnerabilities by strictly escaping subprocess execution lists using `shlex.quote` in `cmd_builder.py`.
+    - Hardened asynchronous report PDF generation against Server-Side Request Forgery (SSRF) and Local File Inclusion (LFI) by wrapping WeasyPrint HTML instances in a `secure_url_fetcher` that restricts fetches to data URIs, local files inside `BASE_DIR`/`MEDIA_ROOT`, and Google Fonts.
+    - Prevented DB connection leaks in background threads by ensuring `close_old_connections()` is executed on thread finalization.
+  - **Code Restructuring & Sub-Package Migration**:
+    - Restructured and moved all stress testing Python scripts (`stress_views.py`, `stress_cmd_builder.py`, `stress_report_builder.py`, `stress_telemetry.py`, `stress_testing_tasks.py`, `stress_aggregation.py`) to the clean, dedicated sub-package directory [reNgine/stress/](file:///d:/Repos/r3ngine/web/reNgine/stress/) as `views.py`, `cmd_builder.py`, `report_builder.py`, `telemetry.py`, `testing_tasks.py`, and `aggregation.py`.
+    - Updated all import definitions, mock patches, and test configurations to reference the new package paths.
+    - Resolved `RuntimeWarning: coroutine ... was never awaited` test warnings by replacing global `asyncio.run` mocks with targeted helper patches.
+- **Locust Path Splitting & K6 Telemetry Fixes**:
+  - Fixed Locust target URL parsing in `_build_locust_cmd` by utilizing `urllib.parse.urlparse` to dynamically split target URLs into host and path components. This avoids trailing slash errors (such as `GET /xmlrpc.php/` returning `400 Bad Request`) and ensures Locust script generation properly separates the request path from the base host.
+  - Resolved K6 real-time dashboard updates by adding dynamic `throughput_rps` calculation to `K6Parser`. It extracts elapsed minutes and seconds from K6's progress output via regex and divides total requests by elapsed seconds, resolving static or missing real-time telemetry metrics.
+  - Fixed WrkParser final metrics aggregation by summing both socket errors and timeout errors to represent the correct count of failed requests.
+- **Dalfox Scanner Enhancements & Stabilization**:
+  - Resolved a missing findings issue caused by the `--only-poc r` filter overriding genuine verified payloads (`v`) by expanding the filter to `--only-poc v,r`.
+  - Upgraded Dalfox execution to support optional Deep Scan (`--deep-scan`), remote payload dictionaries (`--remote-payloads`), remote parameter wordlists (`--remote-wordlists`), and automatic WAF bypassing (`--waf-bypass auto`) for deeper detection coverage.
+  - Added a configurable scan timeout parameter (`--scan-timeout`) to prevent scan stagnation on heavily-parametrised endpoints, and removed the obsolete `--skip-bav` flag.
+
+- **Active Directory Intelligence Plugin (Phases 7–12)**:
+  - **Reporting Engine**: Implemented `ReportingEngine.compile()` producing 7-section AD intelligence reports covering executive summary, domain users, groups, computers, trusts, exposures, and recommendations. Exports to both JSON and PDF via `JSONRenderer` and `PDFRenderer` (WeasyPrint).
+  - **Paginated Findings API**: All findings, trusts, and exposure endpoints now return paginated results (50 records per page) with `page`/`total_pages` metadata, preventing browser memory exhaustion against large Active Directory environments.
+  - **Graph Scalability**: `graph_domains` endpoint enforces a `?limit=300` default node cap with a truncation warning banner and user-triggered "Load All" confirmation to prevent browser hangs on domains with thousands of objects.
+  - **Performance Guardrails**: Cytoscape animations are automatically disabled for graphs exceeding 400 nodes; layout computation is deferred to a web worker to prevent UI thread blocking.
+  - **Cytoscape Graph Layouts**: Added 5 named layout presets — `hierarchical` (KLay), `radial` (Concentric), `force` (CoSE-Bilkent), `bipartite` (Grid), and `cluster` (COSE) — selectable from the graph toolbar without page reload.
+  - **Semantic Node Styling**: Domain controllers, trust bridges, exposed accounts, and disabled objects each carry distinct node shapes, border weights, and color families to allow at-a-glance risk triage.
+  - **Real-Time WebSocket Streaming**: Backend emits graph and findings events through Django Channels with 150 ms client-side batching to coalesce burst updates during large LDAP/BloodHound ingests.
+  - **Search, Focus & Node Detail Panel**: Graph toolbar includes live search with node focus/highlight; clicking any node opens a slide-over detail panel showing all attributes, related trust paths, and linked exposures.
+  - **RBAC & Evidence Logs**: All sensitive assessment actions (launch, export, delete) require the `can_run_ad_assessment` permission; every action is written to an immutable evidence log accessible from the assessment detail view.
+  - **AD Assessment from Subdomain**: Added API endpoint and subdomain list UI action to launch an AD assessment directly from any subdomain record, automatically pre-populating the target domain from the selected subdomain's resolved FQDN.
+  - **AD Report Templates**: Added `ad_modern` and `cyber_pro` PDF report templates; `ADReportModal` component provides in-app template selection and one-click PDF download.
+
+- **Scan Workflow Reliability & Cancellation Hardening**:
+  - **Centralized Abort Utility** (`web/reNgine/utils/scan_cancellation.py`): Introduced `abort_scan_history(scan, aborted_by)` and `abort_subscan(subscan)` as the canonical abort path across all API surfaces. Workflow cancellation now always occurs *before* database status is updated to prevent a race where a resumed worker sees ABORTED state and skips cleanup.
+  - **Child Subscan Propagation**: `abort_scan_history` now recursively aborts all child subscans in RUNNING state, ensuring no orphaned subscan workflows outlive a stopped parent scan.
+  - **Fixed `StopScan` API** (`api/views.py`): Removed duplicate 68-line inline `abort_scan`/`abort_subscan` closures; endpoint now delegates entirely to the centralized utility.
+  - **Fixed `stop_scans` Bulk Stop** (`startScan/views.py`): The bulk stop endpoint was cancelling Temporal workflows but never writing `scan.scan_status = ABORTED_TASK` to the database, leaving scans permanently shown as RUNNING in the UI.
+  - **Fixed Queryset Bulk Delete Signal Bypass** (`api/subscans.py`): `SubScan.objects.filter(…).delete()` does not fire `pre_delete` signals and therefore never triggered workflow cancellation. Replaced with a per-instance loop that calls `abort_subscan(subscan)` before each deletion.
+  - **Fixed `delete_all_scan_results` Signal Bypass** (`startScan/views.py`): Same queryset bypass issue affected the "Delete All Scans" action. Replaced `ScanHistory.objects.all().delete()` with a materialised loop that calls `abort_scan_history(scan)` and removes results directories before each `scan.delete()`.
+  - **Fixed `scan_history` Bulk Stop Missing Child Cancellation** (`api/scan_history.py`): `stop_scan` and `bulk_stop` handlers had duplicated inline Temporal cancellation logic that never cancelled child subscans. Both now delegate to `abort_scan_history`.
+  - **Workflow Execution Retry Cap**: Added `RetryPolicy(maximum_attempts=10)` to `MasterScanWorkflow` and `SubScanWorkflow` start calls in `tasks.py`. After 10 consecutive activity failures the workflow transitions to FAILED state in Temporal rather than retrying indefinitely. Users can re-trigger execution via the existing **Resume** button, which starts a fresh workflow from the last persisted checkpoint.
+  - **Workflow Flush Utility** (`web/scripts/flush_workflows.py`): Added a one-shot maintenance script that terminates all running scan/subscan Temporal workflows and marks corresponding database records as ABORTED/CANCELLED. System scheduler workflows (`temporal-sys-scheduler:*`) are intentionally skipped. Run from inside the web container: `python3 scripts/flush_workflows.py`.
+
+- **Dynamic Plugin Routing**:
+  - Replaced 5 individually hard-coded Active Directory route definitions in the host router with a single dynamic entry via `ADPluginApp`, resolving the discrepancy between plugin slug registration and frontend route matching.
+  - Plugin page routing now follows the established wildcard pattern (`/p/$pluginSlug` and `/p/$pluginSlug/$pageName`) so future plugin pages are automatically reachable without core router changes.
+
+- **Plugin System Fixes**:
+  - Fixed the plugin installer sync step to copy only the compiled `ui/dist/` output into `MEDIA_ROOT`, preventing unintentional inclusion of plugin source trees, `node_modules`, or private configuration files in the served static asset directory.
+
+- **CSRF Security Fixes**:
+  - Fixed a `TypeError: Cannot read properties of null` crash in `SubdomainsTab` caused by a null CSRF token on initial page load; token is now coerced to an empty string before use.
+  - Fixed CSRF token not being included in AD plugin API requests (`adApi`); all mutating API calls now read the token from the Django cookie and attach it as the `X-CSRFToken` header.
+
+- **Crash Recovery Improvements**:
+  - `recover_stuck_scans` now correctly identifies `RUNNING_TASK` scans whose associated Temporal workflow no longer exists (e.g. after a container restart with no checkpoint), marks them as `ABORTED_TASK`, and surfaces them in the REST API recovery endpoint.
+  - Added a hard cap to the REST API recovery endpoint: at most 50 scans are recovered per invocation to prevent a single recovery pass from overwhelming the Temporal task queue on large installations.
+
 ### [v3.1.0] - 2026-05-20
 
 - **Scan Pipeline**: fully fixed and stabilized. All tools now working to their full capabilities again.

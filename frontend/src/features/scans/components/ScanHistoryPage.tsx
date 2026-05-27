@@ -53,6 +53,7 @@ import {
 import {
   useScansHistory,
   useStopScan,
+  useResumeScan,
   useDeleteScan,
   useBulkScanAction,
   useDomains
@@ -70,6 +71,7 @@ export const ScanHistoryPage: React.FC = () => {
   const navigate = useNavigate();
   const { data: scans, isLoading } = useScansHistory(projectSlug);
   const stopScanMutation = useStopScan(projectSlug);
+  const resumeScanMutation = useResumeScan(projectSlug);
   const deleteScanMutation = useDeleteScan(projectSlug);
   const bulkActionMutation = useBulkScanAction(projectSlug);
   const { data: domains } = useDomains(projectSlug);
@@ -555,6 +557,23 @@ export const ScanHistoryPage: React.FC = () => {
           }
         }}>
           <StopCircle size={14} /> STOP SCAN
+        </MenuItem>
+        <MenuItem onClick={() => {
+          if (activeScanId) {
+            const scan = scans?.find((s) => s.id === activeScanId);
+            if (scan && (scan.scan_status === 0 || scan.scan_status === 3)) {
+              resumeScanMutation.mutate(activeScanId);
+            } else {
+              setSnackbar({
+                open: true,
+                message: 'Only failed or aborted scans can be resumed.',
+                severity: 'info'
+              });
+            }
+            handleMenuClose();
+          }
+        }}>
+          <Play size={14} /> RESUME SCAN
         </MenuItem>
         <MenuItem onClick={() => {
           if (activeScanId) {

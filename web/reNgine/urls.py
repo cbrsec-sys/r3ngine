@@ -8,7 +8,8 @@ from drf_yasg import openapi
 from drf_yasg.views import get_schema_view
 from rest_framework import permissions
 
-from reNgine import stress_views, views as rengine_views
+from reNgine import views as rengine_views
+from reNgine.stress import views as stress_views
 from dashboard import views as dashboard_views
 from .openapi_info import info
 
@@ -68,8 +69,13 @@ urlpatterns = [
         name='stress_test_status'
     ),
     path(
-        'media/<path:path>', 
-        rengine_views.serve_protected_media, 
+        'api/stress/<int:scan_id>/report/',
+        stress_views.StressReportGenerationAPI.as_view(),
+        name='stress_report_generation'
+    ),
+    path(
+        'media/<path:path>',
+        rengine_views.serve_protected_media,
         name='serve_protected_media'
     ),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

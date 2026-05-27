@@ -7,7 +7,7 @@ from rest_framework_simplejwt.views import (
 )
 
 from .views import *
-from .dashboard_views import DashboardAPIView
+from .dashboard_views import DashboardAPIView, CWEInfoAPIView
 from .target_summary_views import TargetSummaryAPIView
 from .scan_summary_views import ScanSummaryAPIView
 
@@ -18,6 +18,7 @@ from .users import UserManageViewSet
 from .stress_testing_views import StressTestingAPIView, StressTestingHistoryAPIView
 from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView
 from .scan_configuration import ScanConfigurationAPI
+from .config_migration_views import ExportConfig, ImportConfig
 
 
 app_name = 'api'
@@ -309,6 +310,10 @@ urlpatterns = [
         StopScan.as_view(),
         name='stop_scan'),
     path(
+        'action/resume/scan/',
+        ResumeScan.as_view(),
+        name='resume_scan'),
+    path(
         'fetch/results/subscan/',
         FetchSubscanResults.as_view(),
         name='fetch_subscan_results'),
@@ -343,6 +348,11 @@ urlpatterns = [
         name='toggle_bug_bounty_mode'
     ),
     path(
+        'toggle-scan-queueing-mode/', 
+        ToggleScanQueueingView.as_view(), 
+        name='toggle_scan_queueing_mode'
+    ),
+    path(
         'update-theme/',
         UpdateThemeView.as_view(),
         name='update_theme'
@@ -353,9 +363,24 @@ urlpatterns = [
         name='report_settings'
     ),
     path(
+        'settings/export/',
+        ExportConfig.as_view(),
+        name='settings_export'
+    ),
+    path(
+        'settings/import/',
+        ImportConfig.as_view(),
+        name='settings_import'
+    ),
+    path(
         'dashboard/<slug:slug>/',
         DashboardAPIView.as_view(),
         name='dashboard_api'
+    ),
+    path(
+        'cwe-info/',
+        CWEInfoAPIView.as_view(),
+        name='cwe_info_api'
     ),
     path(
         'system/health/',
@@ -403,6 +428,11 @@ urlpatterns = [
         name='apme_trigger'
     ),
     path(
+        'action/ad-assessment/from-subdomain/',
+        LaunchADAssessmentFromSubdomain.as_view(),
+        name='launch_ad_assessment_from_subdomain'
+    ),
+    path(
         'auth/token/',
         TokenObtainPairView.as_view(),
         name='token_obtain_pair'
@@ -442,4 +472,28 @@ urlpatterns = [
 ]
 
 
-urlpatterns += router.urls
+# Dynamic plugin API URL discovery
+# Each plugin may provide backend/api_urls.py to expose plugin-specific endpoints
+# at /api/plugins/{plugin_slug}/
+import importlib
+import os as _os
+from django.conf import settings as _settings
+
+_plugins_data_dir = _os.path.join(_settings.BASE_DIR, 'plugins_data')
+if _os.path.exists(_plugins_data_dir):
+    for _plugin_slug in _os.listdir(_plugins_data_dir):
+        _plugin_api_module = f"plugins_data.{_plugin_slug}.backend.api_urls"
+        try:
+            importlib.import_module(_plugin_api_module)
+            urlpatterns.append(
+                path(f'plugins/{_plugin_slug}/', include(
+                    (_plugin_api_module, _plugin_slug),
+                    namespace=_plugin_slug,
+                ))
+            )
+        except ImportError:
+            pass
+        except Exception as _e:
+            import logging as _logging
+            _logging.getLogger(__name__).warning(
+                f"Failed to load plugin URLs for {_plugin_slug}: {_e}")

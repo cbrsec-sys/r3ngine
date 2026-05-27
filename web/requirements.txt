@@ -1,11 +1,9 @@
 aiodns==3.0.0
 argh==0.26.2
 beautifulsoup4==4.9.3
-celery==5.4.0
 discord-webhook==1.3.0
 Django==3.2.23
 django-ace==1.0.11
-django-celery-beat==2.6.0
 django-login-required-middleware==0.6.1
 django-role-permissions==3.2.0
 django-mathfilters==1.0.0
@@ -62,4 +60,8 @@ django-cors-headers==4.3.1
 h2
 priority
 service_identity
+temporalio==1.7.0
 git+https://github.com/MatrixTM/PyRoxy.git
+icmplib==3.0.4
+impacket==0.13.1
+typing_extensions>=4.0.0

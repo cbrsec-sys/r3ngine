@@ -7,8 +7,8 @@ from django.template.loader import get_template
 from django.db.models import Count, Case, When, IntegerField
 from weasyprint import HTML, CSS
 from django.utils import timezone
+from reNgine.utilities import secure_url_fetcher
 
-from reNgine.celery import app
 from reNgine.definitions import *
 from reNgine.llm import LLMReportGenerator
 from reNgine.charts import (
@@ -16,15 +16,15 @@ from reNgine.charts import (
     generate_vulnerability_chart_by_severity,
     generate_attack_surface_map
 )
-from reNgine.graph_utils import Neo4jManager
+from reNgine.utils.graph import Neo4jManager
 from reNgine.common_func import get_interesting_subdomains
+from reNgine.stress.report_builder import StressReportBuilder
 from startScan.models import ScanHistory, Subdomain, Vulnerability, IpAddress, ScanReport, StressTestResult
 from scanEngine.models import VulnerabilityReportSetting
 
 logger = logging.getLogger('reNgine.tasks')
 
-@app.task(name='generate_report_task', bind=True, queue='report_queue')
-def generate_report_task(self, report_id):
+def generate_report_task(report_id):
     try:
         report_obj = ScanReport.objects.get(id=report_id)
         report_obj.status = 1 # Running
@@ -50,7 +50,7 @@ def generate_report_task(self, report_id):
             report_name = 'Stress Test Report'
 
         # Fetch stress results if needed
-        stress_results = []
+        stress_results = StressTestResult.objects.none()
         if report_type == 'stress_test' or report_template in ['stress_cyber_pro', 'stress_modern']:
             stress_results = StressTestResult.objects.filter(scan_history=scan).order_by('-timestamp')
 
@@ -254,15 +254,39 @@ def generate_report_task(self, report_id):
             generate_vulnerability_chart_by_severity,
             generate_attack_surface_map,
             generate_stress_latency_chart,
-            generate_stress_success_rate_chart
+            generate_stress_success_rate_chart,
+            generate_stress_latency_distribution_chart,
+            generate_stress_response_code_chart,
+            generate_stress_error_breakdown_chart,
+            generate_stress_endpoint_heatmap
         )
-        
+
         data['subdomain_http_status_chart'] = generate_subdomain_chart_by_http_status(subdomains)
         data['vulns_severity_chart'] = generate_vulnerability_chart_by_severity(vulns) if vulns else ''
-        
+
+        # Enhanced stress test charts for detailed reports
         if stress_results.exists():
             data['stress_latency_chart'] = generate_stress_latency_chart(stress_results)
             data['stress_success_rate_chart'] = generate_stress_success_rate_chart(stress_results)
+
+            # Generate per-stress-result detailed charts and context
+            stress_report_contexts = []
+            for stress_result in stress_results:
+                builder = StressReportBuilder(stress_result)
+                report_context = builder.build()
+
+                # Generate charts specific to this result
+                report_context['latency_distribution_chart'] = generate_stress_latency_distribution_chart(stress_result)
+                report_context['response_code_chart'] = generate_stress_response_code_chart(stress_result.response_code_distribution)
+                report_context['error_breakdown_chart'] = generate_stress_error_breakdown_chart(stress_result.error_breakdown)
+                report_context['endpoint_heatmap_chart'] = generate_stress_endpoint_heatmap(
+                    stress_result.endpoints_tested,
+                    stress_result.response_code_distribution
+                )
+
+                stress_report_contexts.append(report_context)
+
+            data['stress_report_contexts'] = stress_report_contexts
 
         if report_template == 'enterprise':
             template = get_template('report/enterprise.html')
@@ -274,7 +298,7 @@ def generate_report_task(self, report_id):
             template = get_template('report/default.html')
 
         html = template.render(data)
-        pdf = HTML(string=html).write_pdf()
+        pdf = HTML(string=html, url_fetcher=secure_url_fetcher).write_pdf()
 
         target_name = scan.domain.name
         date_str = datetime.now().strftime('%Y-%m-%d')
@@ -290,8 +314,14 @@ def generate_report_task(self, report_id):
         logger.error(f"Error generating report: {str(e)}")
         import traceback
         logger.error(traceback.format_exc())
-        report_obj = ScanReport.objects.get(id=report_id)
-        report_obj.status = 0 # Failed
-        report_obj.error_message = str(e)
-        report_obj.save()
+        try:
+            report_obj = ScanReport.objects.get(id=report_id)
+            report_obj.status = 0 # Failed
+            report_obj.error_message = str(e)
+            report_obj.save()
+        except ScanReport.DoesNotExist:
+            logger.error(f"ScanReport with id {report_id} does not exist. Cannot save failed status.")
+    finally:
+        from django.db import close_old_connections
+        close_old_connections()
 

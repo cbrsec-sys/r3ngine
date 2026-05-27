@@ -257,6 +257,28 @@ export const useStopScan = (projectSlug: string) => {
   });
 };
 
+export const useResumeScan = (projectSlug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch('/api/action/resume/scan/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ scan_id: id }),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scans-history', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+    },
+  });
+};
+
 export const useDeleteScan = (projectSlug: string) => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -374,6 +396,26 @@ export const useStopScanAction = (projectSlug: string) => {
   });
 };
 
+export const useResumeScanAction = (projectSlug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      const response = await fetch(`/api/action/resume/scan/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ scan_id: id }),
+      });
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+    }
+  });
+};
 export const useDeleteScanAction = (projectSlug: string) => {
   const queryClient = useQueryClient();
   return useMutation({

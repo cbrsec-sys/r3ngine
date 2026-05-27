@@ -1,25 +1,24 @@
+import logging
 import os
 import json
 import csv
 import subprocess
 import shutil
 import re
-from celery.utils.log import get_task_logger
-from reNgine.celery import app
+import threading
 from reNgine.common_func import (
     get_random_proxy,
 )
-from reNgine.task_utils import save_email, save_employee
-from reNgine.opsec_utils import OpSecManager, ProxychainsWrapper
+from reNgine.utils.task import save_email, save_employee
+from reNgine.utils.opsec import OpSecManager, ProxychainsWrapper
 from startScan.models import ScanHistory, Email, Employee
 from reNgine.definitions import *
 from reNgine.osint.linkedin_intelligence import LinkedInScraper
-from reNgine.celery_custom_task import RengineTask
+from dashboard.models import LinkedInCredentials, HunterIOAPIKey
 
-logger = get_task_logger(__name__)
+logger = logging.getLogger(__name__)
 
-@app.task(name='run_holehe', queue='main_scan_queue', base=RengineTask, bind=True)
-def run_holehe(self, email_address, scan_history_id):
+def run_holehe(email_address, scan_history_id):
     """
     Run holehe for a specific email address to find associated social media accounts.
     """
@@ -60,8 +59,7 @@ def run_holehe(self, email_address, scan_history_id):
         logger.error(f"Error running holehe for {email_address}: {str(e)}")
         return []
 
-@app.task(name='run_maigret', queue='main_scan_queue', base=RengineTask, bind=True)
-def run_maigret(self, username, scan_history_id):
+def run_maigret(username, scan_history_id):
     """
     Run maigret to find social media profiles for a given username.
     """
@@ -106,8 +104,7 @@ def run_maigret(self, username, scan_history_id):
         logger.error(f"Error running maigret for {username}: {str(e)}")
         return []
 
-@app.task(name='run_linkedint', queue='osint_queue', base=RengineTask, bind=True)
-def run_linkedint(self, company_name, scan_history_id):
+def run_linkedint(company_name, scan_history_id):
     """
     Run LinkedIn Scraper (Playwright) to scrape LinkedIn for employees of a company.
     """
@@ -153,12 +150,8 @@ def run_linkedint(self, company_name, scan_history_id):
         return []
 
 
-    # 3. LinkedInt for the domain/company
-    company_name = domain.split('.')[0]
-    run_linkedint.delay(company_name, scan_history_id)
 
-@app.task(name='enrich_identities_task', queue='osint_queue', base=RengineTask, bind=True)
-def enrich_identities_task(self, identity, identity_type, scan_history_id, ctx={}):
+def enrich_identities_task(identity, identity_type, scan_history_id, ctx={}):
     """
     Enrich identities using username-anarchy and gosearch.
     identity: Email or Name
@@ -250,30 +243,79 @@ def enrich_identities_task(self, identity, identity_type, scan_history_id, ctx={
     
     return f"Enrichment completed for {full_name}"
 
-@app.task(name='osint_orchestrator', queue='main_scan_queue', base=RengineTask, bind=True)
-def osint_orchestrator(self, scan_history_id):
+def db_conn_safe_wrapper(target_func, *args, **kwargs):
+    from django.db import connections
+    try:
+        return target_func(*args, **kwargs)
+    finally:
+        connections.close_all()
+
+
+def osint_orchestrator(scan_history_id):
     """
     Orchestrate the OSINT pipeline.
     """
     scan_history = ScanHistory.objects.get(pk=scan_history_id)
     domain = scan_history.domain.name
     
+    threads = []
+    
     # 1. Get already discovered emails
     emails = scan_history.emails.all()
     for email in emails:
-        run_holehe.delay(email.address, scan_history_id)
-        # New: Trigger identity enrichment
-        enrich_identities_task.delay(email.address, 'email', scan_history_id)
+        t1 = threading.Thread(
+            target=db_conn_safe_wrapper,
+            args=(run_holehe,),
+            kwargs={'email_address': email.address, 'scan_history_id': scan_history_id},
+            daemon=True
+        )
+        t1.start()
+        threads.append(t1)
         
+        t2 = threading.Thread(
+            target=db_conn_safe_wrapper,
+            args=(enrich_identities_task,),
+            kwargs={'identity': email.address, 'identity_type': 'email', 'scan_history_id': scan_history_id},
+            daemon=True
+        )
+        t2.start()
+        threads.append(t2)
+
     # 2. Get already discovered employees/usernames
     employees = scan_history.employees.all()
     for employee in employees:
         if employee.name:
             if ' ' not in employee.name:
-                run_maigret.delay(employee.name, scan_history_id)
-            # New: Trigger identity enrichment for all employees
-            enrich_identities_task.delay(employee.name, 'employee', scan_history_id)
+                t3 = threading.Thread(
+                    target=db_conn_safe_wrapper,
+                    args=(run_maigret,),
+                    kwargs={'username': employee.name, 'scan_history_id': scan_history_id},
+                    daemon=True
+                )
+                t3.start()
+                threads.append(t3)
             
+            t4 = threading.Thread(
+                target=db_conn_safe_wrapper,
+                args=(enrich_identities_task,),
+                kwargs={'identity': employee.name, 'identity_type': 'employee', 'scan_history_id': scan_history_id},
+                daemon=True
+            )
+            t4.start()
+            threads.append(t4)
+
     # 3. LinkedInt for the domain/company
     company_name = domain.split('.')[0]
-    run_linkedint.delay(company_name, scan_history_id)
+    t5 = threading.Thread(
+        target=db_conn_safe_wrapper,
+        args=(run_linkedint,),
+        kwargs={'company_name': company_name, 'scan_history_id': scan_history_id},
+        daemon=True
+    )
+    t5.start()
+    threads.append(t5)
+
+    # Wait for all threads to complete to ensure the Temporal activity blocks appropriately
+    for t in threads:
+        t.join()
+

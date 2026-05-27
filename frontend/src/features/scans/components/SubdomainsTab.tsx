@@ -51,9 +51,11 @@ import {
   Copy,
   FileText,
   Shield,
+  Network,
   X,
   Folder
 } from 'lucide-react';
+import { getCsrfToken } from '../../../api/axiosConfig';
 
 
 import { 
@@ -135,6 +137,9 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
     message: '',
     severity: 'success',
   });
+
+  // AD Assessment state
+  const [adLaunchMsg, setAdLaunchMsg] = useState<{ text: string; severity: 'success' | 'error' } | null>(null);
 
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
@@ -241,6 +246,30 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
       showNotification(error.message || 'Failed to update status', 'error');
     }
     handleActionClose();
+  };
+
+  const handleLaunchADAssessment = async () => {
+    handleActionClose();
+    if (!selectedId) return;
+    try {
+      const res = await fetch('/api/action/ad-assessment/from-subdomain/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() ?? '' },
+        body: JSON.stringify({ subdomain_id: selectedId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error ?? `HTTP ${res.status}`);
+      setAdLaunchMsg({
+        text: `AD Assessment created for ${json.target_domain}. Open the AD Intelligence plugin to start it.`,
+        severity: 'success',
+      });
+    } catch (err: unknown) {
+      setAdLaunchMsg({
+        text: (err instanceof Error ? err.message : 'Failed to create AD assessment'),
+        severity: 'error',
+      });
+    }
   };
 
   const handleInitiateSubscan = async () => {
@@ -774,6 +803,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           <ListItemIcon><FilePlus size={16} color="#00f3ff" /></ListItemIcon>
           <ListItemText primary="ADD NOTE" />
         </MenuItem> */}
+        <MenuItem onClick={handleLaunchADAssessment} sx={{ color: '#00f3ff' }}>
+          <ListItemIcon><Network size={16} color="#00f3ff" /></ListItemIcon>
+          <ListItemText primary="ASSESS IDENTITY INFRASTRUCTURE" />
+        </MenuItem>
+        <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.08)' }} />
         <MenuItem onClick={() => handleToggleImportant(selectedId!)} sx={{ color: '#ffae00' }}>
           <ListItemIcon><Shield size={16} color="#ffae00" /></ListItemIcon>
           <ListItemText primary={targetSubdomain?.is_important ? "UNMARK IMPORTANT" : "MARK IMPORTANT"} />
@@ -1033,18 +1067,18 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         type={confirmConfig.type}
       />
 
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={4000} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
           variant="filled"
-          sx={{ 
-            fontFamily: 'Orbitron', 
+          sx={{
+            fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
             bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
@@ -1053,6 +1087,21 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           }}
         >
           {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+      <Snackbar
+        open={adLaunchMsg !== null}
+        autoHideDuration={6000}
+        onClose={() => setAdLaunchMsg(null)}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert
+          severity={adLaunchMsg?.severity ?? 'info'}
+          onClose={() => setAdLaunchMsg(null)}
+          sx={{ width: '100%' }}
+        >
+          {adLaunchMsg?.text}
         </Alert>
       </Snackbar>
 

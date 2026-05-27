@@ -47,6 +47,7 @@ export interface ProxySettings {
   use_proxy: boolean;
   proxies: string;
   use_proxychains: boolean;
+  skip_validation?: boolean;
 }
 
 export interface ProxyTaskStatus {
@@ -114,6 +115,7 @@ export interface RengineSystemSettings {
   used: number;
   free: number;
   consumed_percent: number;
+  enable_scan_queueing: boolean;
 }
 
 export interface RengineUpdateResponse {
@@ -176,6 +178,9 @@ export const useUpdateProxySettings = (slug: string) => {
         formData.append('use_proxychains', 'on');
       }
       formData.append('proxies', data.proxies);
+      if (data.skip_validation) {
+        formData.append('skip_validation', 'true');
+      }
 
       const response = await axios.post(`/scanEngine/${slug}/proxy_settings`, formData, {
         headers: {
@@ -602,6 +607,24 @@ export const useDeleteAllScanResults = () => {
         }
       });
       return response.data;
+    },
+  });
+};
+
+export const useToggleScanQueueing = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await axios.post('/api/toggle-scan-queueing-mode/', {}, {
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'Accept': 'application/json'
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['rengine-system-settings'] });
     },
   });
 };

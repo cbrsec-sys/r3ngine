@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from reNgine.graph_utils import Neo4jManager
+from reNgine.utils.graph import Neo4jManager
 
 class Command(BaseCommand):
     help = 'Resets the Neo4j graph and re-syncs all scan data from the database.'

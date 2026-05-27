@@ -1,9 +1,10 @@
 import markdown
 import requests
 import logging
+import os
+import threading
 from django.conf import settings
 
-from celery import group
 from weasyprint import HTML, CSS
 from datetime import datetime
 from django.contrib import messages
@@ -13,19 +14,18 @@ from django.shortcuts import get_object_or_404, render
 from django.template.loader import get_template
 from django.urls import reverse
 from django.utils import timezone
-from django_celery_beat.models import (ClockedSchedule, IntervalSchedule, PeriodicTask)
+from startScan.models import TemporalSchedule
 from rolepermissions.decorators import has_permission_decorator
 
 
-from reNgine.celery import app
 from reNgine.charts import *
 from reNgine.common_func import *
 from reNgine.definitions import ABORTED_TASK, SUCCESS_TASK, PERM_MODIFY_SCAN_REPORT, FOUR_OH_FOUR_URL
-from reNgine.tasks import create_scan_activity, initiate_scan, run_command
+from reNgine.tasks import create_scan_activity, initiate_scan_temporal, run_command
 from scanEngine.models import EngineType
 from startScan.models import *
 from targetApp.models import *
-from reNgine.graph_utils import Neo4jManager
+from reNgine.utils.graph import Neo4jManager
 
 logger = logging.getLogger(__name__)
 
@@ -302,7 +302,10 @@ def start_scan_ui(request, slug, domain_id):
             scan.cfg_custom_dorks = custom_dorks
             scan.save()
 
-        # Start the celery task
+        # Start the scan via Temporal durable workflow orchestration.
+        # initiate_scan_temporal performs the same scan bootstrap as the
+        # legacy Celery initiate_scan, then starts a MasterScanWorkflow on
+        # the Temporal cluster.
         kwargs = {
             'scan_history_id': scan.id,
             'domain_id': domain.id,
@@ -317,7 +320,7 @@ def start_scan_ui(request, slug, domain_id):
             'enable_spiderfoot_scan': spiderfoot_scan,
             'initiated_by_id': request.user.id
         }
-        initiate_scan.apply_async(kwargs=kwargs)
+        initiate_scan_temporal(**kwargs)
         scan.save()
 
         # Send start notif
@@ -413,12 +416,8 @@ def start_multiple_scan(request, slug):
                     'excluded_paths': excluded_paths,
                     'enable_spiderfoot_scan': spiderfoot_scan,
                 }
-
-                _scan_task = initiate_scan.si(**kwargs)
-                grouped_scans.append(_scan_task)
-
-            celery_group = group(grouped_scans)
-            celery_group.apply_async()
+                # Start each scan as an independent Temporal workflow
+                initiate_scan_temporal(**kwargs)
 
             # Send start notif
             messages.add_message(
@@ -535,10 +534,15 @@ def stop_scan(request, id):
     if request.method == "POST":
         scan = get_object_or_404(ScanHistory, id=id)
         try:
-            for task_id in scan.celery_ids:
-                app.control.revoke(task_id, terminate=True, signal='SIGKILL')
-            
-            # after celery task is stopped, update the scan status
+            from reNgine.temporal_client import TemporalClientProvider
+            for te in scan.temporal_executions.filter(status="RUNNING"):
+                try:
+                    TemporalClientProvider.cancel_workflow(te.workflow_id)
+                    te.status = "CANCELLED"
+                    te.ended_at = timezone.now()
+                    te.save()
+                except Exception as cancel_err:
+                    logger.warning(f"Temporal cancel failed for workflow {te.workflow_id}: {cancel_err}")
             scan.scan_status = ABORTED_TASK
             scan.save()
             tasks = (
@@ -548,7 +552,6 @@ def stop_scan(request, id):
                 .order_by('-pk')
             )
             for task in tasks:
-                app.control.revoke(task.celery_id, terminate=True, signal='SIGKILL')
                 task.status = ABORTED_TASK
                 task.time = timezone.now()
                 task.save()
@@ -572,27 +575,40 @@ def stop_scan(request, id):
 
 
 @has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
+def resume_scan(request, id):
+    if request.method == "POST":
+        try:
+            from reNgine.tasks import resume_scan_temporal
+            scan = get_object_or_404(ScanHistory, id=id)
+            resume_scan_temporal(scan.id)
+            response = {'status': True}
+            messages.add_message(
+                request,
+                messages.INFO,
+                'Scan successfully resumed!'
+            )
+        except Exception as e:
+            logger.error(e)
+            response = {'status': False}
+            messages.add_message(
+                request,
+                messages.ERROR,
+                f'Scan failed to resume ! Error: {str(e)}'
+            )
+        return JsonResponse(response)
+    return scan_history(request)
+
+
+@has_permission_decorator(PERM_INITATE_SCANS_SUBSCANS, redirect_url=FOUR_OH_FOUR_URL)
 def stop_scans(request, slug):
     if request.method == "POST":
+        from reNgine.utils.scan_cancellation import abort_scan_history
         for key, value in request.POST.items():
             if key == 'scan_history_table_length' or key == 'csrfmiddlewaretoken':
                 continue
             scan = get_object_or_404(ScanHistory, id=value)
             try:
-                for task_id in scan.celery_ids:
-                    app.control.revoke(task_id, terminate=True, signal='SIGKILL')
-                tasks = (
-                    ScanActivity.objects
-                    .filter(scan_of=scan)
-                    .filter(status=RUNNING_TASK)
-                    .order_by('-pk')
-                )
-                for task in tasks:
-                    app.control.revoke(task.celery_id, terminate=True, signal='SIGKILL')
-                    task.status = ABORTED_TASK
-                    task.time = timezone.now()
-                    task.save()
-                create_scan_activity(scan.id, "Scan aborted", ABORTED_TASK)
+                abort_scan_history(scan, aborted_by=request.user)
                 messages.add_message(
                     request,
                     messages.INFO,
@@ -630,64 +646,39 @@ def schedule_scan(request, host_id, slug):
         engine = get_object_or_404(EngineType, id=engine_type)
         timestr = str(datetime.strftime(timezone.now(), '%Y_%m_%d_%H_%M_%S'))
         task_name = f'{engine.engine_name} for {domain.name}: {timestr}'
+        from reNgine.definitions import SCHEDULED_SCAN
+        from reNgine.temporal_schedule_utils import (
+            _create_periodic_temporal_schedule,
+            _create_clocked_temporal_schedule,
+            interval_to_seconds,
+        )
+        workflow_args = {
+            'domain_id': host_id,
+            'engine_id': engine.id,
+            'scan_type': SCHEDULED_SCAN,
+            'imported_subdomains': subdomains_in,
+            'out_of_scope_subdomains': subdomains_out,
+            'starting_point_path': starting_point_path,
+            'excluded_paths': excluded_paths,
+            'enable_spiderfoot_scan': 'spiderfoot_scan' in request.POST,
+            'initiated_by_id': request.user.id,
+        }
         if scheduled_mode == 'periodic':
             frequency_value = int(request.POST['frequency'])
             frequency_type = request.POST['frequency_type']
-            if frequency_type == 'minutes':
-                period = IntervalSchedule.MINUTES
-            elif frequency_type == 'hours':
-                period = IntervalSchedule.HOURS
-            elif frequency_type == 'days':
-                period = IntervalSchedule.DAYS
-            elif frequency_type == 'weeks':
-                period = IntervalSchedule.DAYS
-                frequency_value *= 7
-            elif frequency_type == 'months':
-                period = IntervalSchedule.DAYS
-                frequency_value *= 30
-            schedule, _ = IntervalSchedule.objects.get_or_create(
-                every=frequency_value,
-                period=period)
-            kwargs = {
-                'domain_id': host_id,
-                'engine_id': engine.id,
-                'scan_history_id': 1,
-                'scan_type': SCHEDULED_SCAN,
-                'imported_subdomains': subdomains_in,
-                'out_of_scope_subdomains': subdomains_out,
-                'starting_point_path': starting_point_path,
-                'excluded_paths': excluded_paths,
-                'enable_spiderfoot_scan': 'spiderfoot_scan' in request.POST,
-                'initiated_by_id': request.user.id
-            }
-            PeriodicTask.objects.create(
-                interval=schedule,
+            _create_periodic_temporal_schedule(
                 name=task_name,
-                task='initiate_scan',
-                kwargs=json.dumps(kwargs)
+                interval_seconds=interval_to_seconds(frequency_value, frequency_type),
+                workflow_args=workflow_args,
+                domain_id=host_id,
             )
         elif scheduled_mode == 'clocked':
             schedule_time = request.POST['scheduled_time']
-            clock, _ = ClockedSchedule.objects.get_or_create(
-                clocked_time=schedule_time)
-            kwargs = {
-                'scan_history_id': 0,
-                'domain_id': host_id,
-                'engine_id': engine.id,
-                'scan_type': SCHEDULED_SCAN,
-                'imported_subdomains': subdomains_in,
-                'out_of_scope_subdomains': subdomains_out,
-                'starting_point_path': starting_point_path,
-                'excluded_paths': excluded_paths,
-                'enable_spiderfoot_scan': 'spiderfoot_scan' in request.POST,
-                'initiated_by_id': request.user.id
-            }
-            PeriodicTask.objects.create(
-                clocked=clock,
-                one_off=True,
+            _create_clocked_temporal_schedule(
                 name=task_name,
-                task='initiate_scan',
-                kwargs=json.dumps(kwargs)
+                clocked_time=schedule_time,
+                workflow_args=workflow_args,
+                domain_id=host_id,
             )
         messages.add_message(
             request,
@@ -715,11 +706,7 @@ def schedule_scan(request, host_id, slug):
 
 
 def scheduled_scan_view(request, slug):
-    scheduled_tasks = (
-        PeriodicTask.objects
-        .all()
-        .exclude(name='celery.backend_cleanup')
-    )
+    scheduled_tasks = TemporalSchedule.objects.all()
     context = {
         'scheduled_scan_active': 'active',
         'scheduled_tasks': scheduled_tasks,
@@ -729,8 +716,13 @@ def scheduled_scan_view(request, slug):
 
 @has_permission_decorator(PERM_MODIFY_SCAN_RESULTS, redirect_url=FOUR_OH_FOUR_URL)
 def delete_scheduled_task(request, id):
-    task_object = get_object_or_404(PeriodicTask, id=id)
+    task_object = get_object_or_404(TemporalSchedule, id=id)
     if request.method == "POST":
+        from reNgine.temporal_schedule_utils import _delete_temporal_schedule_by_id
+        try:
+            _delete_temporal_schedule_by_id(task_object.schedule_id)
+        except Exception as e:
+            logger.error(f"[delete_scheduled_task] Temporal delete failed for '{task_object.schedule_id}': {e}")
         task_object.delete()
         messageData = {'status': 'true'}
         messages.add_message(
@@ -749,12 +741,19 @@ def delete_scheduled_task(request, id):
 @has_permission_decorator(PERM_MODIFY_SCAN_RESULTS, redirect_url=FOUR_OH_FOUR_URL)
 def delete_scheduled_scans(request, slug):
     if request.method == "POST":
+        from reNgine.temporal_schedule_utils import _delete_temporal_schedule_by_id
         for key, value in request.POST.items():
             if 'task' in key or key == 'csrfmiddlewaretoken':
                 continue
             try:
-                scan = get_object_or_404(PeriodicTask, id=value)
-                scan.delete()
+                ts = TemporalSchedule.objects.get(id=value)
+                try:
+                    _delete_temporal_schedule_by_id(ts.schedule_id)
+                except Exception as e:
+                    logger.error(f"[delete_scheduled_scans] Temporal delete failed for '{ts.schedule_id}': {e}")
+                ts.delete()
+            except TemporalSchedule.DoesNotExist:
+                logger.error(f"[delete_scheduled_scans] TemporalSchedule id={value} not found")
             except Exception as e:
                 logger.error(e)
         messages.add_message(
@@ -767,9 +766,20 @@ def delete_scheduled_scans(request, slug):
 @has_permission_decorator(PERM_MODIFY_SCAN_RESULTS, redirect_url=FOUR_OH_FOUR_URL)
 def change_scheduled_task_status(request, id):
     if request.method == 'POST':
-        task = PeriodicTask.objects.get(id=id)
-        task.enabled = not task.enabled
-        task.save()
+        from reNgine.temporal_schedule_utils import _pause_temporal_schedule, _unpause_temporal_schedule
+        try:
+            ts = TemporalSchedule.objects.get(id=id)
+            ts.is_active = not ts.is_active
+            ts.save(update_fields=['is_active', 'updated_at'])
+            try:
+                if ts.is_active:
+                    _unpause_temporal_schedule(ts.schedule_id)
+                else:
+                    _pause_temporal_schedule(ts.schedule_id)
+            except Exception as e:
+                logger.error(f"[change_scheduled_task_status] Temporal pause/unpause failed for '{ts.schedule_id}': {e}")
+        except TemporalSchedule.DoesNotExist:
+            pass
     return HttpResponse('')
 
 
@@ -824,7 +834,20 @@ def fetch_exploit_source(request, id):
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def delete_all_scan_results(request):
     if request.method == 'POST':
-        ScanHistory.objects.all().delete()
+        from reNgine.utils.scan_cancellation import abort_scan_history
+        scans = list(ScanHistory.objects.all())
+        for scan in scans:
+            try:
+                abort_scan_history(scan)
+            except Exception:
+                pass
+            try:
+                if scan.results_dir and os.path.exists(scan.results_dir):
+                    import shutil
+                    shutil.rmtree(scan.results_dir)
+            except Exception:
+                pass
+            scan.delete()
         messageData = {'status': 'true'}
         messages.add_message(
             request,
@@ -869,7 +892,7 @@ def start_organization_scan(request, id, slug):
         # split excluded paths by ,
         excluded_paths = [path.strip() for path in excluded_paths.split(',')]
 
-        # Start Celery task for each organization's domains
+        # Start Temporal workflow for each organization's domains
         for domain in organization.get_domains():
             scan_history_id = create_scan_object(
                 host_id=domain.id,
@@ -891,7 +914,7 @@ def start_organization_scan(request, id, slug):
                 'excluded_paths': excluded_paths,
                 'enable_spiderfoot_scan': 'spiderfoot_scan' in request.POST,
             }
-            initiate_scan.apply_async(kwargs=kwargs)
+            initiate_scan_temporal(**kwargs)
             scan.save()
 
 
@@ -943,69 +966,51 @@ def schedule_organization_scan(request, slug, id):
             timestr = str(datetime.strftime(timezone.now(), '%Y_%m_%d_%H_%M_%S'))
             task_name = f'{engine.engine_name} for {domain.name}: {timestr}'
 
+            from reNgine.definitions import SCHEDULED_SCAN, LIVE_SCAN
+            from reNgine.temporal_schedule_utils import (
+                _create_periodic_temporal_schedule,
+                _create_clocked_temporal_schedule,
+                interval_to_seconds,
+            )
             # Period task
             if scheduled_mode == 'periodic':
                 frequency_value = int(request.POST['frequency'])
                 frequency_type = request.POST['frequency_type']
-                if frequency_type == 'minutes':
-                    period = IntervalSchedule.MINUTES
-                elif frequency_type == 'hours':
-                    period = IntervalSchedule.HOURS
-                elif frequency_type == 'days':
-                    period = IntervalSchedule.DAYS
-                elif frequency_type == 'weeks':
-                    period = IntervalSchedule.DAYS
-                    frequency_value *= 7
-                elif frequency_type == 'months':
-                    period = IntervalSchedule.DAYS
-                    frequency_value *= 30
-
-                schedule, _ = IntervalSchedule.objects.get_or_create(
-                    every=frequency_value,
-                    period=period
-                )
-                _kwargs = json.dumps({
-                    'domain_id': domain.id,
-                    'engine_id': engine.id,
-                    'scan_history_id': 0,
-                    'scan_type': SCHEDULED_SCAN,
-                    'initiated_by_id': request.user.id,
-                    'imported_subdomains': subdomains_in,
-                    'out_of_scope_subdomains': subdomains_out,
-                    'starting_point_path': starting_point_path,
-                    'excluded_paths': excluded_paths,
-                    'enable_spiderfoot_scan': 'spiderfoot_scan' in request.POST,
-                })
-                PeriodicTask.objects.create(
-                    interval=schedule,
+                _create_periodic_temporal_schedule(
                     name=task_name,
-                    task='initiate_scan',
-                    kwargs=_kwargs
+                    interval_seconds=interval_to_seconds(frequency_value, frequency_type),
+                    workflow_args={
+                        'domain_id': domain.id,
+                        'engine_id': engine.id,
+                        'scan_type': SCHEDULED_SCAN,
+                        'initiated_by_id': request.user.id,
+                        'imported_subdomains': subdomains_in,
+                        'out_of_scope_subdomains': subdomains_out,
+                        'starting_point_path': starting_point_path,
+                        'excluded_paths': excluded_paths,
+                        'enable_spiderfoot_scan': 'spiderfoot_scan' in request.POST,
+                    },
+                    domain_id=domain.id,
                 )
 
             # Clocked task
             elif scheduled_mode == 'clocked':
                 schedule_time = request.POST['scheduled_time']
-                clock, _ = ClockedSchedule.objects.get_or_create(
-                    clocked_time=schedule_time
-                )
-                _kwargs = json.dumps({
-                    'domain_id': domain.id,
-                    'engine_id': engine.id,
-                    'scan_history_id': 0,
-                    'scan_type': LIVE_SCAN,
-                    'initiated_by_id': request.user.id,
-                    'imported_subdomains': subdomains_in,
-                    'out_of_scope_subdomains': subdomains_out,
-                    'starting_point_path': starting_point_path,
-                    'excluded_paths': excluded_paths,
-                    'enable_spiderfoot_scan': 'spiderfoot_scan' in request.POST,
-                })
-                PeriodicTask.objects.create(clocked=clock,
-                    one_off=True,
+                _create_clocked_temporal_schedule(
                     name=task_name,
-                    task='initiate_scan',
-                    kwargs=_kwargs
+                    clocked_time=schedule_time,
+                    workflow_args={
+                        'domain_id': domain.id,
+                        'engine_id': engine.id,
+                        'scan_type': LIVE_SCAN,
+                        'initiated_by_id': request.user.id,
+                        'imported_subdomains': subdomains_in,
+                        'out_of_scope_subdomains': subdomains_out,
+                        'starting_point_path': starting_point_path,
+                        'excluded_paths': excluded_paths,
+                        'enable_spiderfoot_scan': 'spiderfoot_scan' in request.POST,
+                    },
+                    domain_id=domain.id,
                 )
 
         # Send start notif
@@ -1100,7 +1105,11 @@ def create_report(request, id):
     )
 
     from reNgine.report_tasks import generate_report_task
-    generate_report_task.delay(report_obj.id)
+    threading.Thread(
+        target=generate_report_task,
+        args=(report_obj.id,),
+        daemon=True
+    ).start()
 
     return JsonResponse({'status': True, 'report_id': report_obj.id})
 

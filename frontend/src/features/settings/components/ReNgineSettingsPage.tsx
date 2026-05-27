@@ -9,20 +9,26 @@ import {
   Alert,
   CircularProgress,
   Grid,
-  Snackbar
+  Snackbar,
+  Switch,
+  FormControlLabel
 } from '@mui/material';
-import { 
-  Trash2, 
-  Database, 
-  Image as ImageIcon, 
+import {
+  Trash2,
+  Database,
+  Image as ImageIcon,
   AlertTriangle,
-  HardDrive
+  HardDrive,
+  Download,
+  Upload
 } from 'lucide-react';
 import Chart from 'react-apexcharts';
-import { 
-  useRengineSystemSettings, 
-  useDeleteAllScanResults, 
-  useDeleteAllScreenshots 
+import axios from 'axios';
+import {
+  useRengineSystemSettings,
+  useDeleteAllScanResults,
+  useDeleteAllScreenshots,
+  useToggleScanQueueing
 } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 
@@ -30,6 +36,7 @@ export const ReNgineSettingsPage: React.FC = () => {
   const { data: systemInfo, isLoading } = useRengineSystemSettings();
   const deleteScanResults = useDeleteAllScanResults();
   const deleteScreenshots = useDeleteAllScreenshots();
+  const toggleScanQueueing = useToggleScanQueueing();
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -39,6 +46,11 @@ export const ReNgineSettingsPage: React.FC = () => {
     message: '',
     severity: 'success',
   });
+
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [overwriteConfigs, setOverwriteConfigs] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [isImporting, setIsImporting] = useState(false);
 
   const handleCloseSnackbar = () => {
     setSnackbar({ ...snackbar, open: false });
@@ -79,6 +91,70 @@ export const ReNgineSettingsPage: React.FC = () => {
           severity: 'error',
         });
       }
+    }
+  };
+
+  const handleToggleQueueing = async () => {
+    try {
+      await toggleScanQueueing.mutateAsync();
+      setSnackbar({
+        open: true,
+        message: 'Scan queueing setting updated.',
+        severity: 'success',
+      });
+    } catch (err) {
+      setSnackbar({
+        open: true,
+        message: 'Failed to update scan queueing setting.',
+        severity: 'error',
+      });
+    }
+  };
+
+  const handleExportConfig = async () => {
+    try {
+      setIsExporting(true);
+      const response = await axios.get('/api/settings/export/', {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'r3ngine_config_backup.zip');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setSnackbar({ open: true, message: 'Configuration exported successfully', severity: 'success' });
+    } catch (err) {
+      setSnackbar({ open: true, message: 'Failed to export configuration', severity: 'error' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  const handleImportConfig = async () => {
+    if (!importFile) return;
+    try {
+      setIsImporting(true);
+      const formData = new FormData();
+      formData.append('file', importFile);
+      formData.append('overwrite_existing', overwriteConfigs ? 'true' : 'false');
+
+      const response = await axios.post('/api/settings/import/', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        }
+      });
+      if (response.data.status) {
+        setSnackbar({ open: true, message: 'Configuration imported successfully', severity: 'success' });
+        setImportFile(null);
+      } else {
+        setSnackbar({ open: true, message: response.data.message || 'Import failed', severity: 'error' });
+      }
+    } catch (err) {
+      setSnackbar({ open: true, message: 'Failed to import configuration', severity: 'error' });
+    } finally {
+      setIsImporting(false);
     }
   };
 
@@ -170,26 +246,162 @@ export const ReNgineSettingsPage: React.FC = () => {
           </Typography>
         </Box>
 
+        <TacticalPanel title="SCAN CONFIGURATION">
+          <Box sx={{ p: 2 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={systemInfo?.enable_scan_queueing || false}
+                  onChange={handleToggleQueueing}
+                  disabled={toggleScanQueueing.isPending}
+                  color="info"
+                />
+              }
+              label={
+                <Box>
+                  <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontWeight: 600 }}>
+                    Enable Scan Queueing
+                  </Typography>
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                    When enabled, running main scans and subscans will queue rather than running concurrently, allowing max 1 main scan and 1 specific subscan at a time.
+                  </Typography>
+                </Box>
+              }
+            />
+          </Box>
+        </TacticalPanel>
+
+        <TacticalPanel title="CONFIGURATION EXPORT / IMPORT">
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography sx={{ color: '#00f3ff', fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
+                  Export Configuration
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                  Download a ZIP containing all configured API keys, tool configs, custom scan engines, and custom wordlists.
+                </Typography>
+              </Box>
+              <Button
+                variant="outlined"
+                color="info"
+                onClick={handleExportConfig}
+                disabled={isExporting}
+                startIcon={isExporting ? <CircularProgress size={18} /> : <Download size={18} />}
+                sx={{
+                  borderColor: '#00f3ff',
+                  color: '#00f3ff',
+                  fontFamily: 'Orbitron',
+                  fontWeight: 900,
+                  px: 3,
+                  '&:hover': {
+                    bgcolor: 'rgba(0, 243, 255, 0.1)',
+                    borderColor: '#00f3ff'
+                  }
+                }}
+              >
+                {isExporting ? 'EXPORTING...' : 'DOWNLOAD BACKUP'}
+              </Button>
+            </Box>
+
+            <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box sx={{ flex: 1 }}>
+                <Typography sx={{ color: '#00ff9d', fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
+                  Import Configuration
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1 }}>
+                  Upload a previously exported ZIP backup to restore API keys, engines, tools, and wordlists.
+                </Typography>
+                <Stack direction="row" sx={{ spacing: 2, alignItems: 'center' }}>
+                  <Button
+                    variant="contained"
+                    component="label"
+                    sx={{
+                      bgcolor: '#00ff9d',
+                      color: '#000',
+                      fontFamily: 'Orbitron',
+                      fontWeight: 900,
+                      '&:hover': { bgcolor: '#00cc7d' }
+                    }}
+                  >
+                    SELECT ZIP
+                    <input
+                      type="file"
+                      accept=".zip"
+                      hidden
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          setImportFile(e.target.files[0]);
+                        }
+                      }}
+                    />
+                  </Button>
+                  {importFile && (
+                    <Typography variant="body2" sx={{ color: '#fff' }}>
+                      {importFile.name}
+                    </Typography>
+                  )}
+                </Stack>
+                <Box sx={{ mt: 1 }}>
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={overwriteConfigs}
+                        onChange={(e) => setOverwriteConfigs(e.target.checked)}
+                        color="success"
+                      />
+                    }
+                    label={<Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>Overwrite existing configurations</Typography>}
+                  />
+                </Box>
+              </Box>
+
+              <Button
+                variant="outlined"
+                color="success"
+                onClick={handleImportConfig}
+                disabled={!importFile || isImporting}
+                startIcon={isImporting ? <CircularProgress size={18} /> : <Upload size={18} />}
+                sx={{
+                  borderColor: '#00ff9d',
+                  color: '#00ff9d',
+                  fontFamily: 'Orbitron',
+                  fontWeight: 900,
+                  px: 3,
+                  '&:hover': {
+                    bgcolor: 'rgba(0, 255, 157, 0.1)',
+                    borderColor: '#00ff9d'
+                  }
+                }}
+              >
+                {isImporting ? 'IMPORTING...' : 'UPLOAD BACKUP'}
+              </Button>
+            </Box>
+          </Box>
+        </TacticalPanel>
+
         <TacticalPanel title="STORAGE METRICS">
-          <Box sx={{ 
-            display: 'flex', 
-            flexDirection: { xs: 'column', md: 'row' }, 
-            alignItems: 'center', 
+          <Box sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            alignItems: 'center',
             justifyContent: 'center',
             gap: { xs: 4, md: 8 }
           }}>
             <Box sx={{ width: 300, display: 'flex', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
-              <Chart 
-                options={chartOptions} 
-                series={series} 
-                type="radialBar" 
+              <Chart
+                options={chartOptions}
+                series={series}
+                type="radialBar"
                 height={320}
               />
               <Box sx={{ position: 'absolute', bottom: 10, textAlign: 'center' }}>
-                <Typography sx={{ 
-                  fontFamily: 'Orbitron', 
-                  fontSize: '0.6rem', 
-                  fontWeight: 900, 
+                <Typography sx={{
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.6rem',
+                  fontWeight: 900,
                   color: gaugeColor,
                   letterSpacing: 2,
                   textTransform: 'uppercase'
@@ -198,29 +410,29 @@ export const ReNgineSettingsPage: React.FC = () => {
                 </Typography>
               </Box>
             </Box>
-            
+
             <Box sx={{ flex: '0 1 auto' }}>
               <Grid container spacing={3}>
-                <Grid size={{xs: 12, sm: 4}} >
-                  <MetricCard 
-                    label="TOTAL STORAGE" 
-                    value={`${systemInfo?.total || 0} GB`} 
-                    icon={<Database size={20} color="#ffd600" />} 
+                <Grid size={{ xs: 12, sm: 4 }} >
+                  <MetricCard
+                    label="TOTAL STORAGE"
+                    value={`${systemInfo?.total || 0} GB`}
+                    icon={<Database size={20} color="#ffd600" />}
                   />
                 </Grid>
-                <Grid size={{xs: 12, sm: 4}} >
-                  <MetricCard 
-                    label="USED SPACE" 
-                    value={`${systemInfo?.used || 0} GB`} 
-                    icon={<HardDrive size={20} color={gaugeColor} />} 
+                <Grid size={{ xs: 12, sm: 4 }} >
+                  <MetricCard
+                    label="USED SPACE"
+                    value={`${systemInfo?.used || 0} GB`}
+                    icon={<HardDrive size={20} color={gaugeColor} />}
                     statusColor={gaugeColor}
                   />
                 </Grid>
-                <Grid size={{xs: 12, sm: 4}} >
-                  <MetricCard 
-                    label="FREE SPACE" 
-                    value={`${systemInfo?.free || 0} GB`} 
-                    icon={<Database size={20} color="#00ff9d" />} 
+                <Grid size={{ xs: 12, sm: 4 }} >
+                  <MetricCard
+                    label="FREE SPACE"
+                    value={`${systemInfo?.free || 0} GB`}
+                    icon={<Database size={20} color="#00ff9d" />}
                     statusColor="#00ff9d"
                   />
                 </Grid>
@@ -231,14 +443,14 @@ export const ReNgineSettingsPage: React.FC = () => {
 
         <TacticalPanel title="DANGER ZONE" borderColor="rgba(255, 0, 85, 0.3)">
           <Stack spacing={0} divider={<Divider sx={{ borderColor: 'rgba(255,0,85,0.1)' }} />}>
-            <MaintenanceRow 
+            <MaintenanceRow
               title="Delete all scan results"
               description="Permanently remove all scan history, findings, and logs across all projects. This action is irreversible."
               onAction={handleDeleteScanResults}
               isLoading={deleteScanResults.isPending}
               buttonLabel="PURGE ALL SCANS"
             />
-            <MaintenanceRow 
+            <MaintenanceRow
               title="Delete all screenshots"
               description="Remove all captured website screenshots to free up disk space. Scan reports will no longer show visual evidence."
               onAction={handleDeleteScreenshots}
@@ -248,11 +460,11 @@ export const ReNgineSettingsPage: React.FC = () => {
           </Stack>
         </TacticalPanel>
 
-        <Alert 
-          severity="info" 
+        <Alert
+          severity="info"
           icon={<AlertTriangle size={20} />}
-          sx={{ 
-            bgcolor: 'rgba(0, 243, 255, 0.05)', 
+          sx={{
+            bgcolor: 'rgba(0, 243, 255, 0.05)',
             color: '#00f3ff',
             border: '1px solid rgba(0, 243, 255, 0.2)',
             '& .MuiAlert-icon': { color: '#00f3ff' }
@@ -262,18 +474,18 @@ export const ReNgineSettingsPage: React.FC = () => {
         </Alert>
       </Stack>
 
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
           variant="filled"
-          sx={{ 
-            fontFamily: 'Orbitron', 
+          sx={{
+            fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
             bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
@@ -289,9 +501,9 @@ export const ReNgineSettingsPage: React.FC = () => {
 };
 
 const MetricCard: React.FC<{ label: string; value: string; icon: React.ReactNode; statusColor?: string }> = ({ label, value, icon, statusColor }) => (
-  <Paper sx={{ 
-    p: 2, 
-    bgcolor: 'rgba(255,255,255,0.02)', 
+  <Paper sx={{
+    p: 2,
+    bgcolor: 'rgba(255,255,255,0.02)',
     border: '1px solid',
     borderColor: statusColor ? `${statusColor}33` : 'rgba(255,255,255,0.05)',
     display: 'flex',
@@ -315,10 +527,10 @@ const MetricCard: React.FC<{ label: string; value: string; icon: React.ReactNode
   </Paper>
 );
 
-const MaintenanceRow: React.FC<{ 
-  title: string; 
-  description: string; 
-  onAction: () => void; 
+const MaintenanceRow: React.FC<{
+  title: string;
+  description: string;
+  onAction: () => void;
   isLoading: boolean;
   buttonLabel: string;
 }> = ({ title, description, onAction, isLoading, buttonLabel }) => (
@@ -337,8 +549,8 @@ const MaintenanceRow: React.FC<{
       onClick={onAction}
       disabled={isLoading}
       startIcon={<Trash2 size={18} />}
-      sx={{ 
-        borderColor: '#ff0055', 
+      sx={{
+        borderColor: '#ff0055',
         color: '#ff0055',
         fontFamily: 'Orbitron',
         fontWeight: 900,

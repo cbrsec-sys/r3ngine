@@ -1,3 +1,5 @@
+import json
+import logging
 from datetime import timedelta
 from django.db.models import Count, Q
 from django.db.models.functions import TruncDay
@@ -5,6 +7,8 @@ from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+
+logger = logging.getLogger(__name__)
 
 from dashboard.models import Project, SearchHistory
 from targetApp.models import Domain
@@ -118,6 +122,42 @@ class DashboardAPIView(APIView):
     def _get_trend_data(self, queryset, date_field, start_date, dates):
         trend_raw = queryset.filter(**{f"{date_field}__gte": start_date}).annotate(
             date=TruncDay(date_field)).values("date").annotate(count=Count('id')).order_by("-date")
-        
+
         trend_map = {item['date'].date() if hasattr(item['date'], 'date') else item['date']: item['count'] for item in trend_raw}
         return [trend_map.get(date, 0) for date in dates][::-1]
+
+
+class CWEInfoAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        cwe_name = request.query_params.get('name', '').strip()
+        if not cwe_name:
+            return Response({'error': 'Missing required parameter: name'}, status=400)
+
+        try:
+            from reNgine.llm import LLMBaseGenerator
+            from reNgine.definitions import CWE_INFO_SYSTEM_PROMPT
+
+            generator = LLMBaseGenerator(logger)
+            raw = generator._call_llm(CWE_INFO_SYSTEM_PROMPT, f"Provide security information for: {cwe_name}")
+
+            if raw.startswith('Error:'):
+                return Response({'error': raw}, status=502)
+
+            # Strip markdown code fences if present
+            cleaned = raw.strip()
+            if cleaned.startswith('```'):
+                cleaned = cleaned.split('\n', 1)[-1]
+                if cleaned.endswith('```'):
+                    cleaned = cleaned.rsplit('```', 1)[0]
+            cleaned = cleaned.strip()
+
+            info = json.loads(cleaned)
+            return Response({'status': True, 'cwe': cwe_name, **info})
+
+        except json.JSONDecodeError:
+            return Response({'status': False, 'error': 'LLM returned non-JSON response', 'raw': raw}, status=502)
+        except Exception as e:
+            logger.error(f"CWEInfoAPIView error: {e}")
+            return Response({'status': False, 'error': str(e)}, status=500)

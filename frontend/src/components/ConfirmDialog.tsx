@@ -6,7 +6,6 @@ import {
   DialogActions,
   Button,
   Typography,
-  Box,
   Stack,
   IconButton,
 } from '@mui/material';
@@ -85,10 +84,10 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         )}
       </DialogTitle>
 
-      <DialogContent sx={{ p: 3, pt: 4 }}>
-        <Typography sx={{ 
-          color: 'rgba(255,255,255,0.7)', 
-          fontSize: '0.85rem', 
+      <DialogContent sx={{ px: 3, pb: 3, pt: '28px !important' }}>
+        <Typography sx={{
+          color: 'rgba(255,255,255,0.7)',
+          fontSize: '0.85rem',
           lineHeight: 1.6,
           textAlign: 'center'
         }}>

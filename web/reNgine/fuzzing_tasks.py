@@ -1,3 +1,4 @@
+import logging
 import os
 import base64
 import json
@@ -5,10 +6,7 @@ from urllib.parse import urlparse
 from django.utils import timezone
 from redis import Redis
 from django.conf import settings
-from celery.utils.log import get_task_logger
 
-from reNgine.celery import app
-from reNgine.celery_custom_task import RengineTask
 from reNgine.definitions import (
 	DIR_FILE_FUZZ,
 	ENABLE_HTTP_CRAWL,
@@ -37,9 +35,9 @@ from reNgine.settings import (
 	DEFAULT_HTTP_TIMEOUT,
 	DEFAULT_THREADS
 )
-from reNgine.opsec_utils import OpSecManager
+from reNgine.utils.opsec import OpSecManager
 from reNgine.common_func import get_http_urls, get_subdomain_from_url, extract_path_from_url, get_random_proxy
-from reNgine.task_utils import (
+from reNgine.utils.task import (
 	run_command,
 	stream_command,
 	save_endpoint,
@@ -49,11 +47,10 @@ from reNgine.task_utils import (
 )
 from startScan.models import DirectoryScan, DirectoryFile, Subdomain
 
-logger = get_task_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
-@app.task(name='dir_file_fuzz', queue='main_scan_queue', base=RengineTask, bind=True)
-def dir_file_fuzz(self, ctx=None, description=None):
+def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_only=None):
 	"""Perform directory and file fuzzing using FFUF and Dirsearch.
 
 	This wrapper ensures that any endpoints are crawled first by delegating to
@@ -69,7 +66,7 @@ def dir_file_fuzz(self, ctx=None, description=None):
 	if ctx is None:
 		ctx = {}
 
-	def _execute_dir_file_fuzz(ctx, description):
+	def _execute_dir_file_fuzz(ctx, description, prepare_only=False, parse_only=None):
 		"""Inner execution logic for FFUF and Dirsearch fuzzing.
 
 		Args:
@@ -97,7 +94,7 @@ def dir_file_fuzz(self, ctx=None, description=None):
 		timeout = config.get(TIMEOUT) or self.yaml_configuration.get(TIMEOUT, DEFAULT_HTTP_TIMEOUT)
 		threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
 		wordlist_name = config.get(WORDLIST, 'dicc')
-		auto_calibration = config.get(AUTO_CALIBRATION, False)
+		auto_calibration = config.get(AUTO_CALIBRATION, True)
 		delay = rate_limit / (threads * 100) if threads else 0
 		custom_headers = config.get(CUSTOM_HEADERS) or config.get(CUSTOM_HEADER) or []
 		
@@ -122,7 +119,8 @@ def dir_file_fuzz(self, ctx=None, description=None):
 		ffuf_base_cmd += f' -e {extensions_str}' if extensions else ''
 		ffuf_base_cmd += f' -maxtime {max_time}' if max_time > 0 else ''
 		ffuf_base_cmd += f' -p {delay}' if delay > 0 else ''
-		ffuf_base_cmd += f' -recursion -recursion-depth {recursive_level} ' if recursive_level > 0 else ''
+		if recursive_level > 0:
+			ffuf_base_cmd += f' -recursion -recursion-depth {recursive_level} -maxtime-job 120'
 		ffuf_base_cmd += f' -t {threads}' if threads and threads > 0 else ''
 		ffuf_base_cmd += f' -timeout {timeout}' if timeout and timeout > 0 else ''
 		ffuf_base_cmd += ' -se' if stop_on_error else ''
@@ -137,6 +135,8 @@ def dir_file_fuzz(self, ctx=None, description=None):
 		
 		for header in custom_headers_list:
 			ffuf_base_cmd += f' -H "{header}"'
+			if 'cookie' in header.lower() or 'authorization' in header.lower():
+				logger.warning(f'Authenticated FFUF fuzzing enabled via header: {header}')
 
 		# Build dirsearch base command
 		dirsearch_base_cmd = 'dirsearch'
@@ -157,28 +157,64 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 		for header in custom_headers_list:
 			dirsearch_base_cmd += f' -H "{header}"'
+			if 'cookie' in header.lower() or 'authorization' in header.lower():
+				logger.warning(f'Authenticated Dirsearch fuzzing enabled via header: {header}')
 
-		# Grab URLs to fuzz
-		urls = get_http_urls(
-			is_alive=True,
-			ignore_files=False,
-			write_filepath=input_path,
-			get_only_default_urls=True,
-			ctx=ctx
-		)
-		if not urls:
-			logger.error('No alive URLs found for directory fuzzing. Skipping.')
-			return []
+		if ctx.get("urls_override"):
+			urls = ctx["urls_override"]
+		else:
+			# Grab URLs to fuzz
+			raw_urls = get_http_urls(
+				is_alive=True,
+				ignore_files=False,
+				write_filepath=input_path,
+				get_only_default_urls=False,
+				ctx=ctx
+			)
+			if not raw_urls:
+				logger.error('No alive URLs found for directory fuzzing. Skipping.')
+				return []
+				
+			# Group by base_url and extract unique directories up to depth 2
+			base_url_map = {}
+			for u in raw_urls:
+				parsed = urlparse(u)
+				base = f"{parsed.scheme}://{parsed.netloc}"
+				if base not in base_url_map:
+					base_url_map[base] = set()
+					
+				path = parsed.path
+				if path and '.' in path.split('/')[-1]:
+					path = '/'.join(path.split('/')[:-1])
+				if not path.endswith('/'):
+					path += '/'
+					
+				segments = [s for s in path.strip('/').split('/') if s]
+				if len(segments) <= 2:
+					base_url_map[base].add(path)
+					
+			urls = []
+			for base, paths in base_url_map.items():
+				for path in list(paths)[:10]:
+					urls.append(f"{base}{path}")
 
 		logger.warning(f'Fuzzing URLs: {urls}')
 
+		if prepare_only:
+			return {
+				"urls": urls,
+				"ffuf_base_cmd": ffuf_base_cmd,
+				"dirsearch_base_cmd": dirsearch_base_cmd,
+				"enable_http_crawl": enable_http_crawl,
+			}
+
 		results = []
-		redis_client = Redis.from_url(os.environ.get('CELERY_BROKER', 'redis://redis:6379/0'))
+		redis_client = Redis.from_url(os.environ.get('REDIS_URL', 'redis://redis:6379/0'))
 		opsec = OpSecManager()
 
-		for url in urls:
-			logger.warning(f'Fuzzing URL: {url}')
-			url_parse = urlparse(url)
+		for target_url in urls:
+			logger.warning(f'Fuzzing URL: {target_url}')
+			url_parse = urlparse(target_url)
 			base_url = url_parse.scheme + '://' + url_parse.netloc
 			subdomain_name = get_subdomain_from_url(base_url)
 			subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=self.scan).first()
@@ -192,9 +228,9 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 			# Use a global lock to ensure sequential execution across all workers
 			with redis_client.lock("fuzz_execution_lock", timeout=14400):
-				logger.info(f'Running ffuf for {base_url}')
+				logger.info(f'Running ffuf for {target_url}')
 				# 1. Run FFUF
-				fcmd = ffuf_base_cmd + f' -u {base_url}/FUZZ -json -s'
+				fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json -s'
 				fcmd += f' -x {proxy}' if proxy else ''
 				fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=proxy)
 				
@@ -209,13 +245,28 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 				logger.info(f'Running ffuf for {base_url}')
 				logger.warning(f'ffuf command: {fcmd}')
-				for line in stream_command(
+
+				if parse_only is not None and target_url in parse_only.get('ffuf', {}):
+					import json
+					ffuf_stdout = parse_only['ffuf'][target_url]
+					line_source = []
+					for raw_line in ffuf_stdout.splitlines():
+						raw_line = raw_line.strip()
+						if not raw_line:
+							continue
+						try:
+							line_source.append(json.loads(raw_line))
+						except Exception:
+							line_source.append(raw_line)
+				else:
+					line_source = stream_command(
 						fcmd,
 						shell=True,
 						history_file=self.history_file,
 						scan_id=self.scan_id,
-						activity_id=self.activity_id):
+						activity_id=self.activity_id)
 
+				for line in line_source:
 					if not isinstance(line, dict):
 						continue
 
@@ -264,13 +315,17 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 					dirscan.directory_files.add(dfile)
 					if self.subscan:
-						dirscan.dir_subscan_ids.add(self.subscan)
+						from startScan.models import SubScan
+						if SubScan.objects.filter(pk=self.subscan.pk).exists():
+							dirscan.dir_subscan_ids.add(self.subscan)
 
 				dirscan.save()
 
 				# 2. Run Dirsearch
 				dirsearch_output = f'{self.results_dir}/dirsearch_{subdomain_name}.json'
-				dcmd = f'{dirsearch_base_cmd} -u {base_url} --format=json -o {dirsearch_output} --no-color'
+				# Remove trailing slash for dirsearch -u
+				target_url_stripped = target_url.rstrip('/')
+				dcmd = f'{dirsearch_base_cmd} -u {target_url_stripped} --format=json -o {dirsearch_output} --no-color'
 				if proxy:
 					dcmd += f' --proxy={proxy}'
 				
@@ -285,15 +340,17 @@ def dir_file_fuzz(self, ctx=None, description=None):
 					subdomain.directories.add(dirscan_ds)
 					subdomain.save()
 
-				logger.info(f'Running dirsearch for {base_url}')
+				logger.info(f'Running dirsearch for {target_url}')
 				logger.warning(f'dirsearch command: {dcmd}')
-				run_command(
-					dcmd,
-					shell=True,
-					history_file=self.history_file,
-					scan_id=self.scan_id,
-					activity_id=self.activity_id
-				)
+
+				if parse_only is None:
+					run_command(
+						dcmd,
+						shell=True,
+						history_file=self.history_file,
+						scan_id=self.scan_id,
+						activity_id=self.activity_id
+					)
 				
 				# Parse dirsearch results from output file
 				if os.path.exists(dirsearch_output):
@@ -338,7 +395,9 @@ def dir_file_fuzz(self, ctx=None, description=None):
 
 								dirscan_ds.directory_files.add(dfile)
 								if self.subscan:
-									dirscan_ds.dir_subscan_ids.add(self.subscan)
+									from startScan.models import SubScan
+									if SubScan.objects.filter(pk=self.subscan.pk).exists():
+										dirscan_ds.dir_subscan_ids.add(self.subscan)
 					except Exception as e:
 						logger.error(f'Error parsing dirsearch results for {base_url}: {e}')
 
@@ -347,8 +406,13 @@ def dir_file_fuzz(self, ctx=None, description=None):
 		# Crawl discovered URLs if enabled
 		if enable_http_crawl:
 			ctx['track'] = True
-			http_crawl(urls, ctx=ctx)
+			http_crawl(self, urls, ctx=ctx)
 
 		return results
 
-	return ensure_endpoints_crawled_and_execute(_execute_dir_file_fuzz, ctx, description)
+	return ensure_endpoints_crawled_and_execute(
+		self, 
+		lambda ctx, description: _execute_dir_file_fuzz(ctx, description, prepare_only=prepare_only, parse_only=parse_only), 
+		ctx, 
+		description
+	)

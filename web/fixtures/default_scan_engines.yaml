@@ -153,7 +153,7 @@
     yaml_configuration: "subdomain_discovery: {\n  'uses_tools': ['subfinder', 'chaos',\n\
       \  'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'baddns'],\n\
       \  'enable_http_crawl': true,\n  'threads': 30,\n  'timeout': 5,\n}\n\
-      http_crawl: {}\nosint: {\n  'discover': ['emails', 'metainfo', 'employees'],\n\
+      \  http_crawl: {}\nosint: {\n  'discover': ['emails', 'metainfo', 'employees'],\n\
       \  'dorks': ['login_pages', 'admin_panels', 'dashboard_pages', 'stackoverflow',\n\
       \  'social_media', 'project_management', 'code_sharing', 'config_files', 'jenkins',\n\
       \  'wordpress_files', 'php_error', 'exposed_documents', 'db_files', 'git_exposed'],\n\
@@ -181,10 +181,10 @@
     yaml_configuration: "subdomain_discovery: {\n  'uses_tools': ['subfinder', 'chaos',\n\
       \  'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'baddns'],\n\
       \  'enable_http_crawl': true,\n  'threads': 30,\n  'timeout': 5,\n}\n\
-      http_crawl: {}\nosint: {\n  'discover': ['emails', 'metainfo'],\n\
+      \  http_crawl: {}\nosint: {\n  'discover': ['emails', 'metainfo'],\n\
       \  'dorks': ['login_pages', 'admin_panels', 'dashboard_pages', 'config_files',\n\
       \  'exposed_documents'],\n  'intensity': 'normal',\n  'documents_limit': 50\n}\n\
-      vulnerability_scan: {\n  'run_nuclei': true,\n  'run_dalfox': true,\n\
+      \  vulnerability_scan: {\n  'run_nuclei': true,\n  'run_dalfox': true,\n\
       \  'run_crlfuzz': true,\n  'run_acunetix': true,\n  'enable_http_crawl': false,\n\
       \  'concurrency': 50,\n  'intensity': 'normal',\n  'rate_limit': 150,\n\
       \  'retries': 1,\n  'timeout': 5,\n  'fetch_gpt_report': false,\n  'nuclei': {\n\
@@ -200,7 +200,7 @@
     engine_name: Firewall and VPN (Sophos)
     yaml_configuration: "subdomain_discovery: {\n  'uses_tools': ['subfinder'],\n\
       \  'enable_http_crawl': true,\n  'threads': 10,\n  'timeout': 5\n}\n\
-      port_scan: {\n  'enable_http_crawl': true,\n  'timeout': 5,\n  'ports':\n\
+      \  port_scan: {\n  'enable_http_crawl': true,\n  'timeout': 5,\n  'ports':\n\
       \  ['80', '443', '4444', '8443', '22', '500', '4500', '1194'],\n  'rate_limit': 100,\n\
       \  'threads': 20,\n  'passive': false,\n  'enable_nmap': true,\n  'nmap_cmd':\n\
       \  '-sV --script vuln'\n}\nvulnerability_scan: {\n  'run_nuclei': true,\n\
@@ -210,9 +210,9 @@
       \  false,\n  'nuclei': {\n    'use_nuclei_config': false,\n    'severities':\n\
       \  ['medium', 'high', 'critical'],\n    'tags': ['sophos', 'firewall', 'vpn'],\n\
       \    'custom_templates': ['/root/nuclei-templates/']\n  }\n}\n\
-      attack_path_modeling: {\n  'enabled': true\n}\nfirewall_vpn_scan: {\n\
+      \  attack_path_modeling: {\n  'enabled': true\n}\nfirewall_vpn_scan: {\n\
       \  'run_ike_scan': true,\n  'run_sslscan': true,\n  'ports': [443, 4444, 8443]\n}\n\n\
-      brute_force_scan: {\n  'users_wordlist': ['top_default_usernames.txt',\n\
+      \  brute_force_scan: {\n  'users_wordlist': ['top_default_usernames.txt',\n\
       \  'most_common_usernames.txt'],\n  'pass_wordlist': ['top_default_passwords.txt',\n\
       \  'most_common_passwords.txt'],\n  'services': ['ssh', 'ftp', 'http', 'smb',\n\
       \  'rdp', 'telnet'],\n  'stop_on_success': true\n}\nspiderfoot_scan: {\n\
@@ -225,11 +225,11 @@
     yaml_configuration: "subdomain_discovery: {\n  'uses_tools': ['subfinder', 'chaos',\n\
       \  'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'baddns'],\n\
       \  'enable_http_crawl': true,\n  'threads': 30,\n  'timeout': 5,\n}\n\
-      web_api_discovery: {\n  'uses_tools': ['kiterunner', 'arjun',\n\
+      \  web_api_discovery: {\n  'uses_tools': ['kiterunner', 'arjun',\n\
       \  'linkfinder', 'paramspider', 'aquatone', 'semgrep', 'retire'],\n  'scan_only_active':\n\
       \  true,\n  'threads': 30,\n  'kiterunner_wordlist': 'routes-large.kite',\n\
       \  'arjun_methods': 'GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH'\n}\n\
-      vulnerability_scan: {\n  'run_acunetix': true\n,  'run_wpscan': true\n}\nattack_path_modeling: {\n\
+      \  vulnerability_scan: {\n  'run_acunetix': true\n,  'run_wpscan': true\n}\nattack_path_modeling: {\n\
       \  'enabled': true\n}\nspiderfoot_scan: {\n  'modules': 'all'\n}"
   model: scanEngine.enginetype
   pk: 8
