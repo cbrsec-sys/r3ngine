@@ -47,18 +47,25 @@
 <a href="https://opensourcesecurityindex.io/" target="_blank" rel="noopener">
 <img style="width: 282px; height: 56px" src="https://opensourcesecurityindex.io/badge.svg" alt="Open Source Security Index - Fastest Growing Open Source Security Projects" width="282" height="56" /> </a>
 </p>
-<h4>r3ngine 3.2.0: The Phoenix Rebirth</h4>
+
+<h3 align="center">r3ngine 3.2.0: The Phoenix Rebirth</h4>
 <p>
   r3ngine 3.2.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Most significantly, v3.2.0 completes the full migration from Celery to <b>Temporal</b> — replacing the legacy at-most-once task broker with a durable workflow engine that provides crash-safe scan execution, full replay history, and pause/resume signaling. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
 </p>
 
-<h4>Attack Path Modeling Engine<h4>
+![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
+
+<h4 align="center">Attack Path Modeling Engine<h4>
 <p align="center">
 <img src=".github/screenshots/apme.png" height="700px" width="1020px" alt=""/>
 </p>
 
+![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
+
+<h2 align="center"><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3NgineMobileSOC</a>: Beta Release Out Now</h2>
+<p align="center">
 <img src="https://img.shields.io/badge/r3ngine--mobile-1.2.0-orange.svg?logo=none" alt="r3ngine Mobile SOC" />
-<h5><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3NgineMobileSOC</a>: Beta Release Out Now</h5>
+</p>
 
 | Dashboard | Geo-Tactical Map | Scan Details | Scan Orchestration |
 | :---: | :---: | :---: | :---: |
@@ -94,80 +101,6 @@
 > **Do not run `make up` or `docker compose up` directly** on an existing v3.1.x install — the old Celery containers will conflict and migrations will not be applied automatically.
 >
 > Any scans running at the time of upgrade **will be interrupted**. Ensure no critical scans are in progress before upgrading.
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## 🚀 The v3 Evolution: Comprehensive Enhancements (Since v2.2)
-
-Version 3.0 and the preceding v2.5/2.4 cycles represent a paradigm shift in r3ngine's capabilities. From **AI-native intelligence** and **graph-based attack modeling** to the new **high-performance stress testing dashboard**, below are the core pillars of the recent evolution, detailed for security professionals who require surgical precision.
-
-### 🧠 The Intelligence & AI Hub
-r3ngine is now an AI-native reconnaissance suite, moving beyond simple tool automation to intelligent analysis.
-*   **Centralized AI Hub**: A unified management interface supporting **OpenAI, Anthropic (Claude 3), Google Gemini, and local Ollama models**.
-*   **Vulnerability Impact Intelligence**: Automated generation of detailed impact narratives and remediation priorities using LLMs, visualized through interactive **Cytoscape.js attack paths**. Features a seamless, state-aware **Impact Explorer** with real-time assessment monitoring and persistent synchronization to reporting models.
-*   **PII Gate Security**: Advanced privacy layer that anonymizes sensitive reconnaissance data (IPs, emails, hostnames) before sending it to external LLMs, ensuring enterprise-grade data protection.
-*   **Dynamic Model Discovery**: Real-time fetching of available models with hardware requirement insights for local deployments.
-
-### 🛠️ Advanced Engine Overhaul
-The core scanning engines have been upgraded to provide "Verification-First" reconnaissance.
-*   **Attack Path Modeling Engine (APME)**: A production-grade, graph-based modeling system utilizing **Neo4j**. It discovers feasible attack routes (e.g., SQLi → DB Access → Pivot) based on a dynamic rules engine. **v3 Update**: Expanded rule set with 20+ sophisticated security patterns and automated "Goal Injection" for robust path discovery.
-*   **Exploitation Readiness Layer (ERL)**: A safe, modular validation layer that converts potential findings into **"Verified" status** using containerized, non-destructive validation tools.
-### 🌪️ Adaptive Stress & Resilience Engine (ASRE)
-reNgine now features a high-performance stress testing suite, enabling users to evaluate endpoint stability and saturation limits directly from the reconnaissance workflow.
-*   **Multi-Tool Orchestration**: Seamlessly execute and control `k6`, `wrk`, `hping3`, and `Locust` with synchronized backend orchestration.
-*   **Real-Time Telemetry Dashboard**: A premium monitoring interface featuring synchronized **ECharts** for Latency, RPS, and Throughput, powered by low-latency **Redis Streams** and **WebSockets**.
-*   **Scenario-Based Testing**: Support for headless Locust execution with dynamic scenario generation and aggregated stats parsing.
-*   **Infrastructure Safety**: Integrated safety guardrails and Redis-backed kill-switch mechanisms for instant termination of high-load tests.
-*   **Specialized Intelligence Reports**: High-fidelity PDF reports with performance-focused aesthetics (`stress_cyber_pro` and `stress_modern`). Includes LLM-powered bottleneck analysis, latency heatmaps, and success-rate stability charts.
-*   **Vulnerability Correlation Engine**: Unifies findings from **Nuclei, Semgrep, Gitleaks, Acunetix, and Retire.js** into a prioritized threat landscape.
-*   **Persistent Vulnerability State Tracking**: Automated lifecycle management that identifies vulnerabilities and their status over time.
-*   **Centralized Brute-Force Orchestration**: A multi-tiered authentication attack pipeline that supports **multi-service targeting (SSH, FTP, HTTP, SMB, RDP, Telnet)**. Centralizes targets from Nmap, Nuclei, and intelligent form extraction into a unified `AuthCandidate` queue, orchestrated via **Hydra** with full OpSec controls.
-*   **Autonomous Plugin Management**: A powerful, modular system to extend reNgine with custom engines and dynamic UI components. Features **Atomic Installation** with background tool installation (`tools.yaml`), automated engine registration via fixtures, and persistent startup verification.
-
-### ⚡ Resource Management & Efficiency
-Optimization is a first-class citizen in v3, ensuring high-performance reconnaissance even on resource-constrained host machines.
-*   **Temporal Workflow Engine**: Replaced Celery with [Temporal](https://temporal.io) for all scan orchestration. Workflows survive container restarts, support pause/resume signaling, and provide a full execution history UI. A single `temporal-python-orchestrator` container replaces the old multi-worker sprawl, reducing base memory overhead significantly.
-*   **Durable Execution**: Scan activities are automatically retried on failure with configurable backoff. No more lost scans due to worker crashes or Redis broker blips.
-*   **Global Redis Caching**: Migrated from per-process local memory caching to a unified Redis-backed caching layer, ensuring shared state efficiency and reduced RAM footprint.
-*   **Deterministic Resource Limits**: All production services (Temporal, Ollama, Neo4j, Web) now feature native Docker `deploy.resources` limits and reservations, preventing system-wide resource starvation.
-
-### 🕵️ Surgical Recon & API Discovery
-The reconnaissance pipeline has been deepened to handle modern, API-centric web architectures.
-*   **Deep Pursuit OSINT Engine**: A modernized, high-performance intelligence pipeline that replaces heavy Spiderfoot scans with surgical discovery. Featuring **holehe** for email pivots, **maigret** for cross-platform social profile mapping, and a custom **Internal Social Intelligence Engine** for advanced LinkedIn discovery.
-*   **OSINT Intelligence Dashboard**: Aggregated view of emails, leaks, employees, dorks, and document metadata.
-
-### 🗂️ Active Directory Intelligence Plugin
-r3ngine v3.2.0 introduces a dedicated **Active Directory Intelligence** plugin for internal network reconnaissance and AD attack surface analysis.
-*   **Graph Visualization**: Interactive Cytoscape.js graph with 5 layout presets (hierarchical, radial, force, bipartite, cluster), semantic node styling for domain controllers, trust bridges, and exposed accounts, plus an animated real-time ingest mode.
-*   **Scalability Guardrails**: Graph enforces a 300-node default cap with user-triggered "Load All"; animations automatically disable above 400 nodes to maintain UI responsiveness.
-*   **Findings & Trust Enumeration**: Paginated API endpoints (50 records/page) for all AD objects — users, groups, computers, trusts, and exposures — with inline search and column-level filtering.
-*   **Real-Time WebSocket Streaming**: Backend emits graph and findings events through Django Channels with 150 ms client-side batching during large LDAP/BloodHound ingests.
-*   **7-Section Intelligence Reports**: `ReportingEngine` compiles executive summary, domain inventory, trust topology, exposure analysis, and recommendations into PDF (`cyber_pro`, `ad_modern` templates) or JSON exports.
-*   **RBAC & Evidence Logs**: All assessment actions require `can_run_ad_assessment` permission and are written to an immutable evidence log.
-*   **Subdomain-Triggered Assessment**: Launch an AD assessment directly from any subdomain record in the subdomain management table.
-
-### 🥷 Stealth, OpSec & Infrastructure
-Operational security is no longer an afterthought; it is baked into every execution.
-*   **Enhanced Proxy Orchestration**: Per-tool rotating proxy support across all discovery modules to bypass rate-limiting and WAF blocks.
-*   **Hardened Scan Termination**: Centralized `abort_scan_history()` / `abort_subscan()` utility ensures all child subscans and Temporal workflows are cancelled before database status is updated, eliminating orphaned workflows and stuck RUNNING scan records. Fixes applied across `StopScan`, `stop_scans`, `bulk_stop`, `delete_all_scan_results`, and `bulk_delete` endpoints.
-*   **Workflow Retry Cap**: `MasterScanWorkflow` and `SubScanWorkflow` now enforce a maximum of 10 retry attempts. After 10 failures the workflow transitions to FAILED state; users can re-trigger execution via the **Resume** button which replays from the last checkpoint.
-*   **Hydra & Medusa Integration**: High-performance authentication brute-forcing with automated service mapping and stealthy, batched execution via **Proxychains4**.
-*   **WAF Bypass & OpSec Presets**: Advanced stealth configuration including User-Agent rotation, custom DNS resolvers, and WAF bypass headers.
-*   **Automated Startup Sync**: A Redis-locked sequence ensures Attack Surface graphs and CISA KEV (Known Exploited Vulnerabilities) catalogs are synchronized immediately upon boot.
-
-### 🎨 Premium Visual Experience
-Aesthetic excellence is a core requirement of the v3 vision.
-*   **Cyberpunk V3 "Neon" Dashboard**: A premium glassmorphic theme with a unified dark/neon palette optimized for complex data visualization.
-    *   **Interactive Subdomain Management**: Fully wired tactical interface for on-demand **LLM Attack Surface Analysis**, targeted **Subscans**, and reconnaissance **TODO/Note management** directly from the inventory.
-    *   **Scan Detail Header Reorganization**: Improved the aesthetic layout of the Scan Detail page by repositioning navigation breadcrumbs below action buttons and right-aligned the control group.
-    *   **Chronological Ordering**: Standardized descending ID ordering across Scan History and Target Lists to ensure the most recent entries appear at the top.
-    * 📊 **Enhanced Telemetry**: Fixed HTTP status breakdown logic to capture and visualize all response codes across assets. Resolved critical Scan Summary API stability issues by refactoring to target-wide cumulative data queries, ensuring full data visibility for rescans and historical targets.
-*   **Responsive Header & Mobile Menu**: Dynamic adaptation of header actions into a high-fidelity hamburger drawer for small viewports, preserving the glassmorphic aesthetic.
-*   **Multi-Tier Theme System**: Toggle between **Hacker (Cyberpunk)**, **Hybrid (Modern Dark)**, and **Enterprise (Professional Slate)** interfaces instantly.
-*   **Attack Surface Map v4.0**: High-performance infrastructure visualization with **Hierarchical Asset Clustering** (Domains > Subdomains > Endpoints). Features advanced **fCoSE** and **KLay** layouts, semantic cluster management, and AI-driven graph search.
-*   **Tactical GeoMap Visualization**: Custom high-performance CSS-animated markers and tooltip interactions for global asset positioning.
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -335,25 +268,34 @@ flowchart TD
 ## Features
 
 ### 🧠 Intelligence & AI Hub
-*   **Centralized AI Management**: Unified interface for OpenAI, Anthropic, Gemini, and local Ollama models.
-*   **Vulnerability Impact Intelligence**: AI-generated impact narratives, remediation strategies, and tactical reports.
+r3ngine is an AI-native reconnaissance suite, moving beyond simple tool automation to intelligent analysis.
+*   **Centralized AI Management**: A unified management interface supporting **OpenAI, Anthropic (Claude 3), Google Gemini, and local Ollama models**.
+*   **Vulnerability Impact Intelligence**: Automated generation of detailed impact narratives, remediation strategies, and remediation priorities using LLMs, visualized through interactive **Cytoscape.js attack paths** and a state-aware **Impact Explorer** with real-time assessment monitoring and persistent synchronization.
+*   **PII Gate Security**: Advanced privacy layer that anonymizes sensitive reconnaissance data (IPs, emails, hostnames) before sending it to external LLMs, ensuring enterprise-grade data protection.
 *   **GPT Attack Surface Generator**: Automated generation of target profiles and high-value asset identification.
-*   **PII Gate Security**: Native anonymization of sensitive reconnaissance data before LLM processing.
+*   **Dynamic Model Discovery**: Real-time fetching of available models with hardware requirement insights for local deployments.
 *   **Natural Language Querying**: Perform complex database lookups using intuitive, human-like operators.
 
-### 🛠️ Advanced Scan Engines
-*   **Active Directory Intelligence**: Full AD attack surface analysis plugin with Cytoscape graph visualization (5 layouts), trust enumeration, exposure analysis, 7-section PDF/JSON reports, real-time WebSocket streaming, and RBAC-gated evidence logs.
-*   **Attack Path Modeling Engine (APME)**: Sophisticated graph-based visualization of multi-stage attack vectors using Neo4j and AI-driven path discovery.
-*   **Adaptive Stress & Resilience Engine (ASRE)**: High-performance real-time stress testing dashboard integrated with `k6`, `wrk`, `hping3`, and `Locust` for endpoint saturation analysis.
-*   **Exploit Readiness Layer (ERL)**: Hardened automated vulnerability verification system with multi-scanner support and stealthy OpSec guardrails.
-*   **Autonomous Recon Orchestration**: Temporal-powered durable workflow pipeline with non-blocking orchestration, crash-safe execution, full replay history, and a 10-attempt retry cap (FAILED workflows are resumable via the UI).
-*   **Vulnerability Correlation Engine**: Multi-tool unification mapping findings from Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, and more.
-*   **Autonomous Tooling & Plugin System**: Background tool management ensures all plugin dependencies (e.g., sqlmap, XSStrike) are installed and verified automatically at runtime. **v3-Hardening**: Integrated native **proxy rotation** and **OpSec compliance** (User-Agent randomization, custom headers) directly into the ERL adapter layer, ensuring stealthy validation of all discovered vulnerabilities.
-*   **Continuous Monitoring**: Periodic discovery of new subdomains, endpoints, and data changes with automated diffing.
+### 🛠️ Advanced Scan & Execution Engines
+*   **Active Directory Intelligence**: Full AD attack surface analysis plugin featuring:
+    *   **Graph Visualization**: Interactive Cytoscape.js graph with 5 layout presets (hierarchical, radial, force, bipartite, cluster), semantic node styling for domain controllers, trust bridges, and exposed accounts, plus an animated real-time ingest mode (with a 300-node default cap and auto-disabled animations above 400 nodes).
+    *   **Findings & Trust Enumeration**: Paginated API endpoints (50 records/page) for all AD objects (users, groups, computers, trusts, and exposures) with inline search and column-level filtering.
+    *   **Real-Time WebSocket Streaming**: Backend events streamed through Django Channels with 150 ms client-side batching during LDAP/BloodHound ingests.
+    *   **7-Section Intelligence Reports**: Executive summary, domain inventory, trust topology, exposure analysis, and recommendations compiled into PDF (`cyber_pro`, `ad_modern` templates) or JSON.
+    *   **RBAC & Evidence Logs**: Assessment actions require `can_run_ad_assessment` permission and are logged to an immutable evidence log.
+    *   **Subdomain-Triggered Assessment**: Launch AD assessments directly from any subdomain record.
+*   **Attack Path Modeling Engine (APME)**: A production-grade, graph-based modeling system utilizing **Neo4j** to discover feasible attack routes (e.g., SQLi → DB Access → Pivot) based on a dynamic rules engine. Features 20+ security patterns and automated "Goal Injection".
+*   **Adaptive Stress & Resilience Engine (ASRE)**: High-performance real-time stress testing dashboard integrated with `k6`, `wrk`, `hping3`, and `Locust`. Features real-time telemetry (ECharts for Latency/RPS/Throughput via Redis Streams and WebSockets), headless Locust execution with dynamic scenarios, safety kill-switches, and LLM-powered bottleneck PDF reports (`stress_cyber_pro` and `stress_modern` templates).
+*   **Exploit Readiness Layer (ERL)**: Hardened automated vulnerability verification system with containerized, non-destructive validation tools. Features native **proxy rotation** and **OpSec compliance** (User-Agent randomization, custom headers) directly in the ERL adapter layer.
+*   **Autonomous Recon Orchestration**: Temporal-powered durable workflow pipeline with non-blocking orchestration, crash-safe execution, full execution history UI, a 10-attempt retry cap, and UI-based resume options.
+*   **Vulnerability Correlation Engine**: Unifies findings from Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, Retire.js, and more into a prioritized threat landscape with **Persistent Vulnerability State Tracking**.
+*   **Autonomous Tooling & Plugin System**: Background tool management ensuring all plugin dependencies (e.g., sqlmap, XSStrike) are installed and verified automatically at runtime using `tools.yaml` and persistent startup verification.
+*   **Continuous Monitoring**: Periodic discovery of new subdomains, endpoints, and data changes with automated diffing and real-time alerts.
 
-### 🕵️ Surgical Reconnaissance
+### 🕵️ Surgical Reconnaissance & OSINT
 *   **Advanced Web API Discovery**: Dedicated pipeline featuring Kiterunner, Arjun, ParamSpider, LinkFinder, and InQL.
-*   **Deep OSINT 2.0**: A modular, internal intelligence pipeline featuring automated email pivoting, social profile mapping, **gosearch** for social presence discovery, **username-anarchy** for tactical identity permutation, and a **Custom Playwright-driven Social Intelligence Engine** that mimics human behavior to discover corporate personnel while maintaining high OpSec.
+*   **Deep Pursuit OSINT Engine**: A modernized, high-performance modular pipeline replacing heavy Spiderfoot scans with surgical discovery. Features email pivoting (**holehe**), cross-platform social profile mapping (**maigret**), social presence discovery (**gosearch**), tactical identity permutation (**username-anarchy**), and a custom **Playwright-driven Social Intelligence Engine** that mimics human behavior to identify corporate personnel under high OpSec.
+*   **OSINT Intelligence Dashboard**: Aggregated view of emails, leaks, employees, dorks, and document metadata.
 *   **ReconX 24/7 Monitoring**: Dedicated, domain-specific background monitoring engine for continuous asset tracking and automated findings ingestion.
 *   **Vulnerability Scanning**:
     *   **Nuclei**: Specialized templates and intelligence-driven targeted scanning.
@@ -362,29 +304,41 @@ flowchart TD
     *   **baddns**: Automated subdomain takeover detection with critical severity mapping.
     *   **betterleaks**: High-precision secret and leak identification in discovered assets.
     *   **Dalfox**: Advanced XSS discovery.
-    *   **CRLFuzzer, S3Scanner, Gitleaks, Retire.js**.
+    *   **Additional Integration**: CRLFuzzer, S3Scanner, Gitleaks, Retire.js.
 *   **WHOIS, WAF Detection, and IP Geolocation**.
 
-### 🥷 Stealth & Operational Security
-*   **Enhanced Proxy Orchestration**: Automated fetching, validation, and per-tool rotation of high-quality proxies.
-*   **Brute-Force Engines**: High-performance Hydra and Medusa integration with Proxychains4, **multi-service orchestration (SSH, FTP, HTTP, SMB, RDP, Telnet)**, automated service mapping (e.g., http → http-get), and configurable `max_retries` to ensure scan resilience.
-*   **OpSec Presets**: User-Agent rotation, stealth timing, and WAF bypass headers.
+### 🥷 Stealth & Operational Security (OpSec)
+*   **Enhanced Proxy Orchestration**: Automated fetching, validation, and per-tool rotation of high-quality proxies across all discovery modules to bypass rate-limiting and WAF blocks.
+*   **Centralized Brute-Force Orchestration**: High-performance Hydra and Medusa integration with Proxychains4. Centralizes Nmap/Nuclei targets into a unified `AuthCandidate` queue supporting **multi-service targeting (SSH, FTP, HTTP, SMB, RDP, Telnet)**, automated service mapping, and configurable `max_retries`.
+*   **OpSec Presets**: User-Agent rotation, stealth timing, custom DNS resolvers, and WAF bypass headers.
+*   **Hardened Scan Termination**: Centralized `abort_scan_history()` / `abort_subscan()` utility to cancel all child subscans and Temporal workflows before database updates, eliminating orphaned processes.
+*   **Workflow Retry Cap**: Limit of 10 retries on workflows before marking as FAILED, allowing checkpoint resumes.
 *   **Metadata Stripping**: Automated removal of sensitive information from discovered assets.
 
-### 🎨 Visual & Administrative
-*   **Cyberpunk V3 UI**: Premium glassmorphic dashboard with Hacker, Hybrid, and Enterprise themes.
-*   **Attack Surface Map v4.0**: Interactive, high-fidelity infrastructure visualization with node analytics.
-*   **Interactive Subdomain Action Interface**: Real-time management for subdomains, subscans, and TODOs.
-*   **Bounty Hub**: Centralized platform for managing HackerOne programs and assets.
-*   **Automated Startup Sync**: Immediate synchronization of Attack Surface graphs and CISA KEV intelligence.
-*   **Target Deletion API**: Resolved a critical 404 error during target deletion by synchronizing the frontend request with the correct backend orchestration endpoint.
-*   **Onboarding Authentication Resilience**: Resolved a critical `TypeError` that caused the application to crash when unauthenticated users accessed the onboarding page.
+### 🎨 Visual & Administrative Interface
+*   **Cyberpunk V3 UI**: Premium glassmorphic dashboard supporting Hacker (Cyberpunk), Hybrid (Modern Dark), and Enterprise (Professional Slate) themes.
+*   **Interactive Subdomain Management**: Wireframes for on-demand LLM Attack Surface Analysis, targeted subscans, and TODO/Note management directly from the subdomain inventory.
+*   **Attack Surface Map v4.0**: Interactive, high-fidelity infrastructure visualization with **Hierarchical Asset Clustering** (Domains > Subdomains > Endpoints), advanced layouts (**fCoSE** and **KLay**), semantic cluster management, and AI-driven graph search.
+*   **Tactical GeoMap Visualization**: Custom high-performance CSS-animated markers and tooltip interactions for global asset positioning.
+*   **Bounty Hub**: Centralized platform for managing HackerOne programs, assets, and direct vulnerability reporting.
+*   **Automated Startup Sync**: A Redis-locked sequence ensures Attack Surface graphs and CISA KEV (Known Exploited Vulnerabilities) catalogs are synchronized immediately upon boot.
+*   **Administrative Robustness**:
+    *   **Scan Detail Header Reorganization**: Better layout with breadcrumbs below action buttons and right-aligned controls.
+    *   **Chronological Ordering**: Standardized descending ID ordering across Scan History and Target Lists.
+    *   📊 **Enhanced Telemetry**: Fixed HTTP status breakdown logic and stabilized Scan Summary API via target-wide cumulative data queries.
+    *   **Target Deletion API**: Resolved 404 errors by synchronizing frontend requests with the correct backend orchestration endpoint.
+    *   **Onboarding Authentication Resilience**: Fixed application crash for unauthenticated users accessing onboarding.
 *   **Customizable Alerts**: Notifications via Slack, Discord, Telegram, and Lark.
-*   **HackerOne Integration**: Direct reporting of vulnerabilities to bug bounty platforms.
 *   **Screenshot Gallery**: Automated visual captures with advanced filtering and tagging.
 *   **Export/Import**: Interoperable with other tools via JSON, CSV, and TXT.
-*   **Configuration Portability**: Export your custom API keys, tool configurations, scan engines, and wordlists to a single backup zip, and effortlessly restore them on a fresh installation.
+*   **Configuration Portability**: Export/restore custom API keys, tool configurations, scan engines, and wordlists to/from a backup zip.
 *   **Integrated Tools**: Chaos, TLSX, CTFR, Netlas, Katana, Medusa, baddns, betterleaks, gosearch, username-anarchy.
+
+### ⚡ Resource Management & Efficiency
+*   **Temporal Workflow Engine**: Replaced Celery with [Temporal](https://temporal.io) for all scan orchestration, utilizing a single `temporal-python-orchestrator` container to reduce base memory overhead.
+*   **Durable Execution**: Automatic retry on activity failures with configurable backoff to survive container restarts and blips.
+*   **Global Redis Caching**: Unified Redis-backed caching layer replacing per-process local memory caching for shared state efficiency.
+*   **Deterministic Resource Limits**: Native Docker `deploy.resources` limits and reservations configured for all production services (Temporal, Ollama, Neo4j, Web) to prevent host resource starvation.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
