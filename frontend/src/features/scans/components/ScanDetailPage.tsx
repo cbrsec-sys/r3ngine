@@ -849,12 +849,14 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
 const SubScanWidget: React.FC<{ subscans: SubScan[], targetName: string }> = ({ subscans, targetName }) => {
   return (
     <Stack spacing={1.5}>
-      <Typography sx={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem', fontWeight: 900, color: '#ff00ff', mb: 1, textTransform: 'uppercase', letterSpacing: 1.5 }}>
-        SUB SCAN HISTORY FOR &nbsp;
-        <Box component="span" sx={{ px: 2, py: 0.4, border: '1px solid #ff00ff', borderRadius: '20px', color: '#ff00ff', fontSize: '0.7rem', bgcolor: 'rgba(255,0,255,0.05)' }}>
+      <Box sx={{ mb: 1 }}>
+        <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#ff00ff', mb: 1, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+          SUB SCAN HISTORY FOR
+        </Typography>
+        <Box component="span" sx={{ display: 'inline-block', px: 2, py: 0.4, border: '1px solid #ff00ff', borderRadius: '20px', color: '#ff00ff', fontSize: '0.7rem', bgcolor: 'rgba(255,0,255,0.05)' }}>
           {targetName}
         </Box>
-      </Typography>
+      </Box>
       {subscans?.map((sub: SubScan) => (
         <Box key={sub.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
           <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, bgcolor: sub.status === 2 ? '#00ff62' : '#ffc107', borderRadius: '4px 0 0 4px' }} />
@@ -1605,7 +1607,37 @@ export const ScanDetailPage = () => {
                       <Typography sx={{ fontSize: '0.7rem', color: '#fff' }}>{ns}</Typography>
                     </Stack>
                   ))}
+                  {(!data.domain_info?.nameservers || data.domain_info.nameservers.length === 0) && (
+                    <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', p: 1 }}>No nameservers identified</Typography>
+                  )}
                 </Stack>
+              )}
+              {infoTab === 4 && (
+                <TableContainer sx={{ maxHeight: 300 }}>
+                  <Table size="small">
+                    <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
+                      <TableRow>
+                        <TableCell sx={{ color: '#00f3ff', fontWeight: 900, fontSize: '0.65rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>IP ADDRESS</TableCell>
+                        <TableCell sx={{ color: '#00f3ff', fontWeight: 900, fontSize: '0.65rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>LOCATION</TableCell>
+                        <TableCell sx={{ color: '#00f3ff', fontWeight: 900, fontSize: '0.65rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>OWNER</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {data.domain_info?.historical_ips?.map((ip: any, idx: number) => (
+                        <TableRow key={idx}>
+                          <TableCell sx={{ color: '#fff', fontSize: '0.7rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{ip.ip}</TableCell>
+                          <TableCell sx={{ color: '#fff', fontSize: '0.7rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{ip.location}</TableCell>
+                          <TableCell sx={{ color: '#fff', fontSize: '0.7rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{ip.owner}</TableCell>
+                        </TableRow>
+                      ))}
+                      {(!data.domain_info?.historical_ips || data.domain_info.historical_ips.length === 0) && (
+                        <TableRow>
+                          <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem', border: 0 }}>NO HISTORICAL IPS FOUND</TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
               )}
             </Box>
           </TacticalPanel>

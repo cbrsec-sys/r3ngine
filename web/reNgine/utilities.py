@@ -1,9 +1,7 @@
 import re
 import os
+import logging
 import validators
-
-from celery._state import get_current_task
-from celery.utils.log import ColorFormatter
 
 
 def is_safe_path(basedir, path, follow_symlinks=True):
@@ -51,24 +49,11 @@ def return_iterable(string):
 
 # Logging formatters
 
-class RengineTaskFormatter(ColorFormatter):
-
-	def __init__(self, *args, **kwargs):
-		super().__init__(*args, **kwargs)
-		try:
-			self.get_current_task = get_current_task
-		except ImportError:
-			self.get_current_task = lambda: None
+class RengineTaskFormatter(logging.Formatter):
 
 	def format(self, record):
-		task = self.get_current_task()
-		if task and task.request:
-			task_name = '/'.join(task.name.replace('tasks.', '').split('.'))
-			record.__dict__.update(task_id=task.request.id,
-								   task_name=task_name)
-		else:
-			record.__dict__.setdefault('task_name', f'{record.module}.{record.funcName}')
-			record.__dict__.setdefault('task_id', '')
+		record.__dict__.setdefault('task_name', f'{record.module}.{record.funcName}')
+		record.__dict__.setdefault('task_id', '')
 		return super().format(record)
 
 
@@ -291,3 +276,43 @@ def get_screenshot_path(subdomain):
 				final_path = test_path
 	
 	return final_path.replace('\\', '/')
+
+
+def secure_url_fetcher(url, *args, **kwargs):
+	"""
+	Secure URL fetcher for WeasyPrint to prevent SSRF and LFI.
+	Restricts to:
+	- Data URLs (base64)
+	- Local files strictly inside Django BASE_DIR or MEDIA_ROOT
+	- Google Fonts domains (fonts.googleapis.com, fonts.gstatic.com)
+	"""
+	from urllib.parse import urlparse
+	from django.conf import settings
+	from weasyprint import default_url_fetcher
+
+	parsed = urlparse(url)
+
+	# 1. Allow data URLs
+	if parsed.scheme == 'data':
+		return default_url_fetcher(url, *args, **kwargs)
+
+	# 2. Allow local files within settings.BASE_DIR or settings.MEDIA_ROOT
+	if parsed.scheme == 'file' or not parsed.scheme:
+		file_path = os.path.abspath(parsed.path)
+		in_base = is_safe_path(os.path.abspath(settings.BASE_DIR), file_path)
+		in_media = False
+		if hasattr(settings, 'MEDIA_ROOT') and settings.MEDIA_ROOT:
+			in_media = is_safe_path(os.path.abspath(settings.MEDIA_ROOT), file_path)
+		
+		if not (in_base or in_media):
+			raise PermissionError(f"Access to file is forbidden: {file_path}")
+		return default_url_fetcher(url, *args, **kwargs)
+
+	# 3. Allow Google Fonts HTTP/HTTPS requests
+	if parsed.scheme in ('http', 'https'):
+		hostname = parsed.hostname
+		if hostname in ('fonts.googleapis.com', 'fonts.gstatic.com'):
+			return default_url_fetcher(url, *args, **kwargs)
+		raise PermissionError(f"External network requests to {hostname} are forbidden.")
+
+	raise PermissionError(f"Unsupported URL scheme: {parsed.scheme}")

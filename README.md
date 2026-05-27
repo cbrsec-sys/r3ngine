@@ -14,10 +14,10 @@
 </p>
 
 <p align="center">
-  <img src=".github/screenshots/r3ngine_dash.png" height="400px" width="520px" alt=""/>
+<img src=".github/screenshots/r3ngine_dash.png" height="550px" width="1020px" alt=""/>
 </p>
 
-<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.1.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
+<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.2.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=Xk_YH83IQgg" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--Asia-2023-blue.svg?logo=none" alt="" /></a>&nbsp;
@@ -37,18 +37,49 @@
 <a href="https://opensourcesecurityindex.io/" target="_blank" rel="noopener">
 <img style="width: 282px; height: 56px" src="https://opensourcesecurityindex.io/badge.svg" alt="Open Source Security Index - Fastest Growing Open Source Security Projects" width="282" height="56" /> </a>
 </p>
-<h4>r3ngine 3.1.0: The Phoenix Rebirth</h4>
+<h4>r3ngine 3.2.0: The Phoenix Rebirth</h4>
 <p>
-  r3ngine 3.1.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity - and for those a little less excentric there is a more toned-down theme as well. Also we have introduced <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
+  r3ngine 3.2.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Most significantly, v3.2.0 completes the full migration from Celery to <b>Temporal</b> — replacing the legacy at-most-once task broker with a durable workflow engine that provides crash-safe scan execution, full replay history, and pause/resume signaling. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
 </p>
 
 <h4>Attack Path Modeling Engine<h4>
 <p align="center">
-<img src=".github/screenshots/apme.png" height="400px" width="520px" alt=""/>
+<img src=".github/screenshots/apme.png" height="700px" width="1020px" alt=""/>
 </p>
 
 <img src="https://img.shields.io/badge/r3ngine--mobile-1.2.0-orange.svg?logo=none" alt="r3ngine Mobile SOC" />
 <h5><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3ngine Mobile SOC</a>: Beta Release Out Now</h5>
+
+![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
+
+> **IMPORTANT — Upgrading to v3.2.0 from an existing installation**
+>
+> v3.2.0 replaces Celery with Temporal as the scan orchestration engine. This is a **breaking infrastructure change** — the old `celery` and `celery-beat` containers are removed, new `temporal`, `temporal-python-orchestrator`, and `temporal-go-executor` containers are added, and database migrations must be applied to create the new Temporal models and remove legacy Celery Beat tables.
+>
+> **You must run the full upgrade script before starting services:**
+>
+> ```bash
+> # Linux / macOS
+> git pull
+> make fullupgrade
+>
+> # Windows
+> git pull
+> make.bat fullupgrade
+> ```
+>
+> The script will:
+> - Warn you of all changes and ask for explicit confirmation before proceeding
+> - Stop and remove all existing containers (including any running `celery` / `celery-beat` services)
+> - Rebuild all images from scratch with `--no-cache`
+> - Apply database migrations (`TemporalWorkflowExecution`, `TemporalSchedule`, removal of `django_celery_beat_*` tables)
+> - Start the full updated stack
+>
+> **Your data is safe.** All Docker volumes (`scan_results`, `postgres_data`, `nuclei_templates`, `wordlist`, etc.) are fully preserved. Only containers and images are rebuilt — no volume data is deleted or modified.
+>
+> **Do not run `make up` or `docker compose up` directly** on an existing v3.1.x install — the old Celery containers will conflict and migrations will not be applied automatically.
+>
+> Any scans running at the time of upgrade **will be interrupted**. Ensure no critical scans are in progress before upgrading.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -81,20 +112,31 @@ reNgine now features a high-performance stress testing suite, enabling users to 
 
 ### ⚡ Resource Management & Efficiency
 Optimization is a first-class citizen in v3, ensuring high-performance reconnaissance even on resource-constrained host machines.
-*   **Worker Consolidation Architecture**: Replaced the legacy multi-worker sprawl with 4 highly optimized worker groups (Core, Service, LLM, and OSINT). This reduces base memory overhead by ~80% (approx. 3.2GB RAM recovery).
-*   **Intelligent Process Recycling**: Native integration of `CELERY_WORKER_MAX_TASKS_PER_CHILD` and `CELERY_WORKER_MAX_MEMORY_PER_CHILD` to automatically recycle worker processes, preventing memory bloat from long-running scans.
+*   **Temporal Workflow Engine**: Replaced Celery with [Temporal](https://temporal.io) for all scan orchestration. Workflows survive container restarts, support pause/resume signaling, and provide a full execution history UI. A single `temporal-python-orchestrator` container replaces the old multi-worker sprawl, reducing base memory overhead significantly.
+*   **Durable Execution**: Scan activities are automatically retried on failure with configurable backoff. No more lost scans due to worker crashes or Redis broker blips.
 *   **Global Redis Caching**: Migrated from per-process local memory caching to a unified Redis-backed caching layer, ensuring shared state efficiency and reduced RAM footprint.
-*   **Deterministic Resource Limits**: All production services (Celery, Ollama, Neo4j, Web) now feature native Docker `deploy.resources` limits and reservations, preventing system-wide resource starvation.
+*   **Deterministic Resource Limits**: All production services (Temporal, Ollama, Neo4j, Web) now feature native Docker `deploy.resources` limits and reservations, preventing system-wide resource starvation.
 
 ### 🕵️ Surgical Recon & API Discovery
 The reconnaissance pipeline has been deepened to handle modern, API-centric web architectures.
 *   **Deep Pursuit OSINT Engine**: A modernized, high-performance intelligence pipeline that replaces heavy Spiderfoot scans with surgical discovery. Featuring **holehe** for email pivots, **maigret** for cross-platform social profile mapping, and a custom **Internal Social Intelligence Engine** for advanced LinkedIn discovery.
 *   **OSINT Intelligence Dashboard**: Aggregated view of emails, leaks, employees, dorks, and document metadata.
 
+### 🗂️ Active Directory Intelligence Plugin
+r3ngine v3.2.0 introduces a dedicated **Active Directory Intelligence** plugin for internal network reconnaissance and AD attack surface analysis.
+*   **Graph Visualization**: Interactive Cytoscape.js graph with 5 layout presets (hierarchical, radial, force, bipartite, cluster), semantic node styling for domain controllers, trust bridges, and exposed accounts, plus an animated real-time ingest mode.
+*   **Scalability Guardrails**: Graph enforces a 300-node default cap with user-triggered "Load All"; animations automatically disable above 400 nodes to maintain UI responsiveness.
+*   **Findings & Trust Enumeration**: Paginated API endpoints (50 records/page) for all AD objects — users, groups, computers, trusts, and exposures — with inline search and column-level filtering.
+*   **Real-Time WebSocket Streaming**: Backend emits graph and findings events through Django Channels with 150 ms client-side batching during large LDAP/BloodHound ingests.
+*   **7-Section Intelligence Reports**: `ReportingEngine` compiles executive summary, domain inventory, trust topology, exposure analysis, and recommendations into PDF (`cyber_pro`, `ad_modern` templates) or JSON exports.
+*   **RBAC & Evidence Logs**: All assessment actions require `can_run_ad_assessment` permission and are written to an immutable evidence log.
+*   **Subdomain-Triggered Assessment**: Launch an AD assessment directly from any subdomain record in the subdomain management table.
+
 ### 🥷 Stealth, OpSec & Infrastructure
 Operational security is no longer an afterthought; it is baked into every execution.
 *   **Enhanced Proxy Orchestration**: Per-tool rotating proxy support across all discovery modules to bypass rate-limiting and WAF blocks.
-*   **Proper Scan Termination**: Resolved critical failures in scan termination by aligning frontend and backend to a unified `StopScan` API, ensuring all sub-tasks and child processes are killed immediately.
+*   **Hardened Scan Termination**: Centralized `abort_scan_history()` / `abort_subscan()` utility ensures all child subscans and Temporal workflows are cancelled before database status is updated, eliminating orphaned workflows and stuck RUNNING scan records. Fixes applied across `StopScan`, `stop_scans`, `bulk_stop`, `delete_all_scan_results`, and `bulk_delete` endpoints.
+*   **Workflow Retry Cap**: `MasterScanWorkflow` and `SubScanWorkflow` now enforce a maximum of 10 retry attempts. After 10 failures the workflow transitions to FAILED state; users can re-trigger execution via the **Resume** button which replays from the last checkpoint.
 *   **Hydra & Medusa Integration**: High-performance authentication brute-forcing with automated service mapping and stealthy, batched execution via **Proxychains4**.
 *   **WAF Bypass & OpSec Presets**: Advanced stealth configuration including User-Agent rotation, custom DNS resolvers, and WAF bypass headers.
 *   **Automated Startup Sync**: A Redis-locked sequence ensures Attack Surface graphs and CISA KEV (Known Exploited Vulnerabilities) catalogs are synchronized immediately upon boot.
@@ -123,6 +165,7 @@ Aesthetic excellence is a core requirement of the v3 vision.
 * [Features](#features)
 * [Enterprise Support](#enterprise-support)
 * [Quick Installation](#quick-installation)
+* [Administration & Recovery](#-administration--recovery)
 * [Installation Video](#installation-video-tutorial)
 * [Community-Curated Videos](#community-curated-videos)
 * [Screenshots](#screenshots)
@@ -168,6 +211,111 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 
 <img src=".github/workflows/workflows.png">
 
+### Temporal Scan Pipeline (v3.2.0)
+
+The full scan pipeline is orchestrated by `MasterScanWorkflow` on Temporal. Every tier boundary is a hard synchronisation point — no tier starts until all activities in the previous tier have completed and their results are persisted to the database.
+
+```mermaid
+flowchart TD
+    START([▶ Scan Initiated]) --> TP
+
+    subgraph S0["⚙️ Step 0 — Target Setup"]
+        direction TB
+        TP[TargetProfilingActivity] --> LC[LoadCheckpointActivity]
+    end
+
+    LC --> F1(( ))
+    F1 --> SD & AI & FW & OS & SF
+
+    subgraph T1["🔍 Tier 1 — Discovery  ·  all parallel"]
+        direction TB
+        SD[RunSubdomainDiscoveryActivity]
+        AI[RunAmassIntelDiscoveryActivity]
+        FW[RunFirewallVPNScanActivity]
+        OS["RunGenericTaskActivity · osint"]
+        SF["RunGenericTaskActivity · spiderfoot_scan\n─ requires yaml spiderfoot_scan block"]
+    end
+
+    SD & AI & FW & OS & SF --> J1(( ))
+    J1 --> PDR[ParseDiscoveryResultsActivity]
+    PDR --> CP1{{"⏸ Pause Checkpoint"}}
+
+    CP1 --> F2(( ))
+    F2 --> HC & PS & SS
+
+    subgraph T2["🌐 Tier 2 — HTTP Crawl · Port Scan · Screenshot  ·  all parallel"]
+        direction TB
+        HC["RunHTTPCrawlActivity\n─ global config · feeds Tiers 3 & 4"] --> PHC[ParseHTTPCrawlResultsActivity]
+        PS[RunPortScanActivity]
+        SS[RunScreenshotActivity]
+    end
+
+    PHC & PS & SS --> J2(( ))
+    J2 --> FU
+
+    subgraph T3["🔗 Tier 3 — URL Fetching  ·  sequential"]
+        direction TB
+        FU[RunFetchURLActivity]
+    end
+
+    FU --> DFF
+
+    subgraph T4["📁 Tier 4 — Directory & File Fuzzing  ·  sequential"]
+        direction TB
+        DFF[RunDirFileFuzzActivity] --> PFF[ParseFuzzResultsActivity]
+    end
+
+    PFF --> PER[ParseEnumerationResultsActivity]
+    PER --> CP2{{"⏸ Pause Checkpoint"}}
+
+    CP2 --> F3(( ))
+    F3 --> WAD & WD & SEC
+
+    subgraph T5["🔬 Tier 5 — Analysis  ·  all parallel"]
+        direction TB
+        WAD[RunWebAPIDiscoveryActivity]
+        WD[RunWAFDetectionActivity]
+        SEC[RunSecretScanningActivity]
+    end
+
+    WAD & WD & SEC --> J3(( ))
+    J3 --> PAR[ParseAnalysisResultsActivity]
+    PAR --> CP3{{"⏸ Pause Checkpoint"}}
+
+    CP3 --> F4(( ))
+    F4 --> NUC & WB & BF
+
+    subgraph T6["🎯 Tier 6 — Assessment  ·  all parallel"]
+        direction TB
+        subgraph NP["NucleiPlannerWorkflow · child workflow"]
+            direction TB
+            NUC[RunVulnerabilityScanActivity]
+        end
+        WB[RunWAFBypassActivity]
+        BF[RunBruteForceScanActivity]
+    end
+
+    NUC & WB & BF --> J4(( ))
+    J4 --> PASM[ParseAssessmentResultsActivity]
+    PASM --> CP4{{"⏸ Pause Checkpoint"}}
+
+    CP4 --> CV
+
+    subgraph T7["🧠 Tier 7 — Intelligence  ·  sequential"]
+        direction TB
+        CV[CorrelateVulnerabilitiesActivity] --> CR[CalculateRiskScoresActivity]
+        CR --> GI["GenerateImpactAssessmentActivity\n─ requires enable_ai_impact_analysis: true"]
+        GI --> SG["SyncGraphActivity  ·  APME + Neo4j\n─ requires attack_path_modeling.enabled: true"]
+    end
+
+    SG --> SN[SendScanNotificationActivity]
+    SN --> DONE([✓ Scan Complete])
+```
+
+> `(( ))` = fork/join (parallel branch split/rejoin) &nbsp;·&nbsp; `{{"⏸"}}` = pause checkpoint (workflow waits for `resume` signal) &nbsp;·&nbsp; `─ requires` = only runs when the noted YAML flag is set
+>
+> Full tier reference and execution notes: [`.github/workflows/temporal-scan-flow.md`](.github/workflows/temporal-scan-flow.md)
+
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
 ## Features
@@ -180,10 +328,11 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **Natural Language Querying**: Perform complex database lookups using intuitive, human-like operators.
 
 ### 🛠️ Advanced Scan Engines
+*   **Active Directory Intelligence**: Full AD attack surface analysis plugin with Cytoscape graph visualization (5 layouts), trust enumeration, exposure analysis, 7-section PDF/JSON reports, real-time WebSocket streaming, and RBAC-gated evidence logs.
 *   **Attack Path Modeling Engine (APME)**: Sophisticated graph-based visualization of multi-stage attack vectors using Neo4j and AI-driven path discovery.
 *   **Adaptive Stress & Resilience Engine (ASRE)**: High-performance real-time stress testing dashboard integrated with `k6`, `wrk`, `hping3`, and `Locust` for endpoint saturation analysis.
 *   **Exploit Readiness Layer (ERL)**: Hardened automated vulnerability verification system with multi-scanner support and stealthy OpSec guardrails.
-*   **Autonomous Recon Orchestration**: Next-generation Celery-based task pipeline with non-blocking orchestration and non-destructive tool execution.
+*   **Autonomous Recon Orchestration**: Temporal-powered durable workflow pipeline with non-blocking orchestration, crash-safe execution, full replay history, and a 10-attempt retry cap (FAILED workflows are resumable via the UI).
 *   **Vulnerability Correlation Engine**: Multi-tool unification mapping findings from Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, and more.
 *   **Autonomous Tooling & Plugin System**: Background tool management ensures all plugin dependencies (e.g., sqlmap, XSStrike) are installed and verified automatically at runtime. **v3-Hardening**: Integrated native **proxy rotation** and **OpSec compliance** (User-Agent randomization, custom headers) directly into the ERL adapter layer, ensuring stealthy validation of all discovered vulnerabilities.
 *   **Continuous Monitoring**: Periodic discovery of new subdomains, endpoints, and data changes with automated diffing.
@@ -220,6 +369,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 *   **HackerOne Integration**: Direct reporting of vulnerabilities to bug bounty platforms.
 *   **Screenshot Gallery**: Automated visual captures with advanced filtering and tagging.
 *   **Export/Import**: Interoperable with other tools via JSON, CSV, and TXT.
+*   **Configuration Portability**: Export your custom API keys, tool configurations, scan engines, and wordlists to a single backup zip, and effortlessly restore them on a fresh installation.
 *   **Integrated Tools**: Chaos, TLSX, CTFR, Netlas, Katana, Medusa, baddns, betterleaks, gosearch, username-anarchy.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
@@ -268,27 +418,22 @@ The r3ngine v3 frontend is built with a "Safety-First" philosophy, enforcing str
 
     * `DJANGO_SUPERUSER_PASSWORD`: web interface admin password (used to login to the web interface).
 
-1. Adjust Celery worker scaling in `.env`
+1. Configure Temporal worker concurrency in `.env` (optional)
 
     ```bash
-    MAX_CONCURRENCY=80
-    MIN_CONCURRENCY=10
+    TEMPORAL_MAX_CONCURRENT_ACTIVITIES=20
+    TEMPORAL_MAX_CONCURRENT_WORKFLOWS=10
     ```
 
-    `MAX_CONCURRENCY`: This parameter specifies the maximum number of reNgine's concurrent Celery worker processes that can be spawned. In this case, it's set to 80, meaning that the application can utilize up to 80 concurrent worker processes to execute tasks concurrently. This is useful for handling a high volume of scans or when you want to scale up processing power during periods of high demand. If you have more CPU cores, you will need to increase this for maximised performance.
+    r3ngine v3.2.0 uses [Temporal](https://temporal.io) for all scan orchestration. The `temporal-python-orchestrator` container runs a single worker that polls for workflow and activity tasks. Concurrency is controlled by the variables above; the defaults are sensible for most machines.
 
-    `MIN_CONCURRENCY`: On the other hand, MIN_CONCURRENCY specifies the minimum number of concurrent worker processes that should be maintained, even during periods of lower demand. In this example, it's set to 10, which means that even when there are fewer tasks to process, at least 10 worker processes will be kept running. This helps ensure that the application can respond promptly to incoming tasks without the overhead of repeatedly starting and stopping worker processes.
+    Recommended values by available RAM:
 
-    These settings allow for dynamic scaling of Celery workers, ensuring that the application efficiently manages its workload by adjusting the number of concurrent workers based on the workload's size and complexity.
+    * 4GB: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=10`
+    * 8GB: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=20`
+    * 16GB+: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=40`
 
-    Here is the ideal value for `MIN_CONCURRENCY` and `MAX_CONCURRENCY` depending on the number of RAM your machine has:
-
-    * 4GB: `MAX_CONCURRENCY=10`
-    * 8GB: `MAX_CONCURRENCY=30`
-    * 16GB: `MAX_CONCURRENCY=50`
-
-    This is just an ideal value which developers have tested and tried out and works! But feel free to play around with the values.
-    Maximum number of scans is determined by various factors, your network bandwidth, RAM, number of CPUs available. etc
+    The Temporal UI is available at `http://localhost:8080` for workflow inspection, history replay, and manual intervention.
 
 1. Run the installation script:
 
@@ -327,6 +472,50 @@ Please note: This is community-curated content and is not owned by reNgine. The 
     ```bash
     sudo chmod +x update.sh
     ```
+
+![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
+
+## 🔧 Administration & Recovery
+
+### Scan Result Recovery
+
+If the database is lost or corrupted but the `scan_results` Docker volume is intact, the `recover_scan_results` management command can reconstruct the database from the files on disk.
+
+**What is recovered** (when the corresponding output files exist):
+
+| Data | Source file(s) |
+|------|----------------|
+| Domain | Parsed from folder name (`domain_scanid`) |
+| ScanHistory | Folder mtime used as scan date |
+| Subdomains | `#id_subdomain_discovery.txt`, `subdomains_*.txt`, subscan dirs |
+| Ports + IpAddresses | `#id_port_scan.txt` — naabu JSONL and legacy JSON-object formats |
+| EndPoints | `#id_fetch_url.txt`, `urls_*.txt` |
+| Vulnerabilities | `*_nmap_vulns.json`, `#id_nuclei_*_module.txt` |
+| WAF associations | `#id_waf_detection.txt` linked to matching subdomains |
+
+**Usage** (run inside the `web` container):
+
+```bash
+# Dry-run — preview what would be recovered without writing anything
+python manage.py recover_scan_results
+
+# Apply — write recovered records to the database
+python manage.py recover_scan_results --apply
+
+# Recover a single scan folder
+python manage.py recover_scan_results --apply --scan-dir /usr/src/scan_results/defijn.io_108
+
+# Use a non-default results root
+python manage.py recover_scan_results --apply --results-root /alt/path/scan_results
+```
+
+**Docker Compose shortcut:**
+
+```bash
+docker-compose exec web python manage.py recover_scan_results --apply
+```
+
+The command is **idempotent** — scans already tracked in the database are skipped on every run, so it is safe to re-run after partial recoveries.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -427,9 +616,9 @@ When submitting issues, provide as much valuable information as possible to help
 
 3. Example Debug Output:
     ```
-    web_1          |   File "/usr/local/lib/python3.10/dist-packages/celery/app/task.py", line 411, in __call__
-    web_1          |     return self.run(*args, **kwargs)
     web_1          | TypeError: run_command() got an unexpected keyword argument 'echo'
+    web_1          |   File "/usr/src/app/reNgine/tasks.py", line 42, in run_command
+    web_1          |     subprocess.run(cmd, **kwargs)
     ```
 
 4. Submit Your Issue:

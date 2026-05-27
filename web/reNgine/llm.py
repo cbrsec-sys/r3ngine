@@ -63,15 +63,25 @@ class LLMBaseGenerator:
         if not self.api_key:
             return "Error: OpenAI API Key not set"
         try:
-            openai.api_key = self.api_key
-            response = openai.ChatCompletion.create(
-                model=self.model_name,
-                messages=[
-                    {'role': 'system', 'content': system_message},
-                    {'role': 'user', 'content': user_message}
+            headers = {
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json"
+            }
+            data = {
+                "model": self.model_name,
+                "messages": [
+                    {"role": "system", "content": system_message},
+                    {"role": "user", "content": user_message}
                 ]
+            }
+            response = requests.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers=headers,
+                json=data,
+                timeout=60
             )
-            return response['choices'][0]['message']['content']
+            response.raise_for_status()
+            return response.json()['choices'][0]['message']['content']
         except Exception as e:
             self.logger.error(f"OpenAI Error: {str(e)}")
             return f"Error: {str(e)}"
@@ -80,7 +90,6 @@ class LLMBaseGenerator:
         if not self.api_key:
             return "Error: Anthropic API Key not set"
         try:
-            # Using requests for Anthropic to avoid adding SDK dependency
             headers = {
                 "x-api-key": self.api_key,
                 "anthropic-version": "2023-06-01",
@@ -89,10 +98,20 @@ class LLMBaseGenerator:
             data = {
                 "model": self.model_name,
                 "max_tokens": 1024,
-                "messages": [{"role": "user", "content": f"{system_message}\n\n{user_message}"}]
+                "system": system_message,
+                "messages": [{"role": "user", "content": user_message}]
             }
-            response = requests.post("https://api.anthropic.com/v1/messages", headers=headers, json=data)
-            return response.json()['content'][0]['text']
+            response = requests.post(
+                "https://api.anthropic.com/v1/messages",
+                headers=headers,
+                json=data,
+                timeout=60
+            )
+            response.raise_for_status()
+            block = response.json()['content'][0]
+            if block.get('type') != 'text':
+                raise ValueError(f"Unexpected Anthropic response content type: {block.get('type')}")
+            return block['text']
         except Exception as e:
             self.logger.error(f"Anthropic Error: {str(e)}")
             return f"Error: {str(e)}"
@@ -101,13 +120,18 @@ class LLMBaseGenerator:
         if not self.api_key:
             return "Error: Gemini API Key not set"
         try:
-            url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent?key={self.api_key}"
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model_name}:generateContent"
+            headers = {
+                "x-goog-api-key": self.api_key,
+                "Content-Type": "application/json"
+            }
             data = {
                 "contents": [{
                     "parts": [{"text": f"{system_message}\n\n{user_message}"}]
                 }]
             }
-            response = requests.post(url, json=data)
+            response = requests.post(url, headers=headers, json=data, timeout=60)
+            response.raise_for_status()
             return response.json()['candidates'][0]['content']['parts'][0]['text']
         except Exception as e:
             self.logger.error(f"Gemini Error: {str(e)}")

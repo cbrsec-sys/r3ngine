@@ -102,7 +102,6 @@ INSTALLED_APPS = [
     'startScan.apps.StartscanConfig',
     'recon_note.apps.ReconNoteConfig',
     'django_ace',
-    'django_celery_beat',
     'mathfilters',
     'drf_yasg',
     'rolepermissions',
@@ -112,8 +111,41 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'corsheaders',
 ]
+
+# Dynamically add enabled plugins to INSTALLED_APPS
+PLUGINS_DIR = os.path.join(BASE_DIR, 'plugins_data')
+if os.path.exists(PLUGINS_DIR):
+    # Ensure plugins_data is a python package
+    init_file = os.path.join(PLUGINS_DIR, '__init__.py')
+    if not os.path.exists(init_file):
+        try:
+            with open(init_file, 'w') as f:
+                pass
+        except IOError:
+            pass
+
+    for item in os.listdir(PLUGINS_DIR):
+        plugin_path = os.path.join(PLUGINS_DIR, item)
+        if os.path.isdir(plugin_path) and not item.startswith('.'):
+            backend_dir = os.path.join(plugin_path, 'backend')
+            if os.path.exists(backend_dir) and os.path.isdir(backend_dir):
+                # Ensure plugin_slug and backend have __init__.py
+                for d in [plugin_path, backend_dir]:
+                    init_f = os.path.join(d, '__init__.py')
+                    if not os.path.exists(init_f):
+                        try:
+                            with open(init_f, 'w') as f:
+                                pass
+                        except IOError:
+                            pass
+                
+                app_module = f"plugins_data.{item}.backend"
+                if app_module not in INSTALLED_APPS:
+                    INSTALLED_APPS.append(app_module)
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'reNgine.middleware.SystemVersionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -183,7 +215,7 @@ CHANNEL_LAYERS = {
     'default': {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG': {
-            "hosts": [os.environ.get('CELERY_BROKER', 'redis://redis:6379/0')],
+            "hosts": [os.environ.get('REDIS_URL', 'redis://redis:6379/0')],
         },
     },
 }
@@ -268,24 +300,11 @@ TOOL_LOCATION = '/usr/src/app/tools/'
 # Number of endpoints that have the same content_length
 DELETE_DUPLICATES_THRESHOLD = 10
 
-'''
-CELERY settings
-'''
-CELERY_BROKER_URL = env("CELERY_BROKER", default="redis://redis:6379/0")
 import urllib.parse
-_parsed_redis = urllib.parse.urlparse(CELERY_BROKER_URL)
+REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
+_parsed_redis = urllib.parse.urlparse(REDIS_URL)
 REDIS_HOST = _parsed_redis.hostname or 'redis'
 REDIS_PORT = _parsed_redis.port or 6379
-CELERY_RESULT_BACKEND = env("CELERY_BROKER", default="redis://redis:6379/0")
-CELERY_ENABLE_UTC = False
-CELERY_TIMEZONE = 'UTC'
-CELERY_IGNORE_RESULTS = False
-CELERY_EAGER_PROPAGATES_EXCEPTIONS = True
-CELERY_TRACK_STARTED = True
-CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
-# Memory Management
-CELERY_WORKER_MAX_TASKS_PER_CHILD = 100
-CELERY_WORKER_MAX_MEMORY_PER_CHILD = 400000  # 400MB
 '''
 ROLES and PERMISSIONS
 '''
@@ -340,12 +359,6 @@ LOGGING = {
             'maxBytes': 1024,
             'backupCount': 3
         },
-        'celery': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'formatter': 'simple',
-            'filename': 'celery.log',
-            'maxBytes': 1024 * 1024 * 100,  # 100 mb
-        },
     },
     'formatters': {
         'default': {
@@ -372,22 +385,6 @@ LOGGING = {
             'handlers': ['brief'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False
-        },
-        'celery': {
-            'handlers': ['celery'],
-            'level': 'DEBUG' if DEBUG else 'ERROR',
-        },
-        'celery.app.trace': {
-            'handlers': ['null'],
-            'propagate': False,
-        },
-        'celery.task': {
-            'handlers': ['task'],
-            'propagate': False
-        },
-        'celery.worker': {
-            'handlers': ['null'],
-            'propagate': False,
         },
         'django.server': {
             'handlers': ['console'],
@@ -427,7 +424,7 @@ DATA_UPLOAD_MAX_NUMBER_FIELDS = None
 CACHES = {
     'default': {
         'BACKEND': 'django_redis.cache.RedisCache',
-        'LOCATION': env("CELERY_BROKER", default="redis://redis:6379/0"),
+        'LOCATION': os.environ.get('REDIS_URL', 'redis://redis:6379/0'),
         'OPTIONS': {
             'CLIENT_CLASS': 'django_redis.client.DefaultClient',
         },

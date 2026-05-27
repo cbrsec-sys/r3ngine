@@ -9,7 +9,7 @@ os.environ['CELERY_ALWAYS_EAGER'] = 'True'
 import yaml
 from celery.utils.log import get_task_logger
 from reNgine.settings import DEBUG
-from reNgine.tasks import (dir_file_fuzz, fetch_url, http_crawl, initiate_scan,
+from reNgine.tasks import (dir_file_fuzz, fetch_url, http_crawl,
                            osint, port_scan, subdomain_discovery,
                            vulnerability_scan)
 from startScan.models import *

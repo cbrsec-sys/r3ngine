@@ -1,3 +1,4 @@
+import logging
 import os
 import requests
 import json
@@ -7,9 +8,7 @@ import io
 from urllib.parse import urlparse
 from bs4 import BeautifulSoup
 from django.utils import timezone
-from celery.utils.log import get_task_logger
 
-from reNgine.celery import app
 from reNgine.definitions import *
 from reNgine.settings import *
 from reNgine.common_func import *
@@ -17,14 +16,14 @@ from django.db import transaction
 import yaml
 import subprocess
 import signal
-from reNgine.task_utils import save_subdomain, stream_command
+from reNgine.utils.task import save_subdomain, stream_command
 from targetApp.models import Domain
 from startScan.models import ScanHistory, Subdomain, EndPoint, MonitoringDiscovery
 from scanEngine.models import EngineType
 from reNgine.parsers import SpiderFootBatchParser
 from redis import Redis
 
-logger = get_task_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 def generate_reconx_config(domain_name, reconx_dir):
@@ -107,7 +106,6 @@ def _process_monitor_spiderfoot_batch(batch, domain, scan_history, ctx, new_disc
 		logger.error(f"Error processing SpiderFoot monitoring batch: {str(e)}")
 
 
-@app.task(name='monitor_target_task', queue='main_scan_queue')
 def monitor_target_task(domain_id):
 	try:
 		domain = Domain.objects.get(pk=domain_id)
@@ -188,7 +186,7 @@ def monitor_target_task(domain_id):
 					# Detect login and status
 					status, title, is_login = detect_login_and_status(url)
 					
-					from reNgine.task_utils import save_endpoint
+					from reNgine.utils.task import save_endpoint
 					endpoint_data = {
 						'http_status': status,
 						'page_title': title,
@@ -326,25 +324,31 @@ def monitor_target_task(domain_id):
 
 		# 6. Follow-up Scan
 		if domain.monitor_scan_scope != 'none' and new_discoveries:
-			from reNgine.tasks import initiate_scan
+			from reNgine.tasks import initiate_scan_temporal
 			if domain.monitor_scan_scope == 'targeted':
 				# Targeted scan for new subdomains
 				new_subs = [d.split(": ")[1] for d in new_discoveries if d.startswith("Subdomain")]
 				if new_subs:
-					initiate_scan.delay(
+					try:
+						initiate_scan_temporal(
+							scan_history_id=None,
+							domain_id=domain.id,
+							engine_id=engine.id,
+							scan_type=SCHEDULED_SCAN,
+							imported_subdomains=new_subs
+						)
+					except Exception as e:
+						logger.warning(f"Failed to start targeted recovery scan for {domain.name}: {e}")
+			elif domain.monitor_scan_scope == 'full':
+				try:
+					initiate_scan_temporal(
 						scan_history_id=None,
 						domain_id=domain.id,
 						engine_id=engine.id,
-						scan_type=SCHEDULED_SCAN,
-						imported_subdomains=new_subs
+						scan_type=SCHEDULED_SCAN
 					)
-			elif domain.monitor_scan_scope == 'full':
-				initiate_scan.delay(
-					scan_history_id=None,
-					domain_id=domain.id,
-					engine_id=engine.id,
-					scan_type=SCHEDULED_SCAN
-				)
+				except Exception as e:
+					logger.warning(f"Failed to start full recovery scan for {domain.name}: {e}")
 
 		scan_history.scan_status = SUCCESS_TASK
 		scan_history.stop_scan_date = timezone.now()

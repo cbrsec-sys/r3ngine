@@ -1,0 +1,133 @@
+"""Tests for Temporal activity correctness — focus on durability constraints."""
+import inspect
+from django.test import TestCase
+
+
+class TestOsintNoDaemonThreads(TestCase):
+    def test_finish_osint_does_not_spawn_thread(self):
+        """finish_osint must call osint_orchestrator directly, not in a daemon thread."""
+        import reNgine.tasks as tasks_mod
+        source = inspect.getsource(tasks_mod.finish_osint)
+        self.assertNotIn(
+            "threading.Thread",
+            source,
+            "finish_osint must not spawn a daemon thread — call osint_orchestrator synchronously",
+        )
+
+    def test_osint_function_does_not_spawn_thread_for_orchestrator(self):
+        """The osint() task body must not launch osint_orchestrator in a daemon thread."""
+        import reNgine.tasks as tasks_mod
+        source = inspect.getsource(tasks_mod.osint)
+        lines = source.split('\n')
+        for i, line in enumerate(lines):
+            if 'daemon=True' in line:
+                context = '\n'.join(lines[max(0, i-3):i+2])
+                if 'osint_orchestrator' in context:
+                    self.fail(
+                        f"osint() must not spawn daemon threads for osint_orchestrator.\nContext:\n{context}"
+                    )
+
+
+class TestRunGenericTaskAllowlist(TestCase):
+
+    def test_permitted_task_names_accepted(self):
+        """Tasks in the allowlist must not raise ValueError."""
+        from reNgine.temporal_activities import _PERMITTED_GENERIC_TASKS
+        # spot-check a few known tasks
+        for name in ("subdomain_discovery", "http_crawl", "vulnerability_scan"):
+            self.assertIn(name, _PERMITTED_GENERIC_TASKS)
+
+    def test_unknown_task_name_raises(self):
+        """A task name not in the allowlist must raise ValueError before any import."""
+        from unittest.mock import patch, MagicMock
+        from reNgine.temporal_activities import run_generic_task_activity
+        fake_ctx = {"scan_history_id": 1, "domain_id": 1, "engine_id": 1}
+        with self.assertRaises(ValueError) as cm:
+            with patch("temporalio.activity.logger"):
+                run_generic_task_activity(fake_ctx, "exec_shell_command")
+        self.assertIn("exec_shell_command", str(cm.exception))
+
+    def test_allowlist_check_before_import(self):
+        """Allowlist must be checked BEFORE attempting to import from tasks module."""
+        import importlib
+        from unittest.mock import patch, MagicMock
+        from reNgine.temporal_activities import run_generic_task_activity
+        fake_ctx = {"scan_history_id": 1, "domain_id": 1, "engine_id": 1}
+        with patch("importlib.import_module") as mock_import:
+            with patch("temporalio.activity.logger"):
+                try:
+                    run_generic_task_activity(fake_ctx, "not_in_allowlist")
+                except ValueError:
+                    pass
+        mock_import.assert_not_called()
+
+
+class TestScanContext(TestCase):
+    def test_required_fields_accepted(self):
+        from reNgine.scan_context import ScanContext
+        ctx: ScanContext = {
+            "scan_history_id": 1,
+            "engine_id": 2,
+            "domain_id": 3,
+        }
+        self.assertEqual(ctx["scan_history_id"], 1)
+
+    def test_optional_fields_accepted(self):
+        from reNgine.scan_context import ScanContext
+        ctx: ScanContext = {
+            "scan_history_id": 1,
+            "engine_id": 2,
+            "domain_id": 3,
+            "tasks": ["osint", "port_scan"],
+            "subdomain_id": 5,
+        }
+        self.assertEqual(ctx["tasks"], ["osint", "port_scan"])
+
+
+class TestSubScanDispatchRegistry(TestCase):
+    def test_all_known_scan_types_in_registry(self):
+        from reNgine.temporal_workflows import _SUBSCAN_DISPATCH
+        required = {
+            "osint", "subdomain_discovery", "port_scan", "fetch_url",
+            "dir_file_fuzz", "screenshot", "waf_detection",
+            "vulnerability_scan", "baddns",
+        }
+        for t in required:
+            self.assertIn(t, _SUBSCAN_DISPATCH, f"'{t}' is missing from _SUBSCAN_DISPATCH")
+
+    def test_regular_entry_has_required_keys(self):
+        from reNgine.temporal_workflows import _SUBSCAN_DISPATCH
+        for scan_type, entry in _SUBSCAN_DISPATCH.items():
+            if entry is None:
+                continue  # special-case — handled inline
+            self.assertIn("activity", entry, f"{scan_type}: missing 'activity' key")
+            self.assertIn("timeout", entry, f"{scan_type}: missing 'timeout' key")
+            self.assertIn("args_builder", entry, f"{scan_type}: missing 'args_builder' key")
+
+
+class TestCheckpointStubRemoval(TestCase):
+    def test_load_checkpoint_activity_is_noop(self):
+        """LoadCheckpointActivity must exist as a no-op backward-compat stub.
+
+        Workflows started before the checkpoint stubs were removed have
+        LoadCheckpointActivity in their event history. The worker must have
+        the activity registered so those histories can replay without a
+        TMPRL1100 nondeterminism error.  The stub must return {}.
+        """
+        from reNgine import temporal_activities
+        self.assertTrue(
+            hasattr(temporal_activities, "load_checkpoint_activity"),
+            "load_checkpoint_activity backward-compat stub must exist for in-flight workflow replay",
+        )
+        result = temporal_activities.load_checkpoint_activity({})
+        self.assertEqual(result, {})
+
+    def test_save_checkpoint_activity_is_noop(self):
+        """SaveCheckpointActivity must exist as a no-op backward-compat stub."""
+        from reNgine import temporal_activities
+        self.assertTrue(
+            hasattr(temporal_activities, "save_checkpoint_activity"),
+            "save_checkpoint_activity backward-compat stub must exist for in-flight workflow replay",
+        )
+        result = temporal_activities.save_checkpoint_activity({})
+        self.assertIsNone(result)

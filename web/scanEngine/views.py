@@ -4,6 +4,7 @@ import re
 import shutil
 import subprocess
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
 
@@ -16,10 +17,8 @@ from rolepermissions.decorators import has_permission_decorator
 
 from reNgine.common_func import *
 from reNgine.tasks import (run_command, send_discord_message, send_slack_message,send_lark_message, send_telegram_message, fetch_proxies_task)
-from celery.result import AsyncResult
 from django.core.cache import cache
-from reNgine.celery import app
-from reNgine.llm_utils import LLMModelManager
+from reNgine.utils.llm import LLMModelManager
 from dashboard.models import LLMConfig
 from scanEngine.forms import *
 from scanEngine.forms import ConfigurationForm
@@ -564,28 +563,32 @@ def fetch_proxies(request, slug):
             except Exception:
                 if 'limit' in request.POST:
                     limit = int(request.POST.get('limit'))
-            task = fetch_proxies_task.delay(limit=limit)
-            return http.JsonResponse({'task_id': task.id})
+            from reNgine.job_tracker import create_job
+            import threading
+            job_id = create_job()
+            threading.Thread(
+                target=fetch_proxies_task,
+                kwargs={'limit': limit, 'job_id': job_id},
+                daemon=True,
+            ).start()
+            return http.JsonResponse({'task_id': job_id})
         except Exception as e:
-            return http.JsonResponse({'error': f"Celery error: {str(e)}"}, status=500)
+            return http.JsonResponse({'error': str(e)}, status=500)
     return http.JsonResponse({'error': 'Invalid request method. POST required.'}, status=405)
 
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def get_proxy_task_status(request, slug, task_id):
-    task_result = AsyncResult(task_id, app=app)
+    from reNgine.job_tracker import get_job
+    job = get_job(task_id)
     result = {
         "task_id": task_id,
-        "status": task_result.status,
-        "result": task_result.result if task_result.ready() else None,
+        "status": job.get("status", "UNKNOWN"),
+        "result": job.get("result") if job.get("status") == "SUCCESS" else None,
     }
-    if task_result.status == 'PROGRESS':
-        result['message'] = task_result.info.get('message')
-        result['progress'] = task_result.info.get('progress')
-    elif task_result.status == 'SUCCESS':
-        result['message'] = 'Proxy list updated'
-        result['progress'] = 100
-    
+    if job.get("status") in ("RUNNING", "SUCCESS"):
+        result["message"] = job.get("message", "")
+        result["progress"] = job.get("progress", 0)
     return http.JsonResponse(result)
 
 
@@ -682,7 +685,7 @@ def update_llm_settings(request, slug):
         
         if action == 'pull' and provider == 'ollama':
             from reNgine.tasks import pull_ollama_model
-            pull_ollama_model.delay(selected_model)
+            threading.Thread(target=pull_ollama_model, args=(selected_model,), daemon=True).start()
             return http.JsonResponse({'status': 'pulling', 'message': f'Started pulling {selected_model}'})
             
         return http.JsonResponse({'status': 'success', 'message': 'Settings updated successfully'})
@@ -923,7 +926,8 @@ def add_tool(request, slug):
                 github_clone_path = '/usr/src/github/' + project_name
                 install_command = install_command + ' ' + github_clone_path + ' && pip3 install -r ' + github_clone_path + '/requirements.txt'
 
-            run_command.apply_async(args=(install_command,))
+            import threading as _threading
+            _threading.Thread(target=run_command, args=(install_command,), daemon=True).start()
             saved_form = form.save()
             if github_clone_path:
                 tool = InstalledExternalTool.objects.get(id=saved_form.pk)
@@ -981,7 +985,8 @@ def update_github_tool(request, slug, id):
         update_command = f"cd {tool.github_clone_path} && git pull"
         if tool.update_command:
              update_command = tool.update_command
-        run_command.apply_async(args=(update_command,))
+        import threading as _threading
+        _threading.Thread(target=run_command, args=(update_command,), daemon=True).start()
         messages.add_message(request, messages.INFO, f'Update started for {tool.name}')
     return http.HttpResponseRedirect(reverse('tool_arsenal', kwargs={'slug': slug}))
 

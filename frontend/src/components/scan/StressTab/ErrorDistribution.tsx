@@ -17,6 +17,7 @@ export const ErrorDistribution: React.FC<ErrorDistributionProps> = ({ data }) =>
             data={data}
             keys={['error_rate']}
             indexBy="endpoint"
+            animate={false}
             margin={{ top: 10, right: 10, bottom: 50, left: 60 }}
             padding={0.3}
             valueScale={{ type: 'linear' }}

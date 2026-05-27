@@ -307,6 +307,149 @@
         </table>
     </article>
 
+    <!-- Per-Tool Detailed Analysis -->
+    {% for stress_context in stress_report_contexts %}
+    <article class="page-break">
+        <h1>{{ stress_context.test_metadata.tool_display_name }} - Detailed Analysis</h1>
+
+        <!-- Test Metadata -->
+        <h2>Test Configuration</h2>
+        <div class="summary-grid">
+            <div class="summary-card">
+                <span class="summary-value">{{ stress_context.test_metadata.duration }}</span>
+                <span class="summary-label">Duration</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-value">{{ stress_context.test_metadata.concurrency_level }}</span>
+                <span class="summary-label">Concurrency</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-value">{{ stress_context.test_metadata.endpoints_tested_count }}</span>
+                <span class="summary-label">Endpoints</span>
+            </div>
+        </div>
+
+        <!-- Performance KPIs -->
+        <h2>Performance Metrics</h2>
+        <div class="summary-grid">
+            <div class="summary-card">
+                <span class="summary-value">{{ stress_context.performance_summary.success_rate_percent }}%</span>
+                <span class="summary-label">Success Rate</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-value">{{ stress_context.performance_summary.avg_latency_ms|floatformat:1 }}ms</span>
+                <span class="summary-label">Avg Latency</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-value">{{ stress_context.performance_summary.peak_throughput_rps|floatformat:1 }}</span>
+                <span class="summary-label">Peak RPS</span>
+            </div>
+        </div>
+
+        <!-- Latency Distribution Chart -->
+        {% if stress_context.latency_distribution_chart %}
+        <h2>Latency Distribution</h2>
+        <div class="chart-box">
+            <img class="chart-img" src="data:image/png;base64,{{ stress_context.latency_distribution_chart }}" />
+            <p style="font-size: 9pt; color: #94a3b8; margin-top: 4mm;">Percentile breakdown of observed latency values.</p>
+        </div>
+        {% endif %}
+    </article>
+
+    <!-- Per-Tool Response Codes & Errors -->
+    <article class="page-break">
+        <h1>{{ stress_context.test_metadata.tool_display_name }} - Response Analysis</h1>
+
+        <!-- Response Code Distribution -->
+        {% if stress_context.response_code_chart %}
+        <h2>Response Code Distribution</h2>
+        <div class="chart-box">
+            <img class="chart-img" src="data:image/png;base64,{{ stress_context.response_code_chart }}" />
+            <p style="font-size: 9pt; color: #94a3b8; margin-top: 4mm;">HTTP status code breakdown of all requests.</p>
+        </div>
+        {% endif %}
+
+        <!-- Error Breakdown -->
+        {% if stress_context.error_breakdown_chart %}
+        <h2 style="margin-top: 20mm;">Error Type Breakdown</h2>
+        <div class="chart-box">
+            <img class="chart-img" src="data:image/png;base64,{{ stress_context.error_breakdown_chart }}" />
+            <p style="font-size: 9pt; color: #94a3b8; margin-top: 4mm;">Classification of errors encountered during the test.</p>
+        </div>
+        {% endif %}
+    </article>
+
+    <!-- Endpoint Analysis -->
+    {% if stress_context.endpoint_analysis.endpoints %}
+    <article class="page-break">
+        <h1>{{ stress_context.test_metadata.tool_display_name }} - Endpoint Analysis</h1>
+
+        <!-- Endpoint Heatmap -->
+        {% if stress_context.endpoint_heatmap_chart %}
+        <h2>Endpoint Response Distribution</h2>
+        <div class="chart-box">
+            <img class="chart-img" src="data:image/png;base64,{{ stress_context.endpoint_heatmap_chart }}" />
+            <p style="font-size: 9pt; color: #94a3b8; margin-top: 4mm;">Response code distribution heatmap across tested endpoints.</p>
+        </div>
+        {% endif %}
+
+        <!-- Endpoints Table -->
+        <h2 style="margin-top: 20mm;">Tested Endpoints</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Endpoint URL</th>
+                    <th>Method</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for endpoint in stress_context.endpoint_analysis.endpoints %}
+                <tr>
+                    <td><small>{{ endpoint.url }}</small></td>
+                    <td>{{ endpoint.method }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </article>
+    {% endif %}
+
+    <!-- Findings & Recommendations -->
+    <article class="page-break">
+        <h1>{{ stress_context.test_metadata.tool_display_name }} - Insights</h1>
+
+        <!-- Findings -->
+        {% if stress_context.findings_and_recommendations.findings_list %}
+        <h2>Key Findings</h2>
+        <ul style="margin-left: 5mm;">
+            {% for finding in stress_context.findings_and_recommendations.findings_list %}
+            <li style="margin-bottom: 3mm;">{{ finding }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <!-- Anomalies -->
+        {% if stress_context.findings_and_recommendations.anomalies %}
+        <h2>Detected Anomalies</h2>
+        <ul style="margin-left: 5mm;">
+            {% for anomaly in stress_context.findings_and_recommendations.anomalies %}
+            <li style="margin-bottom: 3mm;">{{ anomaly }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+
+        <!-- Recommendations -->
+        {% if stress_context.findings_and_recommendations.recommendations_list %}
+        <h2>Recommendations</h2>
+        <ul style="margin-left: 5mm;">
+            {% for rec in stress_context.findings_and_recommendations.recommendations_list %}
+            <li style="margin-bottom: 3mm;">{{ rec }}</li>
+            {% endfor %}
+        </ul>
+        {% endif %}
+    </article>
+    {% endfor %}
+
     <!-- Conclusion -->
     <article class="page-break">
         <h1>Final Conclusion</h1>

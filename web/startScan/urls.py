@@ -80,6 +80,10 @@ urlpatterns = [
         views.stop_scan,
         name='stop_scan'),
     path(
+        'resume/scan/<int:id>',
+        views.resume_scan,
+        name='resume_scan'),
+    path(
         'delete/scheduled_task/<int:id>',
         views.delete_scheduled_task,
         name='delete_scheduled_task'),

@@ -21,58 +21,50 @@ from scanEngine.models import *
 from startScan.models import *
 from targetApp.forms import *
 from targetApp.models import *
-from django_celery_beat.models import IntervalSchedule, PeriodicTask
-
 logger = logging.getLogger(__name__)
 
+
 def manage_monitoring_task(domain):
+    """Create, update, or delete the Temporal Schedule for domain monitoring.
+
+    Called whenever domain.is_monitored or domain.monitor_frequency changes.
+    Replaces the previous django_celery_beat PeriodicTask approach.
+
+    Also cleans up any lingering monitor_periodic_task from the pre-migration state
+    so domains that were monitored before Phase 4D are handled correctly.
+    """
+    from reNgine.temporal_schedule_utils import (
+        _upsert_monitoring_temporal_schedule,
+        _delete_monitoring_temporal_schedule,
+    )
+
     if domain.is_monitored:
-        # Get or create interval
-        frequency = domain.monitor_frequency
-        if frequency == 'hourly':
-            period = IntervalSchedule.HOURS
-            every = 1
-        elif frequency == 'daily':
-            period = IntervalSchedule.DAYS
-            every = 1
-        elif frequency == 'weekly':
-            period = IntervalSchedule.DAYS
-            every = 7
-        elif frequency == 'monthly':
-            period = IntervalSchedule.DAYS
-            every = 30
-        else:
-            # default to daily
-            period = IntervalSchedule.DAYS
-            every = 1
-
-        schedule, created = IntervalSchedule.objects.get_or_create(
-            every=every,
-            period=period,
-        )
-
+        # Clean up legacy Celery Beat task if still present (pre-4D migration)
         if domain.monitor_periodic_task:
-            domain.monitor_periodic_task.interval = schedule
-            domain.monitor_periodic_task.task = 'monitor_target_task'
-            domain.monitor_periodic_task.args = json.dumps([domain.id])
-            domain.monitor_periodic_task.enabled = True
-            domain.monitor_periodic_task.save()
-        else:
-            task = PeriodicTask.objects.create(
-                interval=schedule,
-                name=f'Monitoring for {domain.name} ({domain.id})',
-                task='monitor_target_task',
-                args=json.dumps([domain.id]),
-                enabled=True,
-            )
-            domain.monitor_periodic_task = task
-            domain.save()
-    else:
-        if domain.monitor_periodic_task:
-            task = domain.monitor_periodic_task
+            try:
+                domain.monitor_periodic_task.delete()
+            except Exception:
+                pass
             domain.monitor_periodic_task = None
-            domain.save()
-            task.delete()
+
+        ts = _upsert_monitoring_temporal_schedule(domain)
+        domain.temporal_schedule = ts
+        domain.save()
+    else:
+        # Delete Temporal Schedule if present
+        if domain.temporal_schedule:
+            _delete_monitoring_temporal_schedule(domain)
+            domain.temporal_schedule = None
+
+        # Also clean up legacy Celery Beat task if still present
+        if domain.monitor_periodic_task:
+            try:
+                domain.monitor_periodic_task.delete()
+            except Exception:
+                pass
+            domain.monitor_periodic_task = None
+
+        domain.save()
 
 
 def index(request):

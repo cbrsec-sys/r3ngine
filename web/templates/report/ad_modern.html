@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  :root {
+    --bg: #0d1117; --surface: #161b22; --border: #30363d;
+    --accent: #58a6ff; --text: #c9d1d9; --muted: #8b949e;
+    --crit: #f85149; --high: #ff7b72; --med: #e3b341; --low: #58a6ff; --info: #8b949e;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', Arial, sans-serif;
+         font-size: 10pt; margin: 0; padding: 32px; }
+  h1 { font-size: 20pt; color: var(--accent); letter-spacing: 2px; text-transform: uppercase;
+       border-bottom: 2px solid var(--accent); padding-bottom: 8px; margin-bottom: 24px; }
+  h2 { font-size: 12pt; color: var(--accent); text-transform: uppercase; letter-spacing: 1px;
+       margin-top: 32px; border-left: 3px solid var(--accent); padding-left: 10px; }
+  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 24px; }
+  .meta-card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px 16px; }
+  .meta-label { font-size: 0.7em; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; }
+  .meta-value { font-size: 1.1em; font-weight: bold; margin-top: 2px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 9pt; }
+  th { background: var(--surface); color: var(--accent); padding: 7px 10px; text-align: left;
+       border-bottom: 2px solid var(--border); font-size: 0.8em; text-transform: uppercase; }
+  td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .sev-critical { color: var(--crit); font-weight: bold; }
+  .sev-high { color: var(--high); font-weight: bold; }
+  .sev-medium { color: var(--med); }
+  .sev-low { color: var(--low); }
+  .sev-info { color: var(--info); }
+  code { font-family: 'Consolas', monospace; font-size: 0.88em; color: var(--accent); }
+</style>
+</head>
+<body>
+<h1>Active Directory Assessment Report</h1>
+<div class="meta-grid">
+  <div class="meta-card"><div class="meta-label">Assessment</div>
+    <div class="meta-value">{{ report.metadata.assessment_name }}</div></div>
+  <div class="meta-card"><div class="meta-label">Target Domain</div>
+    <div class="meta-value">{{ report.metadata.target_domain }}</div></div>
+  <div class="meta-card"><div class="meta-label">Status</div>
+    <div class="meta-value">{{ report.metadata.status }}</div></div>
+  <div class="meta-card"><div class="meta-label">Generated</div>
+    <div class="meta-value">{{ report.metadata.generated_at|slice:":19" }}</div></div>
+</div>
+
+<h2>Executive Summary</h2>
+<table>
+  <tr><th>Metric</th><th>Value</th></tr>
+  <tr><td>Domains Discovered</td><td>{{ report.executive_summary.domain_count }}</td></tr>
+  <tr><td>Trust Relationships</td><td>{{ report.executive_summary.trust_count }}</td></tr>
+  <tr><td>Exposed Services</td><td>{{ report.executive_summary.exposure_count }}</td></tr>
+  <tr><td>Average Trust Risk</td><td>{{ report.executive_summary.average_trust_risk|floatformat:2 }}</td></tr>
+  <tr><td>Average Exposure Risk</td><td>{{ report.executive_summary.average_exposure_risk|floatformat:2 }}</td></tr>
+</table>
+
+<h2>Finding Severity Breakdown</h2>
+<table>
+  <tr><th>Severity</th><th>Count</th></tr>
+  {% for sev, count in report.executive_summary.finding_counts.items %}
+  <tr><td class="sev-{{ sev|lower }}">{{ sev }}</td><td>{{ count }}</td></tr>
+  {% empty %}<tr><td colspan="2">No findings recorded.</td></tr>{% endfor %}
+</table>
+
+<h2>Findings</h2>
+<table>
+  <tr><th>Severity</th><th>Title</th><th>Affected Object</th><th>Remediation</th></tr>
+  {% for f in report.findings %}
+  <tr>
+    <td class="sev-{{ f.severity|lower }}">{{ f.severity }}</td>
+    <td>{{ f.title }}</td>
+    <td><code>{{ f.affected_object }}</code></td>
+    <td style="font-size:0.85em">{{ f.remediation }}</td>
+  </tr>
+  {% empty %}<tr><td colspan="4">No findings recorded.</td></tr>{% endfor %}
+</table>
+
+<h2>Trust Analysis</h2>
+<table>
+  <tr><th>Source</th><th>Target</th><th>Type</th><th>Direction</th><th>Transitive</th><th>Selective Auth</th><th>Risk</th></tr>
+  {% for t in report.trust_analysis %}
+  <tr>
+    <td>{{ t.source }}</td><td>{{ t.target }}</td><td>{{ t.type }}</td><td>{{ t.direction }}</td>
+    <td>{% if t.is_transitive %}Yes{% else %}No{% endif %}</td>
+    <td>{% if t.is_selective_auth %}Enabled{% else %}<span style="color:var(--crit)">Disabled</span>{% endif %}</td>
+    <td>{{ t.risk_score|floatformat:1 }}</td>
+  </tr>
+  {% empty %}<tr><td colspan="7">No trust relationships found.</td></tr>{% endfor %}
+</table>
+
+<h2>Exposure Analysis</h2>
+<table>
+  <tr><th>Hostname</th><th>Type</th><th>Port</th><th>Risk</th><th>Correlated Domain</th></tr>
+  {% for e in report.exposure_analysis %}
+  <tr>
+    <td>{{ e.hostname }}</td><td>{{ e.type }}</td><td>{{ e.port }}</td>
+    <td>{{ e.risk_score|floatformat:1 }}</td><td>{{ e.correlated_domain }}</td>
+  </tr>
+  {% empty %}<tr><td colspan="5">No exposures found.</td></tr>{% endfor %}
+</table>
+
+<h2>Assessment Timeline</h2>
+<table>
+  <tr><th>Timestamp</th><th>Event</th><th>Actor</th></tr>
+  {% for ev in report.timeline %}
+  <tr>
+    <td style="white-space:nowrap;font-size:0.8em">{{ ev.timestamp|slice:":19" }}</td>
+    <td>{{ ev.event_type }}</td><td>{{ ev.actor }}</td>
+  </tr>
+  {% empty %}<tr><td colspan="3">No timeline events recorded.</td></tr>{% endfor %}
+</table>
+</body>
+</html>

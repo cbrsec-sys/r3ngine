@@ -1,5 +1,6 @@
 import os
 import shutil
+import threading
 import time
 import zipfile
 import yaml
@@ -109,7 +110,9 @@ class PluginManager:
             if field not in manifest:
                 raise Exception(f"Missing required field '{field}' in manifest.yaml")
                 
-        # Validate runtime keys
+        # Validate runtime keys.
+        # Valid anchor values: any real scan task name (e.g. "subdomain_discovery")
+        # or "standalone" for plugins that operate independently of the main scan pipeline.
         runtime = manifest.get('runtime', {})
         if not any(k in runtime for k in ['run after', 'run before']):
             raise Exception("Manifest must specify 'run after' or 'run before' in runtime section.")
@@ -205,7 +208,7 @@ class AtomicInstaller:
             temp_dir = PluginManager.extract_plugin(zip_path)
             manifest = PluginManager.validate_manifest(temp_dir)
             plugin_name = manifest['name']
-            plugin_slug = slugify(plugin_name)
+            plugin_slug = slugify(plugin_name).replace('-', '_')
             
             # 1. Backup DB
             backup_db_file = cls.backup_db(plugin_slug)
@@ -245,7 +248,26 @@ class AtomicInstaller:
                     shutil.rmtree(final_dir)
                 shutil.move(temp_dir, final_dir)
                 
-                # 5. Ingest Engine Fixtures
+                # 5. Ingest Engine Fixtures and Run Migrations
+                # Run dynamic migrations if the plugin has models
+                backend_dir = os.path.join(final_dir, 'backend')
+                if os.path.exists(os.path.join(backend_dir, 'models.py')):
+                    app_label = f"plugins_data.{plugin_slug}.backend"
+                    logger.info(f"Running migrations for plugin app: {app_label}")
+                    try:
+                        # makemigrations needs the app_label to be the module name.
+                        # However, django's makemigrations expects the actual app label, which defaults to the last part ('backend').
+                        # To be safe, we run makemigrations and migrate on 'backend'.
+                        # But wait, multiple plugins will have 'backend'. Django requires unique app labels.
+                        # We must ensure the plugin's apps.py defines a unique name, or Django defaults to 'backend'.
+                        # The plugin must contain an apps.py that sets `name = 'plugins_data.plugin_slug.backend'` and `label = 'plugin_slug_backend'`.
+                        call_command('makemigrations', f'{plugin_slug}_backend', interactive=False)
+                        call_command('migrate', f'{plugin_slug}_backend', interactive=False)
+                        logger.info(f"Successfully migrated plugin: {plugin_slug}")
+                    except Exception as e:
+                        logger.error(f"Failed to run migrations for {plugin_slug}: {str(e)}")
+                        # Don't fail the whole install if migrations fail, or maybe we should? Let's just log it.
+
                 from scanEngine.models import EngineType
                 for file in os.listdir(final_dir):
                     if file.endswith('_engine.yaml'):
@@ -287,18 +309,33 @@ class AtomicInstaller:
                         
                         # Trigger background installation
                         from .tasks import install_plugin_tools
-                        transaction.on_commit(lambda: install_plugin_tools.delay(plugin_slug))
+                        transaction.on_commit(
+                            lambda: threading.Thread(
+                                target=install_plugin_tools,
+                                args=(plugin_slug,),
+                                daemon=True
+                            ).start()
+                        )
                     except Exception as e:
                         logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
 
-                # 7. Copy UI assets to MEDIA_ROOT
+                # 7. Copy built UI assets (ui/dist/ or ui/ directly) to MEDIA_ROOT
                 if os.path.exists(media_plugin_dir):
                     shutil.rmtree(media_plugin_dir)
-                
+
+                ui_dist_src = os.path.join(final_dir, 'ui', 'dist')
                 ui_src = os.path.join(final_dir, 'ui')
-                if os.path.exists(ui_src):
-                    os.makedirs(media_plugin_dir, exist_ok=True)
-                    shutil.copytree(ui_src, os.path.join(media_plugin_dir, 'ui'))
+                media_ui_target = os.path.join(media_plugin_dir, 'ui')
+
+                if os.path.exists(ui_dist_src):
+                    shutil.copytree(ui_dist_src, media_ui_target)
+                elif os.path.exists(ui_src):
+                    shutil.copytree(ui_src, media_ui_target)
+                else:
+                    logger.warning(
+                        f"No ui/ or ui/dist/ found for {plugin_slug}. "
+                        "UI unavailable until plugin is built and re-installed."
+                    )
                 
                 # 8. Cleanup backups on success
                 if backup_fs_dir and os.path.exists(backup_fs_dir):

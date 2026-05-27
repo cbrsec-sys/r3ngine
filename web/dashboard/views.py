@@ -1,5 +1,6 @@
 import json
 import logging
+import threading
 
 from datetime import timedelta
 
@@ -28,7 +29,7 @@ from startScan.models import *
 from targetApp.models import Domain
 from dashboard.models import *
 from reNgine.definitions import *
-from reNgine.graph_utils import Neo4jManager
+from reNgine.utils.graph import Neo4jManager
 
 
 logger = logging.getLogger(__name__)
@@ -304,12 +305,17 @@ def on_user_logged_out(sender, request, **kwargs):
 
 @receiver(user_logged_in)
 def on_user_logged_in(sender, request, **kwargs):
-    messages.add_message(
-        request,
-        messages.INFO,
-        'Hi @' +
-        request.user.username +
-        ' welcome back!')
+    user = kwargs.get('user')
+    username = user.username if user else (request.user.username if request and hasattr(request, 'user') else 'User')
+    if request:
+        from django.contrib.messages.api import MessageFailure
+        try:
+            messages.add_message(
+                request,
+                messages.INFO,
+                'Hi @' + username + ' welcome back!')
+        except MessageFailure:
+            pass
 
 
 def search(request, slug):
@@ -579,7 +585,11 @@ def get_impact_graph_data(request, slug, vuln_id):
 def trigger_ai_impact(request, slug, vuln_id):
     if request.method == 'POST':
         from reNgine.tasks import generate_impact_assessment
-        generate_impact_assessment.delay(vulnerability_id=vuln_id)
+        threading.Thread(
+            target=generate_impact_assessment.apply,
+            kwargs={'kwargs': {'vulnerability_id': vuln_id}},
+            daemon=True
+        ).start()
         return JsonResponse({'status': True, 'message': 'AI Impact Generation started...'})
     return JsonResponse({'status': False})
 

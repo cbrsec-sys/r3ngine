@@ -11,11 +11,11 @@ interface Props {
   isRefreshingMarketplace?: boolean;
 }
 
-const PluginInventory: React.FC<Props> = ({ 
-  plugins, 
-  marketplacePlugins = [], 
+const PluginInventory: React.FC<Props> = ({
+  plugins,
+  marketplacePlugins = [],
   onRefreshMarketplace,
-  isRefreshingMarketplace 
+  isRefreshingMarketplace
 }) => {
   return (
     <Box>
@@ -26,7 +26,7 @@ const PluginInventory: React.FC<Props> = ({
           INSTALLED ASSETS
         </Typography>
       </Stack>
-      
+
       {(!Array.isArray(plugins) || plugins.length === 0) ? (
         <Box sx={{ textAlign: "center", py: 4, mb: 6, border: '1px dashed rgba(255,255,255,0.1)' }}>
           <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'Orbitron' }}>
@@ -54,8 +54,8 @@ const PluginInventory: React.FC<Props> = ({
           </Typography>
         </Stack>
         <Tooltip title="Refresh Marketplace">
-          <IconButton 
-            onClick={onRefreshMarketplace} 
+          <IconButton
+            onClick={onRefreshMarketplace}
             disabled={isRefreshingMarketplace}
             sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff' } }}
           >
@@ -70,7 +70,8 @@ const PluginInventory: React.FC<Props> = ({
             MARKETPLACE COMING SOON
           </Typography>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            The official r3ngine plugin repository is currently initializing.
+            The official r3ngine plugin repository is currently
+            being alpha tested, and will be released soon.
           </Typography>
         </Box>
       ) : (

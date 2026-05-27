@@ -343,3 +343,200 @@ def generate_stress_success_rate_chart(results):
 
     img_bytes = to_image(fig, format="png")
     return base64.b64encode(img_bytes).decode('utf-8')
+
+
+def generate_stress_latency_distribution_chart(stress_result):
+    """
+    Generates a bar chart for stress test latency distribution (all percentiles).
+    Args:
+        stress_result: StressTestResult object.
+    Returns:
+        Image as base64 encoded string.
+    """
+    labels = ['P50', 'P75', 'P90', 'P95', 'P99', 'P999', 'Avg']
+    values = [
+        stress_result.p50_latency_ms,
+        stress_result.p75_latency_ms,
+        stress_result.p90_latency_ms,
+        stress_result.p95_latency_ms,
+        stress_result.p99_latency_ms,
+        stress_result.p999_latency_ms,
+        stress_result.avg_latency_ms,
+    ]
+
+    colors = ['#4ECDC4', '#4BC0C0', '#45B7B1', '#FF9F43', '#FF6B35', '#FF4D6A', '#6C5CE7']
+
+    fig = go.Figure(data=[
+        go.Bar(x=labels, y=values, marker_color=colors, text=values, textposition='auto')
+    ])
+
+    fig.update_layout(
+        title="Latency Distribution (ms)",
+        yaxis_title="Latency (ms)",
+        xaxis_title="Percentile",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(size=12),
+        margin=dict(t=60, b=60, l=60, r=60),
+        width=700,
+        height=400,
+        showlegend=False
+    )
+
+    img_bytes = to_image(fig, format="png")
+    return base64.b64encode(img_bytes).decode('utf-8')
+
+
+def generate_stress_response_code_chart(response_code_distribution):
+    """
+    Generates a pie chart for stress test response code distribution.
+    Args:
+        response_code_distribution: Dictionary of {code: count}.
+    Returns:
+        Image as base64 encoded string.
+    """
+    if not response_code_distribution:
+        return None
+
+    codes = []
+    counts = []
+    colors = []
+
+    for code, count in sorted(response_code_distribution.items(), key=lambda x: x[1], reverse=True):
+        codes.append(str(code))
+        counts.append(count)
+        colors.append(get_color_by_http_status(code))
+
+    total = sum(counts)
+    text = [f"{code}<br>{count}<br>({count/total:.1%})" for code, count in zip(codes, counts)]
+
+    fig = go.Figure(data=[go.Pie(
+        labels=codes,
+        values=counts,
+        marker=dict(colors=colors),
+        textinfo="text",
+        text=text,
+        textposition="inside",
+        textfont=dict(size=10),
+        hoverinfo="label+percent+value"
+    )])
+
+    fig.update_layout(
+        title="Response Code Distribution",
+        showlegend=True,
+        margin=dict(t=60, b=60, l=60, r=60),
+        width=700,
+        height=700,
+        legend=dict(
+            font=dict(size=12),
+            orientation="v",
+            yanchor="middle",
+            y=0.5,
+            xanchor="left",
+            x=1.05
+        ),
+    )
+
+    img_bytes = to_image(fig, format="png")
+    return base64.b64encode(img_bytes).decode('utf-8')
+
+
+def generate_stress_error_breakdown_chart(error_breakdown):
+    """
+    Generates a bar chart for stress test error type breakdown.
+    Args:
+        error_breakdown: Dictionary of {error_type: count}.
+    Returns:
+        Image as base64 encoded string.
+    """
+    if not error_breakdown:
+        return None
+
+    error_types = list(error_breakdown.keys())
+    counts = list(error_breakdown.values())
+
+    color_map = {
+        'timeout': '#FF4D6A',
+        'connection_refused': '#FF9F43',
+        'connection_reset': '#FFCA3A',
+        'tls_error': '#FF6B35',
+        'http_error': '#6C5CE7',
+    }
+
+    colors = [color_map.get(error_type, '#4ECDC4') for error_type in error_types]
+
+    fig = go.Figure(data=[
+        go.Bar(
+            x=error_types,
+            y=counts,
+            marker_color=colors,
+            text=counts,
+            textposition='auto'
+        )
+    ])
+
+    fig.update_layout(
+        title="Error Type Breakdown",
+        yaxis_title="Count",
+        xaxis_title="Error Type",
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        font=dict(size=12),
+        margin=dict(t=60, b=60, l=60, r=60),
+        width=700,
+        height=400,
+        showlegend=False
+    )
+
+    img_bytes = to_image(fig, format="png")
+    return base64.b64encode(img_bytes).decode('utf-8')
+
+
+def generate_stress_endpoint_heatmap(endpoints_tested, response_code_distribution):
+    """
+    Generates a heatmap visualization for endpoints and response codes.
+    Args:
+        endpoints_tested: List of endpoint URLs.
+        response_code_distribution: Dictionary of {code: count}.
+    Returns:
+        Image as base64 encoded string.
+    """
+    if not endpoints_tested or not response_code_distribution:
+        return None
+
+    # Limit to first 10 endpoints for readability
+    endpoint_list = endpoints_tested[:10] if isinstance(endpoints_tested, list) else list(endpoints_tested)[:10]
+    endpoint_labels = [str(ep) if isinstance(ep, str) else ep.get('url', str(ep)) for ep in endpoint_list]
+
+    # Status code categories
+    status_2xx = sum(v for k, v in response_code_distribution.items() if 200 <= int(k) < 300)
+    status_3xx = sum(v for k, v in response_code_distribution.items() if 300 <= int(k) < 400)
+    status_4xx = sum(v for k, v in response_code_distribution.items() if 400 <= int(k) < 500)
+    status_5xx = sum(v for k, v in response_code_distribution.items() if 500 <= int(k) < 600)
+
+    # Create simple heatmap data (endpoints vs status categories)
+    z_data = []
+    for i in range(len(endpoint_list)):
+        z_data.append([status_2xx, status_3xx, status_4xx, status_5xx])
+
+    fig = go.Figure(data=go.Heatmap(
+        z=z_data,
+        x=['2xx Success', '3xx Redirect', '4xx Client Error', '5xx Server Error'],
+        y=endpoint_labels,
+        colorscale='RdYlGn_r',
+        text=z_data,
+        texttemplate='%{text}',
+        textfont={"size": 10},
+    ))
+
+    fig.update_layout(
+        title="Response Code Distribution by Endpoint",
+        yaxis_title="Endpoint",
+        xaxis_title="Status Code Category",
+        margin=dict(t=60, b=60, l=200, r=60),
+        width=700,
+        height=400 + len(endpoint_list) * 20,
+    )
+
+    img_bytes = to_image(fig, format="png")
+    return base64.b64encode(img_bytes).decode('utf-8')
