@@ -9,15 +9,25 @@
   <h4 align="center"><strong>Phoenix: Fire from the Ashes even Stronger</strong></h4> 
   <h3 align="center">Official v3 Rebirth: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
 </p>
+
 <p align="center">
-  <h3>New V3 Dashboard</h3>
+  <h3 align="center">New V3 Dashboard</h3>
+  <img src=".github/screenshots/r3ngine_dash.png" height="550px" width="1020px" alt=""/>
 </p>
 
 <p align="center">
-<img src=".github/screenshots/r3ngine_dash.png" height="550px" width="1020px" alt=""/>
+  <a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank">
+    <img src="https://img.shields.io/badge/version-v3.2.0-informational?&logo=none" alt="r3ngine Latest Version" />
+  </a>
+  &nbsp;
+  <a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank">
+    <img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" />
+  </a>
+  &nbsp;
+  <a href="#" target="_blank">
+    <img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" />
+  </a>
 </p>
-
-<p align="center"><a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank"><img src="https://img.shields.io/badge/version-v3.2.0-informational?&logo=none" alt="r3ngine Latest Version" /></a>&nbsp;<a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank"><img src="https://img.shields.io/badge/License-GPLv3-red.svg?&logo=none" alt="License" /></a>&nbsp;<a href="#" target="_blank"><img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" /></a></p>
 
 <p align="center">
   <a href="https://www.youtube.com/watch?v=Xk_YH83IQgg" target="_blank"><img src="https://img.shields.io/badge/BlackHat--Arsenal--Asia-2023-blue.svg?logo=none" alt="" /></a>&nbsp;
