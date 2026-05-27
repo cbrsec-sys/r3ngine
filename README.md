@@ -247,7 +247,6 @@ flowchart TD
         direction TB
         HC["RunHTTPCrawlActivity\n─ global config · feeds Tiers 3 & 4"] --> PHC[ParseHTTPCrawlResultsActivity]
         PS[RunPortScanActivity]
-        SS[RunScreenshotActivity]
     end
 
     PHC & PS & SS --> J2(( ))
@@ -293,6 +292,7 @@ flowchart TD
         end
         WB[RunWAFBypassActivity]
         BF[RunBruteForceScanActivity]
+        SS[RunScreenshotActivity]
     end
 
     NUC & WB & BF --> J4(( ))
