@@ -96,7 +96,7 @@ ENV PATH="/root/.bun/bin:${PATH}"
 ENV GO111MODULE=on
 
 # Clone vigolium at the pinned release tag
-RUN git clone --depth 1 --branch v0.1.15-beta https://github.com/vigolium/vigolium /build/vigolium
+RUN git clone --depth 1 https://github.com/vigolium/vigolium /build/vigolium
 
 WORKDIR /build/vigolium
 
