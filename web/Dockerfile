@@ -78,6 +78,38 @@ RUN CGO_ENABLED=0 GO111MODULE=on go build -ldflags="-s -w" -o /usr/local/bin/r3n
 
 
 # ===========================================================================
+# Stage: Vigolium Builder
+#
+# Vigolium requires Go 1.26+ and bun (for embedded vigolium-audit and jsscan
+# binaries). Clone, build embedded deps, then compile the binary.
+# The ~341MB binary is copied directly to /usr/local/bin in the runtime image.
+# ===========================================================================
+FROM golang:1.26-bookworm AS vigolium-builder
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl git make unzip && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install bun (needed for vigolium-audit and jsscan embedded binary builds)
+RUN curl -fsSL https://bun.sh/install | bash
+ENV PATH="/root/.bun/bin:${PATH}"
+ENV GO111MODULE=on
+
+# Clone vigolium at the pinned release tag
+RUN git clone --depth 1 --branch v0.1.15-beta https://github.com/vigolium/vigolium /build/vigolium 2>/dev/null || \
+    git clone --depth 1 https://github.com/vigolium/vigolium /build/vigolium
+
+WORKDIR /build/vigolium
+
+# Build embedded binaries (vigolium-audit via bun, jsscan via bun)
+RUN make ensure-audit && make ensure-jsscan
+
+# Compile vigolium binary
+RUN go build -ldflags="-s -w" -o /usr/local/bin/vigolium ./cmd/vigolium && \
+    rm -rf /root/.cache/go-build /root/.bun /go/pkg /build/vigolium
+
+
+# ===========================================================================
 # Stage 4: Runtime Image
 #
 # Ubuntu 22.04 base. Contains ONLY what r3ngine needs to run:
@@ -202,6 +234,9 @@ COPY --from=go-tools-builder /go/bin/* /usr/local/bin/
 # Copy the r3ngine Temporal executor binary
 # ---------------------------------------------------------------------------
 COPY --from=executor-builder /usr/local/bin/r3ngine-executor /usr/local/bin/r3ngine-executor
+
+# Vigolium — web vulnerability scanner (built separately due to Go 1.26 + bun requirement)
+COPY --from=vigolium-builder /usr/local/bin/vigolium /usr/local/bin/vigolium
 
 # ---------------------------------------------------------------------------
 # Install pre-built binary tools (no compilation needed at runtime)

@@ -795,3 +795,21 @@
     is_github_cloned: true
     github_clone_path: /usr/src/github/XSStrike
     subdomain_gathering_command: null
+
+- model: scanEngine.installedexternaltool
+  pk: 46
+  fields:
+    logo_url: https://www.vigolium.com/logo.png
+    name: Vigolium
+    description: "Vigolium is a high-fidelity web vulnerability scanner combining deterministic multi-phase native scanning with optional AI-driven agentic modes. Features 251 built-in modules covering injection, XSS, SSRF, IDOR, and more."
+    github_url: https://github.com/vigolium/vigolium
+    license_url: https://github.com/vigolium/vigolium/blob/main/LICENSE
+    version_lookup_command: vigolium version
+    update_command: "vigolium update"
+    install_command: "git clone https://github.com/vigolium/vigolium && cd vigolium && make ensure-audit && make ensure-jsscan && go build -o /usr/local/bin/vigolium ./cmd/vigolium"
+    version_match_regex: "v\\d+\\.\\d+\\.\\d+"
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
