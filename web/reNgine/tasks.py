@@ -3443,12 +3443,16 @@ def add_gpt_description_db(title, path, description, impact, remediation, refere
 			gpt_report.references.add(ref)
 		gpt_report.save()
 
-def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, parse_only=None):
+def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, parse_only=None, severity=None):
 	"""HTTP vulnerability scan using Nuclei
 
 	Args:
-		urls (list, optional): If passed, filter on those URLs.
-		description (str, optional): Task description shown in UI.
+		urls (list, optional): List of HTTP URLs to scan.
+		ctx (dict, optional): Task execution context dictionary containing settings.
+		description (str, optional): Task description shown in the UI activity.
+		prepare_only (bool, optional): If True, only write target files and skip tool run.
+		parse_only (str, optional): Path to output file to parse results from.
+		severity (str, optional): Nuclei severity to scan (e.g. info, low, medium, high, critical).
 
 	Notes:
 	Unfurl the urls to keep only domain and path, will be sent to vuln scan and
@@ -3457,7 +3461,9 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	from startScan.models import Subdomain
 	# Config
 	config = self.yaml_configuration.get(VULNERABILITY_SCAN) or {}
-	input_path = f'{self.results_dir}/input_endpoints_vulnerability_scan.txt'
+	severity_filter = severity or ctx.get('nuclei_severity_filter')
+	severity_suffix = f"_{severity_filter}" if severity_filter else ""
+	input_path = f'{self.results_dir}/input_endpoints_vulnerability_scan{severity_suffix}.txt'
 	enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
 	concurrency = config.get(NUCLEI_CONCURRENCY) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
 	intensity = config.get(INTENSITY) or self.yaml_configuration.get(INTENSITY, DEFAULT_SCAN_INTENSITY)
@@ -3478,7 +3484,10 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	nuclei_specific_config = config.get('nuclei', {})
 	use_nuclei_conf = nuclei_specific_config.get(USE_NUCLEI_CONFIG, False)
 	auto_update_templates = nuclei_specific_config.get('auto_update_templates', True)
-	severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
+	if severity_filter:
+		severities = [severity_filter]
+	else:
+		severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
 	tags = nuclei_specific_config.get(NUCLEI_TAGS, [])
 	
 	# Intelligence-Driven Scanning: Inject tags based on detected technologies
@@ -3521,7 +3530,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		)
 
 	if intensity == 'normal': # reduce number of endpoints to scan
-		unfurl_filter = f'{self.results_dir}/urls_unfurled.txt'
+		unfurl_filter = f'{self.results_dir}/urls_unfurled{severity_suffix}.txt'
 		run_command(
 			f"cat {input_path} | unfurl -u format %s://%d%p |uro > {unfurl_filter}",
 			shell=True,
@@ -4022,7 +4031,7 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 
 	# command builder
 	proxy = get_random_proxy()
-	cmd = 'crlfuzz -s'
+	cmd = 'crlfuzz ' # -s
 	cmd += f' -l {input_path}'
 	cmd += f' -x {proxy}' if proxy else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
@@ -7391,7 +7400,8 @@ def resume_scan_temporal(scan_id):
 	scan.tasks = remaining_tasks
 	scan.save()
 	
-	# Rebuild ctx
+	# Rebuild ctx — tasks must be in ctx so TargetProfilingActivity does not
+	# fall back to engine.tasks (the full original list) and reset the resume.
 	yaml_config = yaml.safe_load(scan.scan_type.yaml_configuration)
 	ctx = {
 		'scan_history_id': scan.id,
@@ -7399,6 +7409,7 @@ def resume_scan_temporal(scan_id):
 		'domain_id': scan.domain.id,
 		'results_dir': scan.results_dir,
 		'yaml_configuration': yaml_config,
+		'tasks': remaining_tasks,
 	}
 	
 	workflow_id = f"master-scan-{scan.id}-run-{scan.recovery_count}"
