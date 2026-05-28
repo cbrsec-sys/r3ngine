@@ -6,7 +6,7 @@ import basicSsl from '@vitejs/plugin-basic-ssl';
 export default defineConfig(({ command }) => ({
   plugins: [
     react(),
-    basicSsl()
+    basicSsl(),
   ],
   base: command === 'serve' ? '/' : '/staticfiles/',
   build: {
