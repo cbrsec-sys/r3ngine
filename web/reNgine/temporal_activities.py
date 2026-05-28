@@ -764,7 +764,7 @@ def parse_analysis_results_activity(ctx: dict) -> bool:
 # ===========================================================================
 
 @activity.defn(name="RunNucleiActivity")
-def run_nuclei_activity(ctx: dict) -> bool:
+def run_nuclei_activity(ctx: dict, severity: str = None) -> bool:
     """Run Nuclei vulnerability scan against all live endpoints discovered for this scan.
 
     Performs a pre-flight check against the EndPoint table before invoking nuclei_scan.
@@ -774,6 +774,7 @@ def run_nuclei_activity(ctx: dict) -> bool:
 
     Args:
         ctx (dict): Temporal workflow context containing scan_history_id and engine config.
+        severity (str, optional): The target severity level to filter the scan.
 
     Returns:
         bool: True on success (including graceful skip when no domain is found).
@@ -782,7 +783,8 @@ def run_nuclei_activity(ctx: dict) -> bool:
     from startScan.models import EndPoint, ScanHistory
 
     scan_id = ctx.get('scan_history_id')
-    activity.logger.info(f"[RunNucleiActivity] scan_id={scan_id}")
+    severity = severity or ctx.get('nuclei_severity_filter')
+    activity.logger.info(f"[RunNucleiActivity] scan_id={scan_id} severity={severity}")
 
     # Pre-flight: count endpoints in DB for this scan
     endpoint_count = EndPoint.objects.filter(scan_history_id=scan_id).count()
@@ -812,11 +814,14 @@ def run_nuclei_activity(ctx: dict) -> bool:
         # Let nuclei_scan call get_http_urls() to filter alive endpoints from DB
         urls = []
 
+    task_desc = f'Nuclei Scan ({severity})' if severity else 'Nuclei Scan'
+
     return _run_task(
         nuclei_scan, ctx,
         task_name='nuclei_scan',
-        description='Nuclei Scan',
-        urls=urls
+        description=task_desc,
+        urls=urls,
+        severity=severity
     )
 
 @activity.defn(name="RunCRLFuzzActivity")
@@ -866,6 +871,35 @@ def run_semgrep_activity(ctx: dict) -> bool:
     from reNgine.tasks import semgrep_scan
     activity.logger.info(f"[RunSemgrepActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(semgrep_scan, ctx, task_name='semgrep_scan', description='Semgrep Vulnerability Scan', mode='vulnerability')
+
+
+@activity.defn(name="MarkVulnerabilityScanCompleteActivity")
+def mark_vulnerability_scan_complete_activity(ctx: dict) -> None:
+    """Write a SUCCESS ScanActivity with name='vulnerability_scan'.
+
+    NucleiPlannerWorkflow runs as a child workflow whose internal activities
+    use names like 'nuclei_scan', 'crlfuzz_scan', etc. — never 'vulnerability_scan'.
+    Without this record, resume_scan_temporal always considers vulnerability_scan
+    incomplete and re-runs it from scratch on crash recovery.
+    """
+    from startScan.models import ScanHistory, ScanActivity
+    from reNgine.definitions import SUCCESS_TASK
+    from django.utils import timezone
+
+    scan_id = ctx.get('scan_history_id')
+    scan = ScanHistory.objects.filter(pk=scan_id).first()
+    if not scan:
+        return
+    ScanActivity.objects.get_or_create(
+        scan_of=scan,
+        name='vulnerability_scan',
+        defaults={
+            'title': 'Vulnerability Scan',
+            'time': timezone.now(),
+            'status': SUCCESS_TASK,
+        }
+    )
+    activity.logger.info(f"[MarkVulnerabilityScanCompleteActivity] scan_id={scan_id} marked complete")
 
 
 @activity.defn(name="RunWAFBypassActivity")
