@@ -285,6 +285,19 @@ class MasterScanWorkflow:
                     )
                 )
 
+            vigolium_discovery_config = yaml_config.get('vigolium_discovery', {})
+            if vigolium_discovery_config.get('run_vigolium_discovery', True):
+                tier2_futures.append(
+                    workflow.execute_activity(
+                        "RunVigoliumDiscoveryActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(hours=3),
+                        heartbeat_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_LONG_SCAN,
+                        task_queue="python-orchestrator-queue"
+                    )
+                )
+
             await asyncio.gather(*tier2_futures)
 
             # ------------------------------------------------------------------
@@ -363,6 +376,19 @@ class MasterScanWorkflow:
                 analysis_futures.append(
                     workflow.execute_activity(
                         "RunSecretScanningActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(hours=2),
+                        heartbeat_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_LONG_SCAN,
+                        task_queue="python-orchestrator-queue"
+                    )
+                )
+
+            vigolium_analysis_config = yaml_config.get('vigolium_analysis', {})
+            if vigolium_analysis_config.get('run_vigolium_analysis', True):
+                analysis_futures.append(
+                    workflow.execute_activity(
+                        "RunVigoliumAnalysisActivity",
                         ctx,
                         start_to_close_timeout=timedelta(hours=2),
                         heartbeat_timeout=timedelta(minutes=5),
@@ -655,6 +681,16 @@ class NucleiPlannerWorkflow:
         if leaks_config.get('run_semgrep', True):
             await workflow.execute_activity("RunSemgrepActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
 
+        if vuln_config.get('run_vigolium', True):
+            await workflow.execute_activity(
+                "RunVigoliumScanActivity",
+                ctx,
+                start_to_close_timeout=timedelta(hours=4),
+                heartbeat_timeout=timedelta(minutes=5),
+                retry_policy=_RETRY_LONG_SCAN,
+                task_queue="python-orchestrator-queue"
+            )
+
         # Write a ScanActivity(name='vulnerability_scan', status=SUCCESS) so that
         # resume_scan_temporal can recognise this compound task as complete and
         # skip it on crash recovery, instead of restarting the whole vuln scan.
@@ -844,6 +880,7 @@ class SubScanWorkflow:
             # Determine target url
             subdomain_http_url = ctx.get('subdomain_http_url')
             target_url = subdomain_http_url or f"http://{subdomain_name}/"
+            yaml_config = ctx.get('yaml_configuration', {})
 
             # Parse task-specific subscan IDs to track individual task status
             subscans_info = ctx.get('subscans_info', [])
@@ -963,15 +1000,10 @@ class SubScanWorkflow:
 
             # Execute tiers sequentially, running tasks within each tier concurrently
             for tier_index, tier_tasks in enumerate(tiers, start=1):
-                if not tier_tasks:
-                    continue
-
-                workflow.logger.info(
-                    f"[SubScanWorkflow] Executing Tier {tier_index} tasks: {tier_tasks}"
-                )
-
-                # Execute concurrent tasks within the current tier
+                # Build futures list before the guard so vigolium appends can add work
+                # even when no standard tasks exist in this tier.
                 tier_futures = []
+
                 for t in tier_tasks:
                     if t == "http_crawl":
                         # Build the per-task context with the correct subscan_id for http_crawl.
@@ -1009,6 +1041,43 @@ class SubScanWorkflow:
                         tier_futures.append(_http_crawl_branch_tracked())
                     else:
                         tier_futures.append(run_and_track_task(t))
+
+                # Vigolium discovery runs alongside Tier 2 (HTTP crawl / port scan)
+                if tier_index == 2:
+                    vigolium_discovery_config = yaml_config.get('vigolium_discovery', {})
+                    if vigolium_discovery_config.get('run_vigolium_discovery', True):
+                        tier_futures.append(
+                            workflow.execute_activity(
+                                "RunVigoliumDiscoveryActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(hours=3),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_LONG_SCAN,
+                                task_queue="python-orchestrator-queue"
+                            )
+                        )
+
+                # Vigolium analysis runs alongside Tier 5 (web_api_discovery, waf_detection, secret_scanning)
+                elif tier_index == 5:
+                    vigolium_analysis_config = yaml_config.get('vigolium_analysis', {})
+                    if vigolium_analysis_config.get('run_vigolium_analysis', True):
+                        tier_futures.append(
+                            workflow.execute_activity(
+                                "RunVigoliumAnalysisActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(hours=2),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_LONG_SCAN,
+                                task_queue="python-orchestrator-queue"
+                            )
+                        )
+
+                if not tier_futures:
+                    continue
+
+                workflow.logger.info(
+                    f"[SubScanWorkflow] Executing Tier {tier_index} tasks: {tier_tasks}"
+                )
 
                 await asyncio.gather(*tier_futures)
 
