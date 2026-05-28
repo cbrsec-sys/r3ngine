@@ -7,6 +7,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>r3ngine | Codename Phoenix</title>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/lipis/flag-icons@7.2.3/css/flag-icons.min.css" />
+  
+  <script type="importmap">
+    {
+      "imports": {
+        "react": "{% if VITE_ENABLED %}/react-shim.js{% else %}/staticfiles/react-shim.js{% endif %}",
+        "react-dom": "{% if VITE_ENABLED %}/react-dom-shim.js{% else %}/staticfiles/react-dom-shim.js{% endif %}"
+      }
+    }
+  </script>
+
   {% if VITE_ENABLED %}
     <!-- Vite dev server in DEBUG mode -->
     <script type="module">

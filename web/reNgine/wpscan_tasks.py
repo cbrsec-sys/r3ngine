@@ -85,9 +85,6 @@ def save_finding(task_instance, finding, subdomain, default_title):
         'cve_ids': cve_ids
     }
 
-    if record_exists(Vulnerability, data={'subdomain': subdomain, 'name': title, 'description': description}):
-        return
-
     save_vulnerability(
         target_domain=task_instance.domain,
         http_url=f"http://{subdomain.name}",

@@ -3675,19 +3675,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 			target_domain=self.domain
 		)
 
-		# Look for duplicate vulnerabilities by excluding records that might change but are irrelevant.
-		object_comparison_exclude = ['response', 'curl_command', 'tags', 'references', 'cve_ids', 'cwe_ids']
-
-		# Add subdomain and target domain to the duplicate check
-		vuln_data_copy = vuln_data.copy()
-		vuln_data_copy['subdomain'] = subdomain
-		vuln_data_copy['target_domain'] = self.domain
-
-		# Check if record exists, if exists do not save it
 		severity_value = line['info'].get('severity', 'unknown')
-		if record_exists(Vulnerability, data=vuln_data_copy, exclude_keys=object_comparison_exclude):
-			logger.warning(f'Nuclei vulnerability of severity {severity_value} : {vuln_data_copy["name"]} for {subdomain_name} already exists')
-			continue
 
 		# Get or create EndPoint object
 		response = line.get('response')
@@ -3720,14 +3708,14 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 			)
 
 		# Get or create Vulnerability object
-		vuln, _ = save_vulnerability(
+		vuln, created = save_vulnerability(
 			target_domain=self.domain,
 			http_url=http_url,
 			scan_history=self.scan,
 			subscan=self.subscan,
 			subdomain=subdomain,
 			**vuln_data)
-		if not vuln:
+		if not vuln or not created:
 			continue
 
 		# Print vuln
