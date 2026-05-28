@@ -91,13 +91,12 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # Install bun (needed for vigolium-audit and jsscan embedded binary builds)
-RUN curl -fsSL https://bun.sh/install | bash
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.34"
 ENV PATH="/root/.bun/bin:${PATH}"
 ENV GO111MODULE=on
 
 # Clone vigolium at the pinned release tag
-RUN git clone --depth 1 --branch v0.1.15-beta https://github.com/vigolium/vigolium /build/vigolium 2>/dev/null || \
-    git clone --depth 1 https://github.com/vigolium/vigolium /build/vigolium
+RUN git clone --depth 1 --branch v0.1.15-beta https://github.com/vigolium/vigolium /build/vigolium
 
 WORKDIR /build/vigolium
 
