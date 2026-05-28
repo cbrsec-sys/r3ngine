@@ -1,5 +1,5 @@
 from django.test import TestCase
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 
 class VigoliumDefinitionsTest(TestCase):
@@ -209,6 +209,7 @@ class VigoliumTaskGatingTest(TestCase):
         task = self._make_task(vuln_enabled=True)
         with patch('reNgine.vigolium_tasks._run_vigolium_phase') as mock_run, \
              patch('os.makedirs'), \
+             patch('builtins.open', mock_open()), \
              patch('reNgine.vigolium_tasks.Subdomain'):
             vigolium_scan(task, urls=['https://example.com'])
             mock_run.assert_called_once()

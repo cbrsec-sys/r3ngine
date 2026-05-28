@@ -150,12 +150,14 @@ def _run_vigolium_phase(task_instance, cmd, output_file, phase_label, save_http_
     logger.info(f"Vigolium {phase_label} complete — {findings_saved} findings, {endpoints_saved} endpoints saved")
 
 
-def vigolium_scan(self, urls=[], ctx={}, description=None):
+def vigolium_scan(self, urls=None, ctx={}, description=None):
     """Run vigolium known-issue + dynamic-assessment scan against discovered endpoints.
 
     Runs inside NucleiPlannerWorkflow at Tier 6 alongside nuclei. Reads from
     the passed URL list or falls back to get_http_urls() from the endpoint DB.
     """
+    if urls is None:
+        urls = []
     logger.info("Starting Vigolium Vulnerability Scan")
 
     vuln_config = self.yaml_configuration.get(VULNERABILITY_SCAN, {})
