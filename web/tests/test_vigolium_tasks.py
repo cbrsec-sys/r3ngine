@@ -158,3 +158,64 @@ class VigoliumParserTest(TestCase):
         with patch('reNgine.vigolium_tasks.save_endpoint') as mock_save:
             parse_vigolium_http_record(task, {'method': 'GET'})
             mock_save.assert_not_called()
+
+
+class VigoliumTaskGatingTest(TestCase):
+    def _make_task(self, vuln_enabled=True, discovery_enabled=True, analysis_enabled=True):
+        task = MagicMock()
+        task.scan_id = 1
+        task.activity_id = 1
+        task.domain_id = 1
+        task.scan = MagicMock()
+        task.scan.results_dir = '/tmp/test_scan'
+        task.scan.domain = MagicMock()
+        task.scan.domain.name = 'example.com'
+        task.domain = MagicMock()
+        task.subscan = None
+        task.subdomain = None
+        task.yaml_configuration = {
+            'vulnerability_scan': {
+                'run_vigolium': vuln_enabled,
+                'vigolium': {'strategy': 'balanced', 'concurrency': 50, 'rate_limit': 100, 'timeout': '15s'},
+            },
+            'vigolium_discovery': {'run_vigolium_discovery': discovery_enabled},
+            'vigolium_analysis': {'run_vigolium_analysis': analysis_enabled},
+        }
+        return task
+
+    def test_vigolium_scan_skips_when_disabled(self):
+        from reNgine.vigolium_tasks import vigolium_scan
+        task = self._make_task(vuln_enabled=False)
+        with patch('reNgine.vigolium_tasks._run_vigolium_phase') as mock_run:
+            vigolium_scan(task)
+            mock_run.assert_not_called()
+
+    def test_vigolium_discovery_skips_when_disabled(self):
+        from reNgine.vigolium_tasks import vigolium_discovery
+        task = self._make_task(discovery_enabled=False)
+        with patch('reNgine.vigolium_tasks._run_vigolium_phase') as mock_run:
+            vigolium_discovery(task)
+            mock_run.assert_not_called()
+
+    def test_vigolium_analysis_skips_when_disabled(self):
+        from reNgine.vigolium_tasks import vigolium_analysis
+        task = self._make_task(analysis_enabled=False)
+        with patch('reNgine.vigolium_tasks._run_vigolium_phase') as mock_run:
+            vigolium_analysis(task)
+            mock_run.assert_not_called()
+
+    def test_vigolium_scan_calls_phase_runner(self):
+        from reNgine.vigolium_tasks import vigolium_scan
+        task = self._make_task(vuln_enabled=True)
+        with patch('reNgine.vigolium_tasks._run_vigolium_phase') as mock_run, \
+             patch('os.makedirs'), \
+             patch('reNgine.vigolium_tasks.Subdomain'):
+            vigolium_scan(task, urls=['https://example.com'])
+            mock_run.assert_called_once()
+            # Verify the command includes the correct phases
+            call_args = mock_run.call_args
+            cmd = call_args[0][1]
+            self.assertIn('--only known-issue-scan,dynamic-assessment', cmd)
+            self.assertIn('--stateless', cmd)
+            self.assertIn('--skip-dependency-check', cmd)
+            self.assertIn('--omit-response', cmd)
