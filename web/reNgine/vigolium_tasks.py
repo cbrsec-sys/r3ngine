@@ -148,3 +148,192 @@ def _run_vigolium_phase(task_instance, cmd, output_file, phase_label, save_http_
             endpoints_saved += 1
 
     logger.info(f"Vigolium {phase_label} complete — {findings_saved} findings, {endpoints_saved} endpoints saved")
+
+
+def vigolium_scan(self, urls=[], ctx={}, description=None):
+    """Run vigolium known-issue + dynamic-assessment scan against discovered endpoints.
+
+    Runs inside NucleiPlannerWorkflow at Tier 6 alongside nuclei. Reads from
+    the passed URL list or falls back to get_http_urls() from the endpoint DB.
+    """
+    logger.info("Starting Vigolium Vulnerability Scan")
+
+    vuln_config = self.yaml_configuration.get(VULNERABILITY_SCAN, {})
+    if not vuln_config.get(RUN_VIGOLIUM, True):
+        logger.info("Vigolium scan disabled in configuration. Skipping.")
+        return
+
+    vig_config = vuln_config.get(VIGOLIUM, {})
+    strategy = vig_config.get(VIGOLIUM_STRATEGY, 'balanced')
+    concurrency = vig_config.get(VIGOLIUM_CONCURRENCY, 50)
+    rate_limit = vig_config.get(VIGOLIUM_RATE_LIMIT, 100)
+    timeout = vig_config.get(VIGOLIUM_TIMEOUT, '15s')
+    modules = vig_config.get(VIGOLIUM_MODULES, [])
+    severity_filter = vig_config.get(VIGOLIUM_SEVERITY_FILTER, [])
+
+    if urls:
+        target_urls = urls
+    else:
+        from reNgine.common_func import get_http_urls
+        target_urls = get_http_urls(self.scan_id)
+
+    if not target_urls:
+        if self.scan and self.scan.domain:
+            target_urls = [f"https://{self.scan.domain.name}"]
+        else:
+            logger.warning("Vigolium scan: no targets found. Skipping.")
+            return
+
+    results_dir = f"{self.scan.results_dir}/vigolium/vuln"
+    os.makedirs(results_dir, exist_ok=True)
+
+    targets_file = f"{results_dir}/targets.txt"
+    with open(targets_file, 'w') as f:
+        for url in target_urls:
+            f.write(f"{url}\n")
+
+    output_file = f"{results_dir}/findings.jsonl"
+
+    cmd = (
+        f"vigolium scan"
+        f" -T {targets_file}"
+        f" --stateless"
+        f" --format jsonl"
+        f" -o {output_file}"
+        f" --only known-issue-scan,dynamic-assessment"
+        f" -c {concurrency}"
+        f" -r {rate_limit}"
+        f" --timeout {timeout}"
+        f" --strategy {strategy}"
+        f" --skip-dependency-check"
+        f" --omit-response"
+    )
+
+    if modules:
+        cmd += f" -m {','.join(modules)}"
+    if severity_filter:
+        cmd += f" --known-issue-scan-severities {','.join(severity_filter)}"
+
+    proxy = get_random_proxy()
+    if proxy:
+        cmd += f" --proxy {proxy}"
+
+    _run_vigolium_phase(self, cmd, output_file, "Vulnerability Scan", save_http_records=False)
+    return "Vigolium scan completed"
+
+
+def vigolium_discovery(self, ctx={}, description=None):
+    """Run vigolium endpoint discovery for each subdomain at Tier 2.
+
+    Runs the ingestion + discovery phases to find paths and endpoints that
+    feed the endpoint DB before Tier 3-6 processing. Saves http_records as
+    EndPoint entries for downstream pipeline stages to consume.
+    """
+    logger.info("Starting Vigolium Discovery")
+
+    discovery_config = self.yaml_configuration.get('vigolium_discovery', {})
+    if not discovery_config.get(RUN_VIGOLIUM_DISCOVERY, True):
+        logger.info("Vigolium discovery disabled in configuration. Skipping.")
+        return
+
+    strategy = discovery_config.get(VIGOLIUM_STRATEGY, 'balanced')
+    concurrency = discovery_config.get(VIGOLIUM_CONCURRENCY, 20)
+    rate_limit = discovery_config.get(VIGOLIUM_RATE_LIMIT, 50)
+    timeout = discovery_config.get(VIGOLIUM_TIMEOUT, '10s')
+
+    if self.subscan and self.subdomain:
+        subdomains = Subdomain.objects.filter(pk=self.subdomain.id)
+    else:
+        subdomains = Subdomain.objects.filter(scan_history=self.scan)
+
+    if not subdomains.exists():
+        logger.info("No subdomains found for Vigolium discovery.")
+        return
+
+    results_dir = f"{self.scan.results_dir}/vigolium/discovery"
+    os.makedirs(results_dir, exist_ok=True)
+
+    for subdomain in subdomains:
+        target = f"https://{subdomain.name}"
+        output_file = f"{results_dir}/{subdomain.name}_discovery.jsonl"
+
+        cmd = (
+            f"vigolium scan"
+            f" -t {target}"
+            f" --stateless"
+            f" --format jsonl"
+            f" -o {output_file}"
+            f" --only ingestion,discovery"
+            f" -c {concurrency}"
+            f" -r {rate_limit}"
+            f" --timeout {timeout}"
+            f" --strategy {strategy}"
+            f" --skip-dependency-check"
+        )
+
+        proxy = get_random_proxy()
+        if proxy:
+            cmd += f" --proxy {proxy}"
+
+        _run_vigolium_phase(self, cmd, output_file, f"Discovery ({subdomain.name})", save_http_records=True)
+
+    return "Vigolium discovery completed"
+
+
+def vigolium_analysis(self, ctx={}, description=None):
+    """Run vigolium dynamic assessment for each subdomain at Tier 5.
+
+    Runs the dynamic-assessment phase (passive + active module scanning)
+    in parallel with web_api_discovery to find security weaknesses.
+    Saves findings as Vulnerability records and discovered URLs as EndPoints.
+    """
+    logger.info("Starting Vigolium Dynamic Analysis")
+
+    analysis_config = self.yaml_configuration.get('vigolium_analysis', {})
+    if not analysis_config.get(RUN_VIGOLIUM_ANALYSIS, True):
+        logger.info("Vigolium analysis disabled in configuration. Skipping.")
+        return
+
+    strategy = analysis_config.get(VIGOLIUM_STRATEGY, 'balanced')
+    concurrency = analysis_config.get(VIGOLIUM_CONCURRENCY, 20)
+    rate_limit = analysis_config.get(VIGOLIUM_RATE_LIMIT, 50)
+    timeout = analysis_config.get(VIGOLIUM_TIMEOUT, '10s')
+
+    if self.subscan and self.subdomain:
+        subdomains = Subdomain.objects.filter(pk=self.subdomain.id)
+    else:
+        subdomains = Subdomain.objects.filter(scan_history=self.scan)
+
+    if not subdomains.exists():
+        logger.info("No subdomains found for Vigolium analysis.")
+        return
+
+    results_dir = f"{self.scan.results_dir}/vigolium/analysis"
+    os.makedirs(results_dir, exist_ok=True)
+
+    for subdomain in subdomains:
+        target = f"https://{subdomain.name}"
+        output_file = f"{results_dir}/{subdomain.name}_analysis.jsonl"
+
+        cmd = (
+            f"vigolium scan"
+            f" -t {target}"
+            f" --stateless"
+            f" --format jsonl"
+            f" -o {output_file}"
+            f" --only dynamic-assessment"
+            f" -c {concurrency}"
+            f" -r {rate_limit}"
+            f" --timeout {timeout}"
+            f" --strategy {strategy}"
+            f" --skip-dependency-check"
+            f" --omit-response"
+        )
+
+        proxy = get_random_proxy()
+        if proxy:
+            cmd += f" --proxy {proxy}"
+
+        _run_vigolium_phase(self, cmd, output_file, f"Analysis ({subdomain.name})", save_http_records=True)
+
+    return "Vigolium analysis completed"
