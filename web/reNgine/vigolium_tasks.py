@@ -102,7 +102,7 @@ def parse_vigolium_http_record(task_instance, record_data):
         ctx=ctx,
         crawl=False,
         is_default=False,
-        http_status=record_data.get('status_code'),
+        http_status=record_data.get('status_code') or 0,
         method=record_data.get('method', 'GET'),
     )
 
@@ -137,13 +137,11 @@ def _run_vigolium_phase(task_instance, cmd, output_file, phase_label, save_http_
             subdomain = Subdomain.objects.filter(
                 scan_history=task_instance.scan, name=hostname
             ).first()
-            if not subdomain:
-                subdomain = Subdomain.objects.filter(scan_history=task_instance.scan).first()
             if subdomain:
                 parse_vigolium_finding(task_instance, data, subdomain)
                 findings_saved += 1
             else:
-                logger.warning(f"Vigolium {phase_label}: no subdomain found for {hostname}, skipping finding.")
+                logger.warning(f"Vigolium {phase_label}: no subdomain found for '{hostname}', skipping finding.")
 
         elif record_type == 'http_record' and save_http_records:
             parse_vigolium_http_record(task_instance, data)
