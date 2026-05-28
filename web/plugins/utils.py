@@ -127,8 +127,8 @@ class PluginManager:
         if os.path.exists(final_dir):
             shutil.rmtree(final_dir)
             
-        # 2. Delete from media root
-        media_plugin_dir = os.path.join(settings.MEDIA_ROOT, 'plugins', plugin_slug)
+        # 2. Delete from staticfiles
+        media_plugin_dir = os.path.join(settings.STATIC_ROOT, 'plugins', plugin_slug)
         if os.path.exists(media_plugin_dir):
             shutil.rmtree(media_plugin_dir)
 
@@ -215,7 +215,7 @@ class AtomicInstaller:
             
             # 2. Prepare FS Backups
             final_dir = os.path.join(PluginManager.BASE_PLUGINS_DIR, plugin_slug)
-            media_plugin_dir = os.path.join(settings.MEDIA_ROOT, 'plugins', plugin_slug)
+            media_plugin_dir = os.path.join(settings.STATIC_ROOT, 'plugins', plugin_slug)
             
             if os.path.exists(final_dir):
                 backup_fs_dir = f"{final_dir}_bak_{int(time.time())}"
