@@ -220,3 +220,15 @@ class VigoliumTaskGatingTest(TestCase):
             self.assertIn('--stateless', cmd)
             self.assertIn('--skip-dependency-check', cmd)
             self.assertIn('--omit-response', cmd)
+
+
+class VigoliumActivitiesTest(TestCase):
+    def test_activities_are_importable(self):
+        from reNgine.temporal_activities import (
+            run_vigolium_scan_activity,
+            run_vigolium_discovery_activity,
+            run_vigolium_analysis_activity,
+        )
+        self.assertTrue(callable(run_vigolium_scan_activity))
+        self.assertTrue(callable(run_vigolium_discovery_activity))
+        self.assertTrue(callable(run_vigolium_analysis_activity))

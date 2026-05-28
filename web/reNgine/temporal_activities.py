@@ -873,6 +873,44 @@ def run_semgrep_activity(ctx: dict) -> bool:
     return _run_task(semgrep_scan, ctx, task_name='semgrep_scan', description='Semgrep Vulnerability Scan', mode='vulnerability')
 
 
+@activity.defn(name="RunVigoliumScanActivity")
+def run_vigolium_scan_activity(ctx: dict) -> bool:
+    """Run Vigolium known-issue + dynamic-assessment scan against live endpoints.
+
+    Runs inside NucleiPlannerWorkflow at Tier 6 alongside Nuclei. Default-enabled
+    via vulnerability_scan.run_vigolium: true in the engine YAML config.
+    """
+    from reNgine.vigolium_tasks import vigolium_scan
+    activity.logger.info(f"[RunVigoliumScanActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(vigolium_scan, ctx, task_name='vigolium_scan', description='Vigolium Vulnerability Scan')
+
+
+@activity.defn(name="RunVigoliumDiscoveryActivity")
+def run_vigolium_discovery_activity(ctx: dict) -> bool:
+    """Run Vigolium discovery phase to seed the endpoint DB.
+
+    Runs at Tier 2 in parallel with http_crawl. Populates EndPoint records
+    with URLs discovered by vigolium's ingestion + discovery phases.
+    Controlled by vigolium_discovery.run_vigolium_discovery in engine YAML.
+    """
+    from reNgine.vigolium_tasks import vigolium_discovery
+    activity.logger.info(f"[RunVigoliumDiscoveryActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(vigolium_discovery, ctx, task_name='vigolium_discovery', description='Vigolium Endpoint Discovery')
+
+
+@activity.defn(name="RunVigoliumAnalysisActivity")
+def run_vigolium_analysis_activity(ctx: dict) -> bool:
+    """Run Vigolium dynamic-assessment phase at Tier 5.
+
+    Runs in parallel with web_api_discovery. Executes vigolium's 251-module
+    passive + active scanning suite and saves findings as Vulnerability records.
+    Controlled by vigolium_analysis.run_vigolium_analysis in engine YAML.
+    """
+    from reNgine.vigolium_tasks import vigolium_analysis
+    activity.logger.info(f"[RunVigoliumAnalysisActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(vigolium_analysis, ctx, task_name='vigolium_analysis', description='Vigolium Dynamic Analysis')
+
+
 @activity.defn(name="MarkVulnerabilityScanCompleteActivity")
 def mark_vulnerability_scan_complete_activity(ctx: dict) -> None:
     """Write a SUCCESS ScanActivity with name='vulnerability_scan'.
