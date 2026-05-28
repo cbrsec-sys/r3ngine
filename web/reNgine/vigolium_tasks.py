@@ -103,7 +103,6 @@ def parse_vigolium_http_record(task_instance, record_data):
         crawl=False,
         is_default=False,
         http_status=record_data.get('status_code') or 0,
-        method=record_data.get('method', 'GET'),
     )
 
 
