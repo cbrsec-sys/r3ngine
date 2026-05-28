@@ -83,8 +83,10 @@
   - Moved the visual screenshotting task (`screenshot`) from Tier 2 (parallel to HTTP Crawl & Port Scanning) to Tier 6 (parallel to Vulnerability Scanning).
   - This ensures that crawling, URL fetching, and directory/file fuzzing have completely finished execution, allowing a comprehensive set of alive endpoints to be gathered before screenshots are captured.
 
-- **Nuclei Scan Optimization & Stability**:
-  - Optimized the `nuclei_scan` engine to execute in a single concurrent pass, replacing the inefficient 6-pass sequential severity loop.
+- **Nuclei Scan Sequential Severity Execution**:
+  - Re-implemented nuclei scanning to run sequentially per configured severity level inside the `NucleiPlannerWorkflow`.
+  - Updated `RunNucleiActivity` to accept a `severity` parameter and reflect it in the UI activity status (e.g. `Nuclei Scan (critical)`).
+  - Configured `nuclei_scan` in `tasks.py` to isolate intermediate target endpoints and unfurl files by suffixing them with the active severity level (e.g. `input_endpoints_vulnerability_scan_{severity}.txt`) to prevent disk writes collision.
   - Re-enabled the `-tags` parameter which was previously dropped, ensuring only relevant checks are executed against the target stack.
   - Implemented dynamic fallback to the target root domain in the event that `Subdomain` queries return empty results during parameter resolution.
   - Gated the intensive `nuclei -update-templates` step behind the `auto_update_templates` boolean configuration.

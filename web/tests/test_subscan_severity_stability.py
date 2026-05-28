@@ -187,3 +187,62 @@ class TestSubscanSeverityStability(TestCase):
         self.assertLess(duration, 4.0) # Allow slight buffer for thread scheduling
         # Also confirm the Command database object was updated with a return code indicating termination/killed status
         mock_cmd_obj.save.assert_called()
+
+    def test_save_vulnerability_deduplication(self):
+        """
+        Verify that save_vulnerability correctly deduplicates findings based on core identity
+        (name, scan_history, subdomain, http_url) and updates volatile fields in-place.
+        """
+        from reNgine.common_func import save_vulnerability
+
+        vuln_name = "Centralized Deduplication Test Vuln"
+        http_url = "http://target.stability.test.local/vuln"
+
+        # 1. Save first instance
+        vuln1, created1 = save_vulnerability(
+            target_domain=self.domain,
+            scan_history=self.scan,
+            subdomain=self.subdomain,
+            http_url=http_url,
+            name=vuln_name,
+            severity=3,
+            description="Initial description",
+            curl_command="curl -X GET http://target.stability.test.local/vuln"
+        )
+        self.assertTrue(created1)
+        self.assertEqual(vuln1.description, "Initial description")
+
+        # 2. Save duplicate instance (same identity, different volatile fields)
+        vuln2, created2 = save_vulnerability(
+            target_domain=self.domain,
+            scan_history=self.scan,
+            subdomain=self.subdomain,
+            http_url=http_url,
+            name=vuln_name,
+            severity=3,
+            description="Updated description showing deduplication works",
+            curl_command="curl -X POST http://target.stability.test.local/vuln"
+        )
+        self.assertFalse(created2)
+        self.assertEqual(vuln1.id, vuln2.id)
+
+        # 3. Assert DB only has 1 record for this scan, and it has the updated description
+        db_vulns = Vulnerability.objects.filter(scan_history=self.scan, name=vuln_name)
+        self.assertEqual(db_vulns.count(), 1)
+        self.assertEqual(db_vulns.first().description, "Updated description showing deduplication works")
+
+        # 4. Save vulnerability for a different URL - should create a new record
+        vuln3, created3 = save_vulnerability(
+            target_domain=self.domain,
+            scan_history=self.scan,
+            subdomain=self.subdomain,
+            http_url="http://target.stability.test.local/other-vuln",
+            name=vuln_name,
+            severity=3,
+            description="Different url description",
+            curl_command="curl -X GET http://target.stability.test.local/other-vuln"
+        )
+        self.assertTrue(created3)
+        self.assertNotEqual(vuln1.id, vuln3.id)
+        self.assertEqual(Vulnerability.objects.filter(scan_history=self.scan, name=vuln_name).count(), 2)
+
