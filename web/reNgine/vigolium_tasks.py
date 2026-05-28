@@ -17,7 +17,7 @@ from reNgine.definitions import (
     VULNERABILITY_SCAN,
 )
 from reNgine.common_func import get_random_proxy, save_vulnerability
-from reNgine.tasks import save_endpoint
+from reNgine.utils.task import save_endpoint
 from startScan.models import Subdomain
 
 logger = logging.getLogger(__name__)
@@ -93,12 +93,17 @@ def parse_vigolium_http_record(task_instance, record_data):
     if not url:
         return
 
+    ctx = {
+        'scan_history_id': task_instance.scan_id,
+        'domain_id': getattr(task_instance, 'domain_id', None),
+    }
     save_endpoint(
         http_url=url,
-        scan_history=task_instance.scan,
-        target_domain=task_instance.domain,
-        method=record_data.get('method', 'GET'),
+        ctx=ctx,
+        crawl=False,
+        is_default=False,
         http_status=record_data.get('status_code'),
+        method=record_data.get('method', 'GET'),
     )
 
 
