@@ -42,6 +42,7 @@ class VigoliumParserTest(TestCase):
         task = MagicMock()
         task.scan_id = 1
         task.activity_id = 1
+        task.domain_id = 1
         task.scan = MagicMock()
         task.scan.results_dir = '/tmp/test_scan'
         task.domain = MagicMock()
