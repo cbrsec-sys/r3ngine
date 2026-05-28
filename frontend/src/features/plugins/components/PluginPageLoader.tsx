@@ -25,7 +25,7 @@ const PluginPageLoader: React.FC<Props> = ({ pluginSlug, exportName, ...rest }) 
 
     const load = async () => {
       try {
-        const moduleUrl = `/media/plugins/${pluginSlug}/ui/index.js?v=${Date.now()}`;
+        const moduleUrl = `/staticfiles/plugins/${pluginSlug}/ui/index.js?v=${Date.now()}`;
         const mod = await import(/* @vite-ignore */ moduleUrl) as Record<string, unknown>;
 
         if (cancelled) return;
