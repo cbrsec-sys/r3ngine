@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 ROUTED_TOOLS = {
     'semgrep', 'nuclei', 'ffuf', 'naabu', 'amass', 'subfinder', 'httpx',
     'dalfox', 'crlfuzz', 's3scanner', 'dirsearch', 'gospider', 'gau',
-    'waybackurls', 'hakrawler', 'tlsx', 'katana', 'aquatone', 'nmap',
+    'waybackurls', 'hakrawler', 'tlsx', 'katana', 'aquatone', 'nmap', 'vigolium',
     'sslscan', 'ike-scan', 'hping3', 'wrk', 'k6', 'brutus', 'wpscan'
 }
 
