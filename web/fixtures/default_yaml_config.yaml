@@ -93,6 +93,7 @@ vulnerability_scan: {
   'run_s3scanner': false,
   'enable_http_crawl': true,
   'run_acunetix': false,
+  'run_vigolium': true,
   'concurrency': 50,
   'intensity': 'normal',
   'rate_limit': 150,
@@ -106,6 +107,14 @@ vulnerability_scan: {
     # 'templates': [],            # Nuclei templates (https://github.com/projectdiscovery/nuclei-templates)
     # 'custom_templates': []      # Nuclei custom templates uploaded in reNgine
   },
+  'vigolium': {
+    'strategy': 'balanced',
+    'concurrency': 50,
+    'rate_limit': 100,
+    'timeout': '15s',
+    # 'modules': [],              # Restrict to specific vigolium module IDs
+    # 'severity_filter': []       # e.g. ['high', 'critical']
+  },
   'cpanel_scanner': {
     'run_cpanel2shell': true,
     'cpanel_user_wordlist': '/usr/src/app/wordlist/auth/cpanel_users.txt',
@@ -114,6 +123,22 @@ vulnerability_scan: {
   'run_wpscan': true,
   'wpscan_enumeration': 'vp,vt,u',
   'wpscan_detection_mode': 'mixed'
+}
+
+vigolium_discovery: {
+  'run_vigolium_discovery': true,
+  'strategy': 'balanced',
+  'concurrency': 20,
+  'rate_limit': 50,
+  'timeout': '10s'
+}
+
+vigolium_analysis: {
+  'run_vigolium_analysis': true,
+  'strategy': 'balanced',
+  'concurrency': 20,
+  'rate_limit': 50,
+  'timeout': '10s'
 }
 
 leaks_and_secrets: {
