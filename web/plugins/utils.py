@@ -14,6 +14,10 @@ from django.core.management import call_command
 import requests
 from django.core.cache import cache
 import logging
+try:
+    from .plugin_keys import TRUSTED_PUBLIC_KEYS
+except ImportError:
+    TRUSTED_PUBLIC_KEYS: list[bytes] = []
 from .models import Plugin
 
 logger = logging.getLogger(__name__)
@@ -131,6 +135,57 @@ class PluginManager:
         final_dir = os.path.join(cls.BASE_PLUGINS_DIR, plugin_slug)
         if os.path.exists(final_dir):
             shutil.rmtree(final_dir)
+
+    @classmethod
+    def verify_r3n(cls, r3n_path):
+        """Open a .r3n file, verify content hash and optional Ed25519 signature.
+
+        Returns (plugin_zip_bytes, meta_dict, verification_result) where
+        verification_result is one of: 'official' | 'signed_unknown' | 'unsigned'.
+        Raises ValueError on hash mismatch or invalid signature.
+        """
+        import hashlib
+        import base64
+        import json
+        import io as _io
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        from cryptography.exceptions import InvalidSignature
+
+        with open(r3n_path, 'rb') as f:
+            r3n_bytes = f.read()
+
+        with zipfile.ZipFile(_io.BytesIO(r3n_bytes), 'r') as r3n_zip:
+            names = r3n_zip.namelist()
+            if 'r3n_manifest.json' not in names:
+                raise ValueError("Not a valid .r3n file: missing r3n_manifest.json")
+            if 'plugin.zip' not in names:
+                raise ValueError("Not a valid .r3n file: missing plugin.zip")
+            meta = json.loads(r3n_zip.read('r3n_manifest.json'))
+            plugin_zip_bytes = r3n_zip.read('plugin.zip')
+
+        actual_hash = hashlib.sha256(plugin_zip_bytes).hexdigest()
+        if actual_hash != meta.get('content_hash'):
+            raise ValueError("Content hash mismatch — archive may be tampered")
+
+        raw_sig = meta.get('signature')
+        raw_pub = meta.get('public_key')
+
+        if not raw_sig or not raw_pub:
+            return plugin_zip_bytes, meta, 'unsigned'
+
+        try:
+            pub_key_bytes = base64.b64decode(raw_pub)
+            sig_bytes = base64.b64decode(raw_sig)
+            pub_key = Ed25519PublicKey.from_public_bytes(pub_key_bytes)
+            pub_key.verify(sig_bytes, actual_hash.encode())
+        except InvalidSignature:
+            raise ValueError("Invalid signature — archive may be tampered")
+        except Exception as e:
+            raise ValueError(f"Signature verification error: {e}")
+
+        if pub_key_bytes in TRUSTED_PUBLIC_KEYS:
+            return plugin_zip_bytes, meta, 'official'
+        return plugin_zip_bytes, meta, 'signed_unknown'
 
 class AtomicInstaller:
     """Handles the safe installation of plugins with backup and rollback."""
