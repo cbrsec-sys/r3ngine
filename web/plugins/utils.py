@@ -146,7 +146,6 @@ class PluginManager:
         """
         import hashlib
         import base64
-        import json
         import io as _io
         from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
         from cryptography.exceptions import InvalidSignature
