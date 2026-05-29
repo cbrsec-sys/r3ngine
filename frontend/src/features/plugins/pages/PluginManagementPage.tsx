@@ -141,7 +141,7 @@ const PluginManagementPage: React.FC = () => {
           }}
         >
           UPLOAD PLUGIN
-          <input type="file" hidden accept=".zip" onChange={handleFileUpload} />
+          <input type="file" hidden accept=".r3n,.zip" onChange={handleFileUpload} />
         </Button>
       </Box>
 
