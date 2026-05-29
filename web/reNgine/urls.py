@@ -11,6 +11,7 @@ from rest_framework import permissions
 from reNgine import views as rengine_views
 from reNgine.stress import views as stress_views
 from dashboard import views as dashboard_views
+from plugins.views import PluginUIView
 from .openapi_info import info
 
 schema_view = get_schema_view(
@@ -77,5 +78,10 @@ urlpatterns = [
         'media/<path:path>',
         rengine_views.serve_protected_media,
         name='serve_protected_media'
+    ),
+    path(
+        'plugins-ui/<slug:slug>/<path:path>',
+        PluginUIView.as_view(),
+        name='plugin_ui'
     ),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

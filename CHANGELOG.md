@@ -1,6 +1,30 @@
 # Changelog
 
-### [v3.2.0] - 2026-05-26
+### [v3.2.0] - 2026-05-27
+
+- **Plugin Standardized Naming & Active Exploitation Alignment**:
+  - Standardized all plugin folder, zip, and database slug names under `r3ngine-plugins/` to use underscores (`_`) instead of hyphens (`exploit_readiness_layer`, `active_directory`, `active_exploitation`), ensuring full Python package naming compliance.
+  - Updated the dynamic router in `frontend/src/router.tsx` to automatically normalize hyphens to underscores in the `$pluginSlug` URL parameter, allowing user-friendly, hyphenated paths in the address bar (e.g., `/p/active-directory`) while mapping to underscore folders and database slugs under the hood.
+  - Aligned the `active_exploitation` plugin manifest and configured Vite build options to output an ES library format, exporting `ActiveExploitationDashboard` via `src/index.ts`.
+  - Built a premium dark-themed MUI control panel dashboard for `active_exploitation` showing target metrics, SQLMap databases queue, and a detailed cryptographic log pane.
+  - Added REST API endpoints (`api.py`, `serializers.py`, `api_urls.py`) exposing `/api/plugins/active_exploitation/dumps/` to support viewing database dumps and toggling the data-masking state.
+
+- **Dynamic Plugin Installation Migration Fix & Filesystem Cleanup**:
+  - Resolved runtime installation stalls on the "installing..." status by replacing in-process `call_command` migration tasks in `web/plugins/utils.py` with clean subprocess execution via `sys.executable`. This ensures a fresh Django settings context is initialized, allowing the newly unzipped plugin to dynamically register in `INSTALLED_APPS` and apply migrations without triggering `No installed app with label` errors.
+  - Hardened the dynamic plugin installer in `web/plugins/utils.py` to re-raise migration exceptions, triggering full database rollback and cleanly deleting newly unzipped directories and media assets on installation failure to prevent loop states.
+  - Created a standalone utility script `scripts/clear_failed_plugins.py` to detect and purge orphaned or failed plugin directories from the filesystem that are not registered in the database, preventing startup loop states and duplicate application configuration errors.
+
+
+- **Mobile Task Log Streaming Restoration**:
+  - Restored real-time stream log output for scan tasks in the mobile application by capturing and publishing stdout/stderr lines from the Python orchestrator.
+  - Implemented `_init_redis_logging` and `_publish_to_redis_log` helpers in `task.py` to cache configurations and stream logs to Redis for both local subprocess and Go-routed scan task executions.
+  - Refactored `ScanLogConsumer` in `consumers.py` to start stream listening from ID `0` (instead of `$`), enabling historical log replay when connecting.
+
+- **Mobile Scan In-Progress Indicator**:
+  - Implemented `AnimatedActivityBadge` next to the alert bell in the mobile app dashboard header.
+  - Configured a looping pulse/scale animation running at 60fps on the native driver.
+  - Added polling logic via `/mapi/scan_status/` running every 30 seconds to toggle the badge visibility when scans are active, and configured routing to redirect the user to the scans tab on click.
+  - Documented the new component in `r3ngine-mobile/documentation/AnimatedActivityBadge.md`.
 
 - **URL Gathering Tools Regex Fix**:
   - Corrected a critical POSIX regular expression syntax error (`host_regex`) in the URL fetching task (`fetch_url`) of `tasks.py` that caused all output from `gau`, `waybackurls`, `hakrawler`, `katana`, and `gospider` to produce zero results.
@@ -59,8 +83,10 @@
   - Moved the visual screenshotting task (`screenshot`) from Tier 2 (parallel to HTTP Crawl & Port Scanning) to Tier 6 (parallel to Vulnerability Scanning).
   - This ensures that crawling, URL fetching, and directory/file fuzzing have completely finished execution, allowing a comprehensive set of alive endpoints to be gathered before screenshots are captured.
 
-- **Nuclei Scan Optimization & Stability**:
-  - Optimized the `nuclei_scan` engine to execute in a single concurrent pass, replacing the inefficient 6-pass sequential severity loop.
+- **Nuclei Scan Sequential Severity Execution**:
+  - Re-implemented nuclei scanning to run sequentially per configured severity level inside the `NucleiPlannerWorkflow`.
+  - Updated `RunNucleiActivity` to accept a `severity` parameter and reflect it in the UI activity status (e.g. `Nuclei Scan (critical)`).
+  - Configured `nuclei_scan` in `tasks.py` to isolate intermediate target endpoints and unfurl files by suffixing them with the active severity level (e.g. `input_endpoints_vulnerability_scan_{severity}.txt`) to prevent disk writes collision.
   - Re-enabled the `-tags` parameter which was previously dropped, ensuring only relevant checks are executed against the target stack.
   - Implemented dynamic fallback to the target root domain in the event that `Subdomain` queries return empty results during parameter resolution.
   - Gated the intensive `nuclei -update-templates` step behind the `auto_update_templates` boolean configuration.

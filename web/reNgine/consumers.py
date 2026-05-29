@@ -138,7 +138,7 @@ class ScanLogConsumer(AsyncWebsocketConsumer):
             decode_responses=True
         )
         
-        last_id = '$' # Start from now
+        last_id = '0' # Start from the beginning to load history
         loop = asyncio.get_running_loop()
         
         while self.keep_running:

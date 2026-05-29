@@ -588,12 +588,16 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 
 	# Create vulnerability — use narrower dedup key when caller specifies one,
 	# so volatile fields like description don't cause duplicate rows on re-scan.
-	if dedup_fields:
-		lookup = {k: vuln_data.pop(k) for k in dedup_fields if k in vuln_data}
-		vuln, created = Vulnerability.objects.update_or_create(defaults=vuln_data, **lookup)
-		vuln_data.update(lookup)  # restore for use below (tags, auth-candidate, etc.)
-	else:
-		vuln, created = Vulnerability.objects.get_or_create(**vuln_data)
+	if not dedup_fields:
+		dedup_fields = ['name', 'scan_history']
+		if 'subdomain' in vuln_data:
+			dedup_fields.append('subdomain')
+		if 'http_url' in vuln_data:
+			dedup_fields.append('http_url')
+
+	lookup = {k: vuln_data.pop(k) for k in dedup_fields if k in vuln_data}
+	vuln, created = Vulnerability.objects.update_or_create(defaults=vuln_data, **lookup)
+	vuln_data.update(lookup)  # restore for use below (tags, auth-candidate, etc.)
 	if created:
 		vuln.discovered_date = timezone.now()
 		vuln.open_status = True

@@ -127,8 +127,8 @@ class PluginManager:
         if os.path.exists(final_dir):
             shutil.rmtree(final_dir)
             
-        # 2. Delete from media root
-        media_plugin_dir = os.path.join(settings.MEDIA_ROOT, 'plugins', plugin_slug)
+        # 2. Delete from staticfiles
+        media_plugin_dir = os.path.join(settings.STATIC_ROOT, 'plugins', plugin_slug)
         if os.path.exists(media_plugin_dir):
             shutil.rmtree(media_plugin_dir)
 
@@ -215,7 +215,7 @@ class AtomicInstaller:
             
             # 2. Prepare FS Backups
             final_dir = os.path.join(PluginManager.BASE_PLUGINS_DIR, plugin_slug)
-            media_plugin_dir = os.path.join(settings.MEDIA_ROOT, 'plugins', plugin_slug)
+            media_plugin_dir = os.path.join(settings.STATIC_ROOT, 'plugins', plugin_slug)
             
             if os.path.exists(final_dir):
                 backup_fs_dir = f"{final_dir}_bak_{int(time.time())}"
@@ -252,21 +252,46 @@ class AtomicInstaller:
                 # Run dynamic migrations if the plugin has models
                 backend_dir = os.path.join(final_dir, 'backend')
                 if os.path.exists(os.path.join(backend_dir, 'models.py')):
-                    app_label = f"plugins_data.{plugin_slug}.backend"
+                    # Ensure package directories have __init__.py files present
+                    for d in [final_dir, backend_dir]:
+                        init_f = os.path.join(d, '__init__.py')
+                        if not os.path.exists(init_f):
+                            try:
+                                with open(init_f, 'w') as f:
+                                    pass
+                            except Exception:
+                                pass
+
+                    app_label = f"{plugin_slug}_backend"
                     logger.info(f"Running migrations for plugin app: {app_label}")
                     try:
-                        # makemigrations needs the app_label to be the module name.
-                        # However, django's makemigrations expects the actual app label, which defaults to the last part ('backend').
-                        # To be safe, we run makemigrations and migrate on 'backend'.
-                        # But wait, multiple plugins will have 'backend'. Django requires unique app labels.
-                        # We must ensure the plugin's apps.py defines a unique name, or Django defaults to 'backend'.
-                        # The plugin must contain an apps.py that sets `name = 'plugins_data.plugin_slug.backend'` and `label = 'plugin_slug_backend'`.
-                        call_command('makemigrations', f'{plugin_slug}_backend', interactive=False)
-                        call_command('migrate', f'{plugin_slug}_backend', interactive=False)
+                        import sys
+                        # Run makemigrations in a clean subprocess to auto-load the new app config
+                        makemigrate_res = subprocess.run(
+                            [sys.executable, "manage.py", "makemigrations", app_label],
+                            cwd=settings.BASE_DIR,
+                            capture_output=True,
+                            text=True,
+                            check=True
+                        )
+                        logger.info(f"Subprocess makemigrations stdout: {makemigrate_res.stdout}")
+                        
+                        # Run migrate in a clean subprocess
+                        migrate_res = subprocess.run(
+                            [sys.executable, "manage.py", "migrate", app_label],
+                            cwd=settings.BASE_DIR,
+                            capture_output=True,
+                            text=True,
+                            check=True
+                        )
+                        logger.info(f"Subprocess migrate stdout: {migrate_res.stdout}")
                         logger.info(f"Successfully migrated plugin: {plugin_slug}")
+                    except subprocess.CalledProcessError as e:
+                        logger.error(f"Failed to run migrations for {plugin_slug} (exit {e.returncode}):\nStdout: {e.stdout}\nStderr: {e.stderr}")
+                        raise Exception(f"Migration subprocess failed for {app_label}: {e.stderr or e.stdout}")
                     except Exception as e:
-                        logger.error(f"Failed to run migrations for {plugin_slug}: {str(e)}")
-                        # Don't fail the whole install if migrations fail, or maybe we should? Let's just log it.
+                        logger.error(f"Unexpected error running migrations for {plugin_slug}: {str(e)}")
+                        raise e
 
                 from scanEngine.models import EngineType
                 for file in os.listdir(final_dir):
@@ -319,6 +344,10 @@ class AtomicInstaller:
                     except Exception as e:
                         logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
 
+                # Set needs_restart to True in cache
+                from django.core.cache import cache
+                cache.set(f"plugin_{plugin_slug}_needs_restart", True, timeout=None)
+
                 # 7. Copy built UI assets (ui/dist/ or ui/ directly) to MEDIA_ROOT
                 if os.path.exists(media_plugin_dir):
                     shutil.rmtree(media_plugin_dir)
@@ -358,12 +387,18 @@ class AtomicInstaller:
                 if os.path.exists(final_dir):
                     shutil.rmtree(final_dir)
                 shutil.move(backup_fs_dir, final_dir)
+            else:
+                if final_dir and os.path.exists(final_dir):
+                    shutil.rmtree(final_dir)
             
             # Rollback Media
             if backup_media_dir and os.path.exists(backup_media_dir):
                 if os.path.exists(media_plugin_dir):
                     shutil.rmtree(media_plugin_dir)
                 shutil.move(backup_media_dir, media_plugin_dir)
+            else:
+                if media_plugin_dir and os.path.exists(media_plugin_dir):
+                    shutil.rmtree(media_plugin_dir)
                 
             if temp_dir and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)

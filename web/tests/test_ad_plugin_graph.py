@@ -50,46 +50,38 @@ class TestADGraphEndpoint(TestCase):
         self.user.delete()
 
     def _call_graph_domains(self, limit_param=None, mock_mgr=None):
-        from django.test import RequestFactory
+        from rest_framework.test import APIRequestFactory
         from plugins_data.active_directory.backend.api import ADAssessmentViewSet
 
         params = {}
         if limit_param is not None:
             params['limit'] = str(limit_param)
 
-        req = RequestFactory().get('/graph/domains/', params)
+        req = APIRequestFactory().get('/graph/domains/', params)
         req.user = self.user
 
-        view = ADAssessmentViewSet()
-        view.request = req
-        view.kwargs = {'pk': self.assessment.pk}
-        view.action = 'graph_domains'
-        view.format_kwarg = None
+        view = ADAssessmentViewSet.as_view({'get': 'graph_domains'})
 
         mgr = mock_mgr or _make_mock_manager()
         with patch(
-            'plugins_data.active_directory.backend.api.ADGraphManager',
+            'plugins_data.active_directory.backend.graph.manager.ADGraphManager',
             return_value=mgr,
         ):
-            return view.graph_domains(req, pk=self.assessment.pk)
+            return view(req, pk=self.assessment.pk)
 
     def test_default_limit_returns_200(self):
         response = self._call_graph_domains()
         self.assertEqual(response.status_code, 200)
 
     def test_invalid_limit_returns_400(self):
-        from django.test import RequestFactory
+        from rest_framework.test import APIRequestFactory
         from plugins_data.active_directory.backend.api import ADAssessmentViewSet
 
-        req = RequestFactory().get('/graph/domains/', {'limit': 'abc'})
+        req = APIRequestFactory().get('/graph/domains/', {'limit': 'abc'})
         req.user = self.user
-        view = ADAssessmentViewSet()
-        view.request = req
-        view.kwargs = {'pk': self.assessment.pk}
-        view.action = 'graph_domains'
-        view.format_kwarg = None
+        view = ADAssessmentViewSet.as_view({'get': 'graph_domains'})
 
-        response = view.graph_domains(req, pk=self.assessment.pk)
+        response = view(req, pk=self.assessment.pk)
         self.assertEqual(response.status_code, 400)
         self.assertIn('error', response.data)
 

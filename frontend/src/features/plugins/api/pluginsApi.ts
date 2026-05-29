@@ -13,6 +13,7 @@ export interface Plugin {
   runtime_position: 'BEFORE' | 'AFTER';
   order_weight: number;
   manifest: any;
+  needs_restart: boolean;
 }
 
 export interface MarketplacePlugin {
@@ -127,6 +128,22 @@ export const useRefreshMarketplace = () => {
     mutationFn: () => fetchMarketplacePlugins(true),
     onSuccess: (data) => {
       queryClient.setQueryData(['marketplace-plugins'], data);
+    },
+  });
+};
+
+export const restartOrchestrator = async () => {
+  const { data } = await axios.post(`${API_URL}restart-orchestrator/`);
+  return data;
+};
+
+export const useRestartOrchestrator = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: restartOrchestrator,
+    onSuccess: () => {
+      // Invalidate queries so we reload plugin status
+      queryClient.invalidateQueries({ queryKey: ['plugins'] });
     },
   });
 };

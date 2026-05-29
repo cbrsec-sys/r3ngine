@@ -115,6 +115,10 @@ from reNgine.temporal_activities import (
     run_react2shell_activity,
     run_wpscan_activity,
     run_semgrep_activity,
+    run_vigolium_scan_activity,
+    run_vigolium_discovery_activity,
+    run_vigolium_analysis_activity,
+    mark_vulnerability_scan_complete_activity,
     run_waf_bypass_activity,
     run_brute_force_scan_activity,
     parse_assessment_results_activity,
@@ -199,6 +203,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         async def main():
+            # Clear all needs_restart flags for active plugins in the cache
+            try:
+                from django.core.cache import cache
+                from plugins.models import Plugin
+                for plugin in Plugin.objects.all():
+                    cache.set(f"plugin_{plugin.slug}_needs_restart", False, timeout=None)
+                self.stdout.write(self.style.SUCCESS("Cleared needs_restart flags for all plugins."))
+            except Exception as cache_err:
+                logger.error(f"Failed to clear needs_restart flags: {cache_err}")
+
             temporal_host = os.environ.get("TEMPORAL_HOST", "temporal:7233")
             namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
 
@@ -309,6 +323,10 @@ class Command(BaseCommand):
                 run_react2shell_activity,
                 run_wpscan_activity,
                 run_semgrep_activity,
+                run_vigolium_scan_activity,
+                run_vigolium_discovery_activity,
+                run_vigolium_analysis_activity,
+                mark_vulnerability_scan_complete_activity,
                 run_waf_bypass_activity,
                 run_brute_force_scan_activity,
                 parse_assessment_results_activity,
@@ -398,6 +416,38 @@ class Command(BaseCommand):
                     pass
                 finally:
                     self.stdout.write(self.style.SUCCESS("Temporal worker stopped."))
+
+        def start_redis_listener():
+            import redis
+            import time
+            import signal
+            import os
+            from django.conf import settings
+
+            def listen():
+                while True:
+                    try:
+                        rdb = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
+                        pubsub = rdb.pubsub()
+                        pubsub.subscribe('orchestrator_control')
+                        logger.info("[Control] Subscribed to orchestrator_control Redis channel.")
+                        for message in pubsub.listen():
+                            if message['type'] == 'message':
+                                data = message['data'].decode('utf-8')
+                                if data == 'restart':
+                                    logger.warning("[Control] Received restart command. Terminating process...")
+                                    os.kill(os.getpid(), signal.SIGTERM)
+                                    time.sleep(2)
+                                    os._exit(0)
+                    except Exception as e:
+                        logger.error(f"[Control] Redis listener error: {e}. Retrying in 5 seconds...")
+                        time.sleep(5)
+
+            import threading
+            t = threading.Thread(target=listen, daemon=True)
+            t.start()
+
+        start_redis_listener()
 
         try:
             asyncio.run(main())

@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>Stress Test Report - {{ domain }}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100;200;300;400;500;600&display=swap"
+        rel="stylesheet" />
+    <style>
+        /* ─── Page Setup ─────────────────────────────────────────────────── */
+        @page {
+            size: A4;
+            margin: 25mm 15mm;
+
+            @bottom-left {
+                content: "{{ company }} · Stress Test Report · {{ domain }}";
+                font-family: 'Inter', sans-serif;
+                font-size: 8pt;
+                color: #94a3b8;
+                border-top: 0.5px solid #e2e8f0;
+                padding-top: 4mm;
+            }
+
+            @bottom-right {
+                content: counter(page);
+                font-family: 'Inter', sans-serif;
+                font-size: 9pt;
+                color: #94a3b8;
+                padding-top: 4mm;
+            }
+        }
+
+        @page :first {
+            margin: 0;
+        }
+
+        html {
+            color: #334155;
+            font-family: 'Inter', sans-serif;
+            font-weight: 300;
+            font-size: 11pt;
+            line-height: 1.6;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+        }
+
+        /* ─── Cover Page (modern.html style) ────────────────────────────── */
+        #cover {
+            position: relative;
+            overflow: hidden;
+            background-color: {{ secondary_color|default:"#f8fafc" }};
+            width: 210mm;
+            height: 297mm;
+        }
+
+        .background-element {
+            position: absolute;
+            background: linear-gradient(15deg, {{ primary_color|default:"#3b82f6" }}, {{ secondary_color|default:"#f8fafc" }});
+            opacity: 0.4;
+        }
+
+        .circle {
+            width: 300mm;
+            height: 300mm;
+            border-radius: 50%;
+            top: -100mm;
+            left: -100mm;
+        }
+
+        .rectangle {
+            width: 200mm;
+            height: 100mm;
+            transform: rotate(40deg);
+            bottom: -50mm;
+            right: -50mm;
+        }
+
+        .abstract-shape {
+            position: absolute;
+            border: 2px solid {{ primary_color|default:"#3b82f6" }};
+            opacity: 0.3;
+        }
+
+        .shape1 {
+            width: 40mm;
+            height: 40mm;
+            border-radius: 30% 70% 70% 30% / 30% 30% 70% 70%;
+            top: 10%;
+            right: 10%;
+        }
+
+        .shape2 {
+            width: 60mm;
+            height: 60mm;
+            border-radius: 63% 37% 54% 46% / 55% 48% 52% 45%;
+            bottom: 20%;
+            left: 5%;
+        }
+
+        .cover-content {
+            position: absolute;
+            top: 20%;
+            left: 15%;
+            right: 15%;
+        }
+
+        .cover-title {
+            font-weight: 200;
+            font-size: 42pt;
+            color: {{ primary_color|default:"#3b82f6" }};
+            margin: 0 0 4mm 0;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        .cover-subtitle {
+            font-size: 18pt;
+            font-weight: 300;
+            color: #64748b;
+            margin: 0 0 4mm 0;
+        }
+
+        .cover-domain {
+            font-size: 14pt;
+            font-weight: 400;
+            color: {{ primary_color|default:"#3b82f6" }};
+            margin: 0 0 14mm 0;
+        }
+
+        .cover-line {
+            width: 95%;
+            height: 1.5px;
+            background: linear-gradient(to right, {{ primary_color|default:"#3b82f6" }}, {{ secondary_color|default:"#f8fafc" }});
+            margin: 0 0 14mm 0;
+        }
+
+        .cover-meta {
+            font-size: 11pt;
+            color: #475569;
+            line-height: 2;
+        }
+
+        .cover-footer {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background-color: {{ primary_color|default:"#3b82f6" }};
+            color: #ffffff;
+            padding: 8mm 15mm;
+            font-size: 10pt;
+            text-align: center;
+        }
+
+        .cover-footer .rengine-banner {
+            margin-top: 3mm;
+            font-size: 8pt;
+            opacity: 0.8;
+        }
+
+        /* ─── Table of Contents ──────────────────────────────────────────── */
+        .toc-page {
+            background: white;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .toc-title {
+            font-size: 22pt;
+            font-weight: 400;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            color: {{ primary_color|default:"#3b82f6" }};
+            margin-bottom: 10mm;
+        }
+
+        .toc-title::after {
+            content: '';
+            display: block;
+            height: 1.5px;
+            width: 100%;
+            background: linear-gradient(to right, {{ primary_color|default:"#3b82f6" }}, transparent);
+            margin-top: 3mm;
+        }
+
+        .toc-item {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            padding: 4mm 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+
+        .toc-link {
+            color: #334155;
+            text-decoration: none;
+            font-size: 13pt;
+        }
+
+        .toc-section-num {
+            font-size: 11pt;
+            color: {{ primary_color|default:"#3b82f6" }};
+            font-weight: 500;
+            margin-right: 4mm;
+        }
+
+        .toc-page-num {
+            font-size: 11pt;
+            color: #94a3b8;
+        }
+
+        .toc-page-num::after {
+            content: target-counter(attr(data-href), page);
+            margin-left: 3mm;
+        }
+
+        /* ─── Page Breaks ────────────────────────────────────────────────── */
+        .page-break { page-break-before: always; }
+
+        /* ─── Section Headings ───────────────────────────────────────────── */
+        h1 {
+            font-size: 28pt;
+            font-weight: 200;
+            color: {{ primary_color|default:"#3b82f6" }};
+            margin: 0 0 6mm 0;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        h1::after {
+            content: '';
+            display: block;
+            height: 1.5px;
+            width: 100%;
+            background: linear-gradient(to right, {{ primary_color|default:"#3b82f6" }}, transparent);
+            margin-top: 3mm;
+        }
+
+        h2 {
+            font-size: 18pt;
+            font-weight: 300;
+            color: #1e293b;
+            margin: 12mm 0 4mm 0;
+        }
+
+        h2::after {
+            content: '';
+            display: block;
+            height: 1px;
+            width: 100%;
+            background: linear-gradient(to right, {{ primary_color|default:"#3b82f6" }}66, transparent);
+            margin-top: 2mm;
+        }
+
+        h3 {
+            font-size: 13pt;
+            font-weight: 500;
+            color: #334155;
+            margin: 8mm 0 3mm 0;
+        }
+
+        /* ─── Summary Cards ──────────────────────────────────────────────── */
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 5mm;
+            margin: 8mm 0 12mm 0;
+        }
+
+        .summary-grid-4 {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 4mm;
+            margin: 8mm 0 12mm 0;
+        }
+
+        .summary-grid-4 .summary-value {
+            font-size: 14pt;
+            font-weight: 400;
+            word-break: break-all;
+        }
+
+        .overview-metadata-list {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 8mm 0;
+            border-left: 3px solid {{ primary_color|default:"#3b82f6" }};
+            padding-left: 4mm;
+        }
+
+        .overview-metadata-list li {
+            margin-bottom: 2mm;
+            font-size: 11pt;
+            color: #475569;
+        }
+
+        .overview-metadata-list strong {
+            color: #0f172a;
+            font-weight: 500;
+        }
+
+        .summary-card {
+            padding: 6mm 4mm;
+            background: white;
+            border-radius: 3mm;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+            text-align: center;
+            border-top: 4px solid {{ primary_color|default:"#3b82f6" }};
+        }
+
+        .summary-card.pass  { border-top-color: #10b981; }
+        .summary-card.fail  { border-top-color: #ef4444; }
+        .summary-card.warn  { border-top-color: #f59e0b; }
+
+        .summary-value {
+            font-size: 24pt;
+            font-weight: 200;
+            color: #0f172a;
+            display: block;
+        }
+
+        .summary-label {
+            font-size: 9pt;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        /* ─── Status Badges ──────────────────────────────────────────────── */
+        .badge {
+            display: inline-block;
+            padding: 1mm 4mm;
+            border-radius: 10mm;
+            font-size: 9pt;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .badge-pass    { background: #dcfce7; color: #166534; }
+        .badge-fail    { background: #fee2e2; color: #991b1b; }
+        .badge-warn    { background: #fef3c7; color: #92400e; }
+        .badge-info    { background: #dbeafe; color: #1e40af; }
+        .badge-critical { background: #fee2e2; color: #7f1d1d; }
+        .badge-high    { background: #fef3c7; color: #78350f; }
+        .badge-medium  { background: #fff7ed; color: #9a3412; }
+        .badge-low     { background: #f0fdf4; color: #14532d; }
+
+        /* ─── Tables ──────────────────────────────────────────────────────── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 4mm 0 8mm 0;
+            font-size: 10pt;
+        }
+
+        thead th {
+            background-color: {{ primary_color|default:"#3b82f6" }};
+            color: #ffffff;
+            padding: 3mm 4mm;
+            text-align: left;
+            font-weight: 500;
+            font-size: 9pt;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        tbody tr:nth-child(odd)  { background-color: #f8fafc; }
+        tbody tr:nth-child(even) { background-color: #ffffff; }
+        tbody tr:hover           { background-color: #eff6ff; }
+
+        td {
+            padding: 3mm 4mm;
+            border-bottom: 1px solid #e2e8f0;
+            vertical-align: middle;
+        }
+
+        td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        td.center { text-align: center; }
+
+        /* ─── Chart Containers ───────────────────────────────────────────── */
+        .chart-section {
+            margin: 8mm 0 12mm 0;
+            break-inside: avoid;
+        }
+
+        .chart-caption {
+            font-size: 9pt;
+            color: #94a3b8;
+            text-align: center;
+            margin-top: 3mm;
+            font-style: italic;
+        }
+
+        .chart-img {
+            display: block;
+            margin: 0 auto;
+            max-width: 160mm;
+            height: auto;
+        }
+
+        .chart-img-wide {
+            display: block;
+            margin: 0 auto;
+            max-width: 170mm;
+            height: auto;
+        }
+
+        /* ─── Failover Timeline Block ────────────────────────────────────── */
+        .failover-timeline {
+            display: flex;
+            flex-direction: column;
+            gap: 3mm;
+            margin: 6mm 0;
+        }
+
+        .failover-step {
+            display: flex;
+            align-items: flex-start;
+            gap: 5mm;
+        }
+
+        .failover-step-num {
+            flex-shrink: 0;
+            width: 8mm;
+            height: 8mm;
+            border-radius: 50%;
+            background: {{ primary_color|default:"#3b82f6" }};
+            color: white;
+            font-size: 9pt;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .failover-step-body {
+            flex: 1;
+            padding: 3mm 4mm;
+            background: #f8fafc;
+            border-radius: 2mm;
+            border-left: 3px solid {{ primary_color|default:"#3b82f6" }};
+        }
+
+        .failover-step-title { font-weight: 500; font-size: 10pt; }
+        .failover-step-time  { font-size: 9pt; color: #64748b; }
+
+        /* ─── Alert / Highlight Box ──────────────────────────────────────── */
+        .info-box {
+            background: #eff6ff;
+            border-left: 4px solid {{ primary_color|default:"#3b82f6" }};
+            padding: 5mm 6mm;
+            border-radius: 0 3mm 3mm 0;
+            margin: 6mm 0;
+            font-size: 10pt;
+        }
+
+        .warn-box {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 5mm 6mm;
+            border-radius: 0 3mm 3mm 0;
+            margin: 6mm 0;
+            font-size: 10pt;
+        }
+
+        .danger-box {
+            background: #fef2f2;
+            border-left: 4px solid #ef4444;
+            padding: 5mm 6mm;
+            border-radius: 0 3mm 3mm 0;
+            margin: 6mm 0;
+            font-size: 10pt;
+        }
+
+        .success-box {
+            background: #f0fdf4;
+            border-left: 4px solid #10b981;
+            padding: 5mm 6mm;
+            border-radius: 0 3mm 3mm 0;
+            margin: 6mm 0;
+            font-size: 10pt;
+        }
+
+        /* ─── End of Report ──────────────────────────────────────────────── */
+        @page end-of-report {
+            background: {{ primary_color|default:"#3b82f6" }};
+            margin: 0;
+
+            @top-left   { content: none; }
+            @top-center { content: none; }
+            @top-right  { content: none; }
+            @bottom-left  { content: none; }
+            @bottom-right { content: none; }
+        }
+
+        #end-of-report {
+            align-items: center;
+            display: flex;
+            height: 297mm;
+            justify-content: center;
+            page: end-of-report;
+            background-color: {{ secondary_color|default:"#f8fafc" }};
+            text-align: center;
+        }
+
+        #end-of-report h1 {
+            color: {{ primary_color|default:"#3b82f6" }};
+            font-size: 48pt;
+            font-weight: 200;
+            letter-spacing: 4px;
+        }
+
+        .fading-line {
+            width: 180mm;
+            height: 1px;
+            margin: 5mm auto 0;
+            background: linear-gradient(to right,
+              transparent,
+              {{ primary_color|default:"#3b82f6" }} 20%,
+              {{ primary_color|default:"#3b82f6" }} 80%,
+              transparent
+            );
+        }
+
+        p { margin: 0 0 4mm 0; }
+        ul, ol { margin: 0 0 4mm 5mm; }
+        li { margin-bottom: 2mm; }
+        strong { font-weight: 600; }
+    </style>
+</head>
+
+<body>
+
+    <!-- ══════════════════════════════════════════════════════
+         COVER PAGE  (modern.html style)
+    ══════════════════════════════════════════════════════════ -->
+    <article id="cover">
+        <div class="background-element circle"></div>
+        <div class="background-element rectangle"></div>
+        <div class="abstract-shape shape1"></div>
+        <div class="abstract-shape shape2"></div>
+
+        <div class="cover-content">
+            <h1 class="cover-title">Stress Test Report</h1>
+            <div class="cover-subtitle">Load &amp; Resilience Assessment</div>
+            <div class="cover-domain">{{ domain }}</div>
+            <div class="cover-line"></div>
+            <div class="cover-meta">
+                <div><strong>Client:</strong> {{ client }}</div>
+                <div><strong>Test Date:</strong> {{ test_date }}</div>
+                <div><strong>Report Date:</strong> {{ report_date }}</div>
+                <div><strong>Conducted by:</strong> {{ conducted_by }}</div>
+                <div><strong>Version:</strong> {{ version|default:"1.0" }}</div>
+            </div>
+        </div>
+
+        <div class="cover-footer">
+            {{ company }} &nbsp;|&nbsp; Confidential
+            {% endif %}
+        </div>
+    </article>
+
+    <!-- ══════════════════════════════════════════════════════
+         TABLE OF CONTENTS
+    ══════════════════════════════════════════════════════════ -->
+    <article class="toc-page page-break">
+        <h1 class="toc-title">Table of Contents</h1>
+        <div class="toc-item">
+            <span><span class="toc-section-num">1.</span><a href="#overview" class="toc-link">Overview &amp; Scope</a></span>
+            <span class="toc-page-num" data-href="#overview"></span>
+        </div>
+        <div class="toc-item">
+            <span><span class="toc-section-num">2.</span><a href="#executive-summary" class="toc-link">Executive Summary</a></span>
+            <span class="toc-page-num" data-href="#executive-summary"></span>
+        </div>
+        <div class="toc-item">
+            <span><span class="toc-section-num">3.</span><a href="#main-report" class="toc-link">Main Report</a></span>
+            <span class="toc-page-num" data-href="#main-report"></span>
+        </div>
+        <div class="toc-item" style="padding-left: 8mm;">
+            <span><span class="toc-section-num">3.1</span><a href="#test-config" class="toc-link">Test Configuration</a></span>
+            <span class="toc-page-num" data-href="#test-config"></span>
+        </div>
+        <div class="toc-item" style="padding-left: 8mm;">
+            <span><span class="toc-section-num">3.2</span><a href="#throughput" class="toc-link">Throughput Metrics</a></span>
+            <span class="toc-page-num" data-href="#throughput"></span>
+        </div>
+        <div class="toc-item" style="padding-left: 8mm;">
+            <span><span class="toc-section-num">3.3</span><a href="#latency" class="toc-link">Latency Distribution</a></span>
+            <span class="toc-page-num" data-href="#latency"></span>
+        </div>
+        <div class="toc-item" style="padding-left: 8mm;">
+            <span><span class="toc-section-num">3.4</span><a href="#errors" class="toc-link">Error Rate Analysis</a></span>
+            <span class="toc-page-num" data-href="#errors"></span>
+        </div>
+        {% if resource_table_html %}
+        <div class="toc-item" style="padding-left: 8mm;">
+            <span><span class="toc-section-num">3.5</span><a href="#resources" class="toc-link">Resource Utilisation</a></span>
+            <span class="toc-page-num" data-href="#resources"></span>
+        </div>
+        {% endif %}
+        {% if endpoint_table_html %}
+        <div class="toc-item" style="padding-left: 8mm;">
+            <span><span class="toc-section-num">3.6</span><a href="#endpoints" class="toc-link">Endpoint Breakdown</a></span>
+            <span class="toc-page-num" data-href="#endpoints"></span>
+        </div>
+        {% endif %}
+        {% if response_code_table_html %}
+        <div class="toc-item" style="padding-left: 8mm;">
+            <span><span class="toc-section-num">3.7</span><a href="#response-codes" class="toc-link">HTTP Response Code Distribution</a></span>
+            <span class="toc-page-num" data-href="#response-codes"></span>
+        </div>
+        {% endif %}
+        {% if threshold_table_html %}
+        <div class="toc-item" style="padding-left: 8mm;">
+            <span><span class="toc-section-num">3.8</span><a href="#thresholds" class="toc-link">Degradation Thresholds</a></span>
+            <span class="toc-page-num" data-href="#thresholds"></span>
+        </div>
+        {% endif %}
+        <div class="toc-item">
+            <span><span class="toc-section-num">4.</span><a href="#failover" class="toc-link">Server Failover &amp; Backup Swap-Over</a></span>
+            <span class="toc-page-num" data-href="#failover"></span>
+        </div>
+        <div class="toc-item">
+            <span><span class="toc-section-num">5.</span><a href="#findings" class="toc-link">Findings &amp; Recommendations</a></span>
+            <span class="toc-page-num" data-href="#findings"></span>
+        </div>
+        <div class="toc-item">
+            <span><span class="toc-section-num">6.</span><a href="#conclusion" class="toc-link">Conclusion</a></span>
+            <span class="toc-page-num" data-href="#conclusion"></span>
+        </div>
+    </article>
+
+    <!-- ══════════════════════════════════════════════════════
+         SECTION 1 — OVERVIEW
+    ══════════════════════════════════════════════════════════ -->
+    <article class="page-break">
+        <h1 id="overview">1. Overview</h1>
+
+        <div class="summary-grid-4">
+            <div class="summary-card">
+                <span class="summary-value">{{ domain }}</span>
+                <span class="summary-label">Target</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-value">{{ test_date }}</span>
+                <span class="summary-label">Test Date</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-value">{{ test_duration|default:"-" }}</span>
+                <span class="summary-label">Duration</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-value">{{ max_vus|default:"-" }}</span>
+                <span class="summary-label">Max VUs</span>
+            </div>
+        </div>
+
+        {{ overview_html|safe }}
+
+        <h2>Scope</h2>
+        {% if scope_table_html %}
+        {{ scope_table_html|safe }}
+        {% else %}
+        <table>
+            <thead><tr><th>Parameter</th><th>Value</th></tr></thead>
+            <tbody>
+                <tr><td>Target Domain</td><td>{{ domain }}</td></tr>
+                <tr><td>Test Duration</td><td>{{ test_duration|default:"-" }}</td></tr>
+                <tr><td>Tools Used</td><td>{{ tools_used|default:"-" }}</td></tr>
+                <tr><td>Max Virtual Users</td><td>{{ max_vus|default:"-" }}</td></tr>
+                <tr><td>Environment</td><td>{{ environment|default:"Production" }}</td></tr>
+            </tbody>
+        </table>
+        {% endif %}
+    </article>
+
+    <!-- ══════════════════════════════════════════════════════
+         SECTION 2 — EXECUTIVE SUMMARY
+    ══════════════════════════════════════════════════════════ -->
+    <article class="page-break">
+        <h1 id="executive-summary">2. Executive Summary</h1>
+
+        <div class="summary-grid">
+            <div class="summary-card {% if overall_status == 'PASS' %}pass{% elif overall_status == 'FAIL' %}fail{% else %}warn{% endif %}">
+                <span class="summary-value">{{ overall_status|default:"-" }}</span>
+                <span class="summary-label">Overall Result</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-value">{{ total_requests|default:"-" }}</span>
+                <span class="summary-label">Total Requests</span>
+            </div>
+            <div class="summary-card {% if peak_rps_status == 'PASS' %}pass{% else %}fail{% endif %}">
+                <span class="summary-value">{{ peak_rps|default:"-" }}</span>
+                <span class="summary-label">Peak RPS</span>
+            </div>
+        </div>
+
+        <div class="summary-grid">
+            <div class="summary-card {% if p95_status == 'PASS' %}pass{% else %}fail{% endif %}">
+                <span class="summary-value">{{ p95_achieved|default:"-" }}</span>
+                <span class="summary-label">P95 Latency</span>
+            </div>
+            <div class="summary-card {% if error_rate_status == 'PASS' %}pass{% else %}fail{% endif %}">
+                <span class="summary-value">{{ error_rate|default:"-" }}</span>
+                <span class="summary-label">Error Rate</span>
+            </div>
+            <div class="summary-card {% if failover_status == 'PASS' %}pass{% else %}fail{% endif %}">
+                <span class="summary-value">{{ failover_time|default:"-" }}</span>
+                <span class="summary-label">Failover Time</span>
+            </div>
+        </div>
+
+        {{ executive_summary_html|safe }}
+
+        {% if key_findings_table_html %}
+        <h2>Key Findings</h2>
+        {{ key_findings_table_html|safe }}
+        {% endif %}
+
+        {% if acceptance_criteria_table_html %}
+        <h2>Acceptance Criteria</h2>
+        {{ acceptance_criteria_table_html|safe }}
+        {% endif %}
+    </article>
+
+    <!-- ══════════════════════════════════════════════════════
+         SECTION 3 — MAIN REPORT
+    ══════════════════════════════════════════════════════════ -->
+    <article class="page-break">
+        <h1 id="main-report">3. Main Report</h1>
+
+        <!-- 3.1 Test Configuration -->
+        <h2 id="test-config">3.1 Test Configuration</h2>
+        {% if test_config_table_html %}
+        {{ test_config_table_html|safe }}
+        {% endif %}
+
+        <!-- 3.2 Throughput Metrics -->
+        <h2 id="throughput">3.2 Throughput Metrics</h2>
+        {% if throughput_chart %}
+        <div class="chart-section">
+            <img class="chart-img-wide" src="data:image/png;base64,{{ throughput_chart }}" />
+            <p class="chart-caption">Requests per second across test runs by tool and concurrency level.</p>
+        </div>
+        {% endif %}
+        {% if throughput_table_html %}
+        {{ throughput_table_html|safe }}
+        {% endif %}
+    </article>
+
+    <article class="page-break">
+        <!-- 3.3 Latency Distribution -->
+        <h2 id="latency">3.3 Latency Distribution</h2>
+        {% if latency_chart %}
+        <div class="chart-section">
+            <img class="chart-img-wide" src="data:image/png;base64,{{ latency_chart }}" />
+            <p class="chart-caption">Latency percentiles (P50–P99) under increasing concurrency.</p>
+        </div>
+        {% endif %}
+        {% if latency_table_html %}
+        {{ latency_table_html|safe }}
+        {% endif %}
+
+        <!-- 3.4 Error Rate Analysis -->
+        <h2 id="errors">3.4 Error Rate Analysis</h2>
+        {% if error_chart %}
+        <div class="chart-section">
+            <img class="chart-img-wide" src="data:image/png;base64,{{ error_chart }}" />
+            <p class="chart-caption">Request outcome breakdown (success, client errors, server errors, timeouts) by concurrency.</p>
+        </div>
+        {% endif %}
+        {% if error_table_html %}
+        {{ error_table_html|safe }}
+        {% endif %}
+    </article>
+
+    <!-- 3.5 Resource Utilisation -->
+    {% if resource_table_html %}
+    <article class="page-break">
+        <h2 id="resources">3.5 Server Resource Utilisation</h2>
+        {% if resource_chart %}
+        <div class="chart-section">
+            <img class="chart-img-wide" src="data:image/png;base64,{{ resource_chart }}" />
+            <p class="chart-caption">CPU, memory and network I/O utilisation throughout the test window.</p>
+        </div>
+        {% endif %}
+        {{ resource_table_html|safe }}
+    </article>
+    {% endif %}
+
+    <!-- 3.6 Endpoint Breakdown -->
+    {% if endpoint_table_html %}
+    <article class="page-break">
+        <h2 id="endpoints">3.6 Endpoint Performance Breakdown</h2>
+        {% if endpoint_chart %}
+        <div class="chart-section">
+            <img class="chart-img-wide" src="data:image/png;base64,{{ endpoint_chart }}" />
+            <p class="chart-caption">P95 latency heatmap across tested endpoints.</p>
+        </div>
+        {% endif %}
+        {{ endpoint_table_html|safe }}
+    </article>
+    {% endif %}
+
+    <!-- 3.7 HTTP Response Code Distribution -->
+    {% if response_code_table_html %}
+    <article class="page-break">
+        <h2 id="response-codes">3.7 HTTP Response Code Distribution</h2>
+        {% if response_code_chart %}
+        <div class="chart-section">
+            <img class="chart-img" src="data:image/png;base64,{{ response_code_chart }}" />
+            <p class="chart-caption">Distribution of all HTTP response status codes returned during the test.</p>
+        </div>
+        {% endif %}
+        {{ response_code_table_html|safe }}
+    </article>
+    {% endif %}
+
+    <!-- 3.8 Degradation Thresholds -->
+    {% if threshold_table_html %}
+    <article class="page-break">
+        <h2 id="thresholds">3.8 Performance Degradation Thresholds</h2>
+        {{ threshold_table_html|safe }}
+    </article>
+    {% endif %}
+
+    <!-- ══════════════════════════════════════════════════════
+         SECTION 4 — SERVER FAILOVER
+    ══════════════════════════════════════════════════════════ -->
+    <article class="page-break">
+        <h1 id="failover">4. Server Failover &amp; Backup Swap-Over</h1>
+
+        <div class="info-box">
+            This section documents the controlled fault injection, failover procedure, and system recovery observed during
+            the stress test engagement. All timings are measured from the moment the primary server fault was triggered.
+        </div>
+
+        <!-- 4.1 Architecture -->
+        <h2>4.1 Failover Architecture</h2>
+        {% if failover_arch_table_html %}
+        {{ failover_arch_table_html|safe }}
+        {% endif %}
+
+        <!-- 4.2 Fault Injection Procedure -->
+        {% if fault_injection_table_html %}
+        <h2>4.2 Fault Injection Procedure</h2>
+        {{ fault_injection_table_html|safe }}
+        {% endif %}
+    </article>
+
+    <!-- 4.3 Failover Timing -->
+    {% if failover_timing_table_html %}
+    <article class="page-break">
+        <h2>4.3 Failover Timing Metrics</h2>
+        {% if failover_timing_chart %}
+        <div class="chart-section">
+            <img class="chart-img-wide" src="data:image/png;base64,{{ failover_timing_chart }}" />
+            <p class="chart-caption">Duration of each failover phase against the accepted threshold.</p>
+        </div>
+        {% endif %}
+        {{ failover_timing_table_html|safe }}
+    </article>
+    {% endif %}
+
+    <!-- 4.4 Impact During Failover -->
+    {% if failover_impact_table_html %}
+    <article class="page-break">
+        <h2>4.4 Impact During Failover Window</h2>
+        {% if failover_impact_chart %}
+        <div class="chart-section">
+            <img class="chart-img-wide" src="data:image/png;base64,{{ failover_impact_chart }}" />
+            <p class="chart-caption">RPS and error rate observed before, during, and after the failover event.</p>
+        </div>
+        {% endif %}
+        {{ failover_impact_table_html|safe }}
+    </article>
+    {% endif %}
+
+    <!-- 4.5 Backup Server Performance -->
+    {% if backup_comparison_table_html %}
+    <article class="page-break">
+        <h2>4.5 Backup Server Performance Under Load</h2>
+        {% if backup_comparison_chart %}
+        <div class="chart-section">
+            <img class="chart-img-wide" src="data:image/png;base64,{{ backup_comparison_chart }}" />
+            <p class="chart-caption">Primary vs backup server performance metrics after full traffic reroute.</p>
+        </div>
+        {% endif %}
+        {{ backup_comparison_table_html|safe }}
+    </article>
+    {% endif %}
+
+    <!-- 4.6 Failover Observations -->
+    {% if failover_issues_table_html %}
+    <article class="page-break">
+        <h2>4.6 Failover Observations &amp; Issues</h2>
+        {{ failover_issues_table_html|safe }}
+    </article>
+    {% endif %}
+
+    <!-- ══════════════════════════════════════════════════════
+         SECTION 5 — FINDINGS & RECOMMENDATIONS
+    ══════════════════════════════════════════════════════════ -->
+    <article class="page-break">
+        <h1 id="findings">5. Findings &amp; Recommendations</h1>
+
+        <h2>5.1 Findings Summary</h2>
+        {% if findings_table_html %}
+        {{ findings_table_html|safe }}
+        {% endif %}
+
+        <h2>5.2 Recommendations</h2>
+        {% if recommendations_table_html %}
+        {{ recommendations_table_html|safe }}
+        {% endif %}
+    </article>
+
+    <!-- ══════════════════════════════════════════════════════
+         SECTION 6 — CONCLUSION
+    ══════════════════════════════════════════════════════════ -->
+    <article class="page-break">
+        <h1 id="conclusion">6. Conclusion</h1>
+
+        <div class="summary-grid">
+            <div class="summary-card {% if overall_status == 'PASS' %}pass{% elif overall_status == 'FAIL' %}fail{% else %}warn{% endif %}">
+                <span class="summary-value">{{ overall_status|default:"-" }}</span>
+                <span class="summary-label">Overall Assessment</span>
+            </div>
+            <div class="summary-card {% if failover_status == 'PASS' %}pass{% else %}fail{% endif %}">
+                <span class="summary-value">{{ failover_status|default:"-" }}</span>
+                <span class="summary-label">Failover Result</span>
+            </div>
+            <div class="summary-card">
+                <span class="summary-value">{{ open_findings_count|default:"-" }}</span>
+                <span class="summary-label">Open Findings</span>
+            </div>
+        </div>
+
+        {{ conclusion_html|safe }}
+    </article>
+
+    <!-- ══════════════════════════════════════════════════════
+         END OF REPORT
+    ══════════════════════════════════════════════════════════ -->
+    <article id="end-of-report">
+        <div>
+            <h1>END OF REPORT</h1>
+            <div class="fading-line"></div>
+        </div>
+    </article>
+
+</body>
+</html>
+

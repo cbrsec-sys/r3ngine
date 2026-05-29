@@ -20,7 +20,10 @@ class Neo4jManager:
         self.driver = None
         try:
             self.driver = GraphDatabase.driver(
-                self.uri, auth=(self.user, self.password)
+                self.uri,
+                auth=(self.user, self.password),
+                connection_timeout=10,           # fail fast if Neo4j is unreachable
+                max_transaction_retry_time=30,   # don't retry failed txns for >30s
             )
         except Exception as e:
             logger.error(f"Failed to connect to Neo4j: {e}")
@@ -30,11 +33,16 @@ class Neo4jManager:
             self.driver.close()
 
     def sync_scan_results(self, scan_history_id):
-        """Syncs scan results from PostgreSQL to Neo4j."""
+        """Syncs scan results from PostgreSQL to Neo4j.
+
+        Uses batched UNWIND transactions instead of per-record execute_write calls
+        to avoid the N+1 pattern that caused activity timeouts on large scans.
+        Each entity type is synced in a single transaction regardless of count.
+        """
         if not self.driver:
             return
 
-        from startScan.models import ScanHistory
+        from startScan.models import ScanHistory, Vulnerability
 
         try:
             scan = ScanHistory.objects.get(id=scan_history_id)
@@ -49,7 +57,9 @@ class Neo4jManager:
             return
 
         with self.driver.session() as session:
-            # Create Project and Scan nodes
+            # ----------------------------------------------------------------
+            # 1. Create Project / Scan / Domain scaffold (single transaction)
+            # ----------------------------------------------------------------
             session.execute_write(
                 self._initialize_scan_context,
                 project_id,
@@ -59,85 +69,125 @@ class Neo4jManager:
                 scan_date,
             )
 
-            # Sync Subdomains
-            subdomains = Subdomain.objects.filter(scan_history_id=scan_history_id)
-            for sub in subdomains:
+            # ----------------------------------------------------------------
+            # 2. Subdomains — build batch list, one transaction for all
+            # ----------------------------------------------------------------
+            subdomains_qs = Subdomain.objects.filter(
+                scan_history_id=scan_history_id
+            ).select_related("target_domain").prefetch_related("technologies")
+
+            subdomain_rows = []
+            ip_rows = []
+            tech_rows = []
+
+            for sub in subdomains_qs:
                 domain_name = sub.target_domain.name if sub.target_domain else target_name
                 subdomain_name = sub.name or "unknown"
                 ip_address = sub.ip_addresses if hasattr(sub, "ip_addresses") else None
-
-                session.execute_write(
-                    self._merge_assets,
-                    domain_name,
-                    subdomain_name,
-                    ip_address,
-                    scan_history_id,
-                )
-
-            # Sync Endpoints and Parameters
-            endpoints = EndPoint.objects.filter(scan_history_id=scan_history_id)
-            for endpoint in endpoints:
-                subdomain_name = endpoint.subdomain.name if endpoint.subdomain else target_name
-                session.execute_write(
-                    self._merge_endpoints,
-                    subdomain_name,
-                    endpoint.http_url or "unknown",
-                    scan_history_id,
-                )
-
-                # Sync Parameters
-                parameters = endpoint.parameters.all()
-                for param in parameters:
-                    param_name = param.name or "unknown"
-                    session.execute_write(
-                        self._merge_parameters,
-                        endpoint.http_url or "unknown",
-                        param_name,
-                        param.type,
-                        scan_history_id,
-                    )
-
-            # Sync Technologies
-            subdomains = Subdomain.objects.filter(scan_history_id=scan_history_id)
-            for sub in subdomains:
+                subdomain_rows.append({
+                    "domain_name": domain_name,
+                    "subdomain_name": subdomain_name,
+                    "scan_id": scan_history_id,
+                })
+                if ip_address:
+                    for ip in [x.strip() for x in str(ip_address).split(",") if x.strip()]:
+                        ip_rows.append({
+                            "ip": ip,
+                            "subdomain_name": subdomain_name,
+                            "scan_id": scan_history_id,
+                        })
                 for tech in sub.technologies.all():
                     if tech and tech.name:
-                        session.execute_write(
-                            self._merge_technologies, sub.name or "unknown", tech.name, scan_history_id
-                        )
+                        tech_rows.append({
+                            "subdomain_name": subdomain_name,
+                            "tech_name": tech.name,
+                            "scan_id": scan_history_id,
+                        })
 
-            # Sync Vulnerabilities
-            from startScan.models import Vulnerability
+            if subdomain_rows:
+                session.execute_write(self._batch_merge_subdomains, subdomain_rows)
+            if ip_rows:
+                session.execute_write(self._batch_merge_ips, ip_rows)
+            if tech_rows:
+                session.execute_write(self._batch_merge_technologies, tech_rows)
 
-            vulns = Vulnerability.objects.filter(scan_history_id=scan_history_id)
-            for vuln in vulns:
+            # ----------------------------------------------------------------
+            # 3. Endpoints + Parameters — prefetch to avoid per-endpoint query
+            # ----------------------------------------------------------------
+            endpoints_qs = EndPoint.objects.filter(
+                scan_history_id=scan_history_id
+            ).select_related("subdomain").prefetch_related("parameters")
+
+            endpoint_rows = []
+            param_rows = []
+
+            for endpoint in endpoints_qs:
+                subdomain_name = endpoint.subdomain.name if endpoint.subdomain else target_name
+                url = endpoint.http_url or "unknown"
+                endpoint_rows.append({
+                    "subdomain_name": subdomain_name,
+                    "url": url,
+                    "scan_id": scan_history_id,
+                })
+                for param in endpoint.parameters.all():
+                    param_rows.append({
+                        "url": url,
+                        "param_name": param.name or "unknown",
+                        "param_type": param.type,
+                        "scan_id": scan_history_id,
+                    })
+
+            if endpoint_rows:
+                session.execute_write(self._batch_merge_endpoints, endpoint_rows)
+            if param_rows:
+                session.execute_write(self._batch_merge_parameters, param_rows)
+
+            # ----------------------------------------------------------------
+            # 4. Vulnerabilities + CVEs — prefetch related
+            # ----------------------------------------------------------------
+            vuln_rows = []
+            cve_rows = []
+
+            for vuln in Vulnerability.objects.filter(
+                scan_history_id=scan_history_id
+            ).select_related("subdomain", "endpoint").prefetch_related("cve_ids"):
                 asset_name = (
-                    vuln.subdomain.name
-                    if vuln.subdomain
+                    vuln.subdomain.name if vuln.subdomain
                     else (vuln.endpoint.http_url if vuln.endpoint else None)
                 )
                 asset_type = (
-                    "Subdomain"
-                    if vuln.subdomain
+                    "Subdomain" if vuln.subdomain
                     else ("Endpoint" if vuln.endpoint else None)
                 )
                 if asset_name and asset_type:
-                    session.execute_write(
-                        self._merge_vulnerabilities,
-                        asset_name,
-                        asset_type,
-                        vuln.name or "Unknown Vulnerability",
-                        vuln.severity,
-                        vuln.correlation_score,
-                        scan_history_id,
-                        vuln.id,
-                    )
-                    # Sync CVEs linked to this vulnerability
+                    vuln_rows.append({
+                        "asset_name": asset_name,
+                        "asset_type": asset_type,
+                        "vuln_name": vuln.name or "Unknown Vulnerability",
+                        "severity": vuln.severity,
+                        "score": vuln.correlation_score,
+                        "scan_id": scan_history_id,
+                        "vuln_id": vuln.id,
+                    })
                     for cve in vuln.cve_ids.all():
                         if cve and cve.name:
-                            session.execute_write(
-                                self._merge_cves, vuln.name or "Unknown Vulnerability", cve.name, scan_history_id
-                            )
+                            cve_rows.append({
+                                "vuln_name": vuln.name or "Unknown Vulnerability",
+                                "cve_name": cve.name,
+                                "scan_id": scan_history_id,
+                            })
+
+            if vuln_rows:
+                session.execute_write(self._batch_merge_vulnerabilities, vuln_rows)
+            if cve_rows:
+                session.execute_write(self._batch_merge_cves, cve_rows)
+
+        logger.info(
+            f"[Neo4j] sync_scan_results scan_id={scan_history_id}: "
+            f"{len(subdomain_rows)} subdomains, {len(endpoint_rows)} endpoints, "
+            f"{len(param_rows)} params, {len(tech_rows)} techs, "
+            f"{len(vuln_rows)} vulns, {len(cve_rows)} CVEs synced."
+        )
 
     @staticmethod
     def _initialize_scan_context(
@@ -291,6 +341,142 @@ class Neo4jManager:
             cve_name=cve_name,
             vuln_name=vuln_name,
             scan_id=scan_id,
+        )
+
+    # ------------------------------------------------------------------
+    # Batched UNWIND write helpers — one transaction per entity type.
+    # rows is a list of dicts; keys match the Cypher parameter names.
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _batch_merge_subdomains(tx, rows):
+        """Merge all subdomains for a scan in a single UNWIND transaction."""
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (d:Domain {name: row.domain_name})
+            MERGE (s:Subdomain {name: row.subdomain_name})
+            WITH d, s, row
+            MATCH (sc:Scan {id: row.scan_id})
+            MERGE (d)-[:HAS_SUBDOMAIN]->(s)
+            MERGE (sc)-[:FOUND]->(s)
+            MERGE (sc)-[:FOUND]->(d)
+            """,
+            rows=rows,
+        )
+
+    @staticmethod
+    def _batch_merge_ips(tx, rows):
+        """Merge all IP-address nodes for a scan in a single UNWIND transaction."""
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (i:IPAddress {address: row.ip})
+            WITH i, row
+            MATCH (s:Subdomain {name: row.subdomain_name}), (sc:Scan {id: row.scan_id})
+            MERGE (s)-[:RESOLVES_TO]->(i)
+            MERGE (sc)-[:FOUND]->(i)
+            """,
+            rows=rows,
+        )
+
+    @staticmethod
+    def _batch_merge_technologies(tx, rows):
+        """Merge all technology nodes for a scan in a single UNWIND transaction."""
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (t:Technology {name: row.tech_name})
+            WITH t, row
+            MATCH (s:Subdomain {name: row.subdomain_name}), (sc:Scan {id: row.scan_id})
+            MERGE (s)-[:USES_TECH]->(t)
+            MERGE (sc)-[:FOUND]->(t)
+            """,
+            rows=rows,
+        )
+
+    @staticmethod
+    def _batch_merge_endpoints(tx, rows):
+        """Merge all endpoint nodes for a scan in a single UNWIND transaction."""
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (e:Endpoint {url: row.url})
+            WITH e, row
+            MATCH (s:Subdomain {name: row.subdomain_name}), (sc:Scan {id: row.scan_id})
+            MERGE (s)-[:HAS_ENDPOINT]->(e)
+            MERGE (sc)-[:FOUND]->(e)
+            """,
+            rows=rows,
+        )
+
+    @staticmethod
+    def _batch_merge_parameters(tx, rows):
+        """Merge all parameter nodes for a scan in a single UNWIND transaction."""
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (p:Parameter {name: row.param_name, type: row.param_type})
+            WITH p, row
+            MATCH (e:Endpoint {url: row.url}), (sc:Scan {id: row.scan_id})
+            MERGE (e)-[:HAS_PARAMETER]->(p)
+            MERGE (sc)-[:FOUND]->(p)
+            """,
+            rows=rows,
+        )
+
+    @staticmethod
+    def _batch_merge_vulnerabilities(tx, rows):
+        """Merge all vulnerability nodes for a scan in a single UNWIND transaction.
+
+        Neo4j does not support dynamic node labels inside UNWIND, so we split
+        subdomain-linked and endpoint-linked vulns into two separate runs.
+        """
+        subdomain_rows = [r for r in rows if r["asset_type"] == "Subdomain"]
+        endpoint_rows = [r for r in rows if r["asset_type"] == "Endpoint"]
+
+        if subdomain_rows:
+            tx.run(
+                """
+                UNWIND $rows AS row
+                MERGE (v:Vulnerability {id: row.vuln_id})
+                SET v.name = row.vuln_name, v.severity = row.severity,
+                    v.correlation_score = row.score
+                WITH v, row
+                MATCH (a:Subdomain {name: row.asset_name}), (sc:Scan {id: row.scan_id})
+                MERGE (a)-[:HAS_VULNERABILITY]->(v)
+                MERGE (sc)-[:FOUND]->(v)
+                """,
+                rows=subdomain_rows,
+            )
+        if endpoint_rows:
+            tx.run(
+                """
+                UNWIND $rows AS row
+                MERGE (v:Vulnerability {id: row.vuln_id})
+                SET v.name = row.vuln_name, v.severity = row.severity,
+                    v.correlation_score = row.score
+                WITH v, row
+                MATCH (a:Endpoint {url: row.asset_name}), (sc:Scan {id: row.scan_id})
+                MERGE (a)-[:HAS_VULNERABILITY]->(v)
+                MERGE (sc)-[:FOUND]->(v)
+                """,
+                rows=endpoint_rows,
+            )
+
+    @staticmethod
+    def _batch_merge_cves(tx, rows):
+        """Merge all CVE nodes for a scan in a single UNWIND transaction."""
+        tx.run(
+            """
+            UNWIND $rows AS row
+            MERGE (c:CVE {name: row.cve_name})
+            WITH c, row
+            MATCH (v:Vulnerability {name: row.vuln_name}), (sc:Scan {id: row.scan_id})
+            MERGE (v)-[:LINKED_TO_CVE]->(c)
+            MERGE (sc)-[:FOUND]->(c)
+            """,
+            rows=rows,
         )
 
     def ingest_stress_telemetry(self, endpoint_url, scan_id, telemetry_data):

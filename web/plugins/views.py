@@ -1,10 +1,13 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.http import FileResponse, Http404
+from django.views import View
 from .models import Plugin
 from .serializers import PluginSerializer
 from .utils import AtomicInstaller, PluginManager, MarketplaceManager
 import os
+import mimetypes
 
 class PluginViewSet(viewsets.ModelViewSet):
     queryset = Plugin.objects.all()
@@ -40,6 +43,22 @@ class PluginViewSet(viewsets.ModelViewSet):
         except Exception as e:
             if os.path.exists(temp_zip_path):
                 os.remove(temp_zip_path)
+            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        from django.core.cache import cache
+        cache.set(f"plugin_{instance.slug}_needs_restart", True, timeout=None)
+
+    @action(detail=False, methods=['post'], url_path='restart-orchestrator')
+    def restart_orchestrator(self, request):
+        import redis
+        from django.conf import settings
+        try:
+            rdb = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
+            rdb.publish('orchestrator_control', 'restart')
+            return Response({'success': True, 'message': 'Restart command sent to orchestrator.'})
+        except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(detail=False, methods=['get'], url_path='registry')
@@ -99,3 +118,21 @@ class PluginViewSet(viewsets.ModelViewSet):
         """Force refreshes the marketplace cache."""
         plugins = MarketplaceManager.get_available_plugins(force_refresh=True)
         return Response(plugins)
+
+
+class PluginUIView(View):
+    """Serves built plugin UI assets from plugins_data/{slug}/ui/dist/."""
+
+    def get(self, request, slug, path):
+        ui_dir = os.path.join(PluginManager.BASE_PLUGINS_DIR, slug, 'ui')
+        file_path = os.path.normpath(os.path.join(ui_dir, path))
+
+        # Guard against path traversal
+        if not file_path.startswith(os.path.abspath(ui_dir)):
+            raise Http404
+
+        if not os.path.isfile(file_path):
+            raise Http404
+
+        content_type, _ = mimetypes.guess_type(file_path)
+        return FileResponse(open(file_path, 'rb'), content_type=content_type or 'application/octet-stream')
