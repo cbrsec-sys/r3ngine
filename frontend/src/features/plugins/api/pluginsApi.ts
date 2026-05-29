@@ -12,8 +12,12 @@ export interface Plugin {
   anchor_step: string;
   runtime_position: 'BEFORE' | 'AFTER';
   order_weight: number;
-  manifest: any;
+  manifest: Record<string, any>;
+  tools_config: Record<string, any>;
+  installed_at: string;
   needs_restart: boolean;
+  author: string;
+  trust_level: 'official' | 'signed_unknown' | 'unsigned' | 'legacy';
 }
 
 export interface MarketplacePlugin {
@@ -22,6 +26,8 @@ export interface MarketplacePlugin {
   version: string;
   description: string;
   category?: string;
+  author?: string;
+  signed?: boolean;
   is_installed: boolean;
 }
 
@@ -52,6 +58,7 @@ export interface InstallStatus {
   status: 'running' | 'success' | 'failed';
   plugin_name: string | null;
   error?: string;
+  warning?: string;
 }
 
 export const fetchInstallStatus = async (installId: string): Promise<InstallStatus> => {

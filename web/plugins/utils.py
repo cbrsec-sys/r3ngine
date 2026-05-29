@@ -54,8 +54,8 @@ class MarketplaceManager:
 
     @classmethod
     def download_plugin(cls, slug):
-        download_url = f"https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/main/{slug}/{slug}.zip"
-        temp_zip_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, f"download_{slug}.zip")
+        download_url = f"https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/main/{slug}/{slug}.r3n"
+        temp_zip_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, f"download_{slug}.r3n")
         PluginManager.ensure_dirs()
         
         response = requests.get(download_url, stream=True, timeout=30)
@@ -192,6 +192,7 @@ class AtomicInstaller:
     STEPS = [
         ('upload',      'Saving plugin archive'),
         ('extract',     'Extracting archive'),
+        ('verify',      'Verifying integrity'),
         ('validate',    'Validating manifest'),
         ('backup',      'Creating database backup'),
         ('register',    'Registering plugin'),
@@ -284,10 +285,32 @@ class AtomicInstaller:
         backup_db_file = None
         backup_fs_dir = None
         plugin_slug = None
+        inner_zip_path = None
+        verification_result = 'legacy'
+        r3n_meta: dict = {}
 
         try:
             cls._emit(install_id, 'extract', 'in_progress')
-            temp_dir = PluginManager.extract_plugin(zip_path)
+
+            if zip_path.endswith('.r3n'):
+                cls._emit(install_id, 'verify', 'in_progress')
+                plugin_zip_bytes, r3n_meta, verification_result = PluginManager.verify_r3n(zip_path)
+                inner_zip_path = zip_path.replace('.r3n', '_inner.zip')
+                with open(inner_zip_path, 'wb') as _f:
+                    _f.write(plugin_zip_bytes)
+                actual_zip = inner_zip_path
+                _trust_msg = {
+                    'official':       'Verified — official r3ngine plugin',
+                    'signed_unknown': 'Signed by unverified publisher',
+                    'unsigned':       'Unsigned plugin',
+                }.get(verification_result, '')
+                cls._emit(install_id, 'verify', 'completed', _trust_msg)
+            else:
+                actual_zip = zip_path
+                verification_result = 'legacy'
+                cls._emit(install_id, 'verify', 'completed', 'Legacy .zip — unverified')
+
+            temp_dir = PluginManager.extract_plugin(actual_zip)
             cls._emit(install_id, 'extract', 'completed')
 
             cls._emit(install_id, 'validate', 'in_progress')
@@ -329,6 +352,8 @@ class AtomicInstaller:
                         'manifest': manifest,
                         'anchor_step': anchor,
                         'runtime_position': position,
+                        'author': r3n_meta.get('author', manifest.get('author', '')),
+                        'trust_level': verification_result,
                     }
                 )
                 cls._emit(install_id, 'register', 'completed')
@@ -470,6 +495,13 @@ class AtomicInstaller:
                 if install_id:
                     data = cache.get(f'plugin:install:{install_id}') or {}
                     data['status'] = 'success'
+                    _warning_messages = {
+                        'unsigned': 'This plugin is unsigned. Install at your own risk.',
+                        'signed_unknown': 'This plugin is signed by an unrecognized publisher.',
+                        'legacy': 'This is a legacy .zip plugin with no integrity verification.',
+                    }
+                    if verification_result in _warning_messages:
+                        data['warning'] = _warning_messages[verification_result]
                     cache.set(f'plugin:install:{install_id}', data, timeout=300)
 
                 return plugin
@@ -501,4 +533,6 @@ class AtomicInstaller:
 
             if temp_dir and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
+            if inner_zip_path and os.path.exists(inner_zip_path):
+                os.remove(inner_zip_path)
             raise e
