@@ -7,36 +7,39 @@ import {
   Tabs,
   Tab,
   CircularProgress,
-  Backdrop,
   Snackbar,
   Alert,
   Stack
 } from '@mui/material';
-import { 
-  Upload as UploadIcon, 
-  Extension as ExtensionIcon, 
+import {
+  Upload as UploadIcon,
+  Extension as ExtensionIcon,
   AccountTree as PipelineIcon
 } from '@mui/icons-material';
-import { 
+import {
   Shield
 } from 'lucide-react';
-import { 
-  usePlugins, 
-  useUploadPlugin, 
-  useMarketplacePlugins, 
-  useRefreshMarketplace 
+import { useQueryClient } from '@tanstack/react-query';
+import {
+  usePlugins,
+  useUploadPlugin,
+  useMarketplacePlugins,
+  useRefreshMarketplace
 } from '../api/pluginsApi';
 import PluginInventory from '../components/PluginInventory';
 import PipelineBuilder from '../components/PipelineBuilder';
+import InstallProgressOverlay from '../components/InstallProgressOverlay';
 
 const PluginManagementPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
+  const [installId, setInstallId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
     message: '',
     severity: 'success'
   });
 
+  const queryClient = useQueryClient();
   const { data: plugins, isLoading: isPluginsLoading, error: pluginsError } = usePlugins();
   const { data: marketplaceData, isLoading: isMarketplaceLoading } = useMarketplacePlugins();
   const uploadMutation = useUploadPlugin();
@@ -46,18 +49,30 @@ const PluginManagementPage: React.FC = () => {
     const file = event.target.files?.[0];
     if (file) {
       uploadMutation.mutate(file, {
-        onSuccess: () => {
-          setSnackbar({ open: true, message: 'Plugin uploaded successfully!', severity: 'success' });
+        onSuccess: (result) => {
+          setInstallId(result.install_id);
         },
         onError: (err: any) => {
-          setSnackbar({ 
-            open: true, 
-            message: `Upload failed: ${err.response?.data?.error || err.message}`, 
-            severity: 'error' 
+          setSnackbar({
+            open: true,
+            message: `Upload failed: ${err.response?.data?.error || err.message}`,
+            severity: 'error'
           });
         }
       });
     }
+  };
+
+  const handleInstallComplete = (pluginName: string) => {
+    queryClient.invalidateQueries({ queryKey: ['plugins'] });
+    queryClient.invalidateQueries({ queryKey: ['pluginsRegistry'] });
+    setSnackbar({ open: true, message: `${pluginName} installed successfully!`, severity: 'success' });
+    setInstallId(null);
+  };
+
+  const handleInstallError = (message: string) => {
+    setSnackbar({ open: true, message, severity: 'error' });
+    setInstallId(null);
   };
 
   const handleRefreshMarketplace = () => {
@@ -90,15 +105,11 @@ const PluginManagementPage: React.FC = () => {
 
   return (
     <Box sx={{ p: 4 }}>
-      <Backdrop
-        sx={{ color: '#00f3ff', zIndex: (theme) => theme.zIndex.drawer + 1, flexDirection: 'column', gap: 2, backdropFilter: 'blur(4px)' }}
-        open={uploadMutation.isPending}
-      >
-        <CircularProgress color="inherit" size={60} thickness={2} />
-        <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: 2 }}>
-          INSTALLING PLUGIN...
-        </Typography>
-      </Backdrop>
+      <InstallProgressOverlay
+        installId={installId}
+        onComplete={handleInstallComplete}
+        onError={handleInstallError}
+      />
 
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", mb: 6 }}>
         <Box>

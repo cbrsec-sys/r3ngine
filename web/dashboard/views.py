@@ -196,8 +196,10 @@ def index(request, slug, *args, **kwargs):
     context['most_used_ip'] = ip_addresses.annotate(count=Count('ip_addresses')).order_by('-count').exclude(ip_addresses__isnull=True)[:7]
     context['most_used_tech'] = Technology.objects.filter(technologies__in=subdomains).annotate(count=Count('technologies')).order_by('-count')[:7]
 
-    context['most_common_cve'] = CveId.objects.filter(cve_ids__in=vulnerabilities).annotate(nused=Count('cve_ids')).order_by('-nused').values('name', 'nused')[:7]
-    context['most_common_cwe'] = CweId.objects.filter(cwe_ids__in=vulnerabilities).annotate(nused=Count('cwe_ids')).order_by('-nused').values('name', 'nused')[:7]
+    # Filter out empty or null CVEs to prevent displaying blank items in legacy views
+    context['most_common_cve'] = CveId.objects.filter(cve_ids__in=vulnerabilities).exclude(name='').exclude(name__isnull=True).annotate(nused=Count('cve_ids')).order_by('-nused').values('name', 'nused')[:7]
+    # Filter out empty or null CWEs to prevent displaying blank items and frontend errors in legacy views
+    context['most_common_cwe'] = CweId.objects.filter(cwe_ids__in=vulnerabilities).exclude(name='').exclude(name__isnull=True).annotate(nused=Count('cwe_ids')).order_by('-nused').values('name', 'nused')[:7]
     context['most_common_tags'] = VulnerabilityTags.objects.filter(vuln_tags__in=vulnerabilities).annotate(nused=Count('vuln_tags')).order_by('-nused').values('name', 'nused')[:7]
 
     context['asset_countries'] = CountryISO.objects.filter(ipaddress__in=ip_addresses).annotate(count=Count('ipaddress')).order_by('-count')
@@ -320,6 +322,10 @@ def on_user_logged_in(sender, request, **kwargs):
 
 def search(request, slug):
     # Verified edit
+    return render(request, 'dashboard/v3_index.html')
+
+
+def spa_fallback(request, path=''):
     return render(request, 'dashboard/v3_index.html')
 
 

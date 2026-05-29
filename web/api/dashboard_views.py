@@ -98,8 +98,10 @@ class DashboardAPIView(APIView):
             'most_used_port': Port.objects.filter(ports__in=ip_addresses).annotate(count=Count('ports')).order_by('-count')[:7].values('number', 'service_name', 'count'),
             'most_used_ip': ip_addresses.annotate(count=Count('ip_addresses')).order_by('-count').exclude(address__isnull=True)[:7].values('address', 'count'),
             'most_used_tech': Technology.objects.filter(technologies__in=subdomains).annotate(count=Count('technologies')).order_by('-count')[:7].values('name', 'count'),
-            'most_common_cve': CveId.objects.filter(cve_ids__in=vulnerabilities).annotate(count=Count('cve_ids')).order_by('-count')[:7].values('name', 'count'),
-            'most_common_cwe': CweId.objects.filter(cwe_ids__in=vulnerabilities).annotate(count=Count('cwe_ids')).order_by('-count')[:7].values('name', 'count'),
+            # Filter out empty or null CVEs to prevent displaying blank items
+            'most_common_cve': CveId.objects.filter(cve_ids__in=vulnerabilities).exclude(name='').exclude(name__isnull=True).annotate(count=Count('cve_ids')).order_by('-count')[:7].values('name', 'count'),
+            # Filter out empty or null CWEs to prevent displaying blank items and frontend errors on click
+            'most_common_cwe': CweId.objects.filter(cwe_ids__in=vulnerabilities).exclude(name='').exclude(name__isnull=True).annotate(count=Count('cwe_ids')).order_by('-count')[:7].values('name', 'count'),
             'most_common_tags': VulnerabilityTags.objects.filter(vuln_tags__in=vulnerabilities).annotate(count=Count('vuln_tags')).order_by('-count')[:7].values('name', 'count'),
             'asset_countries': CountryISO.objects.filter(ipaddress__in=ip_addresses).annotate(count=Count('ipaddress')).order_by('-count').values('name', 'iso', 'count'),
             'most_vulnerable_targets': domains.annotate(
