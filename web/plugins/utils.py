@@ -23,7 +23,7 @@ from .models import Plugin
 logger = logging.getLogger(__name__)
 
 class MarketplaceManager:
-    MARKETPLACE_YAML_URL = "https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/main/plugins.yaml"
+    MARKETPLACE_YAML_URL = "https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/master/plugins.yaml"
     CACHE_KEY = "marketplace_plugins"
     CACHE_TIMEOUT = 3600  # 1 hour
 
