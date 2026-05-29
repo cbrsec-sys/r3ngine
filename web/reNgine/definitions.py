@@ -187,6 +187,42 @@ WPSCAN_SCAN_DEFAULT_CONFIG = {
     'wpscan_detection_mode': 'mixed'
 }
 
+# ─── Vigolium ─────────────────────────────────────────────────────────────────
+RUN_VIGOLIUM = 'run_vigolium'
+RUN_VIGOLIUM_DISCOVERY = 'run_vigolium_discovery'
+RUN_VIGOLIUM_ANALYSIS = 'run_vigolium_analysis'
+VIGOLIUM = 'vigolium'
+VIGOLIUM_STRATEGY = 'strategy'
+VIGOLIUM_CONCURRENCY = 'concurrency'
+VIGOLIUM_RATE_LIMIT = 'rate_limit'
+VIGOLIUM_TIMEOUT = 'timeout'
+VIGOLIUM_MODULES = 'modules'
+VIGOLIUM_SEVERITY_FILTER = 'severity_filter'
+
+VIGOLIUM_DEFAULT_CONFIG = {
+    'run_vigolium': True,
+    'strategy': 'balanced',
+    'concurrency': 50,
+    'rate_limit': 100,
+    'timeout': '15s',
+}
+
+VIGOLIUM_DEFAULT_DISCOVERY_CONFIG = {
+    'run_vigolium_discovery': True,
+    'strategy': 'balanced',
+    'concurrency': 20,
+    'rate_limit': 50,
+    'timeout': '10s',
+}
+
+VIGOLIUM_DEFAULT_ANALYSIS_CONFIG = {
+    'run_vigolium_analysis': True,
+    'strategy': 'balanced',
+    'concurrency': 20,
+    'rate_limit': 50,
+    'timeout': '10s',
+}
+
 ATTACK_PATH_MODELING = 'attack_path_modeling'
 ATTACK_PATH_MODELING_DEFAULT_CONFIG = {
     'enabled': True,

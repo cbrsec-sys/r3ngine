@@ -441,6 +441,7 @@ def seed_endpoints_for_crawl_activity(ctx: dict) -> dict:
     """
     from startScan.models import Subdomain, EndPoint
     from reNgine.utils.task import save_endpoint
+    from reNgine.common_func import sanitize_url
 
     scan_id = ctx.get('scan_history_id')
     url_filter = ctx.get('starting_point_path', '')
@@ -449,9 +450,14 @@ def seed_endpoints_for_crawl_activity(ctx: dict) -> dict:
     seed_urls = []
 
     for subdomain in subdomains:
-        raw_url = f'{subdomain.name}{url_filter}' if url_filter else subdomain.name
+        if url_filter:
+            path = url_filter if url_filter.startswith('/') else f'/{url_filter}'
+            raw_url = f'{subdomain.name}{path}'
+        else:
+            raw_url = subdomain.name
         if not raw_url.startswith(('http://', 'https://')):
             raw_url = f'http://{raw_url}'
+        raw_url = sanitize_url(raw_url)
 
         existing = EndPoint.objects.filter(
             scan_history_id=scan_id,
@@ -465,6 +471,7 @@ def seed_endpoints_for_crawl_activity(ctx: dict) -> dict:
             endpoint, _ = save_endpoint(
                 raw_url,
                 ctx=ctx,
+                crawl=False,
                 is_default=True,
                 subdomain=subdomain,
             )
@@ -757,7 +764,7 @@ def parse_analysis_results_activity(ctx: dict) -> bool:
 # ===========================================================================
 
 @activity.defn(name="RunNucleiActivity")
-def run_nuclei_activity(ctx: dict) -> bool:
+def run_nuclei_activity(ctx: dict, severity: str = None) -> bool:
     """Run Nuclei vulnerability scan against all live endpoints discovered for this scan.
 
     Performs a pre-flight check against the EndPoint table before invoking nuclei_scan.
@@ -767,6 +774,7 @@ def run_nuclei_activity(ctx: dict) -> bool:
 
     Args:
         ctx (dict): Temporal workflow context containing scan_history_id and engine config.
+        severity (str, optional): The target severity level to filter the scan.
 
     Returns:
         bool: True on success (including graceful skip when no domain is found).
@@ -775,7 +783,8 @@ def run_nuclei_activity(ctx: dict) -> bool:
     from startScan.models import EndPoint, ScanHistory
 
     scan_id = ctx.get('scan_history_id')
-    activity.logger.info(f"[RunNucleiActivity] scan_id={scan_id}")
+    severity = severity or ctx.get('nuclei_severity_filter')
+    activity.logger.info(f"[RunNucleiActivity] scan_id={scan_id} severity={severity}")
 
     # Pre-flight: count endpoints in DB for this scan
     endpoint_count = EndPoint.objects.filter(scan_history_id=scan_id).count()
@@ -805,11 +814,14 @@ def run_nuclei_activity(ctx: dict) -> bool:
         # Let nuclei_scan call get_http_urls() to filter alive endpoints from DB
         urls = []
 
+    task_desc = f'Nuclei Scan ({severity})' if severity else 'Nuclei Scan'
+
     return _run_task(
         nuclei_scan, ctx,
         task_name='nuclei_scan',
-        description='Nuclei Scan',
-        urls=urls
+        description=task_desc,
+        urls=urls,
+        severity=severity
     )
 
 @activity.defn(name="RunCRLFuzzActivity")
@@ -859,6 +871,73 @@ def run_semgrep_activity(ctx: dict) -> bool:
     from reNgine.tasks import semgrep_scan
     activity.logger.info(f"[RunSemgrepActivity] scan_id={ctx.get('scan_history_id')}")
     return _run_task(semgrep_scan, ctx, task_name='semgrep_scan', description='Semgrep Vulnerability Scan', mode='vulnerability')
+
+
+@activity.defn(name="RunVigoliumScanActivity")
+def run_vigolium_scan_activity(ctx: dict) -> bool:
+    """Run Vigolium known-issue + dynamic-assessment scan against live endpoints.
+
+    Runs inside NucleiPlannerWorkflow at Tier 6 alongside Nuclei. Default-enabled
+    via vulnerability_scan.run_vigolium: true in the engine YAML config.
+    """
+    from reNgine.vigolium_tasks import vigolium_scan
+    activity.logger.info(f"[RunVigoliumScanActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(vigolium_scan, ctx, task_name='vigolium_scan', description='Vigolium Vulnerability Scan')
+
+
+@activity.defn(name="RunVigoliumDiscoveryActivity")
+def run_vigolium_discovery_activity(ctx: dict) -> bool:
+    """Run Vigolium discovery phase to seed the endpoint DB.
+
+    Runs at Tier 2 in parallel with http_crawl. Populates EndPoint records
+    with URLs discovered by vigolium's ingestion + discovery phases.
+    Controlled by vigolium_discovery.run_vigolium_discovery in engine YAML.
+    """
+    from reNgine.vigolium_tasks import vigolium_discovery
+    activity.logger.info(f"[RunVigoliumDiscoveryActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(vigolium_discovery, ctx, task_name='vigolium_discovery', description='Vigolium Endpoint Discovery')
+
+
+@activity.defn(name="RunVigoliumAnalysisActivity")
+def run_vigolium_analysis_activity(ctx: dict) -> bool:
+    """Run Vigolium dynamic-assessment phase at Tier 5.
+
+    Runs in parallel with web_api_discovery. Executes vigolium's 251-module
+    passive + active scanning suite and saves findings as Vulnerability records.
+    Controlled by vigolium_analysis.run_vigolium_analysis in engine YAML.
+    """
+    from reNgine.vigolium_tasks import vigolium_analysis
+    activity.logger.info(f"[RunVigoliumAnalysisActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(vigolium_analysis, ctx, task_name='vigolium_analysis', description='Vigolium Dynamic Analysis')
+
+
+@activity.defn(name="MarkVulnerabilityScanCompleteActivity")
+def mark_vulnerability_scan_complete_activity(ctx: dict) -> None:
+    """Write a SUCCESS ScanActivity with name='vulnerability_scan'.
+
+    NucleiPlannerWorkflow runs as a child workflow whose internal activities
+    use names like 'nuclei_scan', 'crlfuzz_scan', etc. — never 'vulnerability_scan'.
+    Without this record, resume_scan_temporal always considers vulnerability_scan
+    incomplete and re-runs it from scratch on crash recovery.
+    """
+    from startScan.models import ScanHistory, ScanActivity
+    from reNgine.definitions import SUCCESS_TASK
+    from django.utils import timezone
+
+    scan_id = ctx.get('scan_history_id')
+    scan = ScanHistory.objects.filter(pk=scan_id).first()
+    if not scan:
+        return
+    ScanActivity.objects.get_or_create(
+        scan_of=scan,
+        name='vulnerability_scan',
+        defaults={
+            'title': 'Vulnerability Scan',
+            'time': timezone.now(),
+            'status': SUCCESS_TASK,
+        }
+    )
+    activity.logger.info(f"[MarkVulnerabilityScanCompleteActivity] scan_id={scan_id} marked complete")
 
 
 @activity.defn(name="RunWAFBypassActivity")
@@ -1007,6 +1086,8 @@ def sync_graph_activity(ctx: dict) -> bool:
     """Synchronize all scan results to the Neo4j Attack Path Modeling graph.
 
     Delegates to `run_apme` task and additionally runs `Neo4jManager.sync_scan_results`.
+    Sends a heartbeat before the sync so Temporal knows the activity is alive even
+    if Neo4j is slow to accept the initial connection.
 
     Args:
         ctx (dict): Temporal workflow context.
@@ -1015,11 +1096,12 @@ def sync_graph_activity(ctx: dict) -> bool:
         bool: True on success.
     """
     from reNgine.utils.graph import Neo4jManager
-    from reNgine.tasks import run_apme
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[SyncGraphActivity] Syncing scan_id={scan_id} to Neo4j")
+    # Heartbeat before the Neo4j connection attempt so Temporal sees the
+    # activity is alive even if driver init is slow.
+    activity.heartbeat(f"SyncGraphActivity starting neo4j sync for scan_id={scan_id}")
 
-    # Also run raw graph sync
     nm = Neo4jManager()
     try:
         nm.sync_scan_results(scan_id)

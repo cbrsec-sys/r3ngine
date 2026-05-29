@@ -67,6 +67,20 @@ if [ ! -f '/usr/local/bin/kr' ]; then
   cd /usr/src/app
 fi
 
+if [ ! -d '/usr/src/wordlist/kr' ]; then
+  mkdir -p /usr/src/wordlist/kr
+  cd /usr/src/wordlist/kr
+  wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-large.kite.tar.gz -O routes-large.kite.tar.gz
+  tar -xvf routes-large.kite.tar.gz
+  rm -rf routes-large.kite.tar.gz
+  wget https://wordlists-cdn.assetnote.io/data/kiterunner/routes-small.kite.tar.gz -O routes-small.kite.tar.gz
+  tar -xvf routes-small.kite.tar.gz
+  rm -rf routes-small.kite.tar.gz
+  mv routes-large.kite routes-large.kr
+  mv routes-small.kite routes-small.kr
+  cd /usr/src/app
+fi
+
 if [ ! -f '/usr/src/wordlist/cpanel_users.txt' ]; then
   echo "Fetching cPanel2Shell wordlist"
   mkdir -p /usr/src/wordlist

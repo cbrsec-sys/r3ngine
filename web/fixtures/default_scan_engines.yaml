@@ -60,6 +60,7 @@
         'run_acunetix': true,
         'run_wpscan': true,
         'run_s3scanner': true,
+        'run_vigolium': true,
         'enable_http_crawl': true,
         'concurrency': 50,
         'intensity': 'normal',
@@ -71,11 +72,31 @@
           'use_nuclei_config': false,
           'severities': ['unknown', 'info', 'low', 'medium', 'high', 'critical']
         },
+        'vigolium': {
+          'strategy': 'balanced',
+          'concurrency': 50,
+          'rate_limit': 100,
+          'timeout': '15s'
+        },
         'cpanel_scanner': {
           'run_cpanel2shell': true,
           'cpanel_user_wordlist': '/usr/src/app/wordlist/cpanel_users.txt',
           'proxy_type': 'rotating'
         }
+      }
+      vigolium_discovery: {
+        'run_vigolium_discovery': true,
+        'strategy': 'balanced',
+        'concurrency': 20,
+        'rate_limit': 50,
+        'timeout': '10s'
+      }
+      vigolium_analysis: {
+        'run_vigolium_analysis': true,
+        'strategy': 'balanced',
+        'concurrency': 20,
+        'rate_limit': 50,
+        'timeout': '10s'
       }
       attack_path_modeling: {
         'enabled': true,

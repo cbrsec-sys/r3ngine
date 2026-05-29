@@ -6,7 +6,7 @@ from plugins.models import Plugin
 from plugins.utils import PluginManager
 
 class Command(BaseCommand):
-    help = 'Synchronizes plugin UI assets from plugins_data to MEDIA_ROOT for frontend access'
+    help = 'Synchronizes plugin UI assets from plugins_data/ui/dist to STATIC_ROOT for frontend access'
 
     def handle(self, *args, **options):
         active_plugins = Plugin.objects.all()
@@ -33,8 +33,8 @@ class Command(BaseCommand):
                 ))
                 continue
 
-            # Target directory in MEDIA_ROOT
-            media_plugin_dir = os.path.join(settings.MEDIA_ROOT, 'plugins', plugin.slug)
+            # Target directory in STATIC_ROOT (served at /staticfiles/plugins/{slug}/ui/)
+            media_plugin_dir = os.path.join(settings.STATIC_ROOT, 'plugins', plugin.slug)
             media_ui_target = os.path.join(media_plugin_dir, 'ui')
 
             try:
