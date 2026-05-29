@@ -2,7 +2,7 @@
   <em>V3 Beta Release is now operational!</em>
 </p>
 <p align="center">
-<a href="https://rengine.wiki"><img src="frontend/public/img/banner.png" height="400px" width="520px" alt=""/></a>
+<img src="frontend/public/img/banner.png" height="400px" width="520px" alt=""/>
 </p>
 
 <p align="center">
