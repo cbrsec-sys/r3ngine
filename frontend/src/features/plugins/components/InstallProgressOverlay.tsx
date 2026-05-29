@@ -16,6 +16,7 @@ import {
   PackageOpen,
   ShieldCheck,
   RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import { useInstallStatus, type InstallStep } from '../api/pluginsApi';
 
@@ -23,6 +24,7 @@ import { useInstallStatus, type InstallStep } from '../api/pluginsApi';
 const ALL_STEPS: { key: string; label: string }[] = [
   { key: 'upload',     label: 'Saving plugin archive' },
   { key: 'extract',    label: 'Extracting archive' },
+  { key: 'verify',     label: 'Verifying integrity' },
   { key: 'validate',   label: 'Validating manifest' },
   { key: 'backup',     label: 'Creating database backup' },
   { key: 'register',   label: 'Registering plugin' },
@@ -71,7 +73,7 @@ const InstallProgressOverlay: React.FC<Props> = ({ installId, onComplete, onErro
         }}
       >
         {/* Header */}
-        <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 3 }}>
+        <Stack direction="row" spacing={2} sx={{ mb: 3, alignItems: 'center' }}>
           <Box sx={{ color: isSuccess ? '#00ff62' : isFailed ? '#ff003c' : '#00f3ff', filter: `drop-shadow(0 0 8px currentColor)` }}>
             {isSuccess ? <ShieldCheck size={28} /> : isFailed ? <XCircle size={28} /> : <PackageOpen size={28} />}
           </Box>
@@ -130,6 +132,18 @@ const InstallProgressOverlay: React.FC<Props> = ({ installId, onComplete, onErro
             <StepRow key={step.key} step={step} />
           ))}
         </Stack>
+
+        {/* Unsigned / legacy warning */}
+        {isSuccess && data?.warning && (
+          <Box sx={{ mt: 2.5, p: 1.5, bgcolor: 'rgba(255,152,0,0.07)', border: '1px solid rgba(255,152,0,0.25)', borderRadius: 1, display: 'flex', gap: 1.25, alignItems: 'flex-start' }}>
+            <Box sx={{ color: '#ff9800', flexShrink: 0, mt: '1px' }}>
+              <AlertTriangle size={14} />
+            </Box>
+            <Typography variant="caption" sx={{ color: '#ff9800', fontFamily: 'monospace', fontSize: '0.68rem', lineHeight: 1.5 }}>
+              {data.warning}
+            </Typography>
+          </Box>
+        )}
 
         {/* Error message */}
         {isFailed && data?.error && (
