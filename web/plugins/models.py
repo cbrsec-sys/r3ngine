@@ -25,6 +25,8 @@ class Plugin(models.Model):
     
     # Logo or icon path relative to plugin dir
     icon_path = models.CharField(max_length=255, blank=True, null=True)
+    author = models.CharField(max_length=255, blank=True, default='')
+    trust_level = models.CharField(max_length=20, default='unsigned')
 
     class Meta:
         ordering = ['anchor_step', 'runtime_position', 'order_weight', 'name']

@@ -560,19 +560,23 @@ def target_summary(request, slug, id):
         .annotate(count=Count('http_status'))
     )
 
-    # CVEs
+    # CVEs - Exclude empty or null entries to prevent displaying blanks in charts
     context['most_common_cve'] = (
         CveId.objects
         .filter(cve_ids__in=vulnerabilities)
+        .exclude(name='')
+        .exclude(name__isnull=True)
         .annotate(nused=Count('cve_ids'))
         .order_by('-nused')
         .values('name', 'nused')[:7]
     )
 
-    # CWEs
+    # CWEs - Exclude empty or null entries to prevent displaying blanks in charts
     context['most_common_cwe'] = (
         CweId.objects
         .filter(cwe_ids__in=vulnerabilities)
+        .exclude(name='')
+        .exclude(name__isnull=True)
         .annotate(nused=Count('cwe_ids'))
         .order_by('-nused')
         .values('name', 'nused')[:7]

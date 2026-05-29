@@ -1,18 +1,23 @@
 from rest_framework import serializers
 from .models import Plugin
 
+
 class PluginSerializer(serializers.ModelSerializer):
     needs_restart = serializers.SerializerMethodField()
 
     class Meta:
         model = Plugin
         fields = [
-            'id', 'name', 'slug', 'version', 'description', 
-            'is_enabled', 'anchor_step', 'runtime_position', 
-            'order_weight', 'manifest', 'installed_at', 
-            'updated_at', 'icon_path', 'needs_restart'
+            'id', 'name', 'slug', 'version', 'description',
+            'is_enabled', 'anchor_step', 'runtime_position',
+            'order_weight', 'manifest', 'tools_config', 'installed_at',
+            'updated_at', 'icon_path', 'needs_restart',
+            'author', 'trust_level',
         ]
-        read_only_fields = ['id', 'slug', 'installed_at', 'updated_at', 'manifest']
+        read_only_fields = [
+            'id', 'slug', 'installed_at', 'updated_at',
+            'manifest', 'tools_config', 'author', 'trust_level',
+        ]
 
     def get_needs_restart(self, obj):
         from django.core.cache import cache

@@ -48,6 +48,11 @@ def parse_vigolium_finding(task_instance, finding_data, subdomain):
       matched_at  → list of URLs (use first; fall back to data.url)
       tags        → list or null
       request     → raw HTTP request string
+
+    Args:
+        task_instance: Temporal task proxy with scan context.
+        finding_data (dict): Finding payload from Vigolium JSONL.
+        subdomain (Subdomain): Associated Subdomain database object.
     """
     name = finding_data.get('module_name')
     if not name:
@@ -80,6 +85,7 @@ def parse_vigolium_finding(task_instance, finding_data, subdomain):
         tags=tags,
         cve_ids=[],
         references=[],
+        source='Vigolium'
     )
 
 
@@ -201,7 +207,7 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
         f" --stateless"
         f" --format jsonl"
         f" -o {output_file}"
-        f" --only known-issue-scan,dynamic-assessment"
+        # f" --only known-issue-scan,dynamic-assessment"
         f" -c {concurrency}"
         f" -r {rate_limit}"
         f" --timeout {timeout}"

@@ -1,49 +1,77 @@
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from django.http import FileResponse, Http404
 from django.views import View
+from django.core.cache import cache
 from .models import Plugin
 from .serializers import PluginSerializer
 from .utils import AtomicInstaller, PluginManager, MarketplaceManager
 import os
 import mimetypes
+import threading
+import uuid
 
 class PluginViewSet(viewsets.ModelViewSet):
     queryset = Plugin.objects.all()
     serializer_class = PluginSerializer
     lookup_field = 'slug'
     pagination_class = None
+
+    def get_permissions(self):
+        # Read-only actions (list, retrieve, registry, install-status) require only authentication.
+        # All mutating or privileged actions require admin/staff.
+        read_only_actions = {'list', 'retrieve', 'registry', 'install_status'}
+        if self.action in read_only_actions:
+            return [IsAuthenticated()]
+        return [IsAdminUser()]
     
     @action(detail=False, methods=['post'], url_path='upload')
     def upload_plugin(self, request):
         if 'file' not in request.FILES:
             return Response({'error': 'No file uploaded'}, status=status.HTTP_400_BAD_REQUEST)
-            
+
         zip_file = request.FILES['file']
-        # Save temp zip
-        temp_zip_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, 'upload_' + zip_file.name)
         PluginManager.ensure_dirs()
-        
+        temp_zip_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, f'upload_{uuid.uuid4().hex[:8]}_{zip_file.name}')
+
         with open(temp_zip_path, 'wb+') as destination:
             for chunk in zip_file.chunks():
                 destination.write(chunk)
-                
-        try:
-            plugin = AtomicInstaller.install(temp_zip_path)
-            os.remove(temp_zip_path)
-            return Response({
-                'success': True,
-                'plugin': {
-                    'name': plugin.name,
-                    'slug': plugin.slug,
-                    'version': plugin.version
-                }
-            })
-        except Exception as e:
-            if os.path.exists(temp_zip_path):
-                os.remove(temp_zip_path)
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        install_id = uuid.uuid4().hex[:12]
+        cache.set(f'plugin:install:{install_id}', {
+            'steps': [{'key': 'upload', 'label': 'Saving plugin archive', 'status': 'completed', 'message': ''}],
+            'status': 'running',
+            'plugin_name': None,
+        }, timeout=300)
+
+        def _run_install(path, iid):
+            import django.db
+            django.db.close_old_connections()
+            try:
+                AtomicInstaller.install(path, install_id=iid)
+            except Exception:
+                pass  # AtomicInstaller already writes 'failed' state to cache
+            finally:
+                if os.path.exists(path):
+                    os.remove(path)
+                django.db.close_old_connections()
+
+        threading.Thread(target=_run_install, args=(temp_zip_path, install_id), daemon=True).start()
+
+        return Response({'install_id': install_id}, status=status.HTTP_202_ACCEPTED)
+
+    @action(detail=False, methods=['get'], url_path='install-status')
+    def install_status(self, request):
+        install_id = request.GET.get('id', '')
+        if not install_id:
+            return Response({'error': 'id parameter required'}, status=status.HTTP_400_BAD_REQUEST)
+        data = cache.get(f'plugin:install:{install_id}')
+        if data is None:
+            return Response({'error': 'install session not found'}, status=status.HTTP_404_NOT_FOUND)
+        return Response(data)
 
     def perform_update(self, serializer):
         instance = serializer.save()

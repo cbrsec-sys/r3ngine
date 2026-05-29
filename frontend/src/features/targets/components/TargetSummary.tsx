@@ -455,47 +455,71 @@ export const TargetSummary = () => {
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' }, gap: 2 }}>
             <TacticalPanel title="Most Common CVE IDs" icon={<BarChart2 size={14} />} sx={{ height: 280 }}>
               <Box sx={{ p: 1, height: '100%' }}>
-                <Chart
-                  options={{
-                    chart: { type: 'bar', toolbar: { show: false } },
-                    plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
-                    xaxis: { categories: data.most_common_cve?.map((c: any) => c.name) },
-                    colors: ['#ff003c']
-                  }}
-                  series={[{ data: data.most_common_cve?.map((c: any) => c.count || c.nused) }]}
-                  type="bar"
-                  height="100%"
-                />
+                {data.most_common_cve && data.most_common_cve.length > 0 ? (
+                  <Chart
+                    options={{
+                      chart: { type: 'bar', toolbar: { show: false } },
+                      plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
+                      xaxis: { categories: data.most_common_cve?.map((c: any) => c.name) },
+                      colors: ['#ff003c']
+                    }}
+                    series={[{ data: data.most_common_cve?.map((c: any) => c.count || c.nused) }]}
+                    type="bar"
+                    height="100%"
+                  />
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 200 }}>
+                    <Typography sx={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
+                      No CVE Data Available
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             </TacticalPanel>
             <TacticalPanel title="Most Common CWE IDs" icon={<BarChart2 size={14} />} sx={{ height: 280 }}>
               <Box sx={{ p: 1, height: '100%' }}>
-                <Chart
-                  options={{
-                    chart: { type: 'bar', toolbar: { show: false } },
-                    plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
-                    xaxis: { categories: data.most_common_cwe?.map((c: any) => c.name) },
-                    colors: ['#ff9f00']
-                  }}
-                  series={[{ data: data.most_common_cwe?.map((c: any) => c.count || c.nused) }]}
-                  type="bar"
-                  height="100%"
-                />
+                {data.most_common_cwe && data.most_common_cwe.length > 0 ? (
+                  <Chart
+                    options={{
+                      chart: { type: 'bar', toolbar: { show: false } },
+                      plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
+                      xaxis: { categories: data.most_common_cwe?.map((c: any) => c.name) },
+                      colors: ['#ff9f00']
+                    }}
+                    series={[{ data: data.most_common_cwe?.map((c: any) => c.count || c.nused) }]}
+                    type="bar"
+                    height="100%"
+                  />
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 200 }}>
+                    <Typography sx={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
+                      No CWE Data Available
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             </TacticalPanel>
             <TacticalPanel title="Most Common Tags" icon={<BarChart2 size={14} />} sx={{ height: 280 }}>
               <Box sx={{ p: 1, height: '100%' }}>
-                <Chart
-                  options={{
-                    chart: { type: 'bar', toolbar: { show: false } },
-                    plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
-                    xaxis: { categories: data.most_common_tags?.map((c: any) => c.name) },
-                    colors: ['#00ff62']
-                  }}
-                  series={[{ data: data.most_common_tags?.map((c: any) => c.count || c.nused) }]}
-                  type="bar"
-                  height="100%"
-                />
+                {data.most_common_tags && data.most_common_tags.length > 0 ? (
+                  <Chart
+                    options={{
+                      chart: { type: 'bar', toolbar: { show: false } },
+                      plotOptions: { bar: { horizontal: true, borderRadius: 2 } },
+                      xaxis: { categories: data.most_common_tags?.map((c: any) => c.name) },
+                      colors: ['#00ff62']
+                    }}
+                    series={[{ data: data.most_common_tags?.map((c: any) => c.count || c.nused) }]}
+                    type="bar"
+                    height="100%"
+                  />
+                ) : (
+                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 200 }}>
+                    <Typography sx={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
+                      No Tag Data Available
+                    </Typography>
+                  </Box>
+                )}
               </Box>
             </TacticalPanel>
           </Box>

@@ -9,9 +9,9 @@ cd /usr/src/app/frontend && npm install
 if [ "$DEBUG" = "1" ]; then
     echo "Development mode: Starting Vite dev server..."
     npm run dev -- --host 0.0.0.0 &
-else
-    echo "Production mode: Building frontend..."
-    npm run build
+# else
+    # echo "Production mode: Building frontend..."
+    # npm run build
 fi
 
 cd /usr/src/app

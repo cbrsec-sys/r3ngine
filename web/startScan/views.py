@@ -80,9 +80,11 @@ def detail_scan(request, id, slug):
         .annotate(Count('http_status'))
     )
 
-    # CVEs / CWes
+    # CVEs / CWes - Exclude empty or null entries to prevent displaying blanks in charts
     common_cves = (
         cves
+        .exclude(name='')
+        .exclude(name__isnull=True)
         .annotate(nused=Count('cve_ids'))
         .order_by('-nused')
         .values('name', 'nused')
@@ -90,6 +92,8 @@ def detail_scan(request, id, slug):
     )
     common_cwes = (
         cwes
+        .exclude(name='')
+        .exclude(name__isnull=True)
         .annotate(nused=Count('cwe_ids'))
         .order_by('-nused')
         .values('name', 'nused')

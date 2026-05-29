@@ -202,4 +202,9 @@ urlpatterns = [
         '<slug:slug>/api/graph/node/<str:node_id>/ticket/',
         views.generate_ticket,
         name='generate_ticket'),
+
+    # SPA catch-all: serves index.html for any unmatched URL so React Router
+    # can handle client-side routes (including plugin pages) on hard refresh.
+    # Must remain the last pattern in this list.
+    path('<path:path>', views.spa_fallback, name='spa_fallback'),
 ]

@@ -55,6 +55,14 @@ def parse_wpscan_results(task_instance, output_file, subdomain):
         logger.error(f"Failed to parse WPScan results for {subdomain.name}: {str(e)}")
 
 def save_finding(task_instance, finding, subdomain, default_title):
+    """Saves a WPScan finding to the database.
+
+    Args:
+        task_instance: Temporal task proxy with scan context.
+        finding (dict): Finding payload from WPScan JSON.
+        subdomain (Subdomain): Associated Subdomain database object.
+        default_title (str): Fallback title to use if finding has no title.
+    """
     title = finding.get('title', default_title)
     description = finding.get('description', '')
     
@@ -82,7 +90,8 @@ def save_finding(task_instance, finding, subdomain, default_title):
         'description': description,
         'type': 'WordPress',
         'references': ref_urls,
-        'cve_ids': cve_ids
+        'cve_ids': cve_ids,
+        'source': 'WPScan'
     }
 
     save_vulnerability(

@@ -284,79 +284,89 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
 
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Most Common CWE">
-            <Chart
-              options={{
-                chart: {
-                  type: 'treemap' as any,
-                  toolbar: { show: false },
-                  background: 'transparent',
-                  events: {
-                    dataPointSelection: (_e: any, _ctx: any, config: any) => {
-                      const idx = config.dataPointIndex;
-                      const cweItem = data.most_common_cwe.slice(0, 8)[idx];
-                      if (cweItem) handleCweClick(cweItem.name);
+            {data.most_common_cwe && data.most_common_cwe.length > 0 ? (
+              <>
+                <Chart
+                  options={{
+                    chart: {
+                      type: 'treemap' as any,
+                      toolbar: { show: false },
+                      background: 'transparent',
+                      events: {
+                        dataPointSelection: (_e: any, _ctx: any, config: any) => {
+                          const idx = config.dataPointIndex;
+                          const cweItem = data.most_common_cwe.slice(0, 8)[idx];
+                          if (cweItem) handleCweClick(cweItem.name);
+                        },
+                      },
                     },
-                  },
-                },
-                dataLabels: {
-                  enabled: true,
-                  style: { fontSize: '10px', fontFamily: 'Inter, sans-serif', colors: ['#ffffffcc'] },
-                  formatter: (text: string, op: any) => [text, `×${op.value}`],
-                },
-                plotOptions: {
-                  treemap: {
-                    distributed: true,
-                    enableShades: true,
-                    shadeIntensity: 0.3,
-                    colorScale: {
-                      ranges: [
-                        { from: 0, to: 9999, color: '#7000ff' },
-                      ],
+                    dataLabels: {
+                      enabled: true,
+                      style: { fontSize: '10px', fontFamily: 'Inter, sans-serif', colors: ['#ffffffcc'] },
+                      formatter: (text: string, op: any) => [text, `×${op.value}`],
                     },
-                  },
-                },
-                colors: CWE_COLORS,
-                tooltip: {
-                  theme: 'dark',
-                  y: { formatter: (v: number) => `${v} occurrence${v !== 1 ? 's' : ''}` },
-                },
-                legend: { show: false },
-                theme: { mode: 'dark' as any },
-              }}
-              series={[{
-                data: data.most_common_cwe.slice(0, 8).map((c, i) => ({
-                  x: c.name,
-                  y: c.count,
-                  fillColor: CWE_COLORS[i % CWE_COLORS.length],
-                })),
-              }]}
-              type="treemap"
-              height={170}
-            />
-            {/* Clickable legend */}
-            <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-              {data.most_common_cwe.slice(0, 8).map((c, i) => (
-                <Chip
-                  key={c.name}
-                  label={`${c.name} (${c.count})`}
-                  size="small"
-                  onClick={() => handleCweClick(c.name)}
-                  sx={{
-                    height: 20,
-                    fontSize: '0.6rem',
-                    fontWeight: 700,
-                    fontFamily: 'Inter',
-                    cursor: 'pointer',
-                    bgcolor: `${CWE_COLORS[i % CWE_COLORS.length]}18`,
-                    color: CWE_COLORS[i % CWE_COLORS.length],
-                    border: `1px solid ${CWE_COLORS[i % CWE_COLORS.length]}44`,
-                    '&:hover': {
-                      bgcolor: `${CWE_COLORS[i % CWE_COLORS.length]}35`,
+                    plotOptions: {
+                      treemap: {
+                        distributed: true,
+                        enableShades: true,
+                        shadeIntensity: 0.3,
+                        colorScale: {
+                          ranges: [
+                            { from: 0, to: 9999, color: '#7000ff' },
+                          ],
+                        },
+                      },
                     },
+                    colors: CWE_COLORS,
+                    tooltip: {
+                      theme: 'dark',
+                      y: { formatter: (v: number) => `${v} occurrence${v !== 1 ? 's' : ''}` },
+                    },
+                    legend: { show: false },
+                    theme: { mode: 'dark' as any },
                   }}
+                  series={[{
+                    data: data.most_common_cwe.slice(0, 8).map((c, i) => ({
+                      x: c.name,
+                      y: c.count,
+                      fillColor: CWE_COLORS[i % CWE_COLORS.length],
+                    })),
+                  }]}
+                  type="treemap"
+                  height={170}
                 />
-              ))}
-            </Box>
+                {/* Clickable legend */}
+                <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {data.most_common_cwe.slice(0, 8).map((c, i) => (
+                    <Chip
+                      key={c.name}
+                      label={`${c.name} (${c.count})`}
+                      size="small"
+                      onClick={() => handleCweClick(c.name)}
+                      sx={{
+                        height: 20,
+                        fontSize: '0.6rem',
+                        fontWeight: 700,
+                        fontFamily: 'Inter',
+                        cursor: 'pointer',
+                        bgcolor: `${CWE_COLORS[i % CWE_COLORS.length]}18`,
+                        color: CWE_COLORS[i % CWE_COLORS.length],
+                        border: `1px solid ${CWE_COLORS[i % CWE_COLORS.length]}44`,
+                        '&:hover': {
+                          bgcolor: `${CWE_COLORS[i % CWE_COLORS.length]}35`,
+                        },
+                      }}
+                    />
+                  ))}
+                </Box>
+              </>
+            ) : (
+              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 210 }}>
+                <Typography sx={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
+                  No CWE Data Available
+                </Typography>
+              </Box>
+            )}
           </ChartCard>
         </Grid>
 

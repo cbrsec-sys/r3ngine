@@ -644,14 +644,20 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 
 	# Save CVEs
 	for cve_id in cve_ids or []:
-		cve, created = CveId.objects.get_or_create(name=cve_id)
+		# Ignore empty/null CVE IDs
+		if not cve_id or not str(cve_id).strip():
+			continue
+		cve, created = CveId.objects.get_or_create(name=str(cve_id).strip())
 		if cve:
 			vuln.cve_ids.add(cve)
 			vuln.save()
 
 	# Save CWEs
-	for cve_id in cwe_ids or []:
-		cwe, created = CweId.objects.get_or_create(name=cve_id)
+	for cwe_id in cwe_ids or []:
+		# Ignore empty/null CWE IDs
+		if not cwe_id or not str(cwe_id).strip():
+			continue
+		cwe, created = CweId.objects.get_or_create(name=str(cwe_id).strip())
 		if cwe:
 			vuln.cwe_ids.add(cwe)
 			vuln.save()
@@ -2070,24 +2076,40 @@ def is_valid_nmap_command(cmd):
 #------------------------------#
 
 def parse_semgrep_result(result):
-	"""Parses a single Semgrep match into reNgine vulnerability format."""
+	"""Parses a single Semgrep match into reNgine vulnerability format.
+
+	Args:
+		result (dict): Semgrep finding match dictionary.
+
+	Returns:
+		dict: Vulnerability data dictionary ready for saving.
+	"""
 	return {
 		'name': f"Semgrep: {result.get('check_id')}",
 		'description': result.get('extra', {}).get('message', ''),
 		'severity': SEMGREP_SEVERITY_MAP.get(result.get('extra', {}).get('severity', 'INFO'), 0),
 		'http_url': result.get('path', ''),
 		'type': 'SAST',
+		'source': 'Semgrep',
 	}
 
 
 def parse_retire_result(result):
-	"""Parses a single Retire.js vulnerability into reNgine vulnerability format."""
+	"""Parses a single Retire.js vulnerability into reNgine vulnerability format.
+
+	Args:
+		result (dict): Retire.js finding dictionary.
+
+	Returns:
+		dict: Vulnerability data dictionary ready for saving.
+	"""
 	return {
 		'name': f"Retire.js: {result.get('component')} ({result.get('version')})",
 		'description': result.get('info', ''),
 		'severity': 2, # Default medium for library vulnerabilities
 		'http_url': result.get('file', ''),
 		'type': 'SCA',
+		'source': 'Retire.js',
 	}
 
 
