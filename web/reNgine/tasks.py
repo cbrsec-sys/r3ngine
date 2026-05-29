@@ -1086,7 +1086,8 @@ def subdomain_discovery(
 									subdomain=subdomain,
 									scan_history=self.scan,
 									target_domain=self.domain,
-									validation_status='unverified'
+									validation_status='unverified',
+									source='baddns'
 								)
 			subdomains.append(subdomain)
 			urls.append(subdomain.name)
@@ -7255,7 +7256,13 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 
 
 def save_semgrep_vulnerability_finding(result, ctx, base_dir):
-	"""Saves a Semgrep finding as a Vulnerability."""
+	"""Saves a Semgrep finding as a Vulnerability.
+
+	Args:
+		result (dict): Semgrep finding match dictionary.
+		ctx (dict): Scan context containing history and domain IDs.
+		base_dir (str): Base directory path of the cloned repo.
+	"""
 	extra = result.get('extra', {})
 	path = result.get('path', '')
 	
@@ -7271,6 +7278,7 @@ def save_semgrep_vulnerability_finding(result, ctx, base_dir):
 			'type': 'SAST',
 			'request': f"File: {path}\nLine: {result.get('start', {}).get('line')}",
 			'response': extra.get('lines', ''),
+			'source': 'Semgrep',
 		}
 		save_vulnerability(vuln_data, scan_history=scan, target_domain=domain)
 	except Exception as e:

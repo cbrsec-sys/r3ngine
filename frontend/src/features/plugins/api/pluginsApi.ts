@@ -31,12 +31,31 @@ export const fetchPlugins = async (): Promise<Plugin[]> => {
   return Array.isArray(data) ? data : data.results || [];
 };
 
-export const uploadPlugin = async (file: File) => {
+export const uploadPlugin = async (file: File): Promise<{ install_id: string }> => {
   const formData = new FormData();
   formData.append('file', file);
   const { data } = await axios.post(`${API_URL}upload/`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+  return data;
+};
+
+export interface InstallStep {
+  key: string;
+  label: string;
+  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  message: string;
+}
+
+export interface InstallStatus {
+  steps: InstallStep[];
+  status: 'running' | 'success' | 'failed';
+  plugin_name: string | null;
+  error?: string;
+}
+
+export const fetchInstallStatus = async (installId: string): Promise<InstallStatus> => {
+  const { data } = await axios.get(`${API_URL}install-status/`, { params: { id: installId } });
   return data;
 };
 
@@ -61,10 +80,19 @@ export const usePlugins = () => {
 };
 
 export const useUploadPlugin = () => {
-  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: uploadPlugin,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plugins'] }),
+    // Query invalidation is deferred — InstallProgressOverlay calls onComplete when install finishes
+  });
+};
+
+export const useInstallStatus = (installId: string | null) => {
+  return useQuery({
+    queryKey: ['plugin-install-status', installId],
+    queryFn: () => fetchInstallStatus(installId!),
+    enabled: !!installId,
+    refetchInterval: (query) =>
+      query.state.data?.status === 'running' ? 800 : false,
   });
 };
 
@@ -72,7 +100,10 @@ export const useTogglePlugin = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: togglePlugin,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plugins'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['plugins'] });
+      queryClient.invalidateQueries({ queryKey: ['pluginsRegistry'] });
+    },
   });
 };
 
@@ -80,7 +111,10 @@ export const useDeletePlugin = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deletePlugin,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plugins'] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['plugins'] });
+      queryClient.invalidateQueries({ queryKey: ['pluginsRegistry'] });
+    },
   });
 };
 
@@ -118,6 +152,7 @@ export const useInstallMarketplacePlugin = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['plugins'] });
       queryClient.invalidateQueries({ queryKey: ['marketplace-plugins'] });
+      queryClient.invalidateQueries({ queryKey: ['pluginsRegistry'] });
     },
   });
 };

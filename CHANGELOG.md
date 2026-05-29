@@ -1,6 +1,16 @@
 # Changelog
 
-### [v3.2.0] - 2026-05-27
+### [v3.2.0] - 2026-05-29
+
+- **Active Exploitation Dashboard Pagination**:
+  - Implemented page-number pagination (10 items per page) for both the **Exploited Databases Queue** and the **Potential Targets** tables on the `active_exploitation` dashboard.
+  - Defined a custom DRF pagination class `ExploitationPageNumberPagination` on the backend `ExploitedDatabaseDumpViewSet` and `TargetsView` in [api.py](file:///d:/Repos/r3ngine/r3ngine-plugins/active_exploitation/backend/api.py) to resolve `TypeError: y?.some is not a function` console errors caused by unpaginated JSON array expectations.
+  - Implemented a custom `/metrics/` endpoint on the backend viewset to perform global aggregates (total targets, total tables, total rows, critical targets) dynamically across all pages.
+  - Updated the React frontend [ActiveExploitationDashboard.tsx](file:///d:/Repos/r3ngine/r3ngine-plugins/active_exploitation/ui/src/components/ActiveExploitationDashboard.tsx) to manage state for `dumpsPage` and `targetsPage`, and rendered MUI `<Pagination>` controls beneath each table.
+
+- **exploit_readiness_layer Plugin UI Build Fix**:
+  - Resolved JSX syntax and compiler build errors in the `exploit_readiness_layer` plugin's `VulnerabilityTable.tsx` component. Fixed a missing closing parenthesis and brace `)}` in a ternary conditional block and corrected mismatched closing brackets in the `groupedVulnerabilities.map` loop.
+  - Refactored `TextField`, `Menu`, and `Dialog` slots (`slotProps`) in `VulnerabilityTable.tsx` to use MUI v5 native properties (`InputProps`, `PaperProps`), resolving a compilation/type-checking error where `paperProps` was unrecognized.
 
 - **Plugin Standardized Naming & Active Exploitation Alignment**:
   - Standardized all plugin folder, zip, and database slug names under `r3ngine-plugins/` to use underscores (`_`) instead of hyphens (`exploit_readiness_layer`, `active_directory`, `active_exploitation`), ensuring full Python package naming compliance.

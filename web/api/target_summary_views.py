@@ -68,8 +68,10 @@ class TargetSummaryAPIView(APIView):
         # Aggregations
         most_common_vulnerability = vulnerabilities.exclude(severity=0).values("name", "severity").annotate(count=Count('name')).order_by("-count")[:10]
         most_common_tags = VulnerabilityTags.objects.filter(vuln_tags__in=vulnerabilities).annotate(nused=Count('vuln_tags')).order_by('-nused').values('name', 'nused')[:7]
-        most_common_cve = CveId.objects.filter(cve_ids__in=vulnerabilities).annotate(nused=Count('cve_ids')).order_by('-nused').values('name', 'nused')[:7]
-        most_common_cwe = CweId.objects.filter(cwe_ids__in=vulnerabilities).annotate(nused=Count('cwe_ids')).order_by('-nused').values('name', 'nused')[:7]
+        # Filter out empty or null CVEs to prevent displaying blank items
+        most_common_cve = CveId.objects.filter(cve_ids__in=vulnerabilities).exclude(name='').exclude(name__isnull=True).annotate(nused=Count('cve_ids')).order_by('-nused').values('name', 'nused')[:7]
+        # Filter out empty or null CWEs to prevent displaying blank items and frontend errors on click
+        most_common_cwe = CweId.objects.filter(cwe_ids__in=vulnerabilities).exclude(name='').exclude(name__isnull=True).annotate(nused=Count('cwe_ids')).order_by('-nused').values('name', 'nused')[:7]
 
         # Assets
         ip_addresses = IpAddress.objects.filter(ip_addresses__in=subdomain_qs)

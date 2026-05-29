@@ -79,8 +79,14 @@ class PluginManager:
         """Extracts a plugin zip and returns the path to the actual plugin content (flattening root dir if needed)."""
         temp_dir = os.path.join(cls.BASE_PLUGINS_DIR, 'temp_' + datetime.now().strftime('%Y%m%d%H%M%S'))
         os.makedirs(temp_dir, exist_ok=True)
-        
+
         with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+            # Validate all member paths before extraction to prevent Zip Slip attacks.
+            safe_root = os.path.realpath(temp_dir) + os.sep
+            for member in zip_ref.infolist():
+                dest = os.path.realpath(os.path.join(temp_dir, member.filename))
+                if not dest.startswith(safe_root):
+                    raise ValueError(f"Unsafe path in plugin archive: {member.filename}")
             zip_ref.extractall(temp_dir)
             
         # If there's only one directory and no files in the root, move everything up
@@ -122,19 +128,41 @@ class PluginManager:
     @classmethod
     def delete_plugin_files(cls, plugin_slug):
         """Deletes all files associated with a plugin."""
-        # 1. Delete from plugins_data
         final_dir = os.path.join(cls.BASE_PLUGINS_DIR, plugin_slug)
         if os.path.exists(final_dir):
             shutil.rmtree(final_dir)
-            
-        # 2. Delete from staticfiles
-        media_plugin_dir = os.path.join(settings.STATIC_ROOT, 'plugins', plugin_slug)
-        if os.path.exists(media_plugin_dir):
-            shutil.rmtree(media_plugin_dir)
 
 class AtomicInstaller:
     """Handles the safe installation of plugins with backup and rollback."""
-    
+
+    STEPS = [
+        ('upload',      'Saving plugin archive'),
+        ('extract',     'Extracting archive'),
+        ('validate',    'Validating manifest'),
+        ('backup',      'Creating database backup'),
+        ('register',    'Registering plugin'),
+        ('migrations',  'Running database migrations'),
+        ('assets',      'Installing UI assets & fixtures'),
+        ('complete',    'Installation complete'),
+    ]
+
+    @staticmethod
+    def _emit(install_id: str, key: str, step_status: str, message: str = ''):
+        if not install_id:
+            return
+        label = next((lbl for k, lbl in AtomicInstaller.STEPS if k == key), key)
+        data = cache.get(f'plugin:install:{install_id}') or {'steps': [], 'status': 'running', 'plugin_name': None}
+        steps = data['steps']
+        for s in steps:
+            if s['key'] == key:
+                s['status'] = step_status
+                s['message'] = message
+                break
+        else:
+            steps.append({'key': key, 'label': label, 'status': step_status, 'message': message})
+        data['steps'] = steps
+        cache.set(f'plugin:install:{install_id}', data, timeout=300)
+
     @classmethod
     def backup_db(cls, plugin_slug):
         """Creates a database backup before installation."""
@@ -195,42 +223,49 @@ class AtomicInstaller:
             logger.error(f"CRITICAL: Rollback failed! {str(e)}")
 
     @classmethod
-    def install(cls, zip_path: str):
+    def install(cls, zip_path: str, install_id: str = None):
         """Performs the full atomic installation."""
         PluginManager.ensure_dirs()
         temp_dir = None
         backup_db_file = None
         backup_fs_dir = None
-        backup_media_dir = None
         plugin_slug = None
-        
+
         try:
+            cls._emit(install_id, 'extract', 'in_progress')
             temp_dir = PluginManager.extract_plugin(zip_path)
+            cls._emit(install_id, 'extract', 'completed')
+
+            cls._emit(install_id, 'validate', 'in_progress')
             manifest = PluginManager.validate_manifest(temp_dir)
             plugin_name = manifest['name']
             plugin_slug = slugify(plugin_name).replace('-', '_')
-            
+            # Update plugin_name in cache once we know it
+            if install_id:
+                data = cache.get(f'plugin:install:{install_id}') or {}
+                data['plugin_name'] = plugin_name
+                cache.set(f'plugin:install:{install_id}', data, timeout=300)
+            cls._emit(install_id, 'validate', 'completed')
+
             # 1. Backup DB
+            cls._emit(install_id, 'backup', 'in_progress')
             backup_db_file = cls.backup_db(plugin_slug)
-            
+            cls._emit(install_id, 'backup', 'completed')
+
             # 2. Prepare FS Backups
             final_dir = os.path.join(PluginManager.BASE_PLUGINS_DIR, plugin_slug)
-            media_plugin_dir = os.path.join(settings.STATIC_ROOT, 'plugins', plugin_slug)
-            
+
             if os.path.exists(final_dir):
                 backup_fs_dir = f"{final_dir}_bak_{int(time.time())}"
                 shutil.copytree(final_dir, backup_fs_dir)
-                
-            if os.path.exists(media_plugin_dir):
-                backup_media_dir = f"{media_plugin_dir}_bak_{int(time.time())}"
-                shutil.copytree(media_plugin_dir, backup_media_dir)
 
+            cls._emit(install_id, 'register', 'in_progress')
             with transaction.atomic():
                 # 3. Register in DB
                 runtime = manifest.get('runtime', {})
                 anchor = runtime.get('run after') or runtime.get('run before')
                 position = 'AFTER' if 'run after' in runtime else 'BEFORE'
-                
+
                 plugin, created = Plugin.objects.update_or_create(
                     slug=plugin_slug,
                     defaults={
@@ -242,7 +277,8 @@ class AtomicInstaller:
                         'runtime_position': position,
                     }
                 )
-                
+                cls._emit(install_id, 'register', 'completed')
+
                 # 4. Finalize file placement
                 if os.path.exists(final_dir):
                     shutil.rmtree(final_dir)
@@ -264,6 +300,7 @@ class AtomicInstaller:
 
                     app_label = f"{plugin_slug}_backend"
                     logger.info(f"Running migrations for plugin app: {app_label}")
+                    cls._emit(install_id, 'migrations', 'in_progress')
                     try:
                         import sys
                         # Run makemigrations in a clean subprocess to auto-load the new app config
@@ -286,6 +323,7 @@ class AtomicInstaller:
                         )
                         logger.info(f"Subprocess migrate stdout: {migrate_res.stdout}")
                         logger.info(f"Successfully migrated plugin: {plugin_slug}")
+                        cls._emit(install_id, 'migrations', 'completed')
                     except subprocess.CalledProcessError as e:
                         logger.error(f"Failed to run migrations for {plugin_slug} (exit {e.returncode}):\nStdout: {e.stdout}\nStderr: {e.stderr}")
                         raise Exception(f"Migration subprocess failed for {app_label}: {e.stderr or e.stdout}")
@@ -293,6 +331,7 @@ class AtomicInstaller:
                         logger.error(f"Unexpected error running migrations for {plugin_slug}: {str(e)}")
                         raise e
 
+                cls._emit(install_id, 'assets', 'in_progress')
                 from scanEngine.models import EngineType
                 for file in os.listdir(final_dir):
                     if file.endswith('_engine.yaml'):
@@ -348,36 +387,51 @@ class AtomicInstaller:
                 from django.core.cache import cache
                 cache.set(f"plugin_{plugin_slug}_needs_restart", True, timeout=None)
 
-                # 7. Copy built UI assets (ui/dist/ or ui/ directly) to MEDIA_ROOT
-                if os.path.exists(media_plugin_dir):
-                    shutil.rmtree(media_plugin_dir)
-
+                # 7. Promote ui/dist/ contents into ui/ so PluginUIView can serve them.
+                # PluginUIView serves directly from plugins_data/{slug}/ui/, so built
+                # assets must live there (not in a dist/ subdirectory).
                 ui_dist_src = os.path.join(final_dir, 'ui', 'dist')
-                ui_src = os.path.join(final_dir, 'ui')
-                media_ui_target = os.path.join(media_plugin_dir, 'ui')
-
                 if os.path.exists(ui_dist_src):
-                    shutil.copytree(ui_dist_src, media_ui_target)
-                elif os.path.exists(ui_src):
-                    shutil.copytree(ui_src, media_ui_target)
-                else:
-                    logger.warning(
-                        f"No ui/ or ui/dist/ found for {plugin_slug}. "
-                        "UI unavailable until plugin is built and re-installed."
-                    )
+                    ui_dir = os.path.join(final_dir, 'ui')
+                    for item in os.listdir(ui_dist_src):
+                        src_item = os.path.join(ui_dist_src, item)
+                        dst_item = os.path.join(ui_dir, item)
+                        if os.path.exists(dst_item):
+                            if os.path.isdir(dst_item):
+                                shutil.rmtree(dst_item)
+                            else:
+                                os.remove(dst_item)
+                        shutil.move(src_item, dst_item)
+                    shutil.rmtree(ui_dist_src)
                 
+                cls._emit(install_id, 'assets', 'completed')
+
                 # 8. Cleanup backups on success
                 if backup_fs_dir and os.path.exists(backup_fs_dir):
                     shutil.rmtree(backup_fs_dir)
-                if backup_media_dir and os.path.exists(backup_media_dir):
-                    shutil.rmtree(backup_media_dir)
                 if backup_db_file and os.path.exists(backup_db_file):
                     os.remove(backup_db_file)
-                
+
+                cls._emit(install_id, 'complete', 'completed')
+                if install_id:
+                    data = cache.get(f'plugin:install:{install_id}') or {}
+                    data['status'] = 'success'
+                    cache.set(f'plugin:install:{install_id}', data, timeout=300)
+
                 return plugin
                 
         except Exception as e:
             logger.error(f"Installation failed for {plugin_slug}: {str(e)}")
+            # Mark the current in-progress step as failed and update overall status
+            if install_id:
+                data = cache.get(f'plugin:install:{install_id}') or {'steps': [], 'status': 'running'}
+                for s in data.get('steps', []):
+                    if s['status'] == 'in_progress':
+                        s['status'] = 'failed'
+                        s['message'] = str(e)
+                data['status'] = 'failed'
+                data['error'] = str(e)
+                cache.set(f'plugin:install:{install_id}', data, timeout=300)
             # Rollback DB
             if backup_db_file:
                 cls.rollback_db(backup_db_file)
@@ -390,16 +444,7 @@ class AtomicInstaller:
             else:
                 if final_dir and os.path.exists(final_dir):
                     shutil.rmtree(final_dir)
-            
-            # Rollback Media
-            if backup_media_dir and os.path.exists(backup_media_dir):
-                if os.path.exists(media_plugin_dir):
-                    shutil.rmtree(media_plugin_dir)
-                shutil.move(backup_media_dir, media_plugin_dir)
-            else:
-                if media_plugin_dir and os.path.exists(media_plugin_dir):
-                    shutil.rmtree(media_plugin_dir)
-                
+
             if temp_dir and os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
             raise e

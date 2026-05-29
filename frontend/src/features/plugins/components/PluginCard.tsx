@@ -101,7 +101,7 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
                 {data.name[0]}
               </Avatar>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: "bold", color: '#fff' }}>{data.name}</Typography>
+                <Typography variant="h6" sx={{ fontWeight: "bold", color: '#fff', minHeight: '3.1em', lineHeight: 1.235, display: 'flex', alignItems: 'flex-start' }}>{data.name}</Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>v{data.version}</Typography>
               </Box>
             </Box>
