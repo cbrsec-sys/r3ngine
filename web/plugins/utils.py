@@ -463,7 +463,6 @@ class AtomicInstaller:
                         logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
 
                 # Set needs_restart to True in cache
-                from django.core.cache import cache
                 cache.set(f"plugin_{plugin_slug}_needs_restart", True, timeout=None)
 
                 # 7. Promote ui/dist/ contents into ui/ so PluginUIView can serve them.
