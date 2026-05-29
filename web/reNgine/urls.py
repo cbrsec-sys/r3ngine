@@ -57,9 +57,6 @@ urlpatterns = [
         dashboard_views.logout_v3,
         name='logout'),
     path(
-        '',
-        include('dashboard.urls')),
-    path(
         'api/stress/<int:scan_id>/control/',
         stress_views.StressTestControlAPI.as_view(),
         name='stress_test_control'
@@ -84,4 +81,9 @@ urlpatterns = [
         PluginUIView.as_view(),
         name='plugin_ui'
     ),
+    # Dashboard include last — contains the SPA catch-all as its final pattern,
+    # so all more-specific routes above are matched first.
+    path(
+        '',
+        include('dashboard.urls')),
 ] + static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
