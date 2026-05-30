@@ -20,7 +20,6 @@ class TestTorManager(TestCase):
         client.containers.run.assert_called_once()
         # Password was cached
         mock_cache.set.assert_called_once()
-        _, kwargs_or_args = mock_cache.set.call_args[0], mock_cache.set.call_args
         self.assertEqual(mock_cache.set.call_args[0][0], 'tor:control_password')
 
     @patch('reNgine.tor_manager.cache')
@@ -89,3 +88,43 @@ class TestTorManager(TestCase):
                 tm.start()
 
         mock_cache.delete.assert_called_once_with('tor:control_password')
+
+    @patch('reNgine.tor_manager.cache')
+    def test_new_circuit_raises_when_no_password_in_cache(self, mock_cache):
+        from reNgine.tor_manager import TorManager, TorUnavailableError
+        mock_cache.get.return_value = None
+
+        with self.assertRaises(TorUnavailableError):
+            TorManager().new_circuit()
+
+    @patch('reNgine.tor_manager.cache')
+    @patch('reNgine.tor_manager.docker.from_env')
+    def test_start_clears_cache_on_api_error(self, mock_docker, mock_cache):
+        import docker as docker_lib
+        from reNgine.tor_manager import TorManager, TorStartError
+        client = mock_docker.return_value
+        client.containers.get.side_effect = docker_lib.errors.NotFound('r3ngine-tor')
+        client.containers.run.side_effect = docker_lib.errors.APIError('network error')
+
+        tm = TorManager()
+        with patch.object(tm, '_discover_network', return_value='r3ngine_r3ngine_network'):
+            with self.assertRaises(TorStartError):
+                tm.start()
+
+        mock_cache.delete.assert_called_with('tor:control_password')
+
+    @patch('reNgine.tor_manager.cache')
+    @patch('reNgine.tor_manager.docker.from_env')
+    def test_start_clears_cache_when_wait_for_ready_times_out(self, mock_docker, mock_cache):
+        import docker as docker_lib
+        from reNgine.tor_manager import TorManager, TorStartError
+        client = mock_docker.return_value
+        client.containers.get.side_effect = docker_lib.errors.NotFound('r3ngine-tor')
+
+        tm = TorManager()
+        with patch.object(tm, '_discover_network', return_value='r3ngine_r3ngine_network'):
+            with patch.object(tm, '_wait_for_ready', side_effect=TorStartError("timeout")):
+                with self.assertRaises(TorStartError):
+                    tm.start()
+
+        mock_cache.delete.assert_called_with('tor:control_password')
