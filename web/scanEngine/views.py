@@ -391,19 +391,19 @@ def proxy_settings(request, slug):
                 except TorStartError as e:
                     proxy_instance.use_tor = False
                     proxy_instance.save(update_fields=['use_tor'])
+                    err_msg = f'TOR failed to start: {e}'
                     if request.headers.get('Accept') == 'application/json':
-                        return http.JsonResponse(
-                            {'status': 'error', 'message': f'TOR failed to start: {e}'},
-                            status=500
-                        )
+                        return http.JsonResponse({'status': 'error', 'message': err_msg}, status=500)
+                    messages.add_message(request, messages.ERROR, err_msg)
+                    return http.HttpResponseRedirect(reverse('proxy_settings', kwargs={'slug': slug}))
                 except TorUnavailableError as e:
                     proxy_instance.use_tor = False
                     proxy_instance.save(update_fields=['use_tor'])
+                    err_msg = f'Docker socket not available: {e}'
                     if request.headers.get('Accept') == 'application/json':
-                        return http.JsonResponse(
-                            {'status': 'error', 'message': f'Docker socket not available: {e}'},
-                            status=503
-                        )
+                        return http.JsonResponse({'status': 'error', 'message': err_msg}, status=503)
+                    messages.add_message(request, messages.ERROR, err_msg)
+                    return http.HttpResponseRedirect(reverse('proxy_settings', kwargs={'slug': slug}))
             if request.headers.get('Accept') == 'application/json':
                 return http.JsonResponse({'status': 'success', 'message': message})
             messages.add_message(
