@@ -2074,6 +2074,22 @@ class TorStatusAPIView(APIView):
 			return Response({'running': False})
 
 
+class TorExitIPAPIView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request):
+		from reNgine.tor_manager import TorManager, TorUnavailableError
+		try:
+			if not TorManager().is_running():
+				return Response({'ip': None})
+			import requests as req_lib
+			proxies = {'http': 'socks5h://tor:9050', 'https': 'socks5h://tor:9050'}
+			resp = req_lib.get('https://api.ipify.org', proxies=proxies, timeout=10)
+			return Response({'ip': resp.text.strip()})
+		except Exception:
+			return Response({'ip': None})
+
+
 class UninstallTool(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
