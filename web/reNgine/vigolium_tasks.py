@@ -182,7 +182,10 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
         target_urls = urls
     else:
         from reNgine.common_func import get_http_urls
-        target_urls = get_http_urls(self.scan_id)
+        target_urls = get_http_urls(ctx={
+            'scan_history_id': self.scan_id,
+            'domain_id': getattr(self, 'domain_id', None),
+        })
 
     if not target_urls:
         if self.scan and self.scan.domain:
