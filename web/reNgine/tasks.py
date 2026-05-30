@@ -7418,8 +7418,8 @@ def resume_scan_temporal(scan_id):
 	completed_activities = scan.scanactivity_set.filter(status=SUCCESS_TASK).values_list('name', flat=True)
 	completed_tasks = set(completed_activities)
 	
-	# Filter the scan's original task list
-	remaining_tasks = [t for t in scan.tasks if t not in completed_tasks]
+	# Filter the scan's original task list (tasks may be NULL for old/broken scans)
+	remaining_tasks = [t for t in (scan.tasks or []) if t not in completed_tasks]
 	
 	if not remaining_tasks:
 		logger.info(f"Scan {scan_id} has no remaining tasks to resume.")
