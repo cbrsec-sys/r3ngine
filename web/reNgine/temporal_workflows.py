@@ -999,25 +999,24 @@ class SubScanWorkflow:
                 }],
                 # TIER 2: HTTP Crawl & Port Scan — populates endpoint DB for Tiers 3+.
                 [t for t in active_tasks if t in {"http_crawl", "port_scan"}],
-                # TIER 3: URL Fetching — needs Tier 2 http_crawl endpoints.
-                [t for t in active_tasks if t == "fetch_url"],
+                # TIER 3: URL Fetching + Screenshot — both depend only on Tier 2 http_crawl;
+                # screenshot does NOT depend on fetch_url output so they run concurrently.
+                [t for t in active_tasks if t in {"fetch_url", "screenshot"}],
                 # TIER 4: Directory & File Fuzzing — needs Tier 3 URLs.
                 [t for t in active_tasks if t == "dir_file_fuzz"],
                 # TIER 5: Analysis — API discovery, WAF detection, secret scanning.
                 [t for t in active_tasks if t in {"web_api_discovery", "waf_detection", "secret_scanning"}],
                 # TIER 6: Security Assessment — explicit inclusion, mirrors MasterScanWorkflow Tier 6.
-                # Bug fix: previously used an exclusion-based fallthrough that silently dropped
-                # vulnerability_scan, screenshot, waf_bypass, and brute_force_scan.
                 [t for t in active_tasks if t in {
-                    "vulnerability_scan", "screenshot", "waf_bypass", "brute_force_scan"
+                    "vulnerability_scan", "waf_bypass", "brute_force_scan"
                 }],
                 # TIER 6b: Fallback for any task not classified in Tiers 1-6.
                 # Handles future tasks added to _SUBSCAN_DISPATCH without breaking existing tiers.
                 [t for t in active_tasks if t not in {
                     "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
                     "dns_security", "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
-                    "fetch_url", "dir_file_fuzz", "web_api_discovery", "waf_detection",
-                    "secret_scanning", "vulnerability_scan", "screenshot", "waf_bypass", "brute_force_scan"
+                    "fetch_url", "screenshot", "dir_file_fuzz", "web_api_discovery", "waf_detection",
+                    "secret_scanning", "vulnerability_scan", "waf_bypass", "brute_force_scan"
                 }],
             ]
 
