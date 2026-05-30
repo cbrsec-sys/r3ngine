@@ -57,6 +57,7 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_HOST=${POSTGRES_HOST}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
+      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD}
     volumes:
       - ./web:/usr/src/app
       - ./frontend:/usr/src/app/frontend
@@ -69,6 +70,7 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       #- plugins_data:/usr/src/app/plugins_data
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8000:8000"
       - "5173:5173"
@@ -158,6 +160,24 @@ services:
           memory: 2G
         reservations:
           memory: 1G
+
+  tor:
+    build:
+      context: .
+      dockerfile: web/tor/Dockerfile
+    image: r3ngine-tor:latest
+    container_name: r3ngine-tor
+    restart: "no"
+    environment:
+      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD:-changeme}
+    networks:
+      - r3ngine_network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
 
   temporal:
     image: temporalio/auto-setup:1.22.4
