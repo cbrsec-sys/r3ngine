@@ -378,6 +378,14 @@ class ProxyForm(forms.ModelForm):
                 "id": "use_proxychains",
             }))
 
+    use_tor = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(
+            attrs={
+                "class": "form-check-input",
+                "id": "use_tor",
+            }))
+
     proxies = forms.CharField(
         required=False,
         widget=forms.Textarea(
@@ -393,6 +401,7 @@ class ProxyForm(forms.ModelForm):
         self.initial['use_proxy'] = key.use_proxy
         self.initial['proxies'] = key.proxies
         self.initial['use_proxychains'] = key.use_proxychains
+        self.initial['use_tor'] = key.use_tor
 
         if not key.use_proxy:
             self.fields['proxies'].widget.attrs['readonly'] = True
@@ -400,6 +409,7 @@ class ProxyForm(forms.ModelForm):
     def set_initial(self):
         self.initial['use_proxy'] = False
         self.initial['use_proxychains'] = False
+        self.initial['use_tor'] = False
         self.fields['proxies'].widget.attrs['readonly'] = True
 
 
