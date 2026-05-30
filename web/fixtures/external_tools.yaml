@@ -823,7 +823,7 @@
     license_url: https://github.com/drwetter/testssl.sh/blob/3.2/LICENSE
     version_lookup_command: testssl.sh --version
     version_match_regex: "v?\\d+\\.\\d+"
-    install_command: "git clone --depth 1 https://github.com/drwetter/testssl.sh /usr/src/github/testssl.sh && chmod +x /usr/src/github/testssl.sh/testssl.sh && ln -sf /usr/src/github/testssl.sh/testssl.sh /usr/local/bin/testssl.sh"
+    install_command: "git clone --depth 1 https://github.com/drwetter/testssl.sh /usr/src/github/testssl.sh && chmod +x /usr/src/github/testssl.sh/testssl.sh"
     update_command: "cd /usr/src/github/testssl.sh && git pull"
     is_default: true
     is_subdomain_gathering: false
