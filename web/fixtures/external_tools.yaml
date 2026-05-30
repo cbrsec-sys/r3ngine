@@ -838,14 +838,14 @@
     description: "enum4linux-ng is a rewrite of enum4linux in Python 3. It enumerates SMB/SAMBA information including null sessions, shares, users, groups, and password policies."
     github_url: https://github.com/cddmp/enum4linux-ng
     license_url: https://github.com/cddmp/enum4linux-ng/blob/master/LICENSE
-    version_lookup_command: enum4linux-ng.py --help
+    version_lookup_command: "enum4linux-ng --help"
     version_match_regex: "\\d+\\.\\d+"
-    install_command: "pip3 install enum4linux-ng"
-    update_command: "pip3 install enum4linux-ng --upgrade"
+    install_command: "git clone --depth 1 https://github.com/cddmp/enum4linux-ng /usr/src/github/enum4linux-ng && pip3 install -r /usr/src/github/enum4linux-ng/requirements.txt && ln -sf /usr/src/github/enum4linux-ng/enum4linux-ng.py /usr/local/bin/enum4linux-ng"
+    update_command: "cd /usr/src/github/enum4linux-ng && git pull && pip3 install -r requirements.txt"
     is_default: true
     is_subdomain_gathering: false
-    is_github_cloned: false
-    github_clone_path: null
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/enum4linux-ng
     subdomain_gathering_command: null
 - model: scanEngine.installedexternaltool
   pk: 49
@@ -872,14 +872,14 @@
     description: "graphql-cop is a security auditor for GraphQL APIs. Tests for introspection enabled, batch attacks, field suggestions, alias overloading, and other GraphQL-specific security issues."
     github_url: https://github.com/dolevf/graphql-cop
     license_url: https://github.com/dolevf/graphql-cop/blob/main/LICENSE
-    version_lookup_command: graphql-cop --version
+    version_lookup_command: "python3 /usr/src/github/graphql-cop/graphql-cop.py --version"
     version_match_regex: "\\d+\\.\\d+"
-    install_command: "pip3 install graphql-cop"
-    update_command: "pip3 install graphql-cop --upgrade"
+    install_command: "git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop && pip3 install -r /usr/src/github/graphql-cop/requirements.txt"
+    update_command: "cd /usr/src/github/graphql-cop && git pull"
     is_default: true
     is_subdomain_gathering: false
-    is_github_cloned: false
-    github_clone_path: null
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/graphql-cop
     subdomain_gathering_command: null
 - model: scanEngine.installedexternaltool
   pk: 51
@@ -914,4 +914,21 @@
     is_subdomain_gathering: false
     is_github_cloned: false
     github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 53
+  fields:
+    logo_url: null
+    name: rdp-sec-check
+    description: "rdp-sec-check is a Perl script to enumerate security settings of an RDP service. Checks for NLA enforcement, encryption level, and cipher support."
+    github_url: https://github.com/CiscoCXSecurity/rdp-sec-check
+    license_url: https://github.com/CiscoCXSecurity/rdp-sec-check/blob/master/LICENSE
+    version_lookup_command: "rdp-sec-check --help"
+    version_match_regex: "\\d+\\.\\d+"
+    install_command: "git clone --depth 1 https://github.com/CiscoCXSecurity/rdp-sec-check /usr/src/github/rdp-sec-check && cpan install Encoding::BER && ln -sf /usr/src/github/rdp-sec-check/rdp-sec-check.pl /usr/local/bin/rdp-sec-check"
+    update_command: "cd /usr/src/github/rdp-sec-check && git pull"
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/rdp-sec-check
     subdomain_gathering_command: null

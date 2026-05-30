@@ -364,7 +364,20 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel pyOpenSSL h8mail 
     pip3 install --no-cache-dir semgrep && \
     pip3 install --no-cache-dir --upgrade meson ninja arjun inql netlas holehe maigret dirsearch
 
-RUN pip3 install --no-cache-dir graphql-cop enum4linux-ng rdp-sec-check dnsrecon fierce
+RUN git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop \
+    && pip3 install --no-cache-dir -r /usr/src/github/graphql-cop/requirements.txt \
+    && rm -rf /usr/src/github/graphql-cop/.git
+
+RUN git clone --depth 1 https://github.com/cddmp/enum4linux-ng /usr/src/github/enum4linux-ng \
+    && pip3 install --no-cache-dir -r /usr/src/github/enum4linux-ng/requirements.txt \
+    && ln -sf /usr/src/github/enum4linux-ng/enum4linux-ng.py /usr/local/bin/enum4linux-ng \
+    && rm -rf /usr/src/github/enum4linux-ng/.git
+
+RUN git clone --depth 1 https://github.com/CiscoCXSecurity/rdp-sec-check /usr/src/github/rdp-sec-check \
+    && cpan install Encoding::BER \
+    && ln -sf /usr/src/github/rdp-sec-check/rdp-sec-check.pl /usr/local/bin/rdp-sec-check
+
+RUN pip3 install --no-cache-dir dnsrecon fierce
 
 RUN python3 -m pip install --no-cache-dir pipx && \
     pipx install git+https://github.com/blacklanternsecurity/baddns

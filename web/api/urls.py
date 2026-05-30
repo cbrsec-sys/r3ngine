@@ -146,6 +146,10 @@ urlpatterns = [
         ListWordlists.as_view(),
         name='listWordlists'),
     path(
+        'listTools/',
+        ListTools.as_view(),
+        name='listTools'),
+    path(
         'listConfigurations/',
         ListConfigurations.as_view(),
         name='listConfigurations'),

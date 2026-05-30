@@ -2,6 +2,29 @@
 
 ### [v3.2.0] - 2026-05-29
 
+- **ReconX Target Monitoring Settings & API URL Normalization**:
+  - Added a monitoring settings modal inside the mobile app's **ReconX Feed** screen (`app/feeds/monitoring.tsx`), accessible via a header settings icon, to view all database targets from `/mapi/listTargets/` and toggle their active monitoring status using `/mapi/toggle/monitoring/`.
+  - Fixed a double-slash (`//`) API request URL routing and logging issue in the Axios client (`src/api/client.ts`) by stripping the leading slash from relative paths if the baseURL ends with a slash.
+
+- **Mobile Scan Engines Layout Overflow Fix**:
+  - Resolved layout overflow issues on the Scan Engines screen in the mobile application.
+  - Added `flexShrink: 1` to the engine name and `flexWrap: 'wrap'` to both the title row and task preview tag container in `app/system/engines/index.tsx` to prevent default badges and tactical module tags from falling off cards.
+
+- **Mobile Infrastructure & Monitoring Fixes**:
+  - Added new `/api/listTools/` (`/mapi/listTools/`) API endpoint on the backend to list all installed tools, requiring `IsAuditor` permission.
+  - Updated the mobile app's "Tools" tab to fetch from `/mapi/listTools/` instead of `/mapi/external/tool/get_current_release/`, resolving a backend 500 error when queried without arguments.
+  - Integrated `configured_tools_count` into `EngineSerializer` on the backend by parsing the engine's YAML configuration to count configured tools, fixing a client-side bug where the character length of the YAML configuration was displayed.
+  - Updated `manage_monitoring_task(domain)` in `web/targetApp/views.py` to remove references to the deprecated `monitor_periodic_task` model attribute, resolving `AttributeError` exceptions and enabling the continuous monitoring toggle switch to function without errors on both mobile and web.
+
+- **Fix command execution and tool update failures**:
+  - Replaced incorrect `run_command.run(...)` calls with correct direct `run_command(...)` function calls in `web/api/views.py` and `web/startScan/views.py`.
+  - Resolved `'function' object has no attribute 'run'` exceptions that caused tool updates, uninstallation, WAF checks, CMS detection, and scan result deletions to fail.
+  - Verified compilation and syntax correctness of views within the Docker container environment.
+
+- **Import/Export Config Tool Configurations**:
+  - Enhanced the backup import/export views `ExportConfig` and `ImportConfig` in `web/api/config_migration_views.py` to support `spiderfoot` (`/usr/src/github/spiderfoot/spiderfoot.cfg`) and `theHarvester` (`/usr/src/github/theHarvester/api-keys.yaml`) configurations.
+  - Ensured nested destination directories are recursively created if they do not exist during the import operation.
+
 - **Active Exploitation Dashboard Pagination**:
   - Implemented page-number pagination (10 items per page) for both the **Exploited Databases Queue** and the **Potential Targets** tables on the `active_exploitation` dashboard.
   - Defined a custom DRF pagination class `ExploitationPageNumberPagination` on the backend `ExploitedDatabaseDumpViewSet` and `TargetsView` in [api.py](file:///d:/Repos/r3ngine/r3ngine-plugins/active_exploitation/backend/api.py) to resolve `TypeError: y?.some is not a function` console errors caused by unpaginated JSON array expectations.

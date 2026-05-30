@@ -992,12 +992,35 @@ def update_github_tool(request, slug, id):
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def get_full_yaml_config(request, slug):
+    """Retrieve the default YAML configuration.
+    
+    If the configuration does not exist in the database under 'default_yaml_config',
+    it seeds the database using the default_yaml_config.yaml fixture file.
+
+    Args:
+        request (HttpRequest): Django HTTP request object.
+        slug (str): Slug for target engine configuration.
+
+    Returns:
+        JsonResponse: A JSON response containing status and the YAML configuration content.
+    """
     try:
+        from scanEngine.models import Configuration
         from django.conf import settings
-        file_path = os.path.join(settings.BASE_DIR, 'fixtures', 'full_yaml_config.yaml')
         
-        with open(file_path, 'r') as f:
-            content = f.read()
+        config_obj = Configuration.objects.filter(short_name='default_yaml_config').first()
+        if not config_obj:
+            file_path = os.path.join(settings.BASE_DIR, 'fixtures', 'default_yaml_config.yaml')
+            with open(file_path, 'r') as f:
+                content = f.read()
+            config_obj = Configuration.objects.create(
+                name='Default YAML Config',
+                short_name='default_yaml_config',
+                content=content
+            )
+        else:
+            content = config_obj.content
+            
         return http.JsonResponse({'status': 'success', 'content': content})
     except Exception as e:
         return http.JsonResponse({'status': 'error', 'message': str(e)}, status=500)

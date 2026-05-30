@@ -506,6 +506,7 @@ class EngineSerializer(serializers.ModelSerializer):
 				('waf_detection', 'use_censys'),
 				('waf_bypass', 'use_nuclei'),
 				('waf_bypass', 'use_benchmarking'),
+				('dir_file_fuzz', 'run_dirsearch'),
 			]
 			# Add section-level default tools
 			if 'spiderfoot_scan' in config:
