@@ -657,8 +657,7 @@ class NucleiPlannerWorkflow:
                 severity_ctx = {**ctx, "nuclei_severity_filter": severity}
                 await workflow.execute_activity(
                     "RunNucleiActivity",
-                    severity_ctx,
-                    severity,
+                    args=[severity_ctx, severity],
                     start_to_close_timeout=timedelta(hours=6),
                     heartbeat_timeout=timedelta(minutes=5),
                     task_queue="python-orchestrator-queue"
