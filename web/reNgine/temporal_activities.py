@@ -672,12 +672,33 @@ def run_port_scan_activity(ctx: dict) -> bool:
     """
     from reNgine.tasks import port_scan
     activity.logger.info(f"[RunPortScanActivity] scan_id={ctx.get('scan_history_id')}")
+    from scanEngine.models import Proxy as _Proxy
+    _proxy = _Proxy.objects.first()
+    if _proxy and _proxy.use_tor:
+        activity.logger.warning(
+            "[RunPortScanActivity] TOR mode is active but naabu uses raw sockets — "
+            "port scan traffic will NOT be routed through TOR"
+        )
     return _run_task(
         port_scan,
         ctx,
         task_name='port_scan',
         description='Port Scan'
     )
+
+
+@activity.defn(name="TorNewCircuitActivity")
+def run_tor_new_circuit_activity() -> None:
+    from scanEngine.models import Proxy
+    from reNgine.tor_manager import TorManager
+    proxy = Proxy.objects.first()
+    if not proxy or not proxy.use_tor:
+        return
+    try:
+        TorManager().new_circuit()
+        activity.logger.info("[TorNewCircuitActivity] New TOR circuit requested successfully")
+    except Exception as e:
+        activity.logger.warning(f"[TorNewCircuitActivity] Circuit rotation failed (scan continues): {e}")
 
 
 @activity.defn(name="RunScreenshotActivity")
