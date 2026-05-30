@@ -266,6 +266,10 @@ urlpatterns = [
         TorStatusAPIView.as_view(),
         name='rengine_tor_status'),
     path(
+        'rengine/tor-exit-ip/',
+        TorExitIPAPIView.as_view(),
+        name='rengine_tor_exit_ip'),
+    path(
         'action/subdomain/delete/',
         DeleteSubdomain.as_view(),
         name='delete_subdomain'),
