@@ -162,10 +162,9 @@ services:
 
   tor:
     build:
-      context: .
-      dockerfile: web/tor/Dockerfile
+      context: web/tor
     image: r3ngine-tor:latest
-    container_name: r3ngine-tor
+    container_name: tor
     restart: "no"
     networks:
       - r3ngine_network
