@@ -841,6 +841,14 @@ def get_random_proxy():
 	Returns:
 		str: Proxy name or '' if no proxy defined in db or use_proxy is False.
 	"""
+	# TOR mode: when use_tor is enabled, route all scan traffic through the TOR
+	# SOCKS5 proxy. Returning a non-empty proxy string ensures run_command /
+	# stream_command enter their proxychains wrapping branch; ProxychainsWrapper
+	# then builds the 'socks5 tor 9050' config via should_wrap()/wrap_command().
+	_tor_proxy_obj = Proxy.objects.first()
+	if _tor_proxy_obj and _tor_proxy_obj.use_tor:
+		return 'socks5://tor:9050'
+
 	# Check if any Proxy records exist in the database
 	if not Proxy.objects.all().exists():
 		return ''
