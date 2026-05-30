@@ -57,7 +57,6 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_HOST=${POSTGRES_HOST}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
-      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD}
     volumes:
       - ./web:/usr/src/app
       - ./frontend:/usr/src/app/frontend
@@ -168,8 +167,6 @@ services:
     image: r3ngine-tor:latest
     container_name: r3ngine-tor
     restart: "no"
-    environment:
-      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD:-changeme_replace_this}
     networks:
       - r3ngine_network
     deploy:
