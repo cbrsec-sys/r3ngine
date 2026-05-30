@@ -44,7 +44,8 @@ class TorManager:
                 (n for n in networks if 'r3ngine' in n.lower()),
                 networks[0] if networks else 'r3ngine_r3ngine_network'
             )
-        except Exception:
+        except Exception as e:
+            logger.debug(f"[TorManager] Could not discover network, using fallback: {e}")
             return 'r3ngine_r3ngine_network'
 
     def start(self):
@@ -82,7 +83,11 @@ class TorManager:
             cache.delete(CACHE_KEY_PASSWORD)
             raise TorStartError(f"Failed to start TOR container: {e}")
 
-        self._wait_for_ready()
+        try:
+            self._wait_for_ready()
+        except TorStartError:
+            cache.delete(CACHE_KEY_PASSWORD)
+            raise
 
     def stop(self):
         cache.delete(CACHE_KEY_PASSWORD)
@@ -117,7 +122,9 @@ class TorManager:
         )
 
     def new_circuit(self):
-        password = cache.get(CACHE_KEY_PASSWORD, '')
+        password = cache.get(CACHE_KEY_PASSWORD)
+        if not password:
+            raise TorUnavailableError("TOR is not running (no control password in cache)")
         try:
             from stem import Signal
             from stem.control import Controller
