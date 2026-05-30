@@ -2,11 +2,11 @@
   <em>V3 Beta Release is now operational!</em>
 </p>
 <p align="center">
-<a href="https://rengine.wiki"><img src="frontend/public/img/banner.png" height="400px" width="520px" alt=""/></a>
+<img src="frontend/public/img/banner.png" height="400px" width="520px" alt=""/>
 </p>
 
 <p align="center">
-  <h4 align="center"><strong>Phoenix: Fire from the Ashes even Stronger</strong></h4> 
+  <h4 align="center"><strong>Phoenix: From the Ashes even Stronger</strong></h4> 
   <h3 align="center">Official v3 Rebirth: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
 </p>
 
@@ -54,6 +54,24 @@
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
+<h2 align="center"><a href="https://github.com/whiterabb17/r3ngine-plugins" target="_blank">r3Ngine Plugins</a>: Alpha Release Out Now</h2>
+<p align="center">
+<img src="https://img.shields.io/badge/r3ngine--plugins-1.0.0-orange.svg?logo=none" alt="r3ngine Pluings" />
+</p>
+
+| Active Directory |
+| :---: |
+| <img src="https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/refs/heads/master/active_directory/docs/dashboard.png" width="1000px" height="450px" /> |
+
+| Active Exploitation |
+| :---: |
+| <img src="https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/refs/heads/master/active_exploitation/docs/dashboard.png" width="1000px" height="450px" /> |
+
+| Exploit Readiness Layer |
+| :---: |
+| <img src="https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/refs/heads/master/exploit_readiness_layer/docs/dashboard.png" width="1000px" height="450px" /> |
+
+![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 > **IMPORTANT — Upgrading to v3.2.0 from an existing installation**
 >
 > v3.2.0 replaces Celery with Temporal as the scan orchestration engine. This is a **breaking infrastructure change** — the old `celery` and `celery-beat` containers are removed, new `temporal`, `temporal-python-orchestrator`, and `temporal-go-executor` containers are added, and database migrations must be applied to create the new Temporal models and remove legacy Celery Beat tables.
