@@ -1,3 +1,4 @@
+import uuid as _uuid
 from urllib.parse import urlparse
 from django.apps import apps
 from django.contrib.auth.models import User
@@ -659,6 +660,15 @@ class FalsePositiveRule(models.Model):
 class ScanActivity(models.Model):
 	id = models.AutoField(primary_key=True)
 	scan_of = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, blank=True, null=True)
+	task_uid = models.UUIDField(default=_uuid.uuid4, unique=True, db_index=True)
+	time_started = models.DateTimeField(null=True, blank=True)
+	time_ended = models.DateTimeField(null=True, blank=True)
+	tier = models.PositiveSmallIntegerField(null=True, blank=True)
+	subscan = models.ForeignKey(
+		'SubScan', null=True, blank=True,
+		on_delete=models.SET_NULL,
+		related_name='activities',
+	)
 	title = models.CharField(max_length=1000)
 	name = models.CharField(max_length=1000)
 	time = models.DateTimeField()
