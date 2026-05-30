@@ -83,7 +83,7 @@ export const CheckForUpdateModal: React.FC<CheckForUpdateModalProps> = ({ open, 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
           <RefreshCw size={24} color="#00f3ff" style={{ animation: updateCheck.isPending ? 'spin 2s linear infinite' : 'none' }} />
           <Typography variant="h5" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', letterSpacing: 1 }}>
-            VERSION_CHECK
+            VERSION CHECK
           </Typography>
         </Box>
         <IconButton onClick={handleClose} sx={{ color: 'rgba(255,255,255,0.5)' }}>
@@ -96,7 +96,7 @@ export const CheckForUpdateModal: React.FC<CheckForUpdateModalProps> = ({ open, 
           <Box sx={{ py: 8, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
             <CircularProgress sx={{ color: '#00f3ff' }} size={60} thickness={2} />
             <Typography sx={{ color: 'rgba(0, 243, 255, 0.6)', fontFamily: 'Orbitron', fontSize: '0.8rem', letterSpacing: 2 }}>
-              CONTACTING_CENTRAL_COMMAND...
+              CONTACTING CENTRAL COMMAND...
             </Typography>
           </Box>
         ) : result ? (
@@ -118,12 +118,12 @@ export const CheckForUpdateModal: React.FC<CheckForUpdateModalProps> = ({ open, 
                     UPDATE AVAILABLE: v{result.latest_version}
                   </Typography>
                   <Typography variant="body2">
-                    A newer version of reNgine is ready for deployment. Please follow the update instructions to upgrade from v{result.current_version}.
+                    A newer version of r3Ngine is ready for deployment. Please follow the update instructions to upgrade from v{result.current_version}.
                   </Typography>
                 </Alert>
 
                 <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 900, letterSpacing: 2 }}>
-                  CHANGELOG_DATA
+                  CHANGELOG DATA
                 </Typography>
                 <Paper sx={{
                   mt: 1,
@@ -170,10 +170,10 @@ export const CheckForUpdateModal: React.FC<CheckForUpdateModalProps> = ({ open, 
               <Box sx={{ py: 6, textAlign: 'center' }}>
                 <ShieldCheck size={64} color="#00ff9d" style={{ marginBottom: 24, filter: 'drop-shadow(0 0 15px rgba(0, 255, 157, 0.3))' }} />
                 <Typography variant="h5" sx={{ color: '#fff', fontFamily: 'Orbitron', fontWeight: 900, mb: 1 }}>
-                  SYSTEM_OPTIMIZED
+                  SYSTEM OPTIMIZED
                 </Typography>
                 <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.6)' }}>
-                  You are running the latest version of reNgine (v{result.current_version}).
+                  You are running the latest version of r3Ngine (v{result.current_version}).
                 </Typography>
               </Box>
             )}
@@ -208,7 +208,7 @@ export const CheckForUpdateModal: React.FC<CheckForUpdateModalProps> = ({ open, 
               '&:hover': { bgcolor: '#00d0ff' }
             }}
           >
-            UPDATE_NOW
+            UPDATE NOW
           </Button>
         )}
         {!updateCheck.isPending && (
