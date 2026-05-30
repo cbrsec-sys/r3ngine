@@ -667,35 +667,38 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                     </Typography>
                   </Box>
                   <Box component="td" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px' }}>
-                    {sub.screenshot_path ? (
-                      <Box
-                        onClick={() => openLightbox(sub.screenshot_path!, sub.name)}
-                        sx={{
-                          width: 60,
-                          height: 34,
-                          borderRadius: 0.5,
-                          overflow: 'hidden',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          position: 'relative',
-                          '&:hover': {
-                            borderColor: '#00f3ff',
-                            transform: 'scale(1.1)',
-                            zIndex: 10,
-                            boxShadow: '0 0 15px rgba(0, 243, 255, 0.3)'
-                          }
-                        }}
-                      >
-                        <img
-                          src={`/media/${sub.screenshot_path}`}
-                          alt="preview"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </Box>
-                    ) : (
-                      <Typography sx={{ fontSize: '9px', color: 'rgba(255,255,255,0.15)', fontWeight: 800 }}>NO DATA</Typography>
-                    )}
+                    {(() => {
+                      const ssPath = sub.screenshot_path || sub.screenshots?.[0]?.screenshot_path || null;
+                      return ssPath ? (
+                        <Box
+                          onClick={() => openLightbox(ssPath, sub.name)}
+                          sx={{
+                            width: 60,
+                            height: 34,
+                            borderRadius: 0.5,
+                            overflow: 'hidden',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            position: 'relative',
+                            '&:hover': {
+                              borderColor: '#00f3ff',
+                              transform: 'scale(1.1)',
+                              zIndex: 10,
+                              boxShadow: '0 0 15px rgba(0, 243, 255, 0.3)'
+                            }
+                          }}
+                        >
+                          <img
+                            src={`/media/${ssPath}`}
+                            alt="preview"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </Box>
+                      ) : (
+                        <Typography sx={{ fontSize: '9px', color: 'rgba(255,255,255,0.15)', fontWeight: 800 }}>NO DATA</Typography>
+                      );
+                    })()}
                   </Box>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>

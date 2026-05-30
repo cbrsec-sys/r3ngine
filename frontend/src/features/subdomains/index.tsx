@@ -379,28 +379,31 @@ export const SubdomainsPage: React.FC = () => {
                     </Typography>
                   </td>
                   <td style={{ padding: '12px 16px' }}>
-                    {sub.screenshot_path ? (
-                      <Box sx={{
-                        width: 50,
-                        height: 30,
-                        borderRadius: 0.5,
-                        overflow: 'hidden',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        cursor: 'pointer',
-                        '&:hover': { borderColor: '#00f3ff', transform: 'scale(1.5)', zIndex: 10 },
-                        transition: 'all 0.2s'
-                      }}>
-                        <img
-                          src={`/media/${sub.screenshot_path}`}
-                          alt="Visual"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </Box>
-                    ) : (
-                      <Box sx={{ width: 50, height: 30, borderRadius: 0.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <Typography sx={{ fontSize: '6px', color: 'rgba(255,255,255,0.1)' }}>NULL</Typography>
-                      </Box>
-                    )}
+                    {(() => {
+                      const ssPath = sub.screenshot_path || sub.screenshots?.[0]?.screenshot_path || null;
+                      return ssPath ? (
+                        <Box sx={{
+                          width: 50,
+                          height: 30,
+                          borderRadius: 0.5,
+                          overflow: 'hidden',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          cursor: 'pointer',
+                          '&:hover': { borderColor: '#00f3ff', transform: 'scale(1.5)', zIndex: 10 },
+                          transition: 'all 0.2s'
+                        }}>
+                          <img
+                            src={`/media/${ssPath}`}
+                            alt="Visual"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </Box>
+                      ) : (
+                        <Box sx={{ width: 50, height: 30, borderRadius: 0.5, bgcolor: 'rgba(255,255,255,0.02)', border: '1px dashed rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <Typography sx={{ fontSize: '6px', color: 'rgba(255,255,255,0.1)' }}>NULL</Typography>
+                        </Box>
+                      );
+                    })()}
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <Box sx={{ display: 'flex', gap: 0.5 }}>
