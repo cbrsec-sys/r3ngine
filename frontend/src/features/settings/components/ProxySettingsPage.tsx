@@ -456,9 +456,9 @@ export const ProxySettingsPage: React.FC = () => {
         {/* TOR Mode */}
         <Card variant="outlined" sx={{ mt: 2 }}>
           <CardContent>
-            <Stack direction="row" alignItems="center" spacing={1} mb={1}>
+            <Stack direction="row" sx={{ alignItems: 'center', mb: 1 }} spacing={1}>
               <Shield size={18} />
-              <Typography variant="subtitle1" fontWeight="bold">
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
                 TOR Mode
               </Typography>
               <Box
