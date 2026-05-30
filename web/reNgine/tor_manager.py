@@ -8,7 +8,7 @@ from django.core.cache import cache
 
 logger = logging.getLogger(__name__)
 
-TOR_CONTAINER_NAME = 'r3ngine-tor'
+TOR_CONTAINER_NAME = 'tor'
 TOR_IMAGE_NAME = 'r3ngine-tor:latest'
 TOR_SOCKS_HOST = 'tor'
 TOR_SOCKS_PORT = 9050
