@@ -17,6 +17,7 @@ the `self` interface expected by those tasks without requiring Celery.
 
 import logging
 import os
+import threading
 import yaml
 
 from temporalio import activity
@@ -160,6 +161,11 @@ class TemporalTaskProxy:
 # Helper: run a RengineTask function via TemporalTaskProxy
 # ---------------------------------------------------------------------------
 
+# Thread-local used to share the per-activity cancel_event with stream_command/run_command
+# so they can cancel GoExecutorTaskWorkflow instances without signature changes.
+_task_cancel_local = threading.local()
+
+
 def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **kwargs):
     """Execute an existing RengineTask-decorated function inside a Temporal activity.
 
@@ -185,12 +191,13 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **k
     """
     from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
     import contextvars
-    import threading
     import time
 
     proxy = TemporalTaskProxy(ctx, task_name, description)
 
     activity_running = True
+    cancel_event = threading.Event()
+    _task_cancel_local.cancel_event = cancel_event
 
     # Copy the current contextvars context so the heartbeat thread inherits the
     # Temporal activity context. threading.Thread does NOT copy contextvars by
@@ -227,6 +234,7 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **k
                         activity.logger.warning(
                             f"[_run_task] Could not mark scan aborted: {mark_err}"
                         )
+                    cancel_event.set()  # signal stream_command/run_command to abort
                     return  # stop heartbeating; kill switch will stop the subprocess
                 except Exception as hb_err:
                     activity.logger.warning(f"[_run_task] Heartbeat failed: {hb_err}")
@@ -1168,14 +1176,22 @@ def send_scan_notification_activity(ctx: dict) -> bool:
         activity.logger.error(f"[SendScanNotificationActivity] ScanHistory {scan_id} not found.")
         return False
 
-    # Determine overall scan status from ScanActivity records
-    failed_tasks = ScanActivity.objects.filter(
-        scan_of=scan,
-        status=FAILED_TASK
-    ).count()
+    # Determine overall scan status from ScanActivity records.
+    # A task that failed on an early Temporal retry attempt but succeeded on a later
+    # attempt will have both a FAILED_TASK and a SUCCESS_TASK record with the same
+    # name. We only treat a task as truly failed if it NEVER produced a SUCCESS record.
+    failed_names = set(
+        ScanActivity.objects.filter(scan_of=scan, status=FAILED_TASK)
+        .values_list('name', flat=True)
+    )
+    success_names = set(
+        ScanActivity.objects.filter(scan_of=scan, status=SUCCESS_TASK)
+        .values_list('name', flat=True)
+    )
+    true_failures = failed_names - success_names  # failed and never recovered
 
-    status = SUCCESS_TASK if failed_tasks == 0 else FAILED_TASK
-    status_h = 'SUCCESS' if failed_tasks == 0 else 'FAILED'
+    status = SUCCESS_TASK if not true_failures else FAILED_TASK
+    status_h = 'SUCCESS' if not true_failures else 'FAILED'
 
     scan.scan_status = status
     scan.stop_scan_date = timezone.now()
@@ -1940,7 +1956,13 @@ def finalize_failed_scan_activity(ctx: dict, error_msg: str) -> None:
         return
         
     try:
+        from reNgine.definitions import ABORTED_TASK
         scan = ScanHistory.objects.get(pk=scan_id)
+        if scan.scan_status == ABORTED_TASK:
+            logger.info(
+                f"Scan {scan_id} already ABORTED by user — not overwriting to FAILED_TASK."
+            )
+            return
         scan.scan_status = FAILED_TASK
         scan.error_message = error_msg[:300] if error_msg else "Scan workflow crashed."
         scan.stop_scan_date = timezone.now()

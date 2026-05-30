@@ -267,10 +267,10 @@
       As for the name, Dal(달) is the Korean word for "moon," while "Fox" stands for "Finder Of XSS".
     github_url: https://github.com/hahwul/dalfox
     license_url: https://github.com/hahwul/dalfox/blob/main/LICENSE.txt
-    version_lookup_command: dalfox version
-    update_command: go install -v github.com/hahwul/dalfox/v2@latest
-    install_command: go install -v github.com/hahwul/dalfox/v2@latest
-    version_match_regex: v(?i:v)?\d+\.\d+(?:\.\d+)*
+    version_lookup_command: dalfox --version
+    update_command: ARCH=$(dpkg --print-architecture | sed 's/amd64/x86_64/;s/arm64/aarch64/') && VER=$(curl -sf https://api.github.com/repos/hahwul/dalfox/releases/latest | jq -r .tag_name | sed 's/v//') && curl -fsSL "https://github.com/hahwul/dalfox/releases/download/v${VER}/dalfox-v${VER}-linux-${ARCH}.tar.gz" | tar -xz -C /tmp/ && install -m755 "$(find /tmp -maxdepth 2 -name dalfox -type f | head -1)" /usr/local/bin/dalfox
+    install_command: ARCH=$(dpkg --print-architecture | sed 's/amd64/x86_64/;s/arm64/aarch64/') && VER=$(curl -sf https://api.github.com/repos/hahwul/dalfox/releases/latest | jq -r .tag_name | sed 's/v//') && curl -fsSL "https://github.com/hahwul/dalfox/releases/download/v${VER}/dalfox-v${VER}-linux-${ARCH}.tar.gz" | tar -xz -C /tmp/ && install -m755 "$(find /tmp -maxdepth 2 -name dalfox -type f | head -1)" /usr/local/bin/dalfox
+    version_match_regex: v\d+\.\d+(?:\.\d+)*
     is_default: true
     is_subdomain_gathering: false
     is_github_cloned: false

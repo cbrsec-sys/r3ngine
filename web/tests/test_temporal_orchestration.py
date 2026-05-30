@@ -1,6 +1,6 @@
 import os
 import django
-from unittest import TestCase
+from django.test import TestCase
 from unittest.mock import patch, MagicMock, AsyncMock
 
 # Setup Django environment

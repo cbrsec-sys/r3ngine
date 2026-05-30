@@ -115,41 +115,53 @@ fi
 naabu -version && subfinder -version && amass -version
 nuclei -version
 
-# if [ ! -d "/root/nuclei-templates/geeknik_nuclei_templates" ]; then
-#   echo "Installing Geeknik Nuclei templates"
-#   git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/geeknik_nuclei_templates
-# else
-#   echo "Updating Geeknik Nuclei templates"
-#   rm -rf ~/nuclei-templates/geeknik_nuclei_templates
-#   git clone https://github.com/geeknik/the-nuclei-templates.git ~/nuclei-templates/geeknik_nuclei_templates
-# fi
+# Community Nuclei Templates
+# All cloned into /root/nuclei-templates/ — the shared nuclei_templates volume.
+# nuclei runs with -t /root/nuclei-templates so subdirs are picked up automatically.
 
-# if [ ! -f "~/nuclei-templates/ssrf_nagli.yaml" ]; then
-#   echo "Downloading ssrf_nagli for Nuclei"
-#   wget https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml -O ~/nuclei-templates/ssrf_nagli.yaml
-# fi
+if [ ! -d "/root/nuclei-templates/geeknik" ]; then
+  echo "Installing Geeknik Nuclei templates"
+  git clone --depth 1 https://github.com/geeknik/the-nuclei-templates.git /root/nuclei-templates/geeknik
+fi
 
-# # AI Map Templates
-# echo "Checking for AI Map Templates"
-# if [ ! -f "~/nuclei-templates/langserve-detect.yaml" ]; then
-#   wget https://raw.githubusercontent.com/BishopFox/aimap/refs/heads/main/templates/langserve-detect.yaml -O ~/nuclei-templates/langserve-detect.yaml
-# fi
+if [ ! -f "/root/nuclei-templates/ssrf_nagli.yaml" ]; then
+  echo "Downloading ssrf_nagli SSRF template"
+  wget -q https://raw.githubusercontent.com/NagliNagli/BountyTricks/main/ssrf.yaml \
+    -O /root/nuclei-templates/ssrf_nagli.yaml || true
+fi
 
-# if [ ! -f "~/nuclei-templates/mcp-server-detect.yaml" ]; then
-#   wget https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/mcp-server-detect.yaml -O ~/nuclei-templates/mcp-server-detect.yaml
-# fi
+# BishopFox AI Map templates — LangServe, MCP, OpenAI-compat, prompt-leak detection
+AI_TPL_DIR="/root/nuclei-templates/aimap"
+mkdir -p "$AI_TPL_DIR"
+for tpl in langserve-detect mcp-server-detect mcp-tool-enum openai-compat-detect prompt-leak; do
+  if [ ! -f "$AI_TPL_DIR/${tpl}.yaml" ]; then
+    wget -q "https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/${tpl}.yaml" \
+      -O "$AI_TPL_DIR/${tpl}.yaml" || true
+  fi
+done
 
-# if [ ! -f "~/nuclei-templates/mcp-tool-enum.yaml" ]; then
-#   wget https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/mcp-tool-enum.yaml -O ~/nuclei-templates/mcp-tool-enum.yaml
-# fi
+# edoardottt/missing-cve-nuclei-templates — ~64k CVEs absent from the official set
+# Covers XSS (22k), SQLi (12k), DoS (15k), RCE (3k), Path Traversal, SSRF, LFI, XXE, SSTI
+if [ ! -d "/root/nuclei-templates/missing-cve" ]; then
+  echo "Installing missing-cve nuclei templates (~64k additional CVEs)"
+  git clone --depth 1 https://github.com/edoardottt/missing-cve-nuclei-templates.git \
+    /root/nuclei-templates/missing-cve
+fi
 
-# if [ ! -f "~/nuclei-templates/openai-compat-detect.yaml" ]; then
-#   wget https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/openai-compat-detect.yaml -O ~/nuclei-templates/openai-compat-detect.yaml
-# fi
+# emadshanab/Nuclei-Templates-Collection — aggregates 400+ community repos
+# Includes Log4Shell, Spring RCE, F5, WAF detection, Kubernetes, SAP, Oracle, WebSphere
+if [ ! -d "/root/nuclei-templates/community-collection" ]; then
+  echo "Installing Nuclei Templates Collection (400+ community repos)"
+  git clone --depth 1 https://github.com/emadshanab/Nuclei-Templates-Collection.git \
+    /root/nuclei-templates/community-collection
+fi
 
-# if [ ! -f "~/nuclei-templates/prompt-leak.yaml" ]; then
-#   wget https://github.com/BishopFox/aimap/raw/refs/heads/main/templates/prompt-leak.yaml -O ~/nuclei-templates/prompt-leak.yaml
-# fi
+# 0xKayala/Custom-Nuclei-Templates — bug-bounty focused custom templates
+if [ ! -d "/root/nuclei-templates/kayala-custom" ]; then
+  echo "Installing 0xKayala custom nuclei templates"
+  git clone --depth 1 https://github.com/0xKayala/Custom-Nuclei-Templates.git \
+    /root/nuclei-templates/kayala-custom
+fi
 
 # httpx alias
 echo 'alias httpx="/usr/local/bin/httpx"' >> ~/.bashrc

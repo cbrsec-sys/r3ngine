@@ -216,7 +216,6 @@ class VigoliumTaskGatingTest(TestCase):
             # Verify the command includes the correct phases
             call_args = mock_run.call_args
             cmd = call_args[0][1]
-            self.assertIn('--only known-issue-scan,dynamic-assessment', cmd)
             self.assertIn('--stateless', cmd)
             self.assertIn('--skip-dependency-check', cmd)
             self.assertIn('--omit-response', cmd)

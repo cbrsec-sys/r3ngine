@@ -1007,6 +1007,10 @@ def subdomain_discovery(
 		scan_id=self.scan_id,
 		activity_id=self.activity_id)
 
+	if not os.path.isfile(self.output_path):
+		logger.warning('subdomain_discovery: output file not found at %s, no subdomains collected.', self.output_path)
+		return
+
 	with open(self.output_path) as f:
 		lines = f.readlines()
 
@@ -2850,6 +2854,10 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		)
 
 	# Store all the endpoints and run httpx
+	if not os.path.isfile(self.output_path):
+		logger.warning('fetch_url: output file not found at %s, no URLs to process.', self.output_path)
+		return
+
 	with open(self.output_path) as f:
 		discovered_urls = f.readlines()
 		self.notify(fields={'Discovered URLs': len(discovered_urls)})
@@ -3466,6 +3474,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	
 	# Intelligence-Driven Scanning: Inject tags based on detected technologies
 	tech_tags = []
+	all_techs = set()
 	if self.scan:
 		# Get all technologies discovered for this scan
 		subdomains = Subdomain.objects.filter(scan_history=self.scan)
@@ -3474,8 +3483,10 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 			# assuming technologies is a many-to-many field with 'name' attribute
 			all_techs.update(sub.technologies.values_list('name', flat=True))
 		
-		# Temporarily disabled to check if this is causing nuclei scans to hang
-		if all_techs:
+		# Tag injection intentionally disabled: -tags restricts nuclei to matched templates only,
+		# causing missed detections when not all target technologies have been discovered yet.
+		# Full scan without tag filtering ensures complete coverage.
+		if False and all_techs:
 			tech_tags = get_nuclei_tags_from_techs(list(all_techs))
 			logger.info(f'Detected technologies: {list(all_techs)}. Adding targeted Nuclei tags: {tech_tags}')
 
@@ -3517,18 +3528,24 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 			history_file=self.history_file,
 			scan_id=self.scan_id,
 			activity_id=self.activity_id)
-		input_path = unfurl_filter
+		if os.path.isfile(unfurl_filter) and os.path.getsize(unfurl_filter) > 0:
+			input_path = unfurl_filter
+		else:
+			logger.warning('nuclei_scan: unfurl produced no output, using original endpoint list.')
 
 	# Build templates
 	logger.info('Updating Nuclei templates ...')
-	# Wordfence Templates integration
-	is_wordpress_detected = False # Temporarily disabled topscoder wordpress nuclei templates
+	# Wordfence Templates integration — 70k+ WordPress CVE templates, daily-updated
+	is_wordpress_detected = any(
+		'wordpress' in t.lower() or 'wp-' in t.lower()
+		for t in all_techs
+	) if all_techs else False
 	wordfence_exists = False
 	if is_wordpress_detected:
 		logger.info("WordPress detected. Preparing Wordfence Nuclei Templates...")
 		os.environ['GITHUB_TEMPLATE_REPO'] = 'topscoder/nuclei-wordfence-cve'
-		
-		wordfence_dir = '/usr/src/github/topscoder/nuclei-wordfence-cve'
+
+		wordfence_dir = '/root/nuclei-templates/wordfence'
 		if not os.path.exists(wordfence_dir) or not os.listdir(wordfence_dir):
 			os.makedirs(os.path.dirname(wordfence_dir), exist_ok=True)
 			logger.info("Cloning topscoder/nuclei-wordfence-cve templates from GitHub...")
@@ -3536,7 +3553,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 				import subprocess
 				subprocess.run(
 					["git", "clone", "--depth", "1", "https://github.com/topscoder/nuclei-wordfence-cve.git", wordfence_dir],
-					timeout=20,
+					timeout=120,
 					check=True,
 					stdout=subprocess.PIPE,
 					stderr=subprocess.PIPE
@@ -3594,7 +3611,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	cmd += f' -rl {rate_limit}' if rate_limit > 0 else ''
 	if severities_str:
 		cmd += f' -severity {severities_str}'
-	cmd += f' -timeout {str(timeout)}' if timeout and timeout > 0 else ''
+	#cmd += f' -timeout {str(timeout)}' if timeout and timeout > 0 else ''
 	if tags:
 		cmd += f' -tags {tags}'
 	#cmd += f' -silent'
@@ -3602,15 +3619,9 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		cmd += f' -t {tpl}'
 	
 	if is_wordpress_detected and wordfence_exists:
-		# Add Wordfence template path
-		logger.warning(f'wordfence_detected: {is_wordpress_detected}, wordfence_exists: {wordfence_exists}')
-		cmd += " -t /usr/src/github/topscoder/nuclei-wordfence-cve"
-		# Default to production, optional candidate
-		use_candidate = config.get('nuclei_config', {}).get(USE_WORDFENCE_CANDIDATE, False)
-		if use_candidate:
-			cmd += " -tags candidate"
-		else:
-			cmd += " -tags production"
+		# Wordfence templates live at /root/nuclei-templates/wordfence — already included
+		# in the default -t /root/nuclei-templates recursive scan; no extra -t needed.
+		logger.info(f'[nuclei] WordPress detected; Wordfence templates active at /root/nuclei-templates/wordfence')
 	logger.info("Running Nuclei vulnerabilities scan")
 	if hasattr(self, 'activity') and self.activity:
 		self.activity.title = "Nuclei Scan"
@@ -3855,13 +3866,13 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	# command builder
 	proxy = get_random_proxy()
 	opsec = OpSecManager()
-	cmd = 'dalfox --silence --no-color --no-spinner'
-	cmd += f' --only-poc v,r '
+	cmd = 'dalfox --silence --no-color'
+	cmd += f' --only-poc v,r'
 	cmd += f' --ignore-return 302,404,403'
 	
 	cmd = opsec.apply_stealth('dalfox', cmd, proxy=proxy)
 	cmd += f' file {input_path}'
-	cmd += f' --proxy {proxy}' if proxy else ''
+	cmd += f' --proxy {proxy}' if proxy and '--proxy' not in cmd else ''
 	cmd += f' --waf-evasion' if is_waf_evasion else ''
 	cmd += f' --waf-bypass auto'
 	cmd += f' --deep-scan' if use_deep_scan else ''
@@ -3875,7 +3886,7 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	if formatted_headers:
 		cmd += formatted_headers
 	cmd += f' --user-agent {user_agent}' if user_agent else ''
-	cmd += f' --worker {threads}' if threads else ''
+	cmd += f' --workers {threads}' if threads else ''
 	cmd += f' --format json'
 
 	results = []
@@ -3987,6 +3998,10 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 			write_filepath=input_path,
 			ctx=ctx
 		)
+
+	if not os.path.isfile(input_path) or os.path.getsize(input_path) == 0:
+		logger.warning('crlfuzz: no endpoints to scan at %s, skipping.', input_path)
+		return
 
 	notif = Notification.objects.first()
 	send_status = notif.send_scan_status_notif if notif else False
@@ -7509,7 +7524,14 @@ def recover_stuck_scans():
 			logger.error(f"Failed to auto-recover scan {scan.id}: {e}")
 
 	# --- Pass 2: RUNNING_TASK scans whose Temporal workflow is gone ---
-	for scan in ScanHistory.objects.filter(scan_status=RUNNING_TASK, recovery_count__lt=3):
+	# Exclude scans that were explicitly stopped by the user (stop_scan_date is set by
+	# abort_scan_history). This guards against a narrow race-condition window where the
+	# orchestrator restarts before the ABORTED_TASK status is persisted to the DB.
+	for scan in ScanHistory.objects.filter(
+		scan_status=RUNNING_TASK,
+		recovery_count__lt=3,
+		stop_scan_date__isnull=True,
+	):
 		# Prefer the TemporalWorkflowExecution record; fall back to workflow_ids array.
 		latest_exec = (
 			TemporalWorkflowExecution.objects

@@ -3336,10 +3336,20 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 		ip_address = req.query_params.get('ip_address')
 		name = req.query_params.get('name')
 		project = req.query_params.get('project')
+		http_status = req.query_params.get('http_status')
+		is_important = req.query_params.get('is_important')
+		has_vulnerabilities = req.query_params.get('has_vulnerabilities')
+		ports = req.query_params.get('ports')
 
 		subdomains = Subdomain.objects.filter(target_domain__project__slug=project)
 
-		if 'is_important' in req.query_params:
+		if is_important is not None:
+			if is_important.lower() in ('true', '1', 't', 'y', 'yes'):
+				subdomains = subdomains.filter(is_important=True)
+			elif is_important.lower() in ('false', '0', 'f', 'n', 'no'):
+				subdomains = subdomains.filter(is_important=False)
+		elif 'is_important' in req.query_params and not req.query_params.get('is_important'):
+			# Fallback for old behaviour if just `?is_important` was passed empty
 			subdomains = subdomains.filter(is_important=True)
 
 		if target_id:
@@ -3363,7 +3373,7 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 		else:
 			self.queryset = subdomains.distinct()
 
-		if 'only_directory' in req.query_params:
+		if 'only_directory' in req.query_params and str(req.query_params.get('only_directory')).lower() != 'false':
 			self.queryset = self.queryset.exclude(directories__isnull=True)
 
 		if ip_address:
@@ -3371,6 +3381,23 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 
 		if name:
 			self.queryset = self.queryset.filter(name=name)
+
+		if http_status:
+			try:
+				self.queryset = self.queryset.filter(http_status=int(http_status))
+			except ValueError:
+				pass
+
+		if has_vulnerabilities is not None:
+			if has_vulnerabilities.lower() in ('true', '1', 't', 'y', 'yes'):
+				self.queryset = self.queryset.filter(vulnerability__isnull=False).distinct()
+			elif has_vulnerabilities.lower() in ('false', '0', 'f', 'n', 'no'):
+				self.queryset = self.queryset.filter(vulnerability__isnull=True).distinct()
+
+		if ports:
+			port_list = [p.strip() for p in ports.split(',') if p.strip()]
+			if port_list:
+				self.queryset = self.queryset.filter(ip_addresses__ports__number__in=port_list).distinct()
 
 		return self.queryset
 
@@ -4008,6 +4035,9 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		scan_id = req.query_params.get('scan_history')
 		domain = req.query_params.get('domain')
 		severity = req.query_params.get('severity')
+		validation_status = req.query_params.get('validation_status')
+		open_status = req.query_params.get('open_status')
+		source = req.query_params.get('source')
 		subdomain_id = req.query_params.get('subdomain_id')
 		subdomain_name = req.query_params.get('subdomain')
 		vulnerability_name = req.query_params.get('vulnerability_name')
@@ -4046,6 +4076,15 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 			qs = qs.filter(Q(name=vulnerability_name)).distinct()
 		if severity:
 			qs = qs.filter(severity=severity)
+		if validation_status:
+			qs = qs.filter(validation_status__iexact=validation_status)
+		if open_status is not None:
+			if open_status.lower() in ('true', '1', 't', 'y', 'yes'):
+				qs = qs.filter(open_status=True)
+			elif open_status.lower() in ('false', '0', 'f', 'n', 'no'):
+				qs = qs.filter(open_status=False)
+		if source:
+			qs = qs.filter(source__icontains=source)
 		if subdomain_id:
 			qs = qs.filter(subdomain__id=subdomain_id)
 		self.queryset = qs

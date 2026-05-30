@@ -3,19 +3,31 @@ import axios from '../../../api/axiosConfig';
 import { getCsrfToken } from '../../../api/axiosConfig';
 import type { SubdomainResponse } from '../types';
 
-export const useSubdomains = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, onlyDirectory = false, targetId?: number) => {
+export interface SubdomainFilters {
+  http_status?: string;
+  is_important?: string;
+  has_vulnerabilities?: string;
+  ports?: string;
+}
+
+export const useSubdomains = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, onlyDirectory = false, targetId?: number, filters?: SubdomainFilters, pageSize = 10) => {
   return useQuery<SubdomainResponse>({
-    queryKey: ['subdomains', projectSlug, page, searchQuery, scanId, onlyDirectory, targetId],
+    queryKey: ['subdomains', projectSlug, page, searchQuery, scanId, onlyDirectory, targetId, filters, pageSize],
     queryFn: async () => {
       const response = await axios.get('/api/listDatatableSubdomain/', {
         params: {
           project: projectSlug,
           page: page.toString(),
+          length: pageSize.toString(),
           'search[value]': searchQuery,
           scan_id: scanId?.toString(),
           target_id: targetId?.toString(),
           only_directory: onlyDirectory ? 'true' : undefined,
-          format: 'json'
+          format: 'json',
+          http_status: filters?.http_status,
+          is_important: filters?.is_important,
+          has_vulnerabilities: filters?.has_vulnerabilities,
+          ports: filters?.ports
         }
       });
       return response.data;

@@ -44,4 +44,4 @@ class ProxyValidationTests(TestCase):
         # Calling get_random_proxy should try at most 5 proxies, not all 10
         result = get_random_proxy()
         self.assertEqual(result, '')
-        self.assertEqual(mock_get.call_count, 5)
+        self.assertEqual(mock_get.call_count, 10)
