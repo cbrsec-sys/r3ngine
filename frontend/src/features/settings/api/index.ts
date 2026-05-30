@@ -47,6 +47,7 @@ export interface ProxySettings {
   use_proxy: boolean;
   proxies: string;
   use_proxychains: boolean;
+  use_tor: boolean;
   skip_validation?: boolean;
 }
 
@@ -177,6 +178,9 @@ export const useUpdateProxySettings = (slug: string) => {
       if (data.use_proxychains) {
         formData.append('use_proxychains', 'on');
       }
+      if (data.use_tor) {
+        formData.append('use_tor', 'on');
+      }
       formData.append('proxies', data.proxies);
       if (data.skip_validation) {
         formData.append('skip_validation', 'true');
@@ -224,6 +228,33 @@ export const useProxyTaskStatus = (slug: string, taskId: string | null) => {
       }
       return 2000;
     },
+  });
+};
+
+export const useTorStatus = () => {
+  return useQuery<{ running: boolean }>({
+    queryKey: ['tor-status'],
+    queryFn: async () => {
+      const response = await axios.get('/api/rengine/tor-status/', {
+        headers: { 'Accept': 'application/json' }
+      });
+      return response.data;
+    },
+    refetchInterval: 10000,
+  });
+};
+
+export const useTorExitIP = (enabled: boolean) => {
+  return useQuery<{ ip: string | null }>({
+    queryKey: ['tor-exit-ip'],
+    queryFn: async () => {
+      const response = await axios.get('/api/rengine/tor-exit-ip/', {
+        headers: { 'Accept': 'application/json' }
+      });
+      return response.data;
+    },
+    enabled,
+    refetchInterval: enabled ? 30000 : false,
   });
 };
 
