@@ -1,0 +1,16 @@
+- model: scanEngine.enginetype
+  pk: 5
+  fields:
+    engine_name: Port Scan
+    default_engine: true
+    yaml_configuration: |
+      http_crawl: {}
+      port_scan:
+        enable_http_crawl: true
+        timeout: 5
+        ports:
+          - top-100
+        rate_limit: 150
+        threads: 30
+        passive: false
+        enable_network_enum: true

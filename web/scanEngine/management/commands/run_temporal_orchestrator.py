@@ -84,6 +84,7 @@ from reNgine.temporal_activities import (
     run_subdomain_discovery_activity,
     run_amass_intel_discovery_activity,
     run_firewall_vpn_scan_activity,
+    run_dns_security_activity,
     parse_discovery_results_activity,
     seed_endpoints_for_crawl_activity,
 
@@ -292,6 +293,7 @@ class Command(BaseCommand):
                 run_subdomain_discovery_activity,
                 run_amass_intel_discovery_activity,
                 run_firewall_vpn_scan_activity,
+                run_dns_security_activity,
                 parse_discovery_results_activity,
                 seed_endpoints_for_crawl_activity,
 

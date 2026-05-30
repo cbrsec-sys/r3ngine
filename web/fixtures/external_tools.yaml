@@ -813,3 +813,105 @@
     is_github_cloned: false
     github_clone_path: null
     subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 47
+  fields:
+    logo_url: https://testssl.sh/images/testssl.sh.png
+    name: testssl.sh
+    description: "testssl.sh is a comprehensive TLS/SSL testing tool that checks a server's service on any port for the support of TLS/SSL ciphers, protocols and cryptographic flaws. Covers BEAST, BREACH, POODLE, ROBOT, DROWN, Heartbleed, CRIME, LUCKY13, SWEET32, Logjam and FREAK."
+    github_url: https://github.com/drwetter/testssl.sh
+    license_url: https://github.com/drwetter/testssl.sh/blob/3.2/LICENSE
+    version_lookup_command: testssl.sh --version
+    version_match_regex: "v?\\d+\\.\\d+"
+    install_command: "git clone --depth 1 https://github.com/drwetter/testssl.sh /usr/src/github/testssl.sh && chmod +x /usr/src/github/testssl.sh/testssl.sh && ln -sf /usr/src/github/testssl.sh/testssl.sh /usr/local/bin/testssl.sh"
+    update_command: "cd /usr/src/github/testssl.sh && git pull"
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/testssl.sh
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 48
+  fields:
+    logo_url: https://raw.githubusercontent.com/cddmp/enum4linux-ng/master/docs/logo.png
+    name: enum4linux-ng
+    description: "enum4linux-ng is a rewrite of enum4linux in Python 3. It enumerates SMB/SAMBA information including null sessions, shares, users, groups, and password policies."
+    github_url: https://github.com/cddmp/enum4linux-ng
+    license_url: https://github.com/cddmp/enum4linux-ng/blob/master/LICENSE
+    version_lookup_command: enum4linux-ng.py --help
+    version_match_regex: "\\d+\\.\\d+"
+    install_command: "pip3 install enum4linux-ng"
+    update_command: "pip3 install enum4linux-ng --upgrade"
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 49
+  fields:
+    logo_url: https://raw.githubusercontent.com/ticarpi/jwt_tool/master/images/logo.png
+    name: jwt_tool
+    description: "jwt_tool is a Python toolkit for testing, tweaking and cracking JSON Web Tokens. Tests algorithm confusion (RS256 to HS256), alg:none attacks, blank passwords, key injection, and more."
+    github_url: https://github.com/ticarpi/jwt_tool
+    license_url: https://github.com/ticarpi/jwt_tool/blob/master/LICENSE
+    version_lookup_command: "python3 /usr/src/github/jwt_tool/jwt_tool.py --help"
+    version_match_regex: "\\d+\\.\\d+"
+    install_command: "git clone --depth 1 https://github.com/ticarpi/jwt_tool /usr/src/github/jwt_tool && pip3 install -r /usr/src/github/jwt_tool/requirements.txt"
+    update_command: "cd /usr/src/github/jwt_tool && git pull && pip3 install -r requirements.txt"
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: true
+    github_clone_path: /usr/src/github/jwt_tool
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 50
+  fields:
+    logo_url: https://raw.githubusercontent.com/dolevf/graphql-cop/main/static/images/logo.png
+    name: graphql-cop
+    description: "graphql-cop is a security auditor for GraphQL APIs. Tests for introspection enabled, batch attacks, field suggestions, alias overloading, and other GraphQL-specific security issues."
+    github_url: https://github.com/dolevf/graphql-cop
+    license_url: https://github.com/dolevf/graphql-cop/blob/main/LICENSE
+    version_lookup_command: graphql-cop --version
+    version_match_regex: "\\d+\\.\\d+"
+    install_command: "pip3 install graphql-cop"
+    update_command: "pip3 install graphql-cop --upgrade"
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 51
+  fields:
+    logo_url: https://raw.githubusercontent.com/darkoperator/dnsrecon/master/docs/logo.png
+    name: dnsrecon
+    description: "dnsrecon is a Python DNS enumeration script. Checks for zone transfers (AXFR), NS record enumeration, DNSSEC validation, DNS cache snooping, and DNS amplification factor."
+    github_url: https://github.com/darkoperator/dnsrecon
+    license_url: https://github.com/darkoperator/dnsrecon/blob/master/LICENSE
+    version_lookup_command: dnsrecon -v
+    version_match_regex: "v?\\d+\\.\\d+"
+    install_command: "pip3 install dnsrecon"
+    update_command: "pip3 install dnsrecon --upgrade"
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 52
+  fields:
+    logo_url: https://raw.githubusercontent.com/mschwager/fierce/master/images/logo.png
+    name: fierce
+    description: "fierce is a DNS reconnaissance tool for locating non-contiguous IP space. Performs DNS brute force, PTR lookups, and zone transfer attempts against nameservers."
+    github_url: https://github.com/mschwager/fierce
+    license_url: https://github.com/mschwager/fierce/blob/master/LICENSE
+    version_lookup_command: fierce --help
+    version_match_regex: "\\d+\\.\\d+"
+    install_command: "pip3 install fierce"
+    update_command: "pip3 install fierce --upgrade"
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null

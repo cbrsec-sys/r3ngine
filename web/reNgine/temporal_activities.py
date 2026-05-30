@@ -289,6 +289,7 @@ def target_profiling_activity(ctx: dict) -> dict:
     from startScan.models import ScanHistory
     from scanEngine.models import EngineType
     from reNgine.settings import RENGINE_RESULTS
+    from reNgine.definitions import RUNNING_TASK
 
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[TargetProfilingActivity] Profiling scan_history_id={scan_id}")
@@ -301,6 +302,12 @@ def target_profiling_activity(ctx: dict) -> dict:
     engine = EngineType.objects.filter(pk=engine_id).first()
     if not engine:
         raise ValueError(f"EngineType with id={engine_id} not found.")
+
+    # Re-arm status to RUNNING so the Django DB reflects reality when a
+    # workflow is restarted after a prior run set it to FAILED or ABORTED.
+    if scan.scan_status != RUNNING_TASK:
+        scan.scan_status = RUNNING_TASK
+        scan.save(update_fields=['scan_status'])
 
     # Parse YAML configuration if not already done
     if 'yaml_configuration' not in ctx or not ctx['yaml_configuration']:
@@ -402,6 +409,26 @@ def run_firewall_vpn_scan_activity(ctx: dict) -> bool:
         ctx,
         task_name='firewall_vpn_scan',
         description='Firewall & VPN Scan'
+    )
+
+
+@activity.defn(name="RunDNSSecurityActivity")
+def run_dns_security_activity(ctx: dict) -> bool:
+    """Run DNS security checks: AXFR, DNSSEC, amplification, optional brute-force.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.dns_tasks import dns_security
+    activity.logger.info(f"[RunDNSSecurityActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        dns_security,
+        ctx,
+        task_name='dns_security',
+        description='DNS Security Scan'
     )
 
 
@@ -1175,7 +1202,7 @@ def send_scan_notification_activity(ctx: dict) -> bool:
 
 _PERMITTED_GENERIC_TASKS = frozenset({
     "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
-    "osint", "spiderfoot_scan", "http_crawl", "port_scan", "screenshot",
+    "dns_security", "osint", "spiderfoot_scan", "http_crawl", "port_scan", "screenshot",
     "fetch_url", "dir_file_fuzz", "web_api_discovery", "waf_detection",
     "secret_scanning", "vulnerability_scan", "waf_bypass", "brute_force_scan",
     "nuclei_scan", "crlfuzz_scan", "dalfox_xss_scan", "s3scanner",
