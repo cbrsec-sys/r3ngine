@@ -106,6 +106,7 @@ class Proxy(models.Model):
     use_proxy = models.BooleanField(default=False)
     proxies = models.TextField(blank=True, null=True)
     use_proxychains = models.BooleanField(default=False)
+    use_tor = models.BooleanField(default=False)
 
 
 class OpSec(models.Model):
