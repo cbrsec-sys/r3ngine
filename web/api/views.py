@@ -2062,6 +2062,18 @@ class ProxyFetchAPIView(APIView):
 			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class TorStatusAPIView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request):
+		from reNgine.tor_manager import TorManager, TorUnavailableError
+		try:
+			running = TorManager().is_running()
+			return Response({'running': running})
+		except TorUnavailableError:
+			return Response({'running': False})
+
+
 class UninstallTool(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS

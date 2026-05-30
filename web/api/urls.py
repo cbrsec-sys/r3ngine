@@ -262,6 +262,10 @@ urlpatterns = [
         ProxyFetchAPIView.as_view(),
         name='rengine_fetch_proxies'),
     path(
+        'rengine/tor-status/',
+        TorStatusAPIView.as_view(),
+        name='rengine_tor_status'),
+    path(
         'action/subdomain/delete/',
         DeleteSubdomain.as_view(),
         name='delete_subdomain'),
