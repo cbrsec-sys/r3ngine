@@ -1,0 +1,78 @@
+- model: scanEngine.enginetype
+  pk: 8
+  fields:
+    engine_name: Web App & API Discovery
+    default_engine: true
+    yaml_configuration: |
+      subdomain_discovery:
+        uses_tools:
+          - subfinder
+          - chaos
+          - ctfr
+          - sublist3r
+          - tlsx
+          - oneforall
+          - netlas
+          - baddns
+        enable_http_crawl: true
+        threads: 30
+        timeout: 5
+      web_api_discovery:
+        uses_tools:
+          - kiterunner
+          - arjun
+          - linkfinder
+          - paramspider
+          - aquatone
+          - semgrep
+          - retire
+          - jwt_tool
+          - graphql-cop
+        scan_only_active: true
+        threads: 30
+        kiterunner_wordlist: routes-large.kite
+        arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
+      dir_file_fuzz:
+        auto_calibration: true
+        enable_http_crawl: true
+        rate_limit: 150
+        extensions:
+          - html
+          - php
+          - git
+          - yaml
+          - conf
+          - cnf
+          - config
+          - gz
+          - env
+          - log
+          - db
+          - mysql
+          - bak
+          - asp
+          - aspx
+          - txt
+          - conf
+          - sql
+          - json
+          - yml
+          - pdf
+        follow_redirect: false
+        max_time: 300
+        match_http_status:
+          - 200
+          - 204
+        recursive_level: 2
+        stop_on_error: false
+        timeout: 5
+        threads: 30
+        wordlist_name: dicc
+        use_api_wordlist: true
+      vulnerability_scan:
+        run_acunetix: true
+        run_wpscan: true
+      attack_path_modeling:
+        enabled: true
+      spiderfoot_scan:
+        modules: all

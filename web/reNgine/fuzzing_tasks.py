@@ -110,6 +110,10 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 			else:
 				wordlist_path = FFUF_DEFAULT_WORDLIST_PATH
 
+		# Override with API-specific wordlist when use_api_wordlist is enabled
+		from reNgine.api_tasks import resolve_wordlist_path
+		wordlist_path = resolve_wordlist_path(config, wordlist_path)
+
 		# Define input path for URLs to fuzz
 		input_path = f'{self.results_dir}/input_endpoints_dir_file_fuzz.txt'
 

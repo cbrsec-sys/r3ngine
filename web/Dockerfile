@@ -195,6 +195,11 @@ RUN apt-get update -y && \
     hping3 \
     wrk \
     postgresql-client \
+    # Network protocol enumeration tools
+    onesixtyone \
+    snmp \
+    ldap-utils \
+    dnsutils \
     # Utilities
     jq \
     unzip \
@@ -335,6 +340,14 @@ RUN git clone --depth 1 https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/C
     pip3 install --no-cache-dir -r /usr/src/github/CMSeeK/requirements.txt && \
     rm -rf /usr/src/github/CMSeeK/.git
 
+RUN git clone --depth 1 https://github.com/drwetter/testssl.sh /usr/src/github/testssl.sh && \
+    chmod +x /usr/src/github/testssl.sh/testssl.sh && \
+    ln -sf /usr/src/github/testssl.sh/testssl.sh /usr/local/bin/testssl.sh
+
+RUN git clone --depth 1 https://github.com/ticarpi/jwt_tool /usr/src/github/jwt_tool && \
+    pip3 install --no-cache-dir -r /usr/src/github/jwt_tool/requirements.txt && \
+    rm -rf /usr/src/github/jwt_tool/.git
+
 # ---------------------------------------------------------------------------
 # Install Python security tools via pip (no source clone needed)
 #
@@ -344,6 +357,8 @@ RUN git clone --depth 1 https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/C
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel pyOpenSSL h8mail && \
     pip3 install --no-cache-dir semgrep && \
     pip3 install --no-cache-dir --upgrade meson ninja arjun inql netlas holehe maigret dirsearch
+
+RUN pip3 install --no-cache-dir graphql-cop enum4linux-ng rdp-sec-check dnsrecon fierce
 
 RUN python3 -m pip install --no-cache-dir pipx && \
     pipx install git+https://github.com/blacklanternsecurity/baddns

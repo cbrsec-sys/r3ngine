@@ -1,0 +1,33 @@
+- model: scanEngine.enginetype
+  pk: 3
+  fields:
+    engine_name: OSINT
+    default_engine: true
+    yaml_configuration: |
+      osint:
+        discover:
+          - emails
+          - metainfo
+          - employees
+        dorks:
+          - login_pages
+          - admin_panels
+          - dashboard_pages
+          - stackoverflow
+          - social_media
+          - project_management
+          - code_sharing
+          - config_files
+          - jenkins
+          - wordpress_files
+          - php_error
+          - exposed_documents
+          - db_files
+          - git_exposed
+        custom_dorks:
+          - lookup_site: _target_
+            lookup_extensions: php
+        intensity: normal
+        documents_limit: 50
+      spiderfoot_scan:
+        modules: all

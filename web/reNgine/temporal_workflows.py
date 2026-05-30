@@ -179,6 +179,17 @@ class MasterScanWorkflow:
                         task_queue="python-orchestrator-queue"
                     )
                 )
+            if "dns_security" in tasks:
+                discovery_futures.append(
+                    workflow.execute_activity(
+                        "RunDNSSecurityActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(hours=1),
+                        heartbeat_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_NETWORK_SCAN,
+                        task_queue="python-orchestrator-queue"
+                    )
+                )
             if "osint" in tasks:
                 discovery_futures.append(
                     workflow.execute_activity(
@@ -355,8 +366,8 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunWebAPIDiscoveryActivity",
                         ctx,
-                        start_to_close_timeout=timedelta(hours=1),
-                        heartbeat_timeout=timedelta(minutes=5),
+                        start_to_close_timeout=timedelta(hours=4),
+                        heartbeat_timeout=timedelta(minutes=10),
                         retry_policy=_RETRY_NETWORK_SCAN,
                         task_queue="python-orchestrator-queue"
                     )
@@ -972,7 +983,7 @@ class SubScanWorkflow:
                 # All must complete before Tier 2 (subdomains must be in DB).
                 [t for t in active_tasks if t in {
                     "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
-                    "osint", "spiderfoot_scan", "baddns"
+                    "dns_security", "osint", "spiderfoot_scan", "baddns"
                 }],
                 # TIER 2: HTTP Crawl & Port Scan — populates endpoint DB for Tiers 3+.
                 [t for t in active_tasks if t in {"http_crawl", "port_scan"}],
@@ -992,7 +1003,7 @@ class SubScanWorkflow:
                 # Handles future tasks added to _SUBSCAN_DISPATCH without breaking existing tiers.
                 [t for t in active_tasks if t not in {
                     "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
-                    "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
+                    "dns_security", "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
                     "fetch_url", "dir_file_fuzz", "web_api_discovery", "waf_detection",
                     "secret_scanning", "vulnerability_scan", "screenshot", "waf_bypass", "brute_force_scan"
                 }],

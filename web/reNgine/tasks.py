@@ -2425,6 +2425,11 @@ def port_scan(self, hosts=[], ctx={}, description=None, prepare_only=False, pars
 				max_rate=rate_limit,
 				ctx=ctx_nmap)
 
+	# Network protocol enumeration
+	if config.get(ENABLE_NETWORK_ENUM, False) and ports_data:
+		from reNgine.network_tasks import run_network_enum
+		run_network_enum(self, ctx, ports_data)
+
 	return ports_data
 
 
@@ -3010,14 +3015,19 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	results_dir = f"{self.results_dir}/web_api_discovery"
 	os.makedirs(results_dir, exist_ok=True)
 
-	processed_paramspider_subdomains = set()
+	# ── Phase 1: Map URLs to subdomains ─────────────────────────────────────
+	# Build subdomain_targets {name: (Subdomain, base_url)} for Kiterunner and
+	# an ordered url_subdomain_map for per-URL tools (Arjun, LinkFinder, InQL).
+	# URL pattern deduplication removes param-value variants that add no value
+	# (e.g. locale=ar vs locale=cs share the same path+key signature).
+	subdomain_targets = {}
+	url_subdomain_map = []
 	processed_url_patterns = set()
+
 	for url in urls:
-		# URL Pattern Normalization to skip redundant endpoints (e.g. locale=ar vs locale=cs)
 		parsed = urlparse(url)
 		query_keys = sorted(parse_qs(parsed.query).keys())
 		url_pattern = f"{parsed.netloc}{parsed.path}?{'&'.join(query_keys)}"
-		
 		if url_pattern in processed_url_patterns:
 			continue
 		processed_url_patterns.add(url_pattern)
@@ -3027,15 +3037,65 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if not subdomain:
 			continue
 
-		# Arjun - Parameter discovery
-		if 'arjun' in uses_tools:
-			logger.info(f'Running Arjun on {url}')
+		if subdomain_name not in subdomain_targets:
+			base_url = f"{parsed.scheme}://{subdomain_name}/"
+			subdomain_targets[subdomain_name] = (subdomain, base_url)
+
+		url_subdomain_map.append((url, subdomain_name, subdomain))
+
+	# ── Kiterunner: one scan per subdomain against base URL ───────────────────
+	# Running against the root of each subdomain (not individual endpoints)
+	# covers the full route space in a single wordlist pass and avoids
+	# multiplying the 35k-route scan by every discovered endpoint.
+	# The output file is the idempotency guard — if it exists and is non-empty
+	# the scan already ran (e.g. from a prior Temporal retry) and we skip to
+	# parsing, preserving all previously discovered routes.
+	if 'kiterunner' in uses_tools:
+		for subdomain_name, (subdomain, base_url) in subdomain_targets.items():
+			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
+			if os.path.exists(kr_output) and os.path.getsize(kr_output) > 0:
+				logger.info(f'Kiterunner already scanned {subdomain_name}, loading existing results.')
+			else:
+				logger.info(f'Running Kiterunner on {subdomain_name} ({base_url})')
+				cmd = f"kr scan {base_url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json | tee {kr_output}"
+				logger.warning(f'Running Kiterunner command: {cmd}')
+				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			if os.path.exists(kr_output):
+				try:
+					kr_parsed = urlparse(base_url)
+					with open(kr_output, 'r') as f:
+						for line in f:
+							if not line.strip():
+								continue
+							entry = json.loads(line)
+							found_path = entry.get('path', '')
+							if found_path:
+								full_url = f"{kr_parsed.scheme}://{kr_parsed.netloc}{found_path}"
+								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain, http_status=entry.get('status'))
+								if endpoint and '?' in full_url:
+									params = extract_params_from_url(full_url)
+									for p in params:
+										save_parameter(endpoint, p['name'], param_type='Kiterunner', value=p['value'])
+				except Exception as e:
+					logger.error(f"Error parsing Kiterunner output for {subdomain_name}: {e}")
+
+	# ── Per-URL tools (Arjun, ParamSpider, LinkFinder, InQL) ─────────────────
+	# Each tool uses a file-existence check so that Temporal retries skip work
+	# that already completed in a previous attempt.
+	processed_paramspider_subdomains = set()
+	processed_arjun_subdomains = set()
+	for url, subdomain_name, subdomain in url_subdomain_map:
+
+		# Arjun - Parameter discovery (once per subdomain; output is subdomain-scoped)
+		if 'arjun' in uses_tools and subdomain_name not in processed_arjun_subdomains:
+			processed_arjun_subdomains.add(subdomain_name)
 			arjun_output = f"{results_dir}/arjun_{subdomain_name}.json"
-			cmd = f"arjun -u {url} --passive -m {arjun_methods} -t {threads} -oJ {arjun_output}"
-			#proxy = get_random_proxy()
-			#if proxy:
-			#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id) #, proxy=proxy)
+			if os.path.exists(arjun_output) and os.path.getsize(arjun_output) > 0:
+				logger.info(f'Arjun already ran for {subdomain_name}, loading existing results.')
+			else:
+				logger.info(f'Running Arjun on {url}')
+				cmd = f"arjun -u {url} --passive -m {arjun_methods} -t {threads} -oJ {arjun_output}"
+				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(arjun_output):
 				try:
 					with open(arjun_output, 'r') as f:
@@ -3053,51 +3113,22 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 									for p in params:
 										save_parameter(endpoint, p, param_type=method)
 				except Exception as e:
-					logger.error(f"Error parsing Arjun output for {url}: {e}")
+					logger.error(f"Error parsing Arjun output for {subdomain_name}: {e}")
 
-		# Kiterunner - API/Route discovery
-		if 'kiterunner' in uses_tools:
-			logger.info(f'Running Kiterunner on {url}')
-			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
-			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json | tee -a {kr_output}"
-			#proxy = get_random_proxy()
-			#if proxy:
-			#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
-			logger.warning(f'Running Kiterunner command: {cmd}')
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id) #, proxy=proxy)
-			if os.path.exists(kr_output):
-				try:
-					with open(kr_output, 'r') as f:
-						for line in f:
-							if not line.strip(): continue
-							entry = json.loads(line)
-							found_path = entry.get('path', '')
-							if found_path:
-								parsed = urlparse(url)
-								full_url = f"{parsed.scheme}://{parsed.netloc}{found_path}"
-								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain, http_status=entry.get('status'))
-								# Extract parameters from Kiterunner path if any
-								if '?' in full_url:
-									params = extract_params_from_url(full_url)
-									logger.warning(f'Found params: {params}')
-									for p in params:
-										save_parameter(endpoint, p['name'], param_type='Kiterunner', value=p['value'])
-				except Exception as e:
-					logger.error(f"Error parsing Kiterunner output for {url}: {e}")
-
-		# ParamSpider
+		# ParamSpider - once per subdomain
 		if 'paramspider' in uses_tools and subdomain_name not in processed_paramspider_subdomains:
-			logger.info(f'Running ParamSpider on {subdomain_name}')
 			processed_paramspider_subdomains.add(subdomain_name)
 			ps_output = f"{results_dir}/ps_{subdomain_name}.txt"
-			cmd = f"paramspider --domain {subdomain_name} | tee {ps_output}"
-			proxy = get_random_proxy()
-			if proxy:
-				cmd = f"paramspider --domain {subdomain_name} --proxy {proxy} | tee {ps_output}"
-			logger.warning(f'Running ParamSpider command: {cmd}')
-			# proxy already embedded via --proxy flag above; don't also pass proxy= kwarg
-			# or run_command would double-wrap with proxychains when use_proxychains=True
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			if os.path.exists(ps_output) and os.path.getsize(ps_output) > 0:
+				logger.info(f'ParamSpider already ran for {subdomain_name}, loading existing results.')
+			else:
+				logger.info(f'Running ParamSpider on {subdomain_name}')
+				cmd = f"paramspider --domain {subdomain_name} | tee {ps_output}"
+				proxy = get_random_proxy()
+				if proxy:
+					cmd = f"paramspider --domain {subdomain_name} --proxy {proxy} | tee {ps_output}"
+				logger.warning(f'Running ParamSpider command: {cmd}')
+				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(ps_output):
 				try:
 					with open(ps_output, 'r') as f:
@@ -3115,16 +3146,13 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				except Exception as e:
 					logger.error(f"Error parsing ParamSpider output for {subdomain_name}: {e}")
 
-		# LinkFinder
+		# LinkFinder - per URL (fast; fetches and extracts JS links)
 		if 'linkfinder' in uses_tools:
 			logger.info(f'Running LinkFinder on {url}')
 			lf_output = f"{results_dir}/lf_{subdomain_name}.txt"
 			cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -i {url} -o cli | tee {lf_output}"
-			#proxy = get_random_proxy()
-			#if proxy:
-			#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			logger.warning(f'Running LinkFinder command: {cmd}')
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id) #, proxy=proxy)
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(lf_output):
 				try:
 					with open(lf_output, 'r') as f:
@@ -3137,7 +3165,6 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 								else:
 									full_url = line
 								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain)
-								# Extract parameters from LinkFinder findings
 								if '?' in full_url:
 									params = extract_params_from_url(full_url)
 									for p in params:
@@ -3154,19 +3181,24 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			proxy = get_random_proxy()
 			if proxy:
 				cmd += f" -p {proxy}"
-			# proxy already embedded via -p flag above; don't also pass proxy= kwarg
-			# or run_command would double-wrap with proxychains when use_proxychains=True
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
-			# Parse InQL results
 			if os.path.exists(inql_output):
 				try:
 					inql_findings = parse_inql_results(inql_output)
 					for finding in inql_findings:
-						# InQL doesn't always give the full URL, but we know the base URL
-						# We can register the discovery of GraphQL
 						save_endpoint(url, ctx=ctx, subdomain=subdomain, source='InQL (GraphQL Found)')
 				except Exception as e:
 					logger.error(f"Error parsing InQL results for {url}: {e}")
+
+		# jwt_tool - JWT security testing
+		if JWT_TOOL in uses_tools:
+			from reNgine.api_tasks import run_jwt_scan
+			run_jwt_scan(self, ctx, url, subdomain, results_dir)
+
+		# graphql-cop - GraphQL security audit
+		if GRAPHQL_COP in uses_tools:
+			from reNgine.api_tasks import run_graphql_cop
+			run_graphql_cop(self, ctx, url, subdomain)
 
 	# Semgrep - Post-discovery pattern matching
 	if 'semgrep' in uses_tools:
@@ -6508,6 +6540,13 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 				}
 				save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
 	
+	# TLS deep audit (testssl.sh + crt.sh)
+	from reNgine.firewall_tasks import run_crt_sh, run_tls_deep_audit
+	if config.get(ENABLE_TESTSSL, False):
+		run_tls_deep_audit(self, ctx, config)
+	if config.get(ENABLE_CRT_SH, False):
+		run_crt_sh(self, ctx, target)
+
 	# Automatic Trigger for Brute Force Scan on Sophos Portals
 	if run_sslscan and self.scan.tasks and 'brute_force_scan' in self.scan.tasks:
 		auth_targets = [f'https://{target}:{port}' for port in ssl_ports]

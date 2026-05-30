@@ -7,7 +7,9 @@ pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
 
 # Removed migrations and collectstatic per user request
 # Load default fixtures
-python3 manage.py loaddata fixtures/default_scan_engines.yaml --app scanEngine.EngineType
+for f in fixtures/scan_engines/*.yaml; do
+  python3 manage.py loaddata "$f" --app scanEngine.EngineType
+done
 python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.InterestingLookupModel
 python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
 
@@ -40,6 +42,11 @@ fi
 if [ ! -f "/usr/src/wordlist/deepmagic.com-prefixes-top50000.txt" ]; then
   echo "Downloading Deepmagic top 50000 Wordlist"
   wget https://raw.githubusercontent.com/danielmiessler/SecLists/master/Discovery/DNS/deepmagic.com-prefixes-top50000.txt -O /usr/src/wordlist/deepmagic.com-prefixes-top50000.txt
+fi
+
+if [ ! -f "/usr/src/wordlist/api-endpoints.txt" ]; then
+  echo "Downloading API endpoints wordlist"
+  wget -q https://wordlists-cdn.assetnote.io/data/automated/httparchive_apiroutes_2023_01_28.txt -O /usr/src/wordlist/api-endpoints.txt || true
 fi
 
 # Setup Auth Brute-Force Wordlists

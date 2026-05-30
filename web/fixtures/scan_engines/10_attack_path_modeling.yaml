@@ -1,0 +1,9 @@
+- model: scanEngine.enginetype
+  pk: 10
+  fields:
+    engine_name: Attack Path Modeling Engine
+    default_engine: true
+    yaml_configuration: |
+      attack_path_modeling:
+        enabled: true
+        top_n: 10

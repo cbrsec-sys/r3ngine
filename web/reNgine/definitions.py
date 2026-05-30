@@ -67,6 +67,12 @@ TOOL_COLORS = {
     'betterleaks': COLOR_RED,
     'gosearch': COLOR_GREEN,
     'username-anarchy': COLOR_YELLOW,
+    'testssl.sh': COLOR_GREEN,
+    'jwt_tool': COLOR_MAGENTA,
+    'graphql-cop': COLOR_BLUE,
+    'enum4linux-ng': COLOR_YELLOW,
+    'dnsrecon': COLOR_CYAN,
+    'fierce': COLOR_ORANGE,
 }
 
 ###############################################################################
@@ -176,6 +182,26 @@ GOSEARCH = 'gosearch'
 USERNAME_ANARCHY = 'username-anarchy'
 AMASS_INTEL = 'amass_intel'
 DIRSEARCH = 'dirsearch'
+
+# TLS deep audit
+ENABLE_TESTSSL = 'enable_testssl'
+ENABLE_CRT_SH = 'enable_crt_sh'
+
+# Network protocol enumeration
+ENABLE_NETWORK_ENUM = 'enable_network_enum'
+
+# API security
+JWT_TOOL = 'jwt_tool'
+GRAPHQL_COP = 'graphql-cop'
+USE_API_WORDLIST = 'use_api_wordlist'
+FFUF_DEFAULT_API_WORDLIST_PATH = '/usr/src/wordlist/api-endpoints.txt'
+
+# DNS security
+DNS_SECURITY = 'dns_security'
+ENABLE_AXFR = 'enable_axfr'
+ENABLE_DNSSEC_CHECK = 'enable_dnssec_check'
+ENABLE_DNS_BRUTE = 'enable_dns_brute'
+DNS_AMPLIFICATION_THRESHOLD = 'amplification_threshold'
 
 
 RUN_WPSCAN = 'run_wpscan'
