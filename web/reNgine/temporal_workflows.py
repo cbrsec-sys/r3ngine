@@ -114,6 +114,21 @@ class MasterScanWorkflow:
             await workflow.sleep(timedelta(seconds=30))
 
         # ------------------------------------------------------------------
+        # STEP -1: Pre-populate task timeline (idempotent)
+        # ------------------------------------------------------------------
+        try:
+            await workflow.execute_activity(
+                "InitializeScanTasksActivity",
+                ctx,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue"
+            )
+        except Exception:
+            # Non-fatal: scan runs normally even if timeline pre-population fails
+            pass
+
+        # ------------------------------------------------------------------
         # STEP 0: Target Profiling — validate scan, enrich context, set up dirs
         # ------------------------------------------------------------------
         try:
@@ -884,6 +899,19 @@ class SubScanWorkflow:
             if can_proceed:
                 break
             await workflow.sleep(timedelta(seconds=30))
+
+        # Pre-populate subscan task timeline (idempotent)
+        try:
+            subscan_init_ctx = {**ctx, 'tasks': tasks}
+            await workflow.execute_activity(
+                "InitializeScanTasksActivity",
+                subscan_init_ctx,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue"
+            )
+        except Exception:
+            pass
 
         # Validate tasks against the permitted task list before any dispatch
         known_explicit = set(_SUBSCAN_DISPATCH.keys())
