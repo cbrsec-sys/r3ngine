@@ -2992,7 +2992,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	"""Advanced Web App & API Discovery using Kiterunner, Arjun, LinkFinder, etc."""
 	logger.info('Running Web API Discovery Task')
 	config = self.yaml_configuration.get(WEB_API_DISCOVERY) or {}
-	uses_tools = ctx.get('api_discovery_tools') or config.get(USES_TOOLS, ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'])
+	uses_tools = ctx.get('api_discovery_tools') or config.get(USES_TOOLS, ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'semgrep'])
 	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
@@ -3258,66 +3258,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 							logger.warning(f'Found potential vulnerability: {vuln_data}')
 							save_vulnerability(vuln_data, self.scan, self.domain)
 
-	# Aquatone - Visual discovery
-	if 'aquatone' in uses_tools:
-		logger.info('Running Aquatone on discovery results')
-		aquatone_dir = f"{results_dir}/aquatone"
-		os.makedirs(aquatone_dir, exist_ok=True)
-		urls_file = f"{results_dir}/all_discovery_urls.txt"
-		# Get all endpoints discovered so far for this scan
-		all_endpoints = EndPoint.objects.filter(subdomain__scan_history=self.scan)
-		with open(urls_file, 'w') as f:
-			for ep in all_endpoints:
-				f.write(f"{ep.http_url}\n")
-		
-		cmd = f"cat {urls_file} | aquatone -out {aquatone_dir} -chrome-path /usr/bin/chromium" # -silent"
-		# Get a fresh random proxy specifically for Aquatone to avoid stale leaked loop variables
-		aquatone_proxy = get_random_proxy()
-		if aquatone_proxy:
-			cmd += f" -proxy {aquatone_proxy}"
-		logger.warning(f'Running Aquatone command: {cmd}')
-		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
-
-		# Parse Aquatone results and link to database
-		aquatone_session = f"{aquatone_dir}/aquatone_session.json"
-		if os.path.exists(aquatone_session):
-			try:
-				from startScan.models import Screenshot
-				with open(aquatone_session, 'r') as f:
-					data = json.load(f)
-					# Aquatone session data contains 'pages' key
-					pages = data.get('pages', {})
-					for page_id, page_data in pages.items():
-						page_url = page_data.get('url')
-						if not page_url: continue
-						
-						subdomain_name = get_subdomain_from_url(page_url)
-						subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=self.scan).first()
-						if not subdomain: continue
-						
-						# Save to Screenshot model
-						screenshot_file = f"aquatone/screenshots/{page_id}.png"
-						html_file = f"aquatone/html/{page_id}.html"
-						logger.warning(f'Aquatone artifacts saved to {html_file}')
-						Screenshot.objects.get_or_create(
-							subdomain=subdomain,
-							scan_history=self.scan,
-							url=page_url,
-							defaults={
-								'title': page_data.get('title'),
-								'status_code': page_data.get('status_code'),
-								'screenshot_path': screenshot_file,
-								'html_path': html_file,
-								'technologies': page_data.get('tags') or [], # Aquatone uses tags for tech
-							}
-						)
-						# Also update the subdomain's screenshot_path if not set
-						if not subdomain.screenshot_path:
-							subdomain.screenshot_path = screenshot_file
-							subdomain.save()
-							
-			except Exception as e:
-				logger.error(f"Error parsing Aquatone session for {self.scan}: {e}")
+	# Aquatone - Visual discovery removed in favor of Playwright implementation
 
 
 	# Sync to Graph
@@ -4150,7 +4091,10 @@ def s3scanner(self, ctx={}, description=None):
 		ctx (dict): Context
 		description (str, optional): Task description shown in UI.
 	"""
-	input_path = f'{self.results_dir}/#{self.scan_id}_subdomain_discovery.txt'
+	input_path = f'{self.results_dir}/subdomain_discovery.txt'
+	if not os.path.isfile(input_path):
+		logger.warning(f's3scanner: subdomain list not found at {input_path}, skipping.')
+		return
 	vuln_config = self.yaml_configuration.get(VULNERABILITY_SCAN) or {}
 	s3_config = vuln_config.get(S3SCANNER) or {}
 	threads = s3_config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
