@@ -31,10 +31,9 @@ export const TacticalPanel: React.FC<TacticalPanelProps> = ({
         borderRadius: '18px',
         position: 'relative',
         boxShadow: 'inset 0 0 30px rgba(0, 0, 0, 0.5), 0 15px 35px rgba(0, 0, 0, 0.8)',
+        /* Minimal hover effect to prevent huge tables from getting too hectic */
         '&:hover': {
-          transform: 'translateY(-6px) scale(1.005)',
-          borderColor: 'rgba(0, 240, 255, 0.4)',
-          boxShadow: `0 0 10px rgba(0, 240, 255, 0.6), 0 0 20px rgba(0, 240, 255, 0.3)`
+          borderColor: 'rgba(0, 240, 255, 0.2)',
         },
         ...sx,
         /* Dual Gradient Glow */
@@ -47,25 +46,6 @@ export const TacticalPanel: React.FC<TacticalPanelProps> = ({
           opacity: 0.6,
           pointerEvents: 'none',
           zIndex: 0
-        },
-        /* Light Sweep Effect on Hover */
-        '&::after': {
-          content: '""',
-          position: 'absolute',
-          top: '-50%',
-          left: '-150%',
-          width: '200%',
-          height: '200%',
-          background: 'linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.05), transparent)',
-          transform: 'rotate(45deg)',
-          transition: '0.8s cubic-bezier(0.4, 0, 0.2, 1)',
-          opacity: 0,
-          pointerEvents: 'none',
-          zIndex: 1
-        },
-        '&:hover::after': {
-          left: '120%',
-          opacity: 1
         }
       }}
     >

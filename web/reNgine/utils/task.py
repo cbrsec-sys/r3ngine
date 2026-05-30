@@ -360,24 +360,73 @@ def run_command(
                 errors='replace',
                 preexec_fn=os.setsid)
             output = ''
+            _run_cmd_line_count = 0
+            _run_cmd_aborted = False
             for stdout_line in iter(popen.stdout.readline, ""):
                 item = stdout_line.strip()
                 output += '\n' + item
                 logger.info(f"{COLOR_WHITE}{item}{COLOR_RESET}")
                 if redis_client and soc_config:
                     _publish_to_redis_log(redis_client, soc_config, scan_id, command_obj_id, item)
+                _run_cmd_line_count += 1
+                if _run_cmd_line_count % 10 == 0 and scan_id:
+                    try:
+                        from startScan.models import ScanHistory as _SH
+                        from reNgine.definitions import ABORTED_TASK as _ABORTED
+                        _s = _SH.objects.filter(pk=scan_id).values_list('scan_status', flat=True).first()
+                        if _s == _ABORTED:
+                            logger.warning(f"[run_command] Scan {scan_id} aborted — killing subprocess.")
+                            try:
+                                os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
+                            except (ProcessLookupError, OSError):
+                                pass
+                            _run_cmd_aborted = True
+                            break
+                    except Exception:
+                        pass
             popen.stdout.close()
-            try:
-                popen.wait(timeout=7200)
-            except subprocess.TimeoutExpired:
-                try:
-                    os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
-                except (ProcessLookupError, OSError):
-                    pass
-                return_code = 124 # Timeout
-                output += "\nCommand timed out."
+            if _run_cmd_aborted:
+                return_code = -1
             else:
-                return_code = popen.returncode
+                # Replace bare 7200 s wait with a polling loop so abort is
+                # detected even if the process is slow to produce output.
+                import time as _time
+                _deadline = _time.monotonic() + 7200
+                _timed_out = False
+                while True:
+                    try:
+                        popen.wait(timeout=10)
+                        break
+                    except subprocess.TimeoutExpired:
+                        if scan_id:
+                            try:
+                                from startScan.models import ScanHistory as _SH
+                                from reNgine.definitions import ABORTED_TASK as _ABORTED
+                                _s = _SH.objects.filter(pk=scan_id).values_list('scan_status', flat=True).first()
+                                if _s == _ABORTED:
+                                    logger.warning(f"[run_command] Scan {scan_id} aborted during wait — killing.")
+                                    try:
+                                        os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
+                                    except (ProcessLookupError, OSError):
+                                        pass
+                                    _run_cmd_aborted = True
+                                    break
+                            except Exception:
+                                pass
+                        if _time.monotonic() > _deadline:
+                            _timed_out = True
+                            break
+                if _run_cmd_aborted:
+                    return_code = -1
+                elif _timed_out:
+                    try:
+                        os.killpg(os.getpgid(popen.pid), signal.SIGKILL)
+                    except (ProcessLookupError, OSError):
+                        pass
+                    return_code = 124  # Timeout
+                    output += "\nCommand timed out."
+                else:
+                    return_code = popen.returncode
         except Exception as e:
             logger.error(f"Error executing command {cmd}: {str(e)}")
             output = f"Error executing command: {str(e)}"
@@ -495,8 +544,8 @@ def save_employee(name, designation='', scan_history=None):
         scan_history.save()
         from reNgine.osint_tasks import enrich_identities_task
         threading.Thread(
-            target=enrich_identities_task.apply,
-            kwargs={'kwargs': {'identity': name, 'identity_type': 'employee', 'scan_history_id': scan_history.id}},
+            target=enrich_identities_task,
+            kwargs={'identity': name, 'identity_type': 'employee', 'scan_history_id': scan_history.id},
             daemon=True
         ).start()
 
@@ -702,29 +751,76 @@ def stream_command(
 		from temporalio.client import Client
 
 		async def _execute_remote_command(command_str, scan_history_id, command_rec_id):
-			"""Asynchronously invoke the Temporal workflow to run a command on the Go executor.
+			"""Start GoExecutorTaskWorkflow and wait for result, cancelling it if the scan is aborted.
 
-			Args:
-				command_str (str): The full command string to execute
-				scan_history_id (int): Associated Scan History ID
-				command_rec_id (int): Database record Command ID to log stdout/stderr to
-
-			Returns:
-				dict: The workflow execution result containing exit_code, stdout, and stderr
+			Uses start_workflow + a polling loop (10 s timeout slices) so that an
+			ABORTED_TASK status in DB or a cancel_event from the Temporal heartbeat
+			thread causes the GoExecutorTaskWorkflow to be cancelled promptly rather
+			than waiting for the full tool run to complete.
 			"""
 			from reNgine.temporal_client import TemporalClientProvider
+			from reNgine.definitions import ABORTED_TASK
 			client = await TemporalClientProvider.get_client()
-			result = await client.execute_workflow(
+			workflow_id = f"go-exec-{tool}-{command_rec_id or int(time.time())}"
+
+			handle = await client.start_workflow(
 				"GoExecutorTaskWorkflow",
 				{
 					"command": [command_str],
 					"scan_id": scan_history_id or 0,
 					"command_id": command_rec_id or 0
 				},
-				id=f"go-exec-{tool}-{command_rec_id or int(time.time())}",
+				id=workflow_id,
 				task_queue="python-orchestrator-queue"
 			)
-			return result
+
+			# Poll with 10 s slices so we can react to cancellation promptly.
+			while True:
+				try:
+					result = await asyncio.wait_for(asyncio.shield(handle.result()), timeout=10.0)
+					return result
+				except asyncio.TimeoutError:
+					pass  # not done yet — check abort conditions below
+
+				# 1) Check the cancel_event set by _run_task's heartbeat thread.
+				try:
+					from reNgine.temporal_activities import _task_cancel_local
+					ce = getattr(_task_cancel_local, 'cancel_event', None)
+					if ce and ce.is_set():
+						logger.warning(
+							f"[stream_command] cancel_event set — cancelling GoExecutorTaskWorkflow {workflow_id}"
+						)
+						try:
+							await handle.cancel()
+						except Exception:
+							pass
+						return {"exit_code": -1, "stdout": "", "stderr": "Scan aborted"}
+				except Exception:
+					pass
+
+				# 2) Fallback: direct DB check.
+				if scan_history_id:
+					try:
+						loop = asyncio.get_event_loop()
+						status = await loop.run_in_executor(
+							None,
+							lambda: __import__(
+								'startScan.models', fromlist=['ScanHistory']
+							).ScanHistory.objects.filter(pk=scan_history_id)
+							.values_list('scan_status', flat=True)
+							.first()
+						)
+						if status == ABORTED_TASK:
+							logger.warning(
+								f"[stream_command] DB ABORTED_TASK — cancelling GoExecutorTaskWorkflow {workflow_id}"
+							)
+							try:
+								await handle.cancel()
+							except Exception:
+								pass
+							return {"exit_code": -1, "stdout": "", "stderr": "Scan aborted"}
+					except Exception:
+						pass
 
 		try:
 			try:

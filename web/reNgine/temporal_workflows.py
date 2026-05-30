@@ -554,6 +554,13 @@ class MasterScanWorkflow:
             )
             return {"status": "SUCCESS", "scan_history_id": ctx.get("scan_history_id")}
 
+        except asyncio.CancelledError:
+            workflow.logger.info(
+                f"MasterScanWorkflow cancelled for scan_id={ctx.get('scan_history_id')} "
+                "— skipping FinalizeFailedScanActivity (ABORTED_TASK already set by API)."
+            )
+            raise
+
         except Exception as e:
             workflow.logger.error(
                 f"MasterScanWorkflow FAILED for scan_id={ctx.get('scan_history_id')}: {e}"

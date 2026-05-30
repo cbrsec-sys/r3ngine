@@ -123,6 +123,15 @@ vulnerability_scan: {
     'run_cpanel2shell': true,
     'cpanel_user_wordlist': '/usr/src/app/wordlist/cpanel_users.txt',
     'proxy_type': 'rotating'
+  },
+  'run_vigolium': true,
+  'vigolium': {
+    'strategy': 'balanced',         # Options: fast, balanced, thorough
+    'concurrency': 50,
+    'rate_limit': 100,
+    'timeout': '15s',
+    # 'modules': [],                # Restrict to specific Vigolium modules (empty = all)
+    # 'severity_filter': []         # known-issue-scan severities to include (empty = all)
   }
 }
 waf_detection: {
@@ -186,4 +195,18 @@ stress_test: {
 attack_path_modeling: {
   'enabled': true,
   'top_n': 5
+}
+vigolium_discovery: {
+  'run_vigolium_discovery': true,
+  'strategy': 'balanced',           # Options: fast, balanced, thorough
+  'concurrency': 20,
+  'rate_limit': 50,
+  'timeout': '10s'
+}
+vigolium_analysis: {
+  'run_vigolium_analysis': true,
+  'strategy': 'balanced',           # Options: fast, balanced, thorough
+  'concurrency': 20,
+  'rate_limit': 50,
+  'timeout': '10s'
 }

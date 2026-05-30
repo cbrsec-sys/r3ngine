@@ -18,7 +18,9 @@ import {
   ListItemIcon,
   ListItemText,
   Chip,
-  Backdrop
+  Backdrop,
+  Select,
+  FormControl
 } from '@mui/material';
 import {
   Search,
@@ -45,13 +47,14 @@ import { TacticalPanel } from '../../components/TacticalPanel';
 export const SubdomainsPage: React.FC = () => {
   const { projectSlug } = useParams({ from: '/$projectSlug/subdomains' });
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedAssets, setSelectedAssets] = useState<number[]>([]);
 
-  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch);
+  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, undefined, false, undefined, undefined, pageSize);
   const [isReady, setIsReady] = useState(false);
 
   // Tactical Render Delay to ensure huge data-tables don't "white-screen" during paint
@@ -429,9 +432,9 @@ export const SubdomainsPage: React.FC = () => {
 
         {/* Tactical Pagination */}
         <Box sx={{ p: 2, display: 'flex', justifyContent: 'center', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <Stack spacing={2}>
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', mt: 4, mb: 4, gap: 2 }}>
             <Pagination
-              count={Math.ceil((data?.count || 0) / 50)}
+              count={Math.ceil((data?.count || 0) / pageSize)}
               page={page}
               onChange={(_, v) => setPage(v)}
               size="small"
@@ -444,12 +447,38 @@ export const SubdomainsPage: React.FC = () => {
                   '&.Mui-selected': {
                     bgcolor: 'rgba(0, 243, 255, 0.1)',
                     color: '#00f3ff',
-                    borderColor: '#00f3ff'
+                    borderColor: 'rgba(0, 243, 255, 0.3)',
+                  },
+                  '&:hover': {
+                    bgcolor: 'rgba(255,255,255,0.05)',
                   }
                 }
               }}
             />
-          </Stack>
+            <FormControl size="small" variant="outlined" sx={{ minWidth: 100 }}>
+              <Select
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setPage(1);
+                }}
+                sx={{
+                  color: '#00f3ff',
+                  bgcolor: 'rgba(0, 243, 255, 0.05)',
+                  '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.2)' },
+                  '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.4)' },
+                  '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' },
+                  '& .MuiSvgIcon-root': { color: '#00f3ff' },
+                  fontSize: '0.75rem',
+                  height: '28px',
+                }}
+              >
+                <MenuItem value={10}>10 items</MenuItem>
+                <MenuItem value={20}>20 items</MenuItem>
+                <MenuItem value={50}>50 items</MenuItem>
+              </Select>
+            </FormControl>
+          </Box>
         </Box>
       </TacticalPanel>
 

@@ -9,13 +9,20 @@
 # retries: 1                        # Nuclei
 
 subdomain_discovery: {
-  'uses_tools': ['subfinder', 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas'],  # amass-passive, amass-active, All
+  'uses_tools': ['subfinder', 'ctfr', 'sublist3r', 'tlsx', 'oneforall', 'netlas', 'baddns'],  # amass-passive, amass-active, All
   'enable_http_crawl': true,
   'threads': 30,
   'timeout': 5,
   # 'use_subfinder_config': false,
   # 'use_amass_config': false,
   # 'amass_wordlist': 'deepmagic.com-prefixes-top50000'
+}
+vigolium_discovery: {
+  'run_vigolium_discovery': true,
+  'strategy': 'balanced',
+  'concurrency': 20,
+  'rate_limit': 50,
+  'timeout': '10s'
 }
 http_crawl: {
   # 'threads': 30,
@@ -31,9 +38,9 @@ port_scan: {
   'threads': 30,
   'passive': false,
   # 'use_naabu_config': false,
-  # 'enable_nmap': true,
-  # 'nmap_cmd': 'nmap -vv -Pn ',
-  # 'nmap_script': '',
+  'enable_nmap': true,
+  'nmap_cmd': 'nmap -vv -Pn ',
+  'nmap_script': '/usr/share/nmap/scripts/vulners.nse',
   # 'nmap_script_args': ''
 }
 osint: {
@@ -93,7 +100,6 @@ vulnerability_scan: {
   'run_s3scanner': false,
   'enable_http_crawl': true,
   'run_acunetix': false,
-  'run_vigolium': true,
   'concurrency': 50,
   'intensity': 'normal',
   'rate_limit': 150,
@@ -107,6 +113,7 @@ vulnerability_scan: {
     # 'templates': [],            # Nuclei templates (https://github.com/projectdiscovery/nuclei-templates)
     # 'custom_templates': []      # Nuclei custom templates uploaded in reNgine
   },
+  'run_vigolium': true,
   'vigolium': {
     'strategy': 'balanced',
     'concurrency': 50,
@@ -123,14 +130,6 @@ vulnerability_scan: {
   'run_wpscan': true,
   'wpscan_enumeration': 'vp,vt,u',
   'wpscan_detection_mode': 'mixed'
-}
-
-vigolium_discovery: {
-  'run_vigolium_discovery': true,
-  'strategy': 'balanced',
-  'concurrency': 20,
-  'rate_limit': 50,
-  'timeout': '10s'
 }
 
 vigolium_analysis: {
@@ -189,15 +188,15 @@ screenshot: {
   'threads': 40
 }
 web_api_discovery: {
-  'uses_tools': ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep', 'retire'],
+  'uses_tools': ['arjun', 'linkfinder', 'paramspider', 'semgrep', 'retire'], # 'kiterunner', 'aquatone',
   'scan_only_active': true,
   'threads': 30,
   'timeout': 5,
-  'kiterunner_wordlist': 'routes-large.kite',
+  'kiterunner_wordlist': 'routes-small.kr',
   'arjun_methods': 'GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH'
 }
 stress_test: {
-  'uses_tools': ['k6', 'wrk', 'hping3', 'locust'],
+  'uses_tools': ['k6', 'wrk', 'hping3', 'locust', 'stressor'],
   'concurrency': 100,
   'duration': '30s',
   'rate_limit': 150,

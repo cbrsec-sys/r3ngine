@@ -862,7 +862,7 @@ def get_random_proxy():
 	# Limit to 5 checks to cap worst-case wait (5 × timeout = 25 s).
 	checked_count = 0
 	for proxy_name in proxies:
-		if checked_count >= 25:
+		if checked_count >= 5:
 			logger.warning('Reached maximum sequential proxy validation limit (5). Stopping checks.')
 			break
 		checked_count += 1

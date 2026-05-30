@@ -45,7 +45,6 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/owasp-amass/amass/v4/...@v4.2.0 && \
     go install -ldflags="-s -w" -v github.com/ffuf/ffuf/v2@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest && \
-    go install -ldflags="-s -w" -v github.com/hahwul/dalfox/v2@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/katana/cmd/katana@latest && \
     go install -ldflags="-s -w" -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest && \
     go install -ldflags="-s -w" -v github.com/sa7mon/s3scanner@b6c26d67bc2abe346555dd7010e6065889d66039 && \
@@ -266,6 +265,13 @@ RUN ARCH=$(dpkg --print-architecture) && \
 # Brutus — HTTP brute force tool
 RUN curl -L https://github.com/praetorian-inc/brutus/releases/latest/download/brutus-linux-amd64.tar.gz | \
     tar xz && mv brutus /usr/local/bin/
+
+# Dalfox v3 — XSS scanner (Rust rewrite; replaces Go v2 hahwul/dalfox/v2)
+RUN ARCH=$(dpkg --print-architecture | sed 's/amd64/x86_64/;s/arm64/aarch64/') && \
+    DALFOX_VERSION="3.0.0" && \
+    curl -fsSL "https://github.com/hahwul/dalfox/releases/download/v${DALFOX_VERSION}/dalfox-v${DALFOX_VERSION}-linux-${ARCH}.tar.gz" \
+      | tar -xz -C /tmp/ && \
+    install -m755 "$(find /tmp -maxdepth 2 -name dalfox -type f | head -1)" /usr/local/bin/dalfox
 
 # Aquatone — visual recon / screenshot tool (needs Chromium at runtime)
 RUN ARCH=$(dpkg --print-architecture) && \
