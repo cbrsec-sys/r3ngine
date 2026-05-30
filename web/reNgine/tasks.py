@@ -3656,7 +3656,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	cmd += f' -timeout {str(timeout)}' if timeout and timeout > 0 else ''
 	if tags:
 		cmd += f' -tags {tags}'
-	cmd += f' -silent'
+	#cmd += f' -silent'
 	for tpl in templates:
 		cmd += f' -t {tpl}'
 	
@@ -7455,11 +7455,29 @@ def resume_scan_temporal(scan_id):
 	scan.workflow_ids = workflow_ids
 	scan.save()
 	
-	# Spawn new MasterScanWorkflow
-	async def _start():
+	# Cancel any previously known workflows for this scan before spawning the new one.
+	# This prevents double-execution when recovery fires while the old workflow
+	# (or its nuclei child) is still alive — e.g. after a Temporal server blip.
+	old_ids = [wid for wid in (scan.workflow_ids or []) if wid != workflow_id]
+
+	async def _cancel_old_and_start():
 		from temporalio.common import RetryPolicy
 		from datetime import timedelta
+		from temporalio.service import RPCError, RPCStatusCode
 		client = await TemporalClientProvider.get_client()
+
+		for old_wf_id in old_ids:
+			for candidate in [old_wf_id, f"{old_wf_id}-nuclei"]:
+				try:
+					handle = client.get_workflow_handle(candidate)
+					await handle.cancel()
+					logger.info(f"Cancelled old workflow before recovery: {candidate}")
+				except RPCError as e:
+					if e.status not in (RPCStatusCode.NOT_FOUND,):
+						logger.warning(f"Could not cancel old workflow {candidate}: {e}")
+				except Exception as e:
+					logger.warning(f"Could not cancel old workflow {candidate}: {e}")
+
 		await client.start_workflow(
 			"MasterScanWorkflow",
 			args=[ctx],
@@ -7470,10 +7488,10 @@ def resume_scan_temporal(scan_id):
 			task_timeout=timedelta(hours=1),
 			retry_policy=RetryPolicy(maximum_attempts=10),
 		)
-	
+
 	loop = asyncio.new_event_loop()
 	try:
-		loop.run_until_complete(_start())
+		loop.run_until_complete(_cancel_old_and_start())
 	finally:
 		loop.close()
 
@@ -7509,13 +7527,34 @@ def recover_stuck_scans():
 
 	async def _is_workflow_active(workflow_id):
 		from temporalio.client import WorkflowExecutionStatus
+		from temporalio.service import RPCError, RPCStatusCode
 		try:
 			client = await TemporalClientProvider.get_client()
 			handle = client.get_workflow_handle(workflow_id)
 			desc = await handle.describe()
-			return desc.status == WorkflowExecutionStatus.RUNNING
-		except Exception:
+			# Also check well-known child workflow IDs that outlive the master
+			if desc.status == WorkflowExecutionStatus.RUNNING:
+				return True
+			# Master finished — check whether its nuclei child is still running
+			nuclei_id = f"{workflow_id}-nuclei"
+			try:
+				nuclei_handle = client.get_workflow_handle(nuclei_id)
+				nuclei_desc = await nuclei_handle.describe()
+				if nuclei_desc.status == WorkflowExecutionStatus.RUNNING:
+					return True
+			except RPCError as e:
+				if e.status != RPCStatusCode.NOT_FOUND:
+					return True  # server error — assume running
 			return False
+		except RPCError as e:
+			if e.status == RPCStatusCode.NOT_FOUND:
+				return False  # workflow genuinely absent — safe to recover
+			# Any other RPC error means Temporal itself is unavailable — do NOT recover
+			logger.warning(f"Temporal RPC error checking workflow '{workflow_id}': {e}. Skipping recovery.")
+			return True
+		except Exception as e:
+			logger.warning(f"Unexpected error checking workflow '{workflow_id}': {e}. Skipping recovery.")
+			return True
 
 	# --- Pass 1: FAILED_TASK scans ---
 	for scan in ScanHistory.objects.filter(scan_status=FAILED_TASK, recovery_count__lt=3):
