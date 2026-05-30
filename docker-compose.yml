@@ -169,7 +169,7 @@ services:
     container_name: r3ngine-tor
     restart: "no"
     environment:
-      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD:-changeme}
+      - TOR_CONTROL_PASSWORD=${TOR_CONTROL_PASSWORD:-changeme_replace_this}
     networks:
       - r3ngine_network
     deploy:
