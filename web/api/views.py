@@ -888,7 +888,7 @@ class WafDetector(APIView):
 			return Response(response)
 		
 		wafw00f_command = f'wafw00f {url}'
-		_, output = run_command.run(wafw00f_command, shell=True, remove_ansi_sequence=True)
+		_, output = run_command(wafw00f_command, shell=True, remove_ansi_sequence=True)
 		regex = r"behind (.*?) WAF"
 		group = re.search(regex, output)
 		if group:
@@ -2095,7 +2095,7 @@ class UninstallTool(APIView):
 		else:
 			return Response({'status': False, 'message': 'Cannot uninstall tool!'})
 
-		run_command.run(uninstall_command, shell=True)
+		run_command(uninstall_command, shell=True)
 
 		tool.delete()
 
@@ -2130,7 +2130,7 @@ class UpdateTool(APIView):
 
 		
 		try:
-			return_code, output = run_command.run(update_command, shell=True)
+			return_code, output = run_command(update_command, shell=True)
 			if return_code == 0:
 				return Response({'status': True, 'message': tool.name + ' updated successfully.'})
 			else:
@@ -2152,7 +2152,7 @@ class UninstallTool(APIView):
 		tool = InstalledExternalTool.objects.get(id=tool_id)
 		
 		try:
-			return_code, output = run_command.run(tool.uninstall_command, shell=True)
+			return_code, output = run_command(tool.uninstall_command, shell=True)
 			if return_code == 0:
 				tool.delete()
 				return Response({'status': True, 'message': tool.name + ' uninstalled successfully.'})
@@ -2189,7 +2189,7 @@ class GetExternalToolCurrentVersion(APIView):
 
 		version_number = None
 		try:
-			return_code, stdout = run_command.run(tool.version_lookup_command, shell=True)
+			return_code, stdout = run_command(tool.version_lookup_command, shell=True)
 			if return_code != 0:
 				logger.warning(f"Version lookup failed for {tool.name} with code {return_code}: {stdout}")
 				return Response({'status': False, 'message': 'Tool not found or check failed.'})
@@ -2395,7 +2395,7 @@ class CMSDetector(APIView):
 			cms_detector_command += ' --random-agent --batch --follow-redirect'
 			cms_detector_command += f' -u {url}'
 
-			_, output = run_command.run(cms_detector_command, shell=True, remove_ansi_sequence=True)
+			_, output = run_command(cms_detector_command, shell=True, remove_ansi_sequence=True)
 
 			response['message'] = 'Could not detect CMS!'
 
@@ -4375,11 +4375,9 @@ class NotificationSettingsAPIView(APIView):
 		return Response(serializer.errors, status=400)
 
 class MobileMediaServeView(APIView):
-	permission_classes = [AllowAny]
+	permission_classes = [IsAuthenticated]
 	def get(self, request):
-		#logger.warning(f"!!! MobileMediaServeView HIT !!! User authenticated: {request.user.is_authenticated}")
 		path = request.query_params.get('path')
-		#logger.warning(f"!!! Path requested: {path} !!!")
 		if not path:
 			return Response({'error': 'Path is required'}, status=status.HTTP_400_BAD_REQUEST)
 		
@@ -4399,8 +4397,6 @@ class MobileMediaServeView(APIView):
 		path = path.lstrip('/')
 		file_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, path))
 		
-		#logger.info(f"MobileMediaServeView: path={path}, file_path={file_path}, MEDIA_ROOT={settings.MEDIA_ROOT}")
-		
 		# Security check
 		if not is_safe_path(settings.MEDIA_ROOT, file_path):
 			logger.error(f"is_safe_path failed for {file_path}")
@@ -4411,7 +4407,6 @@ class MobileMediaServeView(APIView):
 				raise Http404("File not found")
 				
 			content_type, _ = mimetypes.guess_type(file_path)
-			#logger.warning(f"!!! MobileMediaServeView: Returning file with content_type={content_type} !!!")
 			return FileResponse(open(file_path, 'rb'), content_type=content_type)
 		else:
 			logger.error(f"File not found: {file_path}")
