@@ -250,6 +250,8 @@ class ProxychainsWrapper:
 
     def _fetch_proxies(self):
         proxy_obj = Proxy.objects.first()
+        if proxy_obj and proxy_obj.use_tor:
+            return ["socks5 tor 9050"]
         if not proxy_obj or not proxy_obj.use_proxy or not proxy_obj.proxies:
             return []
         
@@ -335,6 +337,8 @@ class ProxychainsWrapper:
 
     def should_wrap(self):
         proxy_obj = Proxy.objects.first()
+        if proxy_obj and proxy_obj.use_tor:
+            return True
         return proxy_obj and proxy_obj.use_proxy and proxy_obj.use_proxychains
 
     def write_temp_config(self, proxy_str):
