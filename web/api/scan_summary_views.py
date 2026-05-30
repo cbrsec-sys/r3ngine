@@ -16,6 +16,8 @@ from startScan.models import (
 )
 from recon_note.models import TodoNote
 from reNgine.utilities import get_screenshot_path
+from reNgine.definitions import RUNNING_TASK, SUCCESS_TASK, FAILED_TASK
+from api.scan_task_counts import get_task_counts
 
 from api.target_summary_serializers import TargetSummarySerializer, TacticalScanHistorySerializer
 from api.serializers import (
@@ -171,24 +173,30 @@ class ScanSummaryAPIView(APIView):
                 scan_data['subdomain_diff'] = 0
             recent_scans_data.append(scan_data)
 
-        # Timeline/Activities
-        activities = ScanActivity.objects.filter(scan_of=scan).order_by('time')
+        # Timeline/Activities — ordered by tier then time_started, PENDING rows last within tier
+        activities = ScanActivity.objects.filter(scan_of=scan).order_by(
+            'tier', 'time_started', 'time'
+        )
         timeline_data = []
+        _STATUS_MAP = {
+            2: 'SUCCESS',
+            1: 'RUNNING',
+            0: 'FAILED',
+            3: 'ABORTED',
+            -1: 'PENDING',
+        }
         for activity in activities:
-            status_map = {
-                2: 'SUCCESS',
-                1: 'RUNNING',
-                0: 'FAILED',
-                3: 'ABORTED',
-                -1: 'PENDING'
-            }
             timeline_data.append({
                 'id': activity.id,
+                'task_uid': str(activity.task_uid) if activity.task_uid else None,
                 'title': activity.title,
                 'time': activity.time,
-                'status': status_map.get(activity.status, 'UNKNOWN'),
+                'time_started': activity.time_started,
+                'time_ended': activity.time_ended,
+                'tier': activity.tier,
+                'status': _STATUS_MAP.get(activity.status, 'UNKNOWN'),
                 'name': activity.name,
-                'error_message': activity.error_message if hasattr(activity, 'error_message') else None,
+                'error_message': activity.error_message,
                 'commands': list(Command.objects.filter(activity=activity).values('command', 'output', 'return_code'))
             })
 
@@ -206,6 +214,7 @@ class ScanSummaryAPIView(APIView):
                     'count': endpoint_qs.filter(matched_gf_patterns__icontains=gf).count()
                 })
 
+        _tc = get_task_counts(scan)
         data = {
             'subdomain_count': subdomain_count,
             'alive_count': alive_count,
@@ -314,8 +323,11 @@ class ScanSummaryAPIView(APIView):
                 'used_gf_patterns': scan.used_gf_patterns.split(',') if scan.used_gf_patterns else [],
                 'is_spiderfoot_running': scan.scanactivity_set.filter(
                     Q(name='spiderfoot_scan') | Q(title__icontains='spiderfoot'),
-                    status=1
-                ).exists()
+                    status=RUNNING_TASK
+                ).exists(),
+                'successful_task_count': _tc[0],
+                'failed_task_count': _tc[1],
+                'total_task_count': _tc[2],
             },
             'exposed_count': exposed_count,
             'secret_leaks_count': secret_leaks_count,
