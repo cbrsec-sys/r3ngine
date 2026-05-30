@@ -16,7 +16,7 @@ from startScan.models import (
 )
 from recon_note.models import TodoNote
 from reNgine.utilities import get_screenshot_path
-from reNgine.definitions import RUNNING_TASK, SUCCESS_TASK, FAILED_TASK
+from reNgine.definitions import RUNNING_TASK
 from api.scan_task_counts import get_task_counts
 
 from api.target_summary_serializers import TargetSummarySerializer, TacticalScanHistorySerializer

@@ -124,6 +124,8 @@ class MasterScanWorkflow:
                 retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
+        except asyncio.CancelledError:
+            raise
         except Exception:
             # Non-fatal: scan runs normally even if timeline pre-population fails
             pass
@@ -921,6 +923,8 @@ class SubScanWorkflow:
                 retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
+        except asyncio.CancelledError:
+            raise
         except Exception:
             pass
 

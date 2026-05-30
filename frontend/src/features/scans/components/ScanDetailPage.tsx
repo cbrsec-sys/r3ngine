@@ -1297,6 +1297,17 @@ export const ScanDetailPage = () => {
     setTaskOverlayOpen(true);
   };
 
+  const groupedTimeline = useMemo(() => {
+    const timeline: ScanActivity[] = data?.timeline ?? [];
+    const groups = new Map<number, ScanActivity[]>();
+    timeline.forEach((act) => {
+      const tier = act.tier ?? 7;
+      if (!groups.has(tier)) groups.set(tier, []);
+      groups.get(tier)!.push(act);
+    });
+    return Array.from(groups.entries()).sort(([a], [b]) => a - b);
+  }, [data?.timeline]);
+
   if (isLoading || !data) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
@@ -1434,26 +1445,13 @@ export const ScanDetailPage = () => {
 
       <TacticalPanel title="Timeline" icon={<History size={14} />}>
         <Box sx={{ p: 1, maxHeight: 400, overflow: 'auto' }}>
-          {(() => {
-            const timeline: ScanActivity[] = data.timeline ?? [];
-            if (timeline.length === 0) {
-              return (
-                <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center', py: 4 }}>
-                  NO ACTIVITY LOGS
-                </Typography>
-              );
-            }
-            // Group by tier; null tier → 7
-            const groups = new Map<number, ScanActivity[]>();
-            timeline.forEach((act) => {
-              const tier = act.tier ?? 7;
-              if (!groups.has(tier)) groups.set(tier, []);
-              groups.get(tier)!.push(act);
-            });
-            const sorted = Array.from(groups.entries()).sort(([a], [b]) => a - b);
-            return (
-              <Stack>
-                {sorted.map(([tier, activities]) => (
+          {groupedTimeline.length === 0 ? (
+            <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center', py: 4 }}>
+              NO ACTIVITY LOGS
+            </Typography>
+          ) : (
+            <Stack>
+              {groupedTimeline.map(([tier, activities]) => (
                   <Box key={tier}>
                     <Typography sx={{
                       display: 'block',
@@ -1507,9 +1505,8 @@ export const ScanDetailPage = () => {
                     })}
                   />
                 )}
-              </Stack>
-            );
-          })()}
+            </Stack>
+          )}
         </Box>
       </TacticalPanel>
 
