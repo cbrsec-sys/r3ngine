@@ -312,17 +312,34 @@ class MasterScanWorkflow:
             await asyncio.gather(*tier2_futures)
 
             # ------------------------------------------------------------------
-            # TIER 3: URL Fetching (sequential — needs Tier 2 http_crawl endpoints)
+            # TIER 3: URL Fetching + Screenshot (parallel — both depend only on
+            # Tier 2 http_crawl; screenshot does NOT depend on fetch_url output)
             # ------------------------------------------------------------------
+            tier3_futures = []
             if "fetch_url" in tasks:
-                await workflow.execute_activity(
-                    "RunFetchURLActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(hours=2),
-                    heartbeat_timeout=timedelta(minutes=5),
-                    retry_policy=_RETRY_LONG_SCAN,
-                    task_queue="python-orchestrator-queue"
+                tier3_futures.append(
+                    workflow.execute_activity(
+                        "RunFetchURLActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(hours=2),
+                        heartbeat_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_LONG_SCAN,
+                        task_queue="python-orchestrator-queue"
+                    )
                 )
+            if "screenshot" in tasks:
+                tier3_futures.append(
+                    workflow.execute_activity(
+                        "RunScreenshotActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(hours=1),
+                        heartbeat_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_NETWORK_SCAN,
+                        task_queue="python-orchestrator-queue"
+                    )
+                )
+            if tier3_futures:
+                await asyncio.gather(*tier3_futures)
 
             # ------------------------------------------------------------------
             # TIER 4: Directory & File Fuzzing (sequential — needs Tier 3 URLs)
@@ -436,17 +453,6 @@ class MasterScanWorkflow:
                         task_queue="python-orchestrator-queue",
                         execution_timeout=timedelta(hours=10),
                         run_timeout=timedelta(hours=10)
-                    )
-                )
-            if "screenshot" in tasks:
-                assessment_futures.append(
-                    workflow.execute_activity(
-                        "RunScreenshotActivity",
-                        ctx,
-                        start_to_close_timeout=timedelta(hours=1),
-                        heartbeat_timeout=timedelta(minutes=5),
-                        retry_policy=_RETRY_NETWORK_SCAN,
-                        task_queue="python-orchestrator-queue"
                     )
                 )
             if "waf_bypass" in tasks:
