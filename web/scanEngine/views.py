@@ -360,6 +360,7 @@ def proxy_settings(request, slug):
         form.set_initial()
 
     if request.method == "POST":
+        old_use_tor = proxy.use_tor if proxy else False
         if proxy:
             form = ProxyForm(request.POST, instance=proxy)
         else:
@@ -377,6 +378,32 @@ def proxy_settings(request, slug):
             else:
                 message = 'Proxies updated.'
             proxy_instance.save()
+            # TOR container lifecycle — start or stop on change
+            new_use_tor = proxy_instance.use_tor
+            if new_use_tor != old_use_tor:
+                from reNgine.tor_manager import TorManager, TorStartError, TorUnavailableError
+                tor = TorManager()
+                try:
+                    if new_use_tor:
+                        tor.start()
+                    else:
+                        tor.stop()
+                except TorStartError as e:
+                    proxy_instance.use_tor = False
+                    proxy_instance.save(update_fields=['use_tor'])
+                    if request.headers.get('Accept') == 'application/json':
+                        return http.JsonResponse(
+                            {'status': 'error', 'message': f'TOR failed to start: {e}'},
+                            status=500
+                        )
+                except TorUnavailableError as e:
+                    proxy_instance.use_tor = False
+                    proxy_instance.save(update_fields=['use_tor'])
+                    if request.headers.get('Accept') == 'application/json':
+                        return http.JsonResponse(
+                            {'status': 'error', 'message': f'Docker socket not available: {e}'},
+                            status=503
+                        )
             if request.headers.get('Accept') == 'application/json':
                 return http.JsonResponse({'status': 'success', 'message': message})
             messages.add_message(
@@ -392,7 +419,8 @@ def proxy_settings(request, slug):
         return http.JsonResponse({
             'use_proxy': proxy.use_proxy if proxy else False,
             'proxies': proxy.proxies if proxy else "",
-            'use_proxychains': proxy.use_proxychains if proxy else False
+            'use_proxychains': proxy.use_proxychains if proxy else False,
+            'use_tor': proxy.use_tor if proxy else False,
         })
 
     context['settings_nav_active'] = 'active'
