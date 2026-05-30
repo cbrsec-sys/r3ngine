@@ -7,9 +7,11 @@ import django.db.models.deletion
 
 def _assign_task_uids(apps, schema_editor):
     ScanActivity = apps.get_model('startScan', 'ScanActivity')
-    for row in ScanActivity.objects.filter(task_uid__isnull=True):
+    rows = list(ScanActivity.objects.filter(task_uid__isnull=True))
+    for row in rows:
         row.task_uid = uuid.uuid4()
-        row.save(update_fields=['task_uid'])
+    if rows:
+        ScanActivity.objects.bulk_update(rows, ['task_uid'], batch_size=500)
 
 
 class Migration(migrations.Migration):
