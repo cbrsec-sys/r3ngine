@@ -128,6 +128,17 @@ class MasterScanWorkflow:
             # Non-fatal: scan runs normally even if timeline pre-population fails
             pass
 
+        # TOR circuit rotation — no-op when TOR mode is inactive
+        try:
+            await workflow.execute_activity(
+                "TorNewCircuitActivity",
+                start_to_close_timeout=timedelta(seconds=30),
+                retry_policy=RetryPolicy(maximum_attempts=1),
+                task_queue="python-orchestrator-queue"
+            )
+        except Exception:
+            pass
+
         # ------------------------------------------------------------------
         # STEP 0: Target Profiling — validate scan, enrich context, set up dirs
         # ------------------------------------------------------------------
@@ -908,6 +919,17 @@ class SubScanWorkflow:
                 subscan_init_ctx,
                 start_to_close_timeout=timedelta(minutes=2),
                 retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue"
+            )
+        except Exception:
+            pass
+
+        # TOR circuit rotation — no-op when TOR mode is inactive
+        try:
+            await workflow.execute_activity(
+                "TorNewCircuitActivity",
+                start_to_close_timeout=timedelta(seconds=30),
+                retry_policy=RetryPolicy(maximum_attempts=1),
                 task_queue="python-orchestrator-queue"
             )
         except Exception:
