@@ -57,6 +57,7 @@
           trufflehog: true
       dir_file_fuzz:
         auto_calibration: true
+        run_dirsearch: true
         enable_http_crawl: true
         rate_limit: 150
         extensions:
@@ -99,6 +100,7 @@
           - waybackurls
           - katana
           - gau
+          - vigolium
         remove_duplicate_endpoints: true
         duplicate_fields:
           - content_length

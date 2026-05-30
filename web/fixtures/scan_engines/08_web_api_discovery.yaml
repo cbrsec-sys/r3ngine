@@ -34,6 +34,7 @@
         arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
       dir_file_fuzz:
         auto_calibration: true
+        run_dirsearch: true
         enable_http_crawl: true
         rate_limit: 150
         extensions:

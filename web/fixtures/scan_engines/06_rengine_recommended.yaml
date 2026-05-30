@@ -35,6 +35,7 @@
         run_dalfox: true
         run_crlfuzz: true
         run_acunetix: true
+        run_vigolium: true
         enable_http_crawl: false
         concurrency: 50
         intensity: normal
@@ -49,6 +50,23 @@
             - medium
             - high
             - critical
+        vigolium:
+          strategy: balanced
+          concurrency: 50
+          rate_limit: 100
+          timeout: 15s
+      vigolium_discovery:
+        run_vigolium_discovery: true
+        strategy: balanced
+        concurrency: 20
+        rate_limit: 50
+        timeout: 10s
+      vigolium_analysis:
+        run_vigolium_analysis: true
+        strategy: balanced
+        concurrency: 20
+        rate_limit: 50
+        timeout: 10s
       attack_path_modeling:
         enabled: true
       waf_detection:
@@ -57,6 +75,32 @@
       waf_bypass:
         use_nuclei: true
         use_benchmarking: true
+      port_scan:
+        enable_http_crawl: true
+        timeout: 5
+        ports:
+          - top-100
+        rate_limit: 150
+        threads: 30
+        passive: false
+        enable_nmap: true
+        nmap_cmd: -sV
+        enable_network_enum: true
+      firewall_vpn_scan:
+        run_sslscan: true
+        enable_testssl: true
+        enable_crt_sh: true
+      web_api_discovery:
+        uses_tools:
+          - kiterunner
+          - arjun
+          - linkfinder
+          - jwt_tool
+          - graphql-cop
+        scan_only_active: true
+        threads: 30
+        kiterunner_wordlist: routes-large.kite
+        arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
       dns_security:
         enable_axfr: true
         enable_dnssec_check: true

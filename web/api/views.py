@@ -2747,6 +2747,45 @@ class ListWordlists(APIView):
 		return Response({'wordlists': wordlist_serializer.data})
 
 
+class ListTools(APIView):
+	"""
+	API view to list all installed external tools in the system.
+	Requires IsAuditor permission.
+	"""
+	permission_classes = [IsAuditor]
+
+	def get(self, request, format=None):
+		"""
+		Handles GET request to list all installed external tools.
+
+		Args:
+			request: Django REST framework request object.
+			format: Optional format suffix.
+
+		Returns:
+			Response: A REST Framework Response object containing a dict with the list of tools.
+		"""
+		tools = InstalledExternalTool.objects.all().order_by('id')
+		tools_list = []
+		for tool in tools:
+			tools_list.append({
+				'id': tool.id,
+				'name': tool.name,
+				'description': tool.description,
+				'logo_url': tool.logo_url,
+				'github_url': tool.github_url,
+				'license_url': tool.license_url,
+				'is_default': tool.is_default,
+				'is_subdomain_gathering': tool.is_subdomain_gathering,
+				'is_github_cloned': tool.is_github_cloned,
+				'github_clone_path': tool.github_clone_path,
+				'install_command': tool.install_command,
+				'update_command': tool.update_command,
+				'version_lookup_command': tool.version_lookup_command,
+			})
+		return Response({'tools': tools_list})
+
+
 class ListConfigurations(APIView):
 	permission_classes = [IsAuditor]
 	def get(self, request, format=None):

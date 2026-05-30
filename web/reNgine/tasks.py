@@ -1865,9 +1865,18 @@ def leaklookup(self, host=None, ctx=None, **kwargs):
 
 
 def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
-	"""Scan for secrets in JS files and potentially other sources."""
+	"""Scan for secrets in JS files and potentially other sources.
+
+	Args:
+		config (dict, optional): Leaks and secrets configuration dictionary.
+		host (str, optional): Target hostname.
+		ctx (dict, optional): Scan activity context.
+	"""
 	if not self.scan:
 		return "No scan history found."
+
+	if config is None:
+		config = self.yaml_configuration.get('leaks_and_secrets') or self.yaml_configuration.get('osint', {}).get('leaks_and_secrets') or {}
 
 	endpoints = EndPoint.objects.filter(scan_history=self.scan)
 	# Sensitive extensions to scan
@@ -2826,7 +2835,58 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 				activity_id=self.activity_id
 			)
 			recon_run = True
-	
+
+	# Vigolium spidering — runs ingestion+discovery phases to collect additional URLs.
+	# Activated by adding 'vigolium' to fetch_url.uses_tools in the YAML config.
+	if 'vigolium' in tools and os.path.isfile(input_path):
+		from reNgine.vigolium_tasks import _iter_jsonl
+
+		vigolium_jsonl = f'{self.results_dir}/urls_vigolium.jsonl'
+		vigolium_urls_file = f'{self.results_dir}/urls_vigolium.txt'
+
+		vig_spider_config = config.get('vigolium_spider', {})
+		vig_concurrency = vig_spider_config.get(VIGOLIUM_CONCURRENCY, 20)
+		vig_rate_limit = vig_spider_config.get(VIGOLIUM_RATE_LIMIT, 50)
+		vig_timeout = vig_spider_config.get(VIGOLIUM_TIMEOUT, '10s')
+		vig_strategy = vig_spider_config.get(VIGOLIUM_STRATEGY, 'balanced')
+
+		vig_cmd = (
+			f"vigolium scan"
+			f" -T {input_path}"
+			f" --only ingestion,discovery"
+			f" --stateless"
+			f" --format jsonl"
+			f" -o {vigolium_jsonl}"
+			f" -c {vig_concurrency}"
+			f" -r {vig_rate_limit}"
+			f" --timeout {vig_timeout}"
+			f" --strategy {vig_strategy}"
+			f" --skip-dependency-check"
+		)
+		proxy = get_random_proxy()
+		if proxy:
+			vig_cmd += f" --proxy {proxy}"
+
+		logger.info("fetch_url: running vigolium spidering")
+		logger.warning(f"vigolium spider command: {vig_cmd}")
+		run_command_with_retry(
+			vig_cmd,
+			results_file=vigolium_jsonl,
+			scan_id=self.scan_id,
+			activity_id=self.activity_id
+		)
+
+		spider_urls = [
+			record['data']['url']
+			for record in _iter_jsonl(vigolium_jsonl)
+			if record.get('type') == 'http_record' and record.get('data', {}).get('url')
+		]
+		if spider_urls:
+			with open(vigolium_urls_file, 'w') as _vf:
+				_vf.write('\n'.join(spider_urls))
+			logger.info(f"fetch_url: vigolium spidering found {len(spider_urls)} URLs")
+			recon_run = True
+
 	if not recon_run:
 		logger.warning('No reconnaissance tools enabled for fetch_url. Skipping.')
 		return

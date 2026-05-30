@@ -85,7 +85,7 @@ def run_graphql_cop(self, ctx, url, subdomain):
         output_file = (
             f'{self.results_dir}/graphqlcop_{graphql_url.replace("://", "_").replace("/", "_")[:80]}.json'
         )
-        cmd = f'graphql-cop -t {graphql_url} -o json 2>/dev/null | tee {output_file}'
+        cmd = f'python3 /usr/src/github/graphql-cop/graphql-cop.py -t {graphql_url} -o json 2>/dev/null | tee {output_file}'
         logger.warning(f'Running graphql-cop on {graphql_url}')
         run_command(
             cmd,

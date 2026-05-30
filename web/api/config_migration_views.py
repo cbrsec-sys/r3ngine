@@ -15,7 +15,8 @@ from api.permissions import HasPermission  # Assuming this exists based on api/v
 from dashboard.models import (
     OpenAiAPIKey, OllamaSettings, NetlasAPIKey, ChaosAPIKey, HackerOneAPIKey,
     ShodanAPIKey, CensysAPIKey, LLMConfig, SpiderfootAPIKey, LeakLookupAPIKey,
-    AcunetixAPIKey, LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey
+    AcunetixAPIKey, LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey,
+    SOCConfiguration
 )
 
 from scanEngine.models import (
@@ -27,7 +28,8 @@ from scanEngine.models import (
 DASHBOARD_MODELS = [
     OpenAiAPIKey, OllamaSettings, NetlasAPIKey, ChaosAPIKey, HackerOneAPIKey,
     ShodanAPIKey, CensysAPIKey, LLMConfig, SpiderfootAPIKey, LeakLookupAPIKey,
-    AcunetixAPIKey, LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey
+    AcunetixAPIKey, LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey,
+    SOCConfiguration
 ]
 
 SCANENGINE_MODELS = [
@@ -35,6 +37,14 @@ SCANENGINE_MODELS = [
     Notification, Proxy, OpSec, Hackerone, VulnerabilityReportSetting,
     InstalledExternalTool
 ]
+
+SINGLETON_MODELS = (
+    OpenAiAPIKey, OllamaSettings, NetlasAPIKey, ChaosAPIKey, HackerOneAPIKey,
+    ShodanAPIKey, CensysAPIKey, LeakLookupAPIKey, AcunetixAPIKey,
+    LinkedInCredentials, HunterIOAPIKey, WpScanAPIKey, SOCConfiguration,
+    InterestingLookupModel, Notification, Proxy, OpSec, Hackerone,
+    VulnerabilityReportSetting
+)
 
 class ExportConfig(APIView):
     permission_classes = [IsAuthenticated, HasPermission]
@@ -68,6 +78,17 @@ class ExportConfig(APIView):
                         file_path = os.path.join(wordlist_dir, filename)
                         with open(file_path, 'rb') as f:
                             zip_file.writestr(f'wordlists/{filename}', f.read())
+
+            # 4. Export Spiderfoot and theHarvester Tool Configs
+            harvester_config_path = '/usr/src/github/theHarvester/api-keys.yaml'
+            if os.path.exists(harvester_config_path):
+                with open(harvester_config_path, 'rb') as f:
+                    zip_file.writestr('tool_configs/theharvester_api-keys.yaml', f.read())
+
+            spiderfoot_config_path = '/usr/src/github/spiderfoot/spiderfoot.cfg'
+            if os.path.exists(spiderfoot_config_path):
+                with open(spiderfoot_config_path, 'rb') as f:
+                    zip_file.writestr('tool_configs/spiderfoot.cfg', f.read())
 
         zip_buffer.seek(0)
         
@@ -113,6 +134,21 @@ class ImportConfig(APIView):
                                 with open(file_path, 'wb') as f:
                                     f.write(zip_file.read(file_info.filename))
 
+                # 4. Restore Spiderfoot and theHarvester Tool Configs
+                for file_info in zip_file.infolist():
+                    if file_info.filename.startswith('tool_configs/'):
+                        dest_path = None
+                        if file_info.filename == 'tool_configs/theharvester_api-keys.yaml':
+                            dest_path = '/usr/src/github/theHarvester/api-keys.yaml'
+                        elif file_info.filename == 'tool_configs/spiderfoot.cfg':
+                            dest_path = '/usr/src/github/spiderfoot/spiderfoot.cfg'
+                        
+                        if dest_path:
+                            if overwrite_existing or not os.path.exists(dest_path):
+                                os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+                                with open(dest_path, 'wb') as f:
+                                    f.write(zip_file.read(file_info.filename))
+
             return Response({'status': True, 'message': 'Configuration imported successfully.'})
         except zipfile.BadZipFile:
             return Response({'status': False, 'message': 'Invalid zip file.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -120,25 +156,44 @@ class ImportConfig(APIView):
             return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     def restore_models(self, data, overwrite_existing):
+        """Restore serialized models from a data dictionary.
+
+        For models identified as singletons (e.g., settings, proxies, API keys),
+        this function updates the existing first record in the database instead
+        of creating duplicates, ensuring that the application continues to use
+        the imported settings.
+
+        Args:
+            data (dict): Serialized objects grouped by model name.
+            overwrite_existing (bool): True to overwrite existing records, False to skip.
+        """
         for model_name, objects_data in data.items():
             for obj_data in objects_data:
                 try:
                     # obj_data is a serialized dict representation
-                    # To allow deserializing into potentially different pk, we might need to handle it carefully.
-                    # Usually `deserialize` handles JSON string from `serialize` directly.
-                    # Since we loaded it into python dict, we need to convert to json string for `deserialize`
+                    # Convert to json string for `deserialize`
                     json_str = json.dumps([obj_data])
                     for deserialized_obj in deserialize('json', json_str):
                         model_class = type(deserialized_obj.object)
-                        # To support overwrite, we check if an object with the same PK exists, or handle uniquely.
-                        # For singletons like Proxy, OpSec, we usually only have one row (pk=1)
-                        if overwrite_existing:
-                            deserialized_obj.save()
-                        else:
-                            # If it doesn't exist, create it.
-                            # For some models, checking PK is enough.
-                            if not model_class.objects.filter(pk=deserialized_obj.object.pk).exists():
+                        
+                        if model_class in SINGLETON_MODELS:
+                            existing_obj = model_class.objects.first()
+                            if existing_obj:
+                                if overwrite_existing:
+                                    # Copy fields (except ID) to the existing first instance
+                                    for field in model_class._meta.fields:
+                                        if field.name != 'id':
+                                            setattr(existing_obj, field.name, getattr(deserialized_obj.object, field.name))
+                                    existing_obj.save()
+                            else:
                                 deserialized_obj.save()
+                        else:
+                            if overwrite_existing:
+                                deserialized_obj.save()
+                            else:
+                                # Only save if an object with this primary key does not exist
+                                if not model_class.objects.filter(pk=deserialized_obj.object.pk).exists():
+                                    deserialized_obj.save()
                 except Exception as e:
                     # Log exception and continue
                     print(f"Error restoring {model_name}: {e}")
