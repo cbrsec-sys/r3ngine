@@ -29,15 +29,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 			return naturaltime(obj.insert_date).title()
 
 
-class ScreenshotSerializer(serializers.ModelSerializer):
-	subdomain_name = serializers.CharField(source='subdomain.name', read_only=True)
-	
-	class Meta:
-		model = Screenshot
-		fields = '__all__'
-
-
-
 class EngineTypeSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = EngineType
@@ -355,6 +346,9 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 	max_severity = serializers.SerializerMethodField('get_max_severity')
 	engine_name = serializers.SerializerMethodField('get_engine_name')
 	is_spiderfoot_running = serializers.SerializerMethodField()
+	successful_task_count = serializers.SerializerMethodField()
+	failed_task_count = serializers.SerializerMethodField()
+	total_task_count = serializers.SerializerMethodField()
 
 	class Meta:
 		model = ScanHistory
@@ -381,7 +375,10 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			'max_severity',
 			'engine_name',
 			'cfg_starting_point_path',
-			'is_spiderfoot_running'
+			'is_spiderfoot_running',
+			'successful_task_count',
+			'failed_task_count',
+			'total_task_count',
 		]
 		depth = 1
 
@@ -390,6 +387,22 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			Q(name='spiderfoot_scan') | Q(title__icontains='spiderfoot'),
 			status=RUNNING_TASK
 		).exists()
+
+	def _get_cached_task_counts(self, obj):
+		cache_attr = f'_task_counts_{obj.pk}'
+		if not hasattr(self, cache_attr):
+			from api.scan_task_counts import get_task_counts
+			setattr(self, cache_attr, get_task_counts(obj))
+		return getattr(self, cache_attr)
+
+	def get_successful_task_count(self, obj):
+		return self._get_cached_task_counts(obj)[0]
+
+	def get_failed_task_count(self, obj):
+		return self._get_cached_task_counts(obj)[1]
+
+	def get_total_task_count(self, obj):
+		return self._get_cached_task_counts(obj)[2]
 
 	def get_max_severity(self, scan_history):
 		from startScan.models import Vulnerability
@@ -1082,6 +1095,7 @@ class WafBypassFindingSerializer(serializers.ModelSerializer):
 
 class ScreenshotSerializer(serializers.ModelSerializer):
 	screenshot_path = serializers.SerializerMethodField('get_screenshot_path')
+	subdomain_name = serializers.CharField(source='subdomain.name', read_only=True)
 
 	class Meta:
 		model = Screenshot
