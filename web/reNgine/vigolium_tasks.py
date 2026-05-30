@@ -69,6 +69,13 @@ def parse_vigolium_finding(task_instance, finding_data, subdomain):
     if isinstance(tags, str):
         tags = [tags]
 
+    extracted = finding_data.get('extracted_results') or []
+    if isinstance(extracted, str):
+        extracted = [extracted]
+
+    raw_cvss = finding_data.get('cvss_score')
+    cvss_score = float(raw_cvss) if raw_cvss else None
+
     save_vulnerability(
         target_domain=task_instance.domain,
         http_url=http_url,
@@ -82,6 +89,8 @@ def parse_vigolium_finding(task_instance, finding_data, subdomain):
         curl_command='',
         request=finding_data.get('request', ''),
         response=finding_data.get('response', ''),
+        extracted_results=extracted or None,
+        cvss_score=cvss_score,
         tags=tags,
         cve_ids=[],
         references=[],
