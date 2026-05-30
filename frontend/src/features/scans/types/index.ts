@@ -2,6 +2,9 @@ import type { components } from '@/types/api';
 
 export type ScanHistory = components["schemas"]["ScanHistory"] & {
   is_spiderfoot_running?: boolean;
+  successful_task_count?: number;
+  failed_task_count?: number;
+  total_task_count?: number;
 };
 export type ScheduledScan = components["schemas"]["PeriodicTask"];
 export type SubScan = components["schemas"]["SubScan"];
@@ -22,10 +25,14 @@ export interface TodoNote {
 
 export interface ScanActivity {
   id: number | string;
+  task_uid: string | null;
   title: string;
   name: string;
   status: 'SUCCESS' | 'RUNNING' | 'FAILED' | 'ABORTED' | 'PENDING' | 'UNKNOWN';
   time: string;
+  time_started: string | null;
+  time_ended: string | null;
+  tier: number | null;
   has_commands: boolean;
   error_message?: string | null;
 }
