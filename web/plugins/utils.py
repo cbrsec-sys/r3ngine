@@ -449,7 +449,13 @@ class AtomicInstaller:
                             tools_config = yaml.safe_load(f)
                             plugin.tools_config = tools_config
                             plugin.save()
-                        
+
+                        # Invalidate per-tool verification cache so the fresh install re-checks everything
+                        for _tool in tools_config.get('tools', []):
+                            _tool_name = _tool.get('name')
+                            if _tool_name:
+                                cache.delete(f"plugin_{plugin_slug}_tool_{_tool_name}_verified")
+
                         # Trigger background installation
                         from .tasks import install_plugin_tools
                         transaction.on_commit(

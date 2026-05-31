@@ -205,6 +205,7 @@ RUN apt-get update -y && \
     geoip-bin \
     geoip-database \
     patch \
+    bsdmainutils \
     # Build tools — required by pip (C extensions) and gem installs
     build-essential \
     cmake \
