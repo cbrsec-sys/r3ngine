@@ -481,7 +481,13 @@ urlpatterns = [
         name='get_system_logs'
     ),
     path('plugins/', include('plugins.urls')),
+    path(
+        'push-token/register/',
+        RegisterPushTokenView.as_view(),
+        name='register_push_token',
+    ),
 ]
+
 
 
 # Dynamic plugin API URL discovery
