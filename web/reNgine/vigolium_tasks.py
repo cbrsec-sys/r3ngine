@@ -183,7 +183,7 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
     strategy = vig_config.get(VIGOLIUM_STRATEGY, 'balanced')
     concurrency = vig_config.get(VIGOLIUM_CONCURRENCY, 50)
     rate_limit = vig_config.get(VIGOLIUM_RATE_LIMIT, 100)
-    timeout = vig_config.get(VIGOLIUM_TIMEOUT, '15s')
+    timeout = vig_config.get(VIGOLIUM_TIMEOUT, '300s')
     modules = vig_config.get(VIGOLIUM_MODULES, [])
     severity_filter = vig_config.get(VIGOLIUM_SEVERITY_FILTER, [])
 

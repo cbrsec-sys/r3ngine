@@ -478,7 +478,7 @@ class MasterScanWorkflow:
                     workflow.execute_child_workflow(
                         "NucleiPlannerWorkflow",
                         ctx,
-                        id=f"{workflow.info().workflow_id}-nuclei",
+                        id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
                         task_queue="python-orchestrator-queue",
                         execution_timeout=timedelta(hours=10),
                         run_timeout=timedelta(hours=10)
@@ -889,6 +889,45 @@ class SubScanWorkflow:
     workflow, strictly enforcing sequence-enforced execution tiers.
     """
 
+    def __init__(self) -> None:
+        self._paused = False
+
+    # ------------------------------------------------------------------
+    # Signal Handlers
+    # ------------------------------------------------------------------
+
+    @workflow.signal(name="pause")
+    def pause_workflow(self) -> None:
+        """Signal handler: pause the subscan pipeline at the next tier boundary."""
+        workflow.logger.info("SubScanWorkflow received PAUSE signal.")
+        self._paused = True
+
+    @workflow.signal(name="resume")
+    def resume_workflow(self) -> None:
+        """Signal handler: resume a paused subscan pipeline."""
+        workflow.logger.info("SubScanWorkflow received RESUME signal.")
+        self._paused = False
+
+    # ------------------------------------------------------------------
+    # Query Handlers
+    # ------------------------------------------------------------------
+
+    @workflow.query(name="get_current_state")
+    def get_current_state(self) -> Dict[str, Any]:
+        """Query handler: return the current workflow state for the frontend."""
+        return {"paused": self._paused}
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    async def _check_paused(self) -> None:
+        """Block at a tier boundary if a pause signal was received."""
+        if self._paused:
+            workflow.logger.info("SubScanWorkflow PAUSED — waiting for resume signal.")
+            await workflow.wait_condition(lambda: not self._paused)
+            workflow.logger.info("SubScanWorkflow RESUMED.")
+
     @workflow.run
     async def run(self, ctx: Dict[str, Any], scan_type: Union[str, List[str]]) -> Dict[str, Any]:
         """Execute the subscan workflow.
@@ -1013,13 +1052,13 @@ class SubScanWorkflow:
                         task_queue="python-orchestrator-queue",
                     )
                 elif t == "vulnerability_scan":
-                    await workflow.execute_activity(
-                        "RunGenericTaskActivity",
-                        args=[ctx_task, "vulnerability_scan", "Vulnerability Scan", {"urls": [target_url]}],
-                        start_to_close_timeout=timedelta(hours=6),
-                        heartbeat_timeout=timedelta(minutes=5),
-                        retry_policy=_RETRY_LONG_SCAN,
+                    await workflow.execute_child_workflow(
+                        "NucleiPlannerWorkflow",
+                        ctx_task,
+                        id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
                         task_queue="python-orchestrator-queue",
+                        execution_timeout=timedelta(hours=6),
+                        run_timeout=timedelta(hours=6),
                     )
                 elif dispatch is not None:
                     args = dispatch["args_builder"](ctx_task)
@@ -1139,36 +1178,6 @@ class SubScanWorkflow:
                     else:
                         tier_futures.append(run_and_track_task(t))
 
-                # Vigolium discovery runs alongside Tier 2 (HTTP crawl / port scan)
-                if tier_index == 2:
-                    vigolium_discovery_config = yaml_config.get('vigolium_discovery', {})
-                    if vigolium_discovery_config.get('run_vigolium_discovery', True):
-                        tier_futures.append(
-                            workflow.execute_activity(
-                                "RunVigoliumDiscoveryActivity",
-                                ctx,
-                                start_to_close_timeout=timedelta(hours=3),
-                                heartbeat_timeout=timedelta(minutes=5),
-                                retry_policy=_RETRY_LONG_SCAN,
-                                task_queue="python-orchestrator-queue"
-                            )
-                        )
-
-                # Vigolium analysis runs alongside Tier 5 (web_api_discovery, waf_detection, secret_scanning)
-                elif tier_index == 5:
-                    vigolium_analysis_config = yaml_config.get('vigolium_analysis', {})
-                    if vigolium_analysis_config.get('run_vigolium_analysis', True):
-                        tier_futures.append(
-                            workflow.execute_activity(
-                                "RunVigoliumAnalysisActivity",
-                                ctx,
-                                start_to_close_timeout=timedelta(hours=2),
-                                heartbeat_timeout=timedelta(minutes=5),
-                                retry_policy=_RETRY_LONG_SCAN,
-                                task_queue="python-orchestrator-queue"
-                            )
-                        )
-
                 if not tier_futures:
                     continue
 
@@ -1190,6 +1199,11 @@ class SubScanWorkflow:
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
                     )
+                    await self._check_paused()
+                elif tier_index == 2:
+                    await self._check_paused()
+                elif tier_index == 3:
+                    await self._check_paused()
                 elif tier_index == 4:
                     # ParseFuzzResultsActivity after dir_file_fuzz completes.
                     # ParseEnumerationResultsActivity is run unconditionally AFTER the tier loop
@@ -1211,6 +1225,7 @@ class SubScanWorkflow:
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
                     )
+                    await self._check_paused()
                 elif tier_index == 6:
                     await workflow.execute_activity(
                         "ParseAssessmentResultsActivity",
@@ -1220,6 +1235,7 @@ class SubScanWorkflow:
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
                     )
+                    await self._check_paused()
 
             # Unconditional endpoint count consolidation after all enumeration tiers complete.
             # Bug fix: previously this only ran when dir_file_fuzz was selected (inside Tier 4
@@ -1257,7 +1273,7 @@ class SubScanWorkflow:
                             await workflow.execute_activity(
                                 "CorrelateVulnerabilitiesActivity",
                                 ctx,
-                                start_to_close_timeout=timedelta(minutes=15),
+                                start_to_close_timeout=timedelta(minutes=30),
                                 heartbeat_timeout=timedelta(minutes=5),
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue",
@@ -1302,6 +1318,8 @@ class SubScanWorkflow:
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue",
                             )
+                    except asyncio.CancelledError:
+                        raise
                     except Exception as post_e:
                         workflow.logger.error(f"SubScanWorkflow post-scan tasks failed: {post_e}")
 
