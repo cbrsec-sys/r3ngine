@@ -77,6 +77,22 @@ interface SubdomainsTabProps {
   onTabChange?: (index: number) => void;
 }
 
+const TASK_TIER_ORDER: string[] = [
+  // Tier 1 — Discovery
+  'subdomain_discovery', 'amass_intel_discovery', 'firewall_vpn_scan',
+  'dns_security', 'osint', 'spiderfoot_scan', 'baddns',
+  // Tier 2 — HTTP Crawl & Port Scan
+  'http_crawl', 'port_scan', 'vigolium_discovery',
+  // Tier 3 — Fetching & Screenshot
+  'fetch_url', 'screenshot',
+  // Tier 4 — Fuzzing
+  'dir_file_fuzz',
+  // Tier 5 — Analysis
+  'web_api_discovery', 'waf_detection', 'secret_scanning', 'vigolium_analysis',
+  // Tier 6 — Security Assessment
+  'vulnerability_scan', 'waf_bypass', 'brute_force_scan', 'vigolium_scan',
+];
+
 export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId, targetId, onTabChange }) => {
 
   const [page, setPage] = useState(1);
@@ -873,7 +889,13 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 AVAILABLE TASKS
               </Typography>
               <FormGroup>
-                {selectedEngine.tasks.map((task: string) => (
+                {[...selectedEngine.tasks]
+                  .sort((a, b) => {
+                    const ai = TASK_TIER_ORDER.indexOf(a);
+                    const bi = TASK_TIER_ORDER.indexOf(b);
+                    return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
+                  })
+                  .map((task: string) => (
                   <FormControlLabel
                     key={task}
                     control={
