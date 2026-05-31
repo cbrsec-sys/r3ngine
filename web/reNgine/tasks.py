@@ -2961,6 +2961,24 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 	if self.excluded_paths:
 		all_urls = exclude_urls_by_patterns(self.excluded_paths, all_urls)
 
+	# Pass 1: URL signature dedup — collapse parametric variants (same path, different param values).
+	# e.g. /page?id=1, /page?id=2, /page?id=3 all share signature /page?id and collapse to one.
+	# URLs with different parameter names are treated as structurally distinct and kept.
+	if should_remove_duplicate_endpoints:
+		pre_count = len(all_urls)
+		seen_sigs = {}
+		deduped = []
+		for url in all_urls:
+			sig = url_param_signature(url)
+			if sig not in seen_sigs:
+				seen_sigs[sig] = True
+				deduped.append(url)
+		all_urls = deduped
+		logger.warning(
+			f'fetch_url dedup: {pre_count} → {len(all_urls)} URLs '
+			f'(removed {pre_count - len(all_urls)} parametric variants)'
+		)
+
 	# Write result to output path
 	with open(self.output_path, 'w') as f:
 		f.write('\n'.join(all_urls))
@@ -2979,6 +2997,40 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			ctx=ctx,
 			subdomain=subdomain
 		)
+
+	# Pass 2: Content-based dedup — delete endpoints already enriched by http_crawl
+	# whose (subdomain, content_length, page_title) signature matches a shorter sibling.
+	# Skeleton endpoints added by fetch_url (no content_length/page_title yet) are skipped.
+	if should_remove_duplicate_endpoints and duplicate_removal_fields:
+		scan_obj = ScanHistory.objects.filter(pk=ctx.get('scan_history_id')).first()
+		domain_obj = Domain.objects.filter(pk=ctx.get('domain_id')).first()
+		if scan_obj and domain_obj:
+			field_filter = {f'{f}__isnull': False for f in duplicate_removal_fields}
+			field_filter.update(
+				{f'{f}__gt': 0 for f in duplicate_removal_fields if f == 'content_length'}
+			)
+			crawled_eps = EndPoint.objects.filter(
+				scan_history=scan_obj,
+				target_domain=domain_obj,
+				**field_filter
+			).order_by('http_url')
+
+			seen_content_sigs = {}
+			to_delete = []
+			for ep in crawled_eps:
+				sig = tuple(getattr(ep, f, None) for f in duplicate_removal_fields)
+				subdomain_key = (ep.subdomain_id,) + sig
+				if subdomain_key in seen_content_sigs:
+					to_delete.append(ep.pk)
+				else:
+					seen_content_sigs[subdomain_key] = ep.pk
+
+			if to_delete:
+				deleted_count, _ = EndPoint.objects.filter(pk__in=to_delete).delete()
+				logger.warning(
+					f'fetch_url content dedup: removed {deleted_count} duplicate endpoints '
+					f'(same {duplicate_removal_fields})'
+				)
 
 
 

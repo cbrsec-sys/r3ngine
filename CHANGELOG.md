@@ -2,6 +2,14 @@
 
 ### [v3.3.0] - 2026-05-31
 
+- **URL Deduplication After fetch_url**:
+  - Implemented the previously dead `remove_duplicate_endpoints` and `duplicate_fields` scan config options in `fetch_url` (`tasks.py`). Both are now fully active (default: enabled, fields: `content_length`, `page_title`).
+  - **Pass 1 — URL signature dedup (pre-save)**: After all URL filtering, parametric variants of the same path are collapsed to a single representative URL before any database writes. e.g. `/page?id=1`, `/page?id=2`, `/page?id=100` (all share signature `/page?id`) are reduced to one entry. URLs with structurally different parameter names (e.g. `/page?id=1` vs `/page?id=1&sort=asc`) are treated as distinct endpoints and preserved.
+  - **Pass 2 — Content-based dedup (post-save)**: After skeleton endpoints are written to the database, endpoints already enriched by the Tier 2 `http_crawl` are grouped by `(subdomain, content_length, page_title)`. Duplicate records within each group (identical content fingerprint) are deleted, keeping the first encountered. Skeleton endpoints with no crawl data are unaffected.
+  - Added `url_param_signature(url)` helper to `common_func.py` that generates the dedup key (`scheme://netloc/path?{sorted param names}`) used by Pass 1.
+  - Both passes are guarded by the `should_remove_duplicate_endpoints` flag and log their reduction counts, visible in `temporal-python-orchestrator` logs during scans.
+  - Reduces the endpoint list fed into Tier 4 (`dir_file_fuzz`), Tier 5 (`web_api_discovery`), and Tier 6 (`nuclei`) — directly lowering scan load for targets with large historical URL sets from tools like `gau`.
+
 - **Nmap Vulners NSE Grouped Vulnerability Findings**:
   - Nmap vulners NSE script results are now grouped by product version (e.g. "Exim smtpd 4.99.2") instead of stored as individual records per CVE/hash. All CVE and exploit IDs for the same product are logically grouped under a single finding.
   - Added `group_key` field (indexed `CharField`) to the `Vulnerability` model. For vulners findings this is populated with the service product+version string (e.g. `"ISC BIND 9.11.36"`) derived from nmap's XML output. Migration `0033_vulnerability_group_key` applies the schema change.
