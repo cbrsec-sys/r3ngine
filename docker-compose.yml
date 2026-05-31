@@ -294,7 +294,7 @@ services:
         limits:
           memory: 8G
         reservations:
-          memory: 4G
+          memory: 3G
     #memswap_limit: 9G
 
 networks:
