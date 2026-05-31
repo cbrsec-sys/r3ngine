@@ -555,6 +555,7 @@ class Vulnerability(models.Model):
 	validation_confidence = models.FloatField(null=True, blank=True, default=0.0)
 	correlation_score = models.FloatField(null=True, blank=True, default=0.0)
 	is_suppressed = models.BooleanField(default=False)
+	group_key = models.CharField(max_length=500, null=True, blank=True, db_index=True)
 
 	def get_path(self):
 		if self.http_url:
