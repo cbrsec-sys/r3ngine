@@ -55,10 +55,26 @@ from startScan.models import Vulnerability
 
 class NmapTestCase(TestCase):
     def test_vulnerability_has_group_key_field(self):
-        """Vulnerability model must have a group_key field."""
-        v = Vulnerability(
+        """Vulnerability model must have a group_key field backed by a DB column."""
+        from startScan.models import Domain, ScanHistory
+        from scanEngine.models import EngineType
+        engine = EngineType.objects.create(
+            engine_name='test-engine',
+            yaml_configuration='subdomain_discovery:\n  - subfinder\n'
+        )
+        domain = Domain.objects.create(name='test-group-key.com')
+        scan = ScanHistory.objects.create(
+            domain=domain,
+            scan_type=engine,
+            scan_status=0,
+            start_scan_date='2026-01-01T00:00:00Z'
+        )
+        v = Vulnerability.objects.create(
+            scan_history=scan,
+            target_domain=domain,
             name='Exim smtpd 4.99.2 (CVE-2026-45185)',
             severity=3,
             group_key='Exim smtpd 4.99.2'
         )
+        v.refresh_from_db()
         self.assertEqual(v.group_key, 'Exim smtpd 4.99.2')
