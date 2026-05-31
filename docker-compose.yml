@@ -166,6 +166,7 @@ services:
     image: r3ngine-tor:latest
     container_name: tor
     restart: "no"
+    profiles: ["tor"]
     networks:
       - r3ngine_network
     deploy:
