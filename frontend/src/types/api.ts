@@ -5999,6 +5999,8 @@ export interface components {
             correlation_score?: number | null;
             /** Is suppressed */
             is_suppressed?: boolean;
+            /** Group key */
+            group_key?: string | null;
             readonly subdomain?: {
                 /** Id */
                 readonly id?: number;
