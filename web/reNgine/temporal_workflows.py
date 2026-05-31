@@ -130,16 +130,17 @@ class MasterScanWorkflow:
             # Non-fatal: scan runs normally even if timeline pre-population fails
             pass
 
-        # TOR circuit rotation — no-op when TOR mode is inactive
-        try:
-            await workflow.execute_activity(
-                "TorNewCircuitActivity",
-                start_to_close_timeout=timedelta(seconds=30),
-                retry_policy=RetryPolicy(maximum_attempts=1),
-                task_queue="python-orchestrator-queue"
-            )
-        except Exception:
-            pass
+        # TOR circuit rotation — only dispatched when TOR mode is active
+        if ctx.get('use_tor', False):
+            try:
+                await workflow.execute_activity(
+                    "TorNewCircuitActivity",
+                    start_to_close_timeout=timedelta(seconds=30),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                    task_queue="python-orchestrator-queue"
+                )
+            except Exception:
+                pass
 
         # ------------------------------------------------------------------
         # STEP 0: Target Profiling — validate scan, enrich context, set up dirs
@@ -858,6 +859,21 @@ _SUBSCAN_DISPATCH = {
         "timeout": timedelta(minutes=30),
         "args_builder": lambda ctx: [ctx, "run_apme", "Attack Path Modeling Engine", {"scan_history_id": ctx.get("scan_history_id")}],
     },
+    "vigolium_discovery": {
+        "activity": "RunVigoliumDiscoveryActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [ctx],
+    },
+    "vigolium_analysis": {
+        "activity": "RunVigoliumAnalysisActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [ctx],
+    },
+    "vigolium_scan": {
+        "activity": "RunVigoliumScanActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [ctx],
+    },
     # Special cases — handled with inline logic in SubScanWorkflow.run():
     "vulnerability_scan": None,  # Has Tier 7 post-steps (correlation, risk, APME)
     "baddns": None,              # Modifies ctx before dispatch
@@ -928,16 +944,17 @@ class SubScanWorkflow:
         except Exception:
             pass
 
-        # TOR circuit rotation — no-op when TOR mode is inactive
-        try:
-            await workflow.execute_activity(
-                "TorNewCircuitActivity",
-                start_to_close_timeout=timedelta(seconds=30),
-                retry_policy=RetryPolicy(maximum_attempts=1),
-                task_queue="python-orchestrator-queue"
-            )
-        except Exception:
-            pass
+        # TOR circuit rotation — only dispatched when TOR mode is active
+        if ctx.get('use_tor', False):
+            try:
+                await workflow.execute_activity(
+                    "TorNewCircuitActivity",
+                    start_to_close_timeout=timedelta(seconds=30),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                    task_queue="python-orchestrator-queue"
+                )
+            except Exception:
+                pass
 
         # Validate tasks against the permitted task list before any dispatch
         known_explicit = set(_SUBSCAN_DISPATCH.keys())
@@ -1052,17 +1069,20 @@ class SubScanWorkflow:
                     "dns_security", "osint", "spiderfoot_scan", "baddns"
                 }],
                 # TIER 2: HTTP Crawl & Port Scan — populates endpoint DB for Tiers 3+.
-                [t for t in active_tasks if t in {"http_crawl", "port_scan"}],
+                # vigolium_discovery runs alongside http_crawl to seed endpoints concurrently.
+                [t for t in active_tasks if t in {"http_crawl", "port_scan", "vigolium_discovery"}],
                 # TIER 3: URL Fetching + Screenshot — both depend only on Tier 2 http_crawl;
                 # screenshot does NOT depend on fetch_url output so they run concurrently.
                 [t for t in active_tasks if t in {"fetch_url", "screenshot"}],
                 # TIER 4: Directory & File Fuzzing — needs Tier 3 URLs.
                 [t for t in active_tasks if t == "dir_file_fuzz"],
                 # TIER 5: Analysis — API discovery, WAF detection, secret scanning.
-                [t for t in active_tasks if t in {"web_api_discovery", "waf_detection", "secret_scanning"}],
+                # vigolium_analysis runs alongside web_api_discovery as in MasterScanWorkflow.
+                [t for t in active_tasks if t in {"web_api_discovery", "waf_detection", "secret_scanning", "vigolium_analysis"}],
                 # TIER 6: Security Assessment — explicit inclusion, mirrors MasterScanWorkflow Tier 6.
+                # vigolium_scan runs alongside vulnerability_scan at Tier 6.
                 [t for t in active_tasks if t in {
-                    "vulnerability_scan", "waf_bypass", "brute_force_scan"
+                    "vulnerability_scan", "waf_bypass", "brute_force_scan", "vigolium_scan"
                 }],
                 # TIER 6b: Fallback for any task not classified in Tiers 1-6.
                 # Handles future tasks added to _SUBSCAN_DISPATCH without breaking existing tiers.
@@ -1070,7 +1090,8 @@ class SubScanWorkflow:
                     "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
                     "dns_security", "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
                     "fetch_url", "screenshot", "dir_file_fuzz", "web_api_discovery", "waf_detection",
-                    "secret_scanning", "vulnerability_scan", "waf_bypass", "brute_force_scan"
+                    "secret_scanning", "vulnerability_scan", "waf_bypass", "brute_force_scan",
+                    "vigolium_discovery", "vigolium_analysis", "vigolium_scan"
                 }],
             ]
 
