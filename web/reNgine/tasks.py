@@ -605,7 +605,7 @@ def initiate_subscan_temporal(
 						execution_timeout=timedelta(days=7),
 						run_timeout=timedelta(days=7),
 						task_timeout=timedelta(hours=1),
-						retry_policy=RetryPolicy(maximum_attempts=10),
+						retry_policy=RetryPolicy(maximum_attempts=1),
 					)
 					return handle.id
 				except TemporalServiceError as e:
@@ -2823,9 +2823,9 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			# Apply custom headers
 			if custom_headers:
 				formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
-				if tool == 'gospider': tool_cmd += formatted_headers
+				if tool == 'gospider': tool_cmd += f' {formatted_headers}'
 				elif tool == 'hakrawler': tool_cmd += ';;'.join(header for header in custom_headers)
-				elif tool == 'katana': tool_cmd += formatted_headers
+				elif tool == 'katana': tool_cmd += f' {formatted_headers}'
 
 			url_results_file = f'{self.results_dir}/urls_{tool}.txt'
 			full_cmd = f'cat {input_path} | {tool_cmd} | grep -Eo {host_regex} | tee {url_results_file}'
@@ -3547,10 +3547,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 			# assuming technologies is a many-to-many field with 'name' attribute
 			all_techs.update(sub.technologies.values_list('name', flat=True))
 		
-		# Tag injection intentionally disabled: -tags restricts nuclei to matched templates only,
-		# causing missed detections when not all target technologies have been discovered yet.
-		# Full scan without tag filtering ensures complete coverage.
-		if False and all_techs:
+		if all_techs:
 			tech_tags = get_nuclei_tags_from_techs(list(all_techs))
 			logger.info(f'Detected technologies: {list(all_techs)}. Adding targeted Nuclei tags: {tech_tags}')
 
@@ -3667,7 +3664,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	cmd = opsec.apply_stealth('nuclei', cmd, proxy=proxy)
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
-		cmd += formatted_headers
+		cmd += f' {formatted_headers}'
 	cmd += f' -l {input_path}'
 	cmd += f' -c {str(concurrency)}' if concurrency > 0 else ''
 
@@ -3677,7 +3674,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		cmd += f' -severity {severities_str}'
 	#cmd += f' -timeout {str(timeout)}' if timeout and timeout > 0 else ''
 	if tags:
-		cmd += f' -tags {tags}'
+		cmd += f" -tags '{tags}'"
 	#cmd += f' -silent'
 	for tpl in templates:
 		cmd += f' -t {tpl}'
@@ -3948,7 +3945,7 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	cmd += f' --scan-timeout {scan_timeout}' if scan_timeout else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
-		cmd += formatted_headers
+		cmd += f' {formatted_headers}'
 	cmd += f' --user-agent {user_agent}' if user_agent else ''
 	cmd += f' --workers {threads}' if threads else ''
 	cmd += f' --format json'
@@ -4052,6 +4049,8 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 	input_path = f'{self.results_dir}/input_endpoints_crlf.txt'
 	output_path = f'{self.results_dir}/{self.filename}'
 
+	urls = [u for u in urls if u and u.strip()]
+
 	if urls:
 		with open(input_path, 'w') as f:
 			f.write('\n'.join(urls))
@@ -4077,7 +4076,7 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 	cmd += f' -x {proxy}' if proxy else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
-		cmd += formatted_headers
+		cmd += f' {formatted_headers}'
 	cmd += f' -o {output_path}'
 
 	run_command(
@@ -4099,6 +4098,8 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 
 	for crlf in crlfs:
 		url = crlf.strip()
+		if not url:
+			continue
 
 		vuln_data = parse_crlfuzz_result(url)
 
@@ -4280,7 +4281,7 @@ def http_crawl(
 	cmd += f' --http-proxy {proxy}' if proxy else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
-		cmd += formatted_headers
+		cmd += f' {formatted_headers}'
 	cmd += f' -json'
 	cmd += f' -u {urls[0]}' if len(urls) == 1 else f' -l {input_path}'
 	cmd += f' -x {method}' if method else ''
