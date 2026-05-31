@@ -5168,6 +5168,7 @@ def parse_nmap_vulners_output(script_output, url='', service_title=''):
 			vuln = cve_to_vuln(cve_id, vuln_type='nmap-vulners-nse')
 			if vuln:
 				vuln['source'] = 'VULNERS'
+				vuln['group_key'] = service_title
 				vulns.append(vuln)
 	return vulns
 

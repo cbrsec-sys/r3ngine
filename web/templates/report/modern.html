@@ -1003,7 +1003,7 @@
     </article>
     {% if show_vuln %}
     <h3 class="primary">Summary of Vulnerabilities Identified</h3>
-    {% if all_vulnerabilities.count == 0 %}
+    {% if all_vulnerabilities_count == 0 %}
     <p>
         No vulnerabilities were identified on <span class="primary">{{ scan_object.domain.name }}</span>
     </p>
@@ -1339,7 +1339,7 @@
           </h3>
         </div>
         {% for group in grouped_vulners_findings %}
-        <div class="vuln-card" id="vuln_vulners_{{ group.group_key|slugify }}">
+        <div class="vuln-card" id="vuln_{{ group.group_key|slugify }}">
           <div class="vuln-card-header {% if group.max_severity == 4 %}critical-td{% elif group.max_severity == 3 %}high-td{% elif group.max_severity == 2 %}medium-td{% elif group.max_severity == 1 %}low-td{% else %}info-td{% endif %}">
             <h4>{{ group.group_key }}</h4>
             <div class="vuln-severity {% if group.max_severity == 4 %}critical-severity-badge{% elif group.max_severity == 3 %}high-severity-badge{% elif group.max_severity == 2 %}medium-severity-badge{% elif group.max_severity == 1 %}low-severity-badge{% else %}info-severity-badge{% endif %}">
