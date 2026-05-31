@@ -1,7 +1,7 @@
 - model: scanEngine.enginetype
   pk: 12
   fields:
-    engine_name: Full Custom
+    engine_name: Comprehensive
     default_engine: false
     yaml_configuration: |
       subdomain_discovery:
@@ -17,6 +17,17 @@
         enable_http_crawl: true
         threads: 30
         timeout: 5
+      firewall_vpn_scan:
+        run_ike_scan: true
+        run_sslscan: true
+        enable_testssl: true
+        enable_crt_sh: true
+        threads: 20
+      dns_security:
+        enable_axfr: true
+        enable_dnssec_check: true
+        enable_dns_brute: false
+        amplification_threshold: 10
       http_crawl: {}
       port_scan:
         enable_http_crawl: true
@@ -82,7 +93,7 @@
           - json
           - yml
           - pdf
-        follow_redirect: false
+        follow_redirect: true
         max_time: 300
         match_http_status:
           - 200
@@ -92,7 +103,7 @@
         timeout: 120
         threads: 20
         wordlist_name: dicc
-        use_api_wordlist: false
+        use_api_wordlist: true
       fetch_url:
         uses_tools:
           - gospider
@@ -128,6 +139,19 @@
           - mpeg
           - mp3
         threads: 20
+      web_api_discovery:
+        uses_tools:
+          - arjun
+          - linkfinder
+          - paramspider
+          - semgrep
+          - retire
+          - jwt_tool
+          - graphql-cop
+        scan_only_active: true
+        threads: 30
+        kiterunner_wordlist: routes-small.kr
+        arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
       vulnerability_scan:
         run_nuclei: true
         run_dalfox: true
@@ -156,7 +180,7 @@
           strategy: balanced
           concurrency: 30
           rate_limit: 100
-          timeout: 15s
+          timeout: 300s
         cpanel_scanner:
           run_cpanel2shell: true
           cpanel_user_wordlist: /usr/src/app/wordlist/cpanel_users.txt
@@ -166,16 +190,13 @@
         strategy: balanced
         concurrency: 20
         rate_limit: 50
-        timeout: 10s
+        timeout: 180s
       vigolium_analysis:
         run_vigolium_analysis: true
         strategy: balanced
         concurrency: 20
         rate_limit: 50
-        timeout: 10s
-      attack_path_modeling:
-        enabled: true
-        top_n: 10
+        timeout: 300s
       waf_detection:
         use_shodan: true
         use_censys: true
@@ -187,27 +208,6 @@
         intensity: normal
         timeout: 10
         threads: 40
-      firewall_vpn_scan:
-        run_ike_scan: true
-        run_sslscan: true
-        enable_testssl: true
-        enable_crt_sh: true
-        threads: 20
-      web_api_discovery:
-        uses_tools:
-          - arjun
-          - linkfinder
-          - paramspider
-          - semgrep
-          - retire
-          - jwt_tool
-          - graphql-cop
-        scan_only_active: true
-        threads: 30
-        kiterunner_wordlist: routes-small.kr
-        arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
-      dns_security:
-        enable_axfr: true
-        enable_dnssec_check: true
-        enable_dns_brute: false
-        amplification_threshold: 10
+      attack_path_modeling:
+        enabled: true
+        top_n: 10
