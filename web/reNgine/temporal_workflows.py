@@ -142,6 +142,11 @@ class MasterScanWorkflow:
             except Exception:
                 pass
 
+        # State flags for finally-block dispatch (mirrors SubScanWorkflow pattern).
+        is_cancelled = False
+        success = False
+        _failure_reason: str | None = None
+
         # ------------------------------------------------------------------
         # STEP 0: Target Profiling — validate scan, enrich context, set up dirs
         # ------------------------------------------------------------------
@@ -531,73 +536,9 @@ class MasterScanWorkflow:
 
             await self._check_paused()
 
-            # ------------------------------------------------------------------
-            # TIER 7: Post-Processing & Intelligence (sequential — ordering matters)
-            # ------------------------------------------------------------------
-            # MANDATORY TASKS: These must run for ALL scans unconditionally.
-        
-            await workflow.execute_activity(
-                "CorrelateVulnerabilitiesActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
-            await workflow.execute_activity(
-                "CalculateRiskScoresActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=15),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
-
-            # AI Impact Assessment
-            await workflow.execute_activity(
-                "GenerateImpactAssessmentActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_LLM,
-                task_queue="python-orchestrator-queue"
-            )
-
-            # Neo4j graph sync (must precede APME so graph nodes exist)
-            await workflow.execute_activity(
-                "SyncGraphActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_NETWORK_SCAN,
-                task_queue="python-orchestrator-queue"
-            )
-
-            # MANDATORY: Attack Path Modeling Engine — must be the final analysis step
-            await workflow.execute_activity(
-                "RunGenericTaskActivity",
-                args=[ctx, "run_apme", "Attack Path Modeling Engine", {"scan_history_id": ctx.get("scan_history_id")}],
-                start_to_close_timeout=timedelta(minutes=30),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
-
-            # ------------------------------------------------------------------
-            # FINAL: Mark scan complete and send notification
-            # ------------------------------------------------------------------
-            await workflow.execute_activity(
-                "SendScanNotificationActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=5),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
-
-            workflow.logger.info(
-                f"MasterScanWorkflow COMPLETE for scan_id={ctx.get('scan_history_id')}"
-            )
+            # Tier 7, notification, and finalization have moved to the finally
+            # block below — guarded by `if success:` to match SubScanWorkflow.
+            success = True
             return {"status": "SUCCESS", "scan_history_id": ctx.get("scan_history_id")}
 
         except asyncio.CancelledError:
@@ -605,22 +546,116 @@ class MasterScanWorkflow:
                 f"MasterScanWorkflow cancelled for scan_id={ctx.get('scan_history_id')} "
                 "— skipping FinalizeFailedScanActivity (ABORTED_TASK already set by API)."
             )
+            is_cancelled = True
             raise
 
         except Exception as e:
             workflow.logger.error(
                 f"MasterScanWorkflow FAILED for scan_id={ctx.get('scan_history_id')}: {e}"
             )
-            # Finalize the scan as failed in Django DB so it can be manually resumed
-            await workflow.execute_activity(
-                "FinalizeFailedScanActivity",
-                args=[ctx, str(e)],
-                start_to_close_timeout=timedelta(minutes=5),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
+            _failure_reason = str(e)
             raise e
+
+        finally:
+            if not is_cancelled:
+                if success:
+                    # ------------------------------------------------------------------
+                    # TIER 7: Post-Processing & Intelligence (sequential — ordering matters)
+                    # Runs only when all scan tiers completed cleanly (success=True),
+                    # matching the SubScanWorkflow pattern. Errors here are non-fatal:
+                    # findings are still queryable even without correlation/risk data.
+                    # ------------------------------------------------------------------
+                    try:
+                        if "vulnerability_scan" in tasks:
+                            await workflow.execute_activity(
+                                "CorrelateVulnerabilitiesActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_INTERNAL,
+                                task_queue="python-orchestrator-queue"
+                            )
+                            await workflow.execute_activity(
+                                "CalculateRiskScoresActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(minutes=15),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_INTERNAL,
+                                task_queue="python-orchestrator-queue"
+                            )
+                            # AI Impact Assessment
+                            await workflow.execute_activity(
+                                "GenerateImpactAssessmentActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_LLM,
+                                task_queue="python-orchestrator-queue"
+                            )
+
+                        _graph_tasks = {
+                            "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
+                            "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
+                            "fetch_url", "dir_file_fuzz", "web_api_discovery", "vulnerability_scan"
+                        }
+                        if any(t in _graph_tasks for t in tasks):
+                            # Neo4j graph sync (must precede APME so graph nodes exist)
+                            await workflow.execute_activity(
+                                "SyncGraphActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_NETWORK_SCAN,
+                                task_queue="python-orchestrator-queue"
+                            )
+                            # Attack Path Modeling Engine — must be the final analysis step
+                            await workflow.execute_activity(
+                                "RunGenericTaskActivity",
+                                args=[ctx, "run_apme", "Attack Path Modeling Engine",
+                                      {"scan_history_id": ctx.get("scan_history_id")}],
+                                start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_INTERNAL,
+                                task_queue="python-orchestrator-queue"
+                            )
+
+                        # ------------------------------------------------------------------
+                        # FINAL: Mark scan complete and send notification
+                        # ------------------------------------------------------------------
+                        await workflow.execute_activity(
+                            "SendScanNotificationActivity",
+                            ctx,
+                            start_to_close_timeout=timedelta(minutes=5),
+                            heartbeat_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_INTERNAL,
+                            task_queue="python-orchestrator-queue"
+                        )
+                        workflow.logger.info(
+                            f"MasterScanWorkflow COMPLETE for scan_id={ctx.get('scan_history_id')}"
+                        )
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as post_e:
+                        workflow.logger.error(
+                            f"MasterScanWorkflow post-scan tasks failed for "
+                            f"scan_id={ctx.get('scan_history_id')}: {post_e}"
+                        )
+                else:
+                    # Scan tiers failed — finalize the scan record in Django DB.
+                    try:
+                        await workflow.execute_activity(
+                            "FinalizeFailedScanActivity",
+                            args=[ctx, _failure_reason or "Workflow failed during execution"],
+                            start_to_close_timeout=timedelta(minutes=5),
+                            heartbeat_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_INTERNAL,
+                            task_queue="python-orchestrator-queue"
+                        )
+                    except Exception as fin_e:
+                        workflow.logger.error(
+                            f"FinalizeFailedScanActivity itself failed for "
+                            f"scan_id={ctx.get('scan_history_id')}: {fin_e}"
+                        )
 
     # ------------------------------------------------------------------
     # Signal Handlers
