@@ -465,7 +465,7 @@
           <li><a href="#interesting-recon-data"></a></li>
         {% endif %}
 
-        {% if all_vulnerabilities.count > 0 and show_vuln %}
+        {% if all_vulnerabilities_count > 0 and show_vuln %}
           <li><a href="#vulnerability-summary"></a></li>
         {% endif %}
 
@@ -473,7 +473,7 @@
           <li><a href="#reconnaissance-results"></a></li>
         {% endif %}
 
-        {% if all_vulnerabilities.count > 0 and show_vuln %}
+        {% if all_vulnerabilities_count > 0 and show_vuln %}
           <li><a href="#vulnerabilities-discovered"></a></li>
         {% endif %}
         {% if enable_llm_report_generation %}
@@ -671,7 +671,7 @@
     {% if show_vuln %}
       <article style="page-break-before: always" class="summary">
         <h3 id="vulnerability-summary" class="page_title">Summary of Vulnerabilities Identified</h3>
-        {% if all_vulnerabilities.count > 0 %}
+        {% if all_vulnerabilities_count > 0 %}
         <p>Listed below are the vulnerabilities identified on <span class="primary-color">{{scan_object.domain.name}}</span></p>
         <div class="table">
           <div class="row header bg-critical">
@@ -876,7 +876,7 @@
       </article>
     {% endif %}
 
-    {% if all_vulnerabilities.count > 0 and show_vuln %}
+    {% if all_vulnerabilities_count > 0 and show_vuln %}
       <article style="page-break-before: always" class="summary">
         <h3 id="vulnerabilities-discovered" class="page_title">Vulnerabilities Discovered</h3>
         <p>
@@ -1042,7 +1042,7 @@
           </div>
           {% for group in grouped_vulners_findings %}
           <div>
-            <h4 class="content-heading" id="vuln_vulners_{{ group.group_key|slugify }}">
+            <h4 class="content-heading" id="vuln_{{ group.group_key|slugify }}">
               <span>{{ group.group_key }}</span>
               {% if group.max_severity == 4 %}
                 <span style="float: right;" class="badge bg-critical">Critical</span>
