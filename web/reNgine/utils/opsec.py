@@ -129,9 +129,9 @@ class OpSecManager:
             for header in self.get_waf_headers(proxy_ip):
                 flags.append(f"-H '{header}'")
         
-        if self.settings.enable_rate_limit:
+        if self.settings.enable_rate_limit and not re.search(r'\s-rl\s', cmd):
             flags.append(f"-rl {self.settings.max_rps}")
-        
+
         if self.settings.http_protocol == "http2":
             flags.append("-fh2")
         

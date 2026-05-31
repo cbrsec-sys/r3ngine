@@ -258,6 +258,8 @@ services:
     restart: always
     init: true
     entrypoint: /usr/src/app/executor-entrypoint.sh
+    mem_limit: 6g
+    memswap_limit: 6g
     environment:
       - TEMPORAL_HOST=temporal:7233
       - TEMPORAL_NAMESPACE=default
