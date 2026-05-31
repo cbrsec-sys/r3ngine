@@ -1,5 +1,17 @@
 # Changelog
 
+### [v3.3.0] - 2026-05-31
+
+- **Nmap Vulners NSE Grouped Vulnerability Findings**:
+  - Nmap vulners NSE script results are now grouped by product version (e.g. "Exim smtpd 4.99.2") instead of stored as individual records per CVE/hash. All CVE and exploit IDs for the same product are logically grouped under a single finding.
+  - Added `group_key` field (indexed `CharField`) to the `Vulnerability` model. For vulners findings this is populated with the service product+version string (e.g. `"ISC BIND 9.11.36"`) derived from nmap's XML output. Migration `0033_vulnerability_group_key` applies the schema change.
+  - Changed nmap vulners deduplication from `(name, http_url, scan_history)` to `(name, subdomain, scan_history)`, so the same CVE detected on multiple open ports of the same host (e.g. port 465 and 587) is stored as a single `Vulnerability` record rather than duplicated per port.
+  - `parse_nmap_vulners_output()` in `tasks.py` now sets `group_key = service_title` on every returned vuln dict, including the legacy regex-based CVE fallback path. The field is re-asserted after CVE enrichment to prevent overwrite.
+  - Added `build_vuln_context()` helper in `report_tasks.py` that splits scan vulnerabilities into non-vulners findings (passed to existing templates via `all_vulnerabilities`) and a `grouped_vulners_findings` list (one entry per product group, with `group_key`, `items`, `count`, `max_severity`, `max_cvss`). The combined `unique_vulnerabilities` summary and total `all_vulnerabilities_count` span both sources.
+  - All four PDF/HTML report templates (`cyber_pro`, `enterprise`, `modern`, `default`) now include a dedicated **NMAP VULNERS NSE FINDINGS** section rendered after the standard vulnerability findings. Each product group is shown as a card with a sub-table of individual CVE/hash IDs, CVSS scores, severity, and references.
+  - Fixed `modern.html` and `default.html` to guard the vulnerability section on `all_vulnerabilities_count` (total, including vulners) instead of `all_vulnerabilities.count` (non-vulners only), preventing scans with exclusively vulners results from rendering as "no vulnerabilities found".
+  - In the vulnerability table UI, vulners groups with more than one entry are collapsed by default. Clicking the group header row expands/collapses the individual CVE rows. The header displays a `▲ COLLAPSE` / `▼ EXPAND` indicator. Grouping uses the DB-backed `group_key` field when present, with a regex fallback for older records. Non-vulners groupings (SSL/TLS audit, Semgrep) are unaffected.
+
 ### [v3.2.0] - 2026-05-29
 
 - **ReconX Target Monitoring Settings & API URL Normalization**:
