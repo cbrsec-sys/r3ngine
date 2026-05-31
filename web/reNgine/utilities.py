@@ -275,7 +275,12 @@ def get_screenshot_path(subdomain):
 				# Fallback to default prepending if nothing found
 				final_path = test_path
 	
-	return final_path.replace('\\', '/')
+	if final_path:
+		full_final_path = os.path.join(settings.MEDIA_ROOT, final_path)
+		if not os.path.exists(full_final_path):
+			return None
+			
+	return final_path.replace('\\', '/') if final_path else None
 
 
 def secure_url_fetcher(url, *args, **kwargs):

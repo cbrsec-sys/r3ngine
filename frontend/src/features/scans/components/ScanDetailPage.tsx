@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useParams, Link as RouterLink } from '@tanstack/react-router';
 import {
   Box,
@@ -750,6 +750,17 @@ const TaskOverlay: React.FC<{
   );
 };
 
+const TIER_LABELS: Record<number, string> = {
+  0: 'Initialization',
+  1: 'Discovery',
+  2: 'Enumeration',
+  3: 'URL & Screenshots',
+  4: 'Fuzzing',
+  5: 'Analysis',
+  6: 'Security Assessment',
+  7: 'Post-Processing',
+};
+
 const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> = ({ activity, onClick }) => {
   const statusConfig: Record<string, { color: string, label: string }> = {
     'SUCCESS': { color: '#00ff62', label: 'Completed' },
@@ -833,9 +844,20 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
             • Click to view details <ChevronRight size={10} />
           </Typography>
         </Stack>
-        <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
-          {new Date(activity.time).toLocaleString()}
-        </Typography>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
+          <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+            {activity.status === 'PENDING'
+              ? 'Queued'
+              : activity.time_started
+                ? new Date(activity.time_started).toLocaleString()
+                : new Date(activity.time).toLocaleString()}
+          </Typography>
+          {activity.time_started && activity.time_ended && (
+            <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', fontWeight: 600 }}>
+              ({Math.round((new Date(activity.time_ended).getTime() - new Date(activity.time_started).getTime()) / 1000)}s)
+            </Typography>
+          )}
+        </Stack>
         {activity.error_message && (
           <Typography sx={{ fontSize: '0.65rem', color: '#ff003c', bgcolor: 'rgba(255,0,60,0.1)', p: 1, borderRadius: 0.5, border: '1px solid rgba(255,0,60,0.2)', mt: 1 }}>
             ERROR: {activity.error_message}
@@ -1275,6 +1297,17 @@ export const ScanDetailPage = () => {
     setTaskOverlayOpen(true);
   };
 
+  const groupedTimeline = useMemo(() => {
+    const timeline: ScanActivity[] = data?.timeline ?? [];
+    const groups = new Map<number, ScanActivity[]>();
+    timeline.forEach((act) => {
+      const tier = act.tier ?? 7;
+      if (!groups.has(tier)) groups.set(tier, []);
+      groups.get(tier)!.push(act);
+    });
+    return Array.from(groups.entries()).sort(([a], [b]) => a - b);
+  }, [data?.timeline]);
+
   if (isLoading || !data) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
@@ -1412,40 +1445,68 @@ export const ScanDetailPage = () => {
 
       <TacticalPanel title="Timeline" icon={<History size={14} />}>
         <Box sx={{ p: 1, maxHeight: 400, overflow: 'auto' }}>
-          <Stack>
-            <Box sx={{ position: 'relative' }}>
-              {data.timeline?.map((activity: ScanActivity, idx: number) => (
-                <TimelineItem
-                  key={idx}
-                  activity={activity}
-                  onClick={() => handleTimelineItemClick(activity)}
-                />
-              ))}
-              {[2, 3, 4].includes(data.scan_info.scan_status) && (
-                <TimelineItem
-                  activity={{
-                    id: 'raw-scan-history',
-                    title: 'Raw Scan History',
-                    name: 'raw_scan_history',
-                    status: 'SUCCESS',
-                    time: new Date().toISOString(),
-                    has_commands: true
-                  }}
-                  onClick={() => handleTimelineItemClick({
-                    id: 'raw-scan-history',
-                    title: 'Raw Scan History',
-                    name: 'raw_scan_history',
-                    status: 'SUCCESS',
-                    time: new Date().toISOString(),
-                    has_commands: true
-                  })}
-                />
-              )}
-            </Box>
-            {(!data.timeline || data.timeline.length === 0) && (
-              <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center', py: 4 }}>NO ACTIVITY LOGS</Typography>
-            )}
-          </Stack>
+          {groupedTimeline.length === 0 ? (
+            <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', textAlign: 'center', py: 4 }}>
+              NO ACTIVITY LOGS
+            </Typography>
+          ) : (
+            <Stack>
+              {groupedTimeline.map(([tier, activities]) => (
+                  <Box key={tier}>
+                    <Typography sx={{
+                      display: 'block',
+                      fontSize: '0.55rem',
+                      fontWeight: 800,
+                      letterSpacing: '0.1em',
+                      textTransform: 'uppercase',
+                      color: 'rgba(255,255,255,0.25)',
+                      mt: 1.5,
+                      mb: 0.5,
+                      px: 1,
+                    }}>
+                      Tier {tier} — {TIER_LABELS[tier] ?? 'Unknown'}
+                    </Typography>
+                    <Box sx={{ position: 'relative' }}>
+                      {activities.map((activity) => (
+                        <TimelineItem
+                          key={activity.task_uid ?? activity.id}
+                          activity={activity}
+                          onClick={() => handleTimelineItemClick(activity)}
+                        />
+                      ))}
+                    </Box>
+                  </Box>
+                ))}
+                {[2, 3, 4].includes(data.scan_info.scan_status) && (
+                  <TimelineItem
+                    activity={{
+                      id: 'raw-scan-history',
+                      task_uid: null,
+                      title: 'Raw Scan History',
+                      name: 'raw_scan_history',
+                      status: 'SUCCESS',
+                      time: new Date().toISOString(),
+                      time_started: null,
+                      time_ended: null,
+                      tier: null,
+                      has_commands: true
+                    }}
+                    onClick={() => handleTimelineItemClick({
+                      id: 'raw-scan-history',
+                      task_uid: null,
+                      title: 'Raw Scan History',
+                      name: 'raw_scan_history',
+                      status: 'SUCCESS',
+                      time: new Date().toISOString(),
+                      time_started: null,
+                      time_ended: null,
+                      tier: null,
+                      has_commands: true
+                    })}
+                  />
+                )}
+            </Stack>
+          )}
         </Box>
       </TacticalPanel>
 
@@ -1847,7 +1908,22 @@ export const ScanDetailPage = () => {
         >
           <Box sx={{ mt: 0.5 }}>
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN DETAIL</Typography>
-            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info?.name || 'N/A'}</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+              IDENTIFIER: <Box component="span" sx={{
+                color: '#c0521a',
+                '@keyframes subtlePulse': {
+                  '0%, 100%': { opacity: 1 },
+                  '50%': { opacity: 0.55 }
+                },
+                animation: 'subtlePulse 3s ease-in-out infinite'
+              }}>{scanId}</Box>
+              {' | '}
+              TARGET: <Box component="span" sx={{
+                color: '#c0521a',
+                animation: 'subtlePulse 3s ease-in-out infinite',
+                animationDelay: '1.5s'
+              }}>{data.target_info?.name || 'N/A'}</Box>
+            </Typography>
           </Box>
           <Stack spacing={1} sx={{ alignItems: { xs: 'flex-start', sm: 'flex-end' }, width: { xs: '100%', sm: 'auto' } }}>
             <Stack

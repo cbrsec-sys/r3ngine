@@ -757,9 +757,56 @@
         </div>
         {% endwith %}
         {% endfor %}
+        {% if grouped_vulners_findings %}
+        <div style="margin-top: 8mm;">
+          <h3 style="font-size: 11pt; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4mm;">
+            NMAP VULNERS NSE FINDINGS
+          </h3>
+        </div>
+        {% for group in grouped_vulners_findings %}
+        <div class="finding-card" id="vuln_{{ group.group_key|slugify }}">
+          <div class="finding-header {% if group.max_severity == 4 %}severity-critical{% elif group.max_severity == 3 %}severity-high{% elif group.max_severity == 2 %}severity-medium{% elif group.max_severity == 1 %}severity-low{% else %}severity-info{% endif %}">
+            <h4 class="finding-title" style="color: white;">{{ group.group_key }}</h4>
+            <span class="severity-badge {% if group.max_severity == 4 %}severity-critical{% elif group.max_severity == 3 %}severity-high{% elif group.max_severity == 2 %}severity-medium{% elif group.max_severity == 1 %}severity-low{% else %}severity-info{% endif %}">
+              {% if group.max_severity == 4 %}Critical{% elif group.max_severity == 3 %}High{% elif group.max_severity == 2 %}Medium{% elif group.max_severity == 1 %}Low{% else %}Info{% endif %}
+            </span>
+            <span style="opacity: 0.8; font-size: 8pt;">{{ group.count }} CVE/ID Entries | Max CVSS: {{ group.max_cvss }}</span>
+          </div>
+          <div class="finding-body">
+            <div class="meta-item"><b>Source:</b> VULNERS (nmap NSE)</div>
+            <table style="width:100%; border-collapse: collapse; font-size: 8pt; margin-top: 4mm;">
+              <thead>
+                <tr>
+                  <th style="text-align:left; padding: 3px 6px; border-bottom: 1px solid rgba(128,128,128,0.3);">ID / CVE</th>
+                  <th style="text-align:center; padding: 3px 6px; border-bottom: 1px solid rgba(128,128,128,0.3);">CVSS</th>
+                  <th style="text-align:center; padding: 3px 6px; border-bottom: 1px solid rgba(128,128,128,0.3);">Severity</th>
+                  <th style="text-align:left; padding: 3px 6px; border-bottom: 1px solid rgba(128,128,128,0.3);">Reference</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in group.items %}
+                <tr>
+                  <td style="padding: 3px 6px; font-family: monospace; word-break: break-all;">{{ item.name }}</td>
+                  <td style="text-align:center; padding: 3px 6px;">{{ item.cvss_score|default:"N/A" }}</td>
+                  <td style="text-align:center; padding: 3px 6px;">
+                    {% if item.severity == 4 %}Critical{% elif item.severity == 3 %}High{% elif item.severity == 2 %}Medium{% elif item.severity == 1 %}Low{% else %}Info{% endif %}
+                  </td>
+                  <td style="padding: 3px 6px; word-break: break-all;">
+                    {% for ref in item.references.all %}
+                      {{ ref.url|truncatechars:70 }}{% if not forloop.last %}, {% endif %}
+                    {% endfor %}
+                  </td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        {% endfor %}
+        {% endif %}
     </article>
     {% endif %}
-    
+
     <!-- Attack Surface Map -->
     {% if attack_surface_map_image %}
     <article class="page-break" id="attack-surface-map">

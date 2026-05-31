@@ -215,7 +215,7 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                 NO SCREENSHOTS CAPTURED
               </Typography>
               <Typography sx={{ color: 'rgba(255,255,255,0.15)', fontSize: '0.65rem', mt: 1 }}>
-                EyeWitness did not produce any results for this scan, or the task has not completed yet.
+                Playwright screenshot capture produced no results for this scan, or the task has not completed yet.
               </Typography>
             </Box>
           )}

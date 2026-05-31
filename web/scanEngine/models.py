@@ -106,6 +106,7 @@ class Proxy(models.Model):
     use_proxy = models.BooleanField(default=False)
     proxies = models.TextField(blank=True, null=True)
     use_proxychains = models.BooleanField(default=False)
+    use_tor = models.BooleanField(default=False)
 
 
 class OpSec(models.Model):
@@ -180,9 +181,9 @@ class InstalledExternalTool(models.Model):
     description = models.CharField(max_length=2000)
     github_url = models.CharField(max_length=500)
     license_url = models.CharField(max_length=500, null=True, blank=True)
-    version_lookup_command = models.CharField(max_length=200, null=True, blank=True)
-    update_command = models.CharField(max_length=200, null=True, blank=True)
-    install_command = models.CharField(max_length=200)
+    version_lookup_command = models.CharField(max_length=500, null=True, blank=True)
+    update_command = models.CharField(max_length=500, null=True, blank=True)
+    install_command = models.CharField(max_length=500)
     version_match_regex = models.CharField(max_length=100, default='[vV]*(\d+\.)?(\d+\.)?(\*|\d+)', null=True, blank=True)
     is_default = models.BooleanField(default=False)
     is_subdomain_gathering = models.BooleanField(default=False)

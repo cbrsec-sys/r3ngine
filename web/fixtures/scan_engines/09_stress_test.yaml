@@ -1,0 +1,18 @@
+- model: scanEngine.enginetype
+  pk: 9
+  fields:
+    engine_name: Adaptive Stress & Resilience Engine
+    default_engine: true
+    yaml_configuration: |
+      stress_test:
+        crawl_targets: false
+        uses_tools:
+          - k6
+          - wrk
+          - hping3
+          - locust
+        concurrency: 100
+        duration: 30s
+        rate_limit: 150
+        kill_switch: true
+        intensity: normal

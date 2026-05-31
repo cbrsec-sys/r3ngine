@@ -14,7 +14,7 @@ class ScanHistoryViewSet(viewsets.ModelViewSet):
     serializer_class = ScanHistorySerializer
 
     def get_queryset(self):
-        queryset = ScanHistory.objects.all().order_by('-id')
+        queryset = ScanHistory.objects.prefetch_related('scanactivity_set').order_by('-id')
         project = self.request.query_params.get('project')
         target_id = self.request.query_params.get('target_id')
         if project:

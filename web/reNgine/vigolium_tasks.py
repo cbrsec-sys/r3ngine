@@ -69,6 +69,13 @@ def parse_vigolium_finding(task_instance, finding_data, subdomain):
     if isinstance(tags, str):
         tags = [tags]
 
+    extracted = finding_data.get('extracted_results') or []
+    if isinstance(extracted, str):
+        extracted = [extracted]
+
+    raw_cvss = finding_data.get('cvss_score')
+    cvss_score = float(raw_cvss) if raw_cvss else None
+
     save_vulnerability(
         target_domain=task_instance.domain,
         http_url=http_url,
@@ -82,6 +89,8 @@ def parse_vigolium_finding(task_instance, finding_data, subdomain):
         curl_command='',
         request=finding_data.get('request', ''),
         response=finding_data.get('response', ''),
+        extracted_results=extracted or None,
+        cvss_score=cvss_score,
         tags=tags,
         cve_ids=[],
         references=[],
@@ -174,7 +183,7 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
     strategy = vig_config.get(VIGOLIUM_STRATEGY, 'balanced')
     concurrency = vig_config.get(VIGOLIUM_CONCURRENCY, 50)
     rate_limit = vig_config.get(VIGOLIUM_RATE_LIMIT, 100)
-    timeout = vig_config.get(VIGOLIUM_TIMEOUT, '15s')
+    timeout = vig_config.get(VIGOLIUM_TIMEOUT, '300s')
     modules = vig_config.get(VIGOLIUM_MODULES, [])
     severity_filter = vig_config.get(VIGOLIUM_SEVERITY_FILTER, [])
 
@@ -182,7 +191,10 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
         target_urls = urls
     else:
         from reNgine.common_func import get_http_urls
-        target_urls = get_http_urls(self.scan_id)
+        target_urls = get_http_urls(ctx={
+            'scan_history_id': self.scan_id,
+            'domain_id': getattr(self, 'domain_id', None),
+        })
 
     if not target_urls:
         if self.scan and self.scan.domain:

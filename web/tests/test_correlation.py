@@ -1,6 +1,6 @@
 import os
-import unittest
 import django
+from django.test import TestCase
 from django.utils import timezone
 
 # Setup Django environment
@@ -11,7 +11,7 @@ django.setup()
 from startScan.models import *
 from reNgine.correlation import VulnerabilityCorrelationEngine
 
-class TestVulnerabilityCorrelation(unittest.TestCase):
+class TestVulnerabilityCorrelation(TestCase):
     def setUp(self):
         # Setup basic data
         self.domain, _ = Domain.objects.get_or_create(name='test-correlation.com')

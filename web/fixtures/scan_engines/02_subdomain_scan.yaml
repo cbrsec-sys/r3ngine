@@ -1,0 +1,27 @@
+- model: scanEngine.enginetype
+  pk: 2
+  fields:
+    engine_name: Subdomain Scan
+    default_engine: true
+    yaml_configuration: |
+      subdomain_discovery:
+        uses_tools:
+          - subfinder
+          - ctfr
+          - sublist3r
+          - tlsx
+          - oneforall
+          - netlas
+          - chaos
+          - baddns
+        enable_http_crawl: true
+        threads: 30
+        timeout: 5
+      http_crawl: {}
+      dns_security:
+        enable_axfr: true
+        enable_dnssec_check: true
+        enable_dns_brute: false
+        amplification_threshold: 10
+      spiderfoot_scan:
+        modules: all

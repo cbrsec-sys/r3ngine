@@ -45,7 +45,6 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/owasp-amass/amass/v4/...@v4.2.0 && \
     go install -ldflags="-s -w" -v github.com/ffuf/ffuf/v2@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest && \
-    go install -ldflags="-s -w" -v github.com/hahwul/dalfox/v2@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/katana/cmd/katana@latest && \
     go install -ldflags="-s -w" -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest && \
     go install -ldflags="-s -w" -v github.com/sa7mon/s3scanner@b6c26d67bc2abe346555dd7010e6065889d66039 && \
@@ -195,12 +194,18 @@ RUN apt-get update -y && \
     hping3 \
     wrk \
     postgresql-client \
+    # Network protocol enumeration tools
+    onesixtyone \
+    snmp \
+    ldap-utils \
+    dnsutils \
     # Utilities
     jq \
     unzip \
     geoip-bin \
     geoip-database \
     patch \
+    bsdmainutils \
     # Build tools — required by pip (C extensions) and gem installs
     build-essential \
     cmake \
@@ -261,6 +266,13 @@ RUN ARCH=$(dpkg --print-architecture) && \
 # Brutus — HTTP brute force tool
 RUN curl -L https://github.com/praetorian-inc/brutus/releases/latest/download/brutus-linux-amd64.tar.gz | \
     tar xz && mv brutus /usr/local/bin/
+
+# Dalfox v3 — XSS scanner (Rust rewrite; replaces Go v2 hahwul/dalfox/v2)
+RUN ARCH=$(dpkg --print-architecture | sed 's/amd64/x86_64/;s/arm64/aarch64/') && \
+    DALFOX_VERSION="3.0.0" && \
+    curl -fsSL "https://github.com/hahwul/dalfox/releases/download/v${DALFOX_VERSION}/dalfox-v${DALFOX_VERSION}-linux-${ARCH}.tar.gz" \
+      | tar -xz -C /tmp/ && \
+    install -m755 "$(find /tmp -maxdepth 2 -name dalfox -type f | head -1)" /usr/local/bin/dalfox
 
 # Aquatone — visual recon / screenshot tool (needs Chromium at runtime)
 RUN ARCH=$(dpkg --print-architecture) && \
@@ -335,6 +347,14 @@ RUN git clone --depth 1 https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/C
     pip3 install --no-cache-dir -r /usr/src/github/CMSeeK/requirements.txt && \
     rm -rf /usr/src/github/CMSeeK/.git
 
+RUN git clone --depth 1 https://github.com/drwetter/testssl.sh /usr/src/github/testssl.sh && \
+    chmod +x /usr/src/github/testssl.sh/testssl.sh && \
+    ln -sf /usr/src/github/testssl.sh/testssl.sh /usr/local/bin/testssl.sh
+
+RUN git clone --depth 1 https://github.com/ticarpi/jwt_tool /usr/src/github/jwt_tool && \
+    pip3 install --no-cache-dir -r /usr/src/github/jwt_tool/requirements.txt && \
+    rm -rf /usr/src/github/jwt_tool/.git
+
 # ---------------------------------------------------------------------------
 # Install Python security tools via pip (no source clone needed)
 #
@@ -344,6 +364,21 @@ RUN git clone --depth 1 https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/C
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel pyOpenSSL h8mail && \
     pip3 install --no-cache-dir semgrep && \
     pip3 install --no-cache-dir --upgrade meson ninja arjun inql netlas holehe maigret dirsearch
+
+RUN git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop \
+    && pip3 install --no-cache-dir -r /usr/src/github/graphql-cop/requirements.txt \
+    && rm -rf /usr/src/github/graphql-cop/.git
+
+RUN git clone --depth 1 https://github.com/cddmp/enum4linux-ng /usr/src/github/enum4linux-ng \
+    && pip3 install --no-cache-dir -r /usr/src/github/enum4linux-ng/requirements.txt \
+    && ln -sf /usr/src/github/enum4linux-ng/enum4linux-ng.py /usr/local/bin/enum4linux-ng \
+    && rm -rf /usr/src/github/enum4linux-ng/.git
+
+RUN git clone --depth 1 https://github.com/CiscoCXSecurity/rdp-sec-check /usr/src/github/rdp-sec-check \
+    && cpan install Encoding::BER \
+    && ln -sf /usr/src/github/rdp-sec-check/rdp-sec-check.pl /usr/local/bin/rdp-sec-check
+
+RUN pip3 install --no-cache-dir dnsrecon fierce
 
 RUN python3 -m pip install --no-cache-dir pipx && \
     pipx install git+https://github.com/blacklanternsecurity/baddns

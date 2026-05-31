@@ -29,15 +29,6 @@ class ProjectSerializer(serializers.ModelSerializer):
 			return naturaltime(obj.insert_date).title()
 
 
-class ScreenshotSerializer(serializers.ModelSerializer):
-	subdomain_name = serializers.CharField(source='subdomain.name', read_only=True)
-	
-	class Meta:
-		model = Screenshot
-		fields = '__all__'
-
-
-
 class EngineTypeSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = EngineType
@@ -134,6 +125,19 @@ class SearchHistorySerializer(serializers.ModelSerializer):
 	class Meta:
 		model = SearchHistory
 		fields = ['query']
+
+
+class MobilePushTokenSerializer(serializers.ModelSerializer):
+	"""
+	Serializer for MobilePushToken model.
+	Used by RegisterPushTokenView to accept and return token registration data.
+	The `user` field is automatically set from the authenticated request user.
+	"""
+	class Meta:
+		model = MobilePushToken
+		fields = ['id', 'token', 'device_label', 'is_active', 'created_at', 'updated_at']
+		read_only_fields = ['id', 'is_active', 'created_at', 'updated_at']
+
 
 
 class DomainSerializer(serializers.ModelSerializer):
@@ -355,6 +359,9 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 	max_severity = serializers.SerializerMethodField('get_max_severity')
 	engine_name = serializers.SerializerMethodField('get_engine_name')
 	is_spiderfoot_running = serializers.SerializerMethodField()
+	successful_task_count = serializers.SerializerMethodField()
+	failed_task_count = serializers.SerializerMethodField()
+	total_task_count = serializers.SerializerMethodField()
 
 	class Meta:
 		model = ScanHistory
@@ -381,7 +388,10 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			'max_severity',
 			'engine_name',
 			'cfg_starting_point_path',
-			'is_spiderfoot_running'
+			'is_spiderfoot_running',
+			'successful_task_count',
+			'failed_task_count',
+			'total_task_count',
 		]
 		depth = 1
 
@@ -390,6 +400,22 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			Q(name='spiderfoot_scan') | Q(title__icontains='spiderfoot'),
 			status=RUNNING_TASK
 		).exists()
+
+	def _get_cached_task_counts(self, obj):
+		cache_attr = f'_task_counts_{obj.pk}'
+		if not hasattr(self, cache_attr):
+			from api.scan_task_counts import get_task_counts
+			setattr(self, cache_attr, get_task_counts(obj))
+		return getattr(self, cache_attr)
+
+	def get_successful_task_count(self, obj):
+		return self._get_cached_task_counts(obj)[0]
+
+	def get_failed_task_count(self, obj):
+		return self._get_cached_task_counts(obj)[1]
+
+	def get_total_task_count(self, obj):
+		return self._get_cached_task_counts(obj)[2]
 
 	def get_max_severity(self, scan_history):
 		from startScan.models import Vulnerability
@@ -449,9 +475,83 @@ class OrganizationSerializer(serializers.ModelSerializer):
 class EngineSerializer(serializers.ModelSerializer):
 
 	tasks = serializers.SerializerMethodField('get_tasks')
+	configured_tools_count = serializers.SerializerMethodField('get_configured_tools_count')
 
 	def get_tasks(self, instance):
 		return instance.tasks
+
+	def get_configured_tools_count(self, instance):
+		"""
+		Calculates the total number of unique tools configured in the scan engine
+		by parsing its YAML configuration.
+
+		Args:
+			instance (EngineType): The EngineType model instance.
+
+		Returns:
+			int: The number of configured tools.
+		"""
+		if not instance.yaml_configuration:
+			return 0
+		try:
+			import yaml
+			config = yaml.safe_load(instance.yaml_configuration)
+			if not isinstance(config, dict):
+				return 0
+			tools = set()
+			boolean_tool_flags = [
+				('port_scan', 'enable_nmap'),
+				('port_scan', 'enable_network_enum'),
+				('vulnerability_scan', 'run_nuclei'),
+				('vulnerability_scan', 'run_dalfox'),
+				('vulnerability_scan', 'run_crlfuzz'),
+				('vulnerability_scan', 'run_acunetix'),
+				('vulnerability_scan', 'run_wpscan'),
+				('vulnerability_scan', 'run_s3scanner'),
+				('vulnerability_scan', 'run_vigolium'),
+				('vigolium_discovery', 'run_vigolium_discovery'),
+				('vigolium_analysis', 'run_vigolium_analysis'),
+				('firewall_vpn_scan', 'run_ike_scan'),
+				('firewall_vpn_scan', 'run_sslscan'),
+				('firewall_vpn_scan', 'enable_testssl'),
+				('firewall_vpn_scan', 'enable_crt_sh'),
+				('waf_detection', 'use_shodan'),
+				('waf_detection', 'use_censys'),
+				('waf_bypass', 'use_nuclei'),
+				('waf_bypass', 'use_benchmarking'),
+				('dir_file_fuzz', 'run_dirsearch'),
+			]
+			# Add section-level default tools
+			if 'spiderfoot_scan' in config:
+				tools.add('spiderfoot')
+			if 'screenshot' in config:
+				tools.add('playwright')
+			if 'dir_file_fuzz' in config:
+				tools.add('ffuf')
+
+			for section_name, section_data in config.items():
+				if not isinstance(section_data, dict):
+					continue
+				if 'uses_tools' in section_data and isinstance(section_data['uses_tools'], list):
+					for t in section_data['uses_tools']:
+						if isinstance(t, str):
+							tools.add(t.strip().lower())
+				if 'discover' in section_data and isinstance(section_data['discover'], list):
+					for t in section_data['discover']:
+						if isinstance(t, str):
+							tools.add(t.strip().lower())
+				if 'leaks_and_secrets' in section_data and isinstance(section_data['leaks_and_secrets'], dict):
+					for tool_name, enabled in section_data['leaks_and_secrets'].items():
+						if enabled is True:
+							tools.add(tool_name.strip().lower())
+			for section, flag in boolean_tool_flags:
+				section_data = config.get(section)
+				if isinstance(section_data, dict) and section_data.get(flag) is True:
+					clean_name = flag.replace('run_', '').replace('enable_', '').replace('use_', '')
+					tools.add(clean_name.strip().lower())
+			return len(tools)
+		except Exception:
+			return 0
 
 	class Meta:
 		model = EngineType
@@ -460,7 +560,8 @@ class EngineSerializer(serializers.ModelSerializer):
 			'default_engine',
 			'engine_name',
 			'yaml_configuration',
-			'tasks'
+			'tasks',
+			'configured_tools_count'
 		]
 
 
@@ -1082,6 +1183,7 @@ class WafBypassFindingSerializer(serializers.ModelSerializer):
 
 class ScreenshotSerializer(serializers.ModelSerializer):
 	screenshot_path = serializers.SerializerMethodField('get_screenshot_path')
+	subdomain_name = serializers.CharField(source='subdomain.name', read_only=True)
 
 	class Meta:
 		model = Screenshot
@@ -1270,7 +1372,12 @@ class ScanActivitySerializer(serializers.ModelSerializer):
 
 	class Meta:
 		model = ScanActivity
-		fields = ['id', 'title', 'name', 'time', 'status', 'domain', 'completed_ago']
+		fields = [
+			'id', 'task_uid', 'title', 'name',
+			'time', 'time_started', 'time_ended',
+			'tier', 'status', 'error_message',
+			'domain', 'completed_ago',
+		]
 
 	def get_domain_name(self, activity):
 		if activity.scan_of:

@@ -77,6 +77,22 @@ interface SubdomainsTabProps {
   onTabChange?: (index: number) => void;
 }
 
+const TASK_TIER_ORDER: string[] = [
+  // Tier 1 — Discovery
+  'subdomain_discovery', 'amass_intel_discovery', 'firewall_vpn_scan',
+  'dns_security', 'osint', 'spiderfoot_scan', 'baddns',
+  // Tier 2 — HTTP Crawl & Port Scan
+  'http_crawl', 'port_scan', 'vigolium_discovery',
+  // Tier 3 — Fetching & Screenshot
+  'fetch_url', 'screenshot',
+  // Tier 4 — Fuzzing
+  'dir_file_fuzz',
+  // Tier 5 — Analysis
+  'web_api_discovery', 'waf_detection', 'secret_scanning', 'vigolium_analysis',
+  // Tier 6 — Security Assessment
+  'vulnerability_scan', 'waf_bypass', 'brute_force_scan', 'vigolium_scan',
+];
+
 export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId, targetId, onTabChange }) => {
 
   const [page, setPage] = useState(1);
@@ -667,35 +683,38 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                     </Typography>
                   </Box>
                   <Box component="td" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px' }}>
-                    {sub.screenshot_path ? (
-                      <Box
-                        onClick={() => openLightbox(sub.screenshot_path!, sub.name)}
-                        sx={{
-                          width: 60,
-                          height: 34,
-                          borderRadius: 0.5,
-                          overflow: 'hidden',
-                          border: '1px solid rgba(255,255,255,0.1)',
-                          cursor: 'pointer',
-                          transition: 'all 0.2s',
-                          position: 'relative',
-                          '&:hover': {
-                            borderColor: '#00f3ff',
-                            transform: 'scale(1.1)',
-                            zIndex: 10,
-                            boxShadow: '0 0 15px rgba(0, 243, 255, 0.3)'
-                          }
-                        }}
-                      >
-                        <img
-                          src={`/media/${sub.screenshot_path}`}
-                          alt="preview"
-                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                        />
-                      </Box>
-                    ) : (
-                      <Typography sx={{ fontSize: '9px', color: 'rgba(255,255,255,0.15)', fontWeight: 800 }}>NO DATA</Typography>
-                    )}
+                    {(() => {
+                      const ssPath = sub.screenshot_path || sub.screenshots?.[0]?.screenshot_path || null;
+                      return ssPath ? (
+                        <Box
+                          onClick={() => openLightbox(ssPath, sub.name)}
+                          sx={{
+                            width: 60,
+                            height: 34,
+                            borderRadius: 0.5,
+                            overflow: 'hidden',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            position: 'relative',
+                            '&:hover': {
+                              borderColor: '#00f3ff',
+                              transform: 'scale(1.1)',
+                              zIndex: 10,
+                              boxShadow: '0 0 15px rgba(0, 243, 255, 0.3)'
+                            }
+                          }}
+                        >
+                          <img
+                            src={`/media/${ssPath}`}
+                            alt="preview"
+                            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                          />
+                        </Box>
+                      ) : (
+                        <Typography sx={{ fontSize: '9px', color: 'rgba(255,255,255,0.15)', fontWeight: 800 }}>NO DATA</Typography>
+                      );
+                    })()}
                   </Box>
                   <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                     <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'flex-end' }}>
@@ -870,7 +889,13 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 AVAILABLE TASKS
               </Typography>
               <FormGroup>
-                {selectedEngine.tasks.map((task: string) => (
+                {[...selectedEngine.tasks]
+                  .sort((a, b) => {
+                    const ai = TASK_TIER_ORDER.indexOf(a);
+                    const bi = TASK_TIER_ORDER.indexOf(b);
+                    return (ai === -1 ? Infinity : ai) - (bi === -1 ? Infinity : bi);
+                  })
+                  .map((task: string) => (
                   <FormControlLabel
                     key={task}
                     control={

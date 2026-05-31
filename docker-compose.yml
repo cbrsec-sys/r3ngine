@@ -69,6 +69,7 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       #- plugins_data:/usr/src/app/plugins_data
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8000:8000"
       - "5173:5173"
@@ -158,6 +159,22 @@ services:
           memory: 2G
         reservations:
           memory: 1G
+
+  tor:
+    build:
+      context: web/tor
+    image: r3ngine-tor:latest
+    container_name: tor
+    restart: "no"
+    profiles: ["tor"]
+    networks:
+      - r3ngine_network
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 64M
 
   temporal:
     image: temporalio/auto-setup:1.22.4
@@ -275,9 +292,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
+          memory: 8G
         reservations:
-          memory: 2G
+          memory: 3G
+    #memswap_limit: 9G
 
 networks:
   r3ngine_network:

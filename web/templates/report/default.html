@@ -465,7 +465,7 @@
           <li><a href="#interesting-recon-data"></a></li>
         {% endif %}
 
-        {% if all_vulnerabilities.count > 0 and show_vuln %}
+        {% if all_vulnerabilities_count > 0 and show_vuln %}
           <li><a href="#vulnerability-summary"></a></li>
         {% endif %}
 
@@ -473,7 +473,7 @@
           <li><a href="#reconnaissance-results"></a></li>
         {% endif %}
 
-        {% if all_vulnerabilities.count > 0 and show_vuln %}
+        {% if all_vulnerabilities_count > 0 and show_vuln %}
           <li><a href="#vulnerabilities-discovered"></a></li>
         {% endif %}
         {% if enable_llm_report_generation %}
@@ -671,7 +671,7 @@
     {% if show_vuln %}
       <article style="page-break-before: always" class="summary">
         <h3 id="vulnerability-summary" class="page_title">Summary of Vulnerabilities Identified</h3>
-        {% if all_vulnerabilities.count > 0 %}
+        {% if all_vulnerabilities_count > 0 %}
         <p>Listed below are the vulnerabilities identified on <span class="primary-color">{{scan_object.domain.name}}</span></p>
         <div class="table">
           <div class="row header bg-critical">
@@ -876,7 +876,7 @@
       </article>
     {% endif %}
 
-    {% if all_vulnerabilities.count > 0 and show_vuln %}
+    {% if all_vulnerabilities_count > 0 and show_vuln %}
       <article style="page-break-before: always" class="summary">
         <h3 id="vulnerabilities-discovered" class="page_title">Vulnerabilities Discovered</h3>
         <p>
@@ -1036,6 +1036,58 @@
               </div>
             {% endfor %}
           {% endfor %}
+          {% if grouped_vulners_findings %}
+          <div style="margin-top: 8mm;">
+            <h4 class="subheading" style="text-transform: uppercase; letter-spacing: 2px;">NMAP VULNERS NSE FINDINGS</h4>
+          </div>
+          {% for group in grouped_vulners_findings %}
+          <div>
+            <h4 class="content-heading" id="vuln_{{ group.group_key|slugify }}">
+              <span>{{ group.group_key }}</span>
+              {% if group.max_severity == 4 %}
+                <span style="float: right;" class="badge bg-critical">Critical</span>
+                <div class="critical-hr-line"></div>
+              {% elif group.max_severity == 3 %}
+                <span style="float: right;" class="badge bg-high">High</span>
+                <div class="high-hr-line"></div>
+              {% elif group.max_severity == 2 %}
+                <span style="float: right;" class="badge bg-medium">Medium</span>
+                <div class="medium-hr-line"></div>
+              {% elif group.max_severity == 1 %}
+                <span style="float: right;" class="badge bg-low">Low</span>
+                <div class="low-hr-line"></div>
+              {% else %}
+                <span style="float: right;" class="badge bg-info">Info</span>
+                <div class="info-hr-line"></div>
+              {% endif %}
+            </h4>
+            <span class="mini-heading">Vulnerability Source: VULNERS (nmap NSE)</span><br>
+            <span class="mini-heading">{{ group.count }} CVE/ID Entries | Max CVSS: {{ group.max_cvss }}</span><br>
+            <div class="table" style="margin-top: 6px;">
+              <div class="row header bg-info">
+                <div class="cell grey-color" style="width: 30%;">ID / CVE</div>
+                <div class="cell grey-color" style="width: 10%;">CVSS</div>
+                <div class="cell grey-color" style="width: 15%;">Severity</div>
+                <div class="cell grey-color" style="width: 45%;">Reference</div>
+              </div>
+              {% for item in group.items %}
+              <div class="row">
+                <div class="cell" style="width: 30%; font-family: monospace; word-break: break-all;">{{ item.name }}</div>
+                <div class="cell" style="width: 10%;">{{ item.cvss_score|default:"N/A" }}</div>
+                <div class="cell" style="width: 15%;">
+                  {% if item.severity == 4 %}Critical{% elif item.severity == 3 %}High{% elif item.severity == 2 %}Medium{% elif item.severity == 1 %}Low{% else %}Info{% endif %}
+                </div>
+                <div class="cell" style="width: 45%; word-break: break-all;">
+                  {% for ref in item.references.all %}
+                    {{ ref.url|truncatechars:70 }}{% if not forloop.last %}, {% endif %}
+                  {% endfor %}
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+          {% endfor %}
+          {% endif %}
         </article>
       {% endif %}
 

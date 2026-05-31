@@ -30,8 +30,8 @@ def manage_monitoring_task(domain):
     Called whenever domain.is_monitored or domain.monitor_frequency changes.
     Replaces the previous django_celery_beat PeriodicTask approach.
 
-    Also cleans up any lingering monitor_periodic_task from the pre-migration state
-    so domains that were monitored before Phase 4D are handled correctly.
+    Args:
+        domain (Domain): The target domain object.
     """
     from reNgine.temporal_schedule_utils import (
         _upsert_monitoring_temporal_schedule,
@@ -39,14 +39,6 @@ def manage_monitoring_task(domain):
     )
 
     if domain.is_monitored:
-        # Clean up legacy Celery Beat task if still present (pre-4D migration)
-        if domain.monitor_periodic_task:
-            try:
-                domain.monitor_periodic_task.delete()
-            except Exception:
-                pass
-            domain.monitor_periodic_task = None
-
         ts = _upsert_monitoring_temporal_schedule(domain)
         domain.temporal_schedule = ts
         domain.save()
@@ -55,14 +47,6 @@ def manage_monitoring_task(domain):
         if domain.temporal_schedule:
             _delete_monitoring_temporal_schedule(domain)
             domain.temporal_schedule = None
-
-        # Also clean up legacy Celery Beat task if still present
-        if domain.monitor_periodic_task:
-            try:
-                domain.monitor_periodic_task.delete()
-            except Exception:
-                pass
-            domain.monitor_periodic_task = None
 
         domain.save()
 

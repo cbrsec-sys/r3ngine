@@ -64,11 +64,10 @@ class BackendOptimizationTest(TransactionTestCase):
 
     @patch('reNgine.tasks.get_http_urls')
     @patch('reNgine.tasks.Subdomain.objects.filter')
-    @patch('reNgine.tasks.chord')
-    @patch('reNgine.tasks.nuclei_individual_severity_module')
+    @patch('reNgine.tasks.stream_command')
     @patch('reNgine.tasks.run_command')
-    def test_nuclei_tag_injection(self, mock_run_cmd, mock_nuclei_module, mock_chord, mock_subdomain_filter, mock_get_urls):
-        """Test that nuclei_scan correctly injects tags based on discovered technologies."""
+    def test_nuclei_tag_injection(self, mock_run_cmd, mock_stream, mock_subdomain_filter, mock_get_urls):
+        """Test that nuclei_scan correctly runs without restricting tags based on discovered technologies."""
         mock_sub = MagicMock()
         mock_sub.name = self.domain_name
         mock_sub.technologies.values_list.return_value = ['WordPress', 'Nginx']
@@ -82,28 +81,34 @@ class BackendOptimizationTest(TransactionTestCase):
             return [f"http://{self.domain_name}"]
         mock_get_urls.side_effect = get_urls_side_effect
         
+        # mock stream_command to yield nothing
+        mock_stream.return_value = iter([])
+        
         task_instance = MagicMock()
         task_instance.scan = self.scan
         task_instance.scan_id = self.scan.id
+        task_instance.activity_id = None
         task_instance.results_dir = self.results_dir
+        task_instance.starting_point_path = ""
         task_instance.yaml_configuration = self.ctx['yaml_configuration']
         
-        actual_func = getattr(nuclei_scan.run, '__func__', getattr(nuclei_scan, '__wrapped__', nuclei_scan))
+        actual_func = getattr(nuclei_scan, 'run', getattr(nuclei_scan, '__wrapped__', nuclei_scan))
         # Signature: (self, urls=[], ctx={}, description=None)
         actual_func(task_instance, [f"http://{self.domain_name}"], self.ctx)
         
-        self.assertTrue(mock_nuclei_module.apply.called)
-        kwargs = mock_nuclei_module.apply.call_args[1]['kwargs']
-        cmd = kwargs['cmd']
+        self.assertTrue(mock_stream.called)
+        cmd = mock_stream.call_args[0][0]
         self.assertIn('-tags', cmd)
-        self.assertIn('wordpress', cmd)
+        # Tech tags are intentionally disabled to ensure nuclei scans look for everything (full template coverage)
+        self.assertNotIn('wordpress', cmd)
 
+    @patch('reNgine.tasks.http_crawl')
     @patch('reNgine.fuzzing_tasks.Redis')
     @patch('reNgine.fuzzing_tasks.get_http_urls')
     @patch('reNgine.common_func.get_http_urls')
     @patch('reNgine.fuzzing_tasks.stream_command')
     @patch('reNgine.fuzzing_tasks.run_command')
-    def test_dir_file_fuzz_deduplication(self, mock_run, mock_stream, mock_get_urls_common, mock_get_urls_fuzz, mock_redis_cls):
+    def test_dir_file_fuzz_deduplication(self, mock_run, mock_stream, mock_get_urls_common, mock_get_urls_fuzz, mock_redis_cls, mock_http_crawl):
         """Test that dir_file_fuzz correctly merges and deduplicates results from ffuf and dirsearch."""
         mock_redis = MagicMock()
         mock_redis_cls.from_url.return_value = mock_redis
@@ -144,13 +149,15 @@ class BackendOptimizationTest(TransactionTestCase):
         mock_stream.side_effect = stream_side_effect
         mock_run.side_effect = run_side_effect
         
-        actual_func = getattr(dir_file_fuzz.run, '__func__', getattr(dir_file_fuzz, '__wrapped__', dir_file_fuzz))
+        actual_func = getattr(dir_file_fuzz, 'run', getattr(dir_file_fuzz, '__wrapped__', dir_file_fuzz))
         
         task_instance = MagicMock()
         task_instance.scan = self.scan
         task_instance.scan_id = self.scan.id
+        task_instance.activity_id = None
         task_instance.results_dir = self.results_dir
         task_instance.history_file = "/tmp/history.txt"
+        task_instance.starting_point_path = ""
         task_instance.subscan = None
         task_instance.yaml_configuration = {
             'fuzzing': {
@@ -178,13 +185,15 @@ class BackendOptimizationTest(TransactionTestCase):
         
         mock_run.side_effect = run_side_effect
         
-        actual_func = getattr(amass_intel_discovery.run, '__func__', getattr(amass_intel_discovery, '__wrapped__', amass_intel_discovery))
+        actual_func = getattr(amass_intel_discovery, 'run', getattr(amass_intel_discovery, '__wrapped__', amass_intel_discovery))
         
         task_instance = MagicMock()
         task_instance.scan = self.scan
         task_instance.scan_id = self.scan.id
+        task_instance.activity_id = None
         task_instance.domain = self.domain
         task_instance.results_dir = self.results_dir
+        task_instance.starting_point_path = ""
         task_instance.yaml_configuration = {}
         
         # Signature: (self, host, ctx={}, description=None)

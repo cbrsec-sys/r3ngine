@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
-import { useProxySettings, useUpdateProxySettings, useFetchProxies, useProxyTaskStatus } from '../api';
+import { useProxySettings, useUpdateProxySettings, useFetchProxies, useProxyTaskStatus, useTorStatus } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 
 export const ProxySettingsPage: React.FC = () => {
@@ -42,6 +42,8 @@ export const ProxySettingsPage: React.FC = () => {
   const [fetchLimit, setFetchLimit] = useState<number | 'custom'>(1000);
   const [customLimit, setCustomLimit] = useState<string>('2000');
   const [validateOnSave, setValidateOnSave] = useState(false);
+  const [useTor, setUseTor] = useState(false);
+  const { data: torStatus } = useTorStatus();
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
     message: string;
@@ -59,6 +61,7 @@ export const ProxySettingsPage: React.FC = () => {
       setUseProxy(settings.use_proxy);
       setUseProxychains(settings.use_proxychains);
       setProxyList(settings.proxies);
+      setUseTor(settings.use_tor ?? false);
     }
   }, [settings]);
 
@@ -93,7 +96,8 @@ export const ProxySettingsPage: React.FC = () => {
       use_proxy: useProxy,
       use_proxychains: useProxychains,
       proxies: proxyList,
-      skip_validation: !validateOnSave
+      skip_validation: !validateOnSave,
+      use_tor: useTor
     }, {
       onSuccess: () => {
         setSnackbar({
@@ -173,14 +177,14 @@ export const ProxySettingsPage: React.FC = () => {
           <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', display: 'block', mb: 1 }}>
             SETTINGS {'>'} <span style={{ color: '#00f3ff' }}>PROXY</span>
           </Typography>
-          <Box sx={{ 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            bgcolor: 'rgba(0, 243, 255, 0.1)', 
-            px: 1.5, 
-            py: 0.5, 
-            borderRadius: 1, 
-            border: '1px solid rgba(0, 243, 255, 0.3)' 
+          <Box sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            bgcolor: 'rgba(0, 243, 255, 0.1)',
+            px: 1.5,
+            py: 0.5,
+            borderRadius: 1,
+            border: '1px solid rgba(0, 243, 255, 0.3)'
           }}>
             <Typography variant="caption" sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontWeight: 700, letterSpacing: 1 }}>
               TOTAL PROXIES: {proxyList.split('\n').filter(p => p.trim() !== '').length}
@@ -265,7 +269,7 @@ export const ProxySettingsPage: React.FC = () => {
                   AUTOMATED PROXY FETCH LIMIT
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
-                  Select the maximum number of raw proxies to scrape and check for liveness. (Note: It may take a while to complete. Validation rate: +-1/3%)
+                  Select the maximum number of raw proxies to scrape and check for liveness. (Note: It may take a while to complete [~75000/10m:00s]. Validation rate: ~1/3%)
                 </Typography>
               </Box>
 
@@ -448,6 +452,56 @@ export const ProxySettingsPage: React.FC = () => {
             </Box>
           </Box>
         </TacticalPanel>
+
+        {/* TOR Mode */}
+        <Card variant="outlined" sx={{ mt: 2 }}>
+          <CardContent>
+            <Stack direction="row" sx={{ alignItems: 'center', mb: 1 }} spacing={1}>
+              <Shield size={18} />
+              <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>
+                TOR Mode
+              </Typography>
+              <Box
+                sx={{
+                  ml: 1,
+                  px: 1,
+                  py: 0.25,
+                  borderRadius: 1,
+                  bgcolor: torStatus?.running ? 'success.main' : 'grey.600',
+                  color: 'white',
+                  fontSize: '0.7rem',
+                  fontWeight: 'bold',
+                }}
+              >
+                {torStatus?.running ? 'RUNNING' : 'STOPPED'}
+              </Box>
+            </Stack>
+
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              TOR Mode routes all scanning traffic through the TOR network.
+              Tools using raw sockets (naabu) will log a warning but run
+              without TOR routing. Scanning will be significantly slower than normal.
+            </Alert>
+
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={useTor}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setUseTor(checked);
+                    if (checked) {
+                      setUseProxy(false);
+                      setUseProxychains(false);
+                    }
+                  }}
+                  color="warning"
+                />
+              }
+              label="Enable TOR Mode"
+            />
+          </CardContent>
+        </Card>
       </Stack>
 
       <ConfirmDialog
