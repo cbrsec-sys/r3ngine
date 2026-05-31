@@ -258,7 +258,6 @@ services:
     restart: always
     init: true
     entrypoint: /usr/src/app/executor-entrypoint.sh
-    memswap_limit: 8g
     environment:
       - TEMPORAL_HOST=temporal:7233
       - TEMPORAL_NAMESPACE=default
@@ -293,9 +292,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 12G
+          memory: 8G
         reservations:
           memory: 4G
+    #memswap_limit: 9G
 
 networks:
   r3ngine_network:
