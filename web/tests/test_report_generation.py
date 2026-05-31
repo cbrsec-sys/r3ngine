@@ -1,6 +1,6 @@
 import os
 from unittest.mock import patch, MagicMock
-from django.test import TransactionTestCase
+from django.test import TestCase, TransactionTestCase
 from django.utils import timezone
 
 from reNgine.report_tasks import generate_report_task
@@ -176,9 +176,69 @@ class ReportGenerationTest(TransactionTestCase):
         
         # Avg P95: (25.0 + 30.0) / 2 = 27.5
         self.assertIn("27.5", rendered_html)
-        
+
         # Verify individual results are rendered
         self.assertIn("wrk", rendered_html)
         self.assertIn("k6", rendered_html)
         self.assertIn("45.0ms", rendered_html) # P99 for wrk
         self.assertIn("35.0ms", rendered_html) # P99 for k6
+
+
+class VulnersReportGroupingTest(TestCase):
+    def setUp(self):
+        from scanEngine.models import EngineType
+        from startScan.models import Domain, ScanHistory, Vulnerability
+        engine = EngineType.objects.create(engine_name='Test Engine', yaml_configuration='')
+        domain = Domain.objects.create(name='report-test.com')
+        scan = ScanHistory.objects.create(
+            domain=domain,
+            scan_type=engine,
+            scan_status=2,
+            start_scan_date='2026-01-01T00:00:00Z'
+        )
+        # Create vulners vulns with same group_key
+        for hash_id, cvss in [('HASH-A', 9.8), ('CVE-2026-1234', 7.5), ('HASH-B', 9.8)]:
+            Vulnerability.objects.create(
+                scan_history=scan,
+                target_domain=domain,
+                name=f'Exim smtpd 4.99.2 ({hash_id})',
+                severity=4 if cvss >= 9 else 3,
+                source='VULNERS',
+                group_key='Exim smtpd 4.99.2',
+                cvss_score=cvss,
+                http_url='mail.report-test.com:465'
+            )
+        # Create non-vulners vuln
+        Vulnerability.objects.create(
+            scan_history=scan,
+            target_domain=domain,
+            name='SQL Injection',
+            severity=4,
+            source='nuclei',
+            cvss_score=9.0,
+            http_url='http://report-test.com/login'
+        )
+        self.scan = scan
+
+    def test_build_vuln_context_separates_vulners(self):
+        """build_vuln_context must separate vulners from other vulns and group by group_key."""
+        from reNgine.report_tasks import build_vuln_context
+        ctx = build_vuln_context(self.scan, ignore_info=False)
+
+        # Non-vulners in all_vulnerabilities
+        all_names = [v.name for v in ctx['all_vulnerabilities']]
+        self.assertIn('SQL Injection', all_names)
+        self.assertNotIn('Exim smtpd 4.99.2 (HASH-A)', all_names)
+
+        # Vulners in grouped_vulners_findings
+        self.assertEqual(len(ctx['grouped_vulners_findings']), 1)
+        group = ctx['grouped_vulners_findings'][0]
+        self.assertEqual(group['group_key'], 'Exim smtpd 4.99.2')
+        self.assertEqual(group['count'], 3)
+        self.assertEqual(group['max_severity'], 4)
+
+    def test_build_vuln_context_total_count(self):
+        """all_vulnerabilities_count must be total (vulners + non-vulners)."""
+        from reNgine.report_tasks import build_vuln_context
+        ctx = build_vuln_context(self.scan, ignore_info=False)
+        self.assertEqual(ctx['all_vulnerabilities_count'], 4)  # 3 vulners + 1 nuclei
