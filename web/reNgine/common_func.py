@@ -17,7 +17,7 @@ import xmltodict
 
 from time import sleep
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 import logging as _logging
 get_task_logger = _logging.getLogger
 from discord_webhook import DiscordEmbed, DiscordWebhook
@@ -485,6 +485,20 @@ def sanitize_url(http_url):
 		url = url._replace(scheme=url.scheme.replace('http', 'https'))
 		url = url._replace(netloc=url.netloc.replace(':443', ''))
 	return url.geturl().rstrip('/')
+
+def url_param_signature(url):
+	"""Return a dedup key based on scheme, netloc, path, and sorted param names (ignoring values).
+
+	Two URLs sharing the same signature differ only in parameter values (e.g. ?id=1 vs ?id=2)
+	and can be treated as the same functional endpoint for load-reduction purposes.
+	"""
+	try:
+		parsed = urlparse(url)
+		param_keys = ','.join(sorted(parse_qs(parsed.query).keys()))
+		return f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{param_keys}"
+	except Exception:
+		return url
+
 
 def extract_path_from_url(url):
 	parsed_url = urlparse(url)
