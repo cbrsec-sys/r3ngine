@@ -120,25 +120,28 @@ fi
 
 # edoardottt/missing-cve-nuclei-templates — ~64k CVEs absent from the official set
 # Covers XSS (22k), SQLi (12k), DoS (15k), RCE (3k), Path Traversal, SSRF, LFI, XXE, SSTI
-if [ ! -d "/root/nuclei-templates/missing-cve" ]; then
+echo "Checking for missing-cve nuclei templates"
+if [ ! -d "~/nuclei-templates/missing-cve" ]; then
   echo "Installing missing-cve nuclei templates (~64k additional CVEs)"
   git clone --depth 1 https://github.com/edoardottt/missing-cve-nuclei-templates.git \
-    /root/nuclei-templates/missing-cve
+    ~/nuclei-templates/missing-cve
 fi
 
 # emadshanab/Nuclei-Templates-Collection — aggregates 400+ community repos
 # Includes Log4Shell, Spring RCE, F5, WAF detection, Kubernetes, SAP, Oracle, WebSphere
-if [ ! -d "/root/nuclei-templates/community-collection" ]; then
+echo "Checking for Nuclei Templates Collection (400+ community repos)"
+if [ ! -d "~/nuclei-templates/community-collection" ]; then
   echo "Installing Nuclei Templates Collection (400+ community repos)"
   git clone --depth 1 https://github.com/emadshanab/Nuclei-Templates-Collection.git \
-    /root/nuclei-templates/community-collection
+    ~/nuclei-templates/community-collection
 fi
 
 # 0xKayala/Custom-Nuclei-Templates — bug-bounty focused custom templates
-if [ ! -d "/root/nuclei-templates/kayala-custom" ]; then
+  echo "Checking for 0xKayala custom nuclei templates"
+if [ ! -d "~/nuclei-templates/kayala-custom" ]; then
   echo "Installing 0xKayala custom nuclei templates"
   git clone --depth 1 https://github.com/0xKayala/Custom-Nuclei-Templates.git \
-    /root/nuclei-templates/kayala-custom
+    ~/nuclei-templates/kayala-custom
 fi
 
 echo "Starting Temporal Go Executor..."
