@@ -2534,7 +2534,7 @@ def nmap(
 			scan_history=self.scan,
 			subscan=self.subscan,
 			endpoint=endpoint,
-			dedup_fields=['name', 'http_url', 'scan_history'],
+			dedup_fields=['name', 'subdomain', 'scan_history'],
 			**vuln_data)
 		vulns_str += f'• {str(vuln)}\n'
 		if created:
@@ -5118,7 +5118,8 @@ def parse_nmap_vulners_output(script_output, url='', service_title=''):
 				'references': [vuln_url],
 				'cve_ids': [],
 				'cwe_ids': [],
-				'tags': tags
+				'tags': tags,
+				'group_key': service_title
 			}
 
 			# If it's a CVE, try to enrich it with cve_to_vuln
@@ -5134,7 +5135,8 @@ def parse_nmap_vulners_output(script_output, url='', service_title=''):
 						vuln['tags'] = []
 					vuln['tags'].extend(old_tags)
 					vuln['tags'] = list(set(vuln['tags']))
-					
+					vuln['group_key'] = service_title  # preserve group_key after CVE enrichment overwrites
+
 					# Improve name if service_title is present
 					if service_title:
 						# If enriched name is just the CVE, use service title
