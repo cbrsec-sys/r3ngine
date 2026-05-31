@@ -473,7 +473,11 @@ def sanitize_url(http_url):
 	# Check if the URL has a scheme. If not, add a temporary one to prevent empty netloc.
 	if "://" not in http_url:
 		http_url = "http://" + http_url
-	url = urlparse(http_url)
+	try:
+		url = urlparse(http_url)
+	except ValueError:
+		# Python 3.10+ raises ValueError for malformed bracket hosts (e.g. http://[]/path).
+		return http_url.rstrip('/')
 
 	if url.netloc.endswith(':80'):
 		url = url._replace(netloc=url.netloc.replace(':80', ''))
