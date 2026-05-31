@@ -258,7 +258,6 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 				logger.warning(f'ffuf command: {fcmd}')
 
 				if parse_only is not None and target_url in parse_only.get('ffuf', {}):
-					import json
 					ffuf_stdout = parse_only['ffuf'][target_url]
 					line_source = []
 					for raw_line in ffuf_stdout.splitlines():
