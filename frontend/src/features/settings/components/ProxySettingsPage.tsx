@@ -177,14 +177,14 @@ export const ProxySettingsPage: React.FC = () => {
           <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', display: 'block', mb: 1 }}>
             SETTINGS {'>'} <span style={{ color: '#00f3ff' }}>PROXY</span>
           </Typography>
-          <Box sx={{ 
-            display: 'inline-flex', 
-            alignItems: 'center', 
-            bgcolor: 'rgba(0, 243, 255, 0.1)', 
-            px: 1.5, 
-            py: 0.5, 
-            borderRadius: 1, 
-            border: '1px solid rgba(0, 243, 255, 0.3)' 
+          <Box sx={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            bgcolor: 'rgba(0, 243, 255, 0.1)',
+            px: 1.5,
+            py: 0.5,
+            borderRadius: 1,
+            border: '1px solid rgba(0, 243, 255, 0.3)'
           }}>
             <Typography variant="caption" sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontWeight: 700, letterSpacing: 1 }}>
               TOTAL PROXIES: {proxyList.split('\n').filter(p => p.trim() !== '').length}
@@ -269,7 +269,7 @@ export const ProxySettingsPage: React.FC = () => {
                   AUTOMATED PROXY FETCH LIMIT
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
-                  Select the maximum number of raw proxies to scrape and check for liveness. (Note: It may take a while to complete. Validation rate: +-1/3%)
+                  Select the maximum number of raw proxies to scrape and check for liveness. (Note: It may take a while to complete [~75000/10m:00s]. Validation rate: ~1/3%)
                 </Typography>
               </Box>
 
