@@ -227,3 +227,125 @@ class TestTemporalOrchestration(TestCase):
         # Verify all subscans have same workflow ID stored
         for subscan in subscans:
             self.assertEqual(subscan.workflow_ids, ['mock-multi-subscan-workflow-id'])
+
+
+class TestWorkflowStructuralInvariants(TestCase):
+    """AST-level checks that enforce structural guarantees introduced by:
+
+    1. Tier 6 sequential-nuclei fix (FIXES.md Fix 2): NucleiPlannerWorkflow
+       must not be inside asyncio.gather with other T6 activities.
+    2. MasterScanWorkflow finally-block alignment: Tier 7 activities must live
+       inside the finally block, guarded by 'if success:'.
+
+    These tests fail fast if a code change accidentally reverts the fixes.
+    No Temporal server or Django ORM is required — they inspect source only.
+    """
+
+    _SOURCE_PATH = "reNgine/temporal_workflows.py"
+
+    @classmethod
+    def _source(cls):
+        with open(cls._SOURCE_PATH) as f:
+            return f.read()
+
+    def test_masterscan_vulnerability_scan_not_in_assessment_futures(self):
+        """NucleiPlannerWorkflow must NOT be appended to assessment_futures.
+
+        Placing the child workflow handle inside assessment_futures means it
+        would be gathered concurrently with waf_bypass / brute_force_scan.
+        If those activities fail, asyncio.gather cannot cancel the Temporal
+        child workflow, causing it to run unmanaged (orphaned).
+        """
+        import ast
+        source = self._source()
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == "MasterScanWorkflow":
+                for item in ast.walk(node):
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == "run":
+                        method_src = ast.get_source_segment(source, item) or ""
+                        self.assertNotIn(
+                            "assessment_futures.append",
+                            method_src,
+                            "vulnerability_scan (NucleiPlannerWorkflow) must not be "
+                            "inside assessment_futures — it must be awaited sequentially "
+                            "before the concurrent gather of other T6 activities."
+                        )
+                        return
+        self.fail("MasterScanWorkflow.run() not found in temporal_workflows.py")
+
+    def test_subscan_nuclei_future_variable_present(self):
+        """SubScanWorkflow tier loop must declare 'nuclei_future' to separate
+        vulnerability_scan from the concurrent tier_futures gather."""
+        self.assertIn(
+            "nuclei_future",
+            self._source(),
+            "SubScanWorkflow Tier 6 fix must introduce 'nuclei_future' variable "
+            "to hold the vulnerability_scan coroutine separately from tier_futures."
+        )
+
+    def test_subscan_nuclei_awaited_before_tier_futures_gather(self):
+        """'await nuclei_future' must appear before 'await asyncio.gather(*tier_futures)'.
+
+        This ordering guarantees NucleiPlannerWorkflow completes before any
+        concurrent T6 activity can raise — preventing the orphaned-child scenario.
+        """
+        source = self._source()
+        nuclei_idx = source.find("await nuclei_future")
+        gather_idx = source.find("await asyncio.gather(*tier_futures)")
+        self.assertGreater(nuclei_idx, 0,
+                           "'await nuclei_future' not found in temporal_workflows.py")
+        self.assertGreater(gather_idx, 0,
+                           "'await asyncio.gather(*tier_futures)' not found")
+        self.assertLess(
+            nuclei_idx, gather_idx,
+            "'await nuclei_future' must appear before 'await asyncio.gather(*tier_futures)' "
+            "in the SubScanWorkflow tier loop."
+        )
+
+    def test_masterscan_has_success_flag(self):
+        """MasterScanWorkflow.run() must declare 'success' and set it True/False."""
+        import ast
+        source = self._source()
+        tree = ast.parse(source)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == "MasterScanWorkflow":
+                for item in ast.walk(node):
+                    if isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)) and item.name == "run":
+                        method_src = ast.get_source_segment(source, item) or ""
+                        self.assertIn("success = True", method_src,
+                                      "MasterScanWorkflow.run() must set 'success = True'")
+                        self.assertIn("success = False", method_src,
+                                      "MasterScanWorkflow.run() must initialise 'success = False'")
+                        return
+        self.fail("MasterScanWorkflow.run() not found in temporal_workflows.py")
+
+    def test_masterscan_correlate_activity_in_finally_block(self):
+        """CorrelateVulnerabilitiesActivity must appear inside a finally: block
+        in MasterScanWorkflow.run(), not inline in the try: body."""
+        import ast
+        source = self._source()
+        tree = ast.parse(source)
+
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == "MasterScanWorkflow":
+                for item in ast.walk(node):
+                    if not isinstance(item, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                        continue
+                    if item.name != "run":
+                        continue
+                    for try_node in ast.walk(item):
+                        if not isinstance(try_node, ast.Try):
+                            continue
+                        finally_src = "".join(
+                            ast.get_source_segment(source, stmt) or ""
+                            for stmt in try_node.finalbody
+                        )
+                        if "CorrelateVulnerabilitiesActivity" in finally_src:
+                            return  # Correct — found in finally block
+                    self.fail(
+                        "CorrelateVulnerabilitiesActivity must be inside a 'finally:' block "
+                        "in MasterScanWorkflow.run(), not inline in the try: body. "
+                        "It must be guarded by 'if success:' so it only runs on clean completion."
+                    )
+        self.fail("MasterScanWorkflow.run() not found in temporal_workflows.py")
