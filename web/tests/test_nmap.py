@@ -78,3 +78,35 @@ class NmapTestCase(TestCase):
         )
         v.refresh_from_db()
         self.assertEqual(v.group_key, 'Exim smtpd 4.99.2')
+
+    def test_vulners_parser_sets_group_key(self):
+        """parse_nmap_vulners_output must set group_key equal to service_title on each vuln."""
+        from reNgine.tasks import parse_nmap_vulners_output
+        script_output = (
+            "E06430E8-210A-510A-A01B-011688E27E2F\t9.8\thttps://vulners.com/githubexploit/E06430E8\t*EXPLOIT*\n"
+            "CVE-2026-45185\t9.8\thttps://vulners.com/cve/CVE-2026-45185\n"
+        )
+        results = parse_nmap_vulners_output(
+            script_output, url='target.com:465', service_title='Exim smtpd 4.99.2'
+        )
+        self.assertTrue(len(results) > 0, "Parser must return at least one result")
+        for vuln in results:
+            self.assertEqual(
+                vuln.get('group_key'), 'Exim smtpd 4.99.2',
+                f"Expected group_key='Exim smtpd 4.99.2' but got {vuln.get('group_key')!r}"
+            )
+
+    def test_vulners_dedup_uses_subdomain_not_http_url(self):
+        """Vulners dedup_fields must use subdomain not http_url (deduplicates across ports)."""
+        import inspect
+        from reNgine import tasks
+        source = inspect.getsource(tasks)
+        import re
+        # Find the dedup_fields line in the nmap vulns save loop
+        # Must NOT contain http_url in the dedup_fields for vulners
+        # The pattern should be: ['name', 'subdomain', 'scan_history']
+        nmap_dedup_pattern = r"dedup_fields=\['name',\s*'subdomain',\s*'scan_history'\]"
+        self.assertRegex(
+            source, nmap_dedup_pattern,
+            "Vulners dedup_fields must be ['name', 'subdomain', 'scan_history']"
+        )
