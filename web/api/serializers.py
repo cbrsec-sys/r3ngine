@@ -127,6 +127,19 @@ class SearchHistorySerializer(serializers.ModelSerializer):
 		fields = ['query']
 
 
+class MobilePushTokenSerializer(serializers.ModelSerializer):
+	"""
+	Serializer for MobilePushToken model.
+	Used by RegisterPushTokenView to accept and return token registration data.
+	The `user` field is automatically set from the authenticated request user.
+	"""
+	class Meta:
+		model = MobilePushToken
+		fields = ['id', 'token', 'device_label', 'is_active', 'created_at', 'updated_at']
+		read_only_fields = ['id', 'is_active', 'created_at', 'updated_at']
+
+
+
 class DomainSerializer(serializers.ModelSerializer):
 	vuln_count = serializers.SerializerMethodField()
 	subdomain_count = serializers.SerializerMethodField()

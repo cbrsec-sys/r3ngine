@@ -2012,7 +2012,87 @@ def create_inappnotification(
 		open_in_new_tab=open_in_new_tab
 	)
 	notification.save()
+
+	# Dispatch a push notification to all registered mobile devices
+	send_mobile_push_notification(
+		title=title,
+		body=description,
+		data={'notification_id': notification.id, 'status': status}
+	)
+
 	return notification
+
+
+def send_mobile_push_notification(title, body, data=None):
+	"""
+		Send a push notification to all active registered mobile devices
+		via the Expo Push Notification Service.
+
+		This function is intentionally fire-and-forget: errors are logged
+		but never re-raised so that a push failure never breaks normal
+		application flow.
+
+		Args:
+			title (str): The notification title shown on the device.
+			body (str): The notification body/description text.
+			data (dict, optional): Extra JSON payload passed to the app
+				when the user taps the notification.
+	"""
+	try:
+		# Import here to avoid circular imports; MobilePushToken lives in dashboard.models
+		from dashboard.models import MobilePushToken
+
+		# Collect all active Expo push tokens
+		tokens = list(
+			MobilePushToken.objects
+			.filter(is_active=True)
+			.values_list('token', flat=True)
+		)
+
+		if not tokens:
+			# No registered devices — nothing to do
+			return
+
+		# Build one message per token (Expo supports batching up to 100)
+		messages = [
+			{
+				'to': token,
+				'title': title,
+				'body': body,
+				'data': data or {},
+				'sound': 'default',
+				'priority': 'high',
+			}
+			for token in tokens
+		]
+
+		# Expo Push API endpoint — no auth required for Expo push tokens
+		expo_push_url = 'https://exp.host/--/api/v2/push/send'
+
+		response = requests.post(
+			expo_push_url,
+			json=messages,
+			headers={
+				'Accept': 'application/json',
+				'Accept-Encoding': 'gzip, deflate',
+				'Content-Type': 'application/json',
+			},
+			timeout=10,
+		)
+
+		result = response.json()
+		# Log any per-token errors returned by Expo
+		for ticket in result.get('data', []):
+			if ticket.get('status') == 'error':
+				logger.warning(
+					'[PushNotification] Expo push error: %s — %s',
+					ticket.get('message'),
+					ticket.get('details'),
+				)
+
+	except Exception as e:
+		# Never let a push failure crash the calling code
+		logger.error('[PushNotification] Failed to dispatch push notifications: %s', e)
 
 def get_ip_info(ip_address):
 	is_ipv4 = bool(validators.ipv4(ip_address))

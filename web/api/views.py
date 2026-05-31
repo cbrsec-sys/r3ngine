@@ -442,6 +442,48 @@ class InAppNotificationManagerViewSet(viewsets.ModelViewSet):
 		return Response(status=HTTP_204_NO_CONTENT)
 
 
+class RegisterPushTokenView(APIView):
+	"""
+	POST /mapi/push-token/register/
+
+	Registers or updates an Expo push notification token for the authenticated user.
+	Called by the mobile app on startup after the user logs in and notification
+	permissions have been granted.
+
+	Request body:
+		token (str): The Expo push token string (e.g. ExponentPushToken[xxxx]).
+		device_label (str, optional): Human-readable label for the device.
+
+	Returns 200 on success with the token record. Returns 400 if no token provided.
+	"""
+	permission_classes = [IsAuthenticated]
+
+	def post(self, request):
+		token_str = request.data.get('token', '').strip()
+		device_label = request.data.get('device_label', '').strip() or None
+
+		if not token_str:
+			return Response({'error': 'token is required'}, status=HTTP_400_BAD_REQUEST)
+
+		# Upsert: if this exact token already exists update its owner/label,
+		# otherwise create a new record. Using update_or_create on token value.
+		obj, created = MobilePushToken.objects.update_or_create(
+			token=token_str,
+			defaults={
+				'user': request.user,
+				'device_label': device_label,
+				'is_active': True,
+			}
+		)
+		return Response({
+			'id': obj.id,
+			'token': obj.token,
+			'device_label': obj.device_label,
+			'is_active': obj.is_active,
+			'created': created,
+		})
+
+
 class OllamaManager(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
