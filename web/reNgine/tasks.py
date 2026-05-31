@@ -320,6 +320,7 @@ def initiate_scan_temporal(
 			subdomain.save()
 
 		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
+		_proxy = Proxy.objects.first()
 		temporal_ctx = {
 			'scan_history_id': scan.id,
 			'engine_id': engine_id,
@@ -333,6 +334,7 @@ def initiate_scan_temporal(
 			'api_discovery_tools': api_discovery_tools,
 			'kr_wordlist': kr_wordlist,
 			'tasks': tasks,
+			'use_tor': bool(_proxy and _proxy.use_tor),
 		}
 
 		# ---- Start MasterScanWorkflow on Temporal ----
@@ -534,6 +536,7 @@ def initiate_subscan_temporal(
 			logger.warning(f"Could not send subscan start notification: {notif_err}")
 
 		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
+		_proxy = Proxy.objects.first()
 		temporal_ctx = {
 			'scan_history_id': scan.id,
 			'subscan_id': first_subscan_id,
@@ -548,7 +551,8 @@ def initiate_subscan_temporal(
 			'starting_point_path': starting_point_path,
 			'excluded_paths': excluded_paths,
 			'api_discovery_tools': api_discovery_tools,
-			'kr_wordlist': kr_wordlist
+			'kr_wordlist': kr_wordlist,
+			'use_tor': bool(_proxy and _proxy.use_tor),
 		}
 
 		# ---- Create initial endpoints in DB ----

@@ -690,11 +690,10 @@ def run_port_scan_activity(ctx: dict) -> bool:
 
 @activity.defn(name="TorNewCircuitActivity")
 def run_tor_new_circuit_activity() -> None:
-    from scanEngine.models import Proxy
-    from reNgine.tor_manager import TorManager
-    proxy = Proxy.objects.first()
-    if not proxy or not proxy.use_tor:
+    from reNgine.common_func import get_random_proxy
+    if not get_random_proxy().startswith('socks'):
         return
+    from reNgine.tor_manager import TorManager
     try:
         TorManager().new_circuit()
         activity.logger.info("[TorNewCircuitActivity] New TOR circuit requested successfully")
