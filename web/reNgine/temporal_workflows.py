@@ -468,24 +468,33 @@ class MasterScanWorkflow:
             await self._check_paused()
 
             # ------------------------------------------------------------------
-            # TIER 6: Security Assessment (parallel — vulnerability, WAF bypass, brute force)
+            # TIER 6: Security Assessment
+            # NucleiPlannerWorkflow runs sequentially FIRST to prevent orphaned
+            # child workflows when a concurrent T6 activity fails. asyncio.gather
+            # cannot cancel a Temporal child workflow — the sequential pattern
+            # eliminates the detachment risk entirely (see FIXES.md Fix 2).
+            # waf_bypass and brute_force_scan run concurrently after nuclei; they
+            # are activities (not child workflows) so gather is safe for them.
             # ------------------------------------------------------------------
-            assessment_futures = []
+            ran_t6 = False
+
             if "vulnerability_scan" in tasks:
                 # Spawn as a child workflow so Nuclei execution has its own
                 # independent Temporal history and can be tracked separately.
-                assessment_futures.append(
-                    workflow.execute_child_workflow(
-                        "NucleiPlannerWorkflow",
-                        ctx,
-                        id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
-                        task_queue="python-orchestrator-queue",
-                        execution_timeout=timedelta(hours=10),
-                        run_timeout=timedelta(hours=10)
-                    )
+                ran_t6 = True
+                await workflow.execute_child_workflow(
+                    "NucleiPlannerWorkflow",
+                    ctx,
+                    id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
+                    task_queue="python-orchestrator-queue",
+                    execution_timeout=timedelta(hours=10),
+                    run_timeout=timedelta(hours=10)
                 )
+
+            other_t6_futures = []
             if "waf_bypass" in tasks:
-                assessment_futures.append(
+                ran_t6 = True
+                other_t6_futures.append(
                     workflow.execute_activity(
                         "RunWAFBypassActivity",
                         ctx,
@@ -496,7 +505,8 @@ class MasterScanWorkflow:
                     )
                 )
             if "brute_force_scan" in tasks:
-                assessment_futures.append(
+                ran_t6 = True
+                other_t6_futures.append(
                     workflow.execute_activity(
                         "RunBruteForceScanActivity",
                         ctx,
@@ -506,9 +516,10 @@ class MasterScanWorkflow:
                         task_queue="python-orchestrator-queue"
                     )
                 )
+            if other_t6_futures:
+                await asyncio.gather(*other_t6_futures)
 
-            if assessment_futures:
-                await asyncio.gather(*assessment_futures)
+            if ran_t6:
                 await workflow.execute_activity(
                     "ParseAssessmentResultsActivity",
                     ctx,
@@ -1139,6 +1150,10 @@ class SubScanWorkflow:
                 # Build futures list before the guard so vigolium appends can add work
                 # even when no standard tasks exist in this tier.
                 tier_futures = []
+                # For Tier 6 only: vulnerability_scan (NucleiPlannerWorkflow child) is
+                # separated from the concurrent gather to prevent orphaned child workflows
+                # when another Tier 6 activity fails (see FIXES.md Fix 2).
+                nuclei_future = None
 
                 for t in tier_tasks:
                     if t == "http_crawl":
@@ -1175,17 +1190,27 @@ class SubScanWorkflow:
                                 raise
 
                         tier_futures.append(_http_crawl_branch_tracked())
+                    elif tier_index == 6 and t == "vulnerability_scan":
+                        # Run nuclei sequentially (not in gather) so that if another
+                        # Tier 6 activity fails, the child workflow is never orphaned.
+                        nuclei_future = run_and_track_task(t)
                     else:
                         tier_futures.append(run_and_track_task(t))
 
-                if not tier_futures:
+                if not tier_futures and nuclei_future is None:
                     continue
 
                 workflow.logger.info(
                     f"[SubScanWorkflow] Executing Tier {tier_index} tasks: {tier_tasks}"
                 )
 
-                await asyncio.gather(*tier_futures)
+                # Nuclei runs first (sequential) so that if the concurrent gather below
+                # raises, the child workflow has already completed cleanly — never orphaned.
+                if nuclei_future is not None:
+                    await nuclei_future
+
+                if tier_futures:
+                    await asyncio.gather(*tier_futures)
 
                 # Execute matching Parse verification activity if any tasks in this tier ran.
                 # Tier indices align with the tiers list above:
