@@ -47,3 +47,18 @@ class TestNmapParsing(unittest.TestCase):
 
     def test_nmap_vulscan_multiple(self):
         pass
+
+
+from django.test import TestCase
+from startScan.models import Vulnerability
+
+
+class NmapTestCase(TestCase):
+    def test_vulnerability_has_group_key_field(self):
+        """Vulnerability model must have a group_key field."""
+        v = Vulnerability(
+            name='Exim smtpd 4.99.2 (CVE-2026-45185)',
+            severity=3,
+            group_key='Exim smtpd 4.99.2'
+        )
+        self.assertEqual(v.group_key, 'Exim smtpd 4.99.2')
