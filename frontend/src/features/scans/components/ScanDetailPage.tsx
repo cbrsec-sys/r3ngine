@@ -1908,7 +1908,22 @@ export const ScanDetailPage = () => {
         >
           <Box sx={{ mt: 0.5 }}>
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN DETAIL</Typography>
-            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {scanId} | TARGET: {data.target_info?.name || 'N/A'}</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+              IDENTIFIER: <Box component="span" sx={{
+                color: '#c0521a',
+                '@keyframes subtlePulse': {
+                  '0%, 100%': { opacity: 1 },
+                  '50%': { opacity: 0.55 }
+                },
+                animation: 'subtlePulse 3s ease-in-out infinite'
+              }}>{scanId}</Box>
+              {' | '}
+              TARGET: <Box component="span" sx={{
+                color: '#c0521a',
+                animation: 'subtlePulse 3s ease-in-out infinite',
+                animationDelay: '1.5s'
+              }}>{data.target_info?.name || 'N/A'}</Box>
+            </Typography>
           </Box>
           <Stack spacing={1} sx={{ alignItems: { xs: 'flex-start', sm: 'flex-end' }, width: { xs: '100%', sm: 'auto' } }}>
             <Stack
