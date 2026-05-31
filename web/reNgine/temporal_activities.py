@@ -17,6 +17,7 @@ the `self` interface expected by those tasks without requiring Celery.
 
 import logging
 import os
+import threading
 import yaml
 
 from temporalio import activity
@@ -95,35 +96,56 @@ class TemporalTaskProxy:
             self._create_scan_activity()
 
     def _create_scan_activity(self):
-        """Create a ScanActivity entry in the database for progress tracking.
+        """Claim the pre-populated INITIATED_TASK row for this task or create one.
 
-        This mirrors the create_scan_activity() call from RengineTask.__call__
-        so the scan activity feed in the frontend is populated correctly.
+        InitializeScanTasksActivity pre-creates rows with status=INITIATED_TASK(-1).
+        This method transitions that row to RUNNING and records time_started.
+        Falls back to creating a new row if no pre-populated row is found.
         """
         from startScan.models import ScanActivity
-        from reNgine.definitions import RUNNING_TASK
+        from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
         try:
-            # Use temporal activity ID as the tracking ID
             temporal_activity_id = activity.info().activity_id
-            self.activity = ScanActivity(
+            now = timezone.now()
+            execution_id = f"temporal-{temporal_activity_id}"
+
+            # Try to claim the pre-populated INITIATED_TASK row
+            updated = ScanActivity.objects.filter(
+                scan_of=self.scan,
                 name=self.task_name,
-                title=self.description,
-                time=timezone.now(),
+                status=INITIATED_TASK,
+            ).update(
                 status=RUNNING_TASK,
-                execution_id=f"temporal-{temporal_activity_id}"
+                time_started=now,
+                time=now,
+                execution_id=execution_id,
             )
-            self.activity.save()
-            self.activity_id = self.activity.id
-            if self.scan:
-                self.activity.scan_of = self.scan
-                self.activity.save()
+            if updated:
+                self.activity = ScanActivity.objects.filter(
+                    scan_of=self.scan,
+                    name=self.task_name,
+                    status=RUNNING_TASK,
+                    execution_id=execution_id,
+                ).first()
+            else:
+                # No pre-populated row — create one directly (backward compat)
+                self.activity = ScanActivity.objects.create(
+                    scan_of=self.scan,
+                    name=self.task_name,
+                    title=self.description,
+                    status=RUNNING_TASK,
+                    time=now,
+                    time_started=now,
+                    execution_id=execution_id,
+                )
+            self.activity_id = self.activity.id if self.activity else None
         except Exception as e:
-            logger.warning(f"Could not create ScanActivity for {self.task_name}: {e}")
+            logger.warning(f"Could not create/claim ScanActivity for {self.task_name}: {e}")
             self.activity = None
             self.activity_id = None
 
     def update_scan_activity(self, status, error_message=None):
-        """Update the ScanActivity record with the final task status.
+        """Update the ScanActivity record with the final task status and time_ended.
 
         Args:
             status (int): Task status code (SUCCESS_TASK, FAILED_TASK, etc.)
@@ -132,10 +154,15 @@ class TemporalTaskProxy:
         from startScan.models import ScanActivity
         try:
             if getattr(self, 'activity', None):
-                self.activity.status = status
-                self.activity.error_message = error_message
-                self.activity.time = timezone.now()
-                self.activity.save()
+                now = timezone.now()
+                update_kwargs = {
+                    'status': status,
+                    'time': now,
+                    'time_ended': now,
+                }
+                if error_message is not None:
+                    update_kwargs['error_message'] = str(error_message)[:300]
+                ScanActivity.objects.filter(pk=self.activity.pk).update(**update_kwargs)
         except Exception as e:
             logger.warning(f"Could not update ScanActivity for {self.task_name}: {e}")
 
@@ -159,6 +186,11 @@ class TemporalTaskProxy:
 # ---------------------------------------------------------------------------
 # Helper: run a RengineTask function via TemporalTaskProxy
 # ---------------------------------------------------------------------------
+
+# Thread-local used to share the per-activity cancel_event with stream_command/run_command
+# so they can cancel GoExecutorTaskWorkflow instances without signature changes.
+_task_cancel_local = threading.local()
+
 
 def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **kwargs):
     """Execute an existing RengineTask-decorated function inside a Temporal activity.
@@ -185,12 +217,13 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **k
     """
     from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
     import contextvars
-    import threading
     import time
 
     proxy = TemporalTaskProxy(ctx, task_name, description)
 
     activity_running = True
+    cancel_event = threading.Event()
+    _task_cancel_local.cancel_event = cancel_event
 
     # Copy the current contextvars context so the heartbeat thread inherits the
     # Temporal activity context. threading.Thread does NOT copy contextvars by
@@ -227,6 +260,7 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **k
                         activity.logger.warning(
                             f"[_run_task] Could not mark scan aborted: {mark_err}"
                         )
+                    cancel_event.set()  # signal stream_command/run_command to abort
                     return  # stop heartbeating; kill switch will stop the subprocess
                 except Exception as hb_err:
                     activity.logger.warning(f"[_run_task] Heartbeat failed: {hb_err}")
@@ -271,6 +305,66 @@ def save_checkpoint_activity(ctx: dict) -> None:
     return
 
 
+@activity.defn(name="InitializeScanTasksActivity")
+def initialize_scan_tasks_activity(ctx: dict) -> dict:
+    """
+    Pre-populates ScanActivity rows for every planned task so the
+    timeline is visible immediately when the scan starts.
+    Idempotent: uses get_or_create so retries are safe.
+    """
+    from django.utils import timezone as tz
+    from startScan.models import ScanActivity, ScanHistory, SubScan
+    from reNgine.definitions import INITIATED_TASK
+    from reNgine.task_plan import build_scan_task_plan
+
+    scan_id = ctx.get('scan_history_id')
+    subscan_id = ctx.get('subscan_id')
+    tasks = ctx.get('tasks', [])
+    yaml_configuration = ctx.get('yaml_configuration', {})
+
+    try:
+        scan = ScanHistory.objects.get(pk=scan_id)
+    except ScanHistory.DoesNotExist:
+        logger.warning(f"InitializeScanTasksActivity: ScanHistory {scan_id} not found")
+        return {'created': 0, 'existing': 0}
+
+    subscan = None
+    if subscan_id:
+        try:
+            subscan = SubScan.objects.get(pk=subscan_id)
+        except SubScan.DoesNotExist:
+            pass
+
+    plan = build_scan_task_plan(tasks, yaml_configuration)
+    created_count = 0
+    existing_count = 0
+    now = tz.now()
+
+    for entry in plan:
+        # Scope the existence check to (scan_of, name) only — regardless of status.
+        # Using status=INITIATED_TASK in the lookup would create phantom PENDING rows
+        # on workflow recovery if tasks have already transitioned to RUNNING/SUCCESS.
+        if not ScanActivity.objects.filter(scan_of=scan, name=entry['name']).exists():
+            ScanActivity.objects.create(
+                scan_of=scan,
+                name=entry['name'],
+                title=entry['title'],
+                tier=entry['tier'],
+                subscan=subscan,
+                time=now,
+                status=INITIATED_TASK,
+            )
+            created_count += 1
+        else:
+            existing_count += 1
+
+    logger.info(
+        f"InitializeScanTasksActivity: scan={scan_id} "
+        f"created={created_count} existing={existing_count}"
+    )
+    return {'created': created_count, 'existing': existing_count}
+
+
 @activity.defn(name="TargetProfilingActivity")
 def target_profiling_activity(ctx: dict) -> dict:
     """Validate the scan target and populate baseline scan context.
@@ -289,6 +383,7 @@ def target_profiling_activity(ctx: dict) -> dict:
     from startScan.models import ScanHistory
     from scanEngine.models import EngineType
     from reNgine.settings import RENGINE_RESULTS
+    from reNgine.definitions import RUNNING_TASK
 
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[TargetProfilingActivity] Profiling scan_history_id={scan_id}")
@@ -301,6 +396,12 @@ def target_profiling_activity(ctx: dict) -> dict:
     engine = EngineType.objects.filter(pk=engine_id).first()
     if not engine:
         raise ValueError(f"EngineType with id={engine_id} not found.")
+
+    # Re-arm status to RUNNING so the Django DB reflects reality when a
+    # workflow is restarted after a prior run set it to FAILED or ABORTED.
+    if scan.scan_status != RUNNING_TASK:
+        scan.scan_status = RUNNING_TASK
+        scan.save(update_fields=['scan_status'])
 
     # Parse YAML configuration if not already done
     if 'yaml_configuration' not in ctx or not ctx['yaml_configuration']:
@@ -402,6 +503,26 @@ def run_firewall_vpn_scan_activity(ctx: dict) -> bool:
         ctx,
         task_name='firewall_vpn_scan',
         description='Firewall & VPN Scan'
+    )
+
+
+@activity.defn(name="RunDNSSecurityActivity")
+def run_dns_security_activity(ctx: dict) -> bool:
+    """Run DNS security checks: AXFR, DNSSEC, amplification, optional brute-force.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.dns_tasks import dns_security
+    activity.logger.info(f"[RunDNSSecurityActivity] scan_id={ctx.get('scan_history_id')}")
+    return _run_task(
+        dns_security,
+        ctx,
+        task_name='dns_security',
+        description='DNS Security Scan'
     )
 
 
@@ -552,12 +673,32 @@ def run_port_scan_activity(ctx: dict) -> bool:
     """
     from reNgine.tasks import port_scan
     activity.logger.info(f"[RunPortScanActivity] scan_id={ctx.get('scan_history_id')}")
+    from scanEngine.models import Proxy as _Proxy
+    _proxy = _Proxy.objects.first()
+    if _proxy and _proxy.use_tor:
+        activity.logger.warning(
+            "[RunPortScanActivity] TOR mode is active but naabu uses raw sockets — "
+            "port scan traffic will NOT be routed through TOR"
+        )
     return _run_task(
         port_scan,
         ctx,
         task_name='port_scan',
         description='Port Scan'
     )
+
+
+@activity.defn(name="TorNewCircuitActivity")
+def run_tor_new_circuit_activity() -> None:
+    from reNgine.common_func import get_random_proxy
+    if not get_random_proxy().startswith('socks'):
+        return
+    from reNgine.tor_manager import TorManager
+    try:
+        TorManager().new_circuit()
+        activity.logger.info("[TorNewCircuitActivity] New TOR circuit requested successfully")
+    except Exception as e:
+        activity.logger.warning(f"[TorNewCircuitActivity] Circuit rotation failed (scan continues): {e}")
 
 
 @activity.defn(name="RunScreenshotActivity")
@@ -1141,14 +1282,22 @@ def send_scan_notification_activity(ctx: dict) -> bool:
         activity.logger.error(f"[SendScanNotificationActivity] ScanHistory {scan_id} not found.")
         return False
 
-    # Determine overall scan status from ScanActivity records
-    failed_tasks = ScanActivity.objects.filter(
-        scan_of=scan,
-        status=FAILED_TASK
-    ).count()
+    # Determine overall scan status from ScanActivity records.
+    # A task that failed on an early Temporal retry attempt but succeeded on a later
+    # attempt will have both a FAILED_TASK and a SUCCESS_TASK record with the same
+    # name. We only treat a task as truly failed if it NEVER produced a SUCCESS record.
+    failed_names = set(
+        ScanActivity.objects.filter(scan_of=scan, status=FAILED_TASK)
+        .values_list('name', flat=True)
+    )
+    success_names = set(
+        ScanActivity.objects.filter(scan_of=scan, status=SUCCESS_TASK)
+        .values_list('name', flat=True)
+    )
+    true_failures = failed_names - success_names  # failed and never recovered
 
-    status = SUCCESS_TASK if failed_tasks == 0 else FAILED_TASK
-    status_h = 'SUCCESS' if failed_tasks == 0 else 'FAILED'
+    status = SUCCESS_TASK if not true_failures else FAILED_TASK
+    status_h = 'SUCCESS' if not true_failures else 'FAILED'
 
     scan.scan_status = status
     scan.stop_scan_date = timezone.now()
@@ -1175,7 +1324,7 @@ def send_scan_notification_activity(ctx: dict) -> bool:
 
 _PERMITTED_GENERIC_TASKS = frozenset({
     "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
-    "osint", "spiderfoot_scan", "http_crawl", "port_scan", "screenshot",
+    "dns_security", "osint", "spiderfoot_scan", "http_crawl", "port_scan", "screenshot",
     "fetch_url", "dir_file_fuzz", "web_api_discovery", "waf_detection",
     "secret_scanning", "vulnerability_scan", "waf_bypass", "brute_force_scan",
     "nuclei_scan", "crlfuzz_scan", "dalfox_xss_scan", "s3scanner",
@@ -1913,15 +2062,25 @@ def finalize_failed_scan_activity(ctx: dict, error_msg: str) -> None:
         return
         
     try:
+        from reNgine.definitions import ABORTED_TASK, RUNNING_TASK, INITIATED_TASK
         scan = ScanHistory.objects.get(pk=scan_id)
+        if scan.scan_status == ABORTED_TASK:
+            logger.info(
+                f"Scan {scan_id} already ABORTED by user — not overwriting to FAILED_TASK."
+            )
+            return
         scan.scan_status = FAILED_TASK
         scan.error_message = error_msg[:300] if error_msg else "Scan workflow crashed."
         scan.stop_scan_date = timezone.now()
         scan.save()
         logger.info(f"Scan {scan_id} marked as FAILED_TASK due to workflow crash.")
-        
-        # Also update running activities
-        scan.scanactivity_set.filter(status=0).update(status=FAILED_TASK, error_message=scan.error_message)
+
+        # Mark any activities still in RUNNING or INITIATED state as FAILED
+        # (previously filtered status=0 which is FAILED_TASK itself — a no-op)
+        err = scan.error_message
+        scan.scanactivity_set.filter(
+            status__in=[RUNNING_TASK, INITIATED_TASK]
+        ).update(status=FAILED_TASK, error_message=err)
     except Exception as e:
         logger.error(f"Failed to finalize crashed scan {scan_id}: {e}")
 

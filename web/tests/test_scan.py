@@ -1,26 +1,25 @@
 import json
 import logging
 import os
-import unittest
+from django.test import TestCase
 
 os.environ['RENGINE_SECRET_KEY'] = 'secret'
 os.environ['CELERY_ALWAYS_EAGER'] = 'True'
 
 import yaml
-from celery.utils.log import get_task_logger
 from reNgine.settings import DEBUG
 from reNgine.tasks import (dir_file_fuzz, fetch_url, http_crawl,
                            osint, port_scan, subdomain_discovery,
                            vulnerability_scan)
 from startScan.models import *
 
-logger = get_task_logger(__name__)
-DOMAIN_NAME = os.environ['DOMAIN_NAME']
+logger = logging.getLogger(__name__)
+DOMAIN_NAME = os.environ.get('DOMAIN_NAME', 'test.local')
 # if not DEBUG:
 #     logging.disable(logging.CRITICAL)
 
 
-class TestOnlineScan(unittest.TestCase):
+class TestOnlineScan(TestCase):
     def setUp(self):
         self.url = f'https://{DOMAIN_NAME}'
         self.yaml_configuration = {

@@ -146,6 +146,10 @@ urlpatterns = [
         ListWordlists.as_view(),
         name='listWordlists'),
     path(
+        'listTools/',
+        ListTools.as_view(),
+        name='listTools'),
+    path(
         'listConfigurations/',
         ListConfigurations.as_view(),
         name='listConfigurations'),
@@ -257,6 +261,14 @@ urlpatterns = [
         'rengine/fetch-proxies/',
         ProxyFetchAPIView.as_view(),
         name='rengine_fetch_proxies'),
+    path(
+        'rengine/tor-status/',
+        TorStatusAPIView.as_view(),
+        name='rengine_tor_status'),
+    path(
+        'rengine/tor-exit-ip/',
+        TorExitIPAPIView.as_view(),
+        name='rengine_tor_exit_ip'),
     path(
         'action/subdomain/delete/',
         DeleteSubdomain.as_view(),
@@ -469,7 +481,13 @@ urlpatterns = [
         name='get_system_logs'
     ),
     path('plugins/', include('plugins.urls')),
+    path(
+        'push-token/register/',
+        RegisterPushTokenView.as_view(),
+        name='register_push_token',
+    ),
 ]
+
 
 
 # Dynamic plugin API URL discovery

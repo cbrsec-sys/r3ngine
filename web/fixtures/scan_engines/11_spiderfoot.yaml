@@ -1,0 +1,10 @@
+- model: scanEngine.enginetype
+  pk: 11
+  fields:
+    engine_name: SpiderFoot Scan
+    default_engine: true
+    yaml_configuration: |
+      spiderfoot_scan:
+        modules: all
+        intensity: normal
+        threads: 10

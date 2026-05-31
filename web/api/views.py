@@ -442,6 +442,48 @@ class InAppNotificationManagerViewSet(viewsets.ModelViewSet):
 		return Response(status=HTTP_204_NO_CONTENT)
 
 
+class RegisterPushTokenView(APIView):
+	"""
+	POST /mapi/push-token/register/
+
+	Registers or updates an Expo push notification token for the authenticated user.
+	Called by the mobile app on startup after the user logs in and notification
+	permissions have been granted.
+
+	Request body:
+		token (str): The Expo push token string (e.g. ExponentPushToken[xxxx]).
+		device_label (str, optional): Human-readable label for the device.
+
+	Returns 200 on success with the token record. Returns 400 if no token provided.
+	"""
+	permission_classes = [IsAuthenticated]
+
+	def post(self, request):
+		token_str = request.data.get('token', '').strip()
+		device_label = request.data.get('device_label', '').strip() or None
+
+		if not token_str:
+			return Response({'error': 'token is required'}, status=HTTP_400_BAD_REQUEST)
+
+		# Upsert: if this exact token already exists update its owner/label,
+		# otherwise create a new record. Using update_or_create on token value.
+		obj, created = MobilePushToken.objects.update_or_create(
+			token=token_str,
+			defaults={
+				'user': request.user,
+				'device_label': device_label,
+				'is_active': True,
+			}
+		)
+		return Response({
+			'id': obj.id,
+			'token': obj.token,
+			'device_label': obj.device_label,
+			'is_active': obj.is_active,
+			'created': created,
+		})
+
+
 class OllamaManager(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
@@ -888,7 +930,7 @@ class WafDetector(APIView):
 			return Response(response)
 		
 		wafw00f_command = f'wafw00f {url}'
-		_, output = run_command.run(wafw00f_command, shell=True, remove_ansi_sequence=True)
+		_, output = run_command(wafw00f_command, shell=True, remove_ansi_sequence=True)
 		regex = r"behind (.*?) WAF"
 		group = re.search(regex, output)
 		if group:
@@ -2062,6 +2104,34 @@ class ProxyFetchAPIView(APIView):
 			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class TorStatusAPIView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request):
+		from reNgine.tor_manager import TorManager, TorUnavailableError
+		try:
+			running = TorManager().is_running()
+			return Response({'running': running})
+		except TorUnavailableError:
+			return Response({'running': False})
+
+
+class TorExitIPAPIView(APIView):
+	permission_classes = [IsAuthenticated]
+
+	def get(self, request):
+		from reNgine.tor_manager import TorManager, TorUnavailableError
+		try:
+			if not TorManager().is_running():
+				return Response({'ip': None})
+			import requests as req_lib
+			proxies = {'http': 'socks5h://tor:9050', 'https': 'socks5h://tor:9050'}
+			resp = req_lib.get('https://api.ipify.org', proxies=proxies, timeout=10)
+			return Response({'ip': resp.text.strip()})
+		except Exception:
+			return Response({'ip': None})
+
+
 class UninstallTool(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
@@ -2095,7 +2165,7 @@ class UninstallTool(APIView):
 		else:
 			return Response({'status': False, 'message': 'Cannot uninstall tool!'})
 
-		run_command.run(uninstall_command, shell=True)
+		run_command(uninstall_command, shell=True)
 
 		tool.delete()
 
@@ -2130,7 +2200,7 @@ class UpdateTool(APIView):
 
 		
 		try:
-			return_code, output = run_command.run(update_command, shell=True)
+			return_code, output = run_command(update_command, shell=True)
 			if return_code == 0:
 				return Response({'status': True, 'message': tool.name + ' updated successfully.'})
 			else:
@@ -2152,7 +2222,7 @@ class UninstallTool(APIView):
 		tool = InstalledExternalTool.objects.get(id=tool_id)
 		
 		try:
-			return_code, output = run_command.run(tool.uninstall_command, shell=True)
+			return_code, output = run_command(tool.uninstall_command, shell=True)
 			if return_code == 0:
 				tool.delete()
 				return Response({'status': True, 'message': tool.name + ' uninstalled successfully.'})
@@ -2189,7 +2259,7 @@ class GetExternalToolCurrentVersion(APIView):
 
 		version_number = None
 		try:
-			return_code, stdout = run_command.run(tool.version_lookup_command, shell=True)
+			return_code, stdout = run_command(tool.version_lookup_command, shell=True)
 			if return_code != 0:
 				logger.warning(f"Version lookup failed for {tool.name} with code {return_code}: {stdout}")
 				return Response({'status': False, 'message': 'Tool not found or check failed.'})
@@ -2395,7 +2465,7 @@ class CMSDetector(APIView):
 			cms_detector_command += ' --random-agent --batch --follow-redirect'
 			cms_detector_command += f' -u {url}'
 
-			_, output = run_command.run(cms_detector_command, shell=True, remove_ansi_sequence=True)
+			_, output = run_command(cms_detector_command, shell=True, remove_ansi_sequence=True)
 
 			response['message'] = 'Could not detect CMS!'
 
@@ -2745,6 +2815,45 @@ class ListWordlists(APIView):
 		wordlists = Wordlist.objects.all()
 		wordlist_serializer = WordlistSerializer(wordlists, many=True)
 		return Response({'wordlists': wordlist_serializer.data})
+
+
+class ListTools(APIView):
+	"""
+	API view to list all installed external tools in the system.
+	Requires IsAuditor permission.
+	"""
+	permission_classes = [IsAuditor]
+
+	def get(self, request, format=None):
+		"""
+		Handles GET request to list all installed external tools.
+
+		Args:
+			request: Django REST framework request object.
+			format: Optional format suffix.
+
+		Returns:
+			Response: A REST Framework Response object containing a dict with the list of tools.
+		"""
+		tools = InstalledExternalTool.objects.all().order_by('id')
+		tools_list = []
+		for tool in tools:
+			tools_list.append({
+				'id': tool.id,
+				'name': tool.name,
+				'description': tool.description,
+				'logo_url': tool.logo_url,
+				'github_url': tool.github_url,
+				'license_url': tool.license_url,
+				'is_default': tool.is_default,
+				'is_subdomain_gathering': tool.is_subdomain_gathering,
+				'is_github_cloned': tool.is_github_cloned,
+				'github_clone_path': tool.github_clone_path,
+				'install_command': tool.install_command,
+				'update_command': tool.update_command,
+				'version_lookup_command': tool.version_lookup_command,
+			})
+		return Response({'tools': tools_list})
 
 
 class ListConfigurations(APIView):
@@ -3336,10 +3445,20 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 		ip_address = req.query_params.get('ip_address')
 		name = req.query_params.get('name')
 		project = req.query_params.get('project')
+		http_status = req.query_params.get('http_status')
+		is_important = req.query_params.get('is_important')
+		has_vulnerabilities = req.query_params.get('has_vulnerabilities')
+		ports = req.query_params.get('ports')
 
 		subdomains = Subdomain.objects.filter(target_domain__project__slug=project)
 
-		if 'is_important' in req.query_params:
+		if is_important is not None:
+			if is_important.lower() in ('true', '1', 't', 'y', 'yes'):
+				subdomains = subdomains.filter(is_important=True)
+			elif is_important.lower() in ('false', '0', 'f', 'n', 'no'):
+				subdomains = subdomains.filter(is_important=False)
+		elif 'is_important' in req.query_params and not req.query_params.get('is_important'):
+			# Fallback for old behaviour if just `?is_important` was passed empty
 			subdomains = subdomains.filter(is_important=True)
 
 		if target_id:
@@ -3363,7 +3482,7 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 		else:
 			self.queryset = subdomains.distinct()
 
-		if 'only_directory' in req.query_params:
+		if 'only_directory' in req.query_params and str(req.query_params.get('only_directory')).lower() != 'false':
 			self.queryset = self.queryset.exclude(directories__isnull=True)
 
 		if ip_address:
@@ -3371,6 +3490,23 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 
 		if name:
 			self.queryset = self.queryset.filter(name=name)
+
+		if http_status:
+			try:
+				self.queryset = self.queryset.filter(http_status=int(http_status))
+			except ValueError:
+				pass
+
+		if has_vulnerabilities is not None:
+			if has_vulnerabilities.lower() in ('true', '1', 't', 'y', 'yes'):
+				self.queryset = self.queryset.filter(vulnerability__isnull=False).distinct()
+			elif has_vulnerabilities.lower() in ('false', '0', 'f', 'n', 'no'):
+				self.queryset = self.queryset.filter(vulnerability__isnull=True).distinct()
+
+		if ports:
+			port_list = [p.strip() for p in ports.split(',') if p.strip()]
+			if port_list:
+				self.queryset = self.queryset.filter(ip_addresses__ports__number__in=port_list).distinct()
 
 		return self.queryset
 
@@ -4008,6 +4144,9 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		scan_id = req.query_params.get('scan_history')
 		domain = req.query_params.get('domain')
 		severity = req.query_params.get('severity')
+		validation_status = req.query_params.get('validation_status')
+		open_status = req.query_params.get('open_status')
+		source = req.query_params.get('source')
 		subdomain_id = req.query_params.get('subdomain_id')
 		subdomain_name = req.query_params.get('subdomain')
 		vulnerability_name = req.query_params.get('vulnerability_name')
@@ -4046,6 +4185,15 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 			qs = qs.filter(Q(name=vulnerability_name)).distinct()
 		if severity:
 			qs = qs.filter(severity=severity)
+		if validation_status:
+			qs = qs.filter(validation_status__iexact=validation_status)
+		if open_status is not None:
+			if open_status.lower() in ('true', '1', 't', 'y', 'yes'):
+				qs = qs.filter(open_status=True)
+			elif open_status.lower() in ('false', '0', 'f', 'n', 'no'):
+				qs = qs.filter(open_status=False)
+		if source:
+			qs = qs.filter(source__icontains=source)
 		if subdomain_id:
 			qs = qs.filter(subdomain__id=subdomain_id)
 		self.queryset = qs
@@ -4336,11 +4484,9 @@ class NotificationSettingsAPIView(APIView):
 		return Response(serializer.errors, status=400)
 
 class MobileMediaServeView(APIView):
-	permission_classes = [AllowAny]
+	permission_classes = [IsAuthenticated]
 	def get(self, request):
-		#logger.warning(f"!!! MobileMediaServeView HIT !!! User authenticated: {request.user.is_authenticated}")
 		path = request.query_params.get('path')
-		#logger.warning(f"!!! Path requested: {path} !!!")
 		if not path:
 			return Response({'error': 'Path is required'}, status=status.HTTP_400_BAD_REQUEST)
 		
@@ -4360,8 +4506,6 @@ class MobileMediaServeView(APIView):
 		path = path.lstrip('/')
 		file_path = os.path.normpath(os.path.join(settings.MEDIA_ROOT, path))
 		
-		#logger.info(f"MobileMediaServeView: path={path}, file_path={file_path}, MEDIA_ROOT={settings.MEDIA_ROOT}")
-		
 		# Security check
 		if not is_safe_path(settings.MEDIA_ROOT, file_path):
 			logger.error(f"is_safe_path failed for {file_path}")
@@ -4372,7 +4516,6 @@ class MobileMediaServeView(APIView):
 				raise Http404("File not found")
 				
 			content_type, _ = mimetypes.guess_type(file_path)
-			#logger.warning(f"!!! MobileMediaServeView: Returning file with content_type={content_type} !!!")
 			return FileResponse(open(file_path, 'rb'), content_type=content_type)
 		else:
 			logger.error(f"File not found: {file_path}")

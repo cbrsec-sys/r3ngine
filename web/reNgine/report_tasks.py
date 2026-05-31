@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from django.core.files.base import ContentFile
 from django.template.loader import get_template
+from collections import defaultdict
 from django.db.models import Count, Case, When, IntegerField
 from weasyprint import HTML, CSS
 from django.utils import timezone
@@ -23,6 +24,59 @@ from startScan.models import ScanHistory, Subdomain, Vulnerability, IpAddress, S
 from scanEngine.models import VulnerabilityReportSetting
 
 logger = logging.getLogger('reNgine.tasks')
+
+
+def build_vuln_context(scan, ignore_info=False):
+    """
+    Splits scan vulnerabilities into:
+    - all_vulnerabilities: non-vulners findings (for existing template {% regroup %} tag)
+    - grouped_vulners_findings: list of product groups from vulners NSE
+    - unique_vulnerabilities: summary for report index table (both sources combined)
+    - all_vulnerabilities_count: total count including vulners
+    """
+    base_qs = Vulnerability.objects.filter(scan_history=scan)
+    if ignore_info:
+        base_qs = base_qs.exclude(severity=0)
+
+    non_vulners = base_qs.exclude(source='VULNERS').order_by('-severity')
+    vulners = base_qs.filter(source='VULNERS').order_by('group_key', '-cvss_score')
+
+    bucket = defaultdict(list)
+    for v in vulners:
+        bucket[v.group_key or v.name].append(v)
+
+    grouped_vulners_findings = sorted(
+        [
+            {
+                'group_key': gk,
+                'items': items,
+                'count': len(items),
+                'max_severity': max(i.severity for i in items),
+                'max_cvss': max((i.cvss_score or 0) for i in items),
+            }
+            for gk, items in bucket.items()
+        ],
+        key=lambda x: (-x['max_severity'], -x['max_cvss'])
+    )
+
+    non_vulners_unique = (
+        non_vulners
+        .values('name', 'severity')
+        .annotate(count=Count('name'))
+        .order_by('-severity', '-count')
+    )
+    vulners_unique = [
+        {'name': g['group_key'], 'severity': g['max_severity'], 'count': g['count']}
+        for g in grouped_vulners_findings
+    ]
+
+    return {
+        'all_vulnerabilities': non_vulners,
+        'all_vulnerabilities_count': non_vulners.count() + vulners.count(),
+        'grouped_vulners_findings': grouped_vulners_findings,
+        'unique_vulnerabilities': list(non_vulners_unique) + vulners_unique,
+    }
+
 
 def generate_report_task(report_id):
     try:
@@ -54,6 +108,9 @@ def generate_report_task(report_id):
         if report_type == 'stress_test' or report_template in ['stress_cyber_pro', 'stress_modern']:
             stress_results = StressTestResult.objects.filter(scan_history=scan).order_by('-timestamp')
 
+        vuln_ctx = build_vuln_context(scan, ignore_info=is_ignore_info_vuln)
+
+        # All-source queryset used for description template substitution and LLM context
         vulns = (
             Vulnerability.objects
             .filter(scan_history=scan)
@@ -64,21 +121,7 @@ def generate_report_task(report_id):
             .exclude(severity=0)
             .order_by('-severity')
         )
-
-        unique_vulns = (
-            Vulnerability.objects
-            .filter(scan_history=scan)
-            .values("name", "severity")
-            .annotate(count=Count('name'))
-            .order_by('-severity', '-count')
-        ) if not is_ignore_info_vuln else (
-            Vulnerability.objects
-            .filter(scan_history=scan)
-            .exclude(severity=0)
-            .values("name", "severity")
-            .annotate(count=Count('name'))
-            .order_by('-severity', '-count')
-        )
+        unique_vulns = vuln_ctx['unique_vulnerabilities']
 
         subdomains = (
             Subdomain.objects
@@ -134,9 +177,7 @@ def generate_report_task(report_id):
 
         data = {
             'scan_object': scan,
-            'unique_vulnerabilities': unique_vulns,
-            'all_vulnerabilities': vulns,
-            'all_vulnerabilities_count': vulns.count(),
+            **vuln_ctx,
             'subdomain_alive_count': subdomain_alive_count,
             'interesting_subdomains': interesting_subdomains,
             'subdomains': subdomains,

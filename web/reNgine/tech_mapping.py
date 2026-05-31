@@ -1,88 +1,541 @@
 #!/usr/bin/python
+import re
 import logging
 
 logger = logging.getLogger('django')
 
-# Mapping of detected technologies to Nuclei tags
-# This helps in running targeted scans based on the technology stack
+# Comprehensive mapping of detected technologies to Nuclei template tags.
+# Keys are lowercase technology names as reported by httpx/wappalyzer.
+# Values are lists of nuclei tags that cover vulnerabilities for that technology.
 TECH_TO_NUCLEI_TAGS = {
-    'wordpress': ['wordpress', 'wp-plugin', 'wp-theme'],
-    'apache': ['apache', 'htaccess'],
-    'nginx': ['nginx'],
-    'php': ['php', 'phpunit'],
-    'laravel': ['laravel'],
-    'django': ['django'],
-    'react': ['react'],
-    'vue': ['vue'],
-    'angular': ['angular'],
-    'jquery': ['jquery'],
-    'bootstrap': ['bootstrap'],
+    # --- CMS ---
+    'wordpress': ['wordpress', 'wp-plugin', 'wp-theme', 'wp'],
+    'woocommerce': ['woocommerce', 'wordpress', 'wp-plugin'],
     'drupal': ['drupal'],
     'joomla': ['joomla'],
     'magento': ['magento'],
+    'prestashop': ['prestashop'],
+    'opencart': ['opencart'],
+    'typo3': ['typo3'],
+    'craft cms': ['craftcms', 'craft'],
+    'kentico': ['kentico'],
+    'umbraco': ['umbraco'],
+    'dotnetnuke': ['dotnetnuke', 'dnn'],
+    'dnn': ['dotnetnuke', 'dnn'],
+    'modx': ['modx'],
+    'concrete5': ['concrete5'],
+    'concrete cms': ['concrete5'],
+    'ghost': ['ghost'],
+    'strapi': ['strapi'],
+    'cs-cart': ['cs-cart'],
+    'oscommerce': ['oscommerce'],
+    'virtuemart': ['virtuemart', 'joomla'],
+    'moodle': ['moodle'],
+    'hubspot cms': ['hubspot'],
+    'squarespace': ['squarespace'],
+    'wix': ['wix'],
+    'webflow': ['webflow'],
     'shopify': ['shopify'],
-    'firebase': ['firebase'],
-    'aws': ['aws', 's3', 'ec2'],
-    'azure': ['azure'],
-    'google cloud': ['gcp'],
-    'docker': ['docker'],
-    'kubernetes': ['k8s', 'kubernetes'],
+    'bigcommerce': ['bigcommerce'],
+    'nopcommerce': ['nopcommerce'],
+    'x-cart': ['x-cart'],
+    'zen cart': ['zen-cart'],
+    'spree': ['spree', 'rails'],
+    'silverstripe': ['silverstripe'],
+    'grav': ['grav'],
+    'kirby': ['kirby'],
+    'processwire': ['processwire'],
+    'contao': ['contao'],
+    'textpattern': ['textpattern'],
+    'mediawiki': ['mediawiki'],
+    'xenforo': ['xenforo'],
+    'phpbb': ['phpbb'],
+    'mybb': ['mybb'],
+    'vbulletin': ['vbulletin'],
+    'discourse': ['discourse'],
+    'ektron': ['ektron'],
+    'episerver': ['episerver', 'optimizely'],
+    'sitefinity': ['sitefinity'],
+    'sharepoint': ['sharepoint', 'microsoft'],
+    'sitecore': ['sitecore'],
+    'liferay': ['liferay'],
+
+    # --- Web Servers ---
+    'apache': ['apache', 'htaccess'],
+    'apache http server': ['apache', 'htaccess'],
+    'apache httpd': ['apache', 'htaccess'],
+    'nginx': ['nginx'],
+    'iis': ['iis', 'microsoft'],
+    'microsoft-iis': ['iis', 'microsoft'],
+    'lighttpd': ['lighttpd'],
+    'litespeed': ['litespeed'],
+    'openlitespeed': ['litespeed', 'openlitespeed'],
+    'caddy': ['caddy'],
+    'varnish': ['varnish'],
+    'haproxy': ['haproxy'],
+    'traefik': ['traefik'],
+    'gunicorn': ['gunicorn', 'python'],
+    'uwsgi': ['uwsgi', 'python'],
+    'cherokee': ['cherokee'],
+    'tengine': ['tengine', 'nginx'],
+    'openresty': ['openresty', 'nginx'],
+
+    # --- Application Servers ---
+    'tomcat': ['tomcat', 'apache-tomcat', 'java'],
+    'apache tomcat': ['tomcat', 'apache-tomcat', 'java'],
+    'weblogic': ['weblogic', 'oracle', 'java'],
+    'oracle weblogic': ['weblogic', 'oracle', 'java'],
+    'jboss': ['jboss', 'jbossas', 'java'],
+    'wildfly': ['wildfly', 'jboss', 'java'],
+    'jboss wildfly': ['wildfly', 'jboss', 'java'],
+    'websphere': ['websphere', 'ibm', 'java'],
+    'ibm websphere': ['websphere', 'ibm', 'java'],
+    'glassfish': ['glassfish', 'java'],
+    'oracle glassfish': ['glassfish', 'java'],
+    'jetty': ['jetty', 'java'],
+    'undertow': ['undertow', 'jboss', 'java'],
+    'payara': ['payara', 'glassfish', 'java'],
+    'coldfusion': ['coldfusion', 'adobe'],
+    'adobe coldfusion': ['coldfusion', 'adobe'],
+
+    # --- Backend Frameworks ---
+    'django': ['django', 'python'],
+    'flask': ['flask', 'python'],
+    'fastapi': ['fastapi', 'python'],
+    'ruby on rails': ['rails', 'ruby'],
+    'rails': ['rails', 'ruby'],
+    'laravel': ['laravel', 'php'],
+    'symfony': ['symfony', 'php'],
+    'codeigniter': ['codeigniter', 'php'],
+    'cakephp': ['cakephp', 'php'],
+    'yii': ['yii', 'php'],
+    'yii2': ['yii', 'php'],
+    'zend framework': ['zend', 'php'],
+    'laminas': ['laminas', 'zend', 'php'],
+    'slim': ['slim', 'php'],
+    'lumen': ['lumen', 'laravel', 'php'],
+    'phalcon': ['phalcon', 'php'],
+    'spring': ['spring', 'java'],
+    'spring boot': ['spring-boot', 'spring', 'java'],
+    'spring mvc': ['spring', 'java'],
+    'struts': ['struts', 'apache-struts', 'java'],
+    'apache struts': ['struts', 'apache-struts', 'java'],
+    'play framework': ['play', 'java'],
+    'grails': ['grails', 'spring', 'java'],
+    'micronaut': ['micronaut', 'java'],
+    'quarkus': ['quarkus', 'java'],
+    'nestjs': ['nestjs', 'nodejs'],
+    'express': ['express', 'nodejs'],
+    'express.js': ['express', 'nodejs'],
+    'koa': ['koa', 'nodejs'],
+    'hapi': ['hapi', 'nodejs'],
+    'fastify': ['fastify', 'nodejs'],
+    'adonis': ['adonisjs', 'nodejs'],
+    'asp.net': ['aspnet', 'dotnet', 'microsoft'],
+    'asp.net core': ['aspnetcore', 'dotnet', 'microsoft'],
+    'asp.net mvc': ['aspnet', 'dotnet', 'microsoft'],
+    '.net': ['dotnet', 'microsoft'],
+    '.net core': ['dotnetcore', 'dotnet', 'microsoft'],
+    'blazor': ['blazor', 'dotnet', 'microsoft'],
+    'sinatra': ['sinatra', 'ruby'],
+    'phoenix': ['phoenix', 'elixir'],
+    'elixir': ['elixir'],
+    'gin': ['gin', 'golang'],
+    'echo': ['echo', 'golang'],
+    'fiber': ['fiber', 'golang'],
+
+    # --- Frontend Frameworks ---
+    'react': ['react'],
+    'angular': ['angular'],
+    'vue': ['vue', 'vuejs'],
+    'vue.js': ['vue', 'vuejs'],
+    'next.js': ['nextjs', 'react'],
+    'nuxt.js': ['nuxtjs', 'vue'],
+    'svelte': ['svelte'],
+    'sveltekit': ['svelte', 'sveltekit'],
+    'remix': ['remix', 'react'],
+    'gatsby': ['gatsby', 'react'],
+    'jquery': ['jquery'],
+    'jquery ui': ['jquery', 'jquery-ui'],
+    'bootstrap': ['bootstrap'],
+    'ember.js': ['ember'],
+    'backbone.js': ['backbone'],
+    'mootools': ['mootools'],
+    'prototype': ['prototype'],
+    'alpine.js': ['alpine'],
+    'htmx': ['htmx'],
+    'stimulus': ['stimulus', 'rails'],
+    'turbo': ['hotwire', 'rails'],
+
+    # --- Programming Languages (as detected by httpx) ---
+    'php': ['php'],
+    'python': ['python'],
+    'ruby': ['ruby'],
+    'java': ['java', 'jsp'],
+    'node.js': ['nodejs', 'node'],
+    'nodejs': ['nodejs', 'node'],
+    'go': ['golang', 'go'],
+    'golang': ['golang', 'go'],
+    'perl': ['perl'],
+    'scala': ['scala', 'java'],
+
+    # --- Databases ---
+    'mysql': ['mysql'],
+    'mariadb': ['mariadb', 'mysql'],
+    'postgresql': ['postgresql', 'postgres'],
+    'postgres': ['postgresql', 'postgres'],
+    'mongodb': ['mongodb'],
+    'redis': ['redis'],
+    'elasticsearch': ['elasticsearch'],
+    'opensearch': ['opensearch', 'elasticsearch'],
+    'sqlite': ['sqlite'],
+    'oracle': ['oracle'],
+    'oracle database': ['oracle'],
+    'mssql': ['mssql', 'microsoft'],
+    'sql server': ['mssql', 'microsoft'],
+    'microsoft sql server': ['mssql', 'microsoft'],
+    'couchdb': ['couchdb'],
+    'influxdb': ['influxdb'],
+    'cassandra': ['cassandra'],
+    'apache cassandra': ['cassandra'],
+    'neo4j': ['neo4j'],
+    'dynamodb': ['dynamodb', 'aws'],
+    'couchbase': ['couchbase'],
+    'rethinkdb': ['rethinkdb'],
+    'arangodb': ['arangodb'],
+    'clickhouse': ['clickhouse'],
+    'memcached': ['memcached'],
+    'etcd': ['etcd'],
+    'cockroachdb': ['cockroachdb'],
+    'tidb': ['tidb'],
+    'vitess': ['vitess', 'mysql'],
+    'presto': ['presto'],
+    'druid': ['druid'],
+    'hive': ['hive', 'hadoop'],
+    'hadoop': ['hadoop'],
+    'hbase': ['hbase', 'hadoop'],
+
+    # --- Cloud / CDN ---
+    'amazon web services': ['aws'],
+    'aws': ['aws'],
+    'amazon s3': ['aws', 's3'],
+    's3': ['aws', 's3'],
+    'amazon cloudfront': ['aws', 'cloudfront'],
+    'amazon ec2': ['aws', 'ec2'],
+    'amazon lambda': ['aws', 'lambda'],
+    'amazon rds': ['aws', 'rds'],
+    'amazon eks': ['aws', 'kubernetes'],
+    'azure': ['azure', 'microsoft'],
+    'microsoft azure': ['azure', 'microsoft'],
+    'azure blob storage': ['azure', 'microsoft'],
+    'azure active directory': ['azure', 'microsoft', 'active-directory'],
+    'google cloud': ['gcp', 'google'],
+    'gcp': ['gcp', 'google'],
+    'google cloud storage': ['gcp', 'google'],
+    'cloudflare': ['cloudflare'],
+    'fastly': ['fastly'],
+    'akamai': ['akamai'],
+    'heroku': ['heroku'],
+    'vercel': ['vercel'],
+    'netlify': ['netlify'],
+    'digitalocean': ['digitalocean'],
+    'linode': ['linode'],
+    'vultr': ['vultr'],
+    'ibm cloud': ['ibm'],
+    'oracle cloud': ['oracle'],
+    'alibaba cloud': ['alibaba'],
+    'aliyun': ['alibaba'],
+
+    # --- DevOps / CI/CD ---
     'jenkins': ['jenkins'],
     'gitlab': ['gitlab'],
+    'gitlab ci': ['gitlab'],
     'github': ['github'],
-    'jira': ['jira'],
-    'confluence': ['confluence'],
-    'redis': ['redis'],
-    'mongodb': ['mongodb'],
-    'mysql': ['mysql'],
-    'postgresql': ['postgresql'],
-    'elasticsearch': ['elasticsearch'],
+    'github actions': ['github'],
+    'travis ci': ['travisci'],
+    'circleci': ['circleci'],
+    'teamcity': ['teamcity', 'jetbrains'],
+    'bamboo': ['bamboo', 'atlassian'],
+    'azure devops': ['azure', 'microsoft'],
+    'argo cd': ['argocd', 'kubernetes'],
+    'argocd': ['argocd', 'kubernetes'],
+    'drone': ['drone'],
+    'concourse': ['concourse'],
+    'spinnaker': ['spinnaker'],
+    'sonarqube': ['sonarqube'],
+    'artifactory': ['artifactory', 'jfrog'],
+    'nexus': ['nexus', 'sonatype'],
+    'harbor': ['harbor'],
+    'vault': ['vault', 'hashicorp'],
+    'consul': ['consul', 'hashicorp'],
+    'nomad': ['nomad', 'hashicorp'],
+    'terraform': ['terraform', 'hashicorp'],
+    'ansible': ['ansible'],
+    'puppet': ['puppet'],
+    'chef': ['chef'],
+    'saltstack': ['saltstack'],
+
+    # --- Containers / Orchestration ---
+    'docker': ['docker'],
+    'kubernetes': ['kubernetes', 'k8s'],
+    'k8s': ['kubernetes', 'k8s'],
+    'openshift': ['openshift', 'kubernetes'],
+    'rancher': ['rancher', 'kubernetes'],
+    'portainer': ['portainer', 'docker'],
+    'podman': ['podman', 'docker'],
+    'containerd': ['containerd'],
+    'helm': ['helm', 'kubernetes'],
+
+    # --- Monitoring / Observability ---
     'grafana': ['grafana'],
     'prometheus': ['prometheus'],
-    'node.js': ['nodejs', 'express'],
-    'express': ['express'],
-    'spring boot': ['spring-boot', 'spring'],
-    'java': ['java', 'jsp'],
-    'asp.net': ['aspnet', 'dotnet'],
-    'iis': ['iis'],
-    'coldfusion': ['coldfusion'],
-    'rails': ['rails', 'ruby'],
-    'python': ['python'],
-    'tomcat': ['tomcat'],
-    'weblogic': ['weblogic'],
-    'jboss': ['jboss'],
-    'websphere': ['websphere'],
+    'kibana': ['kibana', 'elasticsearch'],
+    'elasticsearch kibana': ['kibana', 'elasticsearch'],
+    'logstash': ['logstash', 'elasticsearch'],
+    'datadog': ['datadog'],
+    'new relic': ['newrelic'],
+    'splunk': ['splunk'],
+    'zabbix': ['zabbix'],
+    'nagios': ['nagios'],
+    'icinga': ['icinga', 'nagios'],
+    'netdata': ['netdata'],
+    'dynatrace': ['dynatrace'],
+    'appdynamics': ['appdynamics'],
+    'jaeger': ['jaeger'],
+    'zipkin': ['zipkin'],
+    'graylog': ['graylog'],
+    'fluentd': ['fluentd'],
+    'telegraf': ['telegraf', 'influxdb'],
+    'prtg': ['prtg'],
+
+    # --- Auth / SSO / IAM ---
+    'keycloak': ['keycloak'],
+    'auth0': ['auth0'],
+    'okta': ['okta'],
+    'onelogin': ['onelogin'],
+    'pingidentity': ['pingidentity', 'ping'],
+    'shibboleth': ['shibboleth'],
+    'adfs': ['adfs', 'microsoft', 'active-directory'],
+    'active directory': ['active-directory', 'microsoft'],
+    'ldap': ['ldap'],
+    'openldap': ['ldap', 'openldap'],
+    'cas': ['cas'],
+    'gluu': ['gluu'],
+    'wso2': ['wso2', 'wso2-identity'],
+    'forgerock': ['forgerock'],
+    'azure ad': ['azure', 'active-directory', 'microsoft'],
+
+    # --- API / Gateway ---
+    'swagger': ['swagger', 'openapi'],
+    'openapi': ['swagger', 'openapi'],
+    'graphql': ['graphql'],
+    'kong': ['kong'],
+    'apigee': ['apigee', 'google'],
+    'mulesoft': ['mulesoft'],
+    'wso2 api manager': ['wso2'],
+    'aws api gateway': ['aws', 'api-gateway'],
+    'nginx api gateway': ['nginx'],
+    'tyk': ['tyk'],
+    'gravitee': ['gravitee'],
+    'ambassador': ['ambassador', 'kubernetes'],
+
+    # --- Message Queues / Streaming ---
+    'kafka': ['kafka', 'apache-kafka'],
+    'apache kafka': ['kafka', 'apache-kafka'],
+    'rabbitmq': ['rabbitmq'],
+    'activemq': ['activemq', 'apache'],
+    'nats': ['nats'],
+    'zeromq': ['zeromq'],
+    'celery': ['celery'],
+    'redis streams': ['redis'],
+    'sqs': ['sqs', 'aws'],
+    'amazon sqs': ['sqs', 'aws'],
+    'azure service bus': ['azure', 'microsoft'],
+    'google pubsub': ['gcp', 'google'],
+    'pulsar': ['pulsar', 'apache'],
+
+    # --- Security Appliances / Network ---
+    'f5': ['f5', 'bigip'],
+    'f5 big-ip': ['f5', 'bigip'],
+    'bigip': ['f5', 'bigip'],
+    'fortinet': ['fortinet', 'fortigate'],
+    'fortigate': ['fortinet', 'fortigate'],
+    'palo alto': ['paloalto', 'pan-os'],
+    'pan-os': ['paloalto', 'pan-os'],
+    'citrix': ['citrix', 'netscaler'],
+    'netscaler': ['citrix', 'netscaler'],
+    'citrix netscaler': ['citrix', 'netscaler'],
+    'citrix adc': ['citrix', 'netscaler'],
+    'check point': ['checkpoint'],
+    'cisco': ['cisco'],
+    'cisco asa': ['cisco', 'cisco-asa'],
+    'cisco ios': ['cisco', 'cisco-ios'],
+    'barracuda': ['barracuda'],
+    'sophos': ['sophos'],
+    'juniper': ['juniper'],
+    'pulse secure': ['pulse-secure', 'ivanti'],
+    'ivanti': ['ivanti'],
+    'globalprotect': ['paloalto', 'globalprotect'],
+    'openvpn': ['openvpn'],
+    'pfsense': ['pfsense'],
+    'openwrt': ['openwrt'],
+    'dd-wrt': ['dd-wrt'],
+    'ubiquiti': ['ubiquiti', 'unifi'],
+    'unifi': ['ubiquiti', 'unifi'],
+    'mikrotik': ['mikrotik'],
+    'zyxel': ['zyxel'],
+    'netgear': ['netgear'],
+    'tp-link': ['tp-link'],
+    'dlink': ['dlink', 'd-link'],
+    'd-link': ['dlink', 'd-link'],
+
+    # --- Mail ---
+    'postfix': ['postfix'],
+    'exim': ['exim'],
+    'sendmail': ['sendmail'],
+    'microsoft exchange': ['exchange', 'microsoft'],
+    'exchange': ['exchange', 'microsoft'],
+    'zimbra': ['zimbra'],
+    'roundcube': ['roundcube'],
+    'dovecot': ['dovecot'],
+    'hmail server': ['hmailserver'],
+    'sendgrid': ['sendgrid'],
+    'mailgun': ['mailgun'],
+    'postmark': ['postmark'],
+    'mailchimp': ['mailchimp'],
+    'proofpoint': ['proofpoint'],
+    'mimecast': ['mimecast'],
+    'barracuda email': ['barracuda'],
+
+    # --- Storage / File Sharing ---
+    'nextcloud': ['nextcloud', 'owncloud'],
+    'owncloud': ['owncloud'],
+    'minio': ['minio'],
+    'ceph': ['ceph'],
+    'glusterfs': ['glusterfs'],
+    'freenas': ['freenas', 'truenas'],
+    'truenas': ['truenas', 'freenas'],
+    'synology': ['synology'],
+    'qnap': ['qnap'],
+    'seafile': ['seafile'],
+
+    # --- CRM / ERP ---
+    'salesforce': ['salesforce'],
+    'hubspot': ['hubspot'],
+    'zoho': ['zoho'],
+    'sugarcrm': ['sugarcrm'],
     'sap': ['sap'],
-    'oracle': ['oracle'],
+    'oracle erp': ['oracle'],
+    'microsoft dynamics': ['dynamics', 'microsoft'],
+    'dynamics 365': ['dynamics', 'microsoft'],
+    'odoo': ['odoo'],
+    'dolibarr': ['dolibarr'],
+    'vtiger': ['vtiger'],
+    'openerp': ['odoo'],
+
+    # --- Collaboration / Project Management ---
+    'jira': ['jira', 'atlassian'],
+    'confluence': ['confluence', 'atlassian'],
+    'bitbucket': ['bitbucket', 'atlassian'],
+    'gitlab ce': ['gitlab'],
+    'mattermost': ['mattermost'],
+    'rocketchat': ['rocketchat'],
+    'rocket.chat': ['rocketchat'],
+    'zulip': ['zulip'],
+    'matrix': ['matrix'],
+    'element': ['matrix'],
+
+    # --- Analytics / Business Intelligence ---
+    'google analytics': ['google-analytics', 'google'],
+    'matomo': ['matomo'],
+    'piwik': ['matomo'],
+    'metabase': ['metabase'],
+    'superset': ['superset', 'apache'],
+    'apache superset': ['superset', 'apache'],
+    'redash': ['redash'],
+    'tableau': ['tableau'],
+    'powerbi': ['powerbi', 'microsoft'],
+
+    # --- Web Application Firewalls (detected as tech) ---
+    'cloudflare waf': ['cloudflare'],
+    'aws waf': ['aws'],
+    'modsecurity': ['modsecurity'],
+    'wallarm': ['wallarm'],
+
+    # --- Miscellaneous / Common ---
+    'wordpress multisite': ['wordpress', 'wp'],
+    'phpmyadmin': ['phpmyadmin', 'mysql', 'php'],
+    'adminer': ['adminer', 'mysql', 'php'],
+    'phpinfo': ['php'],
+    'webmin': ['webmin'],
+    'cpanel': ['cpanel'],
+    'plesk': ['plesk'],
+    'directadmin': ['directadmin'],
+    'whmcs': ['whmcs'],
+    'gitea': ['gitea'],
+    'gogs': ['gogs'],
+    'apache solr': ['solr', 'apache'],
+    'solr': ['solr', 'apache'],
+    'apache zookeeper': ['zookeeper', 'apache'],
+    'zookeeper': ['zookeeper', 'apache'],
+    'apache spark': ['spark', 'apache'],
+    'spark': ['spark', 'apache'],
+    'airflow': ['airflow', 'apache'],
+    'apache airflow': ['airflow', 'apache'],
+    'nifi': ['nifi', 'apache'],
+    'flink': ['flink', 'apache'],
+    'ambari': ['ambari', 'apache'],
+    'rancher os': ['rancher', 'kubernetes'],
+    'istio': ['istio', 'kubernetes'],
+    'linkerd': ['linkerd', 'kubernetes'],
+    'envoy': ['envoy'],
+    'prometheus alertmanager': ['prometheus'],
+    'loki': ['loki', 'grafana'],
+    'tempo': ['tempo', 'grafana'],
+    'mimir': ['mimir', 'grafana'],
+    'open webui': ['ollama'],
+    'ollama': ['ollama'],
 }
 
+# Version string pattern — strips "Apache/2.4.51" → "apache"
+_VERSION_STRIP = re.compile(r'[/\s].*$')
+
+
 def get_nuclei_tags_from_techs(techs):
-    """Generate targeted Nuclei tags based on a list of technologies.
-    
-    Args:
-        techs (list): List of technology names discovered by httpx.
-        
-    Returns:
-        list: Targeted Nuclei tags.
+    """Generate targeted Nuclei tags from a list of detected technologies.
+
+    Performs:
+    - Direct dict lookup (exact match after lowercasing)
+    - Version-string stripping ("Apache/2.4.51" → "apache")
+    - Substring matching for partial names
+    - Sanitized raw tech name added as fallback tag
+
+    Returns a sorted, deduplicated list of tag strings.
     """
     if not techs:
         return []
-        
+
     tags = set()
     for tech in techs:
-        tech_lower = tech.lower()
-        # Direct mapping
-        if tech_lower in TECH_TO_NUCLEI_TAGS:
-            tags.update(TECH_TO_NUCLEI_TAGS[tech_lower])
-        
-        # Substring matching for more flexibility
-        for key, value in TECH_TO_NUCLEI_TAGS.items():
-            if key in tech_lower or tech_lower in key:
-                tags.update(value)
-                
-        # Always add the tech itself as a potential tag
-        # (Sanitize: remove spaces and special chars if needed)
-        sanitized_tech = tech_lower.replace(' ', '-').replace('.', '')
-        tags.add(sanitized_tech)
-        
-    return list(tags)
+        tech_lower = tech.lower().strip()
+
+        # Strip version suffix (e.g. "Apache/2.4.51" → "apache")
+        tech_base = _VERSION_STRIP.sub('', tech_lower)
+
+        for candidate in (tech_lower, tech_base):
+            # Direct lookup
+            if candidate in TECH_TO_NUCLEI_TAGS:
+                tags.update(TECH_TO_NUCLEI_TAGS[candidate])
+                break
+        else:
+            # Substring matching — key contained in tech name or vice versa
+            for key, values in TECH_TO_NUCLEI_TAGS.items():
+                if key in tech_lower or tech_lower in key:
+                    tags.update(values)
+
+        # Sanitized raw name as fallback (nuclei may have a matching template tag)
+        sanitized = re.sub(r'[^a-z0-9-]', '-', tech_base).strip('-')
+        if sanitized:
+            tags.add(sanitized)
+
+    return sorted(tags)

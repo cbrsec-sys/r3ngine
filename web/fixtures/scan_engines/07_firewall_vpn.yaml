@@ -1,0 +1,82 @@
+- model: scanEngine.enginetype
+  pk: 7
+  fields:
+    engine_name: Firewall and VPN (Sophos)
+    default_engine: true
+    yaml_configuration: |
+      subdomain_discovery:
+        uses_tools:
+          - subfinder
+        enable_http_crawl: true
+        threads: 10
+        timeout: 5
+      port_scan:
+        enable_http_crawl: true
+        timeout: 5
+        ports:
+          - '80'
+          - '443'
+          - '4444'
+          - '8443'
+          - '22'
+          - '500'
+          - '4500'
+          - '1194'
+        rate_limit: 100
+        threads: 20
+        passive: false
+        enable_nmap: true
+        nmap_cmd: -sV --script vuln
+        enable_network_enum: false
+      vulnerability_scan:
+        run_nuclei: true
+        run_dalfox: false
+        run_crlfuzz: false
+        run_s3scanner: false
+        enable_http_crawl: true
+        concurrency: 20
+        intensity: normal
+        rate_limit: 100
+        retries: 1
+        timeout: 5
+        fetch_gpt_report: false
+        nuclei:
+          use_nuclei_config: false
+          severities:
+            - medium
+            - high
+            - critical
+          tags:
+            - sophos
+            - firewall
+            - vpn
+          custom_templates:
+            - /root/nuclei-templates/
+      attack_path_modeling:
+        enabled: true
+      firewall_vpn_scan:
+        run_ike_scan: true
+        run_sslscan: true
+        enable_testssl: true
+        enable_crt_sh: true
+        ports:
+          - 443
+          - 4444
+          - 8443
+      brute_force_scan:
+        users_wordlist:
+          - top_default_usernames.txt
+          - most_common_usernames.txt
+        pass_wordlist:
+          - top_default_passwords.txt
+          - most_common_passwords.txt
+        services:
+          - ssh
+          - ftp
+          - http
+          - smb
+          - rdp
+          - telnet
+        stop_on_success: true
+      spiderfoot_scan:
+        modules: all

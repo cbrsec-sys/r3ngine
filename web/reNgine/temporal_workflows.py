@@ -114,6 +114,40 @@ class MasterScanWorkflow:
             await workflow.sleep(timedelta(seconds=30))
 
         # ------------------------------------------------------------------
+        # STEP -1: Pre-populate task timeline (idempotent)
+        # ------------------------------------------------------------------
+        try:
+            await workflow.execute_activity(
+                "InitializeScanTasksActivity",
+                ctx,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue"
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            # Non-fatal: scan runs normally even if timeline pre-population fails
+            pass
+
+        # TOR circuit rotation — only dispatched when TOR mode is active
+        if ctx.get('use_tor', False):
+            try:
+                await workflow.execute_activity(
+                    "TorNewCircuitActivity",
+                    start_to_close_timeout=timedelta(seconds=30),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                    task_queue="python-orchestrator-queue"
+                )
+            except Exception:
+                pass
+
+        # State flags for finally-block dispatch (mirrors SubScanWorkflow pattern).
+        is_cancelled = False
+        success = False
+        _failure_reason: str | None = None
+
+        # ------------------------------------------------------------------
         # STEP 0: Target Profiling — validate scan, enrich context, set up dirs
         # ------------------------------------------------------------------
         try:
@@ -174,6 +208,17 @@ class MasterScanWorkflow:
                         "RunFirewallVPNScanActivity",
                         ctx,
                         start_to_close_timeout=timedelta(minutes=30),
+                        heartbeat_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_NETWORK_SCAN,
+                        task_queue="python-orchestrator-queue"
+                    )
+                )
+            if "dns_security" in tasks:
+                discovery_futures.append(
+                    workflow.execute_activity(
+                        "RunDNSSecurityActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(hours=1),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_NETWORK_SCAN,
                         task_queue="python-orchestrator-queue"
@@ -301,17 +346,34 @@ class MasterScanWorkflow:
             await asyncio.gather(*tier2_futures)
 
             # ------------------------------------------------------------------
-            # TIER 3: URL Fetching (sequential — needs Tier 2 http_crawl endpoints)
+            # TIER 3: URL Fetching + Screenshot (parallel — both depend only on
+            # Tier 2 http_crawl; screenshot does NOT depend on fetch_url output)
             # ------------------------------------------------------------------
+            tier3_futures = []
             if "fetch_url" in tasks:
-                await workflow.execute_activity(
-                    "RunFetchURLActivity",
-                    ctx,
-                    start_to_close_timeout=timedelta(hours=2),
-                    heartbeat_timeout=timedelta(minutes=5),
-                    retry_policy=_RETRY_LONG_SCAN,
-                    task_queue="python-orchestrator-queue"
+                tier3_futures.append(
+                    workflow.execute_activity(
+                        "RunFetchURLActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(hours=2),
+                        heartbeat_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_LONG_SCAN,
+                        task_queue="python-orchestrator-queue"
+                    )
                 )
+            if "screenshot" in tasks:
+                tier3_futures.append(
+                    workflow.execute_activity(
+                        "RunScreenshotActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(hours=1),
+                        heartbeat_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_NETWORK_SCAN,
+                        task_queue="python-orchestrator-queue"
+                    )
+                )
+            if tier3_futures:
+                await asyncio.gather(*tier3_futures)
 
             # ------------------------------------------------------------------
             # TIER 4: Directory & File Fuzzing (sequential — needs Tier 3 URLs)
@@ -355,8 +417,8 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunWebAPIDiscoveryActivity",
                         ctx,
-                        start_to_close_timeout=timedelta(hours=1),
-                        heartbeat_timeout=timedelta(minutes=5),
+                        start_to_close_timeout=timedelta(hours=4),
+                        heartbeat_timeout=timedelta(minutes=10),
                         retry_policy=_RETRY_NETWORK_SCAN,
                         task_queue="python-orchestrator-queue"
                     )
@@ -411,35 +473,33 @@ class MasterScanWorkflow:
             await self._check_paused()
 
             # ------------------------------------------------------------------
-            # TIER 6: Security Assessment (parallel — vulnerability, WAF bypass, brute force)
+            # TIER 6: Security Assessment
+            # NucleiPlannerWorkflow runs sequentially FIRST to prevent orphaned
+            # child workflows when a concurrent T6 activity fails. asyncio.gather
+            # cannot cancel a Temporal child workflow — the sequential pattern
+            # eliminates the detachment risk entirely (see FIXES.md Fix 2).
+            # waf_bypass and brute_force_scan run concurrently after nuclei; they
+            # are activities (not child workflows) so gather is safe for them.
             # ------------------------------------------------------------------
-            assessment_futures = []
+            ran_t6 = False
+
             if "vulnerability_scan" in tasks:
                 # Spawn as a child workflow so Nuclei execution has its own
                 # independent Temporal history and can be tracked separately.
-                assessment_futures.append(
-                    workflow.execute_child_workflow(
-                        "NucleiPlannerWorkflow",
-                        ctx,
-                        id=f"{workflow.info().workflow_id}-nuclei",
-                        task_queue="python-orchestrator-queue",
-                        execution_timeout=timedelta(hours=10),
-                        run_timeout=timedelta(hours=10)
-                    )
+                ran_t6 = True
+                await workflow.execute_child_workflow(
+                    "NucleiPlannerWorkflow",
+                    ctx,
+                    id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
+                    task_queue="python-orchestrator-queue",
+                    execution_timeout=timedelta(hours=10),
+                    run_timeout=timedelta(hours=10)
                 )
-            if "screenshot" in tasks:
-                assessment_futures.append(
-                    workflow.execute_activity(
-                        "RunScreenshotActivity",
-                        ctx,
-                        start_to_close_timeout=timedelta(hours=1),
-                        heartbeat_timeout=timedelta(minutes=5),
-                        retry_policy=_RETRY_NETWORK_SCAN,
-                        task_queue="python-orchestrator-queue"
-                    )
-                )
+
+            other_t6_futures = []
             if "waf_bypass" in tasks:
-                assessment_futures.append(
+                ran_t6 = True
+                other_t6_futures.append(
                     workflow.execute_activity(
                         "RunWAFBypassActivity",
                         ctx,
@@ -450,7 +510,8 @@ class MasterScanWorkflow:
                     )
                 )
             if "brute_force_scan" in tasks:
-                assessment_futures.append(
+                ran_t6 = True
+                other_t6_futures.append(
                     workflow.execute_activity(
                         "RunBruteForceScanActivity",
                         ctx,
@@ -460,9 +521,10 @@ class MasterScanWorkflow:
                         task_queue="python-orchestrator-queue"
                     )
                 )
+            if other_t6_futures:
+                await asyncio.gather(*other_t6_futures)
 
-            if assessment_futures:
-                await asyncio.gather(*assessment_futures)
+            if ran_t6:
                 await workflow.execute_activity(
                     "ParseAssessmentResultsActivity",
                     ctx,
@@ -474,89 +536,126 @@ class MasterScanWorkflow:
 
             await self._check_paused()
 
-            # ------------------------------------------------------------------
-            # TIER 7: Post-Processing & Intelligence (sequential — ordering matters)
-            # ------------------------------------------------------------------
-            # MANDATORY TASKS: These must run for ALL scans unconditionally.
-        
-            await workflow.execute_activity(
-                "CorrelateVulnerabilitiesActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
-            await workflow.execute_activity(
-                "CalculateRiskScoresActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=15),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
-
-            # AI Impact Assessment
-            await workflow.execute_activity(
-                "GenerateImpactAssessmentActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_LLM,
-                task_queue="python-orchestrator-queue"
-            )
-
-            # Neo4j graph sync (must precede APME so graph nodes exist)
-            await workflow.execute_activity(
-                "SyncGraphActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=30),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_NETWORK_SCAN,
-                task_queue="python-orchestrator-queue"
-            )
-
-            # MANDATORY: Attack Path Modeling Engine — must be the final analysis step
-            await workflow.execute_activity(
-                "RunGenericTaskActivity",
-                args=[ctx, "run_apme", "Attack Path Modeling Engine", {"scan_history_id": ctx.get("scan_history_id")}],
-                start_to_close_timeout=timedelta(minutes=30),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
-
-            # ------------------------------------------------------------------
-            # FINAL: Mark scan complete and send notification
-            # ------------------------------------------------------------------
-            await workflow.execute_activity(
-                "SendScanNotificationActivity",
-                ctx,
-                start_to_close_timeout=timedelta(minutes=5),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
-
-            workflow.logger.info(
-                f"MasterScanWorkflow COMPLETE for scan_id={ctx.get('scan_history_id')}"
-            )
+            # Tier 7, notification, and finalization have moved to the finally
+            # block below — guarded by `if success:` to match SubScanWorkflow.
+            success = True
             return {"status": "SUCCESS", "scan_history_id": ctx.get("scan_history_id")}
+
+        except asyncio.CancelledError:
+            workflow.logger.info(
+                f"MasterScanWorkflow cancelled for scan_id={ctx.get('scan_history_id')} "
+                "— skipping FinalizeFailedScanActivity (ABORTED_TASK already set by API)."
+            )
+            is_cancelled = True
+            raise
 
         except Exception as e:
             workflow.logger.error(
                 f"MasterScanWorkflow FAILED for scan_id={ctx.get('scan_history_id')}: {e}"
             )
-            # Finalize the scan as failed in Django DB so it can be manually resumed
-            await workflow.execute_activity(
-                "FinalizeFailedScanActivity",
-                args=[ctx, str(e)],
-                start_to_close_timeout=timedelta(minutes=5),
-                heartbeat_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue"
-            )
+            _failure_reason = str(e)
             raise e
+
+        finally:
+            if not is_cancelled:
+                if success:
+                    # ------------------------------------------------------------------
+                    # TIER 7: Post-Processing & Intelligence (sequential — ordering matters)
+                    # Runs only when all scan tiers completed cleanly (success=True),
+                    # matching the SubScanWorkflow pattern. Errors here are non-fatal:
+                    # findings are still queryable even without correlation/risk data.
+                    # ------------------------------------------------------------------
+                    try:
+                        if "vulnerability_scan" in tasks:
+                            await workflow.execute_activity(
+                                "CorrelateVulnerabilitiesActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_INTERNAL,
+                                task_queue="python-orchestrator-queue"
+                            )
+                            await workflow.execute_activity(
+                                "CalculateRiskScoresActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(minutes=15),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_INTERNAL,
+                                task_queue="python-orchestrator-queue"
+                            )
+                            # AI Impact Assessment
+                            await workflow.execute_activity(
+                                "GenerateImpactAssessmentActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_LLM,
+                                task_queue="python-orchestrator-queue"
+                            )
+
+                        _graph_tasks = {
+                            "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
+                            "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
+                            "fetch_url", "dir_file_fuzz", "web_api_discovery", "vulnerability_scan"
+                        }
+                        if any(t in _graph_tasks for t in tasks):
+                            # Neo4j graph sync (must precede APME so graph nodes exist)
+                            await workflow.execute_activity(
+                                "SyncGraphActivity",
+                                ctx,
+                                start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_NETWORK_SCAN,
+                                task_queue="python-orchestrator-queue"
+                            )
+                            # Attack Path Modeling Engine — must be the final analysis step
+                            await workflow.execute_activity(
+                                "RunGenericTaskActivity",
+                                args=[ctx, "run_apme", "Attack Path Modeling Engine",
+                                      {"scan_history_id": ctx.get("scan_history_id")}],
+                                start_to_close_timeout=timedelta(minutes=30),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_INTERNAL,
+                                task_queue="python-orchestrator-queue"
+                            )
+
+                        # ------------------------------------------------------------------
+                        # FINAL: Mark scan complete and send notification
+                        # ------------------------------------------------------------------
+                        await workflow.execute_activity(
+                            "SendScanNotificationActivity",
+                            ctx,
+                            start_to_close_timeout=timedelta(minutes=5),
+                            heartbeat_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_INTERNAL,
+                            task_queue="python-orchestrator-queue"
+                        )
+                        workflow.logger.info(
+                            f"MasterScanWorkflow COMPLETE for scan_id={ctx.get('scan_history_id')}"
+                        )
+                    except asyncio.CancelledError:
+                        raise
+                    except Exception as post_e:
+                        workflow.logger.error(
+                            f"MasterScanWorkflow post-scan tasks failed for "
+                            f"scan_id={ctx.get('scan_history_id')}: {post_e}"
+                        )
+                else:
+                    # Scan tiers failed — finalize the scan record in Django DB.
+                    try:
+                        await workflow.execute_activity(
+                            "FinalizeFailedScanActivity",
+                            args=[ctx, _failure_reason or "Workflow failed during execution"],
+                            start_to_close_timeout=timedelta(minutes=5),
+                            heartbeat_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_INTERNAL,
+                            task_queue="python-orchestrator-queue"
+                        )
+                    except Exception as fin_e:
+                        workflow.logger.error(
+                            f"FinalizeFailedScanActivity itself failed for "
+                            f"scan_id={ctx.get('scan_history_id')}: {fin_e}"
+                        )
 
     # ------------------------------------------------------------------
     # Signal Handlers
@@ -646,8 +745,7 @@ class NucleiPlannerWorkflow:
                 severity_ctx = {**ctx, "nuclei_severity_filter": severity}
                 await workflow.execute_activity(
                     "RunNucleiActivity",
-                    severity_ctx,
-                    severity,
+                    args=[severity_ctx, severity],
                     start_to_close_timeout=timedelta(hours=6),
                     heartbeat_timeout=timedelta(minutes=5),
                     task_queue="python-orchestrator-queue"
@@ -807,6 +905,21 @@ _SUBSCAN_DISPATCH = {
         "timeout": timedelta(minutes=30),
         "args_builder": lambda ctx: [ctx, "run_apme", "Attack Path Modeling Engine", {"scan_history_id": ctx.get("scan_history_id")}],
     },
+    "vigolium_discovery": {
+        "activity": "RunVigoliumDiscoveryActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [ctx],
+    },
+    "vigolium_analysis": {
+        "activity": "RunVigoliumAnalysisActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [ctx],
+    },
+    "vigolium_scan": {
+        "activity": "RunVigoliumScanActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [ctx],
+    },
     # Special cases — handled with inline logic in SubScanWorkflow.run():
     "vulnerability_scan": None,  # Has Tier 7 post-steps (correlation, risk, APME)
     "baddns": None,              # Modifies ctx before dispatch
@@ -821,6 +934,45 @@ class SubScanWorkflow:
     (e.g., 'port_scan', 'fetch_url', 'vulnerability_scan') inside a Temporal
     workflow, strictly enforcing sequence-enforced execution tiers.
     """
+
+    def __init__(self) -> None:
+        self._paused = False
+
+    # ------------------------------------------------------------------
+    # Signal Handlers
+    # ------------------------------------------------------------------
+
+    @workflow.signal(name="pause")
+    def pause_workflow(self) -> None:
+        """Signal handler: pause the subscan pipeline at the next tier boundary."""
+        workflow.logger.info("SubScanWorkflow received PAUSE signal.")
+        self._paused = True
+
+    @workflow.signal(name="resume")
+    def resume_workflow(self) -> None:
+        """Signal handler: resume a paused subscan pipeline."""
+        workflow.logger.info("SubScanWorkflow received RESUME signal.")
+        self._paused = False
+
+    # ------------------------------------------------------------------
+    # Query Handlers
+    # ------------------------------------------------------------------
+
+    @workflow.query(name="get_current_state")
+    def get_current_state(self) -> Dict[str, Any]:
+        """Query handler: return the current workflow state for the frontend."""
+        return {"paused": self._paused}
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    async def _check_paused(self) -> None:
+        """Block at a tier boundary if a pause signal was received."""
+        if self._paused:
+            workflow.logger.info("SubScanWorkflow PAUSED — waiting for resume signal.")
+            await workflow.wait_condition(lambda: not self._paused)
+            workflow.logger.info("SubScanWorkflow RESUMED.")
 
     @workflow.run
     async def run(self, ctx: Dict[str, Any], scan_type: Union[str, List[str]]) -> Dict[str, Any]:
@@ -861,6 +1013,33 @@ class SubScanWorkflow:
             if can_proceed:
                 break
             await workflow.sleep(timedelta(seconds=30))
+
+        # Pre-populate subscan task timeline (idempotent)
+        try:
+            subscan_init_ctx = {**ctx, 'tasks': tasks}
+            await workflow.execute_activity(
+                "InitializeScanTasksActivity",
+                subscan_init_ctx,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue"
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+
+        # TOR circuit rotation — only dispatched when TOR mode is active
+        if ctx.get('use_tor', False):
+            try:
+                await workflow.execute_activity(
+                    "TorNewCircuitActivity",
+                    start_to_close_timeout=timedelta(seconds=30),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
+                    task_queue="python-orchestrator-queue"
+                )
+            except Exception:
+                pass
 
         # Validate tasks against the permitted task list before any dispatch
         known_explicit = set(_SUBSCAN_DISPATCH.keys())
@@ -919,13 +1098,13 @@ class SubScanWorkflow:
                         task_queue="python-orchestrator-queue",
                     )
                 elif t == "vulnerability_scan":
-                    await workflow.execute_activity(
-                        "RunGenericTaskActivity",
-                        args=[ctx_task, "vulnerability_scan", "Vulnerability Scan", {"urls": [target_url]}],
-                        start_to_close_timeout=timedelta(hours=6),
-                        heartbeat_timeout=timedelta(minutes=5),
-                        retry_policy=_RETRY_LONG_SCAN,
+                    await workflow.execute_child_workflow(
+                        "NucleiPlannerWorkflow",
+                        ctx_task,
+                        id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
                         task_queue="python-orchestrator-queue",
+                        execution_timeout=timedelta(hours=6),
+                        run_timeout=timedelta(hours=6),
                     )
                 elif dispatch is not None:
                     args = dispatch["args_builder"](ctx_task)
@@ -972,29 +1151,32 @@ class SubScanWorkflow:
                 # All must complete before Tier 2 (subdomains must be in DB).
                 [t for t in active_tasks if t in {
                     "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
-                    "osint", "spiderfoot_scan", "baddns"
+                    "dns_security", "osint", "spiderfoot_scan", "baddns"
                 }],
                 # TIER 2: HTTP Crawl & Port Scan — populates endpoint DB for Tiers 3+.
-                [t for t in active_tasks if t in {"http_crawl", "port_scan"}],
-                # TIER 3: URL Fetching — needs Tier 2 http_crawl endpoints.
-                [t for t in active_tasks if t == "fetch_url"],
+                # vigolium_discovery runs alongside http_crawl to seed endpoints concurrently.
+                [t for t in active_tasks if t in {"http_crawl", "port_scan", "vigolium_discovery"}],
+                # TIER 3: URL Fetching + Screenshot — both depend only on Tier 2 http_crawl;
+                # screenshot does NOT depend on fetch_url output so they run concurrently.
+                [t for t in active_tasks if t in {"fetch_url", "screenshot"}],
                 # TIER 4: Directory & File Fuzzing — needs Tier 3 URLs.
                 [t for t in active_tasks if t == "dir_file_fuzz"],
                 # TIER 5: Analysis — API discovery, WAF detection, secret scanning.
-                [t for t in active_tasks if t in {"web_api_discovery", "waf_detection", "secret_scanning"}],
+                # vigolium_analysis runs alongside web_api_discovery as in MasterScanWorkflow.
+                [t for t in active_tasks if t in {"web_api_discovery", "waf_detection", "secret_scanning", "vigolium_analysis"}],
                 # TIER 6: Security Assessment — explicit inclusion, mirrors MasterScanWorkflow Tier 6.
-                # Bug fix: previously used an exclusion-based fallthrough that silently dropped
-                # vulnerability_scan, screenshot, waf_bypass, and brute_force_scan.
+                # vigolium_scan runs alongside vulnerability_scan at Tier 6.
                 [t for t in active_tasks if t in {
-                    "vulnerability_scan", "screenshot", "waf_bypass", "brute_force_scan"
+                    "vulnerability_scan", "waf_bypass", "brute_force_scan", "vigolium_scan"
                 }],
                 # TIER 6b: Fallback for any task not classified in Tiers 1-6.
                 # Handles future tasks added to _SUBSCAN_DISPATCH without breaking existing tiers.
                 [t for t in active_tasks if t not in {
                     "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
-                    "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
-                    "fetch_url", "dir_file_fuzz", "web_api_discovery", "waf_detection",
-                    "secret_scanning", "vulnerability_scan", "screenshot", "waf_bypass", "brute_force_scan"
+                    "dns_security", "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
+                    "fetch_url", "screenshot", "dir_file_fuzz", "web_api_discovery", "waf_detection",
+                    "secret_scanning", "vulnerability_scan", "waf_bypass", "brute_force_scan",
+                    "vigolium_discovery", "vigolium_analysis", "vigolium_scan"
                 }],
             ]
 
@@ -1003,6 +1185,10 @@ class SubScanWorkflow:
                 # Build futures list before the guard so vigolium appends can add work
                 # even when no standard tasks exist in this tier.
                 tier_futures = []
+                # For Tier 6 only: vulnerability_scan (NucleiPlannerWorkflow child) is
+                # separated from the concurrent gather to prevent orphaned child workflows
+                # when another Tier 6 activity fails (see FIXES.md Fix 2).
+                nuclei_future = None
 
                 for t in tier_tasks:
                     if t == "http_crawl":
@@ -1039,47 +1225,27 @@ class SubScanWorkflow:
                                 raise
 
                         tier_futures.append(_http_crawl_branch_tracked())
+                    elif tier_index == 6 and t == "vulnerability_scan":
+                        # Run nuclei sequentially (not in gather) so that if another
+                        # Tier 6 activity fails, the child workflow is never orphaned.
+                        nuclei_future = run_and_track_task(t)
                     else:
                         tier_futures.append(run_and_track_task(t))
 
-                # Vigolium discovery runs alongside Tier 2 (HTTP crawl / port scan)
-                if tier_index == 2:
-                    vigolium_discovery_config = yaml_config.get('vigolium_discovery', {})
-                    if vigolium_discovery_config.get('run_vigolium_discovery', True):
-                        tier_futures.append(
-                            workflow.execute_activity(
-                                "RunVigoliumDiscoveryActivity",
-                                ctx,
-                                start_to_close_timeout=timedelta(hours=3),
-                                heartbeat_timeout=timedelta(minutes=5),
-                                retry_policy=_RETRY_LONG_SCAN,
-                                task_queue="python-orchestrator-queue"
-                            )
-                        )
-
-                # Vigolium analysis runs alongside Tier 5 (web_api_discovery, waf_detection, secret_scanning)
-                elif tier_index == 5:
-                    vigolium_analysis_config = yaml_config.get('vigolium_analysis', {})
-                    if vigolium_analysis_config.get('run_vigolium_analysis', True):
-                        tier_futures.append(
-                            workflow.execute_activity(
-                                "RunVigoliumAnalysisActivity",
-                                ctx,
-                                start_to_close_timeout=timedelta(hours=2),
-                                heartbeat_timeout=timedelta(minutes=5),
-                                retry_policy=_RETRY_LONG_SCAN,
-                                task_queue="python-orchestrator-queue"
-                            )
-                        )
-
-                if not tier_futures:
+                if not tier_futures and nuclei_future is None:
                     continue
 
                 workflow.logger.info(
                     f"[SubScanWorkflow] Executing Tier {tier_index} tasks: {tier_tasks}"
                 )
 
-                await asyncio.gather(*tier_futures)
+                # Nuclei runs first (sequential) so that if the concurrent gather below
+                # raises, the child workflow has already completed cleanly — never orphaned.
+                if nuclei_future is not None:
+                    await nuclei_future
+
+                if tier_futures:
+                    await asyncio.gather(*tier_futures)
 
                 # Execute matching Parse verification activity if any tasks in this tier ran.
                 # Tier indices align with the tiers list above:
@@ -1093,6 +1259,11 @@ class SubScanWorkflow:
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
                     )
+                    await self._check_paused()
+                elif tier_index == 2:
+                    await self._check_paused()
+                elif tier_index == 3:
+                    await self._check_paused()
                 elif tier_index == 4:
                     # ParseFuzzResultsActivity after dir_file_fuzz completes.
                     # ParseEnumerationResultsActivity is run unconditionally AFTER the tier loop
@@ -1114,6 +1285,7 @@ class SubScanWorkflow:
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
                     )
+                    await self._check_paused()
                 elif tier_index == 6:
                     await workflow.execute_activity(
                         "ParseAssessmentResultsActivity",
@@ -1123,6 +1295,7 @@ class SubScanWorkflow:
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
                     )
+                    await self._check_paused()
 
             # Unconditional endpoint count consolidation after all enumeration tiers complete.
             # Bug fix: previously this only ran when dir_file_fuzz was selected (inside Tier 4
@@ -1160,7 +1333,7 @@ class SubScanWorkflow:
                             await workflow.execute_activity(
                                 "CorrelateVulnerabilitiesActivity",
                                 ctx,
-                                start_to_close_timeout=timedelta(minutes=15),
+                                start_to_close_timeout=timedelta(minutes=30),
                                 heartbeat_timeout=timedelta(minutes=5),
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue",
@@ -1205,6 +1378,8 @@ class SubScanWorkflow:
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue",
                             )
+                    except asyncio.CancelledError:
+                        raise
                     except Exception as post_e:
                         workflow.logger.error(f"SubScanWorkflow post-scan tasks failed: {post_e}")
 

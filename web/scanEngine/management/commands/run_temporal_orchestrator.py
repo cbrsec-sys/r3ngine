@@ -74,7 +74,8 @@ from reNgine.temporal_activities import (
     run_generic_task_activity,
     finalize_subscan_activity,
     finalize_failed_scan_activity,
-    # Step 0: Target Profiling & backward-compat checkpoint stubs
+    # Step 0: Task initialization & Target Profiling
+    initialize_scan_tasks_activity,
     load_checkpoint_activity,
     save_checkpoint_activity,
     target_profiling_activity,
@@ -84,8 +85,12 @@ from reNgine.temporal_activities import (
     run_subdomain_discovery_activity,
     run_amass_intel_discovery_activity,
     run_firewall_vpn_scan_activity,
+    run_dns_security_activity,
     parse_discovery_results_activity,
     seed_endpoints_for_crawl_activity,
+
+    # TOR
+    run_tor_new_circuit_activity,
 
     # Tier 2: Enumeration
     run_http_crawl_activity,
@@ -283,6 +288,7 @@ class Command(BaseCommand):
                 finalize_failed_scan_activity,
 
                 # Step 0
+                initialize_scan_tasks_activity,
                 load_checkpoint_activity,
                 save_checkpoint_activity,
                 target_profiling_activity,
@@ -292,8 +298,12 @@ class Command(BaseCommand):
                 run_subdomain_discovery_activity,
                 run_amass_intel_discovery_activity,
                 run_firewall_vpn_scan_activity,
+                run_dns_security_activity,
                 parse_discovery_results_activity,
                 seed_endpoints_for_crawl_activity,
+
+                # TOR
+                run_tor_new_circuit_activity,
 
                 # Tier 2
                 run_http_crawl_activity,

@@ -590,10 +590,13 @@ def get_impact_graph_data(request, slug, vuln_id):
 
 def trigger_ai_impact(request, slug, vuln_id):
     if request.method == 'POST':
+        import types
         from reNgine.tasks import generate_impact_assessment
+        proxy = types.SimpleNamespace(_is_temporal_proxy=True, subscan=None)
         threading.Thread(
-            target=generate_impact_assessment.apply,
-            kwargs={'kwargs': {'vulnerability_id': vuln_id}},
+            target=generate_impact_assessment,
+            args=(proxy,),
+            kwargs={'vulnerability_id': vuln_id},
             daemon=True
         ).start()
         return JsonResponse({'status': True, 'message': 'AI Impact Generation started...'})

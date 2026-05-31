@@ -195,14 +195,22 @@ export const ScanHistoryPage: React.FC = () => {
       );
     }
     switch (status) {
-      case 2: // Success
-        return <Chip label="SUCCESS" size="small" sx={{ bgcolor: 'rgba(0, 255, 98, 0.1)', color: '#00ff62', border: '1px solid rgba(0, 255, 98, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<CheckCircle2 size={12} />} />;
+      case 2: { // Complete
+        const total = scan.total_task_count ?? 0;
+        const ok    = scan.successful_task_count ?? 0;
+        const completeLabel = total > 0 ? `COMPLETE ${ok}/${total}` : 'COMPLETE';
+        return <Chip label={completeLabel} size="small" sx={{ bgcolor: 'rgba(0, 255, 98, 0.1)', color: '#00ff62', border: '1px solid rgba(0, 255, 98, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<CheckCircle2 size={12} />} />;
+      }
       case 1: // Running
         return <Chip label="PENDING" size="small" sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<RefreshCw size={12} className="spin" />} />;
       case 3: // Aborted
         return <Chip label="ABORTED" size="small" sx={{ bgcolor: 'rgba(255, 0, 60, 0.1)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<AlertTriangle size={12} />} />;
-      case 0: // Failed
-        return <Chip label="FAILED" size="small" sx={{ bgcolor: 'rgba(255, 0, 60, 0.1)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<XCircle size={12} />} />;
+      case 0: { // Failed
+        const total = scan.total_task_count ?? 0;
+        const ok    = scan.successful_task_count ?? 0;
+        const failedLabel = total > 0 ? `FAILED ${ok}/${total}` : 'FAILED';
+        return <Chip label={failedLabel} size="small" sx={{ bgcolor: 'rgba(255, 0, 60, 0.1)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<XCircle size={12} />} />;
+      }
       case 4: // Partially Complete
         return <Chip label="PARTIALLY COMPLETE" size="small" sx={{ bgcolor: 'rgba(255, 252, 0, 0.1)', color: '#fffc00', border: '1px solid rgba(255, 252, 0, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<AlertTriangle size={12} />} />;
       default:

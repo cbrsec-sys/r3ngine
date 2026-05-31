@@ -206,7 +206,8 @@ export const useFullYamlConfig = () => {
       if (!response.ok) {
         throw new Error('Failed to fetch full YAML config');
       }
-      return response.json();
+      const data = await response.json();
+      return data.content;
     },
   });
 };

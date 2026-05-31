@@ -53,11 +53,21 @@ class ToolExecutionTest(TransactionTestCase):
         
         self.real_target = os.environ.get('TEST_REAL_TARGET', 'defijn.io')
         self.is_real_mode = os.environ.get('TEST_REAL_MODE', 'false').lower() == 'true'
+        
+        self.task = MagicMock()
+        self.task.scan = self.scan
+        self.task.scan_id = self.scan.id
+        self.task.domain = self.domain
+        self.task.yaml_configuration = self.ctx['yaml_configuration']
+        self.task.activity_id = 1
+        self.task.subscan = None
+        self.task.subdomain = None
+        self.task.starting_point_path = ""
 
     def test_wpscan_execution(self):
         print(f"\n[DEBUG] Starting WPScan test. Real mode: {self.is_real_mode}")
         if self.is_real_mode:
-            res = wpscan_scan(urls=[f"http://{self.real_target}"], ctx=self.ctx)
+            res = wpscan_scan(self.task, urls=[f"http://{self.real_target}"], ctx=self.ctx)
             print(f"[DEBUG] WPScan real result: {res}")
         else:
             sample_file = "web/tests/sample_data/wpscan_sample.json"
@@ -75,7 +85,7 @@ class ToolExecutionTest(TransactionTestCase):
             
             # Patch in tasks module
             with patch('reNgine.tasks.stream_command') as mock_stream:
-                res = wpscan_scan(urls=[f"http://{self.domain_name}"], ctx=self.ctx)
+                res = wpscan_scan(self.task, urls=[f"http://{self.domain_name}"], ctx=self.ctx)
                 print(f"[DEBUG] wpscan_scan result: {res}")
             
             vulns = Vulnerability.objects.filter(scan_history=self.scan, type='WordPress')
@@ -86,7 +96,7 @@ class ToolExecutionTest(TransactionTestCase):
     def test_cpanel_execution(self):
         print(f"\n[DEBUG] Starting cPanel test. Real mode: {self.is_real_mode}")
         if self.is_real_mode:
-            res = cpanel_scan(ctx=self.ctx)
+            res = cpanel_scan(self.task, ctx=self.ctx)
             print(f"[DEBUG] cPanel real result: {res}")
         else:
             sample_file = "web/tests/sample_data/cpanel_sample.json"
@@ -102,7 +112,7 @@ class ToolExecutionTest(TransactionTestCase):
             
             # Patch in tasks module
             with patch('reNgine.tasks.stream_command') as mock_stream:
-                res = cpanel_scan(ctx=self.ctx)
+                res = cpanel_scan(self.task, ctx=self.ctx)
                 print(f"[DEBUG] cpanel_scan result: {res}")
             
             vulns = Vulnerability.objects.filter(scan_history=self.scan, type='cPanel')
@@ -174,7 +184,7 @@ class ToolExecutionTest(TransactionTestCase):
                 
                 # Update ctx for trufflehog
                 self.ctx['yaml_configuration'] = {'vulnerability_scan': {'trufflehog': True}}
-                res = secret_scanning(config={'trufflehog': True}, ctx=self.ctx)
+                res = secret_scanning(self.task, config={'trufflehog': True}, ctx=self.ctx)
                 print(f"[DEBUG] secret_scanning result: {res}")
             
             leaks = SecretLeak.objects.filter(scan_history=self.scan, tool_name='trufflehog')
@@ -203,8 +213,8 @@ class ToolExecutionTest(TransactionTestCase):
             print("[DEBUG] Updated Acunetix API Key with real credentials.")
             # We patch time.sleep to avoid waiting too long during polling
             with patch('reNgine.tasks.time.sleep', return_value=None):
-                res = acunetix_scan.apply(args=(self.domain.id, self.scan.id, self.ctx))
-                print(f"[DEBUG] Real Acunetix scan result: {res.result}")
+                res = acunetix_scan(self.task, self.domain.id, self.scan.id, self.ctx)
+                print(f"[DEBUG] Real Acunetix scan result: {res}")
         else:
             # Setup Acunetix API Key
             AcunetixAPIKey.objects.create(
@@ -235,8 +245,8 @@ class ToolExecutionTest(TransactionTestCase):
                 
                 mock_requests_get.side_effect = [mock_targets_resp, mock_scans_resp]
                 
-                res = acunetix_scan.apply(args=(self.domain.id, self.scan.id, self.ctx))
-                print(f"[DEBUG] acunetix_scan result: {res.result}")
+                res = acunetix_scan(self.task, self.domain.id, self.scan.id, self.ctx)
+                print(f"[DEBUG] acunetix_scan result: {res}")
                 
                 mock_acunetix.start_scan.assert_called()
 
@@ -244,8 +254,8 @@ class ToolExecutionTest(TransactionTestCase):
         email = "test@defijn.io"
         print(f"\n[DEBUG] Starting Holehe test.")
         if self.is_real_mode:
-            res = run_holehe.apply(args=(email, self.scan.id))
-            print(f"[DEBUG] Holehe real result: {res.result}")
+            res = run_holehe(email, self.scan.id)
+            print(f"[DEBUG] Holehe real result: {res}")
         else:
             # holehe parsing is based on stdout lines
             with patch('reNgine.osint_tasks.subprocess.Popen') as mock_popen:
@@ -253,8 +263,8 @@ class ToolExecutionTest(TransactionTestCase):
                 process_mock.communicate.return_value = ("[+] twitter\n[+] github\n", "")
                 mock_popen.return_value = process_mock
                 
-                res = run_holehe.apply(args=(email, self.scan.id))
-                print(f"[DEBUG] run_holehe result: {res.result}")
+                res = run_holehe(email, self.scan.id)
+                print(f"[DEBUG] run_holehe result: {res}")
                 
                 email_obj = Email.objects.filter(address=email).first()
                 self.assertIsNotNone(email_obj)

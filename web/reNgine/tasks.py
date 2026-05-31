@@ -320,6 +320,7 @@ def initiate_scan_temporal(
 			subdomain.save()
 
 		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
+		_proxy = Proxy.objects.first()
 		temporal_ctx = {
 			'scan_history_id': scan.id,
 			'engine_id': engine_id,
@@ -333,6 +334,7 @@ def initiate_scan_temporal(
 			'api_discovery_tools': api_discovery_tools,
 			'kr_wordlist': kr_wordlist,
 			'tasks': tasks,
+			'use_tor': bool(_proxy and _proxy.use_tor),
 		}
 
 		# ---- Start MasterScanWorkflow on Temporal ----
@@ -534,6 +536,7 @@ def initiate_subscan_temporal(
 			logger.warning(f"Could not send subscan start notification: {notif_err}")
 
 		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
+		_proxy = Proxy.objects.first()
 		temporal_ctx = {
 			'scan_history_id': scan.id,
 			'subscan_id': first_subscan_id,
@@ -548,7 +551,8 @@ def initiate_subscan_temporal(
 			'starting_point_path': starting_point_path,
 			'excluded_paths': excluded_paths,
 			'api_discovery_tools': api_discovery_tools,
-			'kr_wordlist': kr_wordlist
+			'kr_wordlist': kr_wordlist,
+			'use_tor': bool(_proxy and _proxy.use_tor),
 		}
 
 		# ---- Create initial endpoints in DB ----
@@ -601,7 +605,7 @@ def initiate_subscan_temporal(
 						execution_timeout=timedelta(days=7),
 						run_timeout=timedelta(days=7),
 						task_timeout=timedelta(hours=1),
-						retry_policy=RetryPolicy(maximum_attempts=10),
+						retry_policy=RetryPolicy(maximum_attempts=1),
 					)
 					return handle.id
 				except TemporalServiceError as e:
@@ -1006,6 +1010,10 @@ def subdomain_discovery(
 		history_file=self.history_file,
 		scan_id=self.scan_id,
 		activity_id=self.activity_id)
+
+	if not os.path.isfile(self.output_path):
+		logger.warning('subdomain_discovery: output file not found at %s, no subdomains collected.', self.output_path)
+		return
 
 	with open(self.output_path) as f:
 		lines = f.readlines()
@@ -1861,9 +1869,18 @@ def leaklookup(self, host=None, ctx=None, **kwargs):
 
 
 def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
-	"""Scan for secrets in JS files and potentially other sources."""
+	"""Scan for secrets in JS files and potentially other sources.
+
+	Args:
+		config (dict, optional): Leaks and secrets configuration dictionary.
+		host (str, optional): Target hostname.
+		ctx (dict, optional): Scan activity context.
+	"""
 	if not self.scan:
 		return "No scan history found."
+
+	if config is None:
+		config = self.yaml_configuration.get('leaks_and_secrets') or self.yaml_configuration.get('osint', {}).get('leaks_and_secrets') or {}
 
 	endpoints = EndPoint.objects.filter(scan_history=self.scan)
 	# Sensitive extensions to scan
@@ -2425,6 +2442,11 @@ def port_scan(self, hosts=[], ctx={}, description=None, prepare_only=False, pars
 				max_rate=rate_limit,
 				ctx=ctx_nmap)
 
+	# Network protocol enumeration
+	if config.get(ENABLE_NETWORK_ENUM, False) and ports_data:
+		from reNgine.network_tasks import run_network_enum
+		run_network_enum(self, ctx, ports_data)
+
 	return ports_data
 
 
@@ -2512,7 +2534,7 @@ def nmap(
 			scan_history=self.scan,
 			subscan=self.subscan,
 			endpoint=endpoint,
-			dedup_fields=['name', 'http_url', 'scan_history'],
+			dedup_fields=['name', 'subdomain', 'scan_history'],
 			**vuln_data)
 		vulns_str += f'• {str(vuln)}\n'
 		if created:
@@ -2801,9 +2823,9 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			# Apply custom headers
 			if custom_headers:
 				formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
-				if tool == 'gospider': tool_cmd += formatted_headers
+				if tool == 'gospider': tool_cmd += f' {formatted_headers}'
 				elif tool == 'hakrawler': tool_cmd += ';;'.join(header for header in custom_headers)
-				elif tool == 'katana': tool_cmd += formatted_headers
+				elif tool == 'katana': tool_cmd += f' {formatted_headers}'
 
 			url_results_file = f'{self.results_dir}/urls_{tool}.txt'
 			full_cmd = f'cat {input_path} | {tool_cmd} | grep -Eo {host_regex} | tee {url_results_file}'
@@ -2817,7 +2839,58 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 				activity_id=self.activity_id
 			)
 			recon_run = True
-	
+
+	# Vigolium spidering — runs ingestion+discovery phases to collect additional URLs.
+	# Activated by adding 'vigolium' to fetch_url.uses_tools in the YAML config.
+	if 'vigolium' in tools and os.path.isfile(input_path):
+		from reNgine.vigolium_tasks import _iter_jsonl
+
+		vigolium_jsonl = f'{self.results_dir}/urls_vigolium.jsonl'
+		vigolium_urls_file = f'{self.results_dir}/urls_vigolium.txt'
+
+		vig_spider_config = config.get('vigolium_spider', {})
+		vig_concurrency = vig_spider_config.get(VIGOLIUM_CONCURRENCY, 20)
+		vig_rate_limit = vig_spider_config.get(VIGOLIUM_RATE_LIMIT, 50)
+		vig_timeout = vig_spider_config.get(VIGOLIUM_TIMEOUT, '10s')
+		vig_strategy = vig_spider_config.get(VIGOLIUM_STRATEGY, 'balanced')
+
+		vig_cmd = (
+			f"vigolium scan"
+			f" -T {input_path}"
+			f" --only ingestion,discovery"
+			f" --stateless"
+			f" --format jsonl"
+			f" -o {vigolium_jsonl}"
+			f" -c {vig_concurrency}"
+			f" -r {vig_rate_limit}"
+			f" --timeout {vig_timeout}"
+			f" --strategy {vig_strategy}"
+			f" --skip-dependency-check"
+		)
+		proxy = get_random_proxy()
+		if proxy:
+			vig_cmd += f" --proxy {proxy}"
+
+		logger.info("fetch_url: running vigolium spidering")
+		logger.warning(f"vigolium spider command: {vig_cmd}")
+		run_command_with_retry(
+			vig_cmd,
+			results_file=vigolium_jsonl,
+			scan_id=self.scan_id,
+			activity_id=self.activity_id
+		)
+
+		spider_urls = [
+			record['data']['url']
+			for record in _iter_jsonl(vigolium_jsonl)
+			if record.get('type') == 'http_record' and record.get('data', {}).get('url')
+		]
+		if spider_urls:
+			with open(vigolium_urls_file, 'w') as _vf:
+				_vf.write('\n'.join(spider_urls))
+			logger.info(f"fetch_url: vigolium spidering found {len(spider_urls)} URLs")
+			recon_run = True
+
 	if not recon_run:
 		logger.warning('No reconnaissance tools enabled for fetch_url. Skipping.')
 		return
@@ -2845,6 +2918,10 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		)
 
 	# Store all the endpoints and run httpx
+	if not os.path.isfile(self.output_path):
+		logger.warning('fetch_url: output file not found at %s, no URLs to process.', self.output_path)
+		return
+
 	with open(self.output_path) as f:
 		discovered_urls = f.readlines()
 		self.notify(fields={'Discovered URLs': len(discovered_urls)})
@@ -2884,6 +2961,24 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 	if self.excluded_paths:
 		all_urls = exclude_urls_by_patterns(self.excluded_paths, all_urls)
 
+	# Pass 1: URL signature dedup — collapse parametric variants (same path, different param values).
+	# e.g. /page?id=1, /page?id=2, /page?id=3 all share signature /page?id and collapse to one.
+	# URLs with different parameter names are treated as structurally distinct and kept.
+	if should_remove_duplicate_endpoints:
+		pre_count = len(all_urls)
+		seen_sigs = {}
+		deduped = []
+		for url in all_urls:
+			sig = url_param_signature(url)
+			if sig not in seen_sigs:
+				seen_sigs[sig] = True
+				deduped.append(url)
+		all_urls = deduped
+		logger.warning(
+			f'fetch_url dedup: {pre_count} → {len(all_urls)} URLs '
+			f'(removed {pre_count - len(all_urls)} parametric variants)'
+		)
+
 	# Write result to output path
 	with open(self.output_path, 'w') as f:
 		f.write('\n'.join(all_urls))
@@ -2902,6 +2997,40 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			ctx=ctx,
 			subdomain=subdomain
 		)
+
+	# Pass 2: Content-based dedup — delete endpoints already enriched by http_crawl
+	# whose (subdomain, content_length, page_title) signature matches a shorter sibling.
+	# Skeleton endpoints added by fetch_url (no content_length/page_title yet) are skipped.
+	if should_remove_duplicate_endpoints and duplicate_removal_fields:
+		scan_obj = ScanHistory.objects.filter(pk=ctx.get('scan_history_id')).first()
+		domain_obj = Domain.objects.filter(pk=ctx.get('domain_id')).first()
+		if scan_obj and domain_obj:
+			field_filter = {f'{f}__isnull': False for f in duplicate_removal_fields}
+			field_filter.update(
+				{f'{f}__gt': 0 for f in duplicate_removal_fields if f == 'content_length'}
+			)
+			crawled_eps = EndPoint.objects.filter(
+				scan_history=scan_obj,
+				target_domain=domain_obj,
+				**field_filter
+			).order_by('http_url')
+
+			seen_content_sigs = {}
+			to_delete = []
+			for ep in crawled_eps:
+				sig = tuple(getattr(ep, f, None) for f in duplicate_removal_fields)
+				subdomain_key = (ep.subdomain_id,) + sig
+				if subdomain_key in seen_content_sigs:
+					to_delete.append(ep.pk)
+				else:
+					seen_content_sigs[subdomain_key] = ep.pk
+
+			if to_delete:
+				deleted_count, _ = EndPoint.objects.filter(pk__in=to_delete).delete()
+				logger.warning(
+					f'fetch_url content dedup: removed {deleted_count} duplicate endpoints '
+					f'(same {duplicate_removal_fields})'
+				)
 
 
 
@@ -2987,7 +3116,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	"""Advanced Web App & API Discovery using Kiterunner, Arjun, LinkFinder, etc."""
 	logger.info('Running Web API Discovery Task')
 	config = self.yaml_configuration.get(WEB_API_DISCOVERY) or {}
-	uses_tools = ctx.get('api_discovery_tools') or config.get(USES_TOOLS, ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'aquatone', 'semgrep'])
+	uses_tools = ctx.get('api_discovery_tools') or config.get(USES_TOOLS, ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'semgrep'])
 	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
@@ -3010,14 +3139,19 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	results_dir = f"{self.results_dir}/web_api_discovery"
 	os.makedirs(results_dir, exist_ok=True)
 
-	processed_paramspider_subdomains = set()
+	# ── Phase 1: Map URLs to subdomains ─────────────────────────────────────
+	# Build subdomain_targets {name: (Subdomain, base_url)} for Kiterunner and
+	# an ordered url_subdomain_map for per-URL tools (Arjun, LinkFinder, InQL).
+	# URL pattern deduplication removes param-value variants that add no value
+	# (e.g. locale=ar vs locale=cs share the same path+key signature).
+	subdomain_targets = {}
+	url_subdomain_map = []
 	processed_url_patterns = set()
+
 	for url in urls:
-		# URL Pattern Normalization to skip redundant endpoints (e.g. locale=ar vs locale=cs)
 		parsed = urlparse(url)
 		query_keys = sorted(parse_qs(parsed.query).keys())
 		url_pattern = f"{parsed.netloc}{parsed.path}?{'&'.join(query_keys)}"
-		
 		if url_pattern in processed_url_patterns:
 			continue
 		processed_url_patterns.add(url_pattern)
@@ -3027,15 +3161,65 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		if not subdomain:
 			continue
 
-		# Arjun - Parameter discovery
-		if 'arjun' in uses_tools:
-			logger.info(f'Running Arjun on {url}')
+		if subdomain_name not in subdomain_targets:
+			base_url = f"{parsed.scheme}://{subdomain_name}/"
+			subdomain_targets[subdomain_name] = (subdomain, base_url)
+
+		url_subdomain_map.append((url, subdomain_name, subdomain))
+
+	# ── Kiterunner: one scan per subdomain against base URL ───────────────────
+	# Running against the root of each subdomain (not individual endpoints)
+	# covers the full route space in a single wordlist pass and avoids
+	# multiplying the 35k-route scan by every discovered endpoint.
+	# The output file is the idempotency guard — if it exists and is non-empty
+	# the scan already ran (e.g. from a prior Temporal retry) and we skip to
+	# parsing, preserving all previously discovered routes.
+	if 'kiterunner' in uses_tools:
+		for subdomain_name, (subdomain, base_url) in subdomain_targets.items():
+			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
+			if os.path.exists(kr_output) and os.path.getsize(kr_output) > 0:
+				logger.info(f'Kiterunner already scanned {subdomain_name}, loading existing results.')
+			else:
+				logger.info(f'Running Kiterunner on {subdomain_name} ({base_url})')
+				cmd = f"kr scan {base_url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json | tee {kr_output}"
+				logger.warning(f'Running Kiterunner command: {cmd}')
+				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			if os.path.exists(kr_output):
+				try:
+					kr_parsed = urlparse(base_url)
+					with open(kr_output, 'r') as f:
+						for line in f:
+							if not line.strip():
+								continue
+							entry = json.loads(line)
+							found_path = entry.get('path', '')
+							if found_path:
+								full_url = f"{kr_parsed.scheme}://{kr_parsed.netloc}{found_path}"
+								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain, http_status=entry.get('status'))
+								if endpoint and '?' in full_url:
+									params = extract_params_from_url(full_url)
+									for p in params:
+										save_parameter(endpoint, p['name'], param_type='Kiterunner', value=p['value'])
+				except Exception as e:
+					logger.error(f"Error parsing Kiterunner output for {subdomain_name}: {e}")
+
+	# ── Per-URL tools (Arjun, ParamSpider, LinkFinder, InQL) ─────────────────
+	# Each tool uses a file-existence check so that Temporal retries skip work
+	# that already completed in a previous attempt.
+	processed_paramspider_subdomains = set()
+	processed_arjun_subdomains = set()
+	for url, subdomain_name, subdomain in url_subdomain_map:
+
+		# Arjun - Parameter discovery (once per subdomain; output is subdomain-scoped)
+		if 'arjun' in uses_tools and subdomain_name not in processed_arjun_subdomains:
+			processed_arjun_subdomains.add(subdomain_name)
 			arjun_output = f"{results_dir}/arjun_{subdomain_name}.json"
-			cmd = f"arjun -u {url} --passive -m {arjun_methods} -t {threads} -oJ {arjun_output}"
-			#proxy = get_random_proxy()
-			#if proxy:
-			#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id) #, proxy=proxy)
+			if os.path.exists(arjun_output) and os.path.getsize(arjun_output) > 0:
+				logger.info(f'Arjun already ran for {subdomain_name}, loading existing results.')
+			else:
+				logger.info(f'Running Arjun on {url}')
+				cmd = f"arjun -u {url} --passive -m {arjun_methods} -t {threads} -oJ {arjun_output}"
+				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(arjun_output):
 				try:
 					with open(arjun_output, 'r') as f:
@@ -3053,51 +3237,22 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 									for p in params:
 										save_parameter(endpoint, p, param_type=method)
 				except Exception as e:
-					logger.error(f"Error parsing Arjun output for {url}: {e}")
+					logger.error(f"Error parsing Arjun output for {subdomain_name}: {e}")
 
-		# Kiterunner - API/Route discovery
-		if 'kiterunner' in uses_tools:
-			logger.info(f'Running Kiterunner on {url}')
-			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
-			cmd = f"kr scan {url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json | tee -a {kr_output}"
-			#proxy = get_random_proxy()
-			#if proxy:
-			#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
-			logger.warning(f'Running Kiterunner command: {cmd}')
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id) #, proxy=proxy)
-			if os.path.exists(kr_output):
-				try:
-					with open(kr_output, 'r') as f:
-						for line in f:
-							if not line.strip(): continue
-							entry = json.loads(line)
-							found_path = entry.get('path', '')
-							if found_path:
-								parsed = urlparse(url)
-								full_url = f"{parsed.scheme}://{parsed.netloc}{found_path}"
-								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain, http_status=entry.get('status'))
-								# Extract parameters from Kiterunner path if any
-								if '?' in full_url:
-									params = extract_params_from_url(full_url)
-									logger.warning(f'Found params: {params}')
-									for p in params:
-										save_parameter(endpoint, p['name'], param_type='Kiterunner', value=p['value'])
-				except Exception as e:
-					logger.error(f"Error parsing Kiterunner output for {url}: {e}")
-
-		# ParamSpider
+		# ParamSpider - once per subdomain
 		if 'paramspider' in uses_tools and subdomain_name not in processed_paramspider_subdomains:
-			logger.info(f'Running ParamSpider on {subdomain_name}')
 			processed_paramspider_subdomains.add(subdomain_name)
 			ps_output = f"{results_dir}/ps_{subdomain_name}.txt"
-			cmd = f"paramspider --domain {subdomain_name} | tee {ps_output}"
-			proxy = get_random_proxy()
-			if proxy:
-				cmd = f"paramspider --domain {subdomain_name} --proxy {proxy} | tee {ps_output}"
-			logger.warning(f'Running ParamSpider command: {cmd}')
-			# proxy already embedded via --proxy flag above; don't also pass proxy= kwarg
-			# or run_command would double-wrap with proxychains when use_proxychains=True
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			if os.path.exists(ps_output) and os.path.getsize(ps_output) > 0:
+				logger.info(f'ParamSpider already ran for {subdomain_name}, loading existing results.')
+			else:
+				logger.info(f'Running ParamSpider on {subdomain_name}')
+				cmd = f"paramspider --domain {subdomain_name} | tee {ps_output}"
+				proxy = get_random_proxy()
+				if proxy:
+					cmd = f"paramspider --domain {subdomain_name} --proxy {proxy} | tee {ps_output}"
+				logger.warning(f'Running ParamSpider command: {cmd}')
+				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(ps_output):
 				try:
 					with open(ps_output, 'r') as f:
@@ -3115,16 +3270,13 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				except Exception as e:
 					logger.error(f"Error parsing ParamSpider output for {subdomain_name}: {e}")
 
-		# LinkFinder
+		# LinkFinder - per URL (fast; fetches and extracts JS links)
 		if 'linkfinder' in uses_tools:
 			logger.info(f'Running LinkFinder on {url}')
 			lf_output = f"{results_dir}/lf_{subdomain_name}.txt"
 			cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -i {url} -o cli | tee {lf_output}"
-			#proxy = get_random_proxy()
-			#if proxy:
-			#	cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {cmd}"
 			logger.warning(f'Running LinkFinder command: {cmd}')
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id) #, proxy=proxy)
+			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(lf_output):
 				try:
 					with open(lf_output, 'r') as f:
@@ -3137,7 +3289,6 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 								else:
 									full_url = line
 								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain)
-								# Extract parameters from LinkFinder findings
 								if '?' in full_url:
 									params = extract_params_from_url(full_url)
 									for p in params:
@@ -3154,19 +3305,24 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			proxy = get_random_proxy()
 			if proxy:
 				cmd += f" -p {proxy}"
-			# proxy already embedded via -p flag above; don't also pass proxy= kwarg
-			# or run_command would double-wrap with proxychains when use_proxychains=True
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
-			# Parse InQL results
 			if os.path.exists(inql_output):
 				try:
 					inql_findings = parse_inql_results(inql_output)
 					for finding in inql_findings:
-						# InQL doesn't always give the full URL, but we know the base URL
-						# We can register the discovery of GraphQL
 						save_endpoint(url, ctx=ctx, subdomain=subdomain, source='InQL (GraphQL Found)')
 				except Exception as e:
 					logger.error(f"Error parsing InQL results for {url}: {e}")
+
+		# jwt_tool - JWT security testing
+		if JWT_TOOL in uses_tools:
+			from reNgine.api_tasks import run_jwt_scan
+			run_jwt_scan(self, ctx, url, subdomain, results_dir)
+
+		# graphql-cop - GraphQL security audit
+		if GRAPHQL_COP in uses_tools:
+			from reNgine.api_tasks import run_graphql_cop
+			run_graphql_cop(self, ctx, url, subdomain)
 
 	# Semgrep - Post-discovery pattern matching
 	if 'semgrep' in uses_tools:
@@ -3226,66 +3382,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 							logger.warning(f'Found potential vulnerability: {vuln_data}')
 							save_vulnerability(vuln_data, self.scan, self.domain)
 
-	# Aquatone - Visual discovery
-	if 'aquatone' in uses_tools:
-		logger.info('Running Aquatone on discovery results')
-		aquatone_dir = f"{results_dir}/aquatone"
-		os.makedirs(aquatone_dir, exist_ok=True)
-		urls_file = f"{results_dir}/all_discovery_urls.txt"
-		# Get all endpoints discovered so far for this scan
-		all_endpoints = EndPoint.objects.filter(subdomain__scan_history=self.scan)
-		with open(urls_file, 'w') as f:
-			for ep in all_endpoints:
-				f.write(f"{ep.http_url}\n")
-		
-		cmd = f"cat {urls_file} | aquatone -out {aquatone_dir} -chrome-path /usr/bin/chromium" # -silent"
-		# Get a fresh random proxy specifically for Aquatone to avoid stale leaked loop variables
-		aquatone_proxy = get_random_proxy()
-		if aquatone_proxy:
-			cmd += f" -proxy {aquatone_proxy}"
-		logger.warning(f'Running Aquatone command: {cmd}')
-		run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
-
-		# Parse Aquatone results and link to database
-		aquatone_session = f"{aquatone_dir}/aquatone_session.json"
-		if os.path.exists(aquatone_session):
-			try:
-				from startScan.models import Screenshot
-				with open(aquatone_session, 'r') as f:
-					data = json.load(f)
-					# Aquatone session data contains 'pages' key
-					pages = data.get('pages', {})
-					for page_id, page_data in pages.items():
-						page_url = page_data.get('url')
-						if not page_url: continue
-						
-						subdomain_name = get_subdomain_from_url(page_url)
-						subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=self.scan).first()
-						if not subdomain: continue
-						
-						# Save to Screenshot model
-						screenshot_file = f"aquatone/screenshots/{page_id}.png"
-						html_file = f"aquatone/html/{page_id}.html"
-						logger.warning(f'Aquatone artifacts saved to {html_file}')
-						Screenshot.objects.get_or_create(
-							subdomain=subdomain,
-							scan_history=self.scan,
-							url=page_url,
-							defaults={
-								'title': page_data.get('title'),
-								'status_code': page_data.get('status_code'),
-								'screenshot_path': screenshot_file,
-								'html_path': html_file,
-								'technologies': page_data.get('tags') or [], # Aquatone uses tags for tech
-							}
-						)
-						# Also update the subdomain's screenshot_path if not set
-						if not subdomain.screenshot_path:
-							subdomain.screenshot_path = screenshot_file
-							subdomain.save()
-							
-			except Exception as e:
-				logger.error(f"Error parsing Aquatone session for {self.scan}: {e}")
+	# Aquatone - Visual discovery removed in favor of Playwright implementation
 
 
 	# Sync to Graph
@@ -3493,6 +3590,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	
 	# Intelligence-Driven Scanning: Inject tags based on detected technologies
 	tech_tags = []
+	all_techs = set()
 	if self.scan:
 		# Get all technologies discovered for this scan
 		subdomains = Subdomain.objects.filter(scan_history=self.scan)
@@ -3501,7 +3599,6 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 			# assuming technologies is a many-to-many field with 'name' attribute
 			all_techs.update(sub.technologies.values_list('name', flat=True))
 		
-		# Temporarily disabled to check if this is causing nuclei scans to hang
 		if all_techs:
 			tech_tags = get_nuclei_tags_from_techs(list(all_techs))
 			logger.info(f'Detected technologies: {list(all_techs)}. Adding targeted Nuclei tags: {tech_tags}')
@@ -3544,18 +3641,24 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 			history_file=self.history_file,
 			scan_id=self.scan_id,
 			activity_id=self.activity_id)
-		input_path = unfurl_filter
+		if os.path.isfile(unfurl_filter) and os.path.getsize(unfurl_filter) > 0:
+			input_path = unfurl_filter
+		else:
+			logger.warning('nuclei_scan: unfurl produced no output, using original endpoint list.')
 
 	# Build templates
 	logger.info('Updating Nuclei templates ...')
-	# Wordfence Templates integration
-	is_wordpress_detected = False # Temporarily disabled topscoder wordpress nuclei templates
+	# Wordfence Templates integration — 70k+ WordPress CVE templates, daily-updated
+	is_wordpress_detected = any(
+		'wordpress' in t.lower() or 'wp-' in t.lower()
+		for t in all_techs
+	) if all_techs else False
 	wordfence_exists = False
 	if is_wordpress_detected:
 		logger.info("WordPress detected. Preparing Wordfence Nuclei Templates...")
 		os.environ['GITHUB_TEMPLATE_REPO'] = 'topscoder/nuclei-wordfence-cve'
-		
-		wordfence_dir = '/usr/src/github/topscoder/nuclei-wordfence-cve'
+
+		wordfence_dir = '/root/nuclei-templates/wordfence'
 		if not os.path.exists(wordfence_dir) or not os.listdir(wordfence_dir):
 			os.makedirs(os.path.dirname(wordfence_dir), exist_ok=True)
 			logger.info("Cloning topscoder/nuclei-wordfence-cve templates from GitHub...")
@@ -3563,7 +3666,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 				import subprocess
 				subprocess.run(
 					["git", "clone", "--depth", "1", "https://github.com/topscoder/nuclei-wordfence-cve.git", wordfence_dir],
-					timeout=20,
+					timeout=120,
 					check=True,
 					stdout=subprocess.PIPE,
 					stderr=subprocess.PIPE
@@ -3613,7 +3716,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	cmd = opsec.apply_stealth('nuclei', cmd, proxy=proxy)
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
-		cmd += formatted_headers
+		cmd += f' {formatted_headers}'
 	cmd += f' -l {input_path}'
 	cmd += f' -c {str(concurrency)}' if concurrency > 0 else ''
 
@@ -3621,23 +3724,17 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	cmd += f' -rl {rate_limit}' if rate_limit > 0 else ''
 	if severities_str:
 		cmd += f' -severity {severities_str}'
-	cmd += f' -timeout {str(timeout)}' if timeout and timeout > 0 else ''
+	#cmd += f' -timeout {str(timeout)}' if timeout and timeout > 0 else ''
 	if tags:
-		cmd += f' -tags {tags}'
-	cmd += f' -silent'
+		cmd += f" -tags '{tags}'"
+	#cmd += f' -silent'
 	for tpl in templates:
 		cmd += f' -t {tpl}'
 	
 	if is_wordpress_detected and wordfence_exists:
-		# Add Wordfence template path
-		logger.warning(f'wordfence_detected: {is_wordpress_detected}, wordfence_exists: {wordfence_exists}')
-		cmd += " -t /usr/src/github/topscoder/nuclei-wordfence-cve"
-		# Default to production, optional candidate
-		use_candidate = config.get('nuclei_config', {}).get(USE_WORDFENCE_CANDIDATE, False)
-		if use_candidate:
-			cmd += " -tags candidate"
-		else:
-			cmd += " -tags production"
+		# Wordfence templates live at /root/nuclei-templates/wordfence — already included
+		# in the default -t /root/nuclei-templates recursive scan; no extra -t needed.
+		logger.info(f'[nuclei] WordPress detected; Wordfence templates active at /root/nuclei-templates/wordfence')
 	logger.info("Running Nuclei vulnerabilities scan")
 	if hasattr(self, 'activity') and self.activity:
 		self.activity.title = "Nuclei Scan"
@@ -3882,13 +3979,13 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	# command builder
 	proxy = get_random_proxy()
 	opsec = OpSecManager()
-	cmd = 'dalfox --silence --no-color --no-spinner'
-	cmd += f' --only-poc v,r '
+	cmd = 'dalfox --silence --no-color'
+	cmd += f' --only-poc v,r'
 	cmd += f' --ignore-return 302,404,403'
 	
 	cmd = opsec.apply_stealth('dalfox', cmd, proxy=proxy)
 	cmd += f' file {input_path}'
-	cmd += f' --proxy {proxy}' if proxy else ''
+	cmd += f' --proxy {proxy}' if proxy and '--proxy' not in cmd else ''
 	cmd += f' --waf-evasion' if is_waf_evasion else ''
 	cmd += f' --waf-bypass auto'
 	cmd += f' --deep-scan' if use_deep_scan else ''
@@ -3900,9 +3997,9 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	cmd += f' --scan-timeout {scan_timeout}' if scan_timeout else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
-		cmd += formatted_headers
+		cmd += f' {formatted_headers}'
 	cmd += f' --user-agent {user_agent}' if user_agent else ''
-	cmd += f' --worker {threads}' if threads else ''
+	cmd += f' --workers {threads}' if threads else ''
 	cmd += f' --format json'
 
 	results = []
@@ -4004,6 +4101,8 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 	input_path = f'{self.results_dir}/input_endpoints_crlf.txt'
 	output_path = f'{self.results_dir}/{self.filename}'
 
+	urls = [u for u in urls if u and u.strip()]
+
 	if urls:
 		with open(input_path, 'w') as f:
 			f.write('\n'.join(urls))
@@ -4015,6 +4114,10 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 			ctx=ctx
 		)
 
+	if not os.path.isfile(input_path) or os.path.getsize(input_path) == 0:
+		logger.warning('crlfuzz: no endpoints to scan at %s, skipping.', input_path)
+		return
+
 	notif = Notification.objects.first()
 	send_status = notif.send_scan_status_notif if notif else False
 
@@ -4025,7 +4128,7 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 	cmd += f' -x {proxy}' if proxy else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
-		cmd += formatted_headers
+		cmd += f' {formatted_headers}'
 	cmd += f' -o {output_path}'
 
 	run_command(
@@ -4047,6 +4150,8 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 
 	for crlf in crlfs:
 		url = crlf.strip()
+		if not url:
+			continue
 
 		vuln_data = parse_crlfuzz_result(url)
 
@@ -4118,7 +4223,10 @@ def s3scanner(self, ctx={}, description=None):
 		ctx (dict): Context
 		description (str, optional): Task description shown in UI.
 	"""
-	input_path = f'{self.results_dir}/#{self.scan_id}_subdomain_discovery.txt'
+	input_path = f'{self.results_dir}/subdomain_discovery.txt'
+	if not os.path.isfile(input_path):
+		logger.warning(f's3scanner: subdomain list not found at {input_path}, skipping.')
+		return
 	vuln_config = self.yaml_configuration.get(VULNERABILITY_SCAN) or {}
 	s3_config = vuln_config.get(S3SCANNER) or {}
 	threads = s3_config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
@@ -4225,7 +4333,7 @@ def http_crawl(
 	cmd += f' --http-proxy {proxy}' if proxy else ''
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
-		cmd += formatted_headers
+		cmd += f' {formatted_headers}'
 	cmd += f' -json'
 	cmd += f' -u {urls[0]}' if len(urls) == 1 else f' -l {input_path}'
 	cmd += f' -x {method}' if method else ''
@@ -5062,7 +5170,8 @@ def parse_nmap_vulners_output(script_output, url='', service_title=''):
 				'references': [vuln_url],
 				'cve_ids': [],
 				'cwe_ids': [],
-				'tags': tags
+				'tags': tags,
+				'group_key': service_title
 			}
 
 			# If it's a CVE, try to enrich it with cve_to_vuln
@@ -5078,7 +5187,8 @@ def parse_nmap_vulners_output(script_output, url='', service_title=''):
 						vuln['tags'] = []
 					vuln['tags'].extend(old_tags)
 					vuln['tags'] = list(set(vuln['tags']))
-					
+					vuln['group_key'] = service_title  # preserve group_key after CVE enrichment overwrites
+
 					# Improve name if service_title is present
 					if service_title:
 						# If enriched name is just the CVE, use service title
@@ -5110,6 +5220,7 @@ def parse_nmap_vulners_output(script_output, url='', service_title=''):
 			vuln = cve_to_vuln(cve_id, vuln_type='nmap-vulners-nse')
 			if vuln:
 				vuln['source'] = 'VULNERS'
+				vuln['group_key'] = service_title
 				vulns.append(vuln)
 	return vulns
 
@@ -6508,6 +6619,13 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 				}
 				save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
 	
+	# TLS deep audit (testssl.sh + crt.sh)
+	from reNgine.firewall_tasks import run_crt_sh, run_tls_deep_audit
+	if config.get(ENABLE_TESTSSL, False):
+		run_tls_deep_audit(self, ctx, config)
+	if config.get(ENABLE_CRT_SH, False):
+		run_crt_sh(self, ctx, target)
+
 	# Automatic Trigger for Brute Force Scan on Sophos Portals
 	if run_sslscan and self.scan.tasks and 'brute_force_scan' in self.scan.tasks:
 		auth_targets = [f'https://{target}:{port}' for port in ssl_ports]
@@ -7379,8 +7497,8 @@ def resume_scan_temporal(scan_id):
 	completed_activities = scan.scanactivity_set.filter(status=SUCCESS_TASK).values_list('name', flat=True)
 	completed_tasks = set(completed_activities)
 	
-	# Filter the scan's original task list
-	remaining_tasks = [t for t in scan.tasks if t not in completed_tasks]
+	# Filter the scan's original task list (tasks may be NULL for old/broken scans)
+	remaining_tasks = [t for t in (scan.tasks or []) if t not in completed_tasks]
 	
 	if not remaining_tasks:
 		logger.info(f"Scan {scan_id} has no remaining tasks to resume.")
@@ -7416,11 +7534,29 @@ def resume_scan_temporal(scan_id):
 	scan.workflow_ids = workflow_ids
 	scan.save()
 	
-	# Spawn new MasterScanWorkflow
-	async def _start():
+	# Cancel any previously known workflows for this scan before spawning the new one.
+	# This prevents double-execution when recovery fires while the old workflow
+	# (or its nuclei child) is still alive — e.g. after a Temporal server blip.
+	old_ids = [wid for wid in (scan.workflow_ids or []) if wid != workflow_id]
+
+	async def _cancel_old_and_start():
 		from temporalio.common import RetryPolicy
 		from datetime import timedelta
+		from temporalio.service import RPCError, RPCStatusCode
 		client = await TemporalClientProvider.get_client()
+
+		for old_wf_id in old_ids:
+			for candidate in [old_wf_id, f"{old_wf_id}-nuclei"]:
+				try:
+					handle = client.get_workflow_handle(candidate)
+					await handle.cancel()
+					logger.info(f"Cancelled old workflow before recovery: {candidate}")
+				except RPCError as e:
+					if e.status not in (RPCStatusCode.NOT_FOUND,):
+						logger.warning(f"Could not cancel old workflow {candidate}: {e}")
+				except Exception as e:
+					logger.warning(f"Could not cancel old workflow {candidate}: {e}")
+
 		await client.start_workflow(
 			"MasterScanWorkflow",
 			args=[ctx],
@@ -7431,10 +7567,10 @@ def resume_scan_temporal(scan_id):
 			task_timeout=timedelta(hours=1),
 			retry_policy=RetryPolicy(maximum_attempts=10),
 		)
-	
+
 	loop = asyncio.new_event_loop()
 	try:
-		loop.run_until_complete(_start())
+		loop.run_until_complete(_cancel_old_and_start())
 	finally:
 		loop.close()
 
@@ -7470,13 +7606,34 @@ def recover_stuck_scans():
 
 	async def _is_workflow_active(workflow_id):
 		from temporalio.client import WorkflowExecutionStatus
+		from temporalio.service import RPCError, RPCStatusCode
 		try:
 			client = await TemporalClientProvider.get_client()
 			handle = client.get_workflow_handle(workflow_id)
 			desc = await handle.describe()
-			return desc.status == WorkflowExecutionStatus.RUNNING
-		except Exception:
+			# Also check well-known child workflow IDs that outlive the master
+			if desc.status == WorkflowExecutionStatus.RUNNING:
+				return True
+			# Master finished — check whether its nuclei child is still running
+			nuclei_id = f"{workflow_id}-nuclei"
+			try:
+				nuclei_handle = client.get_workflow_handle(nuclei_id)
+				nuclei_desc = await nuclei_handle.describe()
+				if nuclei_desc.status == WorkflowExecutionStatus.RUNNING:
+					return True
+			except RPCError as e:
+				if e.status != RPCStatusCode.NOT_FOUND:
+					return True  # server error — assume running
 			return False
+		except RPCError as e:
+			if e.status == RPCStatusCode.NOT_FOUND:
+				return False  # workflow genuinely absent — safe to recover
+			# Any other RPC error means Temporal itself is unavailable — do NOT recover
+			logger.warning(f"Temporal RPC error checking workflow '{workflow_id}': {e}. Skipping recovery.")
+			return True
+		except Exception as e:
+			logger.warning(f"Unexpected error checking workflow '{workflow_id}': {e}. Skipping recovery.")
+			return True
 
 	# --- Pass 1: FAILED_TASK scans ---
 	for scan in ScanHistory.objects.filter(scan_status=FAILED_TASK, recovery_count__lt=3):
@@ -7487,7 +7644,14 @@ def recover_stuck_scans():
 			logger.error(f"Failed to auto-recover scan {scan.id}: {e}")
 
 	# --- Pass 2: RUNNING_TASK scans whose Temporal workflow is gone ---
-	for scan in ScanHistory.objects.filter(scan_status=RUNNING_TASK, recovery_count__lt=3):
+	# Exclude scans that were explicitly stopped by the user (stop_scan_date is set by
+	# abort_scan_history). This guards against a narrow race-condition window where the
+	# orchestrator restarts before the ABORTED_TASK status is persisted to the DB.
+	for scan in ScanHistory.objects.filter(
+		scan_status=RUNNING_TASK,
+		recovery_count__lt=3,
+		stop_scan_date__isnull=True,
+	):
 		# Prefer the TemporalWorkflowExecution record; fall back to workflow_ids array.
 		latest_exec = (
 			TemporalWorkflowExecution.objects

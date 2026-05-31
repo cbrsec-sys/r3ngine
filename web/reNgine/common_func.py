@@ -17,7 +17,7 @@ import xmltodict
 
 from time import sleep
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 import logging as _logging
 get_task_logger = _logging.getLogger
 from discord_webhook import DiscordEmbed, DiscordWebhook
@@ -473,7 +473,11 @@ def sanitize_url(http_url):
 	# Check if the URL has a scheme. If not, add a temporary one to prevent empty netloc.
 	if "://" not in http_url:
 		http_url = "http://" + http_url
-	url = urlparse(http_url)
+	try:
+		url = urlparse(http_url)
+	except ValueError:
+		# Python 3.10+ raises ValueError for malformed bracket hosts (e.g. http://[]/path).
+		return http_url.rstrip('/')
 
 	if url.netloc.endswith(':80'):
 		url = url._replace(netloc=url.netloc.replace(':80', ''))
@@ -481,6 +485,20 @@ def sanitize_url(http_url):
 		url = url._replace(scheme=url.scheme.replace('http', 'https'))
 		url = url._replace(netloc=url.netloc.replace(':443', ''))
 	return url.geturl().rstrip('/')
+
+def url_param_signature(url):
+	"""Return a dedup key based on scheme, netloc, path, and sorted param names (ignoring values).
+
+	Two URLs sharing the same signature differ only in parameter values (e.g. ?id=1 vs ?id=2)
+	and can be treated as the same functional endpoint for load-reduction purposes.
+	"""
+	try:
+		parsed = urlparse(url)
+		param_keys = ','.join(sorted(parse_qs(parsed.query).keys()))
+		return f"{parsed.scheme}://{parsed.netloc}{parsed.path}?{param_keys}"
+	except Exception:
+		return url
+
 
 def extract_path_from_url(url):
 	parsed_url = urlparse(url)
@@ -841,6 +859,14 @@ def get_random_proxy():
 	Returns:
 		str: Proxy name or '' if no proxy defined in db or use_proxy is False.
 	"""
+	# TOR mode: when use_tor is enabled, route all scan traffic through the TOR
+	# SOCKS5 proxy. Returning a non-empty proxy string ensures run_command /
+	# stream_command enter their proxychains wrapping branch; ProxychainsWrapper
+	# then builds the 'socks5 tor 9050' config via should_wrap()/wrap_command().
+	_tor_proxy_obj = Proxy.objects.first()
+	if _tor_proxy_obj and _tor_proxy_obj.use_tor:
+		return 'socks5://tor:9050'
+
 	# Check if any Proxy records exist in the database
 	if not Proxy.objects.all().exists():
 		return ''
@@ -862,7 +888,7 @@ def get_random_proxy():
 	# Limit to 5 checks to cap worst-case wait (5 × timeout = 25 s).
 	checked_count = 0
 	for proxy_name in proxies:
-		if checked_count >= 25:
+		if checked_count >= 5:
 			logger.warning('Reached maximum sequential proxy validation limit (5). Stopping checks.')
 			break
 		checked_count += 1
@@ -2004,7 +2030,87 @@ def create_inappnotification(
 		open_in_new_tab=open_in_new_tab
 	)
 	notification.save()
+
+	# Dispatch a push notification to all registered mobile devices
+	send_mobile_push_notification(
+		title=title,
+		body=description,
+		data={'notification_id': notification.id, 'status': status}
+	)
+
 	return notification
+
+
+def send_mobile_push_notification(title, body, data=None):
+	"""
+		Send a push notification to all active registered mobile devices
+		via the Expo Push Notification Service.
+
+		This function is intentionally fire-and-forget: errors are logged
+		but never re-raised so that a push failure never breaks normal
+		application flow.
+
+		Args:
+			title (str): The notification title shown on the device.
+			body (str): The notification body/description text.
+			data (dict, optional): Extra JSON payload passed to the app
+				when the user taps the notification.
+	"""
+	try:
+		# Import here to avoid circular imports; MobilePushToken lives in dashboard.models
+		from dashboard.models import MobilePushToken
+
+		# Collect all active Expo push tokens
+		tokens = list(
+			MobilePushToken.objects
+			.filter(is_active=True)
+			.values_list('token', flat=True)
+		)
+
+		if not tokens:
+			# No registered devices — nothing to do
+			return
+
+		# Build one message per token (Expo supports batching up to 100)
+		messages = [
+			{
+				'to': token,
+				'title': title,
+				'body': body,
+				'data': data or {},
+				'sound': 'default',
+				'priority': 'high',
+			}
+			for token in tokens
+		]
+
+		# Expo Push API endpoint — no auth required for Expo push tokens
+		expo_push_url = 'https://exp.host/--/api/v2/push/send'
+
+		response = requests.post(
+			expo_push_url,
+			json=messages,
+			headers={
+				'Accept': 'application/json',
+				'Accept-Encoding': 'gzip, deflate',
+				'Content-Type': 'application/json',
+			},
+			timeout=10,
+		)
+
+		result = response.json()
+		# Log any per-token errors returned by Expo
+		for ticket in result.get('data', []):
+			if ticket.get('status') == 'error':
+				logger.warning(
+					'[PushNotification] Expo push error: %s — %s',
+					ticket.get('message'),
+					ticket.get('details'),
+				)
+
+	except Exception as e:
+		# Never let a push failure crash the calling code
+		logger.error('[PushNotification] Failed to dispatch push notifications: %s', e)
 
 def get_ip_info(ip_address):
 	is_ipv4 = bool(validators.ipv4(ip_address))

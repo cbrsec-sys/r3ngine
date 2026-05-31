@@ -198,3 +198,30 @@ class SOCConfiguration(models.Model):
 	class Meta:
 		verbose_name = "SOC Configuration"
 		verbose_name_plural = "SOC Configurations"
+
+
+class MobilePushToken(models.Model):
+	"""
+	Stores Expo push notification tokens for mobile app users.
+	Each device registers its token after the user authenticates.
+	Tokens are used by the backend to dispatch push notifications
+	via the Expo Push Notification Service.
+	"""
+	# The authenticated user who owns this push token
+	user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='push_tokens')
+	# The Expo push token string (e.g. ExponentPushToken[xxxx])
+	token = models.CharField(max_length=500, unique=True)
+	# Optional human-readable label for the device (e.g. 'Samsung S24')
+	device_label = models.CharField(max_length=100, blank=True, null=True)
+	# Whether this token should receive notifications
+	is_active = models.BooleanField(default=True)
+	created_at = models.DateTimeField(auto_now_add=True)
+	updated_at = models.DateTimeField(auto_now=True)
+
+	class Meta:
+		verbose_name = "Mobile Push Token"
+		verbose_name_plural = "Mobile Push Tokens"
+		ordering = ['-updated_at']
+
+	def __str__(self):
+		return f"{self.user.username} — {self.token[:40]}..."

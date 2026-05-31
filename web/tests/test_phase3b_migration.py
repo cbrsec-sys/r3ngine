@@ -113,31 +113,31 @@ class TestPhase3B4BruteForceChaining(TestCase):
         )
 
     def test_nmap_uses_brute_force_apply(self):
-        """nmap (auth portal chaining site) must call brute_force_scan.apply() for in-task chaining."""
+        """nmap (auth portal chaining site) must call brute_force_scan(...) for in-task chaining."""
         source = _read('reNgine/tasks.py')
         body = self._get_function_body(source, 'nmap')
         self.assertIn(
-            'brute_force_scan.apply(',
+            'brute_force_scan(self,',
             body,
-            "nmap must call brute_force_scan.apply() for in-task chaining"
+            "nmap must call brute_force_scan(self, ...) for in-task chaining"
         )
 
     def test_firewall_vpn_scan_does_not_use_brute_force_delay(self):
-        """firewall_vpn_scan must not call brute_force_scan.delay — it must use .apply()."""
+        """firewall_vpn_scan must not call brute_force_scan.delay — it must call it directly."""
         source = _read('reNgine/tasks.py')
         body = self._get_function_body(source, 'firewall_vpn_scan')
         self.assertNotIn(
             'brute_force_scan.delay(',
             body,
-            "firewall_vpn_scan must not call brute_force_scan.delay — use .apply()"
+            "firewall_vpn_scan must not call brute_force_scan.delay"
         )
 
     def test_firewall_vpn_scan_uses_brute_force_apply(self):
-        """firewall_vpn_scan must call brute_force_scan.apply() for in-task chaining."""
+        """firewall_vpn_scan must call brute_force_scan(...) directly for in-task chaining."""
         source = _read('reNgine/tasks.py')
         body = self._get_function_body(source, 'firewall_vpn_scan')
         self.assertIn(
-            'brute_force_scan.apply(',
+            'brute_force_scan(self,',
             body,
-            "firewall_vpn_scan must call brute_force_scan.apply() for in-task chaining"
+            "firewall_vpn_scan must call brute_force_scan(self, ...) for in-task chaining"
         )

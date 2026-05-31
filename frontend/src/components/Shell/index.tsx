@@ -71,7 +71,7 @@ import { NotificationsDropdown } from '../../features/notifications/components/N
 import { useUnreadCount } from '../../features/notifications/api';
 import { ScanHistoryDrawer } from '../../features/scans/components/ScanHistoryDrawer';
 import { CheckForUpdateModal } from '../../features/settings/components/CheckForUpdateModal';
-import { useRengineUpdateCheck } from '../../features/settings/api';
+import { useRengineUpdateCheck, useTorStatus, useTorExitIP } from '../../features/settings/api';
 import { useAppTheme } from '../../context/ThemeContext';
 import { HeaderThemeSwitcher } from './HeaderThemeSwitcher';
 
@@ -105,6 +105,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const isMobileHeader = useMediaQuery(theme.breakpoints.down('lg'));
 
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
+  const { data: torStatus } = useTorStatus();
+  const torActive = torStatus?.running ?? false;
+  const { data: torExitIP } = useTorExitIP(torActive);
   const { data: unreadData } = useUnreadCount(projectSlug);
 
   const { data: pluginsRegistry } = useQuery({
@@ -456,7 +459,24 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               />
             </Box>
 
-            <Box sx={{ flexGrow: 1 }} />
+            {/* Center: TOR exit IP (visible only when TOR mode is active) */}
+            <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              {torActive && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                  <Typography sx={{
+                    fontWeight: 900,
+                    fontFamily: "'Bangers', cursive",
+                    letterSpacing: 2,
+                    color: '#ff4d6d',
+                    textShadow: '#8b000080 0px 0px 14px',
+                    fontSize: '1.2rem',
+                    textTransform: 'uppercase',
+                  }}>
+                    IP: {torExitIP?.ip ?? '···'}
+                  </Typography>
+                </Box>
+              )}
+            </Box>
 
             {/* Action Group */}
             <Box sx={{ display: 'flex', alignItems: 'center', gap: isMobileHeader ? 1 : 3, backgroundColor: "transparent" }}>

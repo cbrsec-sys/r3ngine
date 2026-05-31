@@ -1,6 +1,49 @@
 # Changelog
 
+### [v3.3.0] - 2026-05-31
+
+- **URL Deduplication After fetch_url**:
+  - Implemented the previously dead `remove_duplicate_endpoints` and `duplicate_fields` scan config options in `fetch_url` (`tasks.py`). Both are now fully active (default: enabled, fields: `content_length`, `page_title`).
+  - **Pass 1 — URL signature dedup (pre-save)**: After all URL filtering, parametric variants of the same path are collapsed to a single representative URL before any database writes. e.g. `/page?id=1`, `/page?id=2`, `/page?id=100` (all share signature `/page?id`) are reduced to one entry. URLs with structurally different parameter names (e.g. `/page?id=1` vs `/page?id=1&sort=asc`) are treated as distinct endpoints and preserved.
+  - **Pass 2 — Content-based dedup (post-save)**: After skeleton endpoints are written to the database, endpoints already enriched by the Tier 2 `http_crawl` are grouped by `(subdomain, content_length, page_title)`. Duplicate records within each group (identical content fingerprint) are deleted, keeping the first encountered. Skeleton endpoints with no crawl data are unaffected.
+  - Added `url_param_signature(url)` helper to `common_func.py` that generates the dedup key (`scheme://netloc/path?{sorted param names}`) used by Pass 1.
+  - Both passes are guarded by the `should_remove_duplicate_endpoints` flag and log their reduction counts, visible in `temporal-python-orchestrator` logs during scans.
+  - Reduces the endpoint list fed into Tier 4 (`dir_file_fuzz`), Tier 5 (`web_api_discovery`), and Tier 6 (`nuclei`) — directly lowering scan load for targets with large historical URL sets from tools like `gau`.
+
+- **Nmap Vulners NSE Grouped Vulnerability Findings**:
+  - Nmap vulners NSE script results are now grouped by product version (e.g. "Exim smtpd 4.99.2") instead of stored as individual records per CVE/hash. All CVE and exploit IDs for the same product are logically grouped under a single finding.
+  - Added `group_key` field (indexed `CharField`) to the `Vulnerability` model. For vulners findings this is populated with the service product+version string (e.g. `"ISC BIND 9.11.36"`) derived from nmap's XML output. Migration `0033_vulnerability_group_key` applies the schema change.
+  - Changed nmap vulners deduplication from `(name, http_url, scan_history)` to `(name, subdomain, scan_history)`, so the same CVE detected on multiple open ports of the same host (e.g. port 465 and 587) is stored as a single `Vulnerability` record rather than duplicated per port.
+  - `parse_nmap_vulners_output()` in `tasks.py` now sets `group_key = service_title` on every returned vuln dict, including the legacy regex-based CVE fallback path. The field is re-asserted after CVE enrichment to prevent overwrite.
+  - Added `build_vuln_context()` helper in `report_tasks.py` that splits scan vulnerabilities into non-vulners findings (passed to existing templates via `all_vulnerabilities`) and a `grouped_vulners_findings` list (one entry per product group, with `group_key`, `items`, `count`, `max_severity`, `max_cvss`). The combined `unique_vulnerabilities` summary and total `all_vulnerabilities_count` span both sources.
+  - All four PDF/HTML report templates (`cyber_pro`, `enterprise`, `modern`, `default`) now include a dedicated **NMAP VULNERS NSE FINDINGS** section rendered after the standard vulnerability findings. Each product group is shown as a card with a sub-table of individual CVE/hash IDs, CVSS scores, severity, and references.
+  - Fixed `modern.html` and `default.html` to guard the vulnerability section on `all_vulnerabilities_count` (total, including vulners) instead of `all_vulnerabilities.count` (non-vulners only), preventing scans with exclusively vulners results from rendering as "no vulnerabilities found".
+  - In the vulnerability table UI, vulners groups with more than one entry are collapsed by default. Clicking the group header row expands/collapses the individual CVE rows. The header displays a `▲ COLLAPSE` / `▼ EXPAND` indicator. Grouping uses the DB-backed `group_key` field when present, with a regex fallback for older records. Non-vulners groupings (SSL/TLS audit, Semgrep) are unaffected.
+
 ### [v3.2.0] - 2026-05-29
+
+- **ReconX Target Monitoring Settings & API URL Normalization**:
+  - Added a monitoring settings modal inside the mobile app's **ReconX Feed** screen (`app/feeds/monitoring.tsx`), accessible via a header settings icon, to view all database targets from `/mapi/listTargets/` and toggle their active monitoring status using `/mapi/toggle/monitoring/`.
+  - Fixed a double-slash (`//`) API request URL routing and logging issue in the Axios client (`src/api/client.ts`) by stripping the leading slash from relative paths if the baseURL ends with a slash.
+
+- **Mobile Scan Engines Layout Overflow Fix**:
+  - Resolved layout overflow issues on the Scan Engines screen in the mobile application.
+  - Added `flexShrink: 1` to the engine name and `flexWrap: 'wrap'` to both the title row and task preview tag container in `app/system/engines/index.tsx` to prevent default badges and tactical module tags from falling off cards.
+
+- **Mobile Infrastructure & Monitoring Fixes**:
+  - Added new `/api/listTools/` (`/mapi/listTools/`) API endpoint on the backend to list all installed tools, requiring `IsAuditor` permission.
+  - Updated the mobile app's "Tools" tab to fetch from `/mapi/listTools/` instead of `/mapi/external/tool/get_current_release/`, resolving a backend 500 error when queried without arguments.
+  - Integrated `configured_tools_count` into `EngineSerializer` on the backend by parsing the engine's YAML configuration to count configured tools, fixing a client-side bug where the character length of the YAML configuration was displayed.
+  - Updated `manage_monitoring_task(domain)` in `web/targetApp/views.py` to remove references to the deprecated `monitor_periodic_task` model attribute, resolving `AttributeError` exceptions and enabling the continuous monitoring toggle switch to function without errors on both mobile and web.
+
+- **Fix command execution and tool update failures**:
+  - Replaced incorrect `run_command.run(...)` calls with correct direct `run_command(...)` function calls in `web/api/views.py` and `web/startScan/views.py`.
+  - Resolved `'function' object has no attribute 'run'` exceptions that caused tool updates, uninstallation, WAF checks, CMS detection, and scan result deletions to fail.
+  - Verified compilation and syntax correctness of views within the Docker container environment.
+
+- **Import/Export Config Tool Configurations**:
+  - Enhanced the backup import/export views `ExportConfig` and `ImportConfig` in `web/api/config_migration_views.py` to support `spiderfoot` (`/usr/src/github/spiderfoot/spiderfoot.cfg`) and `theHarvester` (`/usr/src/github/theHarvester/api-keys.yaml`) configurations.
+  - Ensured nested destination directories are recursively created if they do not exist during the import operation.
 
 - **Active Exploitation Dashboard Pagination**:
   - Implemented page-number pagination (10 items per page) for both the **Exploited Databases Queue** and the **Potential Targets** tables on the `active_exploitation` dashboard.

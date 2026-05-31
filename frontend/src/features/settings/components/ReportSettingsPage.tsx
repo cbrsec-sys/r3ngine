@@ -154,14 +154,14 @@ export const ReportSettingsPage: React.FC = () => {
 
       <Stack spacing={3} sx={{ width: '100%' }}>
         {/* Branding & Aesthetics */}
-        <TacticalPanel title="BRANDING_&_VISUALS" icon={<Palette size={18} />} sx={{ width: '100%' }}>
+        <TacticalPanel title="BRANDING & VISUALS" icon={<Palette size={18} />} sx={{ width: '100%' }}>
           <Stack spacing={4}>
             <Box>
               <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
                 THEME COLORS
               </Typography>
               <Grid container spacing={3}>
-                <Grid size={{xs: 12, sm: 6}} >
+                <Grid size={{ xs: 12, sm: 6 }} >
                   <Typography variant="caption" sx={{ color: '#00f3ff', mb: 1, display: 'block', fontWeight: 600 }}>PRIMARY COLOR</Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for Main Title, Footer Background, and Page Counters.
@@ -188,7 +188,7 @@ export const ReportSettingsPage: React.FC = () => {
                     />
                   </Box>
                 </Grid>
-                <Grid size={{xs: 12, sm: 6}} >
+                <Grid size={{ xs: 12, sm: 6 }} >
                   <Typography variant="caption" sx={{ color: '#ffd600', mb: 1, display: 'block', fontWeight: 600 }}>SECONDARY COLOR</Typography>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for the report cover background.
@@ -320,12 +320,12 @@ export const ReportSettingsPage: React.FC = () => {
               <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
                 LAYOUT TOGGLES
               </Typography>
-              <Stack 
-                direction="row" 
-                spacing={4} 
-                sx={{ 
-                  width: '100%', 
-                  justifyContent: 'center', 
+              <Stack
+                direction="row"
+                spacing={4}
+                sx={{
+                  width: '100%',
+                  justifyContent: 'center',
                   flexWrap: 'wrap',
                   '& > *': { minWidth: '250px' }
                 }}
@@ -434,20 +434,20 @@ export const ReportSettingsPage: React.FC = () => {
                 </Stack>
               </Box>
 
-              <Box sx={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: 0.5, 
-                px: 1, 
-                py: 0.5, 
-                bgcolor: 'rgba(255,255,255,0.03)', 
-                border: '1px solid rgba(255,255,255,0.1)', 
+              <Box sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                px: 1,
+                py: 0.5,
+                bgcolor: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.1)',
                 borderBottom: 'none',
                 borderTopLeftRadius: '8px',
                 borderTopRightRadius: '8px'
               }}>
                 {[
-                  { icon: <Eye size={16} />, label: 'Preview', action: () => {} },
+                  { icon: <Eye size={16} />, label: 'Preview', action: () => { } },
                   { icon: <Bold size={16} />, label: 'Bold', action: () => handleFormat('**', '**') },
                   { icon: <Italic size={16} />, label: 'Italic', action: () => handleFormat('*', '*') },
                   { icon: <Heading1 size={16} />, label: 'Heading 1', action: () => handleFormat('# ') },
@@ -459,7 +459,7 @@ export const ReportSettingsPage: React.FC = () => {
                   { separator: true },
                   { icon: <Quote size={16} />, label: 'Quote', action: () => handleFormat('> ') },
                   { separator: true },
-                  { icon: <HelpCircle size={16} />, label: 'Help', action: () => {} },
+                  { icon: <HelpCircle size={16} />, label: 'Help', action: () => { } },
                 ].map((item, idx) => (
                   item.separator ? (
                     <Box key={idx} sx={{ width: '1px', height: '16px', bgcolor: 'rgba(255,255,255,0.1)', mx: 0.5 }} />
@@ -468,10 +468,10 @@ export const ReportSettingsPage: React.FC = () => {
                       key={idx}
                       size="small"
                       onClick={item.action}
-                      sx={{ 
-                        minWidth: '32px', 
-                        height: '32px', 
-                        p: 0, 
+                      sx={{
+                        minWidth: '32px',
+                        height: '32px',
+                        p: 0,
                         color: 'rgba(0, 243, 255, 0.7)',
                         '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' }
                       }}
@@ -581,18 +581,18 @@ export const ReportSettingsPage: React.FC = () => {
         </Paper>
       </Stack>
 
-      <Snackbar 
-        open={snackbar.open} 
-        autoHideDuration={6000} 
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
         onClose={handleCloseSnackbar}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={handleCloseSnackbar} 
-          severity={snackbar.severity} 
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
           variant="filled"
-          sx={{ 
-            fontFamily: 'Orbitron', 
+          sx={{
+            fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
             bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',

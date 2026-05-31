@@ -360,6 +360,7 @@ def proxy_settings(request, slug):
         form.set_initial()
 
     if request.method == "POST":
+        old_use_tor = proxy.use_tor if proxy else False
         if proxy:
             form = ProxyForm(request.POST, instance=proxy)
         else:
@@ -377,6 +378,32 @@ def proxy_settings(request, slug):
             else:
                 message = 'Proxies updated.'
             proxy_instance.save()
+            # TOR container lifecycle — start or stop on change
+            new_use_tor = proxy_instance.use_tor
+            if new_use_tor != old_use_tor:
+                from reNgine.tor_manager import TorManager, TorStartError, TorUnavailableError
+                tor = TorManager()
+                try:
+                    if new_use_tor:
+                        tor.start()
+                    else:
+                        tor.stop()
+                except TorStartError as e:
+                    proxy_instance.use_tor = False
+                    proxy_instance.save(update_fields=['use_tor'])
+                    err_msg = f'TOR failed to start: {e}'
+                    if request.headers.get('Accept') == 'application/json':
+                        return http.JsonResponse({'status': 'error', 'message': err_msg}, status=500)
+                    messages.add_message(request, messages.ERROR, err_msg)
+                    return http.HttpResponseRedirect(reverse('proxy_settings', kwargs={'slug': slug}))
+                except TorUnavailableError as e:
+                    proxy_instance.use_tor = False
+                    proxy_instance.save(update_fields=['use_tor'])
+                    err_msg = f'Docker socket not available: {e}'
+                    if request.headers.get('Accept') == 'application/json':
+                        return http.JsonResponse({'status': 'error', 'message': err_msg}, status=503)
+                    messages.add_message(request, messages.ERROR, err_msg)
+                    return http.HttpResponseRedirect(reverse('proxy_settings', kwargs={'slug': slug}))
             if request.headers.get('Accept') == 'application/json':
                 return http.JsonResponse({'status': 'success', 'message': message})
             messages.add_message(
@@ -392,7 +419,8 @@ def proxy_settings(request, slug):
         return http.JsonResponse({
             'use_proxy': proxy.use_proxy if proxy else False,
             'proxies': proxy.proxies if proxy else "",
-            'use_proxychains': proxy.use_proxychains if proxy else False
+            'use_proxychains': proxy.use_proxychains if proxy else False,
+            'use_tor': proxy.use_tor if proxy else False,
         })
 
     context['settings_nav_active'] = 'active'
@@ -992,12 +1020,35 @@ def update_github_tool(request, slug, id):
 
 @has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def get_full_yaml_config(request, slug):
+    """Retrieve the default YAML configuration.
+    
+    If the configuration does not exist in the database under 'default_yaml_config',
+    it seeds the database using the default_yaml_config.yaml fixture file.
+
+    Args:
+        request (HttpRequest): Django HTTP request object.
+        slug (str): Slug for target engine configuration.
+
+    Returns:
+        JsonResponse: A JSON response containing status and the YAML configuration content.
+    """
     try:
+        from scanEngine.models import Configuration
         from django.conf import settings
-        file_path = os.path.join(settings.BASE_DIR, 'fixtures', 'full_yaml_config.yaml')
         
-        with open(file_path, 'r') as f:
-            content = f.read()
+        config_obj = Configuration.objects.filter(short_name='default_yaml_config').first()
+        if not config_obj:
+            file_path = os.path.join(settings.BASE_DIR, 'fixtures', 'default_yaml_config.yaml')
+            with open(file_path, 'r') as f:
+                content = f.read()
+            config_obj = Configuration.objects.create(
+                name='Default YAML Config',
+                short_name='default_yaml_config',
+                content=content
+            )
+        else:
+            content = config_obj.content
+            
         return http.JsonResponse({'status': 'success', 'content': content})
     except Exception as e:
         return http.JsonResponse({'status': 'error', 'message': str(e)}, status=500)

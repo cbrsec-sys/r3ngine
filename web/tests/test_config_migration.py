@@ -24,9 +24,10 @@ class ConfigMigrationTests(TestCase):
             is_superuser=True
         )
         self.client.force_authenticate(user=self.user)
+        self.client.force_login(self.user)
         
         # Assign admin role to pass HasPermission checks
-        assign_role(self.user, 'administrator')
+        assign_role(self.user, 'sys_admin')
 
         # Create some test data
         OpenAiAPIKey.objects.create(key='sk-testkey')
@@ -40,7 +41,7 @@ class ConfigMigrationTests(TestCase):
         self.assertEqual(response['Content-Type'], 'application/zip')
         
         # Read the zip from response
-        zip_buffer = io.BytesIO(response.content)
+        zip_buffer = io.BytesIO(b"".join(response.streaming_content))
         with zipfile.ZipFile(zip_buffer, 'r') as zip_file:
             self.assertIn('dashboard_models.json', zip_file.namelist())
             self.assertIn('scanengine_models.json', zip_file.namelist())
@@ -67,7 +68,7 @@ class ConfigMigrationTests(TestCase):
         self.assertEqual(OpenAiAPIKey.objects.count(), 0)
         
         url_import = reverse('api:settings_import')
-        zip_buffer = io.BytesIO(export_resp.content)
+        zip_buffer = io.BytesIO(b"".join(export_resp.streaming_content))
         zip_buffer.name = 'r3ngine_config_backup.zip' # Mock file name
         
         response = self.client.post(url_import, {

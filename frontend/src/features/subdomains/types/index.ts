@@ -45,6 +45,7 @@ export interface Subdomain {
   content_length: number;
   response_time: number | null;
   screenshot_path: string | null;
+  screenshots: Array<{ id: number; screenshot_path: string; url: string; status_code: number | null }>;
   ip_addresses: IPAddress[];
   technologies: { id: number; name: string }[];
   waf: Waf[];
