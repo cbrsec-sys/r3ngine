@@ -89,6 +89,9 @@ from reNgine.temporal_activities import (
     parse_discovery_results_activity,
     seed_endpoints_for_crawl_activity,
 
+    # TOR
+    run_tor_new_circuit_activity,
+
     # Tier 2: Enumeration
     run_http_crawl_activity,
     parse_http_crawl_results_activity,
@@ -298,6 +301,9 @@ class Command(BaseCommand):
                 run_dns_security_activity,
                 parse_discovery_results_activity,
                 seed_endpoints_for_crawl_activity,
+
+                # TOR
+                run_tor_new_circuit_activity,
 
                 # Tier 2
                 run_http_crawl_activity,
