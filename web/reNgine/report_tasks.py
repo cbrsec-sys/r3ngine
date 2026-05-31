@@ -5,7 +5,7 @@ from datetime import datetime
 from django.core.files.base import ContentFile
 from django.template.loader import get_template
 from collections import defaultdict
-from django.db.models import Count, Max, Case, When, IntegerField
+from django.db.models import Count, Case, When, IntegerField
 from weasyprint import HTML, CSS
 from django.utils import timezone
 from reNgine.utilities import secure_url_fetcher
