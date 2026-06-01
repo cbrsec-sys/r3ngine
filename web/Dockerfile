@@ -114,18 +114,13 @@ RUN go build -ldflags="-s -w" -o /usr/local/bin/vigolium ./cmd/vigolium && \
 # from source. Targets x86_64-unknown-linux-musl to produce a fully static
 # binary with no libc dependency in the runtime image.
 # ===========================================================================
-FROM debian:bookworm-slim AS dalfox-builder
+FROM rust:bookworm AS dalfox-builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     musl-tools \
     pkg-config \
-    build-essential \
-    curl \
     git \
     && rm -rf /var/lib/apt/lists/*
-
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-ENV PATH="/root/.cargo/bin:${PATH}"
 
 RUN rustup target add x86_64-unknown-linux-musl
 
