@@ -2181,3 +2181,45 @@ def check_scan_queue_status_activity(scan_id: int, queue_type: str) -> bool:
         return False
 
     return True
+
+
+@activity.defn(name="GetEnabledPluginsForTierActivity")
+def get_enabled_plugins_for_tier_activity(tier: str) -> list:
+    """Return metadata for all enabled plugins anchored to the given tier.
+
+    Queries the Plugin model for plugins with anchor_step matching `tier`
+    and runtime_position='AFTER', ordered by order_weight. Used by
+    MasterScanWorkflow and SubScanWorkflow to dispatch plugin child workflows
+    after a tier completes.
+
+    Args:
+        tier: e.g. "tier_2", "tier_6"
+
+    Returns:
+        List of dicts: [{"slug": str, "workflow_name": str}]
+    """
+    from plugins.models import Plugin
+
+    results = []
+    plugins = Plugin.objects.filter(
+        anchor_step=tier,
+        runtime_position='AFTER',
+        is_enabled=True,
+    ).order_by('order_weight', 'id')
+
+    for plugin in plugins:
+        workflows = plugin.manifest.get('temporal', {}).get('workflows', [])
+        if not workflows:
+            continue
+        # Temporal workflow name is the class name (last segment of dotted path)
+        workflow_name = workflows[0].rsplit('.', 1)[-1]
+        results.append({
+            "slug": plugin.slug,
+            "workflow_name": workflow_name,
+        })
+        activity.logger.info(
+            f"[GetEnabledPluginsForTierActivity] tier={tier} plugin={plugin.slug} "
+            f"workflow={workflow_name}"
+        )
+
+    return results
