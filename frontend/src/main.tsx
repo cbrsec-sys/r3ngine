@@ -4,7 +4,43 @@ import ReactDOM from 'react-dom';
 import * as ReactDOMClient from 'react-dom/client';
 import * as MaterialUI from '@mui/material';
 import * as MaterialUIStyles from '@mui/material/styles';
-import * as MaterialUIIcons from '@mui/icons-material';
+// Explicit registry — only icons used in the app/plugins are bundled.
+// Add new entries here when a plugin needs an additional icon.
+import {
+  AccountTree,
+  Check,
+  Close,
+  Delete,
+  Download,
+  Extension,
+  FilterList,
+  GppBad,
+  GppMaybe,
+  Inventory,
+  Refresh,
+  Settings,
+  Store,
+  Upload,
+  VerifiedUser,
+} from '@mui/icons-material';
+
+const MaterialUIIcons = {
+  AccountTree,
+  Check,
+  Close,
+  Delete,
+  Download,
+  Extension,
+  FilterList,
+  GppBad,
+  GppMaybe,
+  Inventory,
+  Refresh,
+  Settings,
+  Store,
+  Upload,
+  VerifiedUser,
+};
 import * as LucideReact from 'lucide-react';
 import cytoscape from 'cytoscape';
 import App from './App';
