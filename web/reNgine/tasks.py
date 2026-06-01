@@ -905,7 +905,7 @@ def subdomain_discovery(
 				cmd = f'chaos -d {host} -silent -key {chaos_key} -o {results_file}'
 
 			elif tool == 'baddns':
-				results_file = self.results_dir + '/subdomains_baddns.txt'
+				results_file = self.results_dir + '/baddns_report.json'
 				# Run baddns in silent mode (JSON format) and redirect stdout to results_file
 				cmd = f'baddns -s {host} > {results_file}'
 
@@ -951,7 +951,7 @@ def subdomain_discovery(
 			# If the tool is baddns, extract discovered subdomains from the JSON results
 			if tool == 'baddns' and os.path.exists(results_file):
 				import re
-				extracted_file = self.results_dir + '/subdomains_baddns_extracted.txt'
+				extracted_file = self.results_dir + '/subdomains_baddns.txt'
 				discovered_subs = set()
 				try:
 					with open(results_file, 'r') as f:
@@ -1047,7 +1047,7 @@ def subdomain_discovery(
 			subdomain_count += 1
 			# Special handling for baddns findings (if it was a takeover)
 			# We'll check the baddns report file specifically for this subdomain
-			baddns_report = f'{self.results_dir}/subdomains_baddns.txt'
+			baddns_report = f'{self.results_dir}/baddns_report.json'
 			if os.path.exists(baddns_report):
 				with open(baddns_report, 'r') as f:
 					for b_line in f:
