@@ -7005,12 +7005,25 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 	from reNgine.llm import LLMImpactGenerator
 	from reNgine.privacy import PIIGate
 
+	# Cap the per-run vuln limit so the activity stays well inside start_to_close_timeout.
+	# Single-vuln calls from the dashboard UI bypass this via vulnerability_id.
+	_VULN_LIMIT = 100
+
 	if vulnerability_id:
-		vulns = Vulnerability.objects.filter(id=vulnerability_id)
+		vulns = Vulnerability.objects.filter(id=vulnerability_id).prefetch_related(
+			'subdomain__technologies', 'cve_ids'
+		)
 		if not scan_history_id and vulns.exists():
 			scan_history_id = vulns.first().scan_history_id
 	elif scan_history_id:
-		vulns = Vulnerability.objects.filter(scan_history_id=scan_history_id)
+		# Order critical→info so the most important findings are assessed first
+		# if the run is interrupted; cap to avoid timeout on large scans.
+		vulns = (
+			Vulnerability.objects
+			.filter(scan_history_id=scan_history_id)
+			.prefetch_related('subdomain__technologies', 'cve_ids')
+			.order_by('-severity')[:_VULN_LIMIT]
+		)
 	else:
 		logger.error("Neither scan_history_id nor vulnerability_id provided for impact assessment.")
 		return False
@@ -7020,7 +7033,7 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 		from startScan.models import ScanActivity
 		from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
 		post_processing_names = ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'run_apme', 'report']
-		
+
 		if self.subscan:
 			running_scans = ScanActivity.objects.filter(
 				execution_id__in=self.subscan.workflow_ids,
@@ -7038,11 +7051,6 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 			raise self.retry(countdown=10, max_retries=1000)
 
 	generator = LLMImpactGenerator(logger)
-
-	# Run Correlation Engine to unify results and calculate scores
-	from reNgine.correlation import VulnerabilityCorrelationEngine
-	correlator = VulnerabilityCorrelationEngine(scan_history=ScanHistory.objects.get(id=scan_history_id))
-	correlator.correlate_findings()
 
 	for vuln in vulns:
 		if vuln.is_suppressed:
