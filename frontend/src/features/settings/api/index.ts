@@ -213,6 +213,19 @@ export const useFetchProxies = (slug: string) => {
   });
 };
 
+export const checkProxy = async (
+  slug: string,
+  proxy: string,
+  signal?: AbortSignal
+): Promise<{ proxy: string; valid: boolean }> => {
+  const response = await axios.post(
+    `/scanEngine/${slug}/check_proxy/`,
+    { proxy },
+    { headers: { 'X-CSRFToken': getCsrfToken() }, signal }
+  );
+  return response.data;
+};
+
 export const useProxyTaskStatus = (slug: string, taskId: string | null) => {
   return useQuery<ProxyTaskStatus>({
     queryKey: ['proxy-task-status', slug, taskId],

@@ -625,6 +625,24 @@ def get_proxy_task_status(request, slug, task_id):
     return http.JsonResponse(result)
 
 
+@has_permission_decorator(PERM_MODIFY_SCAN_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def check_proxy_single(request, slug):
+    """Validate a single proxy URL. POST {proxy: str} → {proxy: str, valid: bool}"""
+    if request.method != 'POST':
+        return http.JsonResponse({'error': 'Method not allowed'}, status=405)
+    import json as _json
+    try:
+        body = _json.loads(request.body)
+    except (_json.JSONDecodeError, ValueError):
+        return http.JsonResponse({'error': 'Invalid JSON'}, status=400)
+    proxy_url = (body.get('proxy') or '').strip()
+    if not proxy_url:
+        return http.JsonResponse({'error': 'No proxy provided'}, status=400)
+    from reNgine.common_func import check_proxy_robust
+    is_valid = check_proxy_robust(proxy_url, timeout=10)
+    return http.JsonResponse({'proxy': proxy_url, 'valid': bool(is_valid)})
+
+
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def tool_arsenal_section(request, slug):
     tools = InstalledExternalTool.objects.all().order_by('id')

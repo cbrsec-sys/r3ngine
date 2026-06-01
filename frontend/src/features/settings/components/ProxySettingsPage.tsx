@@ -27,6 +27,7 @@ import { useParams } from '@tanstack/react-router';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { useProxySettings, useUpdateProxySettings, useFetchProxies, useProxyTaskStatus, useTorStatus } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { ProxyValidationModal } from './ProxyValidationModal';
 
 export const ProxySettingsPage: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
@@ -43,6 +44,7 @@ export const ProxySettingsPage: React.FC = () => {
   const [customLimit, setCustomLimit] = useState<string>('2000');
   const [validateOnSave, setValidateOnSave] = useState(false);
   const [useTor, setUseTor] = useState(false);
+  const [isValidationModalOpen, setIsValidationModalOpen] = useState(false);
   const { data: torStatus } = useTorStatus();
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -91,20 +93,16 @@ export const ProxySettingsPage: React.FC = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
-  const handleSave = () => {
+  const doSave = (proxies: string, skipValidation: boolean) => {
     updateSettings.mutate({
       use_proxy: useProxy,
       use_proxychains: useProxychains,
-      proxies: proxyList,
-      skip_validation: !validateOnSave,
-      use_tor: useTor
+      proxies,
+      skip_validation: skipValidation,
+      use_tor: useTor,
     }, {
       onSuccess: () => {
-        setSnackbar({
-          open: true,
-          message: 'Proxy settings saved successfully.',
-          severity: 'success',
-        });
+        setSnackbar({ open: true, message: 'Proxy settings saved successfully.', severity: 'success' });
       },
       onError: (error: any) => {
         setSnackbar({
@@ -114,6 +112,21 @@ export const ProxySettingsPage: React.FC = () => {
         });
       },
     });
+  };
+
+  const handleSave = () => {
+    if (validateOnSave && useProxy && proxyList.trim()) {
+      setIsValidationModalOpen(true);
+    } else {
+      doSave(proxyList, true);
+    }
+  };
+
+  const handleValidationSave = (validProxies: string[]) => {
+    setIsValidationModalOpen(false);
+    const validList = validProxies.join('\n');
+    setProxyList(validList);
+    doSave(validList, true);
   };
 
   const handleLimitChange = (option: number | 'custom') => {
@@ -152,6 +165,8 @@ export const ProxySettingsPage: React.FC = () => {
       }
     });
   };
+
+  const parsedProxies = proxyList.split('\n').map(p => p.trim()).filter(p => p.length > 0);
 
   if (isSettingsLoading) return <LinearProgress sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />;
 
@@ -269,7 +284,8 @@ export const ProxySettingsPage: React.FC = () => {
                   AUTOMATED PROXY FETCH LIMIT
                 </Typography>
                 <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
-                  Select the maximum number of raw proxies to scrape and check for liveness. (Note: It may take a while to complete [~75000/10m:00s]. Validation rate: ~1/3%)
+                  Select the maximum number of raw proxies to scrape and check for liveness.
+                  (Note: It may take a while to complete [~75000/10m:00s]. Validation rate: ~1/3%)
                 </Typography>
               </Box>
 
@@ -537,6 +553,14 @@ export const ProxySettingsPage: React.FC = () => {
           {snackbar.message}
         </Alert>
       </Snackbar>
+
+      <ProxyValidationModal
+        open={isValidationModalOpen}
+        onClose={() => setIsValidationModalOpen(false)}
+        onSave={handleValidationSave}
+        proxyList={parsedProxies}
+        projectSlug={projectSlug}
+      />
     </Box>
   );
 };

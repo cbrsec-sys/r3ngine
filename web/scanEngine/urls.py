@@ -113,4 +113,8 @@ urlpatterns = [
         '<slug:slug>/task_status/<str:task_id>',
         views.get_proxy_task_status,
         name='get_proxy_task_status'),
+    path(
+        '<slug:slug>/check_proxy/',
+        views.check_proxy_single,
+        name='check_proxy_single'),
 ]
