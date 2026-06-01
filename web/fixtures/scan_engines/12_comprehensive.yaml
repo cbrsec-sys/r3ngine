@@ -155,7 +155,7 @@
       vulnerability_scan:
         run_nuclei: true
         run_dalfox: true
-        run_crlfuzz: true
+        run_crlfuzz: false
         run_acunetix: false
         run_wpscan: true
         run_s3scanner: true
@@ -196,7 +196,7 @@
         strategy: balanced
         concurrency: 20
         rate_limit: 50
-        timeout: 300s
+        timeout: 600s
       waf_detection:
         use_shodan: true
         use_censys: true

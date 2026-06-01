@@ -56,6 +56,63 @@ if "%1" == "images" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% images %SERVICES%
 :: Remove containers and delete volume data.
 if "%1" == "prune" %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% stop %SERVICES% & docker-compose %COMPOSE_ALL_FILES% rm -f %SERVICES% & docker volume prune -f
 
+:: !! DESTRUCTIVE !! Delete ALL containers, images, volumes, build cache, and local artifacts for a clean slate.
+if "%1" == "erase" (
+    setlocal enabledelayedexpansion
+    echo.
+    echo ============================================================
+    echo   r3ngine ERASE -- COMPLETE RESET
+    echo ============================================================
+    echo.
+    echo   WARNING: This will PERMANENTLY and IRREVERSIBLY delete:
+    echo.
+    echo   - All r3ngine Docker containers ^(running or stopped^)
+    echo   - All r3ngine Docker images
+    echo   - ALL Docker volumes ^(scan data, PostgreSQL, Neo4j, wordlists^)
+    echo   - Docker build layer cache
+    echo   - Local Python artifacts ^(__pycache__, *.pyc, staticfiles/^)
+    echo   - Local frontend artifacts ^(dist/, node_modules/^)
+    echo.
+    echo   ALL SCAN DATA AND DATABASE CONTENT WILL BE LOST.
+    echo   There is no undo. Back up first if needed.
+    echo.
+    echo ============================================================
+    echo.
+    set /p confirm="  Type 'erase' to confirm full reset: "
+    if /i not "!confirm!" == "erase" (
+        echo.
+        echo   Erase cancelled.
+        echo.
+        goto :eof
+    )
+    echo.
+    echo [1/5] Stopping services and removing all containers, volumes, and images...
+    %DOCKER_COMPOSE% %COMPOSE_ALL_FILES% down --volumes --rmi all --remove-orphans
+    echo.
+    echo [2/5] Pruning Docker build cache...
+    docker builder prune -af
+    echo.
+    echo [3/5] Removing any remaining dangling Docker volumes...
+    docker volume prune -f
+    echo.
+    echo [4/5] Removing local Python build artifacts...
+    for /d /r "web" %%d in (__pycache__) do (
+        if exist "%%d" rd /s /q "%%d"
+    )
+    for /r "web" %%f in (*.pyc *.pyo) do del /f /q "%%f" 2>nul
+    if exist "web\staticfiles" rd /s /q "web\staticfiles"
+    echo.
+    echo [5/5] Removing local frontend build artifacts...
+    if exist "frontend\dist" rd /s /q "frontend\dist"
+    if exist "frontend\node_modules" rd /s /q "frontend\node_modules"
+    echo.
+    echo ============================================================
+    echo   Erase complete. All data has been wiped.
+    echo   Run 'make up' to start fresh.
+    echo ============================================================
+    echo.
+)
+
 :: REQUIRED for v3.2.0+: migrate from Celery to Temporal.
 if "%1" == "fullupgrade" (
     echo.
