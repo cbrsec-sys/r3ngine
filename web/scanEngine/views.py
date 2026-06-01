@@ -274,12 +274,17 @@ def tool_specific_settings(request, slug):
         gf_list = (subprocess.check_output(['gf', '-list'])).decode("utf-8").split('\n')
     except:
         pass
-    nuclei_custom_pattern = [os.path.basename(f) for f in glob.glob("/root/nuclei-templates/*.yaml")]
-    
+    _tpl_base = "/root/nuclei-templates"
+    nuclei_custom_pattern = sorted(
+        os.path.relpath(f, _tpl_base)
+        for f in glob.glob(f"{_tpl_base}/**/*.yaml", recursive=True)
+                 + glob.glob(f"{_tpl_base}/**/*.yml", recursive=True)
+    )
+
     if request.headers.get('Accept') == 'application/json':
         return http.JsonResponse({
             'gf_patterns': sorted([p for p in gf_list if p]),
-            'nuclei_templates': sorted(nuclei_custom_pattern)
+            'nuclei_templates': nuclei_custom_pattern
         })
 
     context['settings_nav_active'] = 'active'

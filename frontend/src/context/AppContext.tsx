@@ -7,10 +7,12 @@ interface AppContextType {
   setProjectName: (n: string) => void;
 }
 
+declare const __APP_VERSION__: string;
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [version, setVersion] = useState('3.0.0');
+  const [version, setVersion] = useState(__APP_VERSION__ ?? '3.4.0');
   const [projectName, setProjectName] = useState('RENGINE');
 
   return (
