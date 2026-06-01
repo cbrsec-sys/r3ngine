@@ -905,7 +905,7 @@ def subdomain_discovery(
 				cmd = f'chaos -d {host} -silent -key {chaos_key} -o {results_file}'
 
 			elif tool == 'baddns':
-				results_file = self.results_dir + '/subdomains_baddns.txt'
+				results_file = self.results_dir + '/baddns_report.json'
 				# Run baddns in silent mode (JSON format) and redirect stdout to results_file
 				cmd = f'baddns -s {host} > {results_file}'
 
@@ -951,7 +951,7 @@ def subdomain_discovery(
 			# If the tool is baddns, extract discovered subdomains from the JSON results
 			if tool == 'baddns' and os.path.exists(results_file):
 				import re
-				extracted_file = self.results_dir + '/subdomains_baddns_extracted.txt'
+				extracted_file = self.results_dir + '/subdomains_baddns.txt'
 				discovered_subs = set()
 				try:
 					with open(results_file, 'r') as f:
@@ -1047,7 +1047,7 @@ def subdomain_discovery(
 			subdomain_count += 1
 			# Special handling for baddns findings (if it was a takeover)
 			# We'll check the baddns report file specifically for this subdomain
-			baddns_report = f'{self.results_dir}/subdomains_baddns.txt'
+			baddns_report = f'{self.results_dir}/baddns_report.json'
 			if os.path.exists(baddns_report):
 				with open(baddns_report, 'r') as f:
 					for b_line in f:
@@ -2257,9 +2257,13 @@ def port_scan(self, hosts=[], ctx={}, description=None, prepare_only=False, pars
 			exclude_subdomains=exclude_subdomains,
 			ctx=ctx)
 
+	if not hosts:
+		logger.warning('port_scan: no hosts to scan, skipping.')
+		return []
+
 	# Build cmd
 	cmd = 'naabu -json -exclude-cdn'
-	cmd += f' -list {input_file}' if len(hosts) > 0 else f' -host {hosts[0]}'
+	cmd += f' -list {input_file}' if len(hosts) > 1 else f' -host {hosts[0]}'
 	if 'full' in ports or 'all' in ports:
 		ports_str = ' -p "-"'
 	elif 'top-100' in ports:
@@ -2403,7 +2407,25 @@ def port_scan(self, hosts=[], ctx={}, description=None, prepare_only=False, pars
 	if len(ports_data) == 0:
 		logger.info('Finished running naabu port scan - No open ports found.')
 		if nmap_enabled:
-			logger.info('Nmap scans skipped')
+			logger.warning('naabu found no open ports; running nmap independently as configured.')
+			# Convert YAML port list to integers where possible; naabu-specific
+			# tokens like 'top-100'/'all'/'full' are ignored and nmap will use
+			# its own defaults (top-1000) when the resulting list is empty.
+			nmap_fallback_ports = [int(p) for p in ports if p.isdigit()]
+			for host in hosts:
+				ctx_nmap = ctx.copy()
+				ctx_nmap['description'] = get_task_title(f'nmap_{host}', self.scan_id, self.subscan_id)
+				ctx_nmap['track'] = False
+				ctx_nmap['activity_id'] = self.activity_id
+				nmap(
+					self,
+					cmd=nmap_cmd,
+					ports=nmap_fallback_ports,
+					host=host,
+					script=nmap_script,
+					script_args=nmap_script_args,
+					max_rate=rate_limit,
+					ctx=ctx_nmap)
 		return ports_data
 
 	# Send notification
@@ -2785,6 +2807,17 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			get_only_default_urls=True,
 			ctx=ctx
 		)
+		# When http_crawl found no alive endpoints, fall back to all default
+		# seed URLs so passive tools (gau, waybackurls) can still query
+		# historical data even if the target is currently unreachable.
+		if not urls and enable_http_crawl:
+			urls = get_http_urls(
+				is_alive=False,
+				write_filepath=input_path,
+				exclude_subdomains=exclude_subdomains,
+				get_only_default_urls=True,
+				ctx=ctx
+			)
 
 	# Domain regex
 	host = self.domain.name if self.domain else urlparse(urls[0]).netloc
@@ -4401,7 +4434,7 @@ def http_crawl(
 			except MultipleObjectsReturned:
 				tech = Technology.objects.filter(name=technology).first()
 			endpoint.techs.add(tech)
-			if is_ran_from_subdomain_scan:
+			if endpoint.is_default and subdomain:
 				subdomain.technologies.add(tech)
 				subdomain.save()
 			endpoint.save()
@@ -4429,7 +4462,7 @@ def http_crawl(
 				add_meta_info=False)
 
 		# Update subdomain status attributes if this is the default endpoint
-		if is_ran_from_subdomain_scan and endpoint.is_default:
+		if endpoint.is_default and subdomain:
 			subdomain.http_url = endpoint.http_url
 			subdomain.http_status = endpoint.http_status
 			subdomain.page_title = endpoint.page_title
@@ -5774,7 +5807,7 @@ def process_httpx_response(line, ctx={}, is_ran_from_subdomain_scan=False):
 	endpoint.save()
 
 	# Sync Subdomain status attributes if this is the default endpoint
-	if is_ran_from_subdomain_scan:
+	if endpoint.is_default and subdomain:
 		subdomain.http_status = http_status
 		subdomain.page_title = page_title
 		subdomain.content_length = content_length
@@ -6972,12 +7005,25 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 	from reNgine.llm import LLMImpactGenerator
 	from reNgine.privacy import PIIGate
 
+	# Cap the per-run vuln limit so the activity stays well inside start_to_close_timeout.
+	# Single-vuln calls from the dashboard UI bypass this via vulnerability_id.
+	_VULN_LIMIT = 100
+
 	if vulnerability_id:
-		vulns = Vulnerability.objects.filter(id=vulnerability_id)
+		vulns = Vulnerability.objects.filter(id=vulnerability_id).prefetch_related(
+			'subdomain__technologies', 'cve_ids'
+		)
 		if not scan_history_id and vulns.exists():
 			scan_history_id = vulns.first().scan_history_id
 	elif scan_history_id:
-		vulns = Vulnerability.objects.filter(scan_history_id=scan_history_id)
+		# Order critical→info so the most important findings are assessed first
+		# if the run is interrupted; cap to avoid timeout on large scans.
+		vulns = (
+			Vulnerability.objects
+			.filter(scan_history_id=scan_history_id)
+			.prefetch_related('subdomain__technologies', 'cve_ids')
+			.order_by('-severity')[:_VULN_LIMIT]
+		)
 	else:
 		logger.error("Neither scan_history_id nor vulnerability_id provided for impact assessment.")
 		return False
@@ -6987,7 +7033,7 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 		from startScan.models import ScanActivity
 		from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
 		post_processing_names = ['correlate_vulnerabilities', 'calculate_risk_scores', 'generate_impact_assessment', 'run_apme', 'report']
-		
+
 		if self.subscan:
 			running_scans = ScanActivity.objects.filter(
 				execution_id__in=self.subscan.workflow_ids,
@@ -7005,11 +7051,6 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 			raise self.retry(countdown=10, max_retries=1000)
 
 	generator = LLMImpactGenerator(logger)
-
-	# Run Correlation Engine to unify results and calculate scores
-	from reNgine.correlation import VulnerabilityCorrelationEngine
-	correlator = VulnerabilityCorrelationEngine(scan_history=ScanHistory.objects.get(id=scan_history_id))
-	correlator.correlate_findings()
 
 	for vuln in vulns:
 		if vuln.is_suppressed:

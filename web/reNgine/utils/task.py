@@ -1182,6 +1182,6 @@ def save_subdomain_metadata(subdomain, endpoint, extra_datas=None):
 		subdomain.http_url = http_url
 		subdomain.save()
 	else:
-		logger.error(f'No HTTP URL found for {subdomain.name}. Skipping.')
+		logger.debug(f'No HTTP URL found for {subdomain.name} yet. Skipping metadata extraction.')
 
 
