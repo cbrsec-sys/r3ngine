@@ -2208,11 +2208,18 @@ def get_enabled_plugins_for_tier_activity(tier: str) -> list:
     ).order_by('order_weight', 'id')
 
     for plugin in plugins:
-        workflows = plugin.manifest.get('temporal', {}).get('workflows', [])
+        manifest = plugin.manifest or {}
+        workflows = manifest.get('temporal', {}).get('workflows', [])
         if not workflows:
             continue
+        workflow_path = workflows[0]
+        if not isinstance(workflow_path, str) or not workflow_path.strip():
+            activity.logger.warning(
+                f"[GetEnabledPluginsForTierActivity] {plugin.slug}: invalid workflow path {workflow_path!r}"
+            )
+            continue
         # Temporal workflow name is the class name (last segment of dotted path)
-        workflow_name = workflows[0].rsplit('.', 1)[-1]
+        workflow_name = workflow_path.rsplit('.', 1)[-1]
         results.append({
             "slug": plugin.slug,
             "workflow_name": workflow_name,
