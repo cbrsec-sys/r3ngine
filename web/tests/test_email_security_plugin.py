@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(
 
 class TestCheckSpf(TestCase):
 
-    @patch('backend.email_tasks.dns.resolver.resolve')
+    @patch('dns.resolver.resolve')
     def test_missing_returns_not_found(self, mock_resolve):
         import dns.exception
         from backend.email_tasks import check_spf
@@ -28,7 +28,7 @@ class TestCheckSpf(TestCase):
         self.assertIsNone(result['record'])
         self.assertFalse(result['weak'])
 
-    @patch('backend.email_tasks.dns.resolver.resolve')
+    @patch('dns.resolver.resolve')
     def test_strong_policy_not_weak(self, mock_resolve):
         from backend.email_tasks import check_spf
         rdata = MagicMock()
@@ -38,7 +38,7 @@ class TestCheckSpf(TestCase):
         self.assertTrue(result['found'])
         self.assertFalse(result['weak'])
 
-    @patch('backend.email_tasks.dns.resolver.resolve')
+    @patch('dns.resolver.resolve')
     def test_softfail_is_weak(self, mock_resolve):
         from backend.email_tasks import check_spf
         rdata = MagicMock()
@@ -48,7 +48,7 @@ class TestCheckSpf(TestCase):
         self.assertTrue(result['found'])
         self.assertTrue(result['weak'])
 
-    @patch('backend.email_tasks.dns.resolver.resolve')
+    @patch('dns.resolver.resolve')
     def test_plus_all_is_weak(self, mock_resolve):
         from backend.email_tasks import check_spf
         rdata = MagicMock()
@@ -60,7 +60,7 @@ class TestCheckSpf(TestCase):
 
 class TestCheckDmarc(TestCase):
 
-    @patch('backend.email_tasks.dns.resolver.resolve')
+    @patch('dns.resolver.resolve')
     def test_missing_returns_not_found(self, mock_resolve):
         import dns.exception
         from backend.email_tasks import check_dmarc
@@ -69,7 +69,7 @@ class TestCheckDmarc(TestCase):
         self.assertFalse(result['found'])
         self.assertIsNone(result['policy'])
 
-    @patch('backend.email_tasks.dns.resolver.resolve')
+    @patch('dns.resolver.resolve')
     def test_policy_reject(self, mock_resolve):
         from backend.email_tasks import check_dmarc
         rdata = MagicMock()
@@ -79,7 +79,7 @@ class TestCheckDmarc(TestCase):
         self.assertTrue(result['found'])
         self.assertEqual(result['policy'], 'reject')
 
-    @patch('backend.email_tasks.dns.resolver.resolve')
+    @patch('dns.resolver.resolve')
     def test_policy_none(self, mock_resolve):
         from backend.email_tasks import check_dmarc
         rdata = MagicMock()
@@ -88,7 +88,7 @@ class TestCheckDmarc(TestCase):
         result = check_dmarc('example.com')
         self.assertEqual(result['policy'], 'none')
 
-    @patch('backend.email_tasks.dns.resolver.resolve')
+    @patch('dns.resolver.resolve')
     def test_policy_quarantine(self, mock_resolve):
         from backend.email_tasks import check_dmarc
         rdata = MagicMock()
