@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -13,6 +13,74 @@ import {
 import { Eye, EyeOff, User, Lock, ExternalLink } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
 import { useLogin } from '../api';
+
+const StaticOverlay: React.FC = () => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rafRef = useRef<number>(0);
+  const lastFrameRef = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const INTERVAL = 1000 / 15; // 15fps — analog static cadence
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+    };
+    resize();
+    const ro = new ResizeObserver(resize);
+    ro.observe(canvas);
+
+    const draw = (timestamp: number) => {
+      rafRef.current = requestAnimationFrame(draw);
+      if (timestamp - lastFrameRef.current < INTERVAL) return;
+      lastFrameRef.current = timestamp;
+
+      const { width, height } = canvas;
+      if (width === 0 || height === 0) return;
+      const imageData = ctx.createImageData(width, height);
+      const data = imageData.data;
+
+      for (let i = 0; i < data.length; i += 4) {
+        if (Math.random() > 0.862) {
+          const brightness = Math.floor(Math.random() * 180 + 20);
+          data[i]     = Math.floor(brightness * 0.08); // R — minimal, keeps cyan
+          data[i + 1] = Math.floor(brightness * 0.85); // G
+          data[i + 2] = brightness;                     // B
+          data[i + 3] = Math.floor(Math.random() * 44 + 9); // alpha 9–53 (+15%)
+        }
+      }
+
+      ctx.putImageData(imageData, 0, 0);
+    };
+
+    rafRef.current = requestAnimationFrame(draw);
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      ro.disconnect();
+    };
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        width: '100%',
+        height: '100%',
+        borderRadius: 'inherit',
+        pointerEvents: 'none',
+        zIndex: 0,
+      }}
+    />
+  );
+};
 
 export const LoginPage: React.FC = () => {
   const { version } = useAppContext();
@@ -74,10 +142,7 @@ export const LoginPage: React.FC = () => {
         backdropFilter: 'blur(20px)',
         border: '1px solid rgba(255, 255, 255, 0.1)',
         borderRadius: 4,
-        p: 4,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
+        overflow: 'hidden',
         boxShadow: '0 0 40px rgba(0, 0, 0, 0.4)',
         transition: 'all 0.4s cubic-bezier(0.4, 0, 0.2, 1)',
         '&:hover': {
@@ -85,6 +150,8 @@ export const LoginPage: React.FC = () => {
           boxShadow: '0 0 50px rgba(0, 243, 255, 0.1)'
         }
       }}>
+        <StaticOverlay />
+        <Box sx={{ position: 'relative', zIndex: 1, width: '100%', p: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
         <Box sx={{ mb: 3, textAlign: 'center' }}>
           <img src="/staticfiles/img/r3ngine_logo.png" alt="reNgine Logo" style={{ height: 80, marginBottom: 16 }} />
           <Typography variant="h5" sx={{
@@ -140,7 +207,7 @@ export const LoginPage: React.FC = () => {
                     </InputAdornment>
                   ),
                   sx: {
-                    bgcolor: 'rgba(255, 255, 255, 0.03)',
+                    bgcolor: 'rgba(8, 8, 14, 0.92)',
                     color: '#fff',
                     borderRadius: 2,
                     '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.08)' },
@@ -178,7 +245,7 @@ export const LoginPage: React.FC = () => {
                     </InputAdornment>
                   ),
                   sx: {
-                    bgcolor: 'rgba(255, 255, 255, 0.03)',
+                    bgcolor: 'rgba(8, 8, 14, 0.92)',
                     color: '#fff',
                     borderRadius: 2,
                     '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255, 255, 255, 0.08)' },
@@ -224,6 +291,7 @@ export const LoginPage: React.FC = () => {
           <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.4)' }}>
             Issues or feature requests? <Link href="https://github.com/whiterabb17/r3ngine/issues" target="_blank" sx={{ color: '#00f3ff' }}>Raise issue on Github.</Link>
           </Typography>
+        </Box>
         </Box>
       </Paper>
     </Box>

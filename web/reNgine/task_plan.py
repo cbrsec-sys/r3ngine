@@ -170,8 +170,21 @@ def build_scan_task_plan(tasks: list, yaml_configuration: dict) -> list:
         if react_cfg.get('run_react2shell', True):
             add('react2shell_scan')
 
-    # Tier 7 — always
-    for t in _TIER7_TASKS:
-        add(t)
+    # Tier 7
+    if 'vulnerability_scan' in tasks:
+        add('correlate_vulnerabilities')
+        add('calculate_risk_scores')
+        add('generate_impact_assessment')
+
+    _graph_tasks = {
+        'subdomain_discovery', 'amass_intel_discovery', 'firewall_vpn_scan',
+        'osint', 'spiderfoot_scan', 'baddns', 'http_crawl', 'port_scan',
+        'fetch_url', 'dir_file_fuzz', 'web_api_discovery', 'vulnerability_scan'
+    }
+    if any(t in _graph_tasks for t in tasks):
+        add('sync_graph')
+        add('run_apme')
+
+    add('scan_notification')
 
     return sorted(plan, key=lambda e: e['tier'])

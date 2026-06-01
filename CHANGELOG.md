@@ -22,6 +22,14 @@
 
 ### [v3.2.0] - 2026-05-29
 
+- **fetch_url Empty Targets Execution Error Fix**:
+  - Added an early exit check to the `fetch_url` task (`web/reNgine/tasks.py`) to properly return when no active target URLs are discovered.
+  - Prevents fatal crashes in downstream URL fetching tools (such as `vigolium scan` throwing `target file contains no targets` exceptions) when invoked against domains with no active endpoints.
+
+- **baddns JSON Parsing Error Fix**:
+  - Resolved an issue in the `subdomain_discovery` task where JSON output from `baddns` was erroneously merged with extracted subdomains and parsed as invalid domains.
+  - Renamed the raw output file to `baddns_report.json` to safely avoid the `subdomains_*.txt` merging glob, ensuring JSON records are only parsed by the takeover evaluation block and preventing task validation errors.
+
 - **ReconX Target Monitoring Settings & API URL Normalization**:
   - Added a monitoring settings modal inside the mobile app's **ReconX Feed** screen (`app/feeds/monitoring.tsx`), accessible via a header settings icon, to view all database targets from `/mapi/listTargets/` and toggle their active monitoring status using `/mapi/toggle/monitoring/`.
   - Fixed a double-slash (`//`) API request URL routing and logging issue in the Axios client (`src/api/client.ts`) by stripping the leading slash from relative paths if the baseURL ends with a slash.
