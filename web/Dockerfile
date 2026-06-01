@@ -108,6 +108,36 @@ RUN go build -ldflags="-s -w" -o /usr/local/bin/vigolium ./cmd/vigolium && \
 
 
 # ===========================================================================
+# Stage: Dalfox Builder
+#
+# Dalfox v3 is a Rust rewrite with no pre-built binaries; must be compiled
+# from source. Targets x86_64-unknown-linux-musl to produce a fully static
+# binary with no libc dependency in the runtime image.
+# ===========================================================================
+FROM debian:bookworm-slim AS dalfox-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    musl-tools \
+    pkg-config \
+    build-essential \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
+
+RUN rustup target add x86_64-unknown-linux-musl
+
+RUN git clone --depth 1 https://github.com/hahwul/dalfox /tmp/dalfox
+
+WORKDIR /tmp/dalfox
+
+RUN cargo build --release --target x86_64-unknown-linux-musl && \
+    cp target/x86_64-unknown-linux-musl/release/dalfox /usr/local/bin/dalfox
+
+
+# ===========================================================================
 # Stage 4: Runtime Image
 #
 # Ubuntu 22.04 base. Contains ONLY what r3ngine needs to run:
@@ -116,6 +146,7 @@ RUN go build -ldflags="-s -w" -o /usr/local/bin/vigolium ./cmd/vigolium && \
 #   - Node.js (Retire.js)
 #   - Pre-compiled Go tool binaries (copied from go-tools-builder)
 #   - r3ngine-executor binary (copied from executor-builder)
+#   - Dalfox binary (copied from dalfox-builder)
 #   - Built frontend dist (copied from frontend-builder)
 #   - Python-based tools (shallow-cloned, .git stripped)
 #   - Playwright Chromium
@@ -267,12 +298,8 @@ RUN ARCH=$(dpkg --print-architecture) && \
 RUN curl -L https://github.com/praetorian-inc/brutus/releases/latest/download/brutus-linux-amd64.tar.gz | \
     tar xz && mv brutus /usr/local/bin/
 
-# Dalfox v3 — XSS scanner (Rust rewrite; replaces Go v2 hahwul/dalfox/v2)
-RUN ARCH=$(dpkg --print-architecture | sed 's/amd64/x86_64/;s/arm64/aarch64/') && \
-    DALFOX_VERSION="3.0.0" && \
-    curl -fsSL "https://github.com/hahwul/dalfox/releases/download/v${DALFOX_VERSION}/dalfox-v${DALFOX_VERSION}-linux-${ARCH}.tar.gz" \
-      | tar -xz -C /tmp/ && \
-    install -m755 "$(find /tmp -maxdepth 2 -name dalfox -type f | head -1)" /usr/local/bin/dalfox
+# Dalfox v3 — XSS scanner (Rust rewrite; built from source in dalfox-builder stage)
+COPY --from=dalfox-builder /usr/local/bin/dalfox /usr/local/bin/dalfox
 
 # Aquatone — visual recon / screenshot tool (needs Chromium at runtime)
 RUN ARCH=$(dpkg --print-architecture) && \

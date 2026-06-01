@@ -409,6 +409,9 @@ class AtomicInstaller:
                     except Exception as e:
                         logger.error(f"Unexpected error running migrations for {plugin_slug}: {str(e)}")
                         raise e
+                else:
+                    # Plugin has no models — migrations not needed
+                    cls._emit(install_id, 'migrations', 'skipped')
 
                 cls._emit(install_id, 'assets', 'in_progress')
                 from scanEngine.models import EngineType
