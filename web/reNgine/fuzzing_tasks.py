@@ -2,6 +2,7 @@ import logging
 import os
 import base64
 import json
+import threading
 from urllib.parse import urlparse
 from django.utils import timezone
 from redis import Redis
@@ -237,182 +238,202 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 				if not any(proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
 					proxy = 'http://' + proxy
 
-			# Use a global lock to ensure sequential execution across all workers
+			# Use a global lock to ensure sequential execution across all workers;
+			# ffuf and dirsearch run concurrently within each URL's lock window.
 			with redis_client.lock("fuzz_execution_lock", timeout=14400):
-				logger.info(f'Running ffuf for {target_url}')
-				# 1. Run FFUF
-				fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json -s'
-				fcmd += f' -x {proxy}' if proxy else ''
-				fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=proxy)
-				
-				# Initialize DirectoryScan object for FFUF
-				dirscan = DirectoryScan.objects.create(
-					scanned_date=timezone.now(),
-					command_line=fcmd
-				)
-				if subdomain:
-					subdomain.directories.add(dirscan)
-					subdomain.save()
+				ffuf_results_local = []
+				ffuf_exc = [None]
+				ds_exc = [None]
 
-				logger.info(f'Running ffuf for {base_url}')
-				logger.warning(f'ffuf command: {fcmd}')
-
-				if parse_only is not None and target_url in parse_only.get('ffuf', {}):
-					ffuf_stdout = parse_only['ffuf'][target_url]
-					line_source = []
-					for raw_line in ffuf_stdout.splitlines():
-						raw_line = raw_line.strip()
-						if not raw_line:
-							continue
-						try:
-							line_source.append(json.loads(raw_line))
-						except Exception:
-							line_source.append(raw_line)
-				else:
-					line_source = stream_command(
-						fcmd,
-						shell=True,
-						history_file=self.history_file,
-						scan_id=self.scan_id,
-						activity_id=self.activity_id)
-
-				for line in line_source:
-					if not isinstance(line, dict):
-						continue
-
-					results.append(line)
-					res_url = line.get('url')
-					if not res_url:
-						continue
-
-					name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
-					length = line.get('length', 0)
-					status = line.get('status', 0)
-					words = line.get('words', 0)
-					lines = line.get('lines', 0)
-					content_type = line.get('content-type', '')
-					duration = line.get('duration', 0)
-
-					if not name:
-						continue
-
-					endpoint, created = save_endpoint(res_url, ctx=ctx)
-					if endpoint is None:
-						continue
-
-					logger.warning(f'Endpoint: {endpoint} Created: {created}')
-					endpoint.http_status = status
-					endpoint.content_length = length
-					endpoint.response_time = duration / 1000000000
-					endpoint.content_type = content_type
-					endpoint.save()
-
+				def _run_ffuf():
 					try:
-						dfile, d_created = save_fuzzing_file(
-							name=name,
-							url=res_url,
-							http_status=status,
-							length=length,
-							words=words,
-							lines=lines,
-							content_type=content_type
+						fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json -s'
+						fcmd += f' -x {proxy}' if proxy else ''
+						fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=proxy)
+
+						dirscan = DirectoryScan.objects.create(
+							scanned_date=timezone.now(),
+							command_line=fcmd
 						)
-						logger.info(f'Saved DirectoryFile for {res_url}')
-						logger.warning(f'DirectoryFile: {dfile} Created: {d_created}')
+						if subdomain:
+							subdomain.directories.add(dirscan)
+
+						logger.info(f'Running ffuf for {base_url}')
+						logger.warning(f'ffuf command: {fcmd}')
+
+						if parse_only is not None and target_url in parse_only.get('ffuf', {}):
+							ffuf_stdout = parse_only['ffuf'][target_url]
+							line_source = []
+							for raw_line in ffuf_stdout.splitlines():
+								raw_line = raw_line.strip()
+								if not raw_line:
+									continue
+								try:
+									line_source.append(json.loads(raw_line))
+								except Exception:
+									line_source.append(raw_line)
+						else:
+							line_source = stream_command(
+								fcmd,
+								shell=True,
+								history_file=self.history_file,
+								scan_id=self.scan_id,
+								activity_id=self.activity_id)
+
+						for line in line_source:
+							if not isinstance(line, dict):
+								continue
+
+							ffuf_results_local.append(line)
+							res_url = line.get('url')
+							if not res_url:
+								continue
+
+							name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
+							length = line.get('length', 0)
+							status = line.get('status', 0)
+							words = line.get('words', 0)
+							lines_count = line.get('lines', 0)
+							content_type = line.get('content-type', '')
+							duration = line.get('duration', 0)
+
+							if not name:
+								continue
+
+							endpoint, created = save_endpoint(res_url, ctx=ctx)
+							if endpoint is None:
+								continue
+
+							logger.warning(f'Endpoint: {endpoint} Created: {created}')
+							endpoint.http_status = status
+							endpoint.content_length = length
+							endpoint.response_time = duration / 1000000000
+							endpoint.content_type = content_type
+							endpoint.save()
+
+							try:
+								dfile, d_created = save_fuzzing_file(
+									name=name,
+									url=res_url,
+									http_status=status,
+									length=length,
+									words=words,
+									lines=lines_count,
+									content_type=content_type
+								)
+								logger.info(f'Saved DirectoryFile for {res_url}')
+								logger.warning(f'DirectoryFile: {dfile} Created: {d_created}')
+							except Exception as e:
+								logger.error(f'Failed to save DirectoryFile for {res_url}: {e}')
+								continue
+
+							dirscan.directory_files.add(dfile)
+							if self.subscan:
+								from startScan.models import SubScan
+								if SubScan.objects.filter(pk=self.subscan.pk).exists():
+									dirscan.dir_subscan_ids.add(self.subscan)
+
+						dirscan.save()
 					except Exception as e:
-						logger.error(f'Failed to save DirectoryFile for {res_url}: {e}')
-						continue
+						ffuf_exc[0] = e
 
-					dirscan.directory_files.add(dfile)
-					if self.subscan:
-						from startScan.models import SubScan
-						if SubScan.objects.filter(pk=self.subscan.pk).exists():
-							dirscan.dir_subscan_ids.add(self.subscan)
+				def _run_dirsearch():
+					try:
+						if not run_dirsearch or not dirsearch_base_cmd:
+							return
+						dirsearch_output = f'{self.results_dir}/dirsearch_{subdomain_name}.json'
+						target_url_stripped = target_url.rstrip('/')
+						dcmd = f'{dirsearch_base_cmd} -u {target_url_stripped} --format=json -o {dirsearch_output} --no-color'
+						if proxy:
+							dcmd += f' --proxy={proxy}'
 
-				dirscan.save()
+						dcmd = opsec.apply_stealth('dirsearch', dcmd, proxy=proxy)
 
-				# 2. Run Dirsearch (only when run_dirsearch is enabled)
-				if run_dirsearch and dirsearch_base_cmd:
-					dirsearch_output = f'{self.results_dir}/dirsearch_{subdomain_name}.json'
-					# Remove trailing slash for dirsearch -u
-					target_url_stripped = target_url.rstrip('/')
-					dcmd = f'{dirsearch_base_cmd} -u {target_url_stripped} --format=json -o {dirsearch_output} --no-color'
-					if proxy:
-						dcmd += f' --proxy={proxy}'
-					
-					dcmd = opsec.apply_stealth('dirsearch', dcmd, proxy=proxy)
-					
-					# Initialize DirectoryScan object for Dirsearch
-					dirscan_ds = DirectoryScan.objects.create(
-						scanned_date=timezone.now(),
-						command_line=dcmd
-					)
-					if subdomain:
-						subdomain.directories.add(dirscan_ds)
-						subdomain.save()
-
-					logger.info(f'Running dirsearch for {target_url}')
-					logger.warning(f'dirsearch command: {dcmd}')
-
-					if parse_only is None:
-						run_command(
-							dcmd,
-							shell=True,
-							history_file=self.history_file,
-							scan_id=self.scan_id,
-							activity_id=self.activity_id
+						dirscan_ds = DirectoryScan.objects.create(
+							scanned_date=timezone.now(),
+							command_line=dcmd
 						)
-					
-					# Parse dirsearch results from output file
-					if os.path.exists(dirsearch_output):
-						try:
-							with open(dirsearch_output, 'r') as f:
-								ds_data = json.load(f)
-								for ds_res in ds_data.get('results', []):
-									res_url = ds_res.get('url')
-									status = ds_res.get('status', 0)
-									length = ds_res.get('content-length', 0)
-									content_type = ds_res.get('content-type', '')
-									
-									if not res_url:
-										continue
-									
-									name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
-									if not name:
-										continue
-									
-									endpoint, created = save_endpoint(res_url, ctx=ctx)
-									if endpoint is None:
-										continue
+						if subdomain:
+							subdomain.directories.add(dirscan_ds)
 
-									endpoint.http_status = status
-									endpoint.content_length = length
-									endpoint.content_type = content_type
-									endpoint.save()
+						logger.info(f'Running dirsearch for {target_url}')
+						logger.warning(f'dirsearch command: {dcmd}')
 
-									try:
-										dfile, d_created = save_fuzzing_file(
-											name=name,
-											url=res_url,
-											http_status=status,
-											length=length,
-											content_type=content_type
-										)
-										logger.info(f'Saved DirectoryFile for {res_url}')
-										logger.warning(f'DirectoryFile: {dfile} Created: {d_created}')
-									except Exception as e:
-										logger.error(f'Failed to save DirectoryFile for {res_url}: {e}')
-										continue
+						if parse_only is None:
+							run_command(
+								dcmd,
+								shell=True,
+								history_file=self.history_file,
+								scan_id=self.scan_id,
+								activity_id=self.activity_id
+							)
 
-									dirscan_ds.directory_files.add(dfile)
-									if self.subscan:
-										from startScan.models import SubScan
-										if SubScan.objects.filter(pk=self.subscan.pk).exists():
-											dirscan_ds.dir_subscan_ids.add(self.subscan)
-						except Exception as e:
-							logger.error(f'Error parsing dirsearch results for {base_url}: {e}')
+						if os.path.exists(dirsearch_output):
+							try:
+								with open(dirsearch_output, 'r') as f:
+									ds_data = json.load(f)
+									for ds_res in ds_data.get('results', []):
+										res_url = ds_res.get('url')
+										status = ds_res.get('status', 0)
+										length = ds_res.get('content-length', 0)
+										content_type = ds_res.get('content-type', '')
 
-					dirscan_ds.save()
+										if not res_url:
+											continue
+
+										name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
+										if not name:
+											continue
+
+										endpoint, created = save_endpoint(res_url, ctx=ctx)
+										if endpoint is None:
+											continue
+
+										endpoint.http_status = status
+										endpoint.content_length = length
+										endpoint.content_type = content_type
+										endpoint.save()
+
+										try:
+											dfile, d_created = save_fuzzing_file(
+												name=name,
+												url=res_url,
+												http_status=status,
+												length=length,
+												content_type=content_type
+											)
+											logger.info(f'Saved DirectoryFile for {res_url}')
+											logger.warning(f'DirectoryFile: {dfile} Created: {d_created}')
+										except Exception as e:
+											logger.error(f'Failed to save DirectoryFile for {res_url}: {e}')
+											continue
+
+										dirscan_ds.directory_files.add(dfile)
+										if self.subscan:
+											from startScan.models import SubScan
+											if SubScan.objects.filter(pk=self.subscan.pk).exists():
+												dirscan_ds.dir_subscan_ids.add(self.subscan)
+							except Exception as e:
+								logger.error(f'Error parsing dirsearch results for {base_url}: {e}')
+
+						dirscan_ds.save()
+					except Exception as e:
+						ds_exc[0] = e
+
+				t_ffuf = threading.Thread(target=_run_ffuf, name=f'ffuf-{target_url}')
+				t_ffuf.start()
+				if run_dirsearch and dirsearch_base_cmd:
+					t_ds = threading.Thread(target=_run_dirsearch, name=f'dirsearch-{target_url}')
+					t_ds.start()
+					t_ds.join()
+				t_ffuf.join()
+
+				if ffuf_exc[0]:
+					raise ffuf_exc[0]
+				if ds_exc[0]:
+					logger.error(f'dirsearch failed for {target_url}: {ds_exc[0]}')
+
+				results.extend(ffuf_results_local)
 
 		# Crawl discovered URLs if enabled
 		if enable_http_crawl:

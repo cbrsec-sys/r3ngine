@@ -49,7 +49,7 @@ export const uploadPlugin = async (file: File): Promise<{ install_id: string }> 
 export interface InstallStep {
   key: string;
   label: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
   message: string;
 }
 
@@ -122,6 +122,27 @@ export const useDeletePlugin = () => {
       queryClient.invalidateQueries({ queryKey: ['plugins'] });
       queryClient.invalidateQueries({ queryKey: ['pluginsRegistry'] });
     },
+  });
+};
+
+export const updatePluginPosition = async ({
+  slug,
+  anchor_step,
+  runtime_position,
+}: {
+  slug: string;
+  anchor_step: string;
+  runtime_position: 'BEFORE' | 'AFTER';
+}) => {
+  const res = await axios.patch(`${API_URL}${slug}/`, { anchor_step, runtime_position });
+  return res.data;
+};
+
+export const useUpdatePluginPosition = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updatePluginPosition,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plugins'] }),
   });
 };
 

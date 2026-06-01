@@ -60,6 +60,41 @@ _RETRY_LLM = RetryPolicy(
 )
 
 
+async def _dispatch_tier_plugins(ctx: dict, tier: str, wf_id_prefix: str) -> None:
+    """Dispatch all enabled plugins anchored to `tier` as child workflows.
+
+    Reusable helper called after any tier's asyncio.gather() completes.
+    Queries GetEnabledPluginsForTierActivity and fires each matching plugin
+    as an independent child workflow. Safe to call from any tier — returns
+    immediately if no plugins are registered for that tier.
+
+    Args:
+        ctx: Scan context dict passed through to each plugin workflow.
+        tier: Anchor tier string, e.g. "tier_2", "vulnerability_scan".
+        wf_id_prefix: Unique prefix for child workflow IDs (scan or subscan ID).
+    """
+    plugin_list = await workflow.execute_activity(
+        "GetEnabledPluginsForTierActivity",
+        tier,
+        start_to_close_timeout=timedelta(seconds=15),
+        heartbeat_timeout=timedelta(seconds=15),
+        retry_policy=_RETRY_INTERNAL,
+        task_queue="python-orchestrator-queue",
+    )
+    for plugin_meta in plugin_list:
+        wf_name = plugin_meta.get("workflow_name")
+        slug = plugin_meta.get("slug")
+        if not wf_name:
+            continue
+        await workflow.execute_child_workflow(
+            wf_name,
+            ctx,
+            id=f"{wf_id_prefix}-plugin-{slug}",
+            task_queue="python-orchestrator-queue",
+            execution_timeout=timedelta(hours=2),
+        )
+
+
 @workflow.defn(name="MasterScanWorkflow")
 class MasterScanWorkflow:
     """Master workflow orchestrating the full 7-tier scan pipeline.
@@ -345,6 +380,9 @@ class MasterScanWorkflow:
 
             await asyncio.gather(*tier2_futures)
 
+            # Post-Tier-2: dispatch any enabled "run after tier_2" plugins
+            await _dispatch_tier_plugins(ctx, "tier_2", str(ctx.get('scan_history_id', 'scan')))
+
             # ------------------------------------------------------------------
             # TIER 3: URL Fetching + Screenshot (parallel — both depend only on
             # Tier 2 http_crawl; screenshot does NOT depend on fetch_url output)
@@ -492,8 +530,8 @@ class MasterScanWorkflow:
                     ctx,
                     id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
                     task_queue="python-orchestrator-queue",
-                    execution_timeout=timedelta(hours=10),
-                    run_timeout=timedelta(hours=10)
+                    execution_timeout=timedelta(hours=24),
+                    run_timeout=timedelta(hours=24)
                 )
 
             other_t6_futures = []
@@ -1103,8 +1141,8 @@ class SubScanWorkflow:
                         ctx_task,
                         id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
                         task_queue="python-orchestrator-queue",
-                        execution_timeout=timedelta(hours=6),
-                        run_timeout=timedelta(hours=6),
+                        execution_timeout=timedelta(hours=12),
+                        run_timeout=timedelta(hours=12),
                     )
                 elif dispatch is not None:
                     args = dispatch["args_builder"](ctx_task)
@@ -1261,6 +1299,11 @@ class SubScanWorkflow:
                     )
                     await self._check_paused()
                 elif tier_index == 2:
+                    # Post-Tier-2 plugin dispatch
+                    await _dispatch_tier_plugins(
+                        ctx, "tier_2",
+                        str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
+                    )
                     await self._check_paused()
                 elif tier_index == 3:
                     await self._check_paused()

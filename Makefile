@@ -16,7 +16,7 @@ $(info Using: $(shell echo "$(DOCKER_COMPOSE)"))
 
 # --------------------------
 
-.PHONY: setup certs up devup build username pull down stop restart rm logs fullupgrade
+.PHONY: setup certs up devup build username pull down stop restart rm logs fullupgrade erase
 
 certs:		    ## Generate certificates.
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} -f docker-compose.setup.yml run --rm certs
@@ -79,6 +79,53 @@ images:			## Show all Docker images.
 
 prune:			## Remove containers and delete volume data.
 	@make stop && make rm && docker volume prune -f
+
+erase:			## !! DESTRUCTIVE !! Delete ALL containers, images, volumes, build cache, and local artifacts for a clean slate.
+	@echo ""
+	@echo "============================================================"
+	@echo "  r3ngine ERASE -- COMPLETE RESET"
+	@echo "============================================================"
+	@echo ""
+	@echo "  WARNING: This will PERMANENTLY and IRREVERSIBLY delete:"
+	@echo ""
+	@echo "  - All r3ngine Docker containers (running or stopped)"
+	@echo "  - All r3ngine Docker images"
+	@echo "  - ALL Docker volumes (scan data, PostgreSQL, Neo4j, wordlists)"
+	@echo "  - Docker build layer cache"
+	@echo "  - Local Python artifacts (__pycache__, *.pyc, staticfiles/)"
+	@echo "  - Local frontend artifacts (dist/, node_modules/)"
+	@echo ""
+	@echo "  ALL SCAN DATA AND DATABASE CONTENT WILL BE LOST."
+	@echo "  There is no undo. Back up first if needed."
+	@echo ""
+	@echo "============================================================"
+	@echo ""
+	@printf "  Type 'erase' to confirm full reset: "; \
+	  read confirm; \
+	  [ "$${confirm}" = "erase" ] || { printf "\n  Erase cancelled.\n\n"; exit 1; }
+	@echo ""
+	@echo "[1/5] Stopping services and removing all containers, volumes, and images..."
+	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} down --volumes --rmi all --remove-orphans || true
+	@echo ""
+	@echo "[2/5] Pruning Docker build cache..."
+	@docker builder prune -af || true
+	@echo ""
+	@echo "[3/5] Removing any remaining dangling Docker volumes..."
+	@docker volume prune -f || true
+	@echo ""
+	@echo "[4/5] Removing local Python build artifacts..."
+	@find web -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null || true
+	@find web -type f \( -name "*.pyc" -o -name "*.pyo" \) -delete 2>/dev/null || true
+	@rm -rf web/staticfiles
+	@echo ""
+	@echo "[5/5] Removing local frontend build artifacts..."
+	@rm -rf frontend/dist frontend/node_modules
+	@echo ""
+	@echo "============================================================"
+	@echo "  Erase complete. All data has been wiped."
+	@echo "  Run 'make up' to start fresh."
+	@echo "============================================================"
+	@echo ""
 
 fullupgrade:		## REQUIRED for v3.2.0+: migrate from Celery to Temporal.
 	@echo ""
