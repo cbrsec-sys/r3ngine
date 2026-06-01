@@ -345,6 +345,28 @@ class MasterScanWorkflow:
 
             await asyncio.gather(*tier2_futures)
 
+            # Post-Tier-2: dispatch any enabled "run after tier_2" plugins
+            _tier2_plugin_list = await workflow.execute_activity(
+                "GetEnabledPluginsForTierActivity",
+                "tier_2",
+                start_to_close_timeout=timedelta(seconds=15),
+                heartbeat_timeout=timedelta(seconds=15),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue",
+            )
+            for _plugin_meta in _tier2_plugin_list:
+                _plugin_wf_name = _plugin_meta.get("workflow_name")
+                _plugin_slug = _plugin_meta.get("slug")
+                if not _plugin_wf_name:
+                    continue
+                await workflow.execute_child_workflow(
+                    _plugin_wf_name,
+                    ctx,
+                    id=f"{ctx.get('scan_history_id', 'scan')}-plugin-{_plugin_slug}",
+                    task_queue="python-orchestrator-queue",
+                    execution_timeout=timedelta(hours=2),
+                )
+
             # ------------------------------------------------------------------
             # TIER 3: URL Fetching + Screenshot (parallel — both depend only on
             # Tier 2 http_crawl; screenshot does NOT depend on fetch_url output)
@@ -1261,6 +1283,32 @@ class SubScanWorkflow:
                     )
                     await self._check_paused()
                 elif tier_index == 2:
+                    # Post-Tier-2 plugin dispatch (mirrors MasterScanWorkflow)
+                    if tier_tasks:
+                        _tier2_plugin_list = await workflow.execute_activity(
+                            "GetEnabledPluginsForTierActivity",
+                            "tier_2",
+                            start_to_close_timeout=timedelta(seconds=15),
+                            heartbeat_timeout=timedelta(seconds=15),
+                            retry_policy=_RETRY_INTERNAL,
+                            task_queue="python-orchestrator-queue",
+                        )
+                        for _plugin_meta in _tier2_plugin_list:
+                            _plugin_wf_name = _plugin_meta.get("workflow_name")
+                            _plugin_slug = _plugin_meta.get("slug")
+                            if not _plugin_wf_name:
+                                continue
+                            _sub_wf_id = (
+                                f"{ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')}"
+                                f"-plugin-{_plugin_slug}"
+                            )
+                            await workflow.execute_child_workflow(
+                                _plugin_wf_name,
+                                ctx,
+                                id=_sub_wf_id,
+                                task_queue="python-orchestrator-queue",
+                                execution_timeout=timedelta(hours=2),
+                            )
                     await self._check_paused()
                 elif tier_index == 3:
                     await self._check_paused()
