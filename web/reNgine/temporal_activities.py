@@ -1237,7 +1237,11 @@ def sync_graph_activity(ctx: dict) -> bool:
         bool: True on success.
     """
     from reNgine.utils.graph import Neo4jManager
+    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
+
     scan_id = ctx.get('scan_history_id')
+    proxy = TemporalTaskProxy(ctx, 'sync_graph', 'Graph Sync (Neo4j)')
+
     activity.logger.info(f"[SyncGraphActivity] Syncing scan_id={scan_id} to Neo4j")
     # Heartbeat before the Neo4j connection attempt so Temporal sees the
     # activity is alive even if driver init is slow.
@@ -1247,10 +1251,12 @@ def sync_graph_activity(ctx: dict) -> bool:
     try:
         nm.sync_scan_results(scan_id)
         activity.logger.info(f"[SyncGraphActivity] Neo4j sync complete for scan_id={scan_id}")
+        proxy.update_scan_activity(SUCCESS_TASK)
         return True
     except Exception as e:
         activity.logger.error(f"[SyncGraphActivity] Neo4j sync failed: {e}")
         logger.error(f"Neo4j sync failed: {e}")
+        proxy.update_scan_activity(FAILED_TASK, error_message=str(e))
         return False
     finally:
         nm.close()
@@ -1275,11 +1281,14 @@ def send_scan_notification_activity(ctx: dict) -> bool:
 
     scan_id = ctx.get('scan_history_id')
     engine_id = ctx.get('engine_id')
+    proxy = TemporalTaskProxy(ctx, 'scan_notification', 'Send Scan Notification')
+
     activity.logger.info(f"[SendScanNotificationActivity] Finalizing scan_id={scan_id}")
 
     scan = ScanHistory.objects.filter(pk=scan_id).first()
     if not scan:
         activity.logger.error(f"[SendScanNotificationActivity] ScanHistory {scan_id} not found.")
+        proxy.update_scan_activity(FAILED_TASK, error_message="ScanHistory not found.")
         return False
 
     # Determine overall scan status from ScanActivity records.
@@ -1288,10 +1297,12 @@ def send_scan_notification_activity(ctx: dict) -> bool:
     # name. We only treat a task as truly failed if it NEVER produced a SUCCESS record.
     failed_names = set(
         ScanActivity.objects.filter(scan_of=scan, status=FAILED_TASK)
+        .exclude(name='scan_notification') # exclude self
         .values_list('name', flat=True)
     )
     success_names = set(
         ScanActivity.objects.filter(scan_of=scan, status=SUCCESS_TASK)
+        .exclude(name='scan_notification') # exclude self
         .values_list('name', flat=True)
     )
     true_failures = failed_names - success_names  # failed and never recovered
@@ -1306,6 +1317,7 @@ def send_scan_notification_activity(ctx: dict) -> bool:
     activity.logger.info(
         f"[SendScanNotificationActivity] scan_id={scan_id} finished with status={status_h}"
     )
+    proxy.update_scan_activity(SUCCESS_TASK)
 
     # Send notification directly (no Celery)
     try:
