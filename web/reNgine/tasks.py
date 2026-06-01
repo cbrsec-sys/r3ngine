@@ -2257,9 +2257,13 @@ def port_scan(self, hosts=[], ctx={}, description=None, prepare_only=False, pars
 			exclude_subdomains=exclude_subdomains,
 			ctx=ctx)
 
+	if not hosts:
+		logger.warning('port_scan: no hosts to scan, skipping.')
+		return []
+
 	# Build cmd
 	cmd = 'naabu -json -exclude-cdn'
-	cmd += f' -list {input_file}' if len(hosts) > 0 else f' -host {hosts[0]}'
+	cmd += f' -list {input_file}' if len(hosts) > 1 else f' -host {hosts[0]}'
 	if 'full' in ports or 'all' in ports:
 		ports_str = ' -p "-"'
 	elif 'top-100' in ports:
@@ -2403,7 +2407,25 @@ def port_scan(self, hosts=[], ctx={}, description=None, prepare_only=False, pars
 	if len(ports_data) == 0:
 		logger.info('Finished running naabu port scan - No open ports found.')
 		if nmap_enabled:
-			logger.info('Nmap scans skipped')
+			logger.warning('naabu found no open ports; running nmap independently as configured.')
+			# Convert YAML port list to integers where possible; naabu-specific
+			# tokens like 'top-100'/'all'/'full' are ignored and nmap will use
+			# its own defaults (top-1000) when the resulting list is empty.
+			nmap_fallback_ports = [int(p) for p in ports if p.isdigit()]
+			for host in hosts:
+				ctx_nmap = ctx.copy()
+				ctx_nmap['description'] = get_task_title(f'nmap_{host}', self.scan_id, self.subscan_id)
+				ctx_nmap['track'] = False
+				ctx_nmap['activity_id'] = self.activity_id
+				nmap(
+					self,
+					cmd=nmap_cmd,
+					ports=nmap_fallback_ports,
+					host=host,
+					script=nmap_script,
+					script_args=nmap_script_args,
+					max_rate=rate_limit,
+					ctx=ctx_nmap)
 		return ports_data
 
 	# Send notification
@@ -2785,6 +2807,17 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			get_only_default_urls=True,
 			ctx=ctx
 		)
+		# When http_crawl found no alive endpoints, fall back to all default
+		# seed URLs so passive tools (gau, waybackurls) can still query
+		# historical data even if the target is currently unreachable.
+		if not urls and enable_http_crawl:
+			urls = get_http_urls(
+				is_alive=False,
+				write_filepath=input_path,
+				exclude_subdomains=exclude_subdomains,
+				get_only_default_urls=True,
+				ctx=ctx
+			)
 
 	# Domain regex
 	host = self.domain.name if self.domain else urlparse(urls[0]).netloc
@@ -4401,7 +4434,7 @@ def http_crawl(
 			except MultipleObjectsReturned:
 				tech = Technology.objects.filter(name=technology).first()
 			endpoint.techs.add(tech)
-			if is_ran_from_subdomain_scan:
+			if endpoint.is_default and subdomain:
 				subdomain.technologies.add(tech)
 				subdomain.save()
 			endpoint.save()
@@ -4429,7 +4462,7 @@ def http_crawl(
 				add_meta_info=False)
 
 		# Update subdomain status attributes if this is the default endpoint
-		if is_ran_from_subdomain_scan and endpoint.is_default:
+		if endpoint.is_default and subdomain:
 			subdomain.http_url = endpoint.http_url
 			subdomain.http_status = endpoint.http_status
 			subdomain.page_title = endpoint.page_title
@@ -5774,7 +5807,7 @@ def process_httpx_response(line, ctx={}, is_ran_from_subdomain_scan=False):
 	endpoint.save()
 
 	# Sync Subdomain status attributes if this is the default endpoint
-	if is_ran_from_subdomain_scan:
+	if endpoint.is_default and subdomain:
 		subdomain.http_status = http_status
 		subdomain.page_title = page_title
 		subdomain.content_length = content_length
