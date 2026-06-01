@@ -80,6 +80,7 @@ from reNgine.temporal_activities import (
     save_checkpoint_activity,
     target_profiling_activity,
     check_scan_queue_status_activity,
+    get_enabled_plugins_for_tier_activity,
 
     # Tier 1: Discovery
     run_subdomain_discovery_activity,
@@ -293,6 +294,7 @@ class Command(BaseCommand):
                 save_checkpoint_activity,
                 target_profiling_activity,
                 check_scan_queue_status_activity,
+                get_enabled_plugins_for_tier_activity,
 
                 # Tier 1
                 run_subdomain_discovery_activity,
