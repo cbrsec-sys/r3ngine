@@ -139,12 +139,14 @@ export const ProxyValidationModal: React.FC<ProxyValidationModalProps> = ({
       onClose={isRunning ? undefined : handleClose}
       maxWidth="md"
       fullWidth
-      PaperProps={{
-        sx: {
-          bgcolor: 'rgba(10, 14, 26, 0.98)',
-          border: '1px solid rgba(0, 243, 255, 0.3)',
-          backdropFilter: 'blur(20px)',
-          boxShadow: '0 0 40px rgba(0, 243, 255, 0.1)',
+      slotProps={{
+        paper: {
+          sx: {
+            bgcolor: 'rgba(10, 14, 26, 0.98)',
+            border: '1px solid rgba(0, 243, 255, 0.3)',
+            backdropFilter: 'blur(20px)',
+            boxShadow: '0 0 40px rgba(0, 243, 255, 0.1)',
+          },
         },
       }}
     >
