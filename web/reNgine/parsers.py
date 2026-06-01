@@ -684,8 +684,26 @@ class SpiderFootBatchParser(BaseParser):
         if not e_type or not e_data:
             return None
             
+        raw_source = event.get("Source", "").strip()
+        
+        # Pre-parse source to remove unnecessary noise (e.g., chained modules)
+        if raw_source:
+            # Deduplicate "sfp_dns, sfp_whois, sfp_dns" -> "sfp_dns, sfp_whois"
+            parts = [p.strip() for p in raw_source.split(',')]
+            unique_parts = []
+            for p in parts:
+                if p and p not in unique_parts:
+                    unique_parts.append(p)
+            source = ', '.join(unique_parts)
+            # Truncate safely to 199 to fit database constraints
+            if len(source) > 199:
+                source = source[:196] + "..."
+        else:
+            source = ""
+
         return {
-            "source": event.get("Source", "").strip(),
+            "source": source,
+            "raw_source": raw_source,
             "type": e_type,
             "source_data": event.get("Source Data", "").strip(),
             "data": e_data,
@@ -730,7 +748,7 @@ class SpiderFootBatchParser(BaseParser):
     def _fingerprint(self, event: dict) -> str:
         import hashlib
         raw = "|".join([
-            event.get("source", ""),
+            event.get("raw_source", event.get("source", "")),
             event.get("type", ""),
             event.get("source_data", ""),
             event.get("data", ""),
