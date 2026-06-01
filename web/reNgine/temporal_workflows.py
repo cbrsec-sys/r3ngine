@@ -621,11 +621,12 @@ class MasterScanWorkflow:
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue"
                             )
-                            # AI Impact Assessment
+                            # AI Impact Assessment — capped at 100 vulns per run;
+                            # timeout sized for 100 × 30s worst-case OpenAI latency.
                             await workflow.execute_activity(
                                 "GenerateImpactAssessmentActivity",
                                 ctx,
-                                start_to_close_timeout=timedelta(minutes=30),
+                                start_to_close_timeout=timedelta(hours=1),
                                 heartbeat_timeout=timedelta(minutes=5),
                                 retry_policy=_RETRY_LLM,
                                 task_queue="python-orchestrator-queue"

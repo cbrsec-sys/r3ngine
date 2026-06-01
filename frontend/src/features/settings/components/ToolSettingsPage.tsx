@@ -19,7 +19,11 @@ import {
   Divider,
   TextField,
   Alert,
-  Snackbar
+  Snackbar,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Chip
 } from '@mui/material';
 import {
   Settings,
@@ -35,7 +39,10 @@ import {
   Trash2,
   Edit3,
   ExternalLink,
-  ChevronRight
+  ChevronRight,
+  ChevronDown,
+  FolderOpen,
+  Folder
 } from 'lucide-react';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import {
@@ -71,10 +78,19 @@ function TabPanel(props: TabPanelProps) {
   );
 }
 
+const groupByDirectory = (templates: string[]): Record<string, string[]> =>
+  templates.reduce((acc, t) => {
+    const sep = t.lastIndexOf('/');
+    const key = sep > -1 ? t.slice(0, sep) : 'custom';
+    (acc[key] ??= []).push(t);
+    return acc;
+  }, {} as Record<string, string[]>);
+
 export const ToolSettingsPage: React.FC = () => {
   const { projectSlug } = useParams({ from: '/$projectSlug/settings/tool-settings' });
   const [tabValue, setTabValue] = useState(0);
   const [editingFile, setEditingFile] = useState<{ key: string; name: string } | null>(null);
+  const [expandedGroup, setExpandedGroup] = useState<string | false>(false);
   const [fileContent, setFileContent] = useState('');
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -401,49 +417,89 @@ export const ToolSettingsPage: React.FC = () => {
               <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontFamily: 'Orbitron', fontSize: '11px' }}>
                 CUSTOM TEMPLATES ({toolSettings?.nuclei_templates?.length || 0})
               </Typography>
-              <Paper sx={{
-                bgcolor: 'rgba(0,0,0,0.2)',
-                maxHeight: '500px',
-                overflow: 'auto',
-                border: '1px solid rgba(255,255,255,0.05)',
-                width: '100%'
-              }}>
-                <List dense>
-                  {toolSettings?.nuclei_templates?.map((template) => (
-                    <ListItem
-                      key={template}
-                      disablePadding
+              <Box sx={{ maxHeight: '500px', overflow: 'auto', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1 }}>
+                {Object.entries(groupByDirectory(toolSettings?.nuclei_templates ?? [])).map(([group, templates]) => (
+                  <Accordion
+                    key={group}
+                    expanded={expandedGroup === group}
+                    onChange={(_, isOpen) => setExpandedGroup(isOpen ? group : false)}
+                    disableGutters
+                    sx={{
+                      bgcolor: 'rgba(0,0,0,0.2)',
+                      backgroundImage: 'none',
+                      boxShadow: 'none',
+                      borderBottom: '1px solid rgba(255,255,255,0.05)',
+                      '&:before': { display: 'none' },
+                    }}
+                  >
+                    <AccordionSummary
+                      expandIcon={<ChevronDown size={14} color="#00f3ff" />}
                       sx={{
-                        borderBottom: '1px solid rgba(255,255,255,0.05)',
+                        minHeight: 36,
+                        px: 1.5,
+                        bgcolor: expandedGroup === group ? 'rgba(0,243,255,0.06)' : 'transparent',
+                        '& .MuiAccordionSummary-content': { alignItems: 'center', gap: 1, my: 0.5 },
                       }}
                     >
-                      <ListItemButton
-                        selected={editingFile?.key === 'nuclei_template' && editingFile?.name === template}
-                        onClick={() => handleViewNucleiTemplate(template)}
+                      {expandedGroup === group
+                        ? <FolderOpen size={14} color="#00f3ff" />
+                        : <Folder size={14} color="rgba(255,255,255,0.4)" />
+                      }
+                      <Typography sx={{
+                        color: expandedGroup === group ? '#00f3ff' : 'rgba(255,255,255,0.7)',
+                        fontSize: '11px',
+                        fontFamily: 'Orbitron',
+                        fontWeight: 700,
+                        textTransform: 'uppercase',
+                        flex: 1,
+                      }}>
+                        {group}
+                      </Typography>
+                      <Chip
+                        label={templates.length}
+                        size="small"
                         sx={{
-                          '&.Mui-selected': {
-                            bgcolor: 'rgba(0,243,255,0.1)',
-                            borderLeft: '3px solid #00f3ff'
-                          },
-                          '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' }
+                          height: 16,
+                          fontSize: '10px',
+                          bgcolor: 'rgba(0,243,255,0.1)',
+                          color: '#00f3ff',
+                          border: '1px solid rgba(0,243,255,0.2)',
+                          borderRadius: 1,
+                          '& .MuiChip-label': { px: 0.75 }
                         }}
-                      >
-                        <ListItemText
-                          primary={template}
-                          slotProps={{
-                            primary: {
-                              sx: {
-                                color: (editingFile?.key === 'nuclei_template' && editingFile?.name === template) ? '#00f3ff' : 'rgba(255,255,255,0.8)',
-                                fontSize: '12px'
-                              }
-                            }
-                          }}
-                        />
-                      </ListItemButton>
-                    </ListItem>
-                  ))}
-                </List>
-              </Paper>
+                      />
+                    </AccordionSummary>
+                    <AccordionDetails sx={{ p: 0 }}>
+                      <List dense disablePadding>
+                        {templates.map((template) => {
+                          const filename = template.split('/').pop()!;
+                          const isSelected = editingFile?.key === 'nuclei_template' && editingFile?.name === template;
+                          return (
+                            <ListItem key={template} disablePadding sx={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                              <ListItemButton
+                                selected={isSelected}
+                                onClick={() => handleViewNucleiTemplate(template)}
+                                sx={{
+                                  pl: 3.5,
+                                  '&.Mui-selected': { bgcolor: 'rgba(0,243,255,0.1)', borderLeft: '3px solid #00f3ff' },
+                                  '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' },
+                                }}
+                              >
+                                <ListItemText
+                                  primary={filename}
+                                  slotProps={{
+                                    primary: { sx: { color: isSelected ? '#00f3ff' : 'rgba(255,255,255,0.8)', fontSize: '12px' } }
+                                  }}
+                                />
+                              </ListItemButton>
+                            </ListItem>
+                          );
+                        })}
+                      </List>
+                    </AccordionDetails>
+                  </Accordion>
+                ))}
+              </Box>
             </Box>
 
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
@@ -451,7 +507,7 @@ export const ToolSettingsPage: React.FC = () => {
                 <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.2)', width: '100%' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                     <Typography sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '14px' }}>
-                      {editingFile.name} (READ-ONLY)
+                      {editingFile.name.split('/').pop()} (READ-ONLY)
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       <Shield size={16} color="#00f3ff" />

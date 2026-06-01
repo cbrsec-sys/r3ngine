@@ -1,6 +1,14 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
+
+let appVersion = '3.0.0';
+try {
+  const raw = readFileSync(resolve(__dirname, '../web/.version'), 'utf-8').trim();
+  appVersion = raw.startsWith('v') ? raw.slice(1) : raw;
+} catch {}
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({
@@ -8,12 +16,15 @@ export default defineConfig(({ command }) => ({
     react(),
     basicSsl(),
   ],
+  define: {
+    __APP_VERSION__: JSON.stringify(appVersion),
+  },
   base: command === 'serve' ? '/' : '/staticfiles/',
   build: {
     manifest: true,
     outDir: 'dist',
     emptyOutDir: true,
-    chunkSizeWarningLimit: 1000,
+    chunkSizeWarningLimit: 1500,
     rollupOptions: {
       output: {
         // Main entry points should NOT have hashes for Django compatibility
@@ -24,24 +35,42 @@ export default defineConfig(({ command }) => ({
         assetFileNames: 'assets/[name].[ext]',
         manualChunks: (id) => {
           if (id.includes('node_modules')) {
-            // Core Frameworks
-            if (id.includes('react/') || id.includes('react-dom/')) return 'vendor-react';
+            // Core React runtime (kept tight — only the runtime itself)
+            if (id.includes('/react/') || id.includes('/react-dom/') || id.includes('/scheduler/')) return 'vendor-react';
+
+            // TanStack router + query
             if (id.includes('@tanstack')) return 'vendor-router';
-            
-            // UI & Styling
-            if (id.includes('@mui') || id.includes('@emotion')) return 'vendor-mui';
+
+            // MUI core + icons + Emotion (icons tree-shaken to only used set via main.tsx registry)
+            if (id.includes('@mui/') || id.includes('@emotion/')) return 'vendor-mui';
+
+            // Small icon set
             if (id.includes('lucide-react')) return 'vendor-icons';
-            
-            // Visualization
+
+            // ECharts + its rendering engine
             if (id.includes('echarts') || id.includes('zrender')) return 'vendor-echarts';
+
+            // ApexCharts
             if (id.includes('apexcharts') || id.includes('react-apexcharts')) return 'vendor-viz';
-            
-            // Animations & Effects
-            if (id.includes('framer-motion') || id.includes('canvas-confetti') || id.includes('animejs')) return 'vendor-effects';
-            
-            // Utils
-            if (id.includes('axios') || id.includes('date-fns') || id.includes('lodash') || id.includes('react-markdown')) return 'vendor-utils';
-            
+
+            // Cytoscape graph engine + all layout plugins
+            if (id.includes('cytoscape')) return 'vendor-cytoscape';
+
+            // D3 ecosystem
+            if (id.includes('/d3-') || id.includes('/d3/') || id.includes('d3-scale')) return 'vendor-d3';
+
+            // Geo / map rendering
+            if (id.includes('leaflet') || id.includes('react-leaflet')) return 'vendor-geo';
+
+            // Syntax highlighting
+            if (id.includes('prismjs') || id.includes('prism-react-renderer') || id.includes('react-simple-code-editor')) return 'vendor-code';
+
+            // Drag-and-drop
+            if (id.includes('@dnd-kit')) return 'vendor-dnd';
+
+            // General utilities
+            if (id.includes('axios') || id.includes('date-fns') || id.includes('lodash') || id.includes('react-markdown') || id.includes('dompurify') || id.includes('zustand')) return 'vendor-utils';
+
             return 'vendor-base';
           }
         },

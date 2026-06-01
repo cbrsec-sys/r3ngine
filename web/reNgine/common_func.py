@@ -784,7 +784,7 @@ def validate_single_proxy(proxy_name):
 	"""Helper to validate a single proxy string.
 	Returns (proxy_name, True) if valid, otherwise (proxy_name, False).
 	"""
-	is_valid = check_proxy_robust(proxy_name, timeout=3)
+	is_valid = check_proxy_robust(proxy_name, timeout=5)
 	return proxy_name, is_valid
 
 
@@ -885,11 +885,11 @@ def get_random_proxy():
 	random.shuffle(proxies)
 
 	# Validate each proxy sequentially until we find a working one.
-	# Limit to 5 checks to cap worst-case wait (5 × timeout = 25 s).
+	# Limit to 25 checks to cap worst-case wait (25 × timeout = 125 s).
 	checked_count = 0
 	for proxy_name in proxies:
-		if checked_count >= 5:
-			logger.warning('Reached maximum sequential proxy validation limit (5). Stopping checks.')
+		if checked_count >= 25:
+			logger.warning('Reached maximum sequential proxy validation limit (25). Stopping checks.')
 			break
 		checked_count += 1
 		

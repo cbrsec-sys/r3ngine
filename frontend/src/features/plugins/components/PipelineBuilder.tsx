@@ -224,7 +224,7 @@ const StandalonePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => (
       transition: 'all 0.15s',
     }}
   >
-    <Stack direction="row" spacing={1.25} alignItems="flex-start">
+    <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start' }}>
       <Box sx={{ color: '#b400ff', flexShrink: 0, mt: '2px' }}>
         <PlugZap size={15} />
       </Box>
@@ -284,7 +284,7 @@ const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
         opacity: plugin.is_enabled ? 1 : 0.45,
       }}
     >
-      <Stack direction="row" spacing={1.25} alignItems="center" sx={{ mb: 1 }}>
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', mb: 1 }}>
         <Box sx={{ color: '#00f3ff', flexShrink: 0 }}>
           <Settings2 size={14} />
         </Box>
@@ -330,8 +330,10 @@ const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
           '.MuiSelect-icon': { color: 'rgba(255,255,255,0.4)' },
         }}
         MenuProps={{
-          PaperProps: {
-            sx: { bgcolor: '#0a0a14', border: '1px solid rgba(0,243,255,0.15)', color: '#fff' },
+          slotProps: {
+            paper: {
+              sx: { bgcolor: '#0a0a14', border: '1px solid rgba(0,243,255,0.15)', color: '#fff' },
+            },
           },
         }}
       >
@@ -546,7 +548,7 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
           {/* Configurable plugins */}
           {configurablePlugins.length > 0 && (
             <>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
                 <Settings2 size={14} color="#00f3ff" />
                 <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.62rem', letterSpacing: 1.5, color: 'rgba(0,243,255,0.7)' }}>
                   CONFIGURABLE INJECTION
@@ -567,7 +569,7 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
           {/* Standalone plugins */}
           {standalonePlugins.length > 0 && (
             <>
-              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5 }}>
+              <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
                 <Layers size={14} color="#b400ff" />
                 <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.62rem', letterSpacing: 1.5, color: 'rgba(180,0,255,0.7)' }}>
                   STANDALONE PLUGINS
