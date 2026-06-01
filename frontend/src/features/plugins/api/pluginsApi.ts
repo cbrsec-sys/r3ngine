@@ -125,6 +125,27 @@ export const useDeletePlugin = () => {
   });
 };
 
+export const updatePluginPosition = async ({
+  slug,
+  anchor_step,
+  runtime_position,
+}: {
+  slug: string;
+  anchor_step: string;
+  runtime_position: 'BEFORE' | 'AFTER';
+}) => {
+  const res = await axios.patch(`${API_URL}${slug}/`, { anchor_step, runtime_position });
+  return res.data;
+};
+
+export const useUpdatePluginPosition = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updatePluginPosition,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plugins'] }),
+  });
+};
+
 export const useUpdatePluginWeight = () => {
   const queryClient = useQueryClient();
   return useMutation({
