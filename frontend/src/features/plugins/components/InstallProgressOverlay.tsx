@@ -48,7 +48,7 @@ const InstallProgressOverlay: React.FC<Props> = ({ installId, onComplete, onErro
     return live ?? { key, label, status: 'pending', message: '' };
   });
 
-  const completedCount = mergedSteps.filter(s => s.status === 'completed').length;
+  const completedCount = mergedSteps.filter(s => s.status === 'completed' || s.status === 'skipped').length;
   const progress = Math.round((completedCount / ALL_STEPS.length) * 100);
   const isSuccess = data?.status === 'success';
   const isFailed = data?.status === 'failed';
@@ -195,6 +195,8 @@ const StepRow: React.FC<{ step: InstallStep }> = ({ step }) => {
         return <CheckCircle size={14} color="#00ff62" />;
       case 'failed':
         return <XCircle size={14} color="#ff003c" />;
+      case 'skipped':
+        return <Circle size={14} color="#4fc3f7" />;
       case 'in_progress':
         return (
           <Box
@@ -216,6 +218,7 @@ const StepRow: React.FC<{ step: InstallStep }> = ({ step }) => {
     if (status === 'completed') return 'rgba(255,255,255,0.7)';
     if (status === 'in_progress') return '#fff';
     if (status === 'failed') return '#ff003c';
+    if (status === 'skipped') return 'rgba(79,195,247,0.6)';
     return 'rgba(255,255,255,0.25)';
   })();
 
@@ -252,6 +255,24 @@ const StepRow: React.FC<{ step: InstallStep }> = ({ step }) => {
               />
             ))}
           </Box>
+        )}
+        {status === 'skipped' && (
+          <Typography
+            sx={{
+              fontFamily: 'Orbitron',
+              fontSize: '0.5rem',
+              fontWeight: 700,
+              letterSpacing: 0.5,
+              color: 'rgba(79,195,247,0.5)',
+              border: '1px solid rgba(79,195,247,0.2)',
+              borderRadius: '3px',
+              px: 0.6,
+              py: 0.1,
+              lineHeight: 1.6,
+            }}
+          >
+            NOT REQUIRED
+          </Typography>
         )}
       </Box>
       {status === 'failed' && message && (

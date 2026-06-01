@@ -341,7 +341,6 @@ def initiate_scan_temporal(
 		from reNgine.temporal_client import TemporalClientProvider
 		from datetime import timedelta
 		from temporalio.exceptions import ServerError as TemporalServiceError
-		from temporalio.common import RetryPolicy
 
 		workflow_id = f"scan-{scan.id}-{uuid.uuid4().hex[:8]}"
 		max_retries = 3
@@ -364,7 +363,6 @@ def initiate_scan_temporal(
 						execution_timeout=timedelta(days=30),
 						run_timeout=timedelta(days=30),
 						task_timeout=timedelta(hours=1),
-						retry_policy=RetryPolicy(maximum_attempts=10),
 					)
 					return handle.id
 				except TemporalServiceError as e:
@@ -3979,7 +3977,7 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 	# command builder
 	proxy = get_random_proxy()
 	opsec = OpSecManager()
-	cmd = 'dalfox --silence --no-color'
+	cmd = 'dalfox scan --no-color'
 	cmd += f' --only-poc v,r'
 	cmd += f' --ignore-return 302,404,403'
 	
@@ -7540,7 +7538,6 @@ def resume_scan_temporal(scan_id):
 	old_ids = [wid for wid in (scan.workflow_ids or []) if wid != workflow_id]
 
 	async def _cancel_old_and_start():
-		from temporalio.common import RetryPolicy
 		from datetime import timedelta
 		from temporalio.service import RPCError, RPCStatusCode
 		client = await TemporalClientProvider.get_client()
@@ -7565,7 +7562,6 @@ def resume_scan_temporal(scan_id):
 			execution_timeout=timedelta(days=30),
 			run_timeout=timedelta(days=30),
 			task_timeout=timedelta(hours=1),
-			retry_policy=RetryPolicy(maximum_attempts=10),
 		)
 
 	loop = asyncio.new_event_loop()

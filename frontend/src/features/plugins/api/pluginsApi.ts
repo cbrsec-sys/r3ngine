@@ -49,7 +49,7 @@ export const uploadPlugin = async (file: File): Promise<{ install_id: string }> 
 export interface InstallStep {
   key: string;
   label: string;
-  status: 'pending' | 'in_progress' | 'completed' | 'failed';
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped';
   message: string;
 }
 
