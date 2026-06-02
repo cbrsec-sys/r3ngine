@@ -178,6 +178,7 @@ def initiate_scan_temporal(
 		excluded_paths=[],
 		custom_dorks=None,
 		enable_spiderfoot_scan=False,
+		selected_plugin_slugs=None,
 	):
 	"""Initiate a new scan using Temporal durable workflow orchestration.
 
@@ -335,6 +336,7 @@ def initiate_scan_temporal(
 			'kr_wordlist': kr_wordlist,
 			'tasks': tasks,
 			'use_tor': bool(_proxy and _proxy.use_tor),
+			'selected_plugin_slugs': selected_plugin_slugs or [],
 		}
 
 		# ---- Start MasterScanWorkflow on Temporal ----
@@ -440,6 +442,7 @@ def initiate_subscan_temporal(
 		starting_point_path='',
 		excluded_paths=[],
 		custom_dorks=None,
+		selected_plugin_slugs=None,
 	):
 	"""Initiate a new subscan using Temporal durable workflow orchestration.
 
@@ -551,6 +554,7 @@ def initiate_subscan_temporal(
 			'api_discovery_tools': api_discovery_tools,
 			'kr_wordlist': kr_wordlist,
 			'use_tor': bool(_proxy and _proxy.use_tor),
+			'selected_plugin_slugs': selected_plugin_slugs or [],
 		}
 
 		# ---- Create initial endpoints in DB ----
@@ -4557,7 +4561,7 @@ def send_scan_notif(
 		'fields': fields,
 		'severity': severity
 	}
-	logger.warning(f'Sending notification "{title}" [{severity}]')
+	logger.info(f'Sending notification "{title}" (severity: {severity})')
 
 	# inapp notification has to be sent eitherways
 	generate_inapp_notification(scan, subscan, status, engine, fields)
@@ -4837,7 +4841,7 @@ def parse_nmap_results(xml_file, output_file=None):
 		except Exception as e:
 			logger.exception(e)
 			logger.error(f'Cannot parse {xml_file} to valid JSON. Skipping.')
-			return []
+			return {'vulns': [], 'services': []}
 
 	# Write JSON to output file
 	if output_file:
@@ -4851,6 +4855,8 @@ def parse_nmap_results(xml_file, output_file=None):
 	)
 	all_vulns = []
 	services = []
+	if not hosts:
+		return {'vulns': all_vulns, 'services': services}
 	if isinstance(hosts, dict):
 		hosts = [hosts]
 
@@ -4864,7 +4870,19 @@ def parse_nmap_results(xml_file, output_file=None):
 			# Extract all the @name values from the list of dictionaries
 			hostnames = [entry.get('@name') for entry in hostnames_list]
 		else:
-			hostnames = [host.get('address')['@addr']]
+			address = host.get('address')
+			if not address:
+				continue
+			if isinstance(address, list):
+				addr = next((a.get('@addr') for a in address if a.get('@addrtype') in ('ipv4', 'ipv6')), None)
+				if not addr:
+					continue
+				hostnames = [addr]
+			else:
+				addr = address.get('@addr')
+				if not addr:
+					continue
+				hostnames = [addr]
 
 		# Iterate over each hostname for each port
 		for hostname in hostnames:
@@ -6621,7 +6639,8 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 					'severity': 0,
 					'description': f'IKE-scan detected an IPSec VPN service.\n\nResults:\n{content}',
 					'http_url': target,
-					'type': 'Infrastructure'
+					'type': 'Infrastructure',
+					'source': 'ike-scan',
 				}
 				save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
 
@@ -6646,7 +6665,8 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 					'severity': 0,
 					'description': parse_sslscan_results(ssl_output_file),
 					'http_url': f'https://{target}:{port}',
-					'type': 'SSL/TLS'
+					'type': 'SSL/TLS',
+					'source': 'sslscan',
 				}
 				save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
 	
@@ -6714,7 +6734,8 @@ def brute_force_scan(self, targets=[], ctx={}, description=None):
 						 f'Service: {res["service"]}\n'
 						 f'Port: {res["port"]}',
 			'http_url': report_url,
-			'type': 'Broken Authentication'
+			'type': 'Broken Authentication',
+			'source': 'brutus',
 		}
 		save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
 		

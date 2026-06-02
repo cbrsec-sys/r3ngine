@@ -70,6 +70,7 @@ def _smb_enum(self, ctx, host):
                 ),
                 severity=3,
                 type='SMB',
+                source='enum4linux-ng',
                 http_url=f'smb://{host}:445',
                 dedup_fields=['name', 'http_url', 'scan_history'],
             )
@@ -109,6 +110,7 @@ def _snmp_enum(self, ctx, host):
             ),
             severity=2,
             type='SNMP',
+            source='onesixtyone',
             http_url=f'udp://{host}:161',
             dedup_fields=['name', 'http_url', 'scan_history'],
         )
@@ -135,6 +137,7 @@ def _snmp_enum(self, ctx, host):
                     ),
                     severity=1,
                     type='SNMP',
+                    source='snmpwalk',
                     http_url=f'udp://{host}:161',
                     dedup_fields=['name', 'http_url', 'scan_history'],
                 )
@@ -162,6 +165,7 @@ def _ldap_enum(self, ctx, host):
                 ),
                 severity=2,
                 type='LDAP',
+                source='ldapsearch',
                 http_url=f'ldap://{host}:389',
                 dedup_fields=['name', 'http_url', 'scan_history'],
             )
@@ -195,6 +199,7 @@ def _rdp_enum(self, ctx, host):
                 description=f'{description} Host: {host}',
                 severity=severity,
                 type='RDP',
+                source='rdp-sec-check',
                 http_url=f'rdp://{host}:3389',
                 dedup_fields=['name', 'http_url', 'scan_history'],
             )
