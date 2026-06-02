@@ -14,11 +14,15 @@ import {
   TextField,
   FormControlLabel,
   Switch,
+  Checkbox,
+  FormGroup,
+  Collapse,
   Divider,
   Grid
 } from '@mui/material';
-import { X, Play, Zap, Shield, Search, Terminal, Globe } from 'lucide-react';
+import { X, Zap, Shield, Terminal, ChevronDown, ChevronUp, Puzzle } from 'lucide-react';
 import { useEngines } from '../../engines/api';
+import { usePlugins } from '../../plugins/api/pluginsApi';
 import { useInitiateScan } from '../api';
 import { useNavigate } from '@tanstack/react-router';
 import { generateDorks } from '../utils/dorkUtils';
@@ -46,8 +50,12 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
     importSubdomainTextArea: '',
     outOfScopeSubdomainTextarea: '',
   });
+  const [selectedPlugins, setSelectedPlugins] = useState<string[]>([]);
+  const [pluginSectionOpen, setPluginSectionOpen] = useState(false);
 
   const { data: engines, isLoading: loadingEngines } = useEngines();
+  const { data: allPlugins } = usePlugins();
+  const enabledPlugins = (allPlugins ?? []).filter(p => p.is_enabled);
   const { mutate: initiateScan, isPending, error, reset } = useInitiateScan(projectSlug);
   const navigate = useNavigate();
 
@@ -63,6 +71,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
       spiderfoot_scan: formData.spiderfoot_scan,
       importSubdomainTextArea: formData.importSubdomainTextArea.split('\n').filter(s => s.trim()),
       outOfScopeSubdomainTextarea: formData.outOfScopeSubdomainTextarea.split('\n').filter(s => s.trim()),
+      selected_plugins: selectedPlugins,
     }, {
       onSuccess: () => {
         onClose();
@@ -75,6 +84,8 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
   const handleClose = () => {
     onClose();
     reset();
+    setSelectedPlugins([]);
+    setPluginSectionOpen(false);
   };
 
   const targetLabel = domainNames.length > 1
@@ -281,6 +292,99 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
               </Box>
             </Grid>
           </Grid>
+
+          {enabledPlugins.length > 0 && (
+            <Box sx={{ mt: 3 }}>
+              <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)', mb: 2 }} />
+              <Button
+                fullWidth
+                onClick={() => setPluginSectionOpen(prev => !prev)}
+                endIcon={pluginSectionOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                sx={{
+                  justifyContent: 'space-between',
+                  color: 'rgba(255,255,255,0.6)',
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.7rem',
+                  fontWeight: 800,
+                  letterSpacing: 1,
+                  px: 0,
+                  '&:hover': { color: '#00ff62', bgcolor: 'transparent' },
+                }}
+                startIcon={<Puzzle size={16} />}
+              >
+                PLUGINS
+                {selectedPlugins.length > 0 && (
+                  <Box component="span" sx={{
+                    ml: 1,
+                    px: 1,
+                    py: 0.25,
+                    bgcolor: 'rgba(0, 255, 98, 0.15)',
+                    color: '#00ff62',
+                    borderRadius: 1,
+                    fontSize: '0.65rem',
+                    fontWeight: 900,
+                  }}>
+                    {selectedPlugins.length} SELECTED
+                  </Box>
+                )}
+              </Button>
+              <Collapse in={pluginSectionOpen}>
+                <Box sx={{ mt: 1.5 }}>
+                  <Typography sx={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.68rem', mb: 1.5, fontFamily: 'monospace' }}>
+                    Select which enabled plugins to include in this scan. Leave all unchecked to run all enabled plugins.
+                  </Typography>
+                  <FormGroup row sx={{ gap: 1 }}>
+                    {enabledPlugins.map(plugin => (
+                      <FormControlLabel
+                        key={plugin.slug}
+                        control={
+                          <Checkbox
+                            size="small"
+                            checked={selectedPlugins.includes(plugin.slug)}
+                            onChange={(e) => {
+                              setSelectedPlugins(prev =>
+                                e.target.checked
+                                  ? [...prev, plugin.slug]
+                                  : prev.filter(s => s !== plugin.slug)
+                              );
+                            }}
+                            sx={{ color: 'rgba(0, 255, 98, 0.2)', '&.Mui-checked': { color: '#00ff62' } }}
+                          />
+                        }
+                        label={
+                          <Box>
+                            <Typography sx={{ fontSize: '0.8rem', color: '#fff', fontWeight: 700 }}>
+                              {plugin.name}
+                            </Typography>
+                            {plugin.description && (
+                              <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>
+                                {plugin.description}
+                              </Typography>
+                            )}
+                          </Box>
+                        }
+                        sx={{
+                          mx: 0,
+                          px: 1.5,
+                          py: 0.75,
+                          border: '1px solid',
+                          borderColor: selectedPlugins.includes(plugin.slug)
+                            ? 'rgba(0, 255, 98, 0.3)'
+                            : 'rgba(255,255,255,0.06)',
+                          borderRadius: 2,
+                          bgcolor: selectedPlugins.includes(plugin.slug)
+                            ? 'rgba(0, 255, 98, 0.05)'
+                            : 'rgba(255,255,255,0.02)',
+                          transition: 'all 0.15s',
+                          alignItems: 'flex-start',
+                        }}
+                      />
+                    ))}
+                  </FormGroup>
+                </Box>
+              </Collapse>
+            </Box>
+          )}
         </DialogContent>
 
         <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>

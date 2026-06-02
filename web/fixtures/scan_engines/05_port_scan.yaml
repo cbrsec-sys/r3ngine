@@ -14,3 +14,11 @@
         threads: 30
         passive: false
         enable_network_enum: true
+      dns_security:
+        enable_axfr: true
+        enable_dnssec_check: true
+        enable_dns_brute: false
+        amplification_threshold: 10
+      attack_path_modeling:
+        enabled: true
+        top_n: 5
