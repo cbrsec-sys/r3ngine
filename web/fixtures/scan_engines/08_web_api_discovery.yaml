@@ -17,6 +17,11 @@
         enable_http_crawl: true
         threads: 30
         timeout: 5
+      dns_security:
+        enable_axfr: true
+        enable_dnssec_check: true
+        enable_dns_brute: false
+        amplification_threshold: 10
       web_api_discovery:
         uses_tools:
           - kiterunner
@@ -32,6 +37,7 @@
         threads: 30
         kiterunner_wordlist: routes-large.kite
         arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
+        use_api_wordlist: true
       dir_file_fuzz:
         auto_calibration: true
         run_dirsearch: true
@@ -54,7 +60,6 @@
           - asp
           - aspx
           - txt
-          - conf
           - sql
           - json
           - yml
