@@ -246,7 +246,94 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 				ffuf_exc = [None]
 				ds_exc = [None]
 
+				_FUZZ_BATCH_SIZE = 100
+
+				def _flush_ffuf_batch(batch, dirscan):
+					"""Persist a batch of ffuf result dicts and link files to dirscan."""
+					from django.db import transaction
+					if not batch:
+						return
+					dfiles = []
+					with transaction.atomic():
+						for line in batch:
+							res_url = line.get('url')
+							if not res_url:
+								continue
+							name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
+							if not name:
+								continue
+							length = line.get('length', 0)
+							status = line.get('status', 0)
+							words = line.get('words', 0)
+							lines_count = line.get('lines', 0)
+							content_type = line.get('content-type', '')
+							duration = line.get('duration', 0)
+							endpoint, _ = save_endpoint(res_url, ctx=ctx)
+							if endpoint is None:
+								continue
+							endpoint.http_status = status
+							endpoint.content_length = length
+							endpoint.response_time = duration / 1000000000
+							endpoint.content_type = content_type
+							endpoint.save()
+							try:
+								dfile, d_created = save_fuzzing_file(
+									name=name,
+									url=res_url,
+									http_status=status,
+									length=length,
+									words=words,
+									lines=lines_count,
+									content_type=content_type
+								)
+								dfiles.append(dfile)
+								logger.info(f'Saved ffuf DirectoryFile {res_url} (created={d_created})')
+							except Exception as e:
+								logger.error(f'Failed to save ffuf DirectoryFile for {res_url}: {e}')
+					if dfiles:
+						dirscan.directory_files.add(*dfiles)
+
+				def _flush_ds_batch(batch, dirscan_ds):
+					"""Persist a batch of dirsearch result dicts and link files to dirscan_ds."""
+					from django.db import transaction
+					if not batch:
+						return
+					dfiles = []
+					with transaction.atomic():
+						for ds_res in batch:
+							res_url = ds_res.get('url')
+							if not res_url:
+								continue
+							name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
+							if not name:
+								continue
+							status = ds_res.get('status', 0)
+							length = ds_res.get('content-length', 0)
+							content_type = ds_res.get('content-type', '')
+							endpoint, _ = save_endpoint(res_url, ctx=ctx)
+							if endpoint is None:
+								continue
+							endpoint.http_status = status
+							endpoint.content_length = length
+							endpoint.content_type = content_type
+							endpoint.save()
+							try:
+								dfile, d_created = save_fuzzing_file(
+									name=name,
+									url=res_url,
+									http_status=status,
+									length=length,
+									content_type=content_type
+								)
+								dfiles.append(dfile)
+								logger.info(f'Saved ds DirectoryFile {res_url} (created={d_created})')
+							except Exception as e:
+								logger.error(f'Failed to save ds DirectoryFile for {res_url}: {e}')
+					if dfiles:
+						dirscan_ds.directory_files.add(*dfiles)
+
 				def _run_ffuf():
+					from django.db import connection
 					try:
 						fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json -s'
 						fcmd += f' -x {proxy}' if proxy else ''
@@ -262,83 +349,52 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 						logger.info(f'Running ffuf for {base_url}')
 						logger.warning(f'ffuf command: {fcmd}')
 
+						batch = []
 						if parse_only is not None and target_url in parse_only.get('ffuf', {}):
 							ffuf_stdout = parse_only['ffuf'][target_url]
-							line_source = []
 							for raw_line in ffuf_stdout.splitlines():
 								raw_line = raw_line.strip()
 								if not raw_line:
 									continue
 								try:
-									line_source.append(json.loads(raw_line))
+									parsed = json.loads(raw_line)
+									batch.append(parsed)
+									ffuf_results_local.append(parsed)
 								except Exception:
-									line_source.append(raw_line)
+									pass
+								if len(batch) >= _FUZZ_BATCH_SIZE:
+									_flush_ffuf_batch(batch, dirscan)
+									batch = []
 						else:
-							line_source = stream_command(
-								fcmd,
-								shell=True,
-								history_file=self.history_file,
-								scan_id=self.scan_id,
-								activity_id=self.activity_id)
+							for line in stream_command(
+									fcmd,
+									shell=True,
+									history_file=self.history_file,
+									scan_id=self.scan_id,
+									activity_id=self.activity_id):
+								if not isinstance(line, dict):
+									continue
+								batch.append(line)
+								ffuf_results_local.append(line)
+								if len(batch) >= _FUZZ_BATCH_SIZE:
+									_flush_ffuf_batch(batch, dirscan)
+									batch = []
 
-						for line in line_source:
-							if not isinstance(line, dict):
-								continue
+						# Flush remaining results
+						_flush_ffuf_batch(batch, dirscan)
 
-							ffuf_results_local.append(line)
-							res_url = line.get('url')
-							if not res_url:
-								continue
-
-							name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
-							length = line.get('length', 0)
-							status = line.get('status', 0)
-							words = line.get('words', 0)
-							lines_count = line.get('lines', 0)
-							content_type = line.get('content-type', '')
-							duration = line.get('duration', 0)
-
-							if not name:
-								continue
-
-							endpoint, created = save_endpoint(res_url, ctx=ctx)
-							if endpoint is None:
-								continue
-
-							logger.warning(f'Endpoint: {endpoint} Created: {created}')
-							endpoint.http_status = status
-							endpoint.content_length = length
-							endpoint.response_time = duration / 1000000000
-							endpoint.content_type = content_type
-							endpoint.save()
-
-							try:
-								dfile, d_created = save_fuzzing_file(
-									name=name,
-									url=res_url,
-									http_status=status,
-									length=length,
-									words=words,
-									lines=lines_count,
-									content_type=content_type
-								)
-								logger.info(f'Saved DirectoryFile for {res_url}')
-								logger.warning(f'DirectoryFile: {dfile} Created: {d_created}')
-							except Exception as e:
-								logger.error(f'Failed to save DirectoryFile for {res_url}: {e}')
-								continue
-
-							dirscan.directory_files.add(dfile)
-							if self.subscan:
-								from startScan.models import SubScan
-								if SubScan.objects.filter(pk=self.subscan.pk).exists():
-									dirscan.dir_subscan_ids.add(self.subscan)
-
+						if self.subscan:
+							from startScan.models import SubScan
+							if SubScan.objects.filter(pk=self.subscan.pk).exists():
+								dirscan.dir_subscan_ids.add(self.subscan)
 						dirscan.save()
 					except Exception as e:
 						ffuf_exc[0] = e
+					finally:
+						connection.close()
 
 				def _run_dirsearch():
+					from django.db import connection
 					try:
 						if not run_dirsearch or not dirsearch_base_cmd:
 							return
@@ -372,54 +428,22 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 						if os.path.exists(dirsearch_output):
 							try:
 								with open(dirsearch_output, 'r') as f:
-									ds_data = json.load(f)
-									for ds_res in ds_data.get('results', []):
-										res_url = ds_res.get('url')
-										status = ds_res.get('status', 0)
-										length = ds_res.get('content-length', 0)
-										content_type = ds_res.get('content-type', '')
-
-										if not res_url:
-											continue
-
-										name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
-										if not name:
-											continue
-
-										endpoint, created = save_endpoint(res_url, ctx=ctx)
-										if endpoint is None:
-											continue
-
-										endpoint.http_status = status
-										endpoint.content_length = length
-										endpoint.content_type = content_type
-										endpoint.save()
-
-										try:
-											dfile, d_created = save_fuzzing_file(
-												name=name,
-												url=res_url,
-												http_status=status,
-												length=length,
-												content_type=content_type
-											)
-											logger.info(f'Saved DirectoryFile for {res_url}')
-											logger.warning(f'DirectoryFile: {dfile} Created: {d_created}')
-										except Exception as e:
-											logger.error(f'Failed to save DirectoryFile for {res_url}: {e}')
-											continue
-
-										dirscan_ds.directory_files.add(dfile)
-										if self.subscan:
-											from startScan.models import SubScan
-											if SubScan.objects.filter(pk=self.subscan.pk).exists():
-												dirscan_ds.dir_subscan_ids.add(self.subscan)
+									results_list = json.load(f).get('results', [])
+								logger.info(f'dirsearch collected {len(results_list)} results for {target_url}')
+								for i in range(0, len(results_list), _FUZZ_BATCH_SIZE):
+									_flush_ds_batch(results_list[i:i + _FUZZ_BATCH_SIZE], dirscan_ds)
 							except Exception as e:
-								logger.error(f'Error parsing dirsearch results for {base_url}: {e}')
+								logger.error(f'Error parsing dirsearch output for {base_url}: {e}')
 
+						if self.subscan:
+							from startScan.models import SubScan
+							if SubScan.objects.filter(pk=self.subscan.pk).exists():
+								dirscan_ds.dir_subscan_ids.add(self.subscan)
 						dirscan_ds.save()
 					except Exception as e:
 						ds_exc[0] = e
+					finally:
+						connection.close()
 
 				t_ffuf = threading.Thread(target=_run_ffuf, name=f'ffuf-{target_url}')
 				t_ffuf.start()
