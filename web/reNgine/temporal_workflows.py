@@ -75,7 +75,7 @@ async def _dispatch_tier_plugins(ctx: dict, tier: str, wf_id_prefix: str) -> Non
     """
     plugin_list = await workflow.execute_activity(
         "GetEnabledPluginsForTierActivity",
-        tier,
+        {"tier": tier, "selected_plugin_slugs": ctx.get("selected_plugin_slugs") or []},
         start_to_close_timeout=timedelta(seconds=15),
         heartbeat_timeout=timedelta(seconds=15),
         retry_policy=_RETRY_INTERNAL,
