@@ -10,6 +10,11 @@
         enable_http_crawl: true
         threads: 10
         timeout: 5
+      dns_security:
+        enable_axfr: true
+        enable_dnssec_check: true
+        enable_dns_brute: false
+        amplification_threshold: 10
       port_scan:
         enable_http_crawl: true
         timeout: 5
