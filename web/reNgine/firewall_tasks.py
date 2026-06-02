@@ -77,6 +77,7 @@ def run_tls_deep_audit(self, ctx, config):
                 description=finding_text,
                 severity=severity_int,
                 type='SSL/TLS',
+                source='testssl.sh',
                 http_url=f'https://{target}:{port}',
                 dedup_fields=['name', 'http_url', 'scan_history'],
             )

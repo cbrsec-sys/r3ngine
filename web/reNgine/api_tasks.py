@@ -64,6 +64,7 @@ def run_jwt_scan(self, ctx, url, subdomain, results_dir):
             description=description,
             severity=3,
             type='Broken Authentication',
+            source='jwt_tool',
             http_url=url,
             dedup_fields=['name', 'http_url', 'scan_history'],
         )
@@ -120,6 +121,7 @@ def run_graphql_cop(self, ctx, url, subdomain):
                 description=entry.get('description', ''),
                 severity=severity_int,
                 type='GraphQL',
+                source='graphql-cop',
                 http_url=graphql_url,
                 dedup_fields=['name', 'http_url', 'scan_history'],
             )
