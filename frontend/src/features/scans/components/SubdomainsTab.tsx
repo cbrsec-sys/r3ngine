@@ -58,14 +58,15 @@ import {
 import { getCsrfToken } from '../../../api/axiosConfig';
 
 
-import { 
-  useSubdomains, 
-  useDeleteSubdomain, 
-  useToggleSubdomainImportant, 
+import {
+  useSubdomains,
+  useDeleteSubdomain,
+  useToggleSubdomainImportant,
   useInitiateSubscan,
   useGPTAttackSurface
 } from '../../subdomains/api';
 import { useEngines } from '../../engines/api';
+import { usePlugins } from '../../plugins/api/pluginsApi';
 import { useCreateTodo } from '../../todos/api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
@@ -140,6 +141,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   // Subscan state
   const [selectedEngineId, setSelectedEngineId] = useState<number | null>(null);
   const [selectedTasks, setSelectedTasks] = useState<string[]>([]);
+  const [selectedPlugins, setSelectedPlugins] = useState<string[]>([]);
   
   // TODO state
   const [todoTitle, setTodoTitle] = useState('');
@@ -176,6 +178,8 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   const attackSurfaceMutation = useGPTAttackSurface();
   const createTodoMutation = useCreateTodo();
   const { data: enginesData } = useEngines();
+  const { data: allPlugins } = usePlugins();
+  const enabledPlugins = (allPlugins ?? []).filter(p => p.is_enabled);
 
   React.useEffect(() => {
     if (!isLoading && data) {
@@ -311,12 +315,14 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
       await subscanMutation.mutateAsync({
         engine_id: selectedEngineId,
         tasks: selectedTasks,
-        subdomain_ids
+        subdomain_ids,
+        selected_plugins: selectedPlugins,
       });
       showNotification('Subscan initiated successfully');
       setSubscanModalOpen(false);
       setSelectedEngineId(null);
       setSelectedTasks([]);
+      setSelectedPlugins([]);
     } catch (error: any) {
       showNotification(error.message || 'Failed to initiate subscan', 'error');
     }
@@ -913,6 +919,41 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   />
                 ))}
               </FormGroup>
+
+              {enabledPlugins.length > 0 && (
+                <>
+                  <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', my: 1.5 }} />
+                  <Typography sx={{ color: 'rgba(0, 243, 255, 0.7)', fontSize: '0.65rem', mb: 1, fontWeight: 900, fontFamily: 'Orbitron' }}>
+                    PLUGINS
+                  </Typography>
+                  <FormGroup>
+                    {enabledPlugins.map(plugin => (
+                      <FormControlLabel
+                        key={plugin.slug}
+                        control={
+                          <Checkbox
+                            size="small"
+                            checked={selectedPlugins.includes(plugin.slug)}
+                            onChange={(e) => {
+                              setSelectedPlugins(prev =>
+                                e.target.checked
+                                  ? [...prev, plugin.slug]
+                                  : prev.filter(s => s !== plugin.slug)
+                              );
+                            }}
+                            sx={{ color: 'rgba(0, 243, 255, 0.2)', '&.Mui-checked': { color: '#00f3ff' } }}
+                          />
+                        }
+                        label={
+                          <Typography sx={{ fontSize: '0.8rem', color: '#fff', fontWeight: 600 }}>
+                            {plugin.name}
+                          </Typography>
+                        }
+                      />
+                    ))}
+                  </FormGroup>
+                </>
+              )}
             </Box>
           )}
         </DialogContent>

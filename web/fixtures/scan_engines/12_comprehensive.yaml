@@ -38,7 +38,8 @@
         threads: 20
         passive: false
         enable_nmap: true
-        nmap_cmd: nmap -vv -sV --script /usr/share/nmap/scripts/vulners.nse
+        nmap_cmd: nmap -vv -Pn -sV
+        nmap_script: /usr/share/nmap/scripts/vulners.nse
         enable_network_enum: true
       osint:
         discover:
@@ -100,7 +101,7 @@
           - 204
         recursive_level: 2
         stop_on_error: false
-        timeout: 120
+        timeout: 300
         threads: 20
         wordlist_name: dicc
         use_api_wordlist: false
@@ -159,7 +160,6 @@
         run_acunetix: false
         run_wpscan: true
         run_s3scanner: true
-        run_vigolium: true
         enable_http_crawl: true
         concurrency: 30
         intensity: normal
@@ -176,6 +176,7 @@
             - medium
             - high
             - critical
+        run_vigolium: true
         vigolium:
           strategy: balanced
           concurrency: 30

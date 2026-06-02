@@ -38,7 +38,7 @@ export const useSubdomains = (projectSlug: string, page = 1, searchQuery = '', s
 
 export const useInitiateSubscan = () => {
   return useMutation({
-    mutationFn: async (params: { engine_id: number; tasks: string[]; subdomain_ids: number[] }) => {
+    mutationFn: async (params: { engine_id: number; tasks: string[]; subdomain_ids: number[]; selected_plugins?: string[] }) => {
       const response = await axios.post('/api/action/initiate/subtask/', params, {
         headers: {
           'X-CSRFToken': getCsrfToken()

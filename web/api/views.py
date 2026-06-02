@@ -483,6 +483,16 @@ class RegisterPushTokenView(APIView):
 			'created': created,
 		})
 
+	def delete(self, request):
+		"""
+		DELETE /mapi/push-token/register/
+
+		Deactivates all push tokens for the authenticated user so the backend
+		stops delivering push notifications to their devices.
+		"""
+		MobilePushToken.objects.filter(user=request.user).update(is_active=False)
+		return Response(status=HTTP_204_NO_CONTENT)
+
 
 class OllamaManager(APIView):
 	permission_classes = [HasPermission]
@@ -1784,6 +1794,9 @@ class InitiateScan(APIView):
 					
 					custom_dorks = data.get('customDorkTextarea', '').strip() if data.get('customDorkSwitch') else None
 					spiderfoot_scan = data.get('spiderfoot_scan', False)
+					selected_plugins = data.get('selected_plugins', [])
+					if isinstance(selected_plugins, str):
+						selected_plugins = [selected_plugins]
 
 					# Create ScanHistory object
 					scan_history_id = create_scan_object(
@@ -1809,7 +1822,8 @@ class InitiateScan(APIView):
 						'excluded_paths': excluded_paths,
 						'custom_dorks': custom_dorks,
 						'enable_spiderfoot_scan': spiderfoot_scan,
-						'initiated_by_id': request.user.id
+						'initiated_by_id': request.user.id,
+						'selected_plugin_slugs': selected_plugins,
 					}
 					initiate_scan_temporal(**kwargs)
 					results.append({'domain': domain.name, 'scan_id': scan.id})
@@ -1857,6 +1871,9 @@ class InitiateSubTask(APIView):
 		data = req.data
 		engine_id = data.get('engine_id')
 		scan_types = data['tasks']
+		selected_plugins = data.get('selected_plugins', [])
+		if isinstance(selected_plugins, str):
+			selected_plugins = [selected_plugins]
 		# Accept both subdomain_ids (list) and subdomain_id (single int) for mobile compatibility
 		subdomain_ids = data.get('subdomain_ids') or []
 		if not subdomain_ids:
@@ -1869,7 +1886,8 @@ class InitiateSubTask(APIView):
 				'scan_history_id': None,
 				'subdomain_id': subdomain_id,
 				'scan_type': scan_types,
-				'engine_id': engine_id
+				'engine_id': engine_id,
+				'selected_plugin_slugs': selected_plugins,
 			}
 			initiate_subscan_temporal(**ctx)
 		return Response({'status': True})
