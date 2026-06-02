@@ -2840,27 +2840,26 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 	for tool in tools:
 		if tool in base_cmd_map:
 			p = get_random_proxy()
-			tool_cmd = base_cmd_map[tool]
-			
-			# Apply proxy
+
+			# Build base command without proxy so we can reuse it for fallback
+			base_tool_cmd = base_cmd_map[tool]
+			if threads > 0:
+				if tool == 'gau': base_tool_cmd += f' --threads {threads}'
+				elif tool == 'gospider': base_tool_cmd += f' -t {threads}'
+				elif tool == 'katana': base_tool_cmd += f' -c {threads}'
+			if custom_headers:
+				formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
+				if tool == 'gospider': base_tool_cmd += f' {formatted_headers}'
+				elif tool == 'hakrawler': base_tool_cmd += ';;'.join(header for header in custom_headers)
+				elif tool == 'katana': base_tool_cmd += f' {formatted_headers}'
+
+			# Add proxy for the primary attempts
+			tool_cmd = base_tool_cmd
 			if p:
 				if tool == 'katana': tool_cmd += f' -proxy "{p}"'
 				elif tool == 'gospider': tool_cmd += f' -p {p}'
 				#elif tool == 'hakrawler': tool_cmd += f' -proxy {p}'
 				elif tool == 'gau': tool_cmd += f' --proxy {p}'
-			
-			# Apply threads
-			if threads > 0:
-				if tool == 'gau': tool_cmd += f' --threads {threads}'
-				elif tool == 'gospider': tool_cmd += f' -t {threads}'
-				elif tool == 'katana': tool_cmd += f' -c {threads}'
-
-			# Apply custom headers
-			if custom_headers:
-				formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
-				if tool == 'gospider': tool_cmd += f' {formatted_headers}'
-				elif tool == 'hakrawler': tool_cmd += ';;'.join(header for header in custom_headers)
-				elif tool == 'katana': tool_cmd += f' {formatted_headers}'
 
 			url_results_file = f'{self.results_dir}/urls_{tool}.txt'
 			full_cmd = f'cat {input_path} | {tool_cmd} | grep -Eo {host_regex} | tee {url_results_file}'
@@ -2873,6 +2872,14 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 				scan_id=self.scan_id,
 				activity_id=self.activity_id
 			)
+
+			# If all 3 proxy attempts produced no results, retry once without proxy
+			if p and (not os.path.exists(url_results_file) or os.path.getsize(url_results_file) == 0):
+				logger.warning(f'{tool}: all proxy attempts failed, retrying once without proxy')
+				full_no_proxy_cmd = f'cat {input_path} | {base_tool_cmd} | grep -Eo {host_regex} | tee {url_results_file}'
+				logger.warning(f'{tool} no-proxy fallback: {full_no_proxy_cmd}')
+				run_command(full_no_proxy_cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+
 			recon_run = True
 
 	# Vigolium spidering — runs ingestion+discovery phases to collect additional URLs.
