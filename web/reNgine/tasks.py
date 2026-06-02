@@ -178,6 +178,7 @@ def initiate_scan_temporal(
 		excluded_paths=[],
 		custom_dorks=None,
 		enable_spiderfoot_scan=False,
+		selected_plugin_slugs=None,
 	):
 	"""Initiate a new scan using Temporal durable workflow orchestration.
 
@@ -335,6 +336,7 @@ def initiate_scan_temporal(
 			'kr_wordlist': kr_wordlist,
 			'tasks': tasks,
 			'use_tor': bool(_proxy and _proxy.use_tor),
+			'selected_plugin_slugs': selected_plugin_slugs or [],
 		}
 
 		# ---- Start MasterScanWorkflow on Temporal ----
@@ -440,6 +442,7 @@ def initiate_subscan_temporal(
 		starting_point_path='',
 		excluded_paths=[],
 		custom_dorks=None,
+		selected_plugin_slugs=None,
 	):
 	"""Initiate a new subscan using Temporal durable workflow orchestration.
 
@@ -551,6 +554,7 @@ def initiate_subscan_temporal(
 			'api_discovery_tools': api_discovery_tools,
 			'kr_wordlist': kr_wordlist,
 			'use_tor': bool(_proxy and _proxy.use_tor),
+			'selected_plugin_slugs': selected_plugin_slugs or [],
 		}
 
 		# ---- Create initial endpoints in DB ----
@@ -2836,27 +2840,26 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 	for tool in tools:
 		if tool in base_cmd_map:
 			p = get_random_proxy()
-			tool_cmd = base_cmd_map[tool]
-			
-			# Apply proxy
+
+			# Build base command without proxy so we can reuse it for fallback
+			base_tool_cmd = base_cmd_map[tool]
+			if threads > 0:
+				if tool == 'gau': base_tool_cmd += f' --threads {threads}'
+				elif tool == 'gospider': base_tool_cmd += f' -t {threads}'
+				elif tool == 'katana': base_tool_cmd += f' -c {threads}'
+			if custom_headers:
+				formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
+				if tool == 'gospider': base_tool_cmd += f' {formatted_headers}'
+				elif tool == 'hakrawler': base_tool_cmd += ';;'.join(header for header in custom_headers)
+				elif tool == 'katana': base_tool_cmd += f' {formatted_headers}'
+
+			# Add proxy for the primary attempts
+			tool_cmd = base_tool_cmd
 			if p:
 				if tool == 'katana': tool_cmd += f' -proxy "{p}"'
 				elif tool == 'gospider': tool_cmd += f' -p {p}'
 				#elif tool == 'hakrawler': tool_cmd += f' -proxy {p}'
 				elif tool == 'gau': tool_cmd += f' --proxy {p}'
-			
-			# Apply threads
-			if threads > 0:
-				if tool == 'gau': tool_cmd += f' --threads {threads}'
-				elif tool == 'gospider': tool_cmd += f' -t {threads}'
-				elif tool == 'katana': tool_cmd += f' -c {threads}'
-
-			# Apply custom headers
-			if custom_headers:
-				formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
-				if tool == 'gospider': tool_cmd += f' {formatted_headers}'
-				elif tool == 'hakrawler': tool_cmd += ';;'.join(header for header in custom_headers)
-				elif tool == 'katana': tool_cmd += f' {formatted_headers}'
 
 			url_results_file = f'{self.results_dir}/urls_{tool}.txt'
 			full_cmd = f'cat {input_path} | {tool_cmd} | grep -Eo {host_regex} | tee {url_results_file}'
@@ -2869,6 +2872,14 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 				scan_id=self.scan_id,
 				activity_id=self.activity_id
 			)
+
+			# If all 3 proxy attempts produced no results, retry once without proxy
+			if p and (not os.path.exists(url_results_file) or os.path.getsize(url_results_file) == 0):
+				logger.warning(f'{tool}: all proxy attempts failed, retrying once without proxy')
+				full_no_proxy_cmd = f'cat {input_path} | {base_tool_cmd} | grep -Eo {host_regex} | tee {url_results_file}'
+				logger.warning(f'{tool} no-proxy fallback: {full_no_proxy_cmd}')
+				run_command(full_no_proxy_cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+
 			recon_run = True
 
 	# Vigolium spidering — runs ingestion+discovery phases to collect additional URLs.
@@ -4557,7 +4568,7 @@ def send_scan_notif(
 		'fields': fields,
 		'severity': severity
 	}
-	logger.warning(f'Sending notification "{title}" [{severity}]')
+	logger.info(f'Sending notification "{title}" (severity: {severity})')
 
 	# inapp notification has to be sent eitherways
 	generate_inapp_notification(scan, subscan, status, engine, fields)
@@ -4837,7 +4848,7 @@ def parse_nmap_results(xml_file, output_file=None):
 		except Exception as e:
 			logger.exception(e)
 			logger.error(f'Cannot parse {xml_file} to valid JSON. Skipping.')
-			return []
+			return {'vulns': [], 'services': []}
 
 	# Write JSON to output file
 	if output_file:
@@ -4851,6 +4862,8 @@ def parse_nmap_results(xml_file, output_file=None):
 	)
 	all_vulns = []
 	services = []
+	if not hosts:
+		return {'vulns': all_vulns, 'services': services}
 	if isinstance(hosts, dict):
 		hosts = [hosts]
 
@@ -4864,7 +4877,19 @@ def parse_nmap_results(xml_file, output_file=None):
 			# Extract all the @name values from the list of dictionaries
 			hostnames = [entry.get('@name') for entry in hostnames_list]
 		else:
-			hostnames = [host.get('address')['@addr']]
+			address = host.get('address')
+			if not address:
+				continue
+			if isinstance(address, list):
+				addr = next((a.get('@addr') for a in address if a.get('@addrtype') in ('ipv4', 'ipv6')), None)
+				if not addr:
+					continue
+				hostnames = [addr]
+			else:
+				addr = address.get('@addr')
+				if not addr:
+					continue
+				hostnames = [addr]
 
 		# Iterate over each hostname for each port
 		for hostname in hostnames:
@@ -6621,7 +6646,8 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 					'severity': 0,
 					'description': f'IKE-scan detected an IPSec VPN service.\n\nResults:\n{content}',
 					'http_url': target,
-					'type': 'Infrastructure'
+					'type': 'Infrastructure',
+					'source': 'ike-scan',
 				}
 				save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
 
@@ -6646,7 +6672,8 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 					'severity': 0,
 					'description': parse_sslscan_results(ssl_output_file),
 					'http_url': f'https://{target}:{port}',
-					'type': 'SSL/TLS'
+					'type': 'SSL/TLS',
+					'source': 'sslscan',
 				}
 				save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
 	
@@ -6714,7 +6741,8 @@ def brute_force_scan(self, targets=[], ctx={}, description=None):
 						 f'Service: {res["service"]}\n'
 						 f'Port: {res["port"]}',
 			'http_url': report_url,
-			'type': 'Broken Authentication'
+			'type': 'Broken Authentication',
+			'source': 'brutus',
 		}
 		save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
 		

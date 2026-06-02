@@ -2196,28 +2196,36 @@ def check_scan_queue_status_activity(scan_id: int, queue_type: str) -> bool:
 
 
 @activity.defn(name="GetEnabledPluginsForTierActivity")
-def get_enabled_plugins_for_tier_activity(tier: str) -> list:
-    """Return metadata for all enabled plugins anchored to the given tier.
+def get_enabled_plugins_for_tier_activity(params: dict) -> list:
+    """Return metadata for enabled plugins anchored to the given tier.
 
     Queries the Plugin model for plugins with anchor_step matching `tier`
-    and runtime_position='AFTER', ordered by order_weight. Used by
-    MasterScanWorkflow and SubScanWorkflow to dispatch plugin child workflows
-    after a tier completes.
+    and runtime_position='AFTER', ordered by order_weight. When
+    selected_plugin_slugs is a non-empty list, only those slugs are returned
+    (per-scan user selection). An empty list means run all enabled plugins.
 
     Args:
-        tier: e.g. "tier_2", "tier_6"
+        params: dict with keys:
+            - tier (str): e.g. "tier_2", "tier_6"
+            - selected_plugin_slugs (list[str]): user-selected slugs, or []
 
     Returns:
         List of dicts: [{"slug": str, "workflow_name": str}]
     """
     from plugins.models import Plugin
 
+    tier = params.get("tier", "")
+    selected_plugin_slugs = params.get("selected_plugin_slugs") or []
+
     results = []
-    plugins = Plugin.objects.filter(
+    qs = Plugin.objects.filter(
         anchor_step=tier,
         runtime_position='AFTER',
         is_enabled=True,
-    ).order_by('order_weight', 'id')
+    )
+    if selected_plugin_slugs:
+        qs = qs.filter(slug__in=selected_plugin_slugs)
+    plugins = qs.order_by('order_weight', 'id')
 
     for plugin in plugins:
         manifest = plugin.manifest or {}

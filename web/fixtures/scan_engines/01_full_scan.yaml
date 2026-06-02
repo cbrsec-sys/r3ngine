@@ -17,6 +17,11 @@
         enable_http_crawl: true
         threads: 30
         timeout: 5
+      dns_security:
+        enable_axfr: true
+        enable_dnssec_check: true
+        enable_dns_brute: false
+        amplification_threshold: 10
       http_crawl: {}
       port_scan:
         enable_http_crawl: true
@@ -27,72 +32,20 @@
         threads: 30
         passive: false
         enable_nmap: true
-        nmap_cmd: -sV --script vuln
+        nmap_cmd: nmap -vv -Pn -sV
+        nmap_script: /usr/share/nmap/scripts/vulners.nse
         enable_network_enum: true
-      osint:
-        discover:
-          - emails
-          - metainfo
-          - employees
-        dorks:
-          - login_pages
-          - admin_panels
-          - dashboard_pages
-          - stackoverflow
-          - social_media
-          - project_management
-          - code_sharing
-          - config_files
-          - jenkins
-          - wordpress_files
-          - php_error
-          - exposed_documents
-          - db_files
-          - git_exposed
-        intensity: normal
-        documents_limit: 50
-        leaks_and_secrets:
-          leaklookup: true
-          gitleaks: true
-          trufflehog: true
-      dir_file_fuzz:
-        auto_calibration: true
-        run_dirsearch: true
+      vigolium_discovery:
+        run_vigolium_discovery: true
+        strategy: balanced
+        concurrency: 20
+        rate_limit: 50
+        timeout: 10s
+      screenshot:
         enable_http_crawl: true
-        rate_limit: 150
-        extensions:
-          - html
-          - php
-          - git
-          - yaml
-          - conf
-          - cnf
-          - config
-          - gz
-          - env
-          - log
-          - db
-          - mysql
-          - bak
-          - asp
-          - aspx
-          - txt
-          - conf
-          - sql
-          - json
-          - yml
-          - pdf
-        follow_redirect: false
-        max_time: 300
-        match_http_status:
-          - 200
-          - 204
-        recursive_level: 2
-        stop_on_error: false
-        timeout: 5
-        threads: 30
-        wordlist_name: dicc
-        use_api_wordlist: false
+        intensity: normal
+        timeout: 10
+        threads: 40
       fetch_url:
         uses_tools:
           - gospider
@@ -128,6 +81,94 @@
           - mpeg
           - mp3
         threads: 30
+      dir_file_fuzz:
+        auto_calibration: true
+        run_dirsearch: true
+        enable_http_crawl: true
+        rate_limit: 150
+        extensions:
+          - html
+          - php
+          - git
+          - yaml
+          - conf
+          - cnf
+          - config
+          - gz
+          - env
+          - log
+          - db
+          - mysql
+          - bak
+          - asp
+          - aspx
+          - txt
+          - sql
+          - json
+          - yml
+          - pdf
+        follow_redirect: false
+        max_time: 300
+        match_http_status:
+          - 200
+          - 204
+        recursive_level: 2
+        stop_on_error: false
+        timeout: 5
+        threads: 30
+        wordlist_name: dicc
+        use_api_wordlist: false
+      osint:
+        discover:
+          - emails
+          - metainfo
+          - employees
+        dorks:
+          - login_pages
+          - admin_panels
+          - dashboard_pages
+          - stackoverflow
+          - social_media
+          - project_management
+          - code_sharing
+          - config_files
+          - jenkins
+          - wordpress_files
+          - php_error
+          - exposed_documents
+          - db_files
+          - git_exposed
+        intensity: normal
+        documents_limit: 50
+        leaks_and_secrets:
+          leaklookup: true
+          gitleaks: true
+          trufflehog: true
+      web_api_discovery:
+        uses_tools:
+          - kiterunner
+          - arjun
+          - linkfinder
+          - paramspider
+          - aquatone
+          - semgrep
+          - retire
+          - jwt_tool
+          - graphql-cop
+        scan_only_active: true
+        threads: 30
+        kiterunner_wordlist: routes-large.kite
+        arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
+        use_api_wordlist: false
+      vigolium_analysis:
+        run_vigolium_analysis: true
+        strategy: balanced
+        concurrency: 20
+        rate_limit: 50
+        timeout: 10s
+      waf_detection:
+        use_shodan: true
+        use_censys: true
       vulnerability_scan:
         run_nuclei: true
         run_dalfox: true
@@ -145,6 +186,7 @@
         fetch_gpt_report: true
         nuclei:
           use_nuclei_config: false
+          auto_update_templates: true
           severities:
             - unknown
             - info
@@ -152,6 +194,18 @@
             - medium
             - high
             - critical
+        dalfox:
+          waf_evasion: false
+          deep_scan: false
+          scan_timeout: 300
+        s3scanner:
+          threads: 10
+          providers:
+            - aws
+            - gcp
+            - digitalocean
+            - dreamhost
+            - linode
         vigolium:
           strategy: balanced
           concurrency: 50
@@ -161,32 +215,11 @@
           run_cpanel2shell: true
           cpanel_user_wordlist: /usr/src/app/wordlist/cpanel_users.txt
           proxy_type: rotating
-      vigolium_discovery:
-        run_vigolium_discovery: true
-        strategy: balanced
-        concurrency: 20
-        rate_limit: 50
-        timeout: 10s
-      vigolium_analysis:
-        run_vigolium_analysis: true
-        strategy: balanced
-        concurrency: 20
-        rate_limit: 50
-        timeout: 10s
-      attack_path_modeling:
-        enabled: true
-        top_n: 10
-      waf_detection:
-        use_shodan: true
-        use_censys: true
+        wpscan_enumeration: vp,vt,u
+        wpscan_detection_mode: mixed
       waf_bypass:
         use_nuclei: true
         use_benchmarking: true
-      screenshot:
-        enable_http_crawl: true
-        intensity: normal
-        timeout: 10
-        threads: 40
       brute_force_scan:
         users_wordlist:
           - top_default_usernames.txt
@@ -201,35 +234,23 @@
           - smb
           - rdp
           - telnet
+        threads: 5
         stop_on_success: true
       firewall_vpn_scan:
         run_ike_scan: true
         run_sslscan: true
         enable_testssl: true
         enable_crt_sh: true
+        ports:
+          - 443
+          - 4444
+          - 8443
         threads: 20
+      attack_path_modeling:
+        enabled: true
+        top_n: 10
       spiderfoot_scan:
         modules: all
-      web_api_discovery:
-        uses_tools:
-          - kiterunner
-          - arjun
-          - linkfinder
-          - paramspider
-          - aquatone
-          - semgrep
-          - retire
-          - jwt_tool
-          - graphql-cop
-        scan_only_active: true
-        threads: 30
-        kiterunner_wordlist: routes-large.kite
-        arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
-      dns_security:
-        enable_axfr: true
-        enable_dnssec_check: true
-        enable_dns_brute: false
-        amplification_threshold: 10
       stress_test:
         uses_tools:
           - k6

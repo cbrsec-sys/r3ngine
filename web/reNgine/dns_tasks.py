@@ -105,6 +105,7 @@ def _check_axfr(self, ctx, target, results_dir):
             ),
             severity=4,
             type='DNS',
+            source='dnsrecon',
             http_url=f'dns://{target}',
             dedup_fields=['name', 'http_url', 'scan_history'],
         )
@@ -136,6 +137,7 @@ def _check_axfr(self, ctx, target, results_dir):
                     ),
                     severity=2,
                     type='DNS',
+                    source='dig',
                     http_url=f'dns://{subdomain_name}',
                     dedup_fields=['name', 'http_url', 'scan_history'],
                 )
@@ -172,6 +174,7 @@ def _check_amplification(self, ctx, target, amp_threshold):
                 ),
                 severity=1,
                 type='DNS',
+                source='dig',
                 http_url=f'dns://{target}',
                 dedup_fields=['name', 'http_url', 'scan_history'],
             )
@@ -203,6 +206,7 @@ def _check_dnssec(self, ctx, target):
                 ),
                 severity=2,
                 type='DNS',
+                source='dig',
                 http_url=f'dns://{target}',
                 dedup_fields=['name', 'http_url', 'scan_history'],
             )
