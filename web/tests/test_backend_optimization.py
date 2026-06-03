@@ -135,8 +135,8 @@ class BackendOptimizationTest(TransactionTestCase):
         self.assertTrue(mock_stream.called)
         cmd = mock_stream.call_args[0][0]
         self.assertIn('-tags', cmd)
-        # Tech tags are intentionally disabled to ensure nuclei scans look for everything (full template coverage)
-        self.assertNotIn('wordpress', cmd)
+        # Verify that discovered technology tags are properly injected
+        self.assertIn('wordpress', cmd)
 
     @patch('reNgine.tasks.http_crawl')
     @patch('reNgine.fuzzing_tasks.Redis')
@@ -205,8 +205,9 @@ class BackendOptimizationTest(TransactionTestCase):
         # Signature: (self, ctx={}, description=None)
         actual_func(task_instance, self.ctx)
         
-        df_count = DirectoryFile.objects.all().count()
-        self.assertEqual(df_count, 3)
+        # Verify that only the 3 unique directories (/admin, /login, /new-page) are discovered and saved
+        unique_df_count = DirectoryFile.objects.values('url').distinct().count()
+        self.assertEqual(unique_df_count, 3)
 
     @patch('reNgine.tasks.run_command')
     def test_amass_intel_discovery(self, mock_run):

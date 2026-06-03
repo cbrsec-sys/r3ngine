@@ -1,5 +1,4 @@
-from django.conf.urls import include, url
-from django.urls import path
+from django.urls import include, path, re_path
 from rest_framework import routers
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
@@ -32,19 +31,19 @@ from .config_migration_views import ExportConfig, ImportConfig
 
 app_name = 'api'
 router = routers.DefaultRouter()
-router.register(r'listDatatableSubdomain', SubdomainDatatableViewSet)
-router.register(r'listTargets', ListTargetsDatatableViewSet)
-router.register(r'listSubdomains', SubdomainsViewSet)
-router.register(r'listEndpoints', EndPointViewSet)
-router.register(r'listDirectories', DirectoryViewSet)
-router.register(r'listVulnerability', VulnerabilityViewSet)
-router.register(r'listInterestingSubdomains', InterestingSubdomainViewSet)
-router.register(r'listInterestingEndpoints', InterestingEndpointViewSet)
-router.register(r'listSubdomainChanges', SubdomainChangesViewSet)
-router.register(r'listEndPointChanges', EndPointChangesViewSet)
-router.register(r'listIps', IpAddressViewSet)
-router.register(r'listActivityLogs', ListActivityLogsViewSet)
-router.register(r'listScanLogs', ListScanLogsViewSet)
+router.register(r'listDatatableSubdomain', SubdomainDatatableViewSet, basename='subdomain-datatable')
+router.register(r'listTargets', ListTargetsDatatableViewSet, basename='target-datatable')
+router.register(r'listSubdomains', SubdomainsViewSet, basename='subdomain-list')
+router.register(r'listEndpoints', EndPointViewSet, basename='endpoint-list')
+router.register(r'listDirectories', DirectoryViewSet, basename='directory')
+router.register(r'listVulnerability', VulnerabilityViewSet, basename='vulnerability-list')
+router.register(r'listInterestingSubdomains', InterestingSubdomainViewSet, basename='interesting-subdomain')
+router.register(r'listInterestingEndpoints', InterestingEndpointViewSet, basename='interesting-endpoint')
+router.register(r'listSubdomainChanges', SubdomainChangesViewSet, basename='subdomain-changes')
+router.register(r'listEndPointChanges', EndPointChangesViewSet, basename='endpoint-changes')
+router.register(r'listIps', IpAddressViewSet, basename='ip-address')
+router.register(r'listActivityLogs', ListActivityLogsViewSet, basename='activity-log')
+router.register(r'listScanLogs', ListScanLogsViewSet, basename='scan-log')
 router.register(r'notifications', InAppNotificationManagerViewSet, basename='notification')
 router.register(r'hackerone-programs', HackerOneProgramViewSet, basename='hackerone_program')
 router.register(r'monitoring', MonitoringDiscoveryViewSet, basename='monitoring')
@@ -61,7 +60,7 @@ router.register(r'users', UserManageViewSet, basename='users')
 
 
 urlpatterns = [
-    url('^', include(router.urls)),
+    re_path(r'^', include(router.urls)),
     path(
         'add/target/',
         AddTarget.as_view(),

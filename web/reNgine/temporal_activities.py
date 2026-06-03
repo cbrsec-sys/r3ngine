@@ -109,11 +109,10 @@ class TemporalTaskProxy:
             now = timezone.now()
             execution_id = f"temporal-{temporal_activity_id}"
 
-            # Try to claim the pre-populated INITIATED_TASK row
+            # Try to claim the pre-populated row (it could be INITIATED, FAILED from prior run, etc.)
             updated = ScanActivity.objects.filter(
                 scan_of=self.scan,
                 name=self.task_name,
-                status=INITIATED_TASK,
             ).update(
                 status=RUNNING_TASK,
                 time_started=now,
@@ -124,7 +123,6 @@ class TemporalTaskProxy:
                 self.activity = ScanActivity.objects.filter(
                     scan_of=self.scan,
                     name=self.task_name,
-                    status=RUNNING_TASK,
                     execution_id=execution_id,
                 ).first()
             else:
@@ -192,7 +190,7 @@ class TemporalTaskProxy:
 _task_cancel_local = threading.local()
 
 
-def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **kwargs):
+def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_task_name: str = None, **kwargs):
     """Execute an existing RengineTask-decorated function inside a Temporal activity.
 
     Spawns a heartbeat thread that sends signals to Temporal every 30 seconds
@@ -206,6 +204,7 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **k
         ctx (dict): Temporal workflow context dictionary.
         task_name (str): Short task name for DB tracking.
         description (str, optional): Human-readable description.
+        db_task_name (str, optional): Alternative database tracking name.
         **kwargs: Extra keyword arguments passed to task_func.
 
     Returns:
@@ -219,7 +218,7 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, **k
     import contextvars
     import time
 
-    proxy = TemporalTaskProxy(ctx, task_name, description)
+    proxy = TemporalTaskProxy(ctx, db_task_name or task_name, description)
 
     activity_running = True
     cancel_event = threading.Event()
@@ -383,50 +382,56 @@ def target_profiling_activity(ctx: dict) -> dict:
     from startScan.models import ScanHistory
     from scanEngine.models import EngineType
     from reNgine.settings import RENGINE_RESULTS
-    from reNgine.definitions import RUNNING_TASK
+    from reNgine.definitions import RUNNING_TASK, SUCCESS_TASK, FAILED_TASK
 
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[TargetProfilingActivity] Profiling scan_history_id={scan_id}")
 
-    scan = ScanHistory.objects.filter(pk=scan_id).first()
-    if not scan:
-        raise ValueError(f"ScanHistory with id={scan_id} not found.")
+    proxy = TemporalTaskProxy(ctx, 'target_profiling', 'Target Profiling')
+    try:
+        scan = ScanHistory.objects.filter(pk=scan_id).first()
+        if not scan:
+            raise ValueError(f"ScanHistory with id={scan_id} not found.")
 
-    engine_id = ctx.get('engine_id') or (scan.scan_type.id if scan.scan_type else None)
-    engine = EngineType.objects.filter(pk=engine_id).first()
-    if not engine:
-        raise ValueError(f"EngineType with id={engine_id} not found.")
+        engine_id = ctx.get('engine_id') or (scan.scan_type.id if scan.scan_type else None)
+        engine = EngineType.objects.filter(pk=engine_id).first()
+        if not engine:
+            raise ValueError(f"EngineType with id={engine_id} not found.")
 
-    # Re-arm status to RUNNING so the Django DB reflects reality when a
-    # workflow is restarted after a prior run set it to FAILED or ABORTED.
-    if scan.scan_status != RUNNING_TASK:
-        scan.scan_status = RUNNING_TASK
-        scan.save(update_fields=['scan_status'])
+        # Re-arm status to RUNNING so the Django DB reflects reality when a
+        # workflow is restarted after a prior run set it to FAILED or ABORTED.
+        if scan.scan_status != RUNNING_TASK:
+            scan.scan_status = RUNNING_TASK
+            scan.save(update_fields=['scan_status'])
 
-    # Parse YAML configuration if not already done
-    if 'yaml_configuration' not in ctx or not ctx['yaml_configuration']:
-        ctx['yaml_configuration'] = yaml.safe_load(engine.yaml_configuration) or {}
+        # Parse YAML configuration if not already done
+        if 'yaml_configuration' not in ctx or not ctx['yaml_configuration']:
+            ctx['yaml_configuration'] = yaml.safe_load(engine.yaml_configuration) or {}
 
-    # Set task list from engine
-    if 'tasks' not in ctx:
-        ctx['tasks'] = engine.tasks or []
+        # Set task list from engine
+        if 'tasks' not in ctx:
+            ctx['tasks'] = engine.tasks or []
 
-    # Ensure results dir exists
-    results_dir = ctx.get('results_dir')
-    if not results_dir:
-        results_dir = f'{RENGINE_RESULTS}/{scan.domain.name}_{scan_id}'
-        ctx['results_dir'] = results_dir
-    os.makedirs(results_dir, exist_ok=True)
+        # Ensure results dir exists
+        results_dir = ctx.get('results_dir')
+        if not results_dir:
+            results_dir = f'{RENGINE_RESULTS}/{scan.domain.name}_{scan_id}'
+            ctx['results_dir'] = results_dir
+        os.makedirs(results_dir, exist_ok=True)
 
-    # Enrich ctx with domain information
-    ctx['domain_name'] = scan.domain.name
-    ctx['engine_id'] = engine_id
+        # Enrich ctx with domain information
+        ctx['domain_name'] = scan.domain.name
+        ctx['engine_id'] = engine_id
 
-    activity.logger.info(
-        f"[TargetProfilingActivity] Profiled target {scan.domain.name}, "
-        f"tasks={ctx.get('tasks')}"
-    )
-    return ctx
+        activity.logger.info(
+            f"[TargetProfilingActivity] Profiled target {scan.domain.name}, "
+            f"tasks={ctx.get('tasks')}"
+        )
+        proxy.update_scan_activity(SUCCESS_TASK)
+        return ctx
+    except Exception as exc:
+        proxy.update_scan_activity(FAILED_TASK, error_message=repr(exc))
+        raise
 
 
 # ===========================================================================
@@ -1069,7 +1074,7 @@ def mark_vulnerability_scan_complete_activity(ctx: dict) -> None:
     scan = ScanHistory.objects.filter(pk=scan_id).first()
     if not scan:
         return
-    ScanActivity.objects.get_or_create(
+    ScanActivity.objects.update_or_create(
         scan_of=scan,
         name='vulnerability_scan',
         defaults={
@@ -1295,9 +1300,12 @@ def send_scan_notification_activity(ctx: dict) -> bool:
     # A task that failed on an early Temporal retry attempt but succeeded on a later
     # attempt will have both a FAILED_TASK and a SUCCESS_TASK record with the same
     # name. We only treat a task as truly failed if it NEVER produced a SUCCESS record.
+    # Only count activities that actually started (time_started set).
+    # Pre-populated INITIATED rows that were never claimed have time_started=None
+    # and must not be treated as failures even if their status was set to FAILED.
     failed_names = set(
-        ScanActivity.objects.filter(scan_of=scan, status=FAILED_TASK)
-        .exclude(name='scan_notification') # exclude self
+        ScanActivity.objects.filter(scan_of=scan, status=FAILED_TASK, time_started__isnull=False)
+        .exclude(name='scan_notification')
         .values_list('name', flat=True)
     )
     success_names = set(
@@ -1347,7 +1355,7 @@ _PERMITTED_GENERIC_TASKS = frozenset({
 
 
 @activity.defn(name="RunGenericTaskActivity")
-def run_generic_task_activity(ctx: dict, task_name: str, description: str = None, extra_args: dict = None) -> bool:
+def run_generic_task_activity(ctx: dict, task_name: str, description: str = None, extra_args: dict = None, db_task_name: str = None) -> bool:
     """Execute any permitted task function dynamically in a Temporal activity.
 
     Only tasks in _PERMITTED_GENERIC_TASKS may be dispatched. This prevents
@@ -1373,6 +1381,7 @@ def run_generic_task_activity(ctx: dict, task_name: str, description: str = None
         ctx,
         task_name=task_name,
         description=description or ' '.join(task_name.split('_')).capitalize(),
+        db_task_name=db_task_name,
         **run_args
     )
 

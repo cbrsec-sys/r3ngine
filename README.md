@@ -17,7 +17,7 @@
 
 <p align="center">
   <a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank">
-    <img src="https://img.shields.io/badge/version-v3.4.0-informational?&logo=none" alt="r3ngine Latest Version" />
+    <img src="https://img.shields.io/badge/version-v3.4.1-informational?&logo=none" alt="r3ngine Latest Version" />
   </a>
   &nbsp;
   <a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank">
@@ -29,9 +29,9 @@
   </a>
 </p>
 
-<h3 align="center">r3ngine 3.4.0: The Phoenix Rebirth</h4>
+<h3 align="center">r3ngine 3.4.1: The Phoenix Rebirth</h4>
 <p>
-  r3ngine 3.4.0 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Most significantly, v3.2.0 completes the full migration from Celery to <b>Temporal</b> — replacing the legacy at-most-once task broker with a durable workflow engine that provides crash-safe scan execution, full replay history, and pause/resume signaling. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
+  r3ngine 3.4.1 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Most significantly, v3.2.0 completes the full migration from Celery to <b>Temporal</b> — replacing the legacy at-most-once task broker with a durable workflow engine that provides crash-safe scan execution, full replay history, and pause/resume signaling. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
 </p>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
@@ -109,7 +109,6 @@
 * [About r3ngine](#about-r3ngine)
 * [Workflow](#workflow)
 * [Features](#features)
-* [Enterprise Support](#enterprise-support)
 * [Quick Installation](#quick-installation)
 * [Administration & Recovery](#-administration--recovery)
 * [Installation Video](#installation-video-tutorial)
@@ -117,8 +116,6 @@
 * [Screenshots](#screenshots)
 * [What's new in reNgine](https://github.com/whiterabb17/r3ngine/releases)
 * [Contributing](#contributing)
-* [r3ngine Support](#r3ngine-support)
-* [Support and Sponsoring](#support-and-sponsoring)
 * [Reporting Security Vulnerabilities](#reporting-security-vulnerabilities)
 * [License](#license)
 
@@ -610,41 +607,6 @@ reNgine is an open-source project that welcomes contributors of all experience l
 * Don't hesitate to ask questions in our community channels
 
 Your contribution, no matter how small, is valuable to us.
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## reNgine Support
-
-Before seeking support:
-
-* Please carefully read the README and documentation at [rengine.wiki](https://rengine.wiki).
-* Most common questions and issues are addressed there.
-
-If you still need assistance:
-
-* Do not use GitHub issues for support requests.
-* Join our [community-maintained Discord channel](https://discord.gg/azv6fzhNCE).
-
-Please note:
-* The Discord channel is maintained by the community.
-* While we strive to help, there's no guarantee of support or response time.
-* For confirmed bugs or feature requests, consider opening a GitHub issue.
-
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Support and Sponsoring
-
-reNgine is a passion project developed in my free time, alongside my day job. Your support helps keep this project alive and growing. Here's how you can contribute:
-
-* Add a [GitHub Star](https://github.com/whiterabb17/r3ngine) to the project.
-* Share about reNgine on social media or in blog posts
-* Nominate me for [GitHub Stars?](https://stars.github.com/nominate/)
-* Use my [DigitalOcean referral link](https://m.do.co/c/e353502d19fc) to get $100 credit (I receive $25)
-
-Your support, whether through donations or simply giving a star, tells me that reNgine is valuable to you. It motivates me to continue improving and adding features to make reNgine the go-to tool for reconnaissance.
-
-Thank you for your support!
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 

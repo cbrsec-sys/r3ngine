@@ -1049,7 +1049,12 @@ class AuthCandidate(models.Model):
 
 	class Meta:
 		verbose_name_plural = "Authentication Candidates"
-		unique_together = ('scan_history', 'target', 'protocol', 'port')
+		constraints = [
+			models.UniqueConstraint(
+				fields=['scan_history', 'target', 'protocol', 'port'],
+				name='unique_authcandidate_scan_target_proto_port',
+			)
+		]
 
 	def __str__(self):
 		return f"{self.protocol.upper()} | {self.target}:{self.port}"

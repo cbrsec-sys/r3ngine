@@ -295,7 +295,7 @@ class MasterScanWorkflow:
                 discovery_futures.append(
                     workflow.execute_activity(
                         "RunGenericTaskActivity",
-                        args=[ctx_baddns, "subdomain_discovery", "Baddns Scan"],
+                        args=[ctx_baddns, "subdomain_discovery", "Baddns Scan", {}, "baddns"],
                         start_to_close_timeout=timedelta(hours=2),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_LONG_SCAN,
@@ -1130,7 +1130,7 @@ class SubScanWorkflow:
                     }
                     await workflow.execute_activity(
                         "RunGenericTaskActivity",
-                        args=[ctx_baddns, "subdomain_discovery", "Baddns Scan", {"host": subdomain_name}],
+                        args=[ctx_baddns, "subdomain_discovery", "Baddns Scan", {"host": subdomain_name}, "baddns"],
                         start_to_close_timeout=timedelta(hours=2),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_NETWORK_SCAN,
