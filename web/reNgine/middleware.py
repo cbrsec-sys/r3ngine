@@ -9,19 +9,24 @@ class ContentSecurityPolicyMiddleware:
 	"""Sets a Content-Security-Policy header on every response."""
 
 	# External origins used by the application:
-	# - cdn.jsdelivr.net        : flag-icons CSS/images/fonts, marked.min.js
-	# - cdnjs.cloudflare.com   : highlight.js scripts and CSS (update.js)
+	# - cdn.jsdelivr.net           : flag-icons CSS/images/fonts, marked.min.js
+	# - cdnjs.cloudflare.com      : highlight.js scripts and CSS (update.js)
+	# - api.dicebear.com          : user avatar SVGs
+	# - flagcdn.com               : country flag PNG images
+	# - *.basemaps.cartocdn.com   : Leaflet dark tile layer images (GeoMap)
 	# - raw.githubusercontent.com : GeoMap GeoJSON (ne_110m_admin_0_countries)
-	# - fonts.googleapis.com   : Google Fonts CSS (404 page, report templates)
-	# - fonts.gstatic.com      : Google Fonts woff2 files
-	# - localhost:5173          : Vite HMR dev server (no-op in production)
+	# - fonts.googleapis.com      : Google Fonts CSS (404 page, report templates)
+	# - fonts.gstatic.com         : Google Fonts woff2 files
+	# - localhost:5173             : Vite HMR dev server (no-op in production)
 	_CSP = (
 		"default-src 'self'; "
 		"script-src 'self' 'unsafe-inline' 'unsafe-eval' "
 		"https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://localhost:5173; "
 		"style-src 'self' 'unsafe-inline' "
 		"https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
-		"img-src 'self' data: blob: https://cdn.jsdelivr.net; "
+		"img-src 'self' data: blob: "
+		"https://cdn.jsdelivr.net https://api.dicebear.com https://flagcdn.com "
+		"https://*.basemaps.cartocdn.com; "
 		"font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com; "
 		"connect-src 'self' ws: wss: "
 		"https://raw.githubusercontent.com https://localhost:5173 wss://localhost:5173; "

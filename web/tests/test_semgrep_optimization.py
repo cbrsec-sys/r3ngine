@@ -47,3 +47,40 @@ class SemgrepOptimizationTests(TestCase):
 		result = clean_and_validate_url(url, base_domain="target.com")
 		# Returns https://target.com/not_a_url_at_all which is checked if it starts with http/https
 		self.assertEqual(result, "https://target.com/not_a_url_at_all")
+
+	def test_clean_semgrep_check_id(self):
+		"""Test clean_semgrep_check_id with various check ID structures.
+		"""
+		from reNgine.common_func import clean_semgrep_check_id
+
+		# Test case 1: Standard dirty check ID from path
+		dirty_id_1 = "usr.src.github.semgrep_rules.typescript.react.security.audit.react-dangerouslysetinnerhtml.react-dangerouslysetinnerhtml"
+		self.assertEqual(
+			clean_semgrep_check_id(dirty_id_1),
+			"typescript.react.security.audit.react-dangerouslysetinnerhtml"
+		)
+
+		# Test case 2: Check ID with 'rules' folder and duplicate rule suffix
+		dirty_id_2 = "app.rules.javascript.browser.security.wildcard-postmessage-configuration.wildcard-postmessage-configuration"
+		self.assertEqual(
+			clean_semgrep_check_id(dirty_id_2),
+			"javascript.browser.security.wildcard-postmessage-configuration"
+		)
+
+		# Test case 3: Check ID from registry/temp rules prefix
+		dirty_id_3 = "p.secrets.generic-api-key"
+		self.assertEqual(
+			clean_semgrep_check_id(dirty_id_3),
+			"secrets.generic-api-key"
+		)
+
+		# Test case 4: Already clean check ID
+		clean_id = "python.django.security.injection.sql-injection"
+		self.assertEqual(
+			clean_semgrep_check_id(clean_id),
+			"python.django.security.injection.sql-injection"
+		)
+
+		# Test case 5: Empty/None values
+		self.assertEqual(clean_semgrep_check_id(""), "")
+		self.assertEqual(clean_semgrep_check_id(None), "")

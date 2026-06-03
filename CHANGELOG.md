@@ -1,6 +1,35 @@
 # Changelog
 
+### [v3.4.2] - 2026-06-03
+
+- **Semgrep Finding Name Normalization**:
+  - Implemented a centralized `clean_semgrep_check_id` helper in `common_func.py` to strip system/path-based prefixes (e.g. `usr.src.github.semgrep_rules.`) and deduplicate repeating suffixes in Semgrep check IDs.
+  - Applied the normalization logic to `parse_semgrep_result` in `common_func.py`, as well as `save_semgrep_vulnerability_finding` and `save_semgrep_secret_finding` in `tasks.py`.
+  - Added comprehensive unit tests in `test_semgrep_optimization.py` to verify normalization under various path structures.
+
 ### [v3.4.1] - 2026-06-03
+
+- **Infrastructure Upgrade: Django 5.2 LTS + PostgreSQL 16 + Gunicorn ASGI**:
+  - **Django 3.2 → 5.2.3 LTS**: Upgraded Django from the expired 3.2 LTS (support ended April 2024) to 5.2.3 LTS (supported until April 2028). All deprecated APIs migrated: `url()` → `re_path()` in `reNgine/urls.py` and `api/urls.py`; `USE_L10N` removed (dropped Django 4.0); `unique_together` converted to `UniqueConstraint` in `AuthCandidate` (migration `0034`) and `ADDomain` (AD plugin migration `0007`); `daphne` removed from `INSTALLED_APPS` (channels 4.x handles runserver natively).
+  - **PostgreSQL 12.3 → 16**: Upgraded the database engine from PostgreSQL 12.3 (EOL November 2024) to PostgreSQL 16-alpine (supported until November 2028). Django 5.2 enforces a minimum of PostgreSQL 14; the upgrade is now fully automated by `make fullupgrade`.
+  - **Gunicorn + Uvicorn ASGI**: Replaced the Django development server (`runserver`) used in production with Gunicorn 22 + `UvicornWorker`. The `UvicornWorker` provides full ASGI support including HTTP and WebSocket (Django Channels scan log streaming). Added `web/gunicorn.conf.py` with 4 workers and `exec gunicorn reNgine.routing:application` in `entrypoint.sh`. Development mode (`DEBUG=1`) continues to use `runserver`.
+  - **Package upgrades**: `djangorestframework` 3.12.4 → 3.15.2, `channels` 3.0.5 → 4.2.2, `channels-redis` 3.4.1 → 4.2.0, `daphne` 3.0.2 → 4.1.2, `psycopg2` 2.9.7 → 2.9.10, `django-redis` 5.4.0 → 7.0.0, `drf-yasg` 1.21.3 → 1.21.15, `django-ace` 1.0.11 → 1.44.0, `django-timezone-field` 6.1.0 → 7.2.1, `djangorestframework-datatables` 0.6.0 → 0.7.0. Replaced `gevent` with `uvicorn[standard]==0.32.1`.
+  - **LoginRequiredMiddleware**: Replaced the abandoned `django-login-required-middleware` package (no Django 4.x/5.x release) with a custom `LoginRequiredMiddleware` class in `reNgine/middleware.py`. Preserves all existing `LOGIN_REQUIRED_IGNORE_VIEW_NAMES` and `LOGIN_REQUIRED_IGNORE_PATHS` settings without any other changes.
+  - **DRF router basename deduplication**: Added explicit `basename=` parameters to 13 `router.register()` calls in `api/urls.py`. DRF 3.15.2 added strict duplicate basename detection (first introduced in 3.14.0); viewsets sharing the same model (`Subdomain` ×5, `EndPoint` ×4, `Command` ×2) now have unique basenames.
+  - **PostgreSQL connection pooling**: Added `CONN_MAX_AGE=60` and `CONN_HEALTH_CHECKS=True` to `DATABASES` settings. Connections are now reused across requests within each Gunicorn worker (safe with UvicornWorker's per-process model) and validated before reuse (Django 4.1+ feature).
+  - **PostgreSQL SSL**: Enabled SSL client configuration in `DATABASES` options. SSL mode is env-configurable via `POSTGRES_SSLMODE` (default: `prefer`; set to `verify-full` in production with certs). The CA certificate is mounted from `secrets/certs/ca.crt` into the container at `BASE_DIR/ca.crt`.
+
+- **Startup Recovery Optimization**:
+  - Adjusted `recover_stuck_scans` to only recover and resume scans that were actively in the `RUNNING_TASK` status when the system stopped or crashed.
+  - Commented out auto-recovery for completed, failed (`FAILED_TASK`), aborted (`ABORTED_TASK`), stopped, or paused scans to prevent unexpected restarts of non-running tasks.
+
+- **Upgrade Tooling (`make fullupgrade`)**:
+  - **`scripts/db_backup.sh`**: Dedicated pre-upgrade database backup script. Isolates `pg_dump` stderr from the dump file (previously `2>&1` could corrupt the backup with error text); checks the pg_dump exit code via `if !` (compatible with `set -euo pipefail`); verifies the output is non-empty before proceeding. Called at step [1/8] with database credentials passed from Makefile variables.
+  - **`scripts/pg_upgrade.sh`**: Automated PostgreSQL major-version upgrade script. Reads the `PG_VERSION` file from the Docker data volume via a transient Alpine container, compares it to the target version parsed from the `postgres:` image tag in `docker-compose.yml`, and performs a dump/restore only when a version mismatch is detected. Idempotent — exits immediately if already on the target version. Called at step [3/8], between service shutdown and image rebuild.
+  - **`fullupgrade` now 8 steps**: Added PG upgrade as step [3/8]; renumbered all subsequent steps. Replaced the fixed `sleep 8` database wait with a polling `pg_isready` loop (up to 60 s). Fixed `showmigrations --plan` grep pattern from `^\[ \]` to ` \[ \]` (Django output uses a leading space). Added gunicorn log check to final verification step.
+
+- **Technology Tag Normalization**:
+  - Updated the technology version-stripping regular expression in `tech_mapping.py` to correctly identify and strip version suffixes that are delimited by hyphens (e.g. `elementor-4-0-4`, `wordpress-7-0`, `woocommerce-10-7-0`), colons, or whitespace, while preserving hyphens in compound technology names like `moment-js` or `parallax-js`.
 
 - **Scan Finalization & UI Timeline Fixes**:
   - Fixed an issue where resumed scans were incorrectly marked as `FAILED` on completion due to dangling `FAILED_TASK` status entries.
