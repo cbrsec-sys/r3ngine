@@ -157,7 +157,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
         )}
       </DialogTitle>
 
-      <DialogContent sx={{ p: 3 }}>
+      <DialogContent sx={{ p: 3, mt: 2 }}>
         <Stack spacing={4}>
           {generationStatus && (
             <Box sx={{ 

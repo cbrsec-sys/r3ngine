@@ -2220,6 +2220,45 @@ def is_valid_nmap_command(cmd):
 # Vulnerability Parsing Utils  #
 #------------------------------#
 
+def clean_semgrep_check_id(check_id):
+	"""Cleans and normalizes Semgrep check IDs by removing rule path prefixes
+	and deduplicating repeating suffixes.
+
+	Args:
+		check_id (str): The raw check ID from Semgrep results.
+
+	Returns:
+		str: The cleaned check ID.
+	"""
+	if not check_id:
+		return ""
+	
+	# Split by dots to inspect path components
+	parts = check_id.split('.')
+	
+	# Common prefixes or folders to discard from check IDs
+	prefixes_to_strip = {
+		'usr', 'src', 'github', 'semgrep_rules', 'rules', 'app', 'p',
+		'semgrep_vulnerability_temp', 'semgrep_secret_temp', 'temp'
+	}
+	
+	# Filter out initial path elements that match our strip list
+	start_idx = 0
+	while start_idx < len(parts) and parts[start_idx].lower() in prefixes_to_strip:
+		start_idx += 1
+		
+	clean_parts = parts[start_idx:]
+	
+	if not clean_parts:
+		return check_id
+		
+	# Deduplicate repeating suffix (e.g. ['react-dangerouslysetinnerhtml', 'react-dangerouslysetinnerhtml'])
+	if len(clean_parts) >= 2 and clean_parts[-1].lower() == clean_parts[-2].lower():
+		clean_parts.pop()
+		
+	return '.'.join(clean_parts)
+
+
 def parse_semgrep_result(result):
 	"""Parses a single Semgrep match into reNgine vulnerability format.
 
@@ -2229,8 +2268,10 @@ def parse_semgrep_result(result):
 	Returns:
 		dict: Vulnerability data dictionary ready for saving.
 	"""
+	check_id = result.get('check_id', '')
+	cleaned_check_id = clean_semgrep_check_id(check_id)
 	return {
-		'name': f"Semgrep: {result.get('check_id')}",
+		'name': f"Semgrep: {cleaned_check_id}",
 		'description': result.get('extra', {}).get('message', ''),
 		'severity': SEMGREP_SEVERITY_MAP.get(result.get('extra', {}).get('severity', 'INFO'), 0),
 		'http_url': result.get('path', ''),

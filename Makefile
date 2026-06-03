@@ -6,9 +6,10 @@ include .env
 # This for future release of Compose that will use Docker Buildkit, which is much efficient.
 COMPOSE_PREFIX_CMD := COMPOSE_DOCKER_CLI_BUILD=1
 
-COMPOSE_ALL_FILES := -f docker-compose.yml
-COMPOSE_DEV_FILES := -f docker-compose.dev.yml
+COMPOSE_ALL_FILES := -f docker/docker-compose.yml
+COMPOSE_DEV_FILES := -f docker/docker-compose.dev.yml
 SERVICES          := db web proxy redis neo4j temporal temporal-python-orchestrator temporal-go-executor
+PG_VOLUME         := $(COMPOSE_PROJECT_NAME)_postgres_data
 
 # Check if 'docker compose' command is available, otherwise use 'docker-compose'
 DOCKER_COMPOSE := $(shell if command -v docker > /dev/null && docker compose version > /dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
@@ -19,7 +20,7 @@ $(info Using: $(shell echo "$(DOCKER_COMPOSE)"))
 .PHONY: setup certs up devup build username pull down stop restart rm logs fullupgrade erase
 
 certs:		    ## Generate certificates.
-	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} -f docker-compose.setup.yml run --rm certs
+	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} -f docker/docker-compose.setup.yml run --rm certs
 
 setup:			## Generate certificates.
 	@make certs
@@ -127,31 +128,38 @@ erase:			## !! DESTRUCTIVE !! Delete ALL containers, images, volumes, build cach
 	@echo "============================================================"
 	@echo ""
 
-fullupgrade:		## REQUIRED for v3.2.0+: migrate from Celery to Temporal.
+fullupgrade:		## Upgrade to Django 5.2 + PostgreSQL 16 + Gunicorn (includes automatic PG image upgrade).
 	@echo ""
 	@echo "============================================================"
-	@echo "  r3ngine FULL UPGRADE — v3.2.0 (Celery → Temporal)"
+	@echo "  r3ngine FULL UPGRADE — v3.4.1"
+	@echo "  Django 5.2 LTS  |  PostgreSQL 16  |  Gunicorn + Uvicorn"
 	@echo "============================================================"
 	@echo ""
-	@echo "  This upgrade makes IRREVERSIBLE changes to your deployment:"
+	@echo "  This upgrade will:"
 	@echo ""
-	@echo "  1. All Celery and Celery Beat containers will be removed."
-	@echo "  2. Temporal workflow engine containers will be started."
-	@echo "  3. Database migrations will apply new Temporal models"
-	@echo "     and remove legacy django_celery_beat tables."
-	@echo "  4. All images will be rebuilt from scratch."
-	@echo "  5. Any in-progress scans WILL be interrupted."
+	@echo "  1. Back up your PostgreSQL database to ./backups/ before"
+	@echo "     touching anything."
+	@echo "  2. Stop all running services."
+	@echo "  3. Detect the PostgreSQL image version and upgrade the data"
+	@echo "     volume automatically if the configured image has changed"
+	@echo "     (restores from the backup created in step 1)."
+	@echo "  4. Rebuild all application images (no cache)."
+	@echo "  5. Apply pending database migrations safely."
+	@echo "  6. Verify all migrations applied before starting the stack."
+	@echo "  7. Start all services in production mode (Gunicorn + Uvicorn)."
+	@echo "  8. Any in-progress scans WILL be interrupted."
 	@echo ""
 	@echo "  YOUR DATA IS SAFE:"
-	@echo "  - All Docker VOLUMES are preserved (scan_results, postgres_data,"
-	@echo "    nuclei_templates, wordlist, etc.)."
-	@echo "  - Only CONTAINERS and IMAGES are rebuilt — no volume data is"
-	@echo "    deleted or modified by this script."
+	@echo "  - A timestamped SQL dump is saved to ./backups/ BEFORE any"
+	@echo "    changes. If anything fails, restore with:"
+	@echo "    psql -U \$$POSTGRES_USER \$$POSTGRES_DB < backups/<dump>.sql"
+	@echo "  - The PostgreSQL volume is only removed when a version upgrade"
+	@echo "    is detected — and only after the backup is confirmed valid."
 	@echo ""
 	@echo "  BEFORE PROCEEDING:"
 	@echo "  - Ensure you have pulled the latest code  (git pull)"
 	@echo "  - Ensure no critical scans are running"
-	@echo "  - Back up your database if required"
+	@echo "  - Ensure the db service is running  (make up)"
 	@echo ""
 	@echo "  For full upgrade instructions see README.md or CHANGELOG.md"
 	@echo "============================================================"
@@ -160,30 +168,75 @@ fullupgrade:		## REQUIRED for v3.2.0+: migrate from Celery to Temporal.
 	  read confirm; \
 	  [ "$${confirm}" = "yes" ] || { printf "\n  Upgrade cancelled.\n\n"; exit 1; }
 	@echo ""
-	@echo "[1/6] Stopping all running services (volumes are NOT removed)..."
+	@echo "[1/8] Creating database backup..."
+	@POSTGRES_USER=${POSTGRES_USER} \
+	  POSTGRES_DB=${POSTGRES_DB} \
+	  DOCKER_COMPOSE_CMD="${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES}" \
+	  bash scripts/db_backup.sh
+	@echo ""
+	@echo "[2/8] Stopping all running services (volumes are NOT removed)..."
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} down --remove-orphans || true
 	@echo ""
-	@echo "[2/6] Pulling latest images and rebuilding containers (no cache)..."
+	@echo "[3/8] Upgrading PostgreSQL data volume if image version changed..."
+	@POSTGRES_USER=${POSTGRES_USER} \
+	  POSTGRES_DB=${POSTGRES_DB} \
+	  DOCKER_COMPOSE_CMD="${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES}" \
+	  PG_VOLUME_NAME=${PG_VOLUME} \
+	  bash scripts/pg_upgrade.sh
+	@echo ""
+	@echo "[4/8] Rebuilding all application images (no cache)..."
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} build --no-cache ${SERVICES}
 	@echo ""
-	@echo "[3/6] Starting database service..."
+	@echo "[5/8] Starting database and waiting for healthcheck..."
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} up -d db redis
-	@sleep 8
+	@echo "  Waiting for PostgreSQL to be ready..."
+	@attempt=0; \
+	  until ${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} exec -T db \
+	    pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} > /dev/null 2>&1; do \
+	    attempt=$$((attempt + 1)); \
+	    if [ $$attempt -ge 30 ]; then \
+	      echo "  ERROR: Database did not become ready within 60s. Aborting."; \
+	      exit 1; \
+	    fi; \
+	    printf "."; sleep 2; \
+	  done; echo " ready."
 	@echo ""
-	@echo "[4/6] Applying database migrations..."
-	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} run --rm web python3 manage.py migrate --noinput
+	@echo "[6/8] Applying database migrations..."
+	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} run --rm \
+	  -e DEBUG=0 web python3 manage.py migrate --noinput; \
+	  MIGRATE_EXIT=$$?; \
+	  if [ $$MIGRATE_EXIT -ne 0 ]; then \
+	    echo ""; \
+	    echo "  ERROR: Migration failed (exit code $$MIGRATE_EXIT)."; \
+	    echo "  The database backup is at ./backups/. Investigate before retrying."; \
+	    exit $$MIGRATE_EXIT; \
+	  fi
 	@echo ""
-	@echo "[5/6] Starting all services..."
+	@echo "  Verifying all migrations are applied..."
+	@PENDING=$$(${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} run --rm \
+	  -e DEBUG=0 web python3 manage.py showmigrations --plan 2>/dev/null | grep " \[ \]" | wc -l); \
+	  if [ "$$PENDING" -gt 0 ]; then \
+	    echo "  WARNING: $$PENDING migration(s) still pending after migrate. Check manually."; \
+	  else \
+	    echo "  All migrations applied successfully."; \
+	  fi
+	@echo ""
+	@echo "[7/8] Starting all services (production mode)..."
 	@DEBUG=0 ${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} up -d ${SERVICES}
 	@echo ""
-	@echo "[6/6] Verifying services are healthy..."
-	@sleep 5
+	@echo "[8/8] Verifying services are healthy (30s grace period)..."
+	@sleep 10
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} ps
+	@echo ""
+	@echo "  Checking gunicorn started correctly..."
+	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} logs web --tail=20 \
+	  | grep -E "Booting worker|UvicornWorker|Starting gunicorn|ERROR" || true
 	@echo ""
 	@echo "============================================================"
 	@echo "  Full upgrade complete."
-	@echo "  Temporal UI: http://localhost:8080"
-	@echo "  r3ngine UI:  https://localhost"
+	@echo "  Temporal UI:    http://localhost:8080"
+	@echo "  r3ngine UI:     https://localhost"
+	@echo "  Database backup: ./backups/"
 	@echo "============================================================"
 	@echo ""
 

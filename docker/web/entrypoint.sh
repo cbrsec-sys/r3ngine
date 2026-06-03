@@ -36,6 +36,11 @@ python3 manage.py loaddata fixtures/default_keywords.yaml
 
 # Start the server
 echo "Starting reNgine server..."
-python3 manage.py runserver 0.0.0.0:8000
-
-exec "$@"
+if [ "$DEBUG" = "1" ]; then
+    echo "  Mode: development (Django runserver via Channels)"
+    python3 manage.py runserver 0.0.0.0:8000
+else
+    echo "  Mode: production (Gunicorn + UvicornWorker ASGI)"
+    exec gunicorn reNgine.routing:application \
+        -c /usr/src/app/gunicorn.conf.py
+fi

@@ -1,17 +1,35 @@
+import re as _re
+
 from django.conf import settings as _settings
+from django.contrib.auth.views import redirect_to_login
 from dashboard.models import UserPreferences
 
 
 class ContentSecurityPolicyMiddleware:
 	"""Sets a Content-Security-Policy header on every response."""
 
+	# External origins used by the application:
+	# - cdn.jsdelivr.net           : flag-icons CSS/images/fonts, marked.min.js
+	# - cdnjs.cloudflare.com      : highlight.js scripts and CSS (update.js)
+	# - api.dicebear.com          : user avatar SVGs
+	# - flagcdn.com               : country flag PNG images
+	# - *.basemaps.cartocdn.com   : Leaflet dark tile layer images (GeoMap)
+	# - raw.githubusercontent.com : GeoMap GeoJSON (ne_110m_admin_0_countries)
+	# - fonts.googleapis.com      : Google Fonts CSS (404 page, report templates)
+	# - fonts.gstatic.com         : Google Fonts woff2 files
+	# - localhost:5173             : Vite HMR dev server (no-op in production)
 	_CSP = (
 		"default-src 'self'; "
-		"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-		"style-src 'self' 'unsafe-inline'; "
-		"img-src 'self' data: blob:; "
-		"font-src 'self' data:; "
-		"connect-src 'self' ws: wss:; "
+		"script-src 'self' 'unsafe-inline' 'unsafe-eval' "
+		"https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://localhost:5173; "
+		"style-src 'self' 'unsafe-inline' "
+		"https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
+		"img-src 'self' data: blob: "
+		"https://cdn.jsdelivr.net https://api.dicebear.com https://flagcdn.com "
+		"https://*.basemaps.cartocdn.com; "
+		"font-src 'self' data: https://cdn.jsdelivr.net https://fonts.gstatic.com; "
+		"connect-src 'self' ws: wss: "
+		"https://raw.githubusercontent.com https://localhost:5173 wss://localhost:5173; "
 		"frame-ancestors 'none';"
 	)
 
@@ -33,6 +51,35 @@ class UserPreferencesMiddleware:
 		if request.user.is_authenticated:
 			from django.utils.functional import SimpleLazyObject
 			request.user_preferences = SimpleLazyObject(lambda: UserPreferences.objects.get_or_create(user=request.user)[0])
+		return self.get_response(request)
+
+
+class LoginRequiredMiddleware:
+	"""
+	Drop-in replacement for the abandoned django-login-required-middleware package.
+	Redirects unauthenticated users to LOGIN_URL, honouring the existing
+	LOGIN_REQUIRED_IGNORE_VIEW_NAMES and LOGIN_REQUIRED_IGNORE_PATHS settings.
+	"""
+
+	def __init__(self, get_response):
+		self.get_response = get_response
+		self._ignore_view_names = set(
+			getattr(_settings, 'LOGIN_REQUIRED_IGNORE_VIEW_NAMES', [])
+		)
+		self._ignore_paths = [
+			_re.compile(p)
+			for p in getattr(_settings, 'LOGIN_REQUIRED_IGNORE_PATHS', [])
+		]
+
+	def __call__(self, request):
+		if not request.user.is_authenticated:
+			resolver_match = getattr(request, 'resolver_match', None)
+			if resolver_match and resolver_match.url_name in self._ignore_view_names:
+				return self.get_response(request)
+			for pattern in self._ignore_paths:
+				if pattern.match(request.path):
+					return self.get_response(request)
+			return redirect_to_login(request.get_full_path())
 		return self.get_response(request)
 
 

@@ -1,7 +1,9 @@
 services:
   db:
     restart: always
-    image: "postgres:12.3-alpine"
+    build:
+      context: ./postgres
+    image: "postgres:16-alpine"
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -28,6 +30,8 @@ services:
 
   redis:
     restart: always
+    build:
+      context: ./redis
     image: "redis:alpine"
     hostname: redis
     networks:
@@ -41,8 +45,8 @@ services:
 
   web:
     build:
-      context: .
-      dockerfile: web/Dockerfile
+      context: ../
+      dockerfile: docker/web/Dockerfile
     entrypoint: /usr/src/app/entrypoint.sh
     restart: always
     init: true
@@ -58,8 +62,8 @@ services:
       - POSTGRES_HOST=${POSTGRES_HOST}
       - DJANGO_SUPERUSER_PASSWORD=${DJANGO_SUPERUSER_PASSWORD}
     volumes:
-      - ./web:/usr/src/app
-      - ./frontend:/usr/src/app/frontend
+      - ../web:/usr/src/app
+      - ../frontend:/usr/src/app/frontend
       - /usr/src/app/frontend/node_modules
       - github_repos:/usr/src/github
       - wordlist:/usr/src/wordlist
@@ -69,7 +73,9 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       #- plugins_data:/usr/src/app/plugins_data
+      - ../secrets/certs/ca.crt:/usr/src/app/ca.crt:ro
       - /var/run/docker.sock:/var/run/docker.sock
+      - ./web/entrypoint.sh:/usr/src/app/entrypoint.sh:ro
     ports:
       - "8000:8000"
       - "5173:5173"
@@ -90,6 +96,8 @@ services:
 
   proxy:
     restart: always
+    build:
+      context: ./proxy
     image: nginx:alpine
     ports:
       - 8082:8082/tcp
@@ -106,7 +114,7 @@ services:
       - source: proxy.key
         target: /etc/nginx/certs/rengine_rsa.key
     volumes:
-      - ./config/nginx/rengine.conf:/etc/nginx/conf.d/rengine.conf:ro
+      - ./proxy/config/rengine.conf:/etc/nginx/conf.d/rengine.conf:ro
       - static_volume:/usr/src/app/staticfiles/
       - scan_results:/usr/src/scan_results
     networks:
@@ -162,7 +170,7 @@ services:
 
   tor:
     build:
-      context: web/tor
+      context: ../web/tor
     image: r3ngine-tor:latest
     container_name: tor
     restart: "no"
@@ -230,7 +238,7 @@ services:
       neo4j:
         condition: service_healthy
     volumes:
-      - ./web:/usr/src/app
+      - ../web:/usr/src/app
       - github_repos:/usr/src/github
       - wordlist:/usr/src/wordlist
       - scan_results:/usr/src/scan_results
@@ -238,6 +246,7 @@ services:
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
+      - ./temporal-python-orchestrator/entrypoint.sh:/usr/src/app/temporal-entrypoint.sh:ro
     networks:
       - r3ngine_network
     healthcheck:
@@ -273,7 +282,7 @@ services:
       db:
         condition: service_healthy
     volumes:
-      - ./web:/usr/src/app
+      - ../web:/usr/src/app
       - github_repos:/usr/src/github
       - wordlist:/usr/src/wordlist
       - scan_results:/usr/src/scan_results
@@ -281,6 +290,7 @@ services:
       - nuclei_templates:/root/nuclei-templates
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
+      - ./temporal-go-executor/entrypoint.sh:/usr/src/app/executor-entrypoint.sh:ro
     networks:
       - r3ngine_network
     healthcheck:
@@ -326,8 +336,8 @@ volumes:
 
 secrets:
   proxy.ca:
-    file: ./secrets/certs/rengine_chain.pem
+    file: ../secrets/certs/rengine_chain.pem
   proxy.key:
-    file: ./secrets/certs/rengine_rsa.key
+    file: ../secrets/certs/rengine_rsa.key
   proxy.cert:
-    file: ./secrets/certs/rengine.pem
+    file: ../secrets/certs/rengine.pem

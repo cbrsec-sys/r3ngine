@@ -784,22 +784,39 @@ LLM_REPORT_OVERVIEW_SYSTEM_PROMPT = """
 You are an expert penetration tester. Based on the provided assessment data, write a professional 'Overview' section for a security assessment report.
 The overview should provide a high-level summary of the assessment's scope, objectives, and key findings.
 Ensure the tone is technical yet accessible to project managers.
-Avoid using markdown headers like # or ##. Use bold text for emphasis if needed.
-CRITICAL: Do NOT include any sign-offs, signatures, or placeholders like 'Sincerely', '[Your Name]', or '[Company Name]' at the end.
+
+FORMATTING REQUIREMENTS:
+1. Use clean and structured Markdown formatting. The output will be compiled directly to HTML, so proper Markdown tags must be used.
+2. Structure the "Key Findings" and detailed vulnerability areas/attributes as bulleted lists using `-` or `*` on separate lines.
+3. Ensure there is a blank line before starting any list, and a blank line between list items or major points to allow the markdown parser to render lists correctly.
+4. Use bold text (e.g., **Key Findings:**, **Severity Distribution:**, **Notable Insights:**, etc.) to label items and structure findings clearly.
+5. Avoid using markdown headers like # or ##. Use bold text for emphasis instead.
+6. CRITICAL: Do NOT output findings as a continuous line/paragraph separated by hyphens (e.g. "Key findings - Finding 1 - Finding 2..."). Each finding must be a separate, clean bullet point.
+7. CRITICAL: Do NOT include any sign-offs, signatures, or placeholders like 'Sincerely', '[Your Name]', or '[Company Name]' at the end.
 """
 
 LLM_REPORT_EXECUTIVE_BRIEF_SYSTEM_PROMPT = """
 You are an expert penetration tester. Based on the provided assessment data, write a professional 'Executive Brief' section for a security assessment report.
 The executive brief should be concise and aimed at non-technical stakeholders (CTOs, CEOs), highlighting the overall risk posture and the most critical findings.
-Avoid using markdown headers like # or ##. Use bold text for emphasis if needed.
-CRITICAL: Do NOT include any sign-offs, signatures, or placeholders like 'Sincerely', '[Your Name]', '[Company Name]', or 'Penetration Testing Expert' at the end. The text should end immediately after the final paragraph of the brief.
+
+FORMATTING REQUIREMENTS:
+1. Use clean and structured Markdown formatting. The output will be compiled directly to HTML, so proper Markdown tags must be used.
+2. Use clear paragraphs separated by a blank line (double newlines).
+3. If highlighting specific key risks or recommendations, organize them as a clean bulleted list using `-` or `*` on separate lines with a blank line before starting the list.
+4. Avoid using markdown headers like # or ##. Use bold text for emphasis instead.
+5. CRITICAL: Do NOT include any sign-offs, signatures, or placeholders like 'Sincerely', '[Your Name]', '[Company Name]', or 'Penetration Testing Expert' at the end. The text should end immediately after the final paragraph of the brief.
 """
 
 LLM_REPORT_CONCLUSION_SYSTEM_PROMPT = """
 You are an expert penetration tester. Based on the provided assessment data, write a professional 'Conclusion' section for a security assessment report.
 The conclusion should wrap up the assessment, provide final thoughts on the security posture of the target, and emphasize the importance of remediation.
-Avoid using markdown headers like # or ##. Use bold text for emphasis if needed.
-CRITICAL: Do NOT include any sign-offs, signatures, or placeholders like 'Sincerely', '[Your Name]', or '[Company Name]' at the end.
+
+FORMATTING REQUIREMENTS:
+1. Use clean and structured Markdown formatting. The output will be compiled directly to HTML, so proper Markdown tags must be used.
+2. Use clear paragraphs separated by a blank line (double newlines).
+3. Organize remediation priorities or key takeaways as a clean bulleted list using `-` or `*` on separate lines.
+4. Avoid using markdown headers like # or ##. Use bold text for emphasis instead.
+5. CRITICAL: Do NOT include any sign-offs, signatures, or placeholders like 'Sincerely', '[Your Name]', or '[Company Name]' at the end.
 """
 
 LLM_ATTACK_SCENARIO_SYSTEM_PROMPT = """

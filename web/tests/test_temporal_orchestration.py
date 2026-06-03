@@ -228,6 +228,90 @@ class TestTemporalOrchestration(TestCase):
         for subscan in subscans:
             self.assertEqual(subscan.workflow_ids, ['mock-multi-subscan-workflow-id'])
 
+    @patch('reNgine.tasks.resume_scan_temporal')
+    @patch('reNgine.temporal_client.TemporalClientProvider.get_client', new_callable=AsyncMock)
+    def test_recover_stuck_scans_only_restarts_running(self, mock_get_client, mock_resume_scan):
+        """Verify recover_stuck_scans only recovers RUNNING_TASK scans with dead workflows, not FAILED/ABORTED ones."""
+        from reNgine.tasks import recover_stuck_scans
+        from reNgine.definitions import FAILED_TASK, RUNNING_TASK, ABORTED_TASK
+        from temporalio.service import RPCError, RPCStatusCode
+        from django.utils import timezone
+
+        # Create test scans under different states
+        scan_running_stuck = ScanHistory.objects.create(
+            domain=self.domain,
+            scan_type=self.engine,
+            start_scan_date=timezone.now(),
+            scan_status=RUNNING_TASK,
+            recovery_count=0,
+            workflow_ids=["stuck-workflow-1"]
+        )
+        scan_running_active = ScanHistory.objects.create(
+            domain=self.domain,
+            scan_type=self.engine,
+            start_scan_date=timezone.now(),
+            scan_status=RUNNING_TASK,
+            recovery_count=0,
+            workflow_ids=["active-workflow-2"]
+        )
+        scan_failed = ScanHistory.objects.create(
+            domain=self.domain,
+            scan_type=self.engine,
+            start_scan_date=timezone.now(),
+            scan_status=FAILED_TASK,
+            recovery_count=0,
+            workflow_ids=["failed-workflow"]
+        )
+        scan_aborted = ScanHistory.objects.create(
+            domain=self.domain,
+            scan_type=self.engine,
+            start_scan_date=timezone.now(),
+            scan_status=ABORTED_TASK,
+            recovery_count=0,
+            workflow_ids=["aborted-workflow"]
+        )
+        scan_stopped = ScanHistory.objects.create(
+            domain=self.domain,
+            scan_type=self.engine,
+            start_scan_date=timezone.now(),
+            scan_status=RUNNING_TASK,
+            recovery_count=0,
+            stop_scan_date=timezone.now(),
+            workflow_ids=["stopped-workflow"]
+        )
+
+        # Mock Temporal client to return NOT_FOUND (inactive/dead) for all except the active one
+        mock_client = MagicMock()
+        
+        def mock_get_handle(workflow_id):
+            h = MagicMock()
+            async def mock_describe():
+                if "active" in workflow_id:
+                    mock_desc = MagicMock()
+                    from temporalio.client import WorkflowExecutionStatus
+                    mock_desc.status = WorkflowExecutionStatus.RUNNING
+                    return mock_desc
+                else:
+                    raise RPCError("Workflow not found", RPCStatusCode.NOT_FOUND, "details")
+            h.describe = mock_describe
+            return h
+
+        mock_client.get_workflow_handle.side_effect = mock_get_handle
+        mock_get_client.return_value = mock_client
+
+        # Execute recovery
+        recover_stuck_scans()
+
+        # Assert only the stuck running scan is resumed
+        mock_resume_scan.assert_called_once_with(scan_running_stuck.id)
+
+        # Clean up database records
+        scan_running_stuck.delete()
+        scan_running_active.delete()
+        scan_failed.delete()
+        scan_aborted.delete()
+        scan_stopped.delete()
+
 
 class TestWorkflowStructuralInvariants(TestCase):
     """AST-level checks that enforce structural guarantees introduced by:
