@@ -403,10 +403,10 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 						dirsearch_output = f'{self.results_dir}/dirsearch_{subdomain_name}.json'
 						target_url_stripped = target_url.rstrip('/')
 						dcmd = f'{dirsearch_base_cmd} -u {target_url_stripped} --format=json -o {dirsearch_output} --no-color'
-						if proxy:
-							dcmd += f' --proxy={proxy}'
+						# if proxy:
+						#	dcmd += f' --proxy={proxy}'
 
-						dcmd = opsec.apply_stealth('dirsearch', dcmd, proxy=proxy)
+						dcmd = opsec.apply_stealth('dirsearch', dcmd) # , proxy=proxy
 
 						dirscan_ds = DirectoryScan.objects.create(
 							scanned_date=timezone.now(),
