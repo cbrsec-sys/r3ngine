@@ -21,14 +21,13 @@ echo "  Backing up '$POSTGRES_DB' to $DUMP_FILE ..."
 
 # Redirect stdout to the dump file; stderr to a separate log so it never
 # contaminates the backup content (avoids false-pass on the size check below).
-$DOCKER_COMPOSE_CMD exec -T db \
+# Use `if !` rather than checking $? after the command: set -e would exit the
+# script immediately on a non-zero return before $? is ever read.
+if ! $DOCKER_COMPOSE_CMD exec -T db \
     pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" \
     > "$DUMP_FILE" \
-    2> "$ERROR_LOG"
-PG_EXIT=$?
-
-if [ $PG_EXIT -ne 0 ]; then
-    echo "  ERROR: pg_dump failed (exit: $PG_EXIT)." >&2
+    2> "$ERROR_LOG"; then
+    echo "  ERROR: pg_dump failed." >&2
     echo "  pg_dump error output:" >&2
     cat "$ERROR_LOG" >&2
     rm -f "$DUMP_FILE" "$ERROR_LOG"
