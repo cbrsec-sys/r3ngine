@@ -1,5 +1,14 @@
 # Changelog
 
+### [v3.4.1] - 2026-06-03
+
+- **Scan Finalization & UI Timeline Fixes**:
+  - Fixed an issue where resumed scans were incorrectly marked as `FAILED` on completion due to dangling `FAILED_TASK` status entries.
+  - **Durable Scan Activity Claiming**: Refactored `_create_scan_activity` in `TemporalTaskProxy` to claim existing `ScanActivity` records by scan and name, regardless of status (e.g. claiming `FAILED_TASK` or `RUNNING_TASK` rows from prior runs on resume), eliminating duplicate timeline entries and cleanup race conditions.
+  - **Target Profiling Status**: Wrapped `TargetProfilingActivity` with `TemporalTaskProxy` to correctly transition its database status to `SUCCESS_TASK` on completion (or `FAILED_TASK` on exception).
+  - **Custom Tracking Names**: Added `db_task_name` parameter to `RunGenericTaskActivity` and `_run_task`, enabling tasks like `baddns` to run as `'subdomain_discovery'` but correctly update their corresponding `'baddns'` database rows.
+  - **Compound Task Persistence**: Updated `MarkVulnerabilityScanCompleteActivity` to use `update_or_create` instead of `get_or_create` to ensure the status of the pre-populated compound `vulnerability_scan` task is correctly updated to `SUCCESS_TASK`.
+
 ### [v3.4.0] - 2026-06-03
 
 - **Burp Suite Professional Integration Plugin**:
