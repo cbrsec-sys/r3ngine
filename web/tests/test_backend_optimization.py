@@ -62,6 +62,42 @@ class BackendOptimizationTest(TransactionTestCase):
         self.assertIn('nginx', tags)
         self.assertIn('php', tags)
 
+    def test_tech_normalization(self):
+        """Verify that version suffixes like -4-0-4, -7.0, and -v5.8 are properly stripped
+        from technology names, while names like moment-js are kept intact.
+        """
+        # List of technology tags with various version suffixes
+        techs_with_versions = [
+            'elementor-4-0-4',
+            'wordpress-7-0',
+            'woocommerce-10-7-0',
+            'parallax-js-1-0',
+            'wow-7-0',
+            'Apache/2.4.51',
+            'nginx-1.18.0',
+            'moment-js',
+        ]
+        
+        # Call the tech mapping utility
+        tags = get_nuclei_tags_from_techs(techs_with_versions)
+        
+        # Verify base tags exist and version-specific tags are stripped
+        self.assertIn('elementor', tags)
+        self.assertNotIn('elementor-4-0-4', tags)
+        self.assertIn('wordpress', tags)
+        self.assertNotIn('wordpress-7-0', tags)
+        self.assertIn('woocommerce', tags)
+        self.assertNotIn('woocommerce-10-7-0', tags)
+        self.assertIn('parallax-js', tags)
+        self.assertNotIn('parallax-js-1-0', tags)
+        self.assertIn('wow', tags)
+        self.assertNotIn('wow-7-0', tags)
+        self.assertIn('apache', tags)
+        self.assertNotIn('apache-2-4-51', tags)
+        self.assertIn('nginx', tags)
+        self.assertNotIn('nginx-1-18-0', tags)
+        self.assertIn('moment-js', tags)
+
     @patch('reNgine.tasks.get_http_urls')
     @patch('reNgine.tasks.Subdomain.objects.filter')
     @patch('reNgine.tasks.stream_command')
