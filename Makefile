@@ -9,6 +9,7 @@ COMPOSE_PREFIX_CMD := COMPOSE_DOCKER_CLI_BUILD=1
 COMPOSE_ALL_FILES := -f docker-compose.yml
 COMPOSE_DEV_FILES := -f docker-compose.dev.yml
 SERVICES          := db web proxy redis neo4j temporal temporal-python-orchestrator temporal-go-executor
+PG_VOLUME         := $(COMPOSE_PROJECT_NAME)_postgres_data
 
 # Check if 'docker compose' command is available, otherwise use 'docker-compose'
 DOCKER_COMPOSE := $(shell if command -v docker > /dev/null && docker compose version > /dev/null 2>&1; then echo "docker compose"; else echo "docker-compose"; fi)
@@ -127,7 +128,7 @@ erase:			## !! DESTRUCTIVE !! Delete ALL containers, images, volumes, build cach
 	@echo "============================================================"
 	@echo ""
 
-fullupgrade:		## Upgrade to Django 5.2 + PostgreSQL 16 + Gunicorn (rebuilds images, migrates DB safely).
+fullupgrade:		## Upgrade to Django 5.2 + PostgreSQL 16 + Gunicorn (includes automatic PG image upgrade).
 	@echo ""
 	@echo "============================================================"
 	@echo "  r3ngine FULL UPGRADE — v3.4.1"
@@ -138,28 +139,22 @@ fullupgrade:		## Upgrade to Django 5.2 + PostgreSQL 16 + Gunicorn (rebuilds imag
 	@echo ""
 	@echo "  1. Back up your PostgreSQL database to ./backups/ before"
 	@echo "     touching anything."
-	@echo "  2. Rebuild all images with the new Django 5.2 + channels 4.x"
-	@echo "     packages (no cache)."
-	@echo "  3. Apply pending database migrations safely — waits for the"
-	@echo "     database healthcheck to pass before attempting any migration."
-	@echo "  4. Verify migrations completed with zero failures before"
-	@echo "     starting the full stack."
-	@echo "  5. Switch the production web server from runserver to"
-	@echo "     Gunicorn + Uvicorn ASGI workers."
-	@echo "  6. Any in-progress scans WILL be interrupted."
+	@echo "  2. Stop all running services."
+	@echo "  3. Detect the PostgreSQL image version and upgrade the data"
+	@echo "     volume automatically if the configured image has changed"
+	@echo "     (restores from the backup created in step 1)."
+	@echo "  4. Rebuild all application images (no cache)."
+	@echo "  5. Apply pending database migrations safely."
+	@echo "  6. Verify all migrations applied before starting the stack."
+	@echo "  7. Start all services in production mode (Gunicorn + Uvicorn)."
+	@echo "  8. Any in-progress scans WILL be interrupted."
 	@echo ""
 	@echo "  YOUR DATA IS SAFE:"
 	@echo "  - A timestamped SQL dump is saved to ./backups/ BEFORE any"
 	@echo "    changes. If anything fails, restore with:"
 	@echo "    psql -U \$$POSTGRES_USER \$$POSTGRES_DB < backups/<dump>.sql"
-	@echo "  - All Docker VOLUMES are preserved (scan_results, postgres_data,"
-	@echo "    nuclei_templates, wordlist, etc.)."
-	@echo "  - Only CONTAINERS and IMAGES are rebuilt — no volume data is"
-	@echo "    deleted or modified by this script."
-	@echo ""
-	@echo "  NOTE: PostgreSQL image version in docker-compose.yml must be"
-	@echo "  updated to postgres:16-alpine separately (requires dump/restore)."
-	@echo "  See UPGRADES.md for the full PostgreSQL 16 migration procedure."
+	@echo "  - The PostgreSQL volume is only removed when a version upgrade"
+	@echo "    is detected — and only after the backup is confirmed valid."
 	@echo ""
 	@echo "  BEFORE PROCEEDING:"
 	@echo "  - Ensure you have pulled the latest code  (git pull)"
@@ -173,19 +168,26 @@ fullupgrade:		## Upgrade to Django 5.2 + PostgreSQL 16 + Gunicorn (rebuilds imag
 	  read confirm; \
 	  [ "$${confirm}" = "yes" ] || { printf "\n  Upgrade cancelled.\n\n"; exit 1; }
 	@echo ""
-	@echo "[1/7] Creating database backup..."
+	@echo "[1/8] Creating database backup..."
 	@POSTGRES_USER=${POSTGRES_USER} \
 	  POSTGRES_DB=${POSTGRES_DB} \
 	  DOCKER_COMPOSE_CMD="${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES}" \
 	  bash scripts/db_backup.sh
 	@echo ""
-	@echo "[2/7] Stopping all running services (volumes are NOT removed)..."
+	@echo "[2/8] Stopping all running services (volumes are NOT removed)..."
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} down --remove-orphans || true
 	@echo ""
-	@echo "[3/7] Rebuilding all images (no cache)..."
+	@echo "[3/8] Upgrading PostgreSQL data volume if image version changed..."
+	@POSTGRES_USER=${POSTGRES_USER} \
+	  POSTGRES_DB=${POSTGRES_DB} \
+	  DOCKER_COMPOSE_CMD="${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES}" \
+	  PG_VOLUME_NAME=${PG_VOLUME} \
+	  bash scripts/pg_upgrade.sh
+	@echo ""
+	@echo "[4/8] Rebuilding all application images (no cache)..."
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} build --no-cache ${SERVICES}
 	@echo ""
-	@echo "[4/7] Starting database and waiting for healthcheck..."
+	@echo "[5/8] Starting database and waiting for healthcheck..."
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} up -d db redis
 	@echo "  Waiting for PostgreSQL to be ready..."
 	@attempt=0; \
@@ -199,7 +201,7 @@ fullupgrade:		## Upgrade to Django 5.2 + PostgreSQL 16 + Gunicorn (rebuilds imag
 	    printf "."; sleep 2; \
 	  done; echo " ready."
 	@echo ""
-	@echo "[5/7] Applying database migrations..."
+	@echo "[6/8] Applying database migrations..."
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} run --rm \
 	  -e DEBUG=0 web python3 manage.py migrate --noinput; \
 	  MIGRATE_EXIT=$$?; \
@@ -219,10 +221,10 @@ fullupgrade:		## Upgrade to Django 5.2 + PostgreSQL 16 + Gunicorn (rebuilds imag
 	    echo "  All migrations applied successfully."; \
 	  fi
 	@echo ""
-	@echo "[6/7] Starting all services (production mode)..."
+	@echo "[7/8] Starting all services (production mode)..."
 	@DEBUG=0 ${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} up -d ${SERVICES}
 	@echo ""
-	@echo "[7/7] Verifying services are healthy (30s grace period)..."
+	@echo "[8/8] Verifying services are healthy (30s grace period)..."
 	@sleep 10
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} ps
 	@echo ""
