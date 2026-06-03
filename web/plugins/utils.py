@@ -453,20 +453,31 @@ class AtomicInstaller:
                             plugin.tools_config = tools_config
                             plugin.save()
 
-                        # Invalidate per-tool verification cache so the fresh install re-checks everything
+                        # Invalidate per-tool verification cache so the orchestrator
+                        # re-installs tools on its next startup rather than skipping them.
                         for _tool in tools_config.get('tools', []):
                             _tool_name = _tool.get('name')
                             if _tool_name:
                                 cache.delete(f"plugin_{plugin_slug}_tool_{_tool_name}_verified")
 
-                        # Trigger background installation
-                        from .tasks import install_plugin_tools
+                        # Trigger orchestrator restart via Redis so it picks up the new plugin
+                        # and installs any required tools in its own container on startup.
+                        def _restart_orchestrator():
+                            try:
+                                import redis as _redis
+                                from django.conf import settings as _settings
+                                rdb = _redis.StrictRedis(
+                                    host=_settings.REDIS_HOST,
+                                    port=_settings.REDIS_PORT,
+                                    db=0,
+                                )
+                                rdb.publish('orchestrator_control', 'restart')
+                                logger.info(f"[{plugin_slug}] Orchestrator restart triggered for tool installation.")
+                            except Exception as _e:
+                                logger.error(f"[{plugin_slug}] Failed to trigger orchestrator restart: {_e}")
+
                         transaction.on_commit(
-                            lambda: threading.Thread(
-                                target=install_plugin_tools,
-                                args=(plugin_slug,),
-                                daemon=True
-                            ).start()
+                            lambda: threading.Thread(target=_restart_orchestrator, daemon=True).start()
                         )
                     except Exception as e:
                         logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
