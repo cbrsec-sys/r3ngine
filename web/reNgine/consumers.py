@@ -10,6 +10,11 @@ logger = logging.getLogger(__name__)
 
 class StressTelemetryConsumer(AsyncWebsocketConsumer):
     async def connect(self):
+        user = self.scope.get('user')
+        if not user or not user.is_authenticated:
+            await self.close(code=4401)
+            return
+
         self.scan_id = self.scope['url_route']['kwargs']['scan_id']
         self.stream_key = f"stress:telemetry:{self.scan_id}"
         self.group_name = f"stress_test_{self.scan_id}"
@@ -100,6 +105,11 @@ class StressTelemetryConsumer(AsyncWebsocketConsumer):
 class ScanLogConsumer(AsyncWebsocketConsumer):
     """WebSocket consumer for real-time scan logs."""
     async def connect(self):
+        user = self.scope.get('user')
+        if not user or not user.is_authenticated:
+            await self.close(code=4401)
+            return
+
         self.scan_id = self.scope['url_route']['kwargs']['scan_id']
         self.stream_key = f"scan:logs:{self.scan_id}"
         self.group_name = f"scan_logs_{self.scan_id}"

@@ -497,8 +497,9 @@ TECH_TO_NUCLEI_TAGS = {
     'ollama': ['ollama'],
 }
 
-# Version string pattern — strips "Apache/2.4.51" → "apache"
-_VERSION_STRIP = re.compile(r'[/\s].*$')
+# Version string pattern — strips version suffixes starting with /, :, space or hyphen when followed by a digit or v+digit
+# e.g. "Apache/2.4.51" -> "apache", "elementor-4-0-4" -> "elementor", "wordpress-7-0" -> "wordpress"
+_VERSION_STRIP = re.compile(r'([/:\s]|-(?=\d|v\d)).*$')
 
 
 def get_nuclei_tags_from_techs(techs):
