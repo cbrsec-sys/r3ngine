@@ -337,7 +337,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 				def _run_ffuf():
 					from django.db import connection
 					try:
-						fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json -s'
+						fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json' # -s
 						fcmd += f' -x {proxy}' if proxy else ''
 						fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=proxy)
 
