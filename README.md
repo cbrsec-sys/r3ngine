@@ -1,7 +1,4 @@
 <p align="center">
-  <em>V3 Beta Release is now operational!</em>
-</p>
-<p align="center">
 <img src="frontend/public/img/banner.png" height="400px" width="520px" alt=""/>
 </p>
 
