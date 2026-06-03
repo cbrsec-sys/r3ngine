@@ -7568,8 +7568,9 @@ def resume_scan_temporal(scan_id):
 	
 	scan = ScanHistory.objects.get(id=scan_id)
 	
-	# Mark old running activities as failed if any
-	scan.scanactivity_set.filter(status__in=[RUNNING_TASK, INITIATED_TASK]).update(status=FAILED_TASK)
+	# Mark genuinely-running activities as failed; leave INITIATED rows intact so
+	# run-2 can claim them — they were never started and are not real failures.
+	scan.scanactivity_set.filter(status=RUNNING_TASK).update(status=FAILED_TASK)
 	
 	# Calculate completed tasks
 	completed_activities = scan.scanactivity_set.filter(status=SUCCESS_TASK).values_list('name', flat=True)
