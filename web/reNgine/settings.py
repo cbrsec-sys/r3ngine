@@ -77,16 +77,17 @@ DATABASES = {
         'PASSWORD': env('POSTGRES_PASSWORD'),
         'HOST': env('POSTGRES_HOST'),
         'PORT': env('POSTGRES_PORT'),
-        # 'OPTIONS':{
-        #     'sslmode':'verify-full',
-        #     'sslrootcert': os.path.join(BASE_DIR, 'ca-certificate.crt')
-        # }
+        'CONN_MAX_AGE': 60,
+        'CONN_HEALTH_CHECKS': True,
+        'OPTIONS': {
+            'sslmode': env('POSTGRES_SSLMODE', default='prefer'),
+            'sslrootcert': os.path.join(BASE_DIR, 'ca.crt'),
+        }
     }
 }
 
 # Application definition
 INSTALLED_APPS = [
-    'daphne',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -152,7 +153,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'login_required.middleware.LoginRequiredMiddleware',
+    'reNgine.middleware.LoginRequiredMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'reNgine.middleware.UserPreferencesMiddleware',
@@ -251,7 +252,6 @@ AUTH_PASSWORD_VALIDATORS = [
 LANGUAGE_CODE = 'en-us'
 TIME_ZONE = 'UTC'
 USE_I18N = True
-USE_L10N = True
 USE_TZ = True
 
 MEDIA_URL = '/media/'

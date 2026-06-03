@@ -127,31 +127,44 @@ erase:			## !! DESTRUCTIVE !! Delete ALL containers, images, volumes, build cach
 	@echo "============================================================"
 	@echo ""
 
-fullupgrade:		## REQUIRED for v3.2.0+: migrate from Celery to Temporal.
+fullupgrade:		## Upgrade to Django 5.2 + PostgreSQL 16 + Gunicorn (rebuilds images, migrates DB safely).
 	@echo ""
 	@echo "============================================================"
-	@echo "  r3ngine FULL UPGRADE — v3.2.0 (Celery → Temporal)"
+	@echo "  r3ngine FULL UPGRADE — v3.4.1"
+	@echo "  Django 5.2 LTS  |  PostgreSQL 16  |  Gunicorn + Uvicorn"
 	@echo "============================================================"
 	@echo ""
-	@echo "  This upgrade makes IRREVERSIBLE changes to your deployment:"
+	@echo "  This upgrade will:"
 	@echo ""
-	@echo "  1. All Celery and Celery Beat containers will be removed."
-	@echo "  2. Temporal workflow engine containers will be started."
-	@echo "  3. Database migrations will apply new Temporal models"
-	@echo "     and remove legacy django_celery_beat tables."
-	@echo "  4. All images will be rebuilt from scratch."
-	@echo "  5. Any in-progress scans WILL be interrupted."
+	@echo "  1. Back up your PostgreSQL database to ./backups/ before"
+	@echo "     touching anything."
+	@echo "  2. Rebuild all images with the new Django 5.2 + channels 4.x"
+	@echo "     packages (no cache)."
+	@echo "  3. Apply pending database migrations safely — waits for the"
+	@echo "     database healthcheck to pass before attempting any migration."
+	@echo "  4. Verify migrations completed with zero failures before"
+	@echo "     starting the full stack."
+	@echo "  5. Switch the production web server from runserver to"
+	@echo "     Gunicorn + Uvicorn ASGI workers."
+	@echo "  6. Any in-progress scans WILL be interrupted."
 	@echo ""
 	@echo "  YOUR DATA IS SAFE:"
+	@echo "  - A timestamped SQL dump is saved to ./backups/ BEFORE any"
+	@echo "    changes. If anything fails, restore with:"
+	@echo "    psql -U \$$POSTGRES_USER \$$POSTGRES_DB < backups/<dump>.sql"
 	@echo "  - All Docker VOLUMES are preserved (scan_results, postgres_data,"
 	@echo "    nuclei_templates, wordlist, etc.)."
 	@echo "  - Only CONTAINERS and IMAGES are rebuilt — no volume data is"
 	@echo "    deleted or modified by this script."
 	@echo ""
+	@echo "  NOTE: PostgreSQL image version in docker-compose.yml must be"
+	@echo "  updated to postgres:16-alpine separately (requires dump/restore)."
+	@echo "  See UPGRADES.md for the full PostgreSQL 16 migration procedure."
+	@echo ""
 	@echo "  BEFORE PROCEEDING:"
 	@echo "  - Ensure you have pulled the latest code  (git pull)"
 	@echo "  - Ensure no critical scans are running"
-	@echo "  - Back up your database if required"
+	@echo "  - Ensure the db service is running  (make up)"
 	@echo ""
 	@echo "  For full upgrade instructions see README.md or CHANGELOG.md"
 	@echo "============================================================"
@@ -160,30 +173,68 @@ fullupgrade:		## REQUIRED for v3.2.0+: migrate from Celery to Temporal.
 	  read confirm; \
 	  [ "$${confirm}" = "yes" ] || { printf "\n  Upgrade cancelled.\n\n"; exit 1; }
 	@echo ""
-	@echo "[1/6] Stopping all running services (volumes are NOT removed)..."
+	@echo "[1/7] Creating database backup..."
+	@POSTGRES_USER=${POSTGRES_USER} \
+	  POSTGRES_DB=${POSTGRES_DB} \
+	  DOCKER_COMPOSE_CMD="${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES}" \
+	  bash scripts/db_backup.sh
+	@echo ""
+	@echo "[2/7] Stopping all running services (volumes are NOT removed)..."
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} down --remove-orphans || true
 	@echo ""
-	@echo "[2/6] Pulling latest images and rebuilding containers (no cache)..."
+	@echo "[3/7] Rebuilding all images (no cache)..."
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} build --no-cache ${SERVICES}
 	@echo ""
-	@echo "[3/6] Starting database service..."
+	@echo "[4/7] Starting database and waiting for healthcheck..."
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} up -d db redis
-	@sleep 8
+	@echo "  Waiting for PostgreSQL to be ready..."
+	@attempt=0; \
+	  until ${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} exec -T db \
+	    pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB} > /dev/null 2>&1; do \
+	    attempt=$$((attempt + 1)); \
+	    if [ $$attempt -ge 30 ]; then \
+	      echo "  ERROR: Database did not become ready within 60s. Aborting."; \
+	      exit 1; \
+	    fi; \
+	    printf "."; sleep 2; \
+	  done; echo " ready."
 	@echo ""
-	@echo "[4/6] Applying database migrations..."
-	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} run --rm web python3 manage.py migrate --noinput
+	@echo "[5/7] Applying database migrations..."
+	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} run --rm \
+	  -e DEBUG=0 web python3 manage.py migrate --noinput; \
+	  MIGRATE_EXIT=$$?; \
+	  if [ $$MIGRATE_EXIT -ne 0 ]; then \
+	    echo ""; \
+	    echo "  ERROR: Migration failed (exit code $$MIGRATE_EXIT)."; \
+	    echo "  The database backup is at ./backups/. Investigate before retrying."; \
+	    exit $$MIGRATE_EXIT; \
+	  fi
 	@echo ""
-	@echo "[5/6] Starting all services..."
+	@echo "  Verifying all migrations are applied..."
+	@PENDING=$$(${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} run --rm \
+	  -e DEBUG=0 web python3 manage.py showmigrations --plan 2>/dev/null | grep " \[ \]" | wc -l); \
+	  if [ "$$PENDING" -gt 0 ]; then \
+	    echo "  WARNING: $$PENDING migration(s) still pending after migrate. Check manually."; \
+	  else \
+	    echo "  All migrations applied successfully."; \
+	  fi
+	@echo ""
+	@echo "[6/7] Starting all services (production mode)..."
 	@DEBUG=0 ${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} up -d ${SERVICES}
 	@echo ""
-	@echo "[6/6] Verifying services are healthy..."
-	@sleep 5
+	@echo "[7/7] Verifying services are healthy (30s grace period)..."
+	@sleep 10
 	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} ps
+	@echo ""
+	@echo "  Checking gunicorn started correctly..."
+	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} logs web --tail=20 \
+	  | grep -E "Booting worker|UvicornWorker|Starting gunicorn|ERROR" || true
 	@echo ""
 	@echo "============================================================"
 	@echo "  Full upgrade complete."
-	@echo "  Temporal UI: http://localhost:8080"
-	@echo "  r3ngine UI:  https://localhost"
+	@echo "  Temporal UI:    http://localhost:8080"
+	@echo "  r3ngine UI:     https://localhost"
+	@echo "  Database backup: ./backups/"
 	@echo "============================================================"
 	@echo ""
 
