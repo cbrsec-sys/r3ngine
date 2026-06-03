@@ -6,8 +6,8 @@ include .env
 # This for future release of Compose that will use Docker Buildkit, which is much efficient.
 COMPOSE_PREFIX_CMD := COMPOSE_DOCKER_CLI_BUILD=1
 
-COMPOSE_ALL_FILES := -f docker-compose.yml
-COMPOSE_DEV_FILES := -f docker-compose.dev.yml
+COMPOSE_ALL_FILES := -f docker/docker-compose.yml
+COMPOSE_DEV_FILES := -f docker/docker-compose.dev.yml
 SERVICES          := db web proxy redis neo4j temporal temporal-python-orchestrator temporal-go-executor
 PG_VOLUME         := $(COMPOSE_PROJECT_NAME)_postgres_data
 
@@ -20,7 +20,7 @@ $(info Using: $(shell echo "$(DOCKER_COMPOSE)"))
 .PHONY: setup certs up devup build username pull down stop restart rm logs fullupgrade erase
 
 certs:		    ## Generate certificates.
-	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} -f docker-compose.setup.yml run --rm certs
+	@${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} -f docker/docker-compose.setup.yml run --rm certs
 
 setup:			## Generate certificates.
 	@make certs
