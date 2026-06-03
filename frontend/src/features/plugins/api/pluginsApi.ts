@@ -210,3 +210,71 @@ export const useRestartOrchestrator = () => {
     },
   });
 };
+
+export const fetchPluginDocs = async (slug: string): Promise<Record<string, string>> => {
+  const { data } = await axios.get(`${API_URL}${slug}/docs/`);
+  return data;
+};
+
+export const usePluginDocs = (slug: string, enabled = false) => {
+  return useQuery({
+    queryKey: ['plugin-docs', slug],
+    queryFn: () => fetchPluginDocs(slug),
+    enabled: enabled && !!slug,
+    retry: false,
+  });
+};
+
+export interface BurpConfig {
+  api_url: string;
+  api_key: string;
+  auto_import_enabled: boolean;
+  auto_push_enabled: boolean;
+  severity_filter: string;
+}
+
+export const fetchBurpConfig = async (): Promise<BurpConfig> => {
+  const { data } = await axios.get('/api/plugins/burpsuite_integration/config/');
+  return data;
+};
+
+export const updateBurpConfig = async (config: Partial<BurpConfig>): Promise<BurpConfig> => {
+  const { data } = await axios.put('/api/plugins/burpsuite_integration/config/', config);
+  return data;
+};
+
+export const fetchBurpHealth = async (): Promise<any> => {
+  const { data } = await axios.get('/api/plugins/burpsuite_integration/health/');
+  return data;
+};
+
+export const useBurpConfig = (enabled: boolean) => {
+  return useQuery({
+    queryKey: ['burp_config_status'],
+    queryFn: fetchBurpConfig,
+    enabled: enabled,
+  });
+};
+
+export const useUpdateBurpConfig = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateBurpConfig,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['burp_config_status'] });
+      queryClient.invalidateQueries({ queryKey: ['burp_health_status'] });
+    },
+  });
+};
+
+export const useBurpHealth = (enabled: boolean) => {
+  return useQuery({
+    queryKey: ['burp_health_status'],
+    queryFn: fetchBurpHealth,
+    enabled: enabled,
+    refetchInterval: 15000, // Poll every 15s
+    retry: false,
+  });
+};
+
+

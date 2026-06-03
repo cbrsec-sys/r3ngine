@@ -1,3 +1,4 @@
+import os
 from django.conf import settings
 from django.conf.urls import url
 from django.conf.urls.static import static
@@ -24,7 +25,7 @@ urlpatterns = [
     url(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     url(r'^swagger/$', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path(
-        'admin/',
+        os.environ.get('DJANGO_ADMIN_URL', 'admin') + '/',
         admin.site.urls),
     path(
         'api/',

@@ -1,5 +1,17 @@
 # Changelog
 
+### [v3.4.0] - 2026-06-03
+
+- **Burp Suite Professional Integration Plugin**:
+  - Implemented a fully self-contained standalone integration plugin (`burpsuite_integration`) for r3ngine.
+  - **Backend Models & Schema**: Configured `BurpSuiteConfig` (singleton API connection parameters), `BurpIssue` (deduplicated local findings repository), and `BurpSyncLog` (sync history and counts) models in a clean, plugin-specific database namespace.
+  - **REST APIs**: Added REST endpoints for retrieving config, sync log history, and issues with status-filtering (`?unmatched=true`). Implemented manual match action (`POST /issues/{id}/match/`) alongside subdomain and endpoint search endpoints.
+  - **Bidirectional Temporal Workflows**: Structured sync into a two-phase architecture: Phase 1 (`run_burp_import_activity`) fetches and registers raw findings; Phase 2 (`run_burp_correlate_activity`) maps findings to existing subdomain/endpoint targets and creates/links core r3ngine `Vulnerability` records. Created `run_burp_push_activity` to send r3ngine targets back to Burp scope.
+  - **Module Federation UI**: Engineered a complete React + MUI dashboard containing a metrics overview (HSL glowing KPI cards), a filterable issues grid with drawer details and a two-stage manual match dialog, a historical timeline, and a live config tester.
+  - **Connection Health Badge**: Added a pulsing `HealthDot` status indicator to the plugin card and settings panel checking live connection health of the Burp REST API.
+  - **Embedded Documentation**: Bound a detailed documentation markdown modal directly into the plugin card's doc icon.
+  - **Build & Compatibility Fixes**: Fixed a Unicode print encoding error in `build_plugins.py` on Windows (replacing `→` with ASCII `->`) and resolved a nested tag JSX mismatch in the card configuration.
+
 ### [v3.3.0] - 2026-05-31
 
 - **URL Deduplication After fetch_url**:

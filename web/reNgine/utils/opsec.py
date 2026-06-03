@@ -446,9 +446,11 @@ class BruteForceOrchestrator:
             wrapped_cmd, conf_path = self.proxy_manager.wrap_command(cmd, proxy=proxy)
             
             try:
-                self.logger.info(f"Executing Brutus for {c.target} ({protocol}): {wrapped_cmd}")
+                self.logger.info(f"Executing Brutus for {c.target} ({protocol})")
                 output_file = f"{self.results_dir}/{protocol}_{c.id}_results.json"
-                subprocess.run(f"{wrapped_cmd} > {output_file}", shell=True, timeout=1200)
+                import shlex
+                with open(output_file, 'w') as fout:
+                    subprocess.run(shlex.split(wrapped_cmd), shell=False, stdout=fout, timeout=1200)
                 
                 if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
                     results = self._parse_brutus_output(output_file, protocol)

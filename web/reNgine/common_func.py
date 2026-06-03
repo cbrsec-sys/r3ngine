@@ -3,6 +3,8 @@ import socket
 import json
 import os
 import pickle
+import subprocess
+from reNgine.validators import validate_external_url
 import random
 import shutil
 import traceback
@@ -925,8 +927,11 @@ def get_cms_details(url):
 	"""
 	# this function will fetch cms details using cms_detector
 	response = {}
-	cms_detector_command = f'python3 /usr/src/github/CMSeeK/cmseek.py --random-agent --batch --follow-redirect -u {url}'
-	os.system(cms_detector_command)
+	subprocess.run(
+		['python3', '/usr/src/github/CMSeeK/cmseek.py',
+		 '--random-agent', '--batch', '--follow-redirect', '-u', url],
+		check=False
+	)
 
 	response['status'] = False
 	response['message'] = 'Could not detect CMS!'
@@ -1002,6 +1007,10 @@ def send_slack_message(message):
 	if not do_send:
 		return
 	hook_url = notif.slack_hook_url
+	try:
+		validate_external_url(hook_url)
+	except ValueError:
+		return
 	requests.post(url=hook_url, data=json.dumps(message), headers=headers)
 
 def send_lark_message(message):
@@ -1020,6 +1029,10 @@ def send_lark_message(message):
 	if not do_send:
 		return
 	hook_url = notif.lark_hook_url
+	try:
+		validate_external_url(hook_url)
+	except ValueError:
+		return
 	requests.post(url=hook_url, data=json.dumps(message), headers=headers)
 
 def send_discord_message(
@@ -1051,21 +1064,27 @@ def send_discord_message(
 	notif = Notification.objects.first()
 	if not (notif and notif.send_to_discord and notif.discord_hook_url):
 		return False
+	try:
+		validate_external_url(notif.discord_hook_url)
+	except ValueError:
+		return False
 
 	# If fields and title, use an embed
 	use_discord_embed = fields and title
 	if use_discord_embed:
 		message = '' # no need for message in embeds
 
-	# Check for cached response in cache, using title as key
-	cached_response = DISCORD_WEBHOOKS_CACHE.get(title) if title else None
-	if cached_response:
-		cached_response = pickle.loads(cached_response)
+	# Check for cached response in cache, using title as key (stored as JSON message ID)
+	cached_msg_id = DISCORD_WEBHOOKS_CACHE.get(title) if title else None
 
-	# Get existing webhook if found in cache
-	cached_webhook = DISCORD_WEBHOOKS_CACHE.get(title + '_webhook') if title else None
-	if cached_webhook:
-		webhook = pickle.loads(cached_webhook)
+	# Get existing webhook if found in cache (stored as JSON dict)
+	cached_webhook_data = DISCORD_WEBHOOKS_CACHE.get(title + '_webhook') if title else None
+	if cached_webhook_data:
+		wh_dict = json.loads(cached_webhook_data)
+		webhook = DiscordWebhook(
+			url=wh_dict.get('url', notif.discord_hook_url),
+			rate_limit_retry=False,
+			content=wh_dict.get('content', message))
 		webhook.remove_embeds()
 	else:
 		webhook = DiscordWebhook(
@@ -1073,11 +1092,18 @@ def send_discord_message(
 			rate_limit_retry=False,
 			content=message)
 
-	# Get existing embed if found in cache
+	# Get existing embed if found in cache (stored as JSON dict)
 	embed = None
-	cached_embed = DISCORD_WEBHOOKS_CACHE.get(title + '_embed') if title else None
-	if cached_embed:
-		embed = pickle.loads(cached_embed)
+	cached_embed_data = DISCORD_WEBHOOKS_CACHE.get(title + '_embed') if title else None
+	if cached_embed_data:
+		embed_dict = json.loads(cached_embed_data)
+		embed = DiscordEmbed(title=embed_dict.get('title', title))
+		if embed_dict.get('color'):
+			embed.set_color(embed_dict['color'])
+		if embed_dict.get('description'):
+			embed.set_description(embed_dict['description'])
+		for field in embed_dict.get('fields', []):
+			embed.add_embed_field(name=field['name'], value=field['value'], inline=field.get('inline', False))
 	elif use_discord_embed:
 		embed = DiscordEmbed(title=title)
 
@@ -1120,9 +1146,17 @@ def send_discord_message(
 
 		webhook.add_embed(embed)
 
-		# Add webhook and embed objects to cache, so we can pick them up later
-		DISCORD_WEBHOOKS_CACHE.set(title + '_webhook', pickle.dumps(webhook))
-		DISCORD_WEBHOOKS_CACHE.set(title + '_embed', pickle.dumps(embed))
+		# Cache webhook and embed data as JSON (never pickle)
+		DISCORD_WEBHOOKS_CACHE.set(title + '_webhook', json.dumps({
+			'url': webhook.url,
+			'content': webhook.content,
+		}))
+		DISCORD_WEBHOOKS_CACHE.set(title + '_embed', json.dumps({
+			'title': embed.title if hasattr(embed, 'title') else title,
+			'color': embed.color if hasattr(embed, 'color') else None,
+			'description': embed.description if hasattr(embed, 'description') else None,
+			'fields': embed.fields if hasattr(embed, 'fields') else [],
+		}))
 
 	# Add files to webhook
 	if files:
@@ -1131,13 +1165,18 @@ def send_discord_message(
 				content = f.read()
 			webhook.add_file(content, name)
 
-	# Edit webhook if it already existed, otherwise send new webhook
-	if cached_response:
-		response = webhook.edit(cached_response)
+	# Edit webhook if it already existed (using cached message ID), otherwise send new
+	if cached_msg_id:
+		webhook.id = cached_msg_id
+		response = webhook.edit(webhook)
 	else:
 		response = webhook.execute()
 		if use_discord_embed and response.status_code == 200:
-			DISCORD_WEBHOOKS_CACHE.set(title, pickle.dumps(response))
+			try:
+				msg_id = response.json().get('id', '')
+				DISCORD_WEBHOOKS_CACHE.set(title, msg_id)
+			except Exception:
+				pass
 
 	# Get status code
 	if response.status_code == 429:

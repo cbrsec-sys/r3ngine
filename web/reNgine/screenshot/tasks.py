@@ -1,6 +1,9 @@
 import logging
 import os
-from startScan.models import Screenshot, Subdomain, ScanHistory
+from urllib.parse import urlparse
+from startScan.models import Screenshot, Subdomain, ScanHistory, EndPoint, Command
+from django.utils import timezone
+from django.conf import settings
 from .capture import run_capture
 
 # Playwright's sync API uses an event loop under the hood, 
@@ -9,60 +12,106 @@ os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
 logger = logging.getLogger(__name__)
 
-from django.conf import settings
-
 def take_screenshot_and_save(subdomain_id, scan_id, results_dir=None, activity_id=None):
     """
-    Orchestrates the capture and database persistence for a single subdomain.
+    Orchestrates the capture and database persistence of screenshots for a subdomain.
+    Queries all unique endpoints for the subdomain and captures a screenshot for each base URL.
+
+    Args:
+        subdomain_id (int): The ID of the Subdomain object in the database.
+        scan_id (int): The ID of the ScanHistory object in the database.
+        results_dir (str, optional): The directory where results are stored. Defaults to settings.RENGINE_RESULTS.
+        activity_id (int, optional): The ID of the ScanActivity executing this task. Defaults to None.
+
+    Returns:
+        bool: True if at least one screenshot was successfully captured and saved, False otherwise.
     """
     if not results_dir:
         results_dir = settings.RENGINE_RESULTS
-    from startScan.models import Command
-    from django.utils import timezone
     try:
         subdomain = Subdomain.objects.get(id=subdomain_id)
         scan = ScanHistory.objects.get(id=scan_id)
         
-        # Determine the best URL to capture
-        url = subdomain.http_url
-        if not url:
-            # If no URL discovered yet, try to guess or use the name
-            url = f"http://{subdomain.name}"
-            
-        logger.info(f"Processing screenshot for {url} (Subdomain ID: {subdomain_id})")
+        # 1. Gather all endpoints for this subdomain in this scan
+        endpoints = EndPoint.objects.filter(subdomain=subdomain, scan_history=scan)
         
-        # Record command for timeline
-        Command.objects.create(
-            command=f"Playwright: screenshot {url}",
-            time=timezone.now(),
-            scan_history_id=scan_id,
-            activity_id=activity_id
-        )
+        # 2. Extract unique base URLs (scheme://netloc)
+        urls_to_capture = set()
+        for ep in endpoints:
+            if ep.http_url:
+                try:
+                    parsed = urlparse(ep.http_url)
+                    if parsed.scheme and parsed.netloc:
+                        base_url = f"{parsed.scheme}://{parsed.netloc}"
+                        urls_to_capture.add(base_url)
+                except Exception as parse_err:
+                    logger.debug(f"Failed to parse endpoint URL {ep.http_url}: {parse_err}")
 
-        capture_result = run_capture(url, scan_id, results_dir)
+        # 3. Add subdomain's main http_url if present
+        if subdomain.http_url:
+            try:
+                parsed = urlparse(subdomain.http_url)
+                if parsed.scheme and parsed.netloc:
+                    urls_to_capture.add(f"{parsed.scheme}://{parsed.netloc}")
+                else:
+                    urls_to_capture.add(subdomain.http_url)
+            except Exception:
+                urls_to_capture.add(subdomain.http_url)
+
+        # 4. Fallback to guessing if no URLs discovered
+        if not urls_to_capture:
+            urls_to_capture.add(f"http://{subdomain.name}")
+            urls_to_capture.add(f"https://{subdomain.name}")
+
+        # 5. Cap to a maximum of 10 unique base URLs to prevent resource thrashing
+        max_screenshots = int(os.getenv("MAX_SCREENSHOTS_PER_SUBDOMAIN", 10))
+        target_urls = sorted(list(urls_to_capture))[:max_screenshots]
         
-        # Save to database if we got at least a screenshot or it was a success
-        if capture_result["screenshot_path"]:
-            Screenshot.objects.create(
-                subdomain=subdomain,
-                scan_history=scan,
-                url=url,
-                title=capture_result["title"],
-                status_code=capture_result["status_code"],
-                screenshot_path=capture_result["screenshot_path"],
-                html_path=capture_result["html_path"],
-                response_headers=capture_result.get("response_headers", {}),
-                tags=capture_result.get("tags", [])
-            )
-            
-            # Legacy support: update the screenshot_path field on Subdomain model
-            subdomain.screenshot_path = capture_result["screenshot_path"]
-            subdomain.save()
-            
-            logger.info(f"Successfully saved screenshot for {subdomain.name}")
+        logger.info(f"Processing {len(target_urls)} screenshot(s) for subdomain {subdomain.name} (ID: {subdomain_id})")
+        
+        success_count = 0
+        first_successful_path = None
+
+        for url in target_urls:
+            try:
+                logger.info(f"Capturing screenshot for {url} (Subdomain ID: {subdomain_id})")
+                # Record command for timeline
+                Command.objects.create(
+                    command=f"Playwright: screenshot {url}",
+                    time=timezone.now(),
+                    scan_history_id=scan_id,
+                    activity_id=activity_id
+                )
+
+                capture_result = run_capture(url, scan_id, results_dir)
+                
+                # Save to database if we got at least a screenshot
+                if capture_result["screenshot_path"]:
+                    Screenshot.objects.create(
+                        subdomain=subdomain,
+                        scan_history=scan,
+                        url=url,
+                        title=capture_result["title"],
+                        status_code=capture_result["status_code"],
+                        screenshot_path=capture_result["screenshot_path"],
+                        html_path=capture_result["html_path"],
+                        response_headers=capture_result.get("response_headers", {}),
+                        tags=capture_result.get("tags", [])
+                    )
+                    success_count += 1
+                    if not first_successful_path:
+                        first_successful_path = capture_result["screenshot_path"]
+                    logger.info(f"Successfully saved screenshot for {url}")
+                else:
+                    logger.warning(f"No screenshot captured for {url}")
+            except Exception as capture_err:
+                logger.error(f"Error capturing screenshot for {url}: {str(capture_err)}")
+
+        if first_successful_path:
+            # Update the subdomain's legacy path field with the first success
+            subdomain.screenshot_path = first_successful_path
+            subdomain.save(update_fields=['screenshot_path'])
             return True
-        else:
-            logger.warning(f"No screenshot captured for {subdomain.name}")
             
     except Subdomain.DoesNotExist:
         logger.error(f"Subdomain with ID {subdomain_id} does not exist.")
