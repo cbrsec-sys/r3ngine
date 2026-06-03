@@ -3765,6 +3765,9 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	formatted_headers = ' '.join(f'-H "{header}"' for header in custom_headers)
 	if formatted_headers:
 		cmd += f' {formatted_headers}'
+	cmd += f' '
+	if 'http' in proxy:
+		cmd += f' -proxy {proxy}' 
 	cmd += f' -l {input_path}'
 	cmd += f' -c {str(concurrency)}' if concurrency > 0 else ''
 
