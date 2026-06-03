@@ -5,6 +5,15 @@ from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
 )
+from rest_framework.throttling import AnonRateThrottle
+
+
+class AuthRateThrottle(AnonRateThrottle):
+    rate = '5/min'
+
+
+class ThrottledTokenObtainPairView(TokenObtainPairView):
+    throttle_classes = [AuthRateThrottle]
 
 from .views import *
 from .dashboard_views import DashboardAPIView, CWEInfoAPIView
@@ -446,7 +455,7 @@ urlpatterns = [
     ),
     path(
         'auth/token/',
-        TokenObtainPairView.as_view(),
+        ThrottledTokenObtainPairView.as_view(),
         name='token_obtain_pair'
     ),
     path(

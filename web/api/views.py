@@ -1,6 +1,7 @@
 import re
 import socket
 import logging
+import subprocess
 # threading.Thread - retained for migration test checks
 import threading
 import requests
@@ -939,8 +940,7 @@ class WafDetector(APIView):
 			response['message'] = 'Invalid Domain/URL provided!'
 			return Response(response)
 		
-		wafw00f_command = f'wafw00f {url}'
-		_, output = run_command(wafw00f_command, shell=True, remove_ansi_sequence=True)
+		_, output = run_command(['wafw00f', url], shell=False, remove_ansi_sequence=True)
 		regex = r"behind (.*?) WAF"
 		group = re.search(regex, output)
 		if group:
@@ -1282,9 +1282,11 @@ class ToggleSubdomainImportantStatus(APIView):
 
 		response = {'status': False, 'message': 'No subdomain_id provided'}
 
-		name = Subdomain.objects.get(id=subdomain_id)
-		name.is_important = not name.is_important
-		name.save()
+		subdomain = Subdomain.objects.filter(id=subdomain_id).first()
+		if not subdomain:
+			return Response({'status': False, 'message': 'Subdomain not found'})
+		subdomain.is_important = not subdomain.is_important
+		subdomain.save()
 
 		response = {'status': True}
 
@@ -1498,24 +1500,19 @@ class DeleteMultipleRows(APIView):
 		data = req.data
 
 		try:
+			row_ids = [int(r) for r in data.get('rows', [])]
 			if data['type'] == 'subscan':
-				for row in data['rows']:
-					SubScan.objects.get(id=row).delete()
+				SubScan.objects.filter(id__in=row_ids).delete()
 			elif data['type'] == 'organization':
-				for row in data['rows']:
-					Organization.objects.get(id=row).delete()
+				Organization.objects.filter(id__in=row_ids).delete()
 			elif data['type'] == 'scan_engine':
-				for row in data['rows']:
-					EngineType.objects.get(id=row).delete()
+				EngineType.objects.filter(id__in=row_ids).delete()
 			elif data['type'] == 'wordlist':
-				for row in data['rows']:
-					Wordlist.objects.get(id=row).delete()
+				Wordlist.objects.filter(id__in=row_ids).delete()
 			elif data['type'] == 'target':
-				for row in data['rows']:
-					Domain.objects.get(id=row).delete()
+				Domain.objects.filter(id__in=row_ids).delete()
 			elif data['type'] == 'scan_history':
-				for row in data['rows']:
-					ScanHistory.objects.get(id=row).delete()
+				ScanHistory.objects.filter(id__in=row_ids).delete()
 			response = True
 		except Exception as e:
 			response = False
@@ -1571,12 +1568,18 @@ class UploadWordlist(APIView):
 			}, status=status.HTTP_400_BAD_REQUEST)
 
 		try:
+			safe_short_name = re.sub(r'[^a-zA-Z0-9_\-]', '', short_name)
+			if not safe_short_name:
+				return Response({'status': False, 'message': 'Invalid short_name'}, status=status.HTTP_400_BAD_REQUEST)
+
 			wordlist_content = upload_file.read().decode('UTF-8', "ignore")
 			wordlist_dir = '/usr/src/wordlist/'
 			if not os.path.exists(wordlist_dir):
 				os.makedirs(wordlist_dir)
 
-			file_path = os.path.join(wordlist_dir, f"{short_name}.txt")
+			file_path = os.path.realpath(os.path.join(wordlist_dir, f"{safe_short_name}.txt"))
+			if not file_path.startswith(os.path.realpath(wordlist_dir) + os.sep):
+				return Response({'status': False, 'message': 'Invalid path'}, status=status.HTTP_400_BAD_REQUEST)
 			with open(file_path, 'w') as f:
 				f.write(wordlist_content)
 
@@ -1921,8 +1924,8 @@ class DeleteSubdomain(APIView):
 
 	def post(self, request):
 		req = self.request
-		for id in req.data['subdomain_ids']:
-			Subdomain.objects.get(id=id).delete()
+		ids = [int(i) for i in req.data.get('subdomain_ids', [])]
+		Subdomain.objects.filter(id__in=ids).delete()
 		return Response({'status': True})
 
 
@@ -1932,8 +1935,8 @@ class DeleteVulnerability(APIView):
 
 	def post(self, request):
 		req = self.request
-		for id in req.data['vulnerability_ids']:
-			Vulnerability.objects.get(id=id).delete()
+		ids = [int(i) for i in req.data.get('vulnerability_ids', [])]
+		Vulnerability.objects.filter(id__in=ids).delete()
 		return Response({'status': True})
 
 
@@ -2479,11 +2482,10 @@ class CMSDetector(APIView):
 		try:
 			# response = get_cms_details(url)
 			response = {}
-			cms_detector_command = f'python3 /usr/src/github/CMSeeK/cmseek.py'
-			cms_detector_command += ' --random-agent --batch --follow-redirect'
-			cms_detector_command += f' -u {url}'
-
-			_, output = run_command(cms_detector_command, shell=True, remove_ansi_sequence=True)
+			_, output = run_command(
+				['python3', '/usr/src/github/CMSeeK/cmseek.py',
+				 '--random-agent', '--batch', '--follow-redirect', '-u', url],
+				shell=False, remove_ansi_sequence=True)
 
 			response['message'] = 'Could not detect CMS!'
 

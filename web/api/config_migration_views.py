@@ -1,4 +1,5 @@
 import os
+import re
 import io
 import json
 import zipfile
@@ -45,6 +46,9 @@ SINGLETON_MODELS = (
     InterestingLookupModel, Notification, Proxy, OpSec, Hackerone,
     VulnerabilityReportSetting
 )
+
+# Only these model classes may be deserialized during config import
+_ALLOWED_IMPORT_MODELS = frozenset(DASHBOARD_MODELS + SCANENGINE_MODELS)
 
 class ExportConfig(APIView):
     permission_classes = [IsAuthenticated, HasPermission]
@@ -124,15 +128,19 @@ class ImportConfig(APIView):
                 if not os.path.exists(wordlist_dir):
                     os.makedirs(wordlist_dir)
 
+                safe_wordlist_dir = os.path.realpath(wordlist_dir)
                 for file_info in zip_file.infolist():
                     if file_info.filename.startswith('wordlists/') and file_info.filename.endswith('.txt'):
                         filename = os.path.basename(file_info.filename)
-                        if filename:
-                            file_path = os.path.join(wordlist_dir, filename)
-                            # Only overwrite wordlists if overwrite_existing is true, or if file doesn't exist
-                            if overwrite_existing or not os.path.exists(file_path):
-                                with open(file_path, 'wb') as f:
-                                    f.write(zip_file.read(file_info.filename))
+                        if not filename or not re.fullmatch(r'[a-zA-Z0-9_\-\.]+\.txt', filename):
+                            continue
+                        file_path = os.path.realpath(os.path.join(wordlist_dir, filename))
+                        if not file_path.startswith(safe_wordlist_dir + os.sep):
+                            continue
+                        # Only overwrite wordlists if overwrite_existing is true, or if file doesn't exist
+                        if overwrite_existing or not os.path.exists(file_path):
+                            with open(file_path, 'wb') as f:
+                                f.write(zip_file.read(file_info.filename))
 
                 # 4. Restore Spiderfoot and theHarvester Tool Configs
                 for file_info in zip_file.infolist():
@@ -175,6 +183,9 @@ class ImportConfig(APIView):
                     json_str = json.dumps([obj_data])
                     for deserialized_obj in deserialize('json', json_str):
                         model_class = type(deserialized_obj.object)
+                        if model_class not in _ALLOWED_IMPORT_MODELS:
+                            print(f"Skipping disallowed model type during import: {model_class.__name__}")
+                            continue
                         
                         if model_class in SINGLETON_MODELS:
                             existing_obj = model_class.objects.first()

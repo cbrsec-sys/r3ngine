@@ -27,14 +27,25 @@ class PluginViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated()]
         return [IsAdminUser()]
     
+    MAX_PLUGIN_UPLOAD_BYTES = 50 * 1024 * 1024  # 50 MB
+
     @action(detail=False, methods=['post'], url_path='upload')
     def upload_plugin(self, request):
         if 'file' not in request.FILES:
             return Response({'error': 'No file uploaded'}, status=status.HTTP_400_BAD_REQUEST)
 
         zip_file = request.FILES['file']
+
+        if zip_file.size > self.MAX_PLUGIN_UPLOAD_BYTES:
+            return Response({'error': 'File too large (max 50 MB)'}, status=status.HTTP_400_BAD_REQUEST)
+
+        header = zip_file.read(4)
+        zip_file.seek(0)
+        if header[:2] != b'PK':
+            return Response({'error': 'File must be a valid ZIP archive'}, status=status.HTTP_400_BAD_REQUEST)
+
         PluginManager.ensure_dirs()
-        temp_zip_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, f'upload_{uuid.uuid4().hex[:8]}_{zip_file.name}')
+        temp_zip_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, f'upload_{uuid.uuid4().hex[:8]}.zip')
 
         with open(temp_zip_path, 'wb+') as destination:
             for chunk in zip_file.chunks():
@@ -104,6 +115,31 @@ class PluginViewSet(viewsets.ModelViewSet):
                     'components': ui_config # Should contain list of {name, file, type}
                 })
         return Response(registry_data)
+
+    @action(detail=True, methods=['get'], url_path='docs')
+    def get_docs(self, request, slug=None):
+        """
+        GET /api/plugins/{slug}/docs/
+        Reads the markdown files in plugins_data/{slug}/docs/ and returns them.
+        """
+        plugin = self.get_object()
+        docs_dir = os.path.join(PluginManager.BASE_PLUGINS_DIR, plugin.slug, 'docs')
+        if not os.path.exists(docs_dir):
+            return Response({'error': 'Documentation not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        docs = {}
+        for file in os.listdir(docs_dir):
+            if file.endswith('.md'):
+                try:
+                    with open(os.path.join(docs_dir, file), 'r', encoding='utf-8') as f:
+                        docs[file] = f.read()
+                except Exception as e:
+                    logger.error(f"Failed to read doc file {file}: {e}")
+
+        if not docs:
+            return Response({'error': 'No markdown files found'}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(docs)
 
     @action(detail=False, methods=['get'], url_path='marketplace')
     def marketplace(self, request):
