@@ -56,6 +56,9 @@ fi
 echo "Copying Auth Wordlists"
 cp -r /usr/src/app/wordlist/auth/* /usr/src/wordlist/auth/
 
+# SMTP username enumeration wordlist
+cp /usr/src/app/wordlist/smtp-usernames.txt /usr/src/wordlist/smtp-usernames.txt
+
 # vulscan (nmap script)
 if [ ! -d "/usr/src/github/scipag_vulscan" ]; then
   echo "Cloning Nmap Vulscan script"
