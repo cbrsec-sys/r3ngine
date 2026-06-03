@@ -15,6 +15,7 @@ import {
   Paper,
   Divider,
   useTheme,
+  alpha,
   CircularProgress,
   Tooltip as MuiTooltip,
   List,
@@ -75,13 +76,29 @@ import { AttackSurfaceTab } from '../../scans/components/AttackSurfaceTab';
 
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
+  const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
+
+  const getThemeColor = (neonColor: string) => {
+    if (!isLight) return neonColor;
+    switch (neonColor) {
+      case '#ff003c': return '#dc2626'; // Darker red
+      case '#ff9f00': return '#d97706'; // Darker amber
+      case '#fffc00': return '#b45309'; // Darker yellow
+      case '#00ff62': return '#16a34a'; // Darker green
+      case '#00f3ff': return '#0284c7'; // Darker cyan
+      case '#7000ff': return '#4f46e5'; // Darker indigo
+      default: return neonColor;
+    }
+  };
+
   const configs: any = {
-    4: { label: 'CRITICAL', color: '#ff003c' },
-    3: { label: 'HIGH', color: '#ff9f00' },
-    2: { label: 'MEDIUM', color: '#fffc00' },
-    1: { label: 'LOW', color: '#00ff62' },
-    0: { label: 'INFO', color: '#00f3ff' },
-    [-1]: { label: 'UNKNOWN', color: '#7000ff' }
+    4: { label: 'CRITICAL', color: getThemeColor('#ff003c') },
+    3: { label: 'HIGH', color: getThemeColor('#ff9f00') },
+    2: { label: 'MEDIUM', color: getThemeColor('#fffc00') },
+    1: { label: 'LOW', color: getThemeColor('#00ff62') },
+    0: { label: 'INFO', color: getThemeColor('#00f3ff') },
+    [-1]: { label: 'UNKNOWN', color: getThemeColor('#7000ff') }
   };
   const config = configs[severity] || configs[-1];
   return (
@@ -90,8 +107,8 @@ const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
       px: 1,
       py: 0.2,
       borderRadius: 0.5,
-      bgcolor: `${config.color}20`,
-      border: `1px solid ${config.color}50`,
+      bgcolor: isLight ? `${config.color}15` : `${config.color}20`,
+      border: `1px solid ${isLight ? config.color : `${config.color}50`}`,
       color: config.color,
       fontSize: '0.6rem',
       fontWeight: 900
@@ -107,12 +124,19 @@ export const TargetSummary = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
   const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
+
+  const cPrimary = isLight ? theme.palette.primary.main : '#00f3ff';
+  const cGreen = isLight ? '#16a34a' : '#00ff62';
+  const cYellow = isLight ? '#b45309' : '#fffc00';
+  const cRed = isLight ? '#dc2626' : '#ff003c';
+  const cPurple = isLight ? '#4f46e5' : '#7000ff';
 
   if (isLoading) {
     return (
       <Box sx={{ height: '80vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-        <CircularProgress size={60} thickness={2} sx={{ color: '#00f3ff' }} />
-        <Typography sx={{ color: '#00f3ff', fontFamily: 'Orbitron', letterSpacing: 4, fontSize: '0.8rem' }}>
+        <CircularProgress size={60} thickness={2} sx={{ color: cPrimary }} />
+        <Typography sx={{ color: cPrimary, fontFamily: 'Orbitron', letterSpacing: 4, fontSize: '0.8rem' }}>
           BOOTING SYSTEM CORE...
         </Typography>
       </Box>
@@ -150,28 +174,28 @@ export const TargetSummary = () => {
         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           <TacticalPanel title="Scan Timeline" icon={<Activity size={14} />}>
             <Box sx={{ p: 2 }}>
-              <Typography component="div" sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.5)', mb: 2 }}>
-                Target <Chip label={data.target_info.name} size="small" sx={{ height: 16, fontSize: '0.6rem', bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} /> has been scanned <b>{data.scan_count}</b> times.
+              <Typography component="div" sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary, mb: 2 }}>
+                Target <Chip label={data.target_info.name} size="small" sx={{ height: 16, fontSize: '0.6rem', bgcolor: alpha(cPrimary, 0.1), color: cPrimary }} /> has been scanned <b>{data.scan_count}</b> times.
               </Typography>
               <List sx={{ p: 0 }}>
                 {data.recent_scans?.map((scan: any) => (
-                  <Box key={scan.id} sx={{ mb: 2, pl: 2, borderLeft: '2px solid rgba(0, 243, 255, 0.2)', position: 'relative' }}>
-                    <Box sx={{ position: 'absolute', left: -5, top: 0, width: 8, height: 8, borderRadius: '50%', bgcolor: '#00f3ff' }} />
+                  <Box key={scan.id} sx={{ mb: 2, pl: 2, borderLeft: `2px solid ${alpha(cPrimary, 0.2)}`, position: 'relative' }}>
+                    <Box sx={{ position: 'absolute', left: -5, top: 0, width: 8, height: 8, borderRadius: '50%', bgcolor: cPrimary }} />
                     <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#fff' }}>{scan.engine_name}</Typography>
+                      <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: theme.palette.text.primary }}>{scan.engine_name}</Typography>
                       <Chip
                         label={scan.scan_status === 2 ? 'Completed' : 'Scanning'}
                         size="small"
-                        sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: scan.scan_status === 2 ? 'rgba(0, 255, 98, 0.1)' : 'rgba(0, 243, 255, 0.1)', color: scan.scan_status === 2 ? '#00ff62' : '#00f3ff' }}
+                        sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: scan.scan_status === 2 ? alpha(cGreen, 0.1) : alpha(cPrimary, 0.1), color: scan.scan_status === 2 ? cGreen : cPrimary }}
                       />
                     </Stack>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block', mb: 1 }}>{scan.completed_ago}</Typography>
+                    <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', mb: 1 }}>{scan.completed_ago}</Typography>
                     <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                      <Typography sx={{ fontSize: '0.7rem', color: '#00f3ff', fontWeight: 700 }}>{scan.subdomain_count} Subdomains Discovered</Typography>
+                      <Typography sx={{ fontSize: '0.7rem', color: cPrimary, fontWeight: 700 }}>{scan.subdomain_count} Subdomains Discovered</Typography>
                       {scan.subdomain_diff !== 0 && (
                         <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center' }}>
-                          {scan.subdomain_diff > 0 ? <ChevronUp size={12} color="#00ff62" /> : <ChevronDown size={12} color="#ff003c" />}
-                          <Typography sx={{ fontSize: '0.65rem', fontWeight: 900, color: scan.subdomain_diff > 0 ? '#00ff62' : '#ff003c' }}>{Math.abs(scan.subdomain_diff)}</Typography>
+                          {scan.subdomain_diff > 0 ? <ChevronUp size={12} color={cGreen} /> : <ChevronDown size={12} color={cRed} />}
+                          <Typography sx={{ fontSize: '0.65rem', fontWeight: 900, color: scan.subdomain_diff > 0 ? cGreen : cRed }}>{Math.abs(scan.subdomain_diff)}</Typography>
                         </Stack>
                       )}
                     </Stack>
@@ -188,11 +212,11 @@ export const TargetSummary = () => {
               <Box sx={{ 
                 px: 1, 
                 py: 0.2, 
-                bgcolor: 'rgba(112, 0, 255, 0.15)', 
-                border: '1px solid rgba(112, 0, 255, 0.3)', 
+                bgcolor: alpha(cPurple, 0.15), 
+                border: `1px solid ${alpha(cPurple, 0.3)}`, 
                 borderRadius: 0.5 
               }}>
-                <Typography sx={{ fontSize: '0.65rem', fontWeight: 900, color: '#7000ff' }}>{data.subscans?.length || 0}</Typography>
+                <Typography sx={{ fontSize: '0.65rem', fontWeight: 900, color: cPurple }}>{data.subscans?.length || 0}</Typography>
               </Box>
             }
           >
@@ -202,29 +226,29 @@ export const TargetSummary = () => {
                   <Box 
                     key={scan.id} 
                     sx={{ 
-                      bgcolor: 'rgba(255, 255, 255, 0.02)', 
-                      border: '1px solid rgba(255, 255, 255, 0.05)', 
+                      bgcolor: alpha(theme.palette.text.primary, 0.02), 
+                      border: `1px solid ${theme.palette.divider}`, 
                       borderRadius: 1.5, 
                       overflow: 'hidden'
                     }}
                   >
                     {/* Item Header */}
-                    <Box sx={{ bgcolor: 'rgba(0, 243, 255, 0.08)', px: 1.5, py: 1, borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>
-                      <Typography sx={{ fontSize: '0.5rem', fontWeight: 720, color: '#00f3ff', textTransform: 'uppercase', letterSpacing: 1, opacity: 0.8 }}>
+                    <Box sx={{ bgcolor: alpha(cPrimary, 0.08), px: 1.5, py: 1, borderBottom: `1px solid ${alpha(cPrimary, 0.1)}` }}>
+                      <Typography sx={{ fontSize: '0.5rem', fontWeight: 720, color: cPrimary, textTransform: 'uppercase', letterSpacing: 1, opacity: 0.8 }}>
                         {(scan.engine || scan.type || 'SCAN').replace(/_/g, ' ')} ON
                       </Typography>
-                      <Typography sx={{ fontSize: '0.65rem', fontWeight: 820, color: '#00f3ff', fontFamily: 'Orbitron' }}>
+                      <Typography sx={{ fontSize: '0.65rem', fontWeight: 820, color: cPrimary, fontFamily: 'Orbitron' }}>
                         {(scan.subdomain_name || data.target_info.name).toUpperCase()}
                       </Typography>
                     </Box>
-
+ 
                     {/* Item Body */}
                     <Box sx={{ p: 1.5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <Box>
-                        <Typography sx={{ fontSize: '0.7rem', color: '#fff', fontWeight: 500, mb: 0.2 }}>
+                        <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.primary, fontWeight: 500, mb: 0.2 }}>
                           Task Completed {scan.completed_ago}
                         </Typography>
-                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+                        <Typography sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary, fontWeight: 600 }}>
                           Took {scan.time_taken || '0 minutes'}
                         </Typography>
                       </Box>
@@ -236,8 +260,8 @@ export const TargetSummary = () => {
                           fontSize: '0.55rem', 
                           fontWeight: 900, 
                           bgcolor: 'transparent', 
-                          color: '#00ff62', 
-                          border: '1px solid rgba(0, 255, 98, 0.3)',
+                          color: cGreen, 
+                          border: `1px solid ${alpha(cGreen, 0.3)}`,
                           borderRadius: 0.5
                         }} 
                       />
@@ -245,14 +269,14 @@ export const TargetSummary = () => {
                   </Box>
                 ))}
                 {(!data.subscans || data.subscans.length === 0) && (
-                  <Typography sx={{ textAlign: 'center', py: 4, color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>
+                  <Typography sx={{ textAlign: 'center', py: 4, color: theme.palette.text.secondary, fontSize: '0.7rem', opacity: 0.5 }}>
                     NO SUB SCANS IDENTIFIED
                   </Typography>
                 )}
               </Stack>
             </Box>
           </TacticalPanel>
-
+ 
           <TacticalPanel title="Related Domains" icon={<LinkIcon size={14} />}>
             <Box sx={{ p: 2 }}>
               <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
@@ -262,10 +286,10 @@ export const TargetSummary = () => {
                     label={d}
                     size="small"
                     variant="outlined"
-                    sx={{ mb: 1, borderColor: 'rgba(0, 243, 255, 0.2)', color: '#00f3ff', fontSize: '0.65rem', fontWeight: 700, '&:hover': { bgcolor: 'rgba(0,243,255,0.1)' } }}
+                    sx={{ mb: 1, borderColor: alpha(cPrimary, 0.2), color: cPrimary, fontSize: '0.65rem', fontWeight: 700, '&:hover': { bgcolor: alpha(cPrimary, 0.1) } }}
                   />
                 ))}
-                {data.related_domains?.length === 0 && <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', py: 2 }}>NO RELATED DOMAINS FOUND</Typography>}
+                {data.related_domains?.length === 0 && <Typography sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary, opacity: 0.5, py: 2 }}>NO RELATED DOMAINS FOUND</Typography>}
               </Stack>
             </Box>
           </TacticalPanel>
@@ -313,34 +337,34 @@ export const TargetSummary = () => {
           <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', lg: '7fr 5fr' }, gap: 2 }}>
             <TacticalPanel title="Target Information" icon={<Activity size={14} />} sx={{ minHeight: 400 }}>
               <Box sx={{ p: 2 }}>
-                <Tabs value={infoTab} onChange={(_, v) => setInfoTab(v)} sx={{ mb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: 32 }}>
+                <Tabs value={infoTab} onChange={(_, v) => setInfoTab(v)} sx={{ mb: 2, borderBottom: `1px solid ${theme.palette.divider}`, minHeight: 32 }}>
                   {['Domain Info', 'Whois', 'DNS Records', 'Nameservers', 'History'].map((l) => (
-                    <Tab key={l} label={l} sx={{ fontSize: '0.65rem', fontWeight: 900, minHeight: 32, p: 1, color: 'rgba(255,255,255,0.4)', '&.Mui-selected': { color: '#00f3ff' } }} />
+                    <Tab key={l} label={l} sx={{ fontSize: '0.65rem', fontWeight: 900, minHeight: 32, p: 1, color: theme.palette.text.secondary, '&.Mui-selected': { color: cPrimary } }} />
                   ))}
                 </Tabs>
-
+ 
                 {infoTab === 0 && (
                   <Box sx={{ 
                     display: 'grid', 
                     gridTemplateColumns: 'repeat(3, 1fr)', 
                     gap: 3 
                   }}>
-                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Domain</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#ff003c' }}>{data.target_info.name}</Typography></Box>
-                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Dnssec</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.dnssec || 'N/A'}</Typography></Box>
-                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Geolocation</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography></Box>
-                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Created</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.created || 'N/A'}</Typography></Box>
-                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Updated</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.updated || 'N/A'}</Typography></Box>
-                    <Box><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Expires</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.expires || 'N/A'}</Typography></Box>
-                    <Box sx={{ gridColumn: 'span 3' }}><Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', mb: 0.5 }}>Registrar</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#00f3ff' }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Domain</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: cRed }}>{data.target_info.name}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Dnssec</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.dnssec || 'N/A'}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Geolocation</Typography><Typography sx={{ fontSize: '0.8rem', fontWeight: 700 }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Created</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.created || 'N/A'}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Updated</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.updated || 'N/A'}</Typography></Box>
+                    <Box><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Expires</Typography><Typography sx={{ fontSize: '0.7rem' }}>{data.domain_info?.expires || 'N/A'}</Typography></Box>
+                    <Box sx={{ gridColumn: 'span 3' }}><Typography sx={{ fontSize: '0.6rem', color: theme.palette.text.secondary, opacity: 0.7, mb: 0.5 }}>Registrar</Typography><Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: cPrimary }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography></Box>
                   </Box>
                 )}
-                {infoTab === 1 && <Typography sx={{ p: 2, fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)' }}>Loading WHOIS Data...</Typography>}
+                {infoTab === 1 && <Typography sx={{ p: 2, fontSize: '0.7rem', color: theme.palette.text.secondary, opacity: 0.7 }}>Loading WHOIS Data...</Typography>}
                 {infoTab === 2 && (
                   <Stack spacing={1}>
                     {data.domain_info?.dns_records?.map((r: any, idx: number) => (
                       <Stack key={idx} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                        <Chip label={r.type.toUpperCase()} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} />
-                        <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{r.name}</Typography>
+                        <Chip label={r.type.toUpperCase()} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: alpha(cPrimary, 0.1), color: cPrimary }} />
+                        <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.primary }}>{r.name}</Typography>
                       </Stack>
                     ))}
                   </Stack>
@@ -349,36 +373,36 @@ export const TargetSummary = () => {
                   <Stack spacing={1}>
                     {data.domain_info?.nameservers?.map((ns: string, idx: number) => (
                       <Stack key={idx} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                        <Globe size={14} color="#00f3ff" />
-                        <Typography sx={{ fontSize: '0.7rem', color: '#fff' }}>{ns}</Typography>
+                        <Globe size={14} color={cPrimary} />
+                        <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.primary }}>{ns}</Typography>
                       </Stack>
                     ))}
                     {(!data.domain_info?.nameservers || data.domain_info.nameservers.length === 0) && (
-                      <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', p: 1 }}>No nameservers identified</Typography>
+                      <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary, opacity: 0.5, p: 1 }}>No nameservers identified</Typography>
                     )}
                   </Stack>
                 )}
                 {infoTab === 4 && (
                   <TableContainer sx={{ maxHeight: 300 }}>
                     <Table size="small">
-                      <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
+                      <TableHead sx={{ bgcolor: alpha(theme.palette.text.primary, 0.05) }}>
                         <TableRow>
-                          <TableCell sx={{ color: '#00f3ff', fontWeight: 900, fontSize: '0.65rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>IP ADDRESS</TableCell>
-                          <TableCell sx={{ color: '#00f3ff', fontWeight: 900, fontSize: '0.65rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>LOCATION</TableCell>
-                          <TableCell sx={{ color: '#00f3ff', fontWeight: 900, fontSize: '0.65rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>OWNER</TableCell>
+                          <TableCell sx={{ color: cPrimary, fontWeight: 900, fontSize: '0.65rem', borderBottom: `1px solid ${alpha(cPrimary, 0.1)}` }}>IP ADDRESS</TableCell>
+                          <TableCell sx={{ color: cPrimary, fontWeight: 900, fontSize: '0.65rem', borderBottom: `1px solid ${alpha(cPrimary, 0.1)}` }}>LOCATION</TableCell>
+                          <TableCell sx={{ color: cPrimary, fontWeight: 900, fontSize: '0.65rem', borderBottom: `1px solid ${alpha(cPrimary, 0.1)}` }}>OWNER</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
                         {data.domain_info?.historical_ips?.map((ip: any, idx: number) => (
                           <TableRow key={idx}>
-                            <TableCell sx={{ color: '#fff', fontSize: '0.7rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{ip.ip}</TableCell>
-                            <TableCell sx={{ color: '#fff', fontSize: '0.7rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{ip.location}</TableCell>
-                            <TableCell sx={{ color: '#fff', fontSize: '0.7rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{ip.owner}</TableCell>
+                            <TableCell sx={{ color: theme.palette.text.primary, fontSize: '0.7rem', borderBottom: `1px solid ${theme.palette.divider}` }}>{ip.ip}</TableCell>
+                            <TableCell sx={{ color: theme.palette.text.primary, fontSize: '0.7rem', borderBottom: `1px solid ${theme.palette.divider}` }}>{ip.location}</TableCell>
+                            <TableCell sx={{ color: theme.palette.text.primary, fontSize: '0.7rem', borderBottom: `1px solid ${theme.palette.divider}` }}>{ip.owner}</TableCell>
                           </TableRow>
                         ))}
                         {(!data.domain_info?.historical_ips || data.domain_info.historical_ips.length === 0) && (
                           <TableRow>
-                            <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem', border: 0 }}>NO HISTORICAL IPS FOUND</TableCell>
+                            <TableCell colSpan={3} align="center" sx={{ py: 4, color: theme.palette.text.secondary, opacity: 0.5, fontSize: '0.7rem', border: 0 }}>NO HISTORICAL IPS FOUND</TableCell>
                           </TableRow>
                         )}
                       </TableBody>
@@ -392,10 +416,10 @@ export const TargetSummary = () => {
                 <Chart
                   options={{
                     chart: { type: 'donut', background: 'transparent' },
-                    theme: { mode: 'dark' as any },
+                    theme: { mode: theme.palette.mode as any },
                     stroke: { show: false },
                     dataLabels: { enabled: false },
-                    legend: { position: 'bottom', fontSize: '10px', labels: { colors: '#fff' } },
+                    legend: { position: 'bottom', fontSize: '10px', labels: { colors: theme.palette.text.secondary } },
                     colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00']
                   }}
                   series={data.http_status_breakdown.map((s: any) => s.count)}
@@ -416,10 +440,10 @@ export const TargetSummary = () => {
                 <Chart
                   options={{
                     chart: { type: 'pie', background: 'transparent' },
-                    theme: { mode: 'dark' as any },
+                    theme: { mode: theme.palette.mode as any },
                     labels: ['Critical', 'High', 'Medium', 'Low', 'Info'],
-                    colors: ['#ff003c', '#ff8c00', '#fffc00', '#00f3ff', 'rgba(255,255,255,0.2)'],
-                    legend: { position: 'bottom', labels: { colors: '#fff' } }
+                    colors: ['#ff003c', '#ff8c00', '#fffc00', '#00f3ff', theme.palette.mode === 'light' ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.2)'],
+                    legend: { position: 'bottom', labels: { colors: theme.palette.text.secondary } }
                   }}
                   series={[data.critical_count || 0, data.high_count || 0, data.medium_count || 0, data.low_count || 0, data.info_count || 0]}
                   type="pie"
@@ -432,17 +456,17 @@ export const TargetSummary = () => {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem' }}>NAME</TableCell>
-                      <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem' }}>SEVERITY</TableCell>
-                      <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem' }}>DATE</TableCell>
+                      <TableCell sx={{ color: theme.palette.text.secondary, fontSize: '0.65rem' }}>NAME</TableCell>
+                      <TableCell sx={{ color: theme.palette.text.secondary, fontSize: '0.65rem' }}>SEVERITY</TableCell>
+                      <TableCell sx={{ color: theme.palette.text.secondary, fontSize: '0.65rem' }}>DATE</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {data.vulnerability_highlights?.map((v: any, idx: number) => (
                       <TableRow key={idx}>
-                        <TableCell sx={{ fontSize: '0.7rem', color: '#fff', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.name}</TableCell>
+                        <TableCell sx={{ fontSize: '0.7rem', color: theme.palette.text.primary, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>{v.name}</TableCell>
                         <TableCell><SeverityBadge severity={v.severity} /></TableCell>
-                        <TableCell sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>{v.discovered_date}</TableCell>
+                        <TableCell sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary }}>{v.discovered_date}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -469,7 +493,7 @@ export const TargetSummary = () => {
                   />
                 ) : (
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 200 }}>
-                    <Typography sx={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
+                    <Typography sx={{ color: theme.palette.text.secondary, opacity: 0.5, fontSize: '0.8rem', fontFamily: 'Inter' }}>
                       No CVE Data Available
                     </Typography>
                   </Box>
@@ -492,7 +516,7 @@ export const TargetSummary = () => {
                   />
                 ) : (
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 200 }}>
-                    <Typography sx={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
+                    <Typography sx={{ color: theme.palette.text.secondary, opacity: 0.5, fontSize: '0.8rem', fontFamily: 'Inter' }}>
                       No CWE Data Available
                     </Typography>
                   </Box>
@@ -515,7 +539,7 @@ export const TargetSummary = () => {
                   />
                 ) : (
                   <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', minHeight: 200 }}>
-                    <Typography sx={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
+                    <Typography sx={{ color: theme.palette.text.secondary, opacity: 0.5, fontSize: '0.8rem', fontFamily: 'Inter' }}>
                       No Tag Data Available
                     </Typography>
                   </Box>
@@ -530,25 +554,25 @@ export const TargetSummary = () => {
               <Box sx={{ p: 2 }}>
                 {data.target_info?.in_scope_ips && data.target_info.in_scope_ips.length > 0 && (
                   <Box sx={{ mb: 2 }}>
-                    <Typography variant="overline" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontWeight: 900, display: 'block', mb: 1, letterSpacing: 1 }}>
+                    <Typography variant="overline" sx={{ color: alpha(cPrimary, 0.6), fontWeight: 900, display: 'block', mb: 1, letterSpacing: 1 }}>
                       MANUAL IN-SCOPE RANGES
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                       {data.target_info.in_scope_ips.map((ip: string) => (
-                        <Chip key={ip} label={ip} size="small" sx={{ mb: 1, bgcolor: 'rgba(0, 243, 255, 0.15)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.3)', fontWeight: 800, fontFamily: 'monospace' }} />
+                        <Chip key={ip} label={ip} size="small" sx={{ mb: 1, bgcolor: alpha(cPrimary, 0.15), color: cPrimary, border: `1px solid ${alpha(cPrimary, 0.3)}`, fontWeight: 800, fontFamily: 'monospace' }} />
                       ))}
                     </Stack>
                   </Box>
                 )}
-                <Typography variant="overline" sx={{ color: 'rgba(255, 255, 255, 0.3)', fontWeight: 900, display: 'block', mb: 1, letterSpacing: 1 }}>
+                <Typography variant="overline" sx={{ color: theme.palette.text.secondary, opacity: 0.5, fontWeight: 900, display: 'block', mb: 1, letterSpacing: 1 }}>
                   HISTORICAL RESOLVED IPS
                 </Typography>
                 <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                   {data.domain_info?.historical_ips?.map((ip: any) => (
-                    <Chip key={ip.ip} label={ip.ip} size="small" sx={{ mb: 1, bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.1)' }} />
+                    <Chip key={ip.ip} label={ip.ip} size="small" sx={{ mb: 1, bgcolor: alpha(theme.palette.text.primary, 0.05), color: theme.palette.text.secondary, border: `1px solid ${theme.palette.divider}` }} />
                   ))}
                   {(!data.domain_info?.historical_ips || data.domain_info.historical_ips.length === 0) && (
-                    <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)', py: 1 }}>NO RESOLVED IPS</Typography>
+                    <Typography sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary, opacity: 0.5, py: 1 }}>NO RESOLVED IPS</Typography>
                   )}
                 </Stack>
               </Box>
@@ -557,7 +581,7 @@ export const TargetSummary = () => {
               <Box sx={{ p: 2 }}>
                 <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                   {data.discovered_ports?.map((p: any) => (
-                    <Chip key={p.number} label={`${p.number}/${p.service_name}`} size="small" sx={{ mb: 1, bgcolor: 'rgba(112,0,255,0.1)', color: '#7000ff', border: '1px solid rgba(112,0,255,0.2)' }} />
+                    <Chip key={p.number} label={`${p.number}/${p.service_name}`} size="small" sx={{ mb: 1, bgcolor: alpha(cPurple, 0.1), color: cPurple, border: `1px solid ${alpha(cPurple, 0.2)}` }} />
                   ))}
                 </Stack>
               </Box>
@@ -566,7 +590,7 @@ export const TargetSummary = () => {
               <Box sx={{ p: 2 }}>
                 <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
                   {data.discovered_technologies?.map((t: any) => (
-                    <Chip key={t.name} label={t.name} size="small" sx={{ mb: 1, bgcolor: 'rgba(255,252,0,0.1)', color: '#fffc00', border: '1px solid rgba(255,252,0,0.2)' }} />
+                    <Chip key={t.name} label={t.name} size="small" sx={{ mb: 1, bgcolor: alpha(cYellow, 0.1), color: cYellow, border: `1px solid ${alpha(cYellow, 0.2)}` }} />
                   ))}
                 </Stack>
               </Box>
@@ -576,22 +600,22 @@ export const TargetSummary = () => {
       </Box>
     </Box>
   );
-
+ 
   const renderMonitoring = () => (
     <TacticalPanel title={`Monitoring Discoveries for ${data.target_info.name}`} icon={<Eye size={14} />}>
       <TableContainer>
         <Table size="small">
-          <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
+          <TableHead sx={{ bgcolor: alpha(theme.palette.text.primary, 0.05) }}>
             <TableRow>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900, borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>TYPE</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900, borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>DISCOVERY</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900, borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>DATE</TableCell>
+              <TableCell sx={{ color: theme.palette.primary.main, fontWeight: 900, borderBottom: `1px solid ${theme.palette.divider}` }}>TYPE</TableCell>
+              <TableCell sx={{ color: theme.palette.primary.main, fontWeight: 900, borderBottom: `1px solid ${theme.palette.divider}` }}>DISCOVERY</TableCell>
+              <TableCell sx={{ color: theme.palette.primary.main, fontWeight: 900, borderBottom: `1px solid ${theme.palette.divider}` }}>DATE</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {(data.monitoring_discoveries || []).map((m: any, idx: number) => (
-              <TableRow key={idx} sx={{ '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)' } }}>
-                <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+              <TableRow key={idx} sx={{ '&:hover': { bgcolor: alpha(theme.palette.primary.main, 0.05) } }}>
+                <TableCell sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
                   <Chip
                     label={m.discovery_type?.toUpperCase()}
                     size="small"
@@ -599,22 +623,22 @@ export const TargetSummary = () => {
                       height: 20,
                       fontSize: '0.6rem',
                       fontWeight: 900,
-                      bgcolor: m.discovery_type === 'subdomain' ? 'rgba(0,255,98,0.1)' : 'rgba(255,252,0,0.1)',
-                      color: m.discovery_type === 'subdomain' ? '#00ff62' : '#fffc00'
+                      bgcolor: m.discovery_type === 'subdomain' ? alpha(cGreen, 0.1) : alpha(cYellow, 0.1),
+                      color: m.discovery_type === 'subdomain' ? cGreen : cYellow
                     }}
                   />
                 </TableCell>
-                <TableCell sx={{ color: '#fff', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <TableCell sx={{ color: theme.palette.text.primary, borderBottom: `1px solid ${theme.palette.divider}` }}>
                   <code style={{ fontSize: '0.7rem' }}>{m.content?.name || m.content?.url}</code>
                 </TableCell>
-                <TableCell sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <TableCell sx={{ color: theme.palette.text.secondary, fontSize: '0.7rem', borderBottom: `1px solid ${theme.palette.divider}` }}>
                   {m.discovered_at}
                 </TableCell>
               </TableRow>
             ))}
             {(!data.monitoring_discoveries || data.monitoring_discoveries.length === 0) && (
               <TableRow>
-                <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO MONITORING DISCOVERIES FOUND</TableCell>
+                <TableCell colSpan={3} align="center" sx={{ py: 4, color: theme.palette.text.secondary, opacity: 0.5 }}>NO MONITORING DISCOVERIES FOUND</TableCell>
               </TableRow>
             )}
           </TableBody>
@@ -629,17 +653,17 @@ export const TargetSummary = () => {
       <Box sx={{ mb: 3 }}>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>TARGET SUMMARY</Typography>
-            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>IDENTIFIER: {targetId} | TARGET: {data.target_info.name}</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'var(--r3-heading-font)', color: theme.palette.text.primary, letterSpacing: 2 }}>TARGET SUMMARY</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary, fontWeight: 600 }}>IDENTIFIER: {targetId} | TARGET: {data.target_info.name}</Typography>
           </Box>
-          <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
-            <span>TARGETS</span> / <span>SUMMARY</span> / <span style={{ color: '#00f3ff' }}>{data.target_info.name}</span>
+          <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary, opacity: 0.8, fontFamily: 'monospace' }}>
+            <span>TARGETS</span> / <span>SUMMARY</span> / <span style={{ color: theme.palette.primary.main }}>{data.target_info.name}</span>
           </Stack>
         </Stack>
       </Box>
 
       {/* Tab Bar Integration */}
-      <Box sx={{ mb: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', position: 'sticky', top: 0, bgcolor: 'rgba(10,10,15,0.9)', zIndex: 10, backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px' }}>
+      <Box sx={{ mb: 3, borderBottom: `1px solid ${theme.palette.divider}`, position: 'sticky', top: 0, bgcolor: theme.palette.background.default, zIndex: 10, backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px' }}>
         <Tabs 
           value={activeTab} 
           onChange={(_, v) => setActiveTab(v)} 
@@ -647,8 +671,8 @@ export const TargetSummary = () => {
           scrollButtons="auto"
           sx={{ 
             minHeight: 50, 
-            '& .MuiTabs-indicator': { bgcolor: '#00f3ff', height: 3, boxShadow: '0 0 15px #00f3ff' },
-            '& .MuiTabs-scrollButtons': { color: '#00f3ff' }
+            '& .MuiTabs-indicator': { bgcolor: theme.palette.primary.main, height: 3, boxShadow: theme.palette.mode === 'light' ? 'none' : `0 0 15px ${theme.palette.primary.main}` },
+            '& .MuiTabs-scrollButtons': { color: theme.palette.primary.main }
           }}
         >
           {tabs.map((tab, idx) => (
@@ -664,11 +688,11 @@ export const TargetSummary = () => {
                 fontSize: '0.65rem', 
                 fontWeight: 900, 
                 minHeight: 50, 
-                color: 'rgba(255,255,255,0.4)', 
+                color: theme.palette.text.secondary, 
                 letterSpacing: 1.5, 
-                fontFamily: 'Orbitron',
+                fontFamily: 'var(--r3-heading-font)',
                 px: 3,
-                '&.Mui-selected': { color: '#00f3ff' } 
+                '&.Mui-selected': { color: theme.palette.primary.main } 
               }} 
             />
           ))}

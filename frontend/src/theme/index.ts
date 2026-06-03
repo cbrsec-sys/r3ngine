@@ -123,7 +123,7 @@ export const modernTheme: Theme = createTheme({
 // Enterprise Theme (Professional)
 export const enterpriseTheme: Theme = createTheme({
   palette: {
-    mode: 'dark', // Keeping dark for now as slates are dark
+    mode: 'light',
     primary: { main: themeTokens.enterprise.palette.primary },
     secondary: { main: themeTokens.enterprise.palette.secondary },
     background: {

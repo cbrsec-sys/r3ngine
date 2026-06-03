@@ -43,14 +43,14 @@ DEFAULT_GET_GPT_REPORT = env.bool('DEFAULT_GET_GPT_REPORT', default=True)
 VITE_DEV_SERVER_URL = env('VITE_DEV_SERVER_URL', default='https://localhost:5173')
 VITE_ENABLED = env.bool('VITE_ENABLED', default=DEBUG)
 
-# Neo4j Configurations
+# Neo4j Configurations — NEO4J_PASSWORD must be set via environment variable
 NEO4J_URI = env('NEO4J_URI', default='bolt://neo4j:7687')
 NEO4J_USER = env('NEO4J_USER', default='neo4j')
-NEO4J_PASSWORD = env('NEO4J_PASSWORD', default='neo4jpassword')
+NEO4J_PASSWORD = env('NEO4J_PASSWORD', default='')
 
 # Globals
-# WARNING: Set ALLOWED_HOSTS to specific domains in production via environment variable
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['*'])
+# Set ALLOWED_HOSTS via environment variable in production
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
 SECRET_KEY = first_run(SECRET_FILE, BASE_DIR)
 
 # Rengine version
@@ -145,6 +145,7 @@ if os.path.exists(PLUGINS_DIR):
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'reNgine.middleware.ContentSecurityPolicyMiddleware',
     'reNgine.middleware.SystemVersionMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
@@ -195,13 +196,13 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '20/min',
+        'anon': '5/min',
         'user': '200/min',
+        'auth': '5/min',
     },
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
         'rest_framework.authentication.SessionAuthentication',
-        'rest_framework.authentication.BasicAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -492,5 +493,6 @@ SIMPLE_JWT = {
     'USER_ID_CLAIM': 'user_id',
 }
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:3000', 'http://127.0.0.1:3000'])
 CORS_ALLOW_CREDENTIALS = True

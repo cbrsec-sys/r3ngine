@@ -1,4 +1,3 @@
-import threading
 from django.apps import AppConfig
 
 
@@ -8,8 +7,3 @@ class PluginsConfig(AppConfig):
 
     def ready(self):
         import plugins.signals
-        from .tasks import verify_all_plugin_tools
-        try:
-            threading.Thread(target=verify_all_plugin_tools, daemon=True).start()
-        except Exception:
-            pass

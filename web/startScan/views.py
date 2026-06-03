@@ -1,6 +1,7 @@
 import markdown
 import requests
 import logging
+from reNgine.validators import validate_external_url
 import os
 import threading
 from django.conf import settings
@@ -810,8 +811,8 @@ def fetch_exploit_source(request, id):
     vuln = get_object_or_404(Vulnerability, id=id)
     if vuln.exploit_url:
         try:
-            # We should probably use a timeout and limit the response size
-            response = requests.get(vuln.exploit_url, timeout=10, verify=False)
+            validate_external_url(vuln.exploit_url)
+            response = requests.get(vuln.exploit_url, timeout=10, verify=True)
             if response.status_code == 200:
                 # If it's HTML, we might want to extract just the code if possible
                 # But for now let's just return the text
