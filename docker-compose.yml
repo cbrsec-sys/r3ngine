@@ -69,6 +69,7 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       #- plugins_data:/usr/src/app/plugins_data
+      - ./secrets/certs/ca.crt:/usr/src/app/ca.crt:ro
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "8000:8000"
