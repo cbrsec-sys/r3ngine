@@ -1,6 +1,33 @@
 import openai
 import re
+import logging
 import requests
+
+_logger = logging.getLogger(__name__)
+
+_PROMPT_INJECTION_RE = re.compile(
+    r'(ignore\s+(previous|all|above|prior)\s+(instructions?|prompts?|context)|'
+    r'forget\s+(your|the|all)\s+(instructions?|prompts?|context)|'
+    r'disregard\s+(previous|all|above)\s+(instructions?|prompts?)|'
+    r'<\|im_start\|>|<\|endoftext\|>|<\|im_sep\|>|'
+    r'\[SYSTEM\]|\[INST\])',
+    re.IGNORECASE,
+)
+_MAX_PROMPT_INPUT_LENGTH = 8000
+
+
+def _sanitize_for_prompt(text: str) -> str:
+    """Truncate and check for prompt injection patterns before sending to an LLM.
+
+    Raises ValueError if injection patterns are detected.
+    """
+    if not text:
+        return text
+    truncated = text[:_MAX_PROMPT_INPUT_LENGTH]
+    if _PROMPT_INJECTION_RE.search(truncated):
+        _logger.warning('Potential prompt injection attempt detected in LLM input')
+        raise ValueError('Input contains disallowed content for LLM processing')
+    return truncated
 from reNgine.common_func import parse_llm_vulnerability_report
 from reNgine.definitions import (
     VULNERABILITY_DESCRIPTION_SYSTEM_MESSAGE, 
@@ -139,7 +166,11 @@ class LLMBaseGenerator:
 
 class LLMVulnerabilityReportGenerator(LLMBaseGenerator):
     def get_vulnerability_description(self, description):
-        self.logger.info(f"Generating Vulnerability Description for: {description}")
+        self.logger.info("Generating Vulnerability Description")
+        try:
+            description = _sanitize_for_prompt(description)
+        except ValueError as e:
+            return {'status': False, 'error': str(e)}
         response_content = self._call_llm(VULNERABILITY_DESCRIPTION_SYSTEM_MESSAGE, description)
         
         if response_content.startswith("Error:"):
@@ -159,7 +190,11 @@ class LLMVulnerabilityReportGenerator(LLMBaseGenerator):
 
 class LLMAttackSuggestionGenerator(LLMBaseGenerator):
     def get_attack_suggestion(self, user_input):
-        self.logger.info(f"Generating Attack Suggestion for: {user_input}")
+        self.logger.info("Generating Attack Suggestion")
+        try:
+            user_input = _sanitize_for_prompt(user_input)
+        except ValueError as e:
+            return {'status': False, 'error': str(e), 'input': ''}
         response_content = self._call_llm(ATTACK_SUGGESTION_GPT_SYSTEM_PROMPT, user_input)
         
         if response_content.startswith("Error:"):
