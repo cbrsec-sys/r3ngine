@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Card,
   CardContent,
@@ -15,7 +15,14 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  DialogActions,
   Divider,
+  Tooltip,
+  TextField,
+  FormControlLabel,
+  Checkbox,
+  Stack,
+  InputAdornment,
 } from '@mui/material';
 import {
   Settings as SettingsIcon,
@@ -26,14 +33,23 @@ import {
   VerifiedUser as VerifiedIcon,
   GppMaybe as SignedUnknownIcon,
   GppBad as UnverifiedIcon,
+  Description as DocIcon,
+  Visibility as EyeIcon,
+  VisibilityOff as EyeOffIcon,
+  Save as SaveIcon,
 } from '@mui/icons-material';
 import type { Plugin, MarketplacePlugin } from '../api/pluginsApi';
 import {
   useTogglePlugin,
   useDeletePlugin,
   useInstallMarketplacePlugin,
-  useRestartOrchestrator
+  useRestartOrchestrator,
+  usePluginDocs,
+  useBurpConfig,
+  useUpdateBurpConfig,
+  useBurpHealth,
 } from '../api/pluginsApi';
+import ReactMarkdown from 'react-markdown';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface Props {
@@ -237,6 +253,386 @@ const PluginDetailsModal: React.FC<DetailsModalProps> = ({ open, onClose, plugin
   );
 };
 
+// ── Health dot status indicator ───────────────────────────────────────────────
+
+const HealthDot: React.FC<{ active: boolean }> = ({ active }) => {
+  const { data, isError, isLoading } = useBurpHealth(active);
+  if (!active) return null;
+
+  let color = '#9e9e9e'; // default grey
+  let tooltip = 'Checking Burp Suite API connection...';
+
+  if (!isLoading) {
+    const isConnected = !isError && data?.status === 'ok';
+    color = isConnected ? '#00ff62' : '#ff003c';
+    tooltip = isConnected 
+      ? 'Burp Suite Pro REST API Connected' 
+      : `Burp Suite Pro Offline: ${data?.message || 'Connection refused'}`;
+  }
+
+  return (
+    <Tooltip title={tooltip} arrow>
+      <Box
+        sx={{
+          width: 8,
+          height: 8,
+          borderRadius: '50%',
+          bgcolor: color,
+          boxShadow: `0 0 8px ${color}`,
+          display: 'inline-block',
+          ml: 1.5,
+          alignSelf: 'center',
+          animation: 'pulse 2s ease-in-out infinite',
+          '@keyframes pulse': {
+            '0%, 100%': { opacity: 1, transform: 'scale(1)' },
+            '50%': { opacity: 0.6, transform: 'scale(1.2)' }
+          }
+        }}
+      />
+    </Tooltip>
+  );
+};
+
+// ── Plugin Docs Modal ─────────────────────────────────────────────────────────
+
+interface DocsModalProps {
+  open: boolean;
+  onClose: () => void;
+  plugin: Plugin;
+}
+
+const PluginDocsModal: React.FC<DocsModalProps> = ({ open, onClose, plugin }) => {
+  const { data: docs, isLoading, isError } = usePluginDocs(plugin.slug, open);
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      slotProps={{
+        paper: {
+          sx: {
+            background: 'linear-gradient(145deg, rgba(8,8,18,0.98) 0%, rgba(12,12,22,0.99) 100%)',
+            border: '1px solid rgba(255, 102, 51, 0.2)', // Orange border for docs
+            borderRadius: '16px',
+            color: '#fff',
+          }
+        }
+      }}
+    >
+      <DialogTitle sx={{ pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.9rem', color: '#fff', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <DocIcon sx={{ color: '#FF6633' }} />
+          {plugin.name} Documentation
+        </Typography>
+        <IconButton size="small" onClick={onClose} sx={{ color: 'rgba(255,255,255,0.4)' }}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
+
+      <DialogContent dividers sx={{ borderColor: 'rgba(255,255,255,0.07)', maxHeight: '70vh', overflowY: 'auto' }}>
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
+            <CircularProgress sx={{ color: '#FF6633' }} size={24} />
+          </Box>
+        ) : isError || !docs ? (
+          <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontStyle: 'italic', py: 4, textAlign: 'center' }}>
+            No detailed documentation files found embedded in this plugin.
+          </Typography>
+        ) : (
+          <Box sx={{
+            '& h1, & h2, & h3, & h4': { fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', mt: 2.5, mb: 1.5 },
+            '& h1': { fontSize: '1.2rem', color: '#FF6633', borderBottom: '1px solid rgba(255,255,255,0.05)', pb: 0.5 },
+            '& h2': { fontSize: '1.05rem', color: '#00f3ff' },
+            '& h3': { fontSize: '0.9rem', color: 'rgba(255,255,255,0.85)' },
+            '& p': { color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', lineHeight: 1.6, mb: 2 },
+            '& li': { color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', lineHeight: 1.6 },
+            '& ul, & ol': { mb: 2, pl: 2.5 },
+            '& code': { fontFamily: 'monospace', fontSize: '0.72rem', bgcolor: 'rgba(255,255,255,0.05)', px: 0.5, py: 0.2, borderRadius: 0.5, color: '#ffeb3b' },
+            '& pre': { bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)', p: 2, borderRadius: 1.5, overflowX: 'auto', mb: 2, '& code': { bgcolor: 'transparent', p: 0, color: 'inherit' } },
+            '& table': { width: '100%', borderCollapse: 'collapse', mb: 2, fontSize: '0.75rem' },
+            '& th, & td': { border: '1px solid rgba(255,255,255,0.07)', p: 1, textAlign: 'left' },
+            '& th': { bgcolor: 'rgba(255,255,255,0.02)', fontWeight: 'bold' }
+          }}>
+            {Object.entries(docs).map(([filename, content]) => (
+              <Box key={filename} sx={{ mb: 4 }}>
+                {Object.keys(docs).length > 1 && (
+                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', display: 'block', mb: 1 }}>
+                    File: {filename}
+                  </Typography>
+                )}
+                <ReactMarkdown>{content}</ReactMarkdown>
+              </Box>
+            ))}
+          </Box>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+// ── Burp Config Modal ─────────────────────────────────────────────────────────
+
+interface BurpConfigModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+const BurpConfigModal: React.FC<BurpConfigModalProps> = ({ open, onClose }) => {
+  const { data: config, isLoading } = useBurpConfig(open);
+  const updateMutation = useUpdateBurpConfig();
+
+  const [apiUrl, setApiUrl] = useState('');
+  const [apiKey, setApiKey] = useState('');
+  const [showKey, setShowKey] = useState(false);
+  const [autoImport, setAutoImport] = useState(true);
+  const [autoPush, setAutoPush] = useState(false);
+  const [severities, setSeverities] = useState({
+    info: false,
+    low: false,
+    medium: false,
+    high: false,
+    critical: false,
+  });
+
+  const [saveSuccess, setSaveSuccess] = useState(false);
+
+  useEffect(() => {
+    if (config) {
+      setApiUrl(config.api_url);
+      setApiKey(config.api_key);
+      setAutoImport(config.auto_import_enabled);
+      setAutoPush(config.auto_push_enabled);
+
+      const filterArray = config.severity_filter.split(',').map(s => s.trim().toLowerCase());
+      setSeverities({
+        info: filterArray.includes('info') || filterArray.includes('information'),
+        low: filterArray.includes('low'),
+        medium: filterArray.includes('medium'),
+        high: filterArray.includes('high'),
+        critical: filterArray.includes('critical'),
+      });
+    }
+  }, [config, open]);
+
+  const handleSeverityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    setSeverities({
+      ...severities,
+      [event.target.name]: event.target.checked,
+    });
+  };
+
+  const handleSave = () => {
+    const filterList: string[] = [];
+    if (severities.info) filterList.push('info');
+    if (severities.low) filterList.push('low');
+    if (severities.medium) filterList.push('medium');
+    if (severities.high) filterList.push('high');
+    if (severities.critical) filterList.push('critical');
+
+    updateMutation.mutate(
+      {
+        api_url: apiUrl,
+        ...(!apiKey.startsWith('******') || apiKey.length !== 8 ? { api_key: apiKey } : {}),
+        auto_import_enabled: autoImport,
+        auto_push_enabled: autoPush,
+        severity_filter: filterList.join(','),
+      },
+      {
+        onSuccess: () => {
+          setSaveSuccess(true);
+          onClose();
+        },
+      }
+    );
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      slotProps={{
+        paper: {
+          sx: {
+            background: 'linear-gradient(145deg, rgba(8,8,18,0.98) 0%, rgba(12,12,22,0.99) 100%)',
+            border: '1px solid rgba(255, 102, 51, 0.2)', // Orange border for Burp Pro
+            borderRadius: '16px',
+            color: '#fff',
+          }
+        }
+      }}
+    >
+      <DialogTitle sx={{ pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.9rem', color: '#fff', display: 'flex', alignItems: 'center', gap: 1 }}>
+          <SettingsIcon sx={{ color: '#FF6633' }} />
+          Burp Connection Config
+        </Typography>
+        <IconButton size="small" onClick={onClose} sx={{ color: 'rgba(255,255,255,0.4)' }}>
+          <CloseIcon fontSize="small" />
+        </IconButton>
+      </DialogTitle>
+      <DialogContent dividers sx={{ borderColor: 'rgba(255,255,255,0.07)', display: 'flex', flexDirection: 'column', gap: 2.5, pt: 2 }}>
+        {isLoading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress sx={{ color: '#FF6633' }} size={24} />
+          </Box>
+        ) : (
+          <Stack spacing={2}>
+            <TextField
+              label="BURP REST API URL"
+              variant="outlined"
+              fullWidth
+              size="small"
+              value={apiUrl}
+              onChange={(e) => setApiUrl(e.target.value)}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  color: '#fff',
+                  fontSize: '0.8rem',
+                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                  '&:hover fieldset': { borderColor: 'rgba(255,102,51,0.4)' },
+                  '&.Mui-focused fieldset': { borderColor: '#FF6633' },
+                },
+                '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' },
+              }}
+            />
+
+            <TextField
+              label="API KEY (IF CONFIGURED)"
+              type={showKey ? 'text' : 'password'}
+              variant="outlined"
+              fullWidth
+              size="small"
+              value={apiKey}
+              onChange={(e) => setApiKey(e.target.value)}
+              slotProps={{
+                input: {
+                  endAdornment: (
+                    <InputAdornment position="end">
+                      <IconButton onClick={() => setShowKey(!showKey)} edge="end" sx={{ color: 'rgba(255,255,255,0.4)' }}>
+                        {showKey ? <EyeOffIcon fontSize="small" /> : <EyeIcon fontSize="small" />}
+                      </IconButton>
+                    </InputAdornment>
+                  ),
+                }
+              }}
+              sx={{
+                '& .MuiOutlinedInput-root': {
+                  color: '#fff',
+                  fontSize: '0.8rem',
+                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                  '&:hover fieldset': { borderColor: 'rgba(255,102,51,0.4)' },
+                  '&.Mui-focused fieldset': { borderColor: '#FF6633' },
+                },
+                '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem' },
+              }}
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={autoImport}
+                  onChange={(e) => setAutoImport(e.target.checked)}
+                  sx={{
+                    '& .MuiSwitch-switchBase.Mui-checked': {
+                      color: '#FF6633',
+                      '& + .MuiSwitch-track': { bgcolor: '#FF6633' },
+                    },
+                  }}
+                />
+              }
+              label={
+                <Typography sx={{ color: '#fff', fontSize: '0.72rem' }}>
+                  Auto-Import scan findings
+                </Typography>
+              }
+            />
+
+            <FormControlLabel
+              control={
+                <Switch
+                  size="small"
+                  checked={autoPush}
+                  onChange={(e) => setAutoPush(e.target.checked)}
+                  sx={{
+                    '& .MuiSwitch-switchBase.Mui-checked': {
+                      color: '#FF6633',
+                      '& + .MuiSwitch-track': { bgcolor: '#FF6633' },
+                    },
+                  }}
+                />
+              }
+              label={
+                <Typography sx={{ color: '#fff', fontSize: '0.72rem' }}>
+                  Auto-Push targets to scope
+                </Typography>
+              }
+            />
+
+            <Box>
+              <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', mb: 1, fontFamily: 'Orbitron', fontWeight: 900 }}>
+                SEVERITY IMPORT FILTER
+              </Typography>
+              <Box sx={{ display: 'flex', flexDirection: 'row', gap: 1, flexWrap: 'wrap' }}>
+                {Object.entries(severities).map(([name, checked]) => (
+                  <FormControlLabel
+                    key={name}
+                    control={
+                      <Checkbox
+                        size="small"
+                        checked={checked}
+                        onChange={handleSeverityChange}
+                        name={name}
+                        sx={{
+                          color: 'rgba(255,255,255,0.2)',
+                          '&.Mui-checked': { color: '#FF6633' },
+                          p: 0.5,
+                        }}
+                      />
+                    }
+                    label={
+                      <Typography sx={{ color: '#fff', fontSize: '0.62rem', fontWeight: 700, fontFamily: 'Orbitron', textTransform: 'uppercase' }}>
+                        {name}
+                      </Typography>
+                    }
+                  />
+                ))}
+              </Box>
+            </Box>
+          </Stack>
+        )}
+      </DialogContent>
+      <DialogActions sx={{ p: 2 }}>
+        <Button onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 900 }}>
+          CANCEL
+        </Button>
+        <Button
+          variant="contained"
+          size="small"
+          onClick={handleSave}
+          disabled={updateMutation.isPending}
+          startIcon={updateMutation.isPending ? <CircularProgress size={10} color="inherit" /> : <SaveIcon fontSize="small" />}
+          sx={{
+            bgcolor: 'rgba(255, 102, 51, 0.2)',
+            border: '1px solid rgba(255, 102, 51, 0.4)',
+            color: '#FF6633',
+            fontFamily: 'Orbitron',
+            fontSize: '0.65rem',
+            fontWeight: 900,
+            '&:hover': { bgcolor: 'rgba(255, 102, 51, 0.35)' },
+          }}
+        >
+          {updateMutation.isPending ? 'SAVING...' : 'SAVE CONFIG'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 // ── Main card ─────────────────────────────────────────────────────────────────
 
 const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
@@ -247,6 +643,8 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = React.useState(false);
   const [isRestartDialogOpen, setIsRestartDialogOpen] = React.useState(false);
   const [isDetailsOpen, setIsDetailsOpen] = React.useState(false);
+  const [isBurpConfigOpen, setIsBurpConfigOpen] = React.useState(false);
+  const [isDocsOpen, setIsDocsOpen] = React.useState(false);
   const [restartSnackbar, setRestartSnackbar] = React.useState(false);
 
   const handleRestart = () => {
@@ -306,7 +704,12 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
                 {data.name[0]}
               </Avatar>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: "bold", color: '#fff', minHeight: '3.1em', lineHeight: 1.235, display: 'flex', alignItems: 'flex-start' }}>{data.name}</Typography>
+                <Typography variant="h6" sx={{ fontWeight: "bold", color: '#fff', minHeight: '3.1em', lineHeight: 1.235, display: 'flex', alignItems: 'flex-start' }}>
+                  {data.name}
+                  {plugin && plugin.slug === 'burpsuite_integration' && (
+                    <HealthDot active={plugin.is_enabled} />
+                  )}
+                </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, flexWrap: 'wrap' }}>
                   <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>v{data.version}</Typography>
                   {data.author && (
@@ -408,8 +811,21 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
                 )}
                 <IconButton
                   size="small"
+                  sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#FF6633' } }}
+                  onClick={() => setIsDocsOpen(true)}
+                >
+                  <DocIcon fontSize="small" />
+                </IconButton>
+                <IconButton
+                  size="small"
                   sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff' } }}
-                  onClick={() => setIsDetailsOpen(true)}
+                  onClick={() => {
+                    if (plugin?.slug === 'burpsuite_integration') {
+                      setIsBurpConfigOpen(true);
+                    } else {
+                      setIsDetailsOpen(true);
+                    }
+                  }}
                 >
                   <SettingsIcon fontSize="small" />
                 </IconButton>
@@ -431,6 +847,21 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
         <PluginDetailsModal
           open={isDetailsOpen}
           onClose={() => setIsDetailsOpen(false)}
+          plugin={plugin}
+        />
+      )}
+
+      {plugin && plugin.slug === 'burpsuite_integration' && (
+        <BurpConfigModal
+          open={isBurpConfigOpen}
+          onClose={() => setIsBurpConfigOpen(false)}
+        />
+      )}
+
+      {plugin && (
+        <PluginDocsModal
+          open={isDocsOpen}
+          onClose={() => setIsDocsOpen(false)}
           plugin={plugin}
         />
       )}

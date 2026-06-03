@@ -1,4 +1,28 @@
+from django.conf import settings as _settings
 from dashboard.models import UserPreferences
+
+
+class ContentSecurityPolicyMiddleware:
+	"""Sets a Content-Security-Policy header on every response."""
+
+	_CSP = (
+		"default-src 'self'; "
+		"script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
+		"style-src 'self' 'unsafe-inline'; "
+		"img-src 'self' data: blob:; "
+		"font-src 'self' data:; "
+		"connect-src 'self' ws: wss:; "
+		"frame-ancestors 'none';"
+	)
+
+	def __init__(self, get_response):
+		self.get_response = get_response
+
+	def __call__(self, request):
+		response = self.get_response(request)
+		if 'Content-Security-Policy' not in response:
+			response['Content-Security-Policy'] = self._CSP
+		return response
 
 class UserPreferencesMiddleware:
 	def __init__(self, get_response):

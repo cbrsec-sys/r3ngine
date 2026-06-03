@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import requests
 import json
 import validators
@@ -16,6 +17,11 @@ from django.db import transaction
 import yaml
 import subprocess
 import signal
+
+
+def _validate_hostname(value):
+	if not re.fullmatch(r'[a-zA-Z0-9]([a-zA-Z0-9\-\.]{0,253}[a-zA-Z0-9])?', value):
+		raise ValueError(f'Invalid hostname: {value!r}')
 from reNgine.utils.task import save_subdomain, stream_command
 from targetApp.models import Domain
 from startScan.models import ScanHistory, Subdomain, EndPoint, MonitoringDiscovery
@@ -145,8 +151,8 @@ def monitor_target_task(domain_id):
 	try:
 		# 2. Subdomain Discovery (Subfinder)
 		subdomain_file = f"{results_dir}/subdomains_monitor.txt"
-		subfinder_cmd = f"subfinder -d {domain.name} -silent -o {subdomain_file}"
-		os.system(subfinder_cmd)
+		_validate_hostname(domain.name)
+		subprocess.run(['subfinder', '-d', domain.name, '-silent', '-o', subdomain_file], check=False)
 
 		if os.path.exists(subdomain_file):
 			with open(subdomain_file, 'r') as f:
@@ -171,8 +177,7 @@ def monitor_target_task(domain_id):
 
 		# 3. URL Discovery (GAU)
 		url_file = f"{results_dir}/urls_monitor.txt"
-		gau_cmd = f"gau {domain.name} --subs --silent -o {url_file}"
-		os.system(gau_cmd)
+		subprocess.run(['gau', domain.name, '--subs', '--silent', '-o', url_file], check=False)
 
 		if os.path.exists(url_file):
 			with open(url_file, 'r') as f:
@@ -272,21 +277,22 @@ def monitor_target_task(domain_id):
 			# Discovery modules + OSINT
 			sf_modules = "snovio,hunterio,emailrep,intelx,shodan,sublist3r,threatcrowd,crtsh"
 			# Use CSV output for streaming. -r includes source data, -n strips newlines.
-			sf_cmd = f"python3 /usr/src/github/spiderfoot/sf.py -s {domain.name} -m {sf_modules} -q -o csv -r -n -c {sf_config_path}"
-			
-			#proxy = get_random_proxy()
-			#if proxy:
-			#	sf_cmd = f"export HTTP_PROXY='{proxy}' HTTPS_PROXY='{proxy}' && {sf_cmd}"
-			
+			_validate_hostname(domain.name)
+			sf_cmd = [
+				'python3', '/usr/src/github/spiderfoot/sf.py',
+				'-s', domain.name, '-m', sf_modules,
+				'-q', '-o', 'csv', '-r', '-n', '-c', sf_config_path
+			]
+
 			# Initialize stateful parser with Redis dedup
 			redis_client = Redis(host="redis", port=6379, decode_responses=True)
 			parser = SpiderFootBatchParser(dedup_backend=redis_client, scan_id=scan_history.id)
-			
+
 			batch = []
 			batch_size = 100
-			
+
 			try:
-				for line in stream_command(sf_cmd, shell=True):
+				for line in stream_command(sf_cmd, shell=False):
 					event = parser.parse_line(line)
 					if not event:
 						continue

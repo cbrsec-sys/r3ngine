@@ -208,16 +208,30 @@ class Command(BaseCommand):
     help = 'Runs the Python Temporal Orchestrator Worker on python-orchestrator-queue.'
 
     def handle(self, *args, **options):
+        # Install plugin tools in THIS container before starting the worker.
+        # Tools must be present in the orchestrator — not the web container — because
+        # activities (swaks, smtp-user-enum, etc.) run here. This is the only place
+        # tool installation should be triggered; AppConfig.ready() must not do it.
+        try:
+            from plugins.tasks import verify_all_plugin_tools
+            import threading
+            t = threading.Thread(target=verify_all_plugin_tools, daemon=True)
+            t.start()
+            t.join(timeout=120)  # wait up to 2 min for apt installs before starting worker
+        except Exception as tool_err:
+            logger.error(f"Plugin tool installation failed at startup: {tool_err}")
+
+        # Clear needs_restart flags synchronously before entering the async event loop.
+        try:
+            from django.core.cache import cache
+            from plugins.models import Plugin
+            for plugin in Plugin.objects.all():
+                cache.set(f"plugin_{plugin.slug}_needs_restart", False, timeout=None)
+            self.stdout.write(self.style.SUCCESS("Cleared needs_restart flags for all plugins."))
+        except Exception as cache_err:
+            logger.error(f"Failed to clear needs_restart flags: {cache_err}")
+
         async def main():
-            # Clear all needs_restart flags for active plugins in the cache
-            try:
-                from django.core.cache import cache
-                from plugins.models import Plugin
-                for plugin in Plugin.objects.all():
-                    cache.set(f"plugin_{plugin.slug}_needs_restart", False, timeout=None)
-                self.stdout.write(self.style.SUCCESS("Cleared needs_restart flags for all plugins."))
-            except Exception as cache_err:
-                logger.error(f"Failed to clear needs_restart flags: {cache_err}")
 
             temporal_host = os.environ.get("TEMPORAL_HOST", "temporal:7233")
             namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")

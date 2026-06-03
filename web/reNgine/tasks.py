@@ -1913,8 +1913,11 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 	if config.get(GITLEAKS):
 		report_path = f"{temp_dir}/gitleaks_report.json"
 		# Gitleaks v8+ detect command
-		cmd = f"gitleaks detect --source {temp_dir} --report-format json --report-path {report_path} --exit-code 0"
-		subprocess.run(cmd, shell=True)
+		subprocess.run(
+			['gitleaks', 'detect', '--source', temp_dir,
+			 '--report-format', 'json', '--report-path', report_path, '--exit-code', '0'],
+			check=False
+		)
 		
 		if os.path.exists(report_path):
 			try:
@@ -1937,8 +1940,10 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 	# Run Trufflehog
 	if config.get(TRUFFLEHOG):
 		# Trufflehog v3 filesystem command
-		cmd = f"trufflehog filesystem {temp_dir} --json"
-		process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		process = subprocess.Popen(
+			['trufflehog', 'filesystem', temp_dir, '--json'],
+			shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+		)
 		stdout, stderr = process.communicate()
 		
 		for line in stdout.decode().splitlines():
@@ -1963,10 +1968,11 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 		# Betterleaks is typically run against files or a directory
 		# It's good for finding secrets like API keys, passwords, etc.
 		# Command: betterleaks -p {temp_dir}
-		cmd = f"betterleaks -p {temp_dir}"
-		# Since betterleaks output format might vary, we'll try to parse stdout
 		logger.info(f"Running Betterleaks on {temp_dir}")
-		process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+		process = subprocess.Popen(
+			['betterleaks', '-p', temp_dir],
+			shell=False, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+		)
 		stdout, stderr = process.communicate()
 		logger.info(f"Betterleaks output: {stdout}")
 		for line in stdout.splitlines():
@@ -6828,7 +6834,7 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 	if not (creds and creds.server_url and creds.api_key):
 		logger.error("Acunetix API keys not fully configured in vault. Skipping.")
 		return False
-	logger.info(f"Acunetix API keys found: {creds.server_url}, {creds.api_key}")
+	logger.info(f"Acunetix credentials configured for: {creds.server_url}")
 	try:
 		acunetix = Acunetix(host=creds.server_url, api=creds.api_key)
 		logger.info(f"Acunetix instance created: {acunetix}")
@@ -6847,6 +6853,8 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 			'Content-Type': 'application/json'
 		}
 		base_url = f"{creds.server_url}"
+		import os as _os
+		_acunetix_verify = _os.environ.get('ACUNETIX_CA_BUNDLE', False)
 		
 		# If target_id wasn't in scan_info, try to find it
 		if not target_id:
@@ -6865,7 +6873,7 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 		max_retries = 360 # 1 hour
 		retries = 0
 		while retries < max_retries:
-			scans_resp = requests.get(f"{base_url}/api/v1/scans?q=target_id:{target_id}", headers=headers, verify=False)
+			scans_resp = requests.get(f"{base_url}/api/v1/scans?q=target_id:{target_id}", headers=headers, verify=_acunetix_verify)
 			if scans_resp.status_code == 200:
 				scans_data = scans_resp.json()
 				scans_list = scans_data.get('scans', [])
@@ -6894,12 +6902,12 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 			# but q=scan_id:ID or the sub-resource works in many versions.
 			vulns_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
 
-		vulns_resp = requests.get(vulns_url, headers=headers, verify=False)
+		vulns_resp = requests.get(vulns_url, headers=headers, verify=_acunetix_verify)
 		if vulns_resp.status_code == 200:
 			vulns_data = vulns_resp.json()
 			for vuln in vulns_data.get('vulnerabilities', []):
 				# Get full details for each vuln
-				vuln_detail_resp = requests.get(f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}", headers=headers, verify=False)
+				vuln_detail_resp = requests.get(f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}", headers=headers, verify=_acunetix_verify)
 				if vuln_detail_resp.status_code == 200:
 					v_detail = vuln_detail_resp.json()
 					

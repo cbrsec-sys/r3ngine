@@ -159,9 +159,12 @@ def sanitize_command_for_db(cmd):
     """
     Strips 'export HTTP_PROXY=... &&' and 'proxychains4 -f ...' from command
     to ensure the UI displays the actual tool name and clean command.
+    Accepts both str and list commands.
     """
     if not cmd:
         return cmd
+    if isinstance(cmd, list):
+        cmd = ' '.join(str(c) for c in cmd)
     if isinstance(cmd, str):
         cmd = cmd.replace('\x00', '')
     # Strip export statements (matches both single and double quotes)
@@ -351,7 +354,7 @@ def run_command(
         popen = None
         try:
             popen = subprocess.Popen(
-                cmd if shell else cmd.split(),
+                cmd if (shell or isinstance(cmd, list)) else cmd.split(),
                 shell=shell,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
@@ -883,7 +886,7 @@ def stream_command(
 		return
 
 	# Sanitize the cmd
-	command = cmd if shell else cmd.split()
+	command = cmd if (shell or isinstance(cmd, list)) else cmd.split()
 
 	# Run the command using subprocess
 	process = subprocess.Popen(
