@@ -239,9 +239,11 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 				if not any(proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
 					proxy = 'http://' + proxy
 
-			# Use a global lock to ensure sequential execution across all workers;
-			# ffuf and dirsearch run concurrently within each URL's lock window.
-			with redis_client.lock("fuzz_execution_lock", timeout=14400):
+			# Per-scan lock: prevents concurrent ffuf/dirsearch for the same scan,
+			# but allows different scans to fuzz in parallel. Timeout = 30 min per
+			# URL window (generous for slow targets; auto-releases on crash).
+			_fuzz_lock_name = f"fuzz_execution_lock_{self.scan_id}"
+			with redis_client.lock(_fuzz_lock_name, timeout=1800):
 				ffuf_results_local = []
 				ffuf_exc = [None]
 				ds_exc = [None]
