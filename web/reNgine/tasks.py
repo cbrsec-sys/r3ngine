@@ -7466,8 +7466,11 @@ def save_semgrep_vulnerability_finding(result, ctx, base_dir):
 		scan = ScanHistory.objects.get(id=ctx.get('scan_history_id'))
 		domain = Domain.objects.get(id=ctx.get('domain_id'))
 		
+		check_id = result.get('check_id', '')
+		cleaned_check_id = clean_semgrep_check_id(check_id)
+		
 		vuln_data = {
-			'name': f"Semgrep: {result.get('check_id')}",
+			'name': f"Semgrep: {cleaned_check_id}",
 			'description': extra.get('message', ''),
 			'severity': SEMGREP_SEVERITY_MAP.get(extra.get('severity', 'INFO'), 0),
 			'http_url': path.replace(base_dir, '').lstrip('/'),
@@ -7482,17 +7485,26 @@ def save_semgrep_vulnerability_finding(result, ctx, base_dir):
 
 
 def save_semgrep_secret_finding(result, ctx, base_dir):
-	"""Saves a Semgrep finding as a SecretLeak."""
+	"""Saves a Semgrep finding as a SecretLeak.
+
+	Args:
+		result (dict): Semgrep finding match dictionary.
+		ctx (dict): Scan context containing history and domain IDs.
+		base_dir (str): Base directory path of the cloned repo.
+	"""
 	extra = result.get('extra', {})
 	path = result.get('path', '')
 	
 	try:
 		scan = ScanHistory.objects.get(id=ctx.get('scan_history_id'))
 		
+		check_id = result.get('check_id', '')
+		cleaned_check_id = clean_semgrep_check_id(check_id)
+		
 		leak_data = {
 			'scan_history': scan,
 			'tool_name': 'Semgrep',
-			'secret_type': result.get('check_id', 'Secret'),
+			'secret_type': cleaned_check_id or 'Secret',
 			'source_url': path.replace(base_dir, '').lstrip('/'),
 			'match_content': extra.get('lines', '').strip(),
 			'status': 'unverified'
@@ -7669,10 +7681,11 @@ def resume_scan_temporal(scan_id):
 def recover_stuck_scans():
 	"""Recover scans stuck due to a crash or Temporal state loss.
 
-	Called on orchestrator startup. Handles two cases:
-	  1. FAILED_TASK scans — workflow terminated, Django already reflects it.
-	  2. RUNNING_TASK scans — Django thinks they're running but Temporal has no
-	     active workflow (happens when Temporal's DB is wiped on restart).
+	Called on orchestrator startup. Identifies RUNNING_TASK scans whose associated
+	Temporal workflow no longer exists (e.g. after a container restart or crash),
+	marks them as FAILED_TASK, and resumes them using the temporal orchestrator.
+	Scans that are already in FAILED_TASK, ABORTED_TASK, or otherwise completed/stopped/paused
+	states are not touched.
 
 	Auto-recovery is capped at recovery_count < 3.
 	"""
@@ -7712,13 +7725,13 @@ def recover_stuck_scans():
 			logger.warning(f"Unexpected error checking workflow '{workflow_id}': {e}. Skipping recovery.")
 			return True
 
-	# --- Pass 1: FAILED_TASK scans ---
-	for scan in ScanHistory.objects.filter(scan_status=FAILED_TASK, recovery_count__lt=3):
-		logger.info(f"Auto-recovering failed scan {scan.id} (recovery_count={scan.recovery_count})")
-		try:
-			resume_scan_temporal(scan.id)
-		except Exception as e:
-			logger.error(f"Failed to auto-recover scan {scan.id}: {e}")
+	# --- Pass 1: FAILED_TASK scans (Commented out to only restart active running scans) ---
+	# for scan in ScanHistory.objects.filter(scan_status=FAILED_TASK, recovery_count__lt=3):
+	# 	logger.info(f"Auto-recovering failed scan {scan.id} (recovery_count={scan.recovery_count})")
+	# 	try:
+	# 		resume_scan_temporal(scan.id)
+	# 	except Exception as e:
+	# 		logger.error(f"Failed to auto-recover scan {scan.id}: {e}")
 
 	# --- Pass 2: RUNNING_TASK scans whose Temporal workflow is gone ---
 	# Exclude scans that were explicitly stopped by the user (stop_scan_date is set by
