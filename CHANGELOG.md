@@ -1,5 +1,12 @@
 # Changelog
 
+### [v3.4.2] - 2026-06-03
+
+- **Semgrep Finding Name Normalization**:
+  - Implemented a centralized `clean_semgrep_check_id` helper in `common_func.py` to strip system/path-based prefixes (e.g. `usr.src.github.semgrep_rules.`) and deduplicate repeating suffixes in Semgrep check IDs.
+  - Applied the normalization logic to `parse_semgrep_result` in `common_func.py`, as well as `save_semgrep_vulnerability_finding` and `save_semgrep_secret_finding` in `tasks.py`.
+  - Added comprehensive unit tests in `test_semgrep_optimization.py` to verify normalization under various path structures.
+
 ### [v3.4.1] - 2026-06-03
 
 - **Infrastructure Upgrade: Django 5.2 LTS + PostgreSQL 16 + Gunicorn ASGI**:
@@ -11,6 +18,10 @@
   - **DRF router basename deduplication**: Added explicit `basename=` parameters to 13 `router.register()` calls in `api/urls.py`. DRF 3.15.2 added strict duplicate basename detection (first introduced in 3.14.0); viewsets sharing the same model (`Subdomain` ×5, `EndPoint` ×4, `Command` ×2) now have unique basenames.
   - **PostgreSQL connection pooling**: Added `CONN_MAX_AGE=60` and `CONN_HEALTH_CHECKS=True` to `DATABASES` settings. Connections are now reused across requests within each Gunicorn worker (safe with UvicornWorker's per-process model) and validated before reuse (Django 4.1+ feature).
   - **PostgreSQL SSL**: Enabled SSL client configuration in `DATABASES` options. SSL mode is env-configurable via `POSTGRES_SSLMODE` (default: `prefer`; set to `verify-full` in production with certs). The CA certificate is mounted from `secrets/certs/ca.crt` into the container at `BASE_DIR/ca.crt`.
+
+- **Startup Recovery Optimization**:
+  - Adjusted `recover_stuck_scans` to only recover and resume scans that were actively in the `RUNNING_TASK` status when the system stopped or crashed.
+  - Commented out auto-recovery for completed, failed (`FAILED_TASK`), aborted (`ABORTED_TASK`), stopped, or paused scans to prevent unexpected restarts of non-running tasks.
 
 - **Upgrade Tooling (`make fullupgrade`)**:
   - **`scripts/db_backup.sh`**: Dedicated pre-upgrade database backup script. Isolates `pg_dump` stderr from the dump file (previously `2>&1` could corrupt the backup with error text); checks the pg_dump exit code via `if !` (compatible with `set -euo pipefail`); verifies the output is non-empty before proceeding. Called at step [1/8] with database credentials passed from Makefile variables.
