@@ -221,16 +221,17 @@ class Command(BaseCommand):
         except Exception as tool_err:
             logger.error(f"Plugin tool installation failed at startup: {tool_err}")
 
+        # Clear needs_restart flags synchronously before entering the async event loop.
+        try:
+            from django.core.cache import cache
+            from plugins.models import Plugin
+            for plugin in Plugin.objects.all():
+                cache.set(f"plugin_{plugin.slug}_needs_restart", False, timeout=None)
+            self.stdout.write(self.style.SUCCESS("Cleared needs_restart flags for all plugins."))
+        except Exception as cache_err:
+            logger.error(f"Failed to clear needs_restart flags: {cache_err}")
+
         async def main():
-            # Clear all needs_restart flags for active plugins in the cache
-            try:
-                from django.core.cache import cache
-                from plugins.models import Plugin
-                for plugin in Plugin.objects.all():
-                    cache.set(f"plugin_{plugin.slug}_needs_restart", False, timeout=None)
-                self.stdout.write(self.style.SUCCESS("Cleared needs_restart flags for all plugins."))
-            except Exception as cache_err:
-                logger.error(f"Failed to clear needs_restart flags: {cache_err}")
 
             temporal_host = os.environ.get("TEMPORAL_HOST", "temporal:7233")
             namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
