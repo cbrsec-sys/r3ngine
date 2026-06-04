@@ -169,7 +169,7 @@ LABEL \
 # client version to be >= the server version (now 16), so we pin to 16.
 # ---------------------------------------------------------------------------
 RUN apt-get update -y && \
-    apt-get install -y --no-install-recommends gnupg curl lsb-release && \
+    apt-get install -y --no-install-recommends ca-certificates gnupg curl lsb-release && \
     rm -rf /var/lib/apt/lists/* && \
     curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
         | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg && \
