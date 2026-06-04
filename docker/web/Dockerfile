@@ -164,6 +164,19 @@ LABEL \
     description="reNgine is an automated recon pipeline for web application penetration testing."
 
 # ---------------------------------------------------------------------------
+# Add the PostgreSQL 16 APT repository.
+# Ubuntu 22.04 ships postgresql-client 14 by default; pg_dump requires the
+# client version to be >= the server version (now 16), so we pin to 16.
+# ---------------------------------------------------------------------------
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends gnupg curl lsb-release && \
+    rm -rf /var/lib/apt/lists/* && \
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+        | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list
+
+# ---------------------------------------------------------------------------
 # System packages — single combined RUN to keep the layer count low.
 # build-essential is kept because pip installs some packages that compile
 # C extensions (cryptography, pycairo, etc.) and gems (wpscan) need gcc.
@@ -219,7 +232,7 @@ RUN apt-get update -y && \
     proxychains4 \
     hping3 \
     wrk \
-    postgresql-client \
+    postgresql-client-16 \
     # Network protocol enumeration tools
     onesixtyone \
     snmp \
