@@ -1287,26 +1287,141 @@ class TemporalSchedule(models.Model):
 
 
 class VulnerabilityHistory(models.Model):
-	"""
-	Tracks the lifecycle, persistence, and remediation status of vulnerabilities across scan runs.
-	"""
-	id = models.AutoField(primary_key=True)
-	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, related_name='vulnerability_history')
-	vulnerability = models.ForeignKey(Vulnerability, on_delete=models.CASCADE, related_name='history_records')
-	cve = models.ForeignKey(CveId, on_delete=models.SET_NULL, null=True, blank=True)
-	group_key = models.CharField(max_length=500, db_index=True)
-	
-	first_seen = models.DateTimeField(auto_now_add=True)
-	last_seen = models.DateTimeField(auto_now=True)
-	is_remediated = models.BooleanField(default=False)
-	remediation_date = models.DateTimeField(null=True, blank=True)
-	
-	total_occurrences = models.IntegerField(default=1)
-	affected_subdomains_count = models.IntegerField(default=0)
-
-	class Meta:
-		unique_together = ('group_key', 'scan_history')
-		indexes = [
-			models.Index(fields=['group_key', '-last_seen']),
-			models.Index(fields=['is_remediated', '-last_seen']),
-		]
+    """
+    Tracks the lifecycle, persistence, and remediation status of vulnerabilities 
+    across scan runs. Enables trend analysis and remediation tracking.
+    
+    Attributes:
+        group_key: SHA-256 hash uniquely identifying a vulnerability class
+        first_seen: Timestamp of initial discovery
+        last_seen: Timestamp of most recent discovery
+        is_remediated: Boolean flag indicating if vulnerability has been fixed
+        remediation_date: Timestamp when vulnerability was first remediated
+        total_occurrences: Count of how many times this vulnerability has appeared
+        affected_subdomains_count: Number of distinct subdomains affected
+        scan_history: Reference to the scan that found this record
+        vulnerability: Reference to the Vulnerability that triggered history creation
+        cve: Optional reference to associated CVE record
+    """
+    id = models.AutoField(primary_key=True)
+    
+    # Linking to scans and vulnerabilities
+    scan_history = models.ForeignKey(
+        ScanHistory, 
+        on_delete=models.CASCADE, 
+        related_name='vulnerability_history',
+        help_text='Scan that generated this history record'
+    )
+    vulnerability = models.ForeignKey(
+        Vulnerability, 
+        on_delete=models.CASCADE, 
+        related_name='history_records',
+        help_text='Vulnerability that triggered this record'
+    )
+    cve = models.ForeignKey(
+        CveId, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        help_text='Associated CVE, if available'
+    )
+    
+    # Deduplication & grouping
+    group_key = models.CharField(
+        max_length=500, 
+        db_index=True,
+        help_text='SHA-256 hash for grouping identical vulnerabilities'
+    )
+    
+    # Timeline tracking
+    first_seen = models.DateTimeField(
+        auto_now_add=True,
+        help_text='First discovery timestamp'
+    )
+    last_seen = models.DateTimeField(
+        auto_now=True,
+        help_text='Most recent discovery timestamp'
+    )
+    
+    # Remediation status
+    is_remediated = models.BooleanField(
+        default=False,
+        help_text='Whether vulnerability has been fixed'
+    )
+    remediation_date = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text='Date when vulnerability was remediated'
+    )
+    
+    # Trending & impact metrics
+    total_occurrences = models.IntegerField(
+        default=1,
+        help_text='Total times this vulnerability appeared'
+    )
+    affected_subdomains_count = models.IntegerField(
+        default=0,
+        help_text='Number of distinct subdomains affected'
+    )
+    
+    class Meta:
+        verbose_name = 'Vulnerability History'
+        verbose_name_plural = 'Vulnerability Histories'
+        ordering = ['-last_seen']
+        
+        # Enforce one history record per (group_key, scan_history) pair
+        unique_together = ('group_key', 'scan_history')
+        
+        # Performance indexes
+        indexes = [
+            models.Index(
+                fields=['group_key', '-last_seen'],
+                name='vh_groupkey_lastseen_idx'
+            ),
+            models.Index(
+                fields=['is_remediated', '-last_seen'],
+                name='vh_remediated_lastseen_idx'
+            ),
+            models.Index(
+                fields=['scan_history', '-last_seen'],
+                name='vh_scan_lastseen_idx'
+            ),
+        ]
+    
+    def __str__(self):
+        status = "✓ Remediated" if self.is_remediated else "✗ Active"
+        return f"{self.vulnerability.name} [{self.group_key[:8]}...] - {status}"
+    
+    def days_since_discovery(self):
+        """Calculate days between first discovery and now."""
+        from django.utils import timezone
+        return (timezone.now() - self.first_seen).days
+    
+    def days_to_remediation(self):
+        """Calculate time from first discovery to remediation."""
+        if not self.remediation_date:
+            return None
+        return (self.remediation_date - self.first_seen).days
+    
+    @classmethod
+    def get_trending_vulns(cls, domain, days=30):
+        """Get vulnerabilities discovered in last N days."""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        cutoff = timezone.now() - timedelta(days=days)
+        return cls.objects.filter(
+            scan_history__domain=domain,
+            first_seen__gte=cutoff
+        ).order_by('-total_occurrences')
+    
+    @classmethod
+    def get_persistent_vulns(cls, domain, min_days=90):
+        """Get vulnerabilities that have persisted for N+ days."""
+        from django.utils import timezone
+        
+        return cls.objects.filter(
+            scan_history__domain=domain,
+            is_remediated=False,
+            days_since_discovery__gte=min_days
+        ).order_by('first_seen')

@@ -231,6 +231,11 @@ class TestVulnerabilityCorrelation(TestCase):
             def json(self):
                 return self.json_data
 
+            def raise_for_status(self):
+                if self.status_code >= 400:
+                    import requests
+                    raise requests.HTTPError(f"HTTP Error {self.status_code}", response=self)
+
         def mock_get(url, *args, **kwargs):
             if "services.nvd.nist.gov" in url:
                 return MockResponse({

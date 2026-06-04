@@ -1216,63 +1216,112 @@ class FetchMostVulnerable(APIView):
 
 
 class CVEDetails(APIView):
+	"""
+	API view for retrieving detailed CVE information.
+	Supports checking the local database first and falling back to live NVD/EPSS enrichment.
+	Also fetches additional threat intelligence context from cve.circl.lu.
+	"""
 	permission_classes = [IsPenetrationTester]
+	
 	def get(self, request):
-		req = self.request
+		"""
+		Retrieve CVE details, performing live enrichment if the CVE is not in the database.
 
+		Args:
+			request: DRF request object containing query parameters.
+				- query_params.cve_id (str): The CVE identifier, e.g., 'CVE-2024-1234'
+
+		Returns:
+			Response: A DRF Response object with either the CVE details or an error message.
+		"""
+		req = self.request
 		cve_id = req.query_params.get('cve_id')
 
 		if not cve_id:
-			return Response({'status': False, 'message': 'CVE ID not provided'})
+			return Response({
+				'status': False, 
+				'message': 'CVE ID not provided'
+			})
 
-		# Check local DB first, otherwise attempt live NVD/EPSS enrichment
 		from reNgine.cve_enrichment import CVEEnrichmentService
 		from startScan.models import CveId
 		
 		formatted_cve_id = cve_id.upper().strip()
-		cve_qs = CveId.objects.filter(name__iexact=formatted_cve_id)
-		cve_obj = None
-		if cve_qs.exists():
-			cve_obj = cve_qs.first()
-		else:
+		
+		# 1. Check if the CVE exists in the local database
+		try:
+			cve_obj = CveId.objects.get(name__iexact=formatted_cve_id)
+			logger.info(f"Found {formatted_cve_id} in local database")
+		except CveId.DoesNotExist:
+			# 2. Attempt live enrichment from NVD and EPSS APIs
+			logger.info(f"CVE {formatted_cve_id} not in database, attempting enrichment...")
 			try:
 				service = CVEEnrichmentService()
 				cve_obj = service.enrich_cve(formatted_cve_id)
+				
+				if not cve_obj:
+					return Response({
+						'status': False, 
+						'message': f'CVE {formatted_cve_id} not found in official sources'
+					})
+				
+				logger.info(f"Successfully enriched {formatted_cve_id}")
 			except Exception as e:
-				logger.error(f"Failed to auto-enrich searched CVE {formatted_cve_id}: {e}")
+				logger.error(f"Enrichment failed for {formatted_cve_id}: {e}")
+				return Response({
+					'status': False, 
+					'message': f'Failed to enrich CVE data: {str(e)}'
+				})
 
+		# 3. Fetch additional context and references from CIRCL.LU API
 		circl_data = {}
 		try:
-			response = requests.get('https://cve.circl.lu/api/cve/' + formatted_cve_id, timeout=10)
+			response = requests.get(f'https://cve.circl.lu/api/cve/{formatted_cve_id}', timeout=10)
 			if response.status_code == 200:
 				circl_data = response.json() or {}
 		except Exception as e:
-			logger.warning(f"Failed to fetch circl.lu details for {formatted_cve_id}: {e}")
+			logger.warning(f"CIRCL.LU lookup failed for {formatted_cve_id}: {e}")
 
-		if not circl_data and (not cve_obj or cve_obj.cvss_v31_base_score is None):
-			return Response({'status': False, 'message': 'CVE ID does not exist.'})
-
+		# 4. Compile the full enriched data dictionary
 		result = {
 			'id': formatted_cve_id,
-			'summary': circl_data.get('summary', 'No summary available in external feeds.'),
-			'cvss': circl_data.get('cvss') or (cve_obj.cvss_v31_base_score if cve_obj else None),
-			'cvss_v31_base_score': cve_obj.cvss_v31_base_score if cve_obj else None,
-			'epss_score': cve_obj.epss_score if cve_obj else None,
-			'epss_percentile': cve_obj.epss_percentile if cve_obj else None,
-			'is_cisa_kev': cve_obj.is_cisa_kev if cve_obj else False,
-			'attack_vector': cve_obj.attack_vector if cve_obj else None,
-			'attack_complexity': cve_obj.attack_complexity if cve_obj else None,
-			'privileges_required': cve_obj.privileges_required if cve_obj else None,
-			'user_interaction': cve_obj.user_interaction if cve_obj else None,
-			'confidentiality_impact': cve_obj.confidentiality_impact if cve_obj else None,
-			'integrity_impact': cve_obj.integrity_impact if cve_obj else None,
-			'availability_impact': cve_obj.availability_impact if cve_obj else None,
-			'published_date': cve_obj.published_date.isoformat() if (cve_obj and cve_obj.published_date) else None,
-			'last_modified_date': cve_obj.last_modified_date.isoformat() if (cve_obj and cve_obj.last_modified_date) else None,
-			'vulnerability_type': cve_obj.vulnerability_type if cve_obj else None,
+			'summary': circl_data.get('summary', 'No summary available'),
+			'assigner': circl_data.get('assigner', 'N/A'),
+			
+			# NVD Data
+			'cvss': circl_data.get('cvss') or cve_obj.cvss_v31_base_score,
+			'cvss_v31_base_score': cve_obj.cvss_v31_base_score,
+			'cvss_vector': circl_data.get('cvss-vector', 'N/A'),
+			
+			# CVSS Impact Breakdown
+			'attack_vector': cve_obj.attack_vector,
+			'attack_complexity': cve_obj.attack_complexity,
+			'privileges_required': cve_obj.privileges_required,
+			'user_interaction': cve_obj.user_interaction,
+			'confidentiality_impact': cve_obj.confidentiality_impact,
+			'integrity_impact': cve_obj.integrity_impact,
+			'availability_impact': cve_obj.availability_impact,
+			
+			# EPSS Data
+			'epss_score': cve_obj.epss_score,
+			'epss_percentile': cve_obj.epss_percentile,
+			
+			# Threat Data
+			'is_cisa_kev': cve_obj.is_cisa_kev,
+			'vulnerability_type': cve_obj.vulnerability_type,
+			
+			# Timeline
+			'published_date': cve_obj.published_date.isoformat() if cve_obj.published_date else None,
+			'last_modified_date': cve_obj.last_modified_date.isoformat() if cve_obj.last_modified_date else None,
+			
+			# References
+			'references': circl_data.get('references', []),
 		}
 
-		return Response({'status': True, 'result': result})
+		return Response({
+			'status': True, 
+			'result': result
+		})
 
 
 
