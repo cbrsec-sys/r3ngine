@@ -2,6 +2,13 @@
 
 ### [v3.5.0] - 2026-06-04
 
+- **CVE Enrichment System**:
+  - **CVE Enrichment Service**: `web/reNgine/cve_enrichment.py` fully operational - fetches CVSS v3.1 metrics from NVD API v2.0, EPSS probability scores from FIRST, and syncs the CISA KEV catalog. Enriched data is cached (7-day TTL for CVEs, 1-hour for KEV) and gracefully degrades on API unavailability.
+  - **Deployment Documentation** (`documents/CVE_ENRICHMENT.md`): Comprehensive documentation covering setup, programmatic usage, management commands, correlation integration, troubleshooting, data retention, performance, and monitoring.
+  - **Deployment Checklist** (`documents/DEPLOYMENT_CHECKLIST.md`): Step-by-step v3.5 upgrade procedure including migration verification, initial data load, cron job setup, rollback plan, and post-deployment verification.
+  - **End-to-End Integration Test** (`web/tests/test_integration.py`): Full pipeline integration test validating the CVE enrichment -> correlation -> in-scan deduplication -> VulnerabilityHistory creation -> cross-scan remediation detection flow. All 3 test suites pass (15 tests total: 7 enrichment + 7 correlation + 1 integration).
+  - **Database Migrations Applied**: Migrations `0035_add_cve_enrichment_fields` and `0036_create_vulnerability_history` confirmed applied in all environments.
+
 - **CVE Correlation, Deduplication & Graph Sync Enhancements**:
   - **Enhanced CveId Model**: Added CVSS v3.1 base score, EPSS score, EPSS percentile, attack complexity, attack vector, privileges required, user interaction, and scope fields to the database schema (migration `0035`).
   - **Correlation Scoring & Deduplication**: Replaced basic CVSS severity lookups with a multi-criteria scoring algorithm in `correlation.py`. Calculates composite scores using configurable tool weights, asset criticality, exploitability factors (CISA KEV, EPSS), and temporal modifiers. Suppresses inside-scan duplicates in-memory and groups them under a unique `group_key` before writing.

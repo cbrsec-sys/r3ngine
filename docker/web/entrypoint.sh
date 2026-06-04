@@ -30,7 +30,6 @@ python3 manage.py sync_roles
 
 # Load default fixtures (Scan Engines, Tools, Keywords)
 echo "Loading default fixtures..."
-python3 manage.py loaddata fixtures/default_scan_engines.yaml
 python3 manage.py loaddata fixtures/external_tools.yaml
 python3 manage.py loaddata fixtures/default_keywords.yaml
 

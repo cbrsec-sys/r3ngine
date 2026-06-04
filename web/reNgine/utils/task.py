@@ -313,7 +313,8 @@ def run_command(
                 {
                     "command": [command_str],
                     "scan_id": scan_history_id or 0,
-                    "command_id": command_rec_id or 0
+                    "command_id": command_rec_id or 0,
+                    "working_dir": cwd or "",
                 },
                 id=f"go-exec-{tool}-{command_rec_id or int(time.time())}",
                 task_queue="python-orchestrator-queue"
@@ -771,7 +772,8 @@ def stream_command(
 				{
 					"command": [command_str],
 					"scan_id": scan_history_id or 0,
-					"command_id": command_rec_id or 0
+					"command_id": command_rec_id or 0,
+					"working_dir": cwd or "",
 				},
 				id=workflow_id,
 				task_queue="python-orchestrator-queue"
@@ -896,6 +898,7 @@ def stream_command(
 		universal_newlines=True,
 		errors='replace',
 		shell=shell,
+		cwd=cwd,
 		preexec_fn=os.setsid)
 
 	# Start a watchdog thread to terminate the command if it runs too long

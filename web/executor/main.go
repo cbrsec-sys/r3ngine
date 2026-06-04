@@ -20,9 +20,10 @@ import (
 )
 
 type ToolExecutionInput struct {
-	Command   []string `json:"command"`
-	ScanID    int      `json:"scan_id"`
-	CommandID int      `json:"command_id"`
+	Command    []string `json:"command"`
+	ScanID     int      `json:"scan_id"`
+	CommandID  int      `json:"command_id"`
+	WorkingDir string   `json:"working_dir"`
 }
 
 type ToolExecutionResult struct {
@@ -55,6 +56,9 @@ func (a *Activities) SubprocessActivity(ctx context.Context, input ToolExecution
 		cmd = exec.CommandContext(ctx, "/bin/bash", "-c", input.Command[0])
 	} else {
 		cmd = exec.CommandContext(ctx, input.Command[0], input.Command[1:]...)
+	}
+	if input.WorkingDir != "" {
+		cmd.Dir = input.WorkingDir
 	}
 	// Place the subprocess in its own process group so all children (nuclei, amass, etc.)
 	// receive SIGKILL when the Temporal context is cancelled, not just the bash shell.
