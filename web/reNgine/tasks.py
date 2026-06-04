@@ -136,13 +136,11 @@ SCAN_PIPELINE_DEFINITION = [
 
 def sync_all_scans_to_graph(self):
 	"""Sync all pre-existing scan results to Neo4j graph."""
-	print(">>> [GRAPH SYNC] Starting global graph synchronization...")
 	logger.info("Starting global graph synchronization...")
 	nm = Neo4jManager()
 	nm.sync_all_scans()
 	nm.close()
 	logger.info("Global graph synchronization completed.")
-	print(">>> [GRAPH SYNC] Global graph synchronization completed.")
 
 def finish_osint(results, scan_history_id):
     """Trigger the Deep Pursuit OSINT pipeline after standard OSINT tasks complete.
@@ -6468,8 +6466,7 @@ def fetch_proxies_task(limit=1000, job_id=None):
             except Exception:
                 alive = False
             if alive:
-                logger.info(f"Proxy LIVE: {proxy_str}")
-                print(f"[PROXY LIVE] {proxy_str}", flush=True)
+                logger.info("Proxy LIVE: %s", proxy_str)
                 with lock:
                     live_proxies.append(proxy_str)
             with lock:
@@ -7530,10 +7527,13 @@ def resume_scan_temporal(scan_id):
 		scan.save()
 		return
 		
-	# Update scan status and recovery count
+	# Update scan status. Clear stop_scan_date and reset recovery_count so that
+	# recover_stuck_scans can find this scan if the container crashes again — a
+	# manually resumed scan is a fresh attempt, not a continuation of prior failures.
 	scan.scan_status = RUNNING_TASK
 	scan.error_message = None
-	scan.recovery_count += 1
+	scan.stop_scan_date = None
+	scan.recovery_count = 0
 	scan.tasks = remaining_tasks
 	scan.save()
 	
@@ -7626,6 +7626,8 @@ def recover_stuck_scans():
 	from reNgine.definitions import FAILED_TASK, RUNNING_TASK
 	from reNgine.temporal_client import TemporalClientProvider
 
+	logger.info("[RECOVERY] recover_stuck_scans triggered")
+
 	async def _is_workflow_active(workflow_id):
 		from temporalio.client import WorkflowExecutionStatus
 		from temporalio.service import RPCError, RPCStatusCode
@@ -7651,29 +7653,34 @@ def recover_stuck_scans():
 			if e.status == RPCStatusCode.NOT_FOUND:
 				return False  # workflow genuinely absent — safe to recover
 			# Any other RPC error means Temporal itself is unavailable — do NOT recover
-			logger.warning(f"Temporal RPC error checking workflow '{workflow_id}': {e}. Skipping recovery.")
+			logger.warning("[RECOVERY] Temporal RPC error checking workflow '%s': %s. Skipping recovery.", workflow_id, e)
 			return True
 		except Exception as e:
-			logger.warning(f"Unexpected error checking workflow '{workflow_id}': {e}. Skipping recovery.")
+			logger.warning("[RECOVERY] Unexpected error checking workflow '%s': %s. Skipping recovery.", workflow_id, e)
 			return True
 
-	# --- Pass 1: FAILED_TASK scans (Commented out to only restart active running scans) ---
-	# for scan in ScanHistory.objects.filter(scan_status=FAILED_TASK, recovery_count__lt=3):
-	# 	logger.info(f"Auto-recovering failed scan {scan.id} (recovery_count={scan.recovery_count})")
-	# 	try:
-	# 		resume_scan_temporal(scan.id)
-	# 	except Exception as e:
-	# 		logger.error(f"Failed to auto-recover scan {scan.id}: {e}")
-
 	# --- Pass 2: RUNNING_TASK scans whose Temporal workflow is gone ---
-	# Exclude scans that were explicitly stopped by the user (stop_scan_date is set by
-	# abort_scan_history). This guards against a narrow race-condition window where the
-	# orchestrator restarts before the ABORTED_TASK status is persisted to the DB.
-	for scan in ScanHistory.objects.filter(
+	# Guard: skip scans whose stop_scan_date was set within the last 2 minutes —
+	# that narrow window covers the abort race-condition where the orchestrator
+	# restarts before abort_scan_history can flip scan_status to ABORTED_TASK.
+	# Scans stopped longer ago (or never stopped) are safe to recover; in particular
+	# a manually-resumed scan now clears stop_scan_date in resume_scan_temporal so
+	# it will always appear here with stop_scan_date=None.
+	from django.utils import timezone as _tz
+	import datetime as _dt
+	_abort_grace = _tz.now() - _dt.timedelta(minutes=2)
+	candidates = list(ScanHistory.objects.filter(
 		scan_status=RUNNING_TASK,
 		recovery_count__lt=3,
-		stop_scan_date__isnull=True,
-	):
+	).exclude(
+		stop_scan_date__gte=_abort_grace,
+	))
+
+	logger.info("[RECOVERY] Evaluating %d RUNNING scan(s) for recovery", len(candidates))
+
+	recovered = 0
+	active = 0
+	for scan in candidates:
 		# Prefer the TemporalWorkflowExecution record; fall back to workflow_ids array.
 		latest_exec = (
 			TemporalWorkflowExecution.objects
@@ -7693,16 +7700,21 @@ def recover_stuck_scans():
 			loop.close()
 
 		if is_active:
+			logger.info("[RECOVERY] Scan %d (%s) workflow '%s' is ACTIVE — skipping", scan.id, scan.domain, workflow_id)
+			active += 1
 			continue
 
 		logger.info(
-			f"RUNNING_TASK scan {scan.id} workflow '{workflow_id}' not active in Temporal — recovering "
-			f"(recovery_count={scan.recovery_count})"
+			"[RECOVERY] Scan %d (%s) workflow '%s' is DEAD — resuming (recovery_count=%d)",
+			scan.id, scan.domain, workflow_id, scan.recovery_count
 		)
 		scan.scan_status = FAILED_TASK
 		scan.save(update_fields=['scan_status'])
 		try:
 			resume_scan_temporal(scan.id)
+			recovered += 1
 		except Exception as e:
-			logger.error(f"Failed to auto-recover stuck running scan {scan.id}: {e}")
+			logger.error("[RECOVERY] Failed to auto-recover stuck running scan %d: %s", scan.id, e)
+
+	logger.info("[RECOVERY] recover_stuck_scans complete — active=%d recovered=%d", active, recovered)
 
