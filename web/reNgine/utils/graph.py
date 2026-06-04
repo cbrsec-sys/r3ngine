@@ -740,18 +740,18 @@ class Neo4jManager:
         query = "MATCH (n) DETACH DELETE n"
         with self.driver.session() as session:
             session.run(query)
-        print("[*] Neo4j database has been reset (all nodes deleted).")
+        logger.info("Neo4j database has been reset (all nodes deleted).")
 
     def sync_all_scans(self):
         """Utility to re-sync all historical scans from Django DB to Neo4j."""
         from startScan.models import ScanHistory
 
         scans = ScanHistory.objects.all().order_by("id")
-        print(f"[*] Starting re-sync of {scans.count()} scans...")
+        logger.info("Starting re-sync of %d scans...", scans.count())
         for scan in scans:
             try:
-                print(f"[*] Syncing scan {scan.id} for {scan.domain.name}...")
+                logger.info("Syncing scan %d for %s...", scan.id, scan.domain.name)
                 self.sync_scan_results(scan.id)
             except Exception as e:
-                print(f"[!] Error syncing scan {scan.id}: {str(e)}")
-        print("[*] Re-sync complete.")
+                logger.error("Error syncing scan %d: %s", scan.id, e)
+        logger.info("Re-sync complete.")

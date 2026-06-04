@@ -1105,7 +1105,7 @@ class FetchMostCommonVulnerability(APIView):
 				response['status'] = True
 				response['result'] = most_common_vulnerabilities
 		except Exception as e:
-			print(str(e))
+			logger.exception("Unexpected error: %s", e)
 			response = {}
 
 		return Response(response)
@@ -2530,7 +2530,7 @@ class Whois(APIView):
 		if not target:
 			return Response({'status': False, 'message': 'Target IP/Domain required!'})
 		if not (validators.domain(target) or validators.ipv4(target) or validators.ipv6(target)):
-			print(f'Ip address or domain "{target}" did not pass validator.')
+			logger.warning('Ip address or domain "%s" did not pass validator.', target)
 			return Response({'status': False, 'message': 'Invalid domain or IP'})
 		is_force_update = req.query_params.get('is_reload')
 		is_force_update = True if is_force_update and 'true' == is_force_update.lower() else False
@@ -3730,13 +3730,13 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 					int_http_status = int(content)
 					qs = self.queryset.filter(http_status=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in title:
 				try:
 					int_http_status = int(content)
 					qs = self.queryset.filter(content_length=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		elif '>' in search_value:
 			search_param = search_value.split(">")
@@ -3747,13 +3747,13 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 					int_val = int(content)
 					qs = self.queryset.filter(http_status__gt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in title:
 				try:
 					int_val = int(content)
 					qs = self.queryset.filter(content_length__gt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		elif '<' in search_value:
 			search_param = search_value.split("<")
@@ -3764,13 +3764,13 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 					int_val = int(content)
 					qs = self.queryset.filter(http_status__lt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in title:
 				try:
 					int_val = int(content)
 					qs = self.queryset.filter(content_length__lt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		elif '!' in search_value:
 			search_param = search_value.split("!")
@@ -3815,13 +3815,13 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 					int_http_status = int(content)
 					qs = self.queryset.exclude(http_status=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in title:
 				try:
 					int_http_status = int(content)
 					qs = self.queryset.exclude(content_length=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		return qs
 
@@ -4041,13 +4041,13 @@ class EndPointViewSet(viewsets.ModelViewSet):
 					int_http_status = int(lookup_content)
 					qs = self.queryset.filter(http_status=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in lookup_title:
 				try:
 					int_http_status = int(lookup_content)
 					qs = self.queryset.filter(content_length=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'parameter' in lookup_title:
 				qs = (
 					self.queryset
@@ -4065,13 +4065,13 @@ class EndPointViewSet(viewsets.ModelViewSet):
 						.filter(http_status__gt=int_val)
 					)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in lookup_title:
 				try:
 					int_val = int(lookup_content)
 					qs = self.queryset.filter(content_length__gt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 		elif '<' in search_value:
 			search_param = search_value.split("<")
 			lookup_title = search_param[0].lower().strip()
@@ -4081,13 +4081,13 @@ class EndPointViewSet(viewsets.ModelViewSet):
 					int_val = int(lookup_content)
 					qs = self.queryset.filter(http_status__lt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in lookup_title:
 				try:
 					int_val = int(lookup_content)
 					qs = self.queryset.filter(content_length__lt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 		elif '!' in search_value:
 			search_param = search_value.split("!")
 			lookup_title = search_param[0].lower().strip()
@@ -4127,13 +4127,13 @@ class EndPointViewSet(viewsets.ModelViewSet):
 					int_http_status = int(lookup_content)
 					qs = self.queryset.exclude(http_status=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in lookup_title:
 				try:
 					int_http_status = int(lookup_content)
 					qs = self.queryset.exclude(content_length=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 		return qs
 
 
@@ -4531,7 +4531,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 					val = float(lookup_content)
 					qs = self.queryset.filter(cvss_score__gt=val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		elif '<' in search_value:
 			search_param = search_value.split("<")
@@ -4542,7 +4542,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 					val = int(lookup_content)
 					qs = self.queryset.filter(cvss_score__lt=val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		return qs
 
