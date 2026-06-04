@@ -126,7 +126,7 @@ from reNgine.temporal_activities import (
     run_vigolium_analysis_activity,
     mark_vulnerability_scan_complete_activity,
     run_waf_bypass_activity,
-    run_brute_force_scan_activity,
+
     parse_assessment_results_activity,
 
     # Tier 7: Post-Processing & Intel
@@ -361,7 +361,7 @@ class Command(BaseCommand):
                 run_vigolium_analysis_activity,
                 mark_vulnerability_scan_complete_activity,
                 run_waf_bypass_activity,
-                run_brute_force_scan_activity,
+
                 parse_assessment_results_activity,
 
                 # Tier 7

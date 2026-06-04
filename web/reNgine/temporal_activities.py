@@ -1108,27 +1108,6 @@ def run_waf_bypass_activity(ctx: dict) -> bool:
     )
 
 
-@activity.defn(name="RunBruteForceScanActivity")
-def run_brute_force_scan_activity(ctx: dict) -> bool:
-    """Run brute force attacks against discovered login endpoints.
-
-    Delegates to the existing `brute_force_scan` task.
-
-    Args:
-        ctx (dict): Temporal workflow context.
-
-    Returns:
-        bool: True on success.
-    """
-    from reNgine.tasks import brute_force_scan
-    activity.logger.info(f"[RunBruteForceScanActivity] scan_id={ctx.get('scan_history_id')}")
-    return _run_task(
-        brute_force_scan,
-        ctx,
-        task_name='brute_force_scan',
-        description='Brute Force Scan'
-    )
-
 
 @activity.defn(name="ParseAssessmentResultsActivity")
 def parse_assessment_results_activity(ctx: dict) -> bool:
@@ -1346,7 +1325,7 @@ _PERMITTED_GENERIC_TASKS = frozenset({
     "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
     "dns_security", "osint", "spiderfoot_scan", "http_crawl", "port_scan", "screenshot",
     "fetch_url", "dir_file_fuzz", "web_api_discovery", "waf_detection",
-    "secret_scanning", "vulnerability_scan", "waf_bypass", "brute_force_scan",
+    "secret_scanning", "vulnerability_scan", "waf_bypass",
     "nuclei_scan", "crlfuzz_scan", "dalfox_xss_scan", "s3scanner",
     "acunetix_scan", "cpanel_scan", "wpscan_scan", "react2shell_scan",
     "semgrep_scan", "correlate_vulnerabilities", "calculate_risk_scores",

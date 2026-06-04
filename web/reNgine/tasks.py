@@ -41,7 +41,7 @@ from reNgine.definitions import *
 from reNgine.settings import *
 from reNgine.llm import *
 from reNgine.utilities import *
-from reNgine.utils.opsec import OpSecManager, BruteForceOrchestrator, ProxychainsWrapper
+from reNgine.utils.opsec import OpSecManager, ProxychainsWrapper
 from reNgine.utils.waf import OriginDiscoveryManager, WafBypassOrchestrator
 from scanEngine.models import (EngineType, InstalledExternalTool, Notification, Proxy, OpSec)
 from startScan.models import *
@@ -112,7 +112,7 @@ SCAN_PIPELINE_DEFINITION = [
         'tier': 6,
         'name': 'Security Assessment',
         'type': 'CONCURRENT',
-        'tasks': ['waf_bypass', 'vulnerability_scan', 'brute_force_scan']
+        'tasks': ['waf_bypass', 'vulnerability_scan']
     },
     {
         'tier': 7,
@@ -2633,20 +2633,6 @@ def nmap(
 		severity=0,
 		fields={'Vulnerabilities discovered': vulns_str},
 		add_meta_info=False)
-
-	# Automatic Trigger for Brute Force Scan (Legacy Support for chaining)
-	auth_targets = []
-	for v in vulns:
-		if 'auth_portal' in (v.get('tags') or []):
-			auth_targets.append(v['http_url'])
-	
-	if auth_targets and self.scan.tasks and 'brute_force_scan' in self.scan.tasks:
-		logger.warning(f'Detected Auth Portals on {host}. Triggering Brute Force Scan...')
-		from reNgine.tasks import brute_force_scan
-		try:
-			brute_force_scan(self, targets=list(set(auth_targets)), ctx=ctx)
-		except Exception as e:
-			logger.warning(f"Brute force scan failed for {host}: {e}")
 
 	return vulns
 
@@ -6701,70 +6687,8 @@ def firewall_vpn_scan(self, ctx={}, description=None):
 	if config.get(ENABLE_CRT_SH, False):
 		run_crt_sh(self, ctx, target)
 
-	# Automatic Trigger for Brute Force Scan on Sophos Portals
-	if run_sslscan and self.scan.tasks and 'brute_force_scan' in self.scan.tasks:
-		auth_targets = [f'https://{target}:{port}' for port in ssl_ports]
-		logger.warning(f'Triggering Brute Force Scan for potential Sophos Portals on {target}')
-		from reNgine.tasks import brute_force_scan
-		try:
-			brute_force_scan(self, targets=auth_targets, ctx=ctx)
-		except Exception as e:
-			logger.warning(f"Brute force scan failed for {target}: {e}")
-
 	return True
 
-
-def brute_force_scan(self, targets=[], ctx={}, description=None):
-	"""
-	Perform centralized brute-force orchestration.
-	1. Pull all pending candidates from AuthCandidate table
-	2. Execute via BruteForceOrchestrator with OpSec settings
-	"""
-	logger.info(f"Starting Centralized Brute Force Orchestration for Scan {self.scan_id}")
-	
-	# Prerequisite: Run Intelligent Form Extraction (Tier 3)
-	from reNgine.auth_discovery_tasks import extract_auth_candidates
-	extract_auth_candidates(self, ctx=ctx)
-
-	# Initialize Orchestrator
-	from reNgine.utils.opsec import BruteForceOrchestrator
-	orchestrator = BruteForceOrchestrator(self.scan)
-	
-	# Extract allowed services from config
-	config = self.yaml_configuration.get(BRUTE_FORCE_SCAN) or {}
-	allowed_services = config.get(SERVICES, [])
-	
-	# Extract threads and pass to ctx
-	ctx['threads'] = config.get(THREADS, 5)
-	
-	# Execute orchestration
-	results = orchestrator.run_orchestration(ctx=ctx, allowed_services=allowed_services)
-	
-	total_found = 0
-	for res in results:
-		total_found += 1
-		# Determine URL for reporting
-		if res['service'] == 'http':
-			report_url = res['target']
-		else:
-			report_url = f"{res['service']}://{res['target']}:{res['port']}"
-
-		vuln_data = {
-			'name': f'Successful Brute-Force: {res["service"].upper()}',
-			'severity': 4, # Critical
-			'description': f'Successfully identified valid credentials on {res["target"]} via Brutus.\n\n'
-						 f'User: {res["user"]}\n'
-						 f'Password: {res["password"]}\n'
-						 f'Service: {res["service"]}\n'
-						 f'Port: {res["port"]}',
-			'http_url': report_url,
-			'type': 'Broken Authentication',
-			'source': 'brutus',
-		}
-		save_vulnerability(target_domain=self.domain, scan_history=self.scan, **vuln_data)
-		
-	logger.info(f"Brute Force Orchestration completed. Credentials Found: {total_found}")
-	return True
 
 def pull_ollama_model(model_name):
     """

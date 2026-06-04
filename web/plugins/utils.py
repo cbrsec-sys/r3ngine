@@ -60,10 +60,15 @@ class MarketplaceManager:
         
         response = requests.get(download_url, stream=True, timeout=30)
         if response.status_code == 200:
-            with open(temp_zip_path, 'wb') as f:
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-            return temp_zip_path
+            try:
+                with open(temp_zip_path, 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+                return temp_zip_path
+            except Exception as e:
+                if os.path.exists(temp_zip_path):
+                    os.remove(temp_zip_path)
+                raise e
         else:
             raise Exception(f"Failed to download plugin {slug}: {response.status_code}")
 
@@ -285,6 +290,7 @@ class AtomicInstaller:
         backup_db_file = None
         backup_fs_dir = None
         plugin_slug = None
+        final_dir = None
         inner_zip_path = None
         verification_result = 'legacy'
         r3n_meta: dict = {}
@@ -354,6 +360,7 @@ class AtomicInstaller:
                         'runtime_position': position,
                         'author': r3n_meta.get('author', manifest.get('author', '')),
                         'trust_level': verification_result,
+                        'icon_path': manifest.get('icon', ''),
                     }
                 )
                 cls._emit(install_id, 'register', 'completed')
@@ -509,6 +516,8 @@ class AtomicInstaller:
                     shutil.rmtree(backup_fs_dir)
                 if backup_db_file and os.path.exists(backup_db_file):
                     os.remove(backup_db_file)
+                if inner_zip_path and os.path.exists(inner_zip_path):
+                    os.remove(inner_zip_path)
 
                 cls._emit(install_id, 'complete', 'completed')
                 if install_id:

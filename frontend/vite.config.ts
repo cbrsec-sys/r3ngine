@@ -1,14 +1,6 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import basicSsl from '@vitejs/plugin-basic-ssl';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
-
-let appVersion = '3.0.0';
-try {
-  const raw = readFileSync(resolve(__dirname, '../web/.version'), 'utf-8').trim();
-  appVersion = raw.startsWith('v') ? raw.slice(1) : raw;
-} catch {}
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({
@@ -16,9 +8,6 @@ export default defineConfig(({ command }) => ({
     react(),
     basicSsl(),
   ],
-  define: {
-    __APP_VERSION__: JSON.stringify(appVersion),
-  },
   base: command === 'serve' ? '/' : '/staticfiles/',
   build: {
     manifest: true,

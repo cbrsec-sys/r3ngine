@@ -155,7 +155,7 @@ USER_AGENT = 'user_agent'
 DELAY = 'delay'
 PROVIDERS = 'providers'
 FIREWALL_VPN_SCAN = 'firewall_vpn_scan'
-BRUTE_FORCE_SCAN = 'brute_force_scan'
+
 SPIDERFOOT_SCAN = 'spiderfoot_scan'
 WEB_API_DISCOVERY = 'web_api_discovery'
 ATTACK_PATH_MODELING = 'attack_path_modeling'
