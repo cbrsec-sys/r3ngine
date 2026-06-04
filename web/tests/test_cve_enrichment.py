@@ -40,6 +40,24 @@ class CVEEnrichmentServiceTestCase(TestCase):
         cache.clear()
     
     @patch('requests.get')
+    def test_enrich_cve_bare_year_number_format(self, mock_get):
+        """Verify that bare YYYY-NNNNN values (missing the CVE- prefix) are normalised."""
+        mock_response = MagicMock()
+        mock_response.status_code = 404
+        mock_response.json.return_value = {"vulnerabilities": []}
+        mock_get.return_value = mock_response
+
+        cve = self.service.enrich_cve("2026-6127")
+
+        self.assertIsNotNone(cve)
+        self.assertEqual(cve.name, "CVE-2026-6127")
+
+    def test_enrich_cve_invalid_format_returns_none(self):
+        """Verify that a value that is not a CVE ID and not YYYY-NNNNN returns None."""
+        result = self.service.enrich_cve("NOT-A-CVE")
+        self.assertIsNone(result)
+
+    @patch('requests.get')
     def test_enrich_cve_from_nvd(self, mock_get):
         """
         Verify that NVD API responses are correctly parsed and applied to CveId objects.

@@ -11,6 +11,7 @@ Supports:
 """
 
 import logging
+import re
 import requests
 from typing import Optional, Dict, List
 from datetime import timedelta
@@ -78,8 +79,12 @@ class CVEEnrichmentService:
         # Normalize CVE name
         cve_name = cve_name.upper().strip()
         if not cve_name.startswith('CVE-'):
-            logger.warning(f"Invalid CVE format: {cve_name}")
-            return None
+            # Accept bare YYYY-NNNNN format and prepend the required prefix
+            if re.match(r'^\d{4}-\d+$', cve_name):
+                cve_name = 'CVE-' + cve_name
+            else:
+                logger.warning("Invalid CVE format: %s", cve_name)
+                return None
         
         # Get or create CVE record
         cve_obj, created = CveId.objects.get_or_create(name=cve_name)

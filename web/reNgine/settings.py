@@ -455,6 +455,10 @@ CSRF_COOKIE_SECURE = True  # HTTPS only
 # NOTE: Leave SECURE_SSL_REDIRECT=False — the upstream nginx reverse proxy handles
 # HTTP→HTTPS redirects. Enabling this in Django would cause a redirect loop.
 SECURE_SSL_REDIRECT = False
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['https://localhost', 'https://127.0.0.1', 'http://localhost:5173'])
+
 
 # HSTS — tell browsers to always use HTTPS for this domain (1 year)
 SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=31536000)
@@ -494,5 +498,53 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:3000', 'http://127.0.0.1:3000'])
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:5173', 'http://127.0.0.1:5173', 'https://localhost:5173', 'https://127.0.0.1:5173'])
 CORS_ALLOW_CREDENTIALS = True
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'system_file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': '/usr/src/app/errors.log',
+            'formatter': 'verbose',
+        },
+        'db_file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': '/usr/src/app/db.log',
+            'formatter': 'verbose',
+        },
+        'temporal_file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': '/usr/src/app/temporal.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['system_file'],
+            'level': 'ERROR',
+            'propagate': True,
+        },
+        'django.db.backends': {
+            'handlers': ['db_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'temporal': {
+            'handlers': ['temporal_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+    },
+}

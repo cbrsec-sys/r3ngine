@@ -3300,7 +3300,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				if proxy:
 					cmd = f"paramspider --domain {subdomain_name} --proxy {proxy} | tee {ps_output}"
 				logger.warning(f'Running ParamSpider command: {cmd}')
-				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+				run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(ps_output):
 				try:
 					with open(ps_output, 'r') as f:
@@ -3430,7 +3430,15 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 							logger.warning(f'Found potential vulnerability: {vuln_data}')
 							save_vulnerability(vuln_data, self.scan, self.domain)
 
-	# Aquatone - Visual discovery removed in favor of Playwright implementation
+	# Aquatone - visual inspection of discovered URLs
+	if 'aquatone' in uses_tools and urls:
+		aquatone_out = f"{results_dir}/aquatone"
+		os.makedirs(aquatone_out, exist_ok=True)
+		targets_file = f"{aquatone_out}/targets.txt"
+		with open(targets_file, 'w') as _f:
+			_f.write('\n'.join(urls))
+		cmd = f"cat {targets_file} | aquatone -out {aquatone_out} -threads {threads} -silent"
+		run_command(cmd, shell=True, cwd=aquatone_out, scan_id=self.scan_id, activity_id=self.activity_id)
 
 
 	# Sync to Graph

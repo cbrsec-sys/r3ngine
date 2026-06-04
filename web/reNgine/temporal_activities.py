@@ -1851,6 +1851,7 @@ def run_startup_sync_activity(task_name: str) -> None:
       'sync_all_scans_to_graph' — syncs all scan results to Neo4j
       'sync_cisa_kev_catalog'   — downloads CISA KEV catalog and marks CVEs
       'sync_semgrep_rules'      — syncs Semgrep rule sets to local filesystem
+      'sync_cve_data'           — full CVE enrichment (KEV catalog + unenriched CVEs)
     """
     activity.logger.info(f"[RunStartupSyncActivity] Starting: {task_name}")
     if task_name == 'sync_all_scans_to_graph':
@@ -1865,6 +1866,12 @@ def run_startup_sync_activity(task_name: str) -> None:
     elif task_name == 'recover_stuck_scans':
         from reNgine.tasks import recover_stuck_scans
         recover_stuck_scans()
+    elif task_name == 'sync_cve_data':
+        from reNgine.cve_enrichment import CVEEnrichmentService, CVEBatchEnricher
+        service = CVEEnrichmentService()
+        enricher = CVEBatchEnricher()
+        service.sync_cisa_kev_catalog()
+        enricher.enrich_unenriched_cves()
     else:
         raise ValueError(f"[RunStartupSyncActivity] Unknown task: {task_name}")
     activity.logger.info(f"[RunStartupSyncActivity] Completed: {task_name}")

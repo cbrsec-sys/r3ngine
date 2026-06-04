@@ -667,7 +667,11 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 		# Ignore empty/null CVE IDs
 		if not cve_id or not str(cve_id).strip():
 			continue
-		cve, created = CveId.objects.get_or_create(name=str(cve_id).strip())
+		normalized = str(cve_id).strip().upper()
+		# Accept bare YYYY-NNNNN values (missing the CVE- prefix)
+		if re.match(r'^\d{4}-\d+$', normalized):
+			normalized = 'CVE-' + normalized
+		cve, created = CveId.objects.get_or_create(name=normalized)
 		if cve:
 			vuln.cve_ids.add(cve)
 			vuln.save()

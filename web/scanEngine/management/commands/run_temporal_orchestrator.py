@@ -156,20 +156,27 @@ from reNgine.temporal_activities import (
 )
 
 
+# (task_name, first_fire_delay_seconds)
+# sync_cve_data fires after 5 minutes to allow sync_all_scans_to_graph to complete first.
 _STARTUP_SYNC_TASKS = [
-    "sync_all_scans_to_graph",
-    "sync_cisa_kev_catalog",
-    "sync_semgrep_rules",
-    "recover_stuck_scans",
+    ("sync_all_scans_to_graph", 30),
+    ("sync_cisa_kev_catalog", 30),
+    ("sync_semgrep_rules", 30),
+    ("recover_stuck_scans", 30),
+    ("sync_cve_data", 300),
 ]
 
 
-async def _register_startup_schedule(client: Client, task_name: str, today: str) -> None:
+async def _register_startup_schedule(
+    client: Client, task_name: str, today: str, interval_seconds: int = 30
+) -> None:
     """Create (or recreate) a one-shot Temporal Schedule for a startup sync task.
 
     The schedule is deleted first so each orchestrator restart gets a fresh one-shot
     trigger. The workflow ID embeds today's date so successful runs are not repeated
     within the same calendar day (workflow ID embeds today's date).
+
+    interval_seconds controls how soon after registration the task fires (approximately).
     """
     schedule_id = f"startup-sync-{task_name.replace('_', '-')}"
     workflow_id = f"{schedule_id}-{today}"
@@ -191,7 +198,7 @@ async def _register_startup_schedule(client: Client, task_name: str, today: str)
                 task_queue="python-orchestrator-queue",
             ),
             spec=ScheduleSpec(
-                intervals=[ScheduleIntervalSpec(every=datetime.timedelta(seconds=30))],
+                intervals=[ScheduleIntervalSpec(every=datetime.timedelta(seconds=interval_seconds))],
             ),
             policy=SchedulePolicy(overlap=ScheduleOverlapPolicy.SKIP),
             state=ScheduleState(
@@ -201,7 +208,7 @@ async def _register_startup_schedule(client: Client, task_name: str, today: str)
             ),
         ),
     )
-    logger.info(f"[Startup] Registered one-shot schedule '{schedule_id}' → workflow '{workflow_id}'")
+    logger.info(f"[Startup] Registered one-shot schedule '{schedule_id}' → workflow '{workflow_id}' (fires in ~{interval_seconds}s)")
 
 
 class Command(BaseCommand):
@@ -286,9 +293,9 @@ class Command(BaseCommand):
             # Register one-shot startup sync schedules (Phase 4B)
             # -------------------------------------------------------------------
             today = datetime.date.today().isoformat()
-            for task_name in _STARTUP_SYNC_TASKS:
+            for task_name, interval_secs in _STARTUP_SYNC_TASKS:
                 try:
-                    await _register_startup_schedule(client, task_name, today)
+                    await _register_startup_schedule(client, task_name, today, interval_secs)
                 except Exception as sched_err:
                     # Non-fatal: log and continue — don't block worker startup
                     logger.error(f"[Startup] Failed to register schedule for '{task_name}': {sched_err}")
