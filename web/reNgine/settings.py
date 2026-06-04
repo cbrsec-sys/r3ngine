@@ -77,7 +77,7 @@ DATABASES = {
         'PASSWORD': env('POSTGRES_PASSWORD'),
         'HOST': env('POSTGRES_HOST'),
         'PORT': env('POSTGRES_PORT'),
-        'CONN_MAX_AGE': 60,
+        'CONN_MAX_AGE': 0,
         'CONN_HEALTH_CHECKS': True,
         'OPTIONS': {
             'sslmode': env('POSTGRES_SSLMODE', default='prefer'),
