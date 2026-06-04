@@ -516,8 +516,8 @@ class MasterScanWorkflow:
             # child workflows when a concurrent T6 activity fails. asyncio.gather
             # cannot cancel a Temporal child workflow — the sequential pattern
             # eliminates the detachment risk entirely (see FIXES.md Fix 2).
-            # waf_bypass and brute_force_scan run concurrently after nuclei; they
-            # are activities (not child workflows) so gather is safe for them.
+            # waf_bypass runs concurrently after nuclei; it is an
+            # activity (not child workflow) so gather is safe for it.
             # ------------------------------------------------------------------
             ran_t6 = False
 
@@ -542,18 +542,6 @@ class MasterScanWorkflow:
                         "RunWAFBypassActivity",
                         ctx,
                         start_to_close_timeout=timedelta(hours=1),
-                        heartbeat_timeout=timedelta(minutes=5),
-                        retry_policy=_RETRY_NETWORK_SCAN,
-                        task_queue="python-orchestrator-queue"
-                    )
-                )
-            if "brute_force_scan" in tasks:
-                ran_t6 = True
-                other_t6_futures.append(
-                    workflow.execute_activity(
-                        "RunBruteForceScanActivity",
-                        ctx,
-                        start_to_close_timeout=timedelta(hours=2),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_NETWORK_SCAN,
                         task_queue="python-orchestrator-queue"
@@ -916,14 +904,6 @@ _SUBSCAN_DISPATCH = {
         "timeout": timedelta(hours=1),
         "args_builder": lambda ctx: [ctx, "waf_bypass", "WAF Bypass", {}],
     },
-    "brute_force_scan": {
-        "activity": "RunGenericTaskActivity",
-        "timeout": timedelta(hours=2),
-        "args_builder": lambda ctx: [
-            ctx, "brute_force_scan", "Brute Force Scan",
-            {"targets": [ctx.get("subdomain_name", "")]},
-        ],
-    },
     "firewall_vpn_scan": {
         "activity": "RunGenericTaskActivity",
         "timeout": timedelta(hours=1),
@@ -1206,7 +1186,7 @@ class SubScanWorkflow:
                 # TIER 6: Security Assessment — explicit inclusion, mirrors MasterScanWorkflow Tier 6.
                 # vigolium_scan runs alongside vulnerability_scan at Tier 6.
                 [t for t in active_tasks if t in {
-                    "vulnerability_scan", "waf_bypass", "brute_force_scan", "vigolium_scan"
+                    "vulnerability_scan", "waf_bypass", "vigolium_scan"
                 }],
                 # TIER 6b: Fallback for any task not classified in Tiers 1-6.
                 # Handles future tasks added to _SUBSCAN_DISPATCH without breaking existing tiers.
@@ -1214,7 +1194,7 @@ class SubScanWorkflow:
                     "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
                     "dns_security", "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
                     "fetch_url", "screenshot", "dir_file_fuzz", "web_api_discovery", "waf_detection",
-                    "secret_scanning", "vulnerability_scan", "waf_bypass", "brute_force_scan",
+                    "secret_scanning", "vulnerability_scan", "waf_bypass",
                     "vigolium_discovery", "vigolium_analysis", "vigolium_scan"
                 }],
             ]

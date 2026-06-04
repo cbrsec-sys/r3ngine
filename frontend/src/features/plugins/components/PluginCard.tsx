@@ -699,9 +699,10 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
               <Avatar
                 variant="rounded"
+                src={plugin?.icon_path ? `/api/plugins/${plugin.slug}/icon/` : undefined}
                 sx={{ bgcolor: isMarketplace && !isInstalled ? '#00ffaa' : '#0076FF', width: 48, height: 48, color: '#000' }}
               >
-                {data.name[0]}
+                {!plugin?.icon_path && data.name[0]}
               </Avatar>
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: "bold", color: '#fff', minHeight: '3.1em', lineHeight: 1.235, display: 'flex', alignItems: 'flex-start' }}>

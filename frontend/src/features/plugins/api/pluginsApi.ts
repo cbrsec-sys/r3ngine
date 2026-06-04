@@ -18,6 +18,7 @@ export interface Plugin {
   needs_restart: boolean;
   author: string;
   trust_level: 'official' | 'signed_unknown' | 'unsigned' | 'legacy';
+  icon_path?: string;
 }
 
 export interface MarketplacePlugin {

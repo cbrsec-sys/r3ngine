@@ -45,7 +45,9 @@ class PluginViewSet(viewsets.ModelViewSet):
             return Response({'error': 'File must be a valid ZIP archive'}, status=status.HTTP_400_BAD_REQUEST)
 
         PluginManager.ensure_dirs()
-        temp_zip_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, f'upload_{uuid.uuid4().hex[:8]}.zip')
+        original_name = zip_file.name
+        ext = '.r3n' if original_name.endswith('.r3n') else '.zip'
+        temp_zip_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, f'upload_{uuid.uuid4().hex[:8]}{ext}')
 
         with open(temp_zip_path, 'wb+') as destination:
             for chunk in zip_file.chunks():
@@ -141,6 +143,28 @@ class PluginViewSet(viewsets.ModelViewSet):
 
         return Response(docs)
 
+    @action(detail=True, methods=['get'], url_path='icon')
+    def get_icon(self, request, slug=None):
+        """Serves the plugin's bundled icon."""
+        plugin = self.get_object()
+        if not plugin.icon_path:
+            return Response({'error': 'No icon configured'}, status=status.HTTP_404_NOT_FOUND)
+            
+        icon_file_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, plugin.slug, plugin.icon_path)
+        
+        # Guard against path traversal
+        safe_dir = os.path.join(PluginManager.BASE_PLUGINS_DIR, plugin.slug)
+        if not os.path.abspath(icon_file_path).startswith(os.path.abspath(safe_dir)):
+            raise Http404
+
+        if not os.path.exists(icon_file_path):
+            return Response({'error': 'Icon file not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+        content_type, _ = mimetypes.guess_type(icon_file_path)
+        from django.http import HttpResponse
+        with open(icon_file_path, 'rb') as f:
+            return HttpResponse(f.read(), content_type=content_type or 'application/octet-stream')
+
     @action(detail=False, methods=['get'], url_path='marketplace')
     def marketplace(self, request):
         """Returns available plugins from the marketplace."""
@@ -155,6 +179,7 @@ class PluginViewSet(viewsets.ModelViewSet):
         if not slug:
             return Response({'error': 'No slug provided'}, status=status.HTTP_400_BAD_REQUEST)
             
+        temp_zip_path = None
         try:
             # 1. Download
             temp_zip_path = MarketplaceManager.download_plugin(slug)
@@ -162,10 +187,6 @@ class PluginViewSet(viewsets.ModelViewSet):
             # 2. Install
             plugin = AtomicInstaller.install(temp_zip_path)
             
-            # 3. Cleanup
-            if os.path.exists(temp_zip_path):
-                os.remove(temp_zip_path)
-                
             return Response({
                 'success': True,
                 'plugin': {
@@ -176,6 +197,10 @@ class PluginViewSet(viewsets.ModelViewSet):
             })
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        finally:
+            # 3. Cleanup
+            if temp_zip_path and os.path.exists(temp_zip_path):
+                os.remove(temp_zip_path)
 
     @action(detail=False, methods=['post'], url_path='marketplace/refresh')
     def marketplace_refresh(self, request):
@@ -199,4 +224,6 @@ class PluginUIView(View):
             raise Http404
 
         content_type, _ = mimetypes.guess_type(file_path)
-        return FileResponse(open(file_path, 'rb'), content_type=content_type or 'application/octet-stream')
+        from django.http import HttpResponse
+        with open(file_path, 'rb') as f:
+            return HttpResponse(f.read(), content_type=content_type or 'application/octet-stream')
