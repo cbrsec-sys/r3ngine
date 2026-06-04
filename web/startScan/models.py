@@ -466,12 +466,37 @@ class VulnerabilityReference(models.Model):
 
 
 class CveId(models.Model):
+	"""
+	Represents a CVE record containing vulnerability metadata such as CVSS severity, exploitability, and relationships.
+	"""
 	id = models.AutoField(primary_key=True)
-	name = models.CharField(max_length=100)
+	name = models.CharField(max_length=100, unique=True, db_index=True)
 	is_cisa_kev = models.BooleanField(default=False)
+	
+	cvss_v31_base_score = models.FloatField(null=True, blank=True)  # 0-10
+	attack_vector = models.CharField(max_length=20, null=True, blank=True)  # NETWORK, ADJACENT, LOCAL, PHYSICAL
+	attack_complexity = models.CharField(max_length=20, null=True, blank=True)  # LOW, HIGH
+	privileges_required = models.CharField(max_length=20, null=True, blank=True)  # NONE, LOW, HIGH
+	user_interaction = models.CharField(max_length=20, null=True, blank=True)  # NONE, REQUIRED
+	confidentiality_impact = models.CharField(max_length=20, null=True, blank=True)  # NONE, LOW, HIGH
+	integrity_impact = models.CharField(max_length=20, null=True, blank=True)  # NONE, LOW, HIGH
+	availability_impact = models.CharField(max_length=20, null=True, blank=True)  # NONE, LOW, HIGH
+	
+	epss_score = models.FloatField(null=True, blank=True)  # 0-1
+	epss_percentile = models.FloatField(null=True, blank=True)  # 0-100
+	published_date = models.DateTimeField(null=True, blank=True)
+	last_modified_date = models.DateTimeField(null=True, blank=True)
+	vulnerability_type = models.CharField(max_length=50, null=True, blank=True)  # SCA, DAST, SAST, Config
+	
+	related_cves = models.ManyToManyField(
+		'self', 
+		symmetrical=False, 
+		blank=True,
+		related_name='related_from'
+	)
 
 	def __str__(self):
-		return self.name
+		return f"{self.name} (CVSS: {self.cvss_v31_base_score})"
 
 
 class CweId(models.Model):
@@ -583,22 +608,53 @@ class ValidationResult(models.Model):
 		return f"Validation for {self.vulnerability.name} by {self.tool}"
 
 	def get_severity(self):
-		return self.severity
+		"""Retrieve severity from the linked vulnerability.
+
+		Returns:
+			int: The severity level (0-4 or -1) of the vulnerability.
+		"""
+		return self.vulnerability.severity
 
 	def get_cve_str(self):
-		return ', '.join(f'`{cve.name}`' for cve in self.cve_ids.all())
+		"""Format the associated CVE names as a comma-separated list of code blocks.
+
+		Returns:
+			str: A string of comma-separated CVE names wrapped in markdown backticks.
+		"""
+		return ', '.join(f'`{cve.name}`' for cve in self.vulnerability.cve_ids.all())
 
 	def get_cwe_str(self):
-		return ', '.join(f'`{cwe.name}`' for cwe in self.cwe_ids.all())
+		"""Format the associated CWE names as a comma-separated list of code blocks.
+
+		Returns:
+			str: A string of comma-separated CWE names wrapped in markdown backticks.
+		"""
+		return ', '.join(f'`{cwe.name}`' for cwe in self.vulnerability.cwe_ids.all())
 
 	def get_tags_str(self):
-		return ', '.join(f'`{tag.name}`' for tag in self.tags.all())
+		"""Format the associated tags as a comma-separated list of code blocks.
+
+		Returns:
+			str: A string of comma-separated vulnerability tag names wrapped in markdown backticks.
+		"""
+		return ', '.join(f'`{tag.name}`' for tag in self.vulnerability.tags.all())
 
 	def get_refs_str(self):
-		return '•' + '\n• '.join(f'`{ref.url}`' for ref in self.references.all())
+		"""Format references as a bulleted list of code blocks.
+
+		Returns:
+			str: A formatted list of references separated by bullet points and wrapped in backticks.
+		"""
+		return '•' + '\n• '.join(f'`{ref.url}`' for ref in self.vulnerability.references.all())
 
 	def get_path(self):
-		return urlparse(self.http_url).path
+		"""Extract path from the linked vulnerability URL.
+
+		Returns:
+			str: The path string of the vulnerability's HTTP URL, or '/' if empty.
+		"""
+		from urllib.parse import urlparse
+		return urlparse(self.vulnerability.http_url).path if self.vulnerability.http_url else "/"
 
 
 class ImpactAssessment(models.Model):
@@ -1228,3 +1284,29 @@ class TemporalSchedule(models.Model):
 
 	def __str__(self):
 		return f'{self.name} ({self.schedule_id})'
+
+
+class VulnerabilityHistory(models.Model):
+	"""
+	Tracks the lifecycle, persistence, and remediation status of vulnerabilities across scan runs.
+	"""
+	id = models.AutoField(primary_key=True)
+	scan_history = models.ForeignKey(ScanHistory, on_delete=models.CASCADE, related_name='vulnerability_history')
+	vulnerability = models.ForeignKey(Vulnerability, on_delete=models.CASCADE, related_name='history_records')
+	cve = models.ForeignKey(CveId, on_delete=models.SET_NULL, null=True, blank=True)
+	group_key = models.CharField(max_length=500, db_index=True)
+	
+	first_seen = models.DateTimeField(auto_now_add=True)
+	last_seen = models.DateTimeField(auto_now=True)
+	is_remediated = models.BooleanField(default=False)
+	remediation_date = models.DateTimeField(null=True, blank=True)
+	
+	total_occurrences = models.IntegerField(default=1)
+	affected_subdomains_count = models.IntegerField(default=0)
+
+	class Meta:
+		unique_together = ('group_key', 'scan_history')
+		indexes = [
+			models.Index(fields=['group_key', '-last_seen']),
+			models.Index(fields=['is_remediated', '-last_seen']),
+		]

@@ -1,5 +1,15 @@
 # Changelog
 
+### [v3.5.0] - 2026-06-04
+
+- **CVE Correlation, Deduplication & Graph Sync Enhancements**:
+  - **Enhanced CveId Model**: Added CVSS v3.1 base score, EPSS score, EPSS percentile, attack complexity, attack vector, privileges required, user interaction, and scope fields to the database schema (migration `0035`).
+  - **Correlation Scoring & Deduplication**: Replaced basic CVSS severity lookups with a multi-criteria scoring algorithm in `correlation.py`. Calculates composite scores using configurable tool weights, asset criticality, exploitability factors (CISA KEV, EPSS), and temporal modifiers. Suppresses inside-scan duplicates in-memory and groups them under a unique `group_key` before writing.
+  - **Vulnerability History Tracking**: Introduced `VulnerabilityHistory` tracking model (migration `0036`) to trace vulnerabilities across historical scans, automatically detecting if a vulnerability is new, persistent, or remediated.
+  - **Durable Database Transactions**: Wrapped finding correlation, impact assessment creation, and history tracking inside atomic transaction blocks to prevent duplicate database insertions and race conditions.
+  - **Neo4j ID-Based Graph Sync**: Refactored Neo4j sync in `graph.py` to link vulnerability nodes to CVE nodes using precise ID matches (CVE ID) instead of string names. Ingests rich metadata (CVSS base score, EPSS score) directly onto Neo4j nodes.
+  - **Correlation Unit Testing**: Added comprehensive backend test coverage in `test_correlation.py` validating correlation scoring weights, duplicate suppression, and cross-scan history tracking.
+
 ### [v3.4.2] - 2026-06-03
 
 - **Semgrep Finding Name Normalization**:
