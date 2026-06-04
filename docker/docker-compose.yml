@@ -1,3 +1,4 @@
+name: r3ngine
 services:
   db:
     restart: always

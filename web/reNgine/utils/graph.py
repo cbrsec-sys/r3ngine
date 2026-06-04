@@ -172,8 +172,13 @@ class Neo4jManager:
                     for cve in vuln.cve_ids.all():
                         if cve and cve.name:
                             cve_rows.append({
-                                "vuln_name": vuln.name or "Unknown Vulnerability",
+                                "vuln_id": vuln.id,
                                 "cve_name": cve.name,
+                                "cvss_score": cve.cvss_v31_base_score,
+                                "epss_score": cve.epss_score,
+                                "is_cisa_kev": cve.is_cisa_kev,
+                                "published_date": cve.published_date.isoformat() if cve.published_date else None,
+                                "attack_vector": cve.attack_vector,
                                 "scan_id": scan_history_id,
                             })
 
@@ -329,17 +334,17 @@ class Neo4jManager:
         )
 
     @staticmethod
-    def _merge_cves(tx, vuln_name, cve_name, scan_id):
+    def _merge_cves(tx, vuln_id, cve_name, scan_id):
         tx.run(
             """
             MERGE (c:CVE {name: $cve_name})
             WITH c
-            MATCH (v:Vulnerability {name: $vuln_name}), (sc:Scan {id: $scan_id})
+            MATCH (v:Vulnerability {id: $vuln_id}), (sc:Scan {id: $scan_id})
             MERGE (v)-[:LINKED_TO_CVE]->(c)
             MERGE (sc)-[:FOUND]->(c)
         """,
             cve_name=cve_name,
-            vuln_name=vuln_name,
+            vuln_id=vuln_id,
             scan_id=scan_id,
         )
 
@@ -471,8 +476,13 @@ class Neo4jManager:
             """
             UNWIND $rows AS row
             MERGE (c:CVE {name: row.cve_name})
+            SET c.cvss_score = row.cvss_score,
+                c.epss_score = row.epss_score,
+                c.is_cisa_kev = row.is_cisa_kev,
+                c.published = row.published_date,
+                c.attack_vector = row.attack_vector
             WITH c, row
-            MATCH (v:Vulnerability {name: row.vuln_name}), (sc:Scan {id: row.scan_id})
+            MATCH (v:Vulnerability {id: row.vuln_id}), (sc:Scan {id: row.scan_id})
             MERGE (v)-[:LINKED_TO_CVE]->(c)
             MERGE (sc)-[:FOUND]->(c)
             """,

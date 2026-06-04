@@ -1225,15 +1225,55 @@ class CVEDetails(APIView):
 		if not cve_id:
 			return Response({'status': False, 'message': 'CVE ID not provided'})
 
-		response = requests.get('https://cve.circl.lu/api/cve/' + cve_id)
+		# Check local DB first, otherwise attempt live NVD/EPSS enrichment
+		from reNgine.cve_enrichment import CVEEnrichmentService
+		from startScan.models import CveId
+		
+		formatted_cve_id = cve_id.upper().strip()
+		cve_qs = CveId.objects.filter(name__iexact=formatted_cve_id)
+		cve_obj = None
+		if cve_qs.exists():
+			cve_obj = cve_qs.first()
+		else:
+			try:
+				service = CVEEnrichmentService()
+				cve_obj = service.enrich_cve(formatted_cve_id)
+			except Exception as e:
+				logger.error(f"Failed to auto-enrich searched CVE {formatted_cve_id}: {e}")
 
-		if response.status_code != 200:
-			return  Response({'status': False, 'message': 'Unknown Error Occured!'})
+		circl_data = {}
+		try:
+			response = requests.get('https://cve.circl.lu/api/cve/' + formatted_cve_id, timeout=10)
+			if response.status_code == 200:
+				circl_data = response.json() or {}
+		except Exception as e:
+			logger.warning(f"Failed to fetch circl.lu details for {formatted_cve_id}: {e}")
 
-		if not response.json():
-			return  Response({'status': False, 'message': 'CVE ID does not exists.'})
+		if not circl_data and (not cve_obj or cve_obj.cvss_v31_base_score is None):
+			return Response({'status': False, 'message': 'CVE ID does not exist.'})
 
-		return Response({'status': True, 'result': response.json()})
+		result = {
+			'id': formatted_cve_id,
+			'summary': circl_data.get('summary', 'No summary available in external feeds.'),
+			'cvss': circl_data.get('cvss') or (cve_obj.cvss_v31_base_score if cve_obj else None),
+			'cvss_v31_base_score': cve_obj.cvss_v31_base_score if cve_obj else None,
+			'epss_score': cve_obj.epss_score if cve_obj else None,
+			'epss_percentile': cve_obj.epss_percentile if cve_obj else None,
+			'is_cisa_kev': cve_obj.is_cisa_kev if cve_obj else False,
+			'attack_vector': cve_obj.attack_vector if cve_obj else None,
+			'attack_complexity': cve_obj.attack_complexity if cve_obj else None,
+			'privileges_required': cve_obj.privileges_required if cve_obj else None,
+			'user_interaction': cve_obj.user_interaction if cve_obj else None,
+			'confidentiality_impact': cve_obj.confidentiality_impact if cve_obj else None,
+			'integrity_impact': cve_obj.integrity_impact if cve_obj else None,
+			'availability_impact': cve_obj.availability_impact if cve_obj else None,
+			'published_date': cve_obj.published_date.isoformat() if (cve_obj and cve_obj.published_date) else None,
+			'last_modified_date': cve_obj.last_modified_date.isoformat() if (cve_obj and cve_obj.last_modified_date) else None,
+			'vulnerability_type': cve_obj.vulnerability_type if cve_obj else None,
+		}
+
+		return Response({'status': True, 'result': result})
+
 
 
 class AddReconNote(APIView):
