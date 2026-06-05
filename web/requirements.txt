@@ -50,7 +50,7 @@ pyOpenSSL>=24.0.0
 locust==2.32.8
 docker>=7.1.0
 stem>=1.8.0
-setuptools==69.5.1
+setuptools==70.0.0
 playwright==1.42.0
 playwright-stealth==1.0.6
 djangorestframework-simplejwt==5.3.1

@@ -230,8 +230,8 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
 
     if modules:
         cmd += f" -m {','.join(modules)}"
-    if severity_filter:
-        cmd += f" --known-issue-scan-severities {','.join(severity_filter)}"
+    #if severity_filter:
+        cmd += f" --known-issue-scan-severities critical,high,medium,low,info " #{','.join(severity_filter)}"
 
     proxy = get_random_proxy()
     if proxy:
