@@ -16,6 +16,7 @@ from django.template.defaultfilters import slugify
 from datetime import datetime
 from rest_framework import viewsets, status
 from rest_framework.pagination import PageNumberPagination
+from rest_framework_datatables.pagination import DatatablesPageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -749,6 +750,7 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]
 	queryset = Domain.objects.all().order_by('-id')
 	serializer_class = DomainSerializer
+	pagination_class = DatatablesPageNumberPagination
 
 	def get_queryset(self):
 		queryset = Domain.objects.all()
