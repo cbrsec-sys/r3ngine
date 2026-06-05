@@ -106,7 +106,12 @@ class CVEEnrichmentService:
             self._enrich_from_epss(cve_obj)
         except Exception as e:
             logger.warning(f"EPSS enrichment failed for {cve_name}: {e}")
-        
+
+        try:
+            self._enrich_from_vulnx(cve_obj)
+        except Exception as e:
+            logger.warning(f"vulnx enrichment failed for {cve_name}: {e}")
+
         # Save and return
         cve_obj.save()
         return cve_obj
@@ -315,6 +320,110 @@ class CVEEnrichmentService:
             f"EPSS={cve_obj.epss_score} percentile={cve_obj.epss_percentile}"
         )
     
+    def _enrich_from_vulnx(self, cve_obj: CveId) -> None:
+        """
+        Fetch CVE metadata from vulnx (ProjectDiscovery Cloud Platform).
+
+        Populates is_poc, is_template, and additional CVSS/EPSS fields if
+        the PDCP API key is configured in the database.
+        """
+        import subprocess
+        import json
+        import os
+        from dashboard.models import ProjectDiscoveryAPIKey
+
+        pdcp_key_obj = ProjectDiscoveryAPIKey.objects.first()
+        pdcp_key = pdcp_key_obj.key if pdcp_key_obj else None
+
+        cmd = ["vulnx", "id", "--json", cve_obj.name]
+        env = os.environ.copy()
+        if pdcp_key:
+            env["PDCP_API_KEY"] = pdcp_key
+
+        logger.debug("Running vulnx command: %s", " ".join(cmd))
+
+        try:
+            result = subprocess.run(
+                cmd,
+                env=env,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+
+            if result.returncode != 0:
+                logger.warning("vulnx command failed with code %d: %s", result.returncode, result.stderr)
+                return
+
+            if not result.stdout.strip():
+                logger.debug("vulnx returned empty output for %s", cve_obj.name)
+                return
+
+            try:
+                data = json.loads(result.stdout)
+            except json.JSONDecodeError:
+                lines = [line.strip() for line in result.stdout.split('\n') if line.strip()]
+                data = None
+                for line in lines:
+                    if line.startswith('{') or line.startswith('['):
+                        try:
+                            data = json.loads(line)
+                            break
+                        except json.JSONDecodeError:
+                            continue
+                if not data:
+                    logger.warning("Failed to parse JSON from vulnx output for %s", cve_obj.name)
+                    return
+
+            vuln_data = None
+            if isinstance(data, dict):
+                vuln_data = data.get("data") if isinstance(data.get("data"), dict) else data
+            elif isinstance(data, list) and data:
+                vuln_data = data[0]
+
+            if not vuln_data or not isinstance(vuln_data, dict):
+                logger.debug("No valid vulnerability data in vulnx response for %s", cve_obj.name)
+                return
+
+            cvss = vuln_data.get("cvss_score")
+            if cvss is not None:
+                cve_obj.cvss_v31_base_score = float(cvss)
+
+            epss_score = vuln_data.get("epss_score")
+            if epss_score is not None:
+                cve_obj.epss_score = float(epss_score)
+
+            epss_perc = vuln_data.get("epss_percentile")
+            if epss_perc is not None:
+                cve_obj.epss_percentile = float(epss_perc)
+
+            is_kev = vuln_data.get("is_kev")
+            if is_kev is not None:
+                cve_obj.is_cisa_kev = bool(is_kev)
+
+            is_poc = vuln_data.get("is_poc")
+            if is_poc is not None:
+                cve_obj.is_poc = bool(is_poc)
+
+            is_template = vuln_data.get("is_template")
+            if is_template is not None:
+                cve_obj.is_template = bool(is_template)
+
+            published = vuln_data.get("cve_created_at")
+            if published:
+                cve_obj.published_date = self._parse_timezone_aware(published)
+
+            modified = vuln_data.get("cve_updated_at")
+            if modified:
+                cve_obj.last_modified_date = self._parse_timezone_aware(modified)
+
+            logger.info("vulnx enrichment successful for %s", cve_obj.name)
+
+        except subprocess.TimeoutExpired:
+            logger.warning("vulnx request timed out for %s", cve_obj.name)
+        except Exception as e:
+            logger.error("Error enriching %s from vulnx: %s", cve_obj.name, e)
+
     def _parse_timezone_aware(self, date_str: str) -> Optional[timezone.datetime]:
         """
         Parse ISO 8601 datetime string and ensure timezone awareness.

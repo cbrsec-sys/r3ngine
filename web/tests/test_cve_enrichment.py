@@ -195,6 +195,40 @@ class CVEEnrichmentServiceTestCase(TestCase):
         self.assertIn("CVE-2024-1111", results)
 
 
+    @patch('subprocess.run')
+    @patch('dashboard.models.ProjectDiscoveryAPIKey.objects')
+    def test_enrich_cve_from_vulnx(self, mock_objects, mock_run):
+        """Verify that vulnx output is correctly parsed and applied to CveId objects."""
+        mock_key = MagicMock()
+        mock_key.key = "test-pdcp-key"
+        mock_objects.first.return_value = mock_key
+        mock_objects.exists.return_value = True
+
+        mock_result = MagicMock()
+        mock_result.returncode = 0
+        mock_result.stdout = json.dumps({
+            "cvss_score": 9.8,
+            "epss_score": 0.95842,
+            "epss_percentile": 0.98765,
+            "is_kev": True,
+            "is_poc": True,
+            "is_template": True,
+            "cve_created_at": "2024-01-15T10:00:00Z",
+            "cve_updated_at": "2024-06-01T10:00:00Z"
+        })
+        mock_run.return_value = mock_result
+
+        cve = CveId.objects.create(name="CVE-2024-1234")
+        self.service._enrich_from_vulnx(cve)
+
+        self.assertEqual(cve.cvss_v31_base_score, 9.8)
+        self.assertAlmostEqual(cve.epss_score, 0.95842, places=5)
+        self.assertAlmostEqual(cve.epss_percentile, 0.98765, places=5)
+        self.assertTrue(cve.is_cisa_kev)
+        self.assertTrue(cve.is_poc)
+        self.assertTrue(cve.is_template)
+
+
 class CorrelationWithEnrichmentTestCase(TestCase):
     """
     Test case to verify the correlation engine integrates correctly with enriched CVE metadata.
