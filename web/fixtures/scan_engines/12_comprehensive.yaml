@@ -16,7 +16,7 @@
           - baddns
         enable_http_crawl: true
         threads: 30
-        timeout: 5
+        timeout: 90
       firewall_vpn_scan:
         run_ike_scan: true
         run_sslscan: true
@@ -95,13 +95,13 @@
           - yml
           - pdf
         follow_redirect: true
-        max_time: 300
+        max_time: 750
         match_http_status:
           - 200
           - 204
         recursive_level: 2
         stop_on_error: false
-        timeout: 300
+        timeout: 600
         threads: 20
         wordlist_name: dicc
         use_api_wordlist: false
@@ -156,7 +156,7 @@
       vulnerability_scan:
         run_nuclei: true
         run_dalfox: true
-        run_crlfuzz: false
+        run_crlfuzz: true
         run_acunetix: false
         run_wpscan: true
         run_s3scanner: true
@@ -181,7 +181,7 @@
           strategy: balanced
           concurrency: 30
           rate_limit: 100
-          timeout: 300s
+          timeout: 600s
         cpanel_scanner:
           run_cpanel2shell: true
           cpanel_user_wordlist: /usr/src/app/wordlist/cpanel_users.txt
@@ -191,7 +191,7 @@
         strategy: balanced
         concurrency: 20
         rate_limit: 50
-        timeout: 180s
+        timeout: 300s
       vigolium_analysis:
         run_vigolium_analysis: true
         strategy: balanced
