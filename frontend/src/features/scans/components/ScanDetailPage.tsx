@@ -1032,63 +1032,107 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: a
   </TacticalPanel>
 );
 
+interface SubdomainVulnCounts {
+  host: string;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  total: number;
+}
+
 const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?: any }> = ({ vulnerabilities = [], sx = {} }) => {
   const [ignoreInfo, setIgnoreInfo] = useState(false);
 
   const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) > 0) : vulnerabilities;
 
-  const subdomainCounts = filteredVulns.reduce(
-    (acc: Record<string, number>, v: Vulnerability) => {
+  const subdomainMap = filteredVulns.reduce(
+    (acc: Record<string, SubdomainVulnCounts>, v: Vulnerability) => {
       try {
         if (!v.http_url) return acc;
-
-        // Ensure protocol exists
-        const normalizedUrl = v.http_url.match(/^https?:\/\//)
-          ? v.http_url
-          : `http://${v.http_url}`;
-
+        const normalizedUrl = v.http_url.match(/^https?:\/\//) ? v.http_url : `http://${v.http_url}`;
         const host = new URL(normalizedUrl).hostname;
-
         if (!host) return acc;
-
-        acc[host] = (acc[host] || 0) + 1;
-      } catch (err) {
-        console.warn('Invalid URL:', v.http_url);
+        if (!acc[host]) acc[host] = { host, critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+        const sev = Number(v.severity);
+        if (sev === 4) acc[host].critical += 1;
+        else if (sev === 3) acc[host].high += 1;
+        else if (sev === 2) acc[host].medium += 1;
+        else if (sev === 1) acc[host].low += 1;
+        acc[host].total += 1;
+      } catch {
+        // ignore invalid URLs
       }
-
       return acc;
     },
     {}
   );
 
-  const sorted = Object.entries(subdomainCounts).sort((a: [string, number], b: [string, number]) => b[1] - a[1]);
-  const mostVulnerable = sorted[0];
+  const rows = Object.values(subdomainMap).sort((a, b) => b.total - a.total);
+
+  const cellStyle = { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 0.75 };
 
   return (
     <TacticalPanel
-      title="MOST VULNERABLE SUBDOMAIN"
+      title="MOST VULNERABLE SUBDOMAINS"
       icon={<ShieldAlert size={14} color="#ff003c" />}
       sx={{ height: '100%', ...sx }}
       headerAction={
         <FormControlLabel
           control={<Checkbox size="small" checked={ignoreInfo} onChange={(e) => setIgnoreInfo(e.target.checked)} sx={{ color: 'rgba(255,255,255,0.4)', '&.Mui-checked': { color: '#00f3ff' } }} />}
-          label={<Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 800 }}>Ignore Info Vulnerabilities</Typography>}
+          label={<Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 800 }}>Ignore Info</Typography>}
         />
       }
     >
-      <Box sx={{ p: 2 }}>
-        {mostVulnerable ? (
-          <Box sx={{ bgcolor: 'rgba(255,0,60,0.05)', border: '1px solid rgba(255,0,60,0.1)', p: 2, borderRadius: 1 }}>
-            <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#ff003c', mb: 1 }}>{mostVulnerable[0]}</Typography>
-            <Typography sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>Total Vulnerabilities: <Box component="span" sx={{ color: '#ff003c', fontWeight: 900 }}>{String(mostVulnerable[1])}</Box></Typography>
-          </Box>
-        ) : (
+      {rows.length > 0 ? (
+        <TableContainer sx={{ maxHeight: 320 }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase', letterSpacing: 1 }}>Subdomain</TableCell>
+                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#ff003c', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Crit</TableCell>
+                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#ff9f00', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>High</TableCell>
+                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#fffc00', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Med</TableCell>
+                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#00ff62', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Low</TableCell>
+                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#00f3ff', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Total</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.host} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
+                  <TableCell sx={cellStyle}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#c7c7c7' }}>{row.host}</Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={cellStyle}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.critical > 0 ? '#ff003c' : 'rgba(255,255,255,0.1)' }}>{row.critical}</Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={cellStyle}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.high > 0 ? '#ff9f00' : 'rgba(255,255,255,0.1)' }}>{row.high}</Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={cellStyle}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.medium > 0 ? '#fffc00' : 'rgba(255,255,255,0.1)' }}>{row.medium}</Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={cellStyle}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.low > 0 ? '#00ff62' : 'rgba(255,255,255,0.1)' }}>{row.low}</Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={cellStyle}>
+                    <Box sx={{ px: 1, py: 0.25, borderRadius: 0.5, bgcolor: 'rgba(0,243,255,0.1)', display: 'inline-block' }}>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#00f3ff' }}>{row.total}</Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Box sx={{ p: 2 }}>
           <Box sx={{ bgcolor: 'rgba(255,252,0,0.1)', border: '1px solid rgba(255,252,0,0.2)', p: 2, borderRadius: 1 }}>
             <Typography sx={{ fontSize: '0.75rem', color: '#fffc00', fontWeight: 700, mb: 1 }}>Could not find most vulnerable targets.</Typography>
             <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,252,0,0.6)' }}>Once the vulnerability scan is performed, reNgine will identify the most vulnerable targets.</Typography>
           </Box>
-        )}
-      </Box>
+        </Box>
+      )}
     </TacticalPanel>
   );
 };
@@ -1758,10 +1802,10 @@ export const ScanDetailPage = () => {
 
       {/* Row 4: Vulnerability Deep Dive */}
       <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
         </Grid>
-        <Grid size={{ xs: 12, md: 8 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} onVulnClick={handleVulnClick} sx={{ height: '100%' }} />
         </Grid>
       </Grid>

@@ -764,6 +764,180 @@ def get_ollama_pull_status(request, slug):
     })
 
 
+def _test_llm_provider(provider: str, api_key: str, model: str) -> dict:
+    """Send a minimal prompt to the given provider and return a result dict.
+
+    Returns {'status': 'success'|'error', 'message': str, 'response': str}.
+    Never raises; all exceptions are caught and converted to error results.
+    """
+    import requests as req_lib
+    from urllib.parse import urlparse
+    from reNgine.definitions import OLLAMA, OPENAI, ANTHROPIC, GEMINI, OLLAMA_INSTANCE
+
+    TEST_SYSTEM = "You are a connectivity test assistant."
+    TEST_PROMPT = "Reply with exactly the word: CONNECTED"
+
+    _HTTP_ERROR_HINTS = {
+        401: "Invalid API key — please check your credentials.",
+        402: "Payment required — your account may have no remaining credits or needs a billing update.",
+        403: "Access forbidden — your API key may lack the required permissions.",
+        429: "Rate limit or quota exceeded — please check your plan limits or try again later.",
+    }
+
+    def _parse_http_error(exc) -> str:
+        try:
+            code = exc.response.status_code
+            hint = _HTTP_ERROR_HINTS.get(code)
+            if hint:
+                return hint
+            try:
+                body = exc.response.json()
+                msg = (
+                    (body.get('error') or {}).get('message')
+                    or body.get('message')
+                    or f"HTTP {code} from provider."
+                )
+                return f"Provider error ({code}): {msg}"
+            except Exception:
+                return f"HTTP {code} from provider."
+        except Exception:
+            return "Unexpected HTTP error from provider."
+
+    if provider == OLLAMA:
+        host = api_key or OLLAMA_INSTANCE
+        parsed = urlparse(host)
+        if parsed.scheme not in ('http', 'https') or not parsed.netloc:
+            return {'status': 'error', 'message': 'Invalid Ollama host URL — must use http:// or https://.', 'response': ''}
+        try:
+            tags_resp = req_lib.get(f"{host}/api/tags", timeout=10)
+            tags_resp.raise_for_status()
+            use_model = model
+            if not use_model:
+                tags = tags_resp.json().get('models', [])
+                use_model = tags[0]['name'] if tags else 'llama3'
+            gen_resp = req_lib.post(
+                f"{host}/api/generate",
+                json={"model": use_model, "prompt": TEST_PROMPT, "stream": False},
+                timeout=60,
+            )
+            gen_resp.raise_for_status()
+            response_text = gen_resp.json().get('response', '').strip()
+            return {'status': 'success', 'message': 'Ollama connection successful.', 'response': response_text}
+        except req_lib.exceptions.ConnectionError:
+            return {'status': 'error', 'message': f"Cannot reach Ollama at {host} — is the service running?", 'response': ''}
+        except req_lib.exceptions.Timeout:
+            return {'status': 'error', 'message': 'Connection to Ollama timed out.', 'response': ''}
+        except req_lib.exceptions.HTTPError as exc:
+            return {'status': 'error', 'message': _parse_http_error(exc), 'response': ''}
+        except Exception:
+            logger.exception("Unexpected error during Ollama connection test")
+            return {'status': 'error', 'message': 'Unexpected error during Ollama connection test.', 'response': ''}
+
+    elif provider == OPENAI:
+        if not api_key:
+            return {'status': 'error', 'message': 'OpenAI API key is required.', 'response': ''}
+        use_model = model or 'gpt-3.5-turbo'
+        try:
+            resp = req_lib.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json={
+                    "model": use_model,
+                    "messages": [
+                        {"role": "system", "content": TEST_SYSTEM},
+                        {"role": "user", "content": TEST_PROMPT},
+                    ],
+                    "max_tokens": 20,
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            response_text = resp.json()['choices'][0]['message']['content'].strip()
+            return {'status': 'success', 'message': 'OpenAI connection successful.', 'response': response_text}
+        except req_lib.exceptions.HTTPError as exc:
+            return {'status': 'error', 'message': _parse_http_error(exc), 'response': ''}
+        except req_lib.exceptions.Timeout:
+            return {'status': 'error', 'message': 'OpenAI request timed out.', 'response': ''}
+        except Exception:
+            logger.exception("Unexpected error during OpenAI connection test")
+            return {'status': 'error', 'message': 'Unexpected error during OpenAI connection test.', 'response': ''}
+
+    elif provider == ANTHROPIC:
+        if not api_key:
+            return {'status': 'error', 'message': 'Anthropic API key is required.', 'response': ''}
+        use_model = model or 'claude-3-haiku-20240307'
+        try:
+            resp = req_lib.post(
+                "https://api.anthropic.com/v1/messages",
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                    "content-type": "application/json",
+                },
+                json={
+                    "model": use_model,
+                    "max_tokens": 20,
+                    "system": TEST_SYSTEM,
+                    "messages": [{"role": "user", "content": TEST_PROMPT}],
+                },
+                timeout=30,
+            )
+            resp.raise_for_status()
+            block = resp.json()['content'][0]
+            if block.get('type') != 'text':
+                return {'status': 'error', 'message': f"Unexpected response type from Anthropic: {block.get('type')}", 'response': ''}
+            return {'status': 'success', 'message': 'Anthropic connection successful.', 'response': block['text'].strip()}
+        except req_lib.exceptions.HTTPError as exc:
+            return {'status': 'error', 'message': _parse_http_error(exc), 'response': ''}
+        except req_lib.exceptions.Timeout:
+            return {'status': 'error', 'message': 'Anthropic request timed out.', 'response': ''}
+        except Exception:
+            logger.exception("Unexpected error during Anthropic connection test")
+            return {'status': 'error', 'message': 'Unexpected error during Anthropic connection test.', 'response': ''}
+
+    elif provider == GEMINI:
+        if not api_key:
+            return {'status': 'error', 'message': 'Google Gemini API key is required.', 'response': ''}
+        use_model = model or 'gemini-1.5-flash'
+        try:
+            url = f"https://generativelanguage.googleapis.com/v1beta/models/{use_model}:generateContent"
+            resp = req_lib.post(
+                url,
+                headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
+                json={"contents": [{"parts": [{"text": f"{TEST_SYSTEM}\n\n{TEST_PROMPT}"}]}]},
+                timeout=30,
+            )
+            resp.raise_for_status()
+            response_text = resp.json()['candidates'][0]['content']['parts'][0]['text'].strip()
+            return {'status': 'success', 'message': 'Gemini connection successful.', 'response': response_text}
+        except req_lib.exceptions.HTTPError as exc:
+            return {'status': 'error', 'message': _parse_http_error(exc), 'response': ''}
+        except req_lib.exceptions.Timeout:
+            return {'status': 'error', 'message': 'Gemini request timed out.', 'response': ''}
+        except Exception:
+            logger.exception("Unexpected error during Gemini connection test")
+            return {'status': 'error', 'message': 'Unexpected error during Gemini connection test.', 'response': ''}
+
+    return {'status': 'error', 'message': f"Unknown provider: {provider}", 'response': ''}
+
+
+@has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def test_llm_connection(request, slug):
+    if request.method != 'POST':
+        return http.JsonResponse({'status': 'error', 'message': 'POST required'}, status=400)
+
+    provider = request.POST.get('provider', '').strip()
+    api_key = request.POST.get('api_key', '').strip()
+    model = request.POST.get('model', '').strip()
+
+    if not provider:
+        return http.JsonResponse({'status': 'error', 'message': 'Provider is required.'}, status=400)
+
+    result = _test_llm_provider(provider, api_key, model)
+    status_code = 200 if result['status'] == 'success' else 400
+    return http.JsonResponse(result, status=status_code)
+
+
 @has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
 def api_vault(request, slug):
     logger.info(f"api_vault view hit! Method: {request.method}, Slug: {slug}, User: {request.user}")

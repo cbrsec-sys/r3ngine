@@ -73,6 +73,10 @@ urlpatterns = [
         views.get_ollama_pull_status,
         name='get_ollama_pull_status'),
     path(
+        '<slug:slug>/test_llm_connection',
+        views.test_llm_connection,
+        name='test_llm_connection'),
+    path(
         '<slug:slug>/rengine_settings',
         views.rengine_settings,
         name='rengine_settings'),
