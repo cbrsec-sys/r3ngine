@@ -338,7 +338,7 @@ def initiate_scan_temporal(
 		}
 
 		# ---- Start MasterScanWorkflow on Temporal ----
-		from reNgine.temporal_client import TemporalClientProvider
+		from reNgine.temporal_client import TemporalClientProvider, run_and_close
 		from datetime import timedelta
 		from temporalio.exceptions import ServerError as TemporalServiceError
 
@@ -379,10 +379,7 @@ def initiate_scan_temporal(
 
 		loop = asyncio.new_event_loop()
 		asyncio.set_event_loop(loop)
-		try:
-			started_workflow_id = loop.run_until_complete(_start_workflow_with_retry())
-		finally:
-			loop.close()
+		started_workflow_id = run_and_close(loop, _start_workflow_with_retry())
 
 		logger.info(
 			f'Started MasterScanWorkflow id={started_workflow_id} '
@@ -579,7 +576,7 @@ def initiate_subscan_temporal(
 			temporal_ctx['subdomain_http_url'] = subdomain.http_url
 
 		# ---- Start SubScanWorkflow on Temporal ----
-		from reNgine.temporal_client import TemporalClientProvider
+		from reNgine.temporal_client import TemporalClientProvider, run_and_close
 		from datetime import timedelta
 		from temporalio.exceptions import ServerError as TemporalServiceError
 		from temporalio.common import RetryPolicy
@@ -622,10 +619,7 @@ def initiate_subscan_temporal(
 
 		loop = asyncio.new_event_loop()
 		asyncio.set_event_loop(loop)
-		try:
-			started_workflow_id = loop.run_until_complete(_start_subscan_workflow_with_retry())
-		finally:
-			loop.close()
+		started_workflow_id = run_and_close(loop, _start_subscan_workflow_with_retry())
 
 		logger.info(
 			f"Started SubScanWorkflow id={started_workflow_id} "
@@ -6200,7 +6194,7 @@ def save_ip_address(ip_address, subdomain=None, subscan=None, scan_id=None, acti
 
 	# Trigger geo localization if newly created OR if geo_iso is null
 	if created or ip.geo_iso is None:
-		from reNgine.temporal_client import TemporalClientProvider
+		from reNgine.temporal_client import TemporalClientProvider, run_and_close
 		import asyncio
 		async def _start():
 			client = await TemporalClientProvider.get_client()
@@ -6212,11 +6206,9 @@ def save_ip_address(ip_address, subdomain=None, subscan=None, scan_id=None, acti
 			)
 		loop = asyncio.new_event_loop()
 		try:
-			loop.run_until_complete(_start())
+			run_and_close(loop, _start())
 		except Exception as e:
 			logger.warning(f"Failed to start GeoLocalizeWorkflow for IP {ip_address} in scan {scan_id}: {e}")
-		finally:
-			loop.close()
 
 	# Set extra attributes
 	for key, value in kwargs.items():
@@ -7504,9 +7496,9 @@ def resume_scan_temporal(scan_id):
 	1. Identifies completed tasks by checking ScanActivity records.
 	2. Spawns MasterScanWorkflow with only the remaining tasks.
 	"""
-	from reNgine.temporal_client import TemporalClientProvider
+	from reNgine.temporal_client import TemporalClientProvider, run_and_close
 	import asyncio
-	
+
 	scan = ScanHistory.objects.get(id=scan_id)
 	
 	# Mark genuinely-running activities as failed; leave INITIATED rows intact so
@@ -7590,10 +7582,7 @@ def resume_scan_temporal(scan_id):
 		)
 
 	loop = asyncio.new_event_loop()
-	try:
-		loop.run_until_complete(_cancel_old_and_start())
-	finally:
-		loop.close()
+	run_and_close(loop, _cancel_old_and_start())
 
 	# Track workflow execution so cancel_workflow can find it
 	from startScan.models import TemporalWorkflowExecution
@@ -7624,7 +7613,7 @@ def recover_stuck_scans():
 	import asyncio
 	from startScan.models import ScanHistory, TemporalWorkflowExecution
 	from reNgine.definitions import FAILED_TASK, RUNNING_TASK
-	from reNgine.temporal_client import TemporalClientProvider
+	from reNgine.temporal_client import TemporalClientProvider, run_and_close
 
 	logger.info("[RECOVERY] recover_stuck_scans triggered")
 
@@ -7694,10 +7683,7 @@ def recover_stuck_scans():
 		)
 
 		loop = asyncio.new_event_loop()
-		try:
-			is_active = loop.run_until_complete(_is_workflow_active(workflow_id)) if workflow_id else False
-		finally:
-			loop.close()
+		is_active = run_and_close(loop, _is_workflow_active(workflow_id)) if workflow_id else False
 
 		if is_active:
 			logger.info("[RECOVERY] Scan %d (%s) workflow '%s' is ACTIVE — skipping", scan.id, scan.domain, workflow_id)
@@ -7708,12 +7694,17 @@ def recover_stuck_scans():
 			"[RECOVERY] Scan %d (%s) workflow '%s' is DEAD — resuming (recovery_count=%d)",
 			scan.id, scan.domain, workflow_id, scan.recovery_count
 		)
-		scan.scan_status = FAILED_TASK
-		scan.save(update_fields=['scan_status'])
 		try:
 			resume_scan_temporal(scan.id)
 			recovered += 1
+			logger.info("[RECOVERY] Scan %d resumed successfully", scan.id)
 		except Exception as e:
+			# Recovery failed — only now mark the scan permanently FAILED so the
+			# user can see it and act on it. Doing this before the attempt would
+			# leave the scan stuck in FAILED state whenever resume raises.
+			scan.refresh_from_db(fields=['scan_status'])
+			scan.scan_status = FAILED_TASK
+			scan.save(update_fields=['scan_status'])
 			logger.error("[RECOVERY] Failed to auto-recover stuck running scan %d: %s", scan.id, e)
 
 	logger.info("[RECOVERY] recover_stuck_scans complete — active=%d recovered=%d", active, recovered)

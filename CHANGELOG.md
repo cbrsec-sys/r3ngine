@@ -2,6 +2,24 @@
 
 ### [v3.5.0] - 2026-06-04
 
+- **Fix gRPC Connection Cancellation Error**:
+  - Resolved `temporalio.service.RPCError: operation was canceled` in the python container during workflow execution result retrieval.
+  - Refactored `stream_command` in `web/reNgine/utils/task.py` to create a single `asyncio.Task` wrapper around `handle.result()` and poll it using `asyncio.wait()`, preventing the accumulation of leaked history-fetching coroutines on timeout.
+  - Ensured the task is cleanly cancelled on early exit or scan aborts.
+
+- **Mobile App Login and ALLOWED_HOSTS Fix**:
+  - Automatically dynamically extract and trust the host from `DOMAIN_NAME` inside `web/reNgine/settings.py` so the configured domain works out-of-the-box.
+  - Forward the `ALLOWED_HOSTS` environment variable to the `web` container in both production `docker-compose.yml` and development `docker-compose.dev.yml` (defaulting to `*` in development to ensure seamless mobile emulator/simulator connectivity).
+  - Updated Nginx's HTTP port 8082 redirect rule in `docker/proxy/config/rengine.conf` to use a `308 Permanent Redirect` instead of `301`, preventing HTTP POST methods (like mobile logins) from being converted to GET requests during HTTP-to-HTTPS redirects.
+
+- **Docker: Pipx Isolation for Conflicting Python Tools**:
+  - Migrated `dirsearch`, `maigret`, and `semgrep` out of the shared system `pip3` environment and into isolated `pipx` virtual environments in `docker/web/Dockerfile`.
+  - Resolves five pip dependency incompatibility warnings at build time: `requests` (2.25.1 vs ≥2.27.0 / ≥2.32.4), `chardet` (4.0.0 vs ≥5), `idna` (2.10 vs ≥3.4), and `urllib3` (1.26.x vs ~2.0).
+  - Each tool's transitive dependencies are now fully isolated and cannot conflict with the Django application's pinned `requirements.txt` packages or with each other.
+  - Follows the same `pipx` pattern already established for `baddns`. `/root/.local/bin` is on `PATH`, so all shims remain accessible at runtime without any additional configuration.
+
+
+
 - **CVE Enrichment System**:
   - **CVE Enrichment Service**: `web/reNgine/cve_enrichment.py` fully operational - fetches CVSS v3.1 metrics from NVD API v2.0, EPSS probability scores from FIRST, and syncs the CISA KEV catalog. Enriched data is cached (7-day TTL for CVEs, 1-hour for KEV) and gracefully degrades on API unavailability.
   - **Deployment Documentation** (`documents/CVE_ENRICHMENT.md`): Comprehensive documentation covering setup, programmatic usage, management commands, correlation integration, troubleshooting, data retention, performance, and monitoring.

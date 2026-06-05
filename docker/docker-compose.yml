@@ -5,6 +5,12 @@ services:
     build:
       context: ./postgres
     image: "postgres:16-alpine"
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c idle_in_transaction_session_timeout=30000
+      -c statement_timeout=300000
     environment:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -54,6 +60,7 @@ services:
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     environment:
       - DEBUG=${DEBUG:-0}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
       - REDIS_URL=redis://redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}
       - POSTGRES_DB=${POSTGRES_DB}
@@ -199,8 +206,8 @@ services:
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_SEEDS=db
     depends_on:
-      - db
-      #  condition: service_healthy
+      db:
+        condition: service_healthy
     networks:
       - r3ngine_network
     healthcheck:

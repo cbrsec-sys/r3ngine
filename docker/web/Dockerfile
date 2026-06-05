@@ -29,7 +29,7 @@ RUN apt-get update && \
 ENV GO111MODULE=on
 
 # All tools in one RUN: single cache-invalidation point, no intermediate layers
-# retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols.
+# retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols.      # v3.3.8 && \
 RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && \
     go install -ldflags="-s -w" -v github.com/jaeles-project/gospider@latest && \
     go install -ldflags="-s -w" -v github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006 && \
@@ -38,7 +38,7 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest && \
-    go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8 && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
     go install -ldflags="-s -w" -v github.com/hakluke/hakrawler@latest && \
     go install -ldflags="-s -w" -v github.com/lc/gau/v2/cmd/gau@latest && \
@@ -393,12 +393,33 @@ RUN git clone --depth 1 https://github.com/ticarpi/jwt_tool /usr/src/github/jwt_
 # ---------------------------------------------------------------------------
 # Install Python security tools via pip (no source clone needed)
 #
-# NOTE: semgrep is installed via pip ONLY. The source clone that was here
-# previously was completely redundant (pip handles it) and has been removed.
+# Tools with no version conflicts are installed into system site-packages.
+# Tools that conflict with each other or with the Django app's requirements
+# (dirsearch, maigret, semgrep) are isolated in their own pipx virtual
+# environments so their transitive dependencies cannot clash.
+#
+# Conflicts resolved by pipx isolation:
+#   dirsearch 0.4.3.post1 — requires requests>=2.27.0  (system: 2.25.1)
+#   maigret   0.6.1       — requires requests>=2.32.4, chardet>=5, idna>=3.4
+#   semgrep   1.165.0     — requires urllib3~=2.0       (system: 1.26.x)
+#
+# /root/.local/bin is already on PATH (set earlier in this Dockerfile), so
+# all pipx shims are immediately available to subsequent RUN steps and at
+# container runtime without any additional PATH configuration.
 # ---------------------------------------------------------------------------
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel pyOpenSSL h8mail && \
-    pip3 install --no-cache-dir semgrep && \
-    pip3 install --no-cache-dir --upgrade meson ninja arjun inql netlas holehe maigret dirsearch
+    pip3 install --no-cache-dir --upgrade meson ninja arjun inql netlas holehe
+
+# Ensure pipx is available and install baddns
+RUN python3 -m pip install --no-cache-dir pipx && \
+    pipx install git+https://github.com/blacklanternsecurity/baddns
+
+# Install conflicting tools in isolated pipx environments
+RUN pipx install dirsearch && \
+    pipx install maigret && \
+    pipx install semgrep && \
+    pipx install fierce && \ 
+    pipx install dnsrecon
 
 RUN git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop \
     && pip3 install --no-cache-dir -r /usr/src/github/graphql-cop/requirements.txt \
@@ -412,11 +433,6 @@ RUN git clone --depth 1 https://github.com/cddmp/enum4linux-ng /usr/src/github/e
 RUN git clone --depth 1 https://github.com/CiscoCXSecurity/rdp-sec-check /usr/src/github/rdp-sec-check \
     && cpan install Encoding::BER \
     && ln -sf /usr/src/github/rdp-sec-check/rdp-sec-check.pl /usr/local/bin/rdp-sec-check
-
-RUN pip3 install --no-cache-dir dnsrecon fierce
-
-RUN python3 -m pip install --no-cache-dir pipx && \
-    pipx install git+https://github.com/blacklanternsecurity/baddns
 
 # ---------------------------------------------------------------------------
 # Copy and install the application's Python requirements

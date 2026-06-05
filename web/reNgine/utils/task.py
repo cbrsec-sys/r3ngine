@@ -778,54 +778,70 @@ def stream_command(
 				id=workflow_id,
 				task_queue="python-orchestrator-queue"
 			)
+			# Create a single task to await the workflow result.
+			# This avoids creating multiple handle.result() coroutines on every iteration,
+			# preventing gRPC connection leaks and RPC cancellation errors.
+			result_task = asyncio.create_task(handle.result())
 
-			# Poll with 10 s slices so we can react to cancellation promptly.
-			while True:
-				try:
-					result = await asyncio.wait_for(asyncio.shield(handle.result()), timeout=10.0)
-					return result
-				except asyncio.TimeoutError:
-					pass  # not done yet — check abort conditions below
-
-				# 1) Check the cancel_event set by _run_task's heartbeat thread.
-				try:
-					from reNgine.temporal_activities import _task_cancel_local
-					ce = getattr(_task_cancel_local, 'cancel_event', None)
-					if ce and ce.is_set():
-						logger.warning(
-							f"[stream_command] cancel_event set — cancelling GoExecutorTaskWorkflow {workflow_id}"
-						)
-						try:
-							await handle.cancel()
-						except Exception:
-							pass
-						return {"exit_code": -1, "stdout": "", "stderr": "Scan aborted"}
-				except Exception:
-					pass
-
-				# 2) Fallback: direct DB check.
-				if scan_history_id:
+			try:
+				# Poll until result_task is complete.
+				while not result_task.done():
+					# 1) Check the cancel_event set by _run_task's heartbeat thread.
 					try:
-						loop = asyncio.get_event_loop()
-						status = await loop.run_in_executor(
-							None,
-							lambda: __import__(
-								'startScan.models', fromlist=['ScanHistory']
-							).ScanHistory.objects.filter(pk=scan_history_id)
-							.values_list('scan_status', flat=True)
-							.first()
-						)
-						if status == ABORTED_TASK:
+						from reNgine.temporal_activities import _task_cancel_local
+						ce = getattr(_task_cancel_local, 'cancel_event', None)
+						if ce and ce.is_set():
 							logger.warning(
-								f"[stream_command] DB ABORTED_TASK — cancelling GoExecutorTaskWorkflow {workflow_id}"
+								f"[stream_command] cancel_event set — cancelling GoExecutorTaskWorkflow {workflow_id}"
 							)
 							try:
 								await handle.cancel()
-							except Exception:
-								pass
+							except Exception as cancel_err:
+								logger.error(f"[stream_command] Failed to cancel workflow {workflow_id}: {cancel_err}")
+							result_task.cancel()
 							return {"exit_code": -1, "stdout": "", "stderr": "Scan aborted"}
-					except Exception:
-						pass
+					except Exception as e:
+						logger.debug(f"[stream_command] Local cancel_event check failed: {e}")
+
+					# 2) Fallback: direct DB check.
+					if scan_history_id:
+						try:
+							loop = asyncio.get_event_loop()
+							status = await loop.run_in_executor(
+								None,
+								lambda: __import__(
+									'startScan.models', fromlist=['ScanHistory']
+								).ScanHistory.objects.filter(pk=scan_history_id)
+								.values_list('scan_status', flat=True)
+								.first()
+							)
+							if status == ABORTED_TASK:
+								logger.warning(
+									f"[stream_command] DB ABORTED_TASK — cancelling GoExecutorTaskWorkflow {workflow_id}"
+								)
+								try:
+									await handle.cancel()
+								except Exception as cancel_err:
+									logger.error(f"[stream_command] Failed to cancel workflow {workflow_id}: {cancel_err}")
+								result_task.cancel()
+								return {"exit_code": -1, "stdout": "", "stderr": "Scan aborted"}
+						except Exception as e:
+							logger.debug(f"[stream_command] DB abort status check failed: {e}")
+
+					# Wait for up to 10 seconds or until the workflow finishes.
+					# This yields control to the event loop, letting result_task run,
+					# without creating redundant coroutines or raising TimeoutError.
+					await asyncio.wait([result_task], timeout=10.0)
+
+				# Once result_task is done, return its result.
+				return await result_task
+			except Exception as e:
+				logger.error(f"[stream_command] Error waiting for GoExecutorTaskWorkflow: {e}")
+				raise
+			finally:
+				# Ensure result_task is cancelled if we exit early (e.g. on abort or error).
+				if not result_task.done():
+					result_task.cancel()
 
 		try:
 			try:
