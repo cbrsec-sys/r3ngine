@@ -424,7 +424,7 @@ RUN git clone --depth 1 https://github.com/ticarpi/jwt_tool /usr/src/github/jwt_
 # container runtime without any additional PATH configuration.
 # ---------------------------------------------------------------------------
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel pyOpenSSL h8mail && \
-    pip3 install --no-cache-dir --upgrade meson ninja arjun inql netlas holehe
+    pip3 install --no-cache-dir --upgrade fierce dirsearch meson ninja arjun inql netlas holehe
 
 # Ensure pipx is available and install baddns
 RUN python3 -m pip install --no-cache-dir pipx && \
@@ -433,16 +433,12 @@ RUN python3 -m pip install --no-cache-dir pipx && \
 # Install conflicting tools in isolated pipx environments.
 # Each venv gets setuptools installed via its own pip to guarantee pkg_resources
 # is available under Python 3.12 (pipx inject can be silently skipped by layer cache).
-RUN pipx install dirsearch && \
-    /root/.local/share/pipx/venvs/dirsearch/bin/pip install --no-cache-dir setuptools && \
-    pipx install maigret && \
-    /root/.local/share/pipx/venvs/maigret/bin/pip install --no-cache-dir setuptools && \
+RUN pipx install maigret && \
+    pipx inject maigret setuptools && \
     pipx install semgrep && \
-    /root/.local/share/pipx/venvs/semgrep/bin/pip install --no-cache-dir setuptools && \
-    pipx install fierce && \
-    /root/.local/share/pipx/venvs/fierce/bin/pip install --no-cache-dir setuptools && \
+    pipx inject semgrep setuptools && \
     pipx install dnsrecon && \
-    /root/.local/share/pipx/venvs/dnsrecon/bin/pip install --no-cache-dir setuptools
+    pipx inject dnsrecon setuptools
 
 RUN git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop \
     && pip3 install --no-cache-dir -r /usr/src/github/graphql-cop/requirements.txt \

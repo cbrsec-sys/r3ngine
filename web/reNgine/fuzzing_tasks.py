@@ -2,7 +2,6 @@ import logging
 import os
 import base64
 import json
-import threading
 from urllib.parse import urlparse
 from django.utils import timezone
 from redis import Redis
@@ -335,7 +334,6 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 						dirscan_ds.directory_files.add(*dfiles)
 
 				def _run_ffuf():
-					from django.db import connection
 					try:
 						fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json' # -s
 						fcmd += f' -x {proxy}' if proxy else ''
@@ -392,11 +390,8 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 						dirscan.save()
 					except Exception as e:
 						ffuf_exc[0] = e
-					finally:
-						connection.close()
 
 				def _run_dirsearch():
-					from django.db import connection
 					try:
 						if not run_dirsearch or not dirsearch_base_cmd:
 							return
@@ -444,16 +439,10 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 						dirscan_ds.save()
 					except Exception as e:
 						ds_exc[0] = e
-					finally:
-						connection.close()
 
-				t_ffuf = threading.Thread(target=_run_ffuf, name=f'ffuf-{target_url}')
-				t_ffuf.start()
+				_run_ffuf()
 				if run_dirsearch and dirsearch_base_cmd:
-					t_ds = threading.Thread(target=_run_dirsearch, name=f'dirsearch-{target_url}')
-					t_ds.start()
-					t_ds.join()
-				t_ffuf.join()
+					_run_dirsearch()
 
 				if ffuf_exc[0]:
 					raise ffuf_exc[0]

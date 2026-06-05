@@ -988,7 +988,7 @@ def get_random_proxy():
 		if check_proxy_robust(proxy_name, timeout=5):
 			logger.warning('Using valid proxy: ' + proxy_name)
 			return proxy_name
-		logger.error(f'Proxy {proxy_name} validation failed.')
+		logger.warning(f'Proxy {proxy_name} validation failed.')
 
 	logger.error('No valid proxies found in the list!')
 	return ''
