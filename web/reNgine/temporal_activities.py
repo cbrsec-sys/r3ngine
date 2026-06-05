@@ -82,13 +82,19 @@ class TemporalTaskProxy:
             self.yaml_configuration['timeout'] = hw_profile.get('timeout')
             self.yaml_configuration['delay'] = hw_profile.get('delay')
             self.yaml_configuration['retries'] = hw_profile.get('retries')
-            
+
+            # Sections that use Go duration strings for timeout (e.g. "180s", "10m").
+            # Injecting a bare integer from the hardware profile breaks their CLI flags,
+            # so we skip timeout overrides for these sections only.
+            _VIGOLIUM_SECTIONS = {'vigolium_discovery', 'vigolium_analysis'}
+
             # Enforce limits inside each subsection (e.g. port_scan, subdomain_discovery)
             for section_name, section_config in self.yaml_configuration.items():
                 if isinstance(section_config, dict):
                     section_config['threads'] = hw_profile.get('threads')
                     section_config['rate_limit'] = hw_profile.get('rate_limit')
-                    section_config['timeout'] = hw_profile.get('timeout')
+                    if section_name not in _VIGOLIUM_SECTIONS:
+                        section_config['timeout'] = hw_profile.get('timeout')
                     section_config['delay'] = hw_profile.get('delay')
                     section_config['retries'] = hw_profile.get('retries')
 
