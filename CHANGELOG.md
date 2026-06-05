@@ -34,6 +34,15 @@
   - **End-to-End Integration Test** (`web/tests/test_integration.py`): Full pipeline integration test validating the CVE enrichment -> correlation -> in-scan deduplication -> VulnerabilityHistory creation -> cross-scan remediation detection flow. All 3 test suites pass (15 tests total: 7 enrichment + 7 correlation + 1 integration).
   - **Database Migrations Applied**: Migrations `0035_add_cve_enrichment_fields` and `0036_create_vulnerability_history` confirmed applied in all environments.
 
+- **vulnx Integration (ProjectDiscovery CVE Intelligence)**:
+  - Integrated ProjectDiscovery `vulnx` CLI into the `go-tools-builder` Docker stage alongside other Go tools.
+  - Added `ProjectDiscoveryAPIKey` model and migration (`dashboard/migrations/0016`) for storing the PDCP API key.
+  - Added PDCP API key field to the API Vault settings page (backend + frontend) so users can save and update their key.
+  - Added `_enrich_from_vulnx` method to `CVEEnrichmentService` in `cve_enrichment.py`: runs `vulnx id --json <CVE>`, parses the JSON response, and populates `is_poc`, `is_template`, CVSS, EPSS, KEV, and date fields.
+  - Added `is_poc` and `is_template` boolean fields to the `CveId` model (migration `startScan/migrations/0039`).
+  - Exposed `is_poc` and `is_template` in the `CVEDetails` API response.
+  - CVE Lookup modal now renders "HAS EXPLOIT / POC" (pink) and "NUCLEI TEMPLATE" (purple) badges alongside the CISA KEV badge when the respective flags are set.
+
 - **CVE Correlation, Deduplication & Graph Sync Enhancements**:
   - **Enhanced CveId Model**: Added CVSS v3.1 base score, EPSS score, EPSS percentile, attack complexity, attack vector, privileges required, user interaction, and scope fields to the database schema (migration `0035`).
   - **Correlation Scoring & Deduplication**: Replaced basic CVSS severity lookups with a multi-criteria scoring algorithm in `correlation.py`. Calculates composite scores using configurable tool weights, asset criticality, exploitability factors (CISA KEV, EPSS), and temporal modifiers. Suppresses inside-scan duplicates in-memory and groups them under a unique `group_key` before writing.
