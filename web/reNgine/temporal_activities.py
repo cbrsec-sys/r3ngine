@@ -2251,8 +2251,10 @@ def sync_bookmarked_programs_activity(project_slug: str) -> None:
 
 @activity.defn(name="FetchProxiesActivity")
 def fetch_proxies_activity(limit: int, job_id: str) -> None:
+    activity.logger.info("[FetchProxies] Starting proxy fetch (limit=%d, job_id=%s)", limit, job_id)
     from reNgine.tasks import fetch_proxies_task
     fetch_proxies_task(limit=limit, job_id=job_id)
+    activity.logger.info("[FetchProxies] Proxy fetch activity complete")
 
 
 @activity.defn(name="CheckScanQueueStatusActivity")
