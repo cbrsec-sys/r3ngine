@@ -174,33 +174,66 @@ class PluginViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='marketplace/install')
     def marketplace_install(self, request):
-        """Installs a plugin from the marketplace."""
+        """
+        Installs a plugin from the marketplace using an async background thread,
+        identical to the upload flow. Returns an install_id immediately (HTTP 202)
+        so the frontend InstallProgressOverlay can poll for real-time progress.
+        """
         slug = request.data.get('slug')
         if not slug:
             return Response({'error': 'No slug provided'}, status=status.HTTP_400_BAD_REQUEST)
-            
-        temp_zip_path = None
-        try:
-            # 1. Download
-            temp_zip_path = MarketplaceManager.download_plugin(slug)
-            
-            # 2. Install
-            plugin = AtomicInstaller.install(temp_zip_path)
-            
-            return Response({
-                'success': True,
-                'plugin': {
-                    'name': plugin.name,
-                    'slug': plugin.slug,
-                    'version': plugin.version
-                }
-            })
-        except Exception as e:
-            return Response({'error': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-        finally:
-            # 3. Cleanup
-            if temp_zip_path and os.path.exists(temp_zip_path):
-                os.remove(temp_zip_path)
+
+        # Generate a tracking ID and seed the cache entry
+        install_id = uuid.uuid4().hex[:12]
+        cache.set(f'plugin:install:{install_id}', {
+            'steps': [{'key': 'upload', 'label': 'Downloading plugin archive', 'status': 'in_progress', 'message': ''}],
+            'status': 'running',
+            'plugin_name': None,
+        }, timeout=300)
+
+        def _run_marketplace_install(slug, iid):
+            """
+            Background thread: downloads the .r3n archive from the marketplace
+            and hands off to AtomicInstaller (which handles all further progress
+            emissions, DB backup, migrations, and asset installation).
+            """
+            import django.db
+            django.db.close_old_connections()
+            temp_zip_path = None
+            try:
+                # Step 1: Download from marketplace
+                temp_zip_path = MarketplaceManager.download_plugin(slug)
+
+                # Mark the download step complete before handing to installer
+                data = cache.get(f'plugin:install:{iid}') or {}
+                steps = data.get('steps', [])
+                for s in steps:
+                    if s['key'] == 'upload':
+                        s['status'] = 'completed'
+                        s['message'] = 'Archive downloaded successfully'
+                data['steps'] = steps
+                cache.set(f'plugin:install:{iid}', data, timeout=300)
+
+                # Step 2: Full atomic install with progress tracking
+                AtomicInstaller.install(temp_zip_path, install_id=iid)
+            except Exception:
+                # AtomicInstaller writes failed state; handle download failures here
+                data = cache.get(f'plugin:install:{iid}') or {'steps': [], 'status': 'running'}
+                for s in data.get('steps', []):
+                    if s.get('status') == 'in_progress':
+                        s['status'] = 'failed'
+                import traceback
+                data['status'] = 'failed'
+                data['error'] = traceback.format_exc().splitlines()[-1]
+                cache.set(f'plugin:install:{iid}', data, timeout=300)
+            finally:
+                if temp_zip_path and os.path.exists(temp_zip_path):
+                    os.remove(temp_zip_path)
+                django.db.close_old_connections()
+
+        threading.Thread(target=_run_marketplace_install, args=(slug, install_id), daemon=True).start()
+
+        return Response({'install_id': install_id}, status=status.HTTP_202_ACCEPTED)
 
     @action(detail=False, methods=['post'], url_path='marketplace/refresh')
     def marketplace_refresh(self, request):

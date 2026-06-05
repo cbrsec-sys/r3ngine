@@ -118,3 +118,65 @@ class SystemVersionMiddleware:
                 response['Access-Control-Expose-Headers'] = "X-System-Version"
                 
         return response
+
+
+from channels.db import database_sync_to_async
+from django.contrib.auth.models import AnonymousUser
+from rest_framework_simplejwt.tokens import AccessToken
+from django.contrib.auth import get_user_model
+import urllib.parse
+
+@database_sync_to_async
+def get_user_from_token(token_string):
+    """
+    Authenticate a user from a JWT token string.
+    
+    Args:
+        token_string (str): The raw JWT token.
+        
+    Returns:
+        User/AnonymousUser: The authenticated user or AnonymousUser.
+    """
+    User = get_user_model()
+    try:
+        token = AccessToken(token_string)
+        user_id = token.payload.get('user_id')
+        if user_id:
+            return User.objects.get(id=user_id)
+    except Exception:
+        pass
+    return AnonymousUser()
+
+
+class JWTAuthMiddleware:
+    """
+    Middleware for Django Channels to authenticate WebSocket connections
+    using JWT access tokens passed via query parameters or headers.
+    """
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        # Only authenticate if not already authenticated by session middleware
+        user = scope.get('user')
+        if not user or not user.is_authenticated:
+            scope['user'] = AnonymousUser()
+
+            # 1. Check query parameters (e.g. ?token=...)
+            query_string = scope.get('query_string', b'').decode('utf-8')
+            query_params = urllib.parse.parse_qs(query_string)
+            token_string = query_params.get('token', [None])[0]
+
+            # 2. Check Authorization header (e.g. Authorization: Bearer ...)
+            if not token_string:
+                headers = dict(scope.get('headers', []))
+                auth_header = headers.get(b'authorization', b'').decode('utf-8')
+                if auth_header.startswith('Bearer '):
+                    token_string = auth_header.split(' ')[1]
+
+            # Resolve the token to a user
+            if token_string:
+                scope['user'] = await get_user_from_token(token_string)
+
+        return await self.inner(scope, receive, send)
+

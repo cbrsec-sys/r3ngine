@@ -49,8 +49,62 @@ NEO4J_USER = env('NEO4J_USER', default='neo4j')
 NEO4J_PASSWORD = env('NEO4J_PASSWORD', default='')
 
 # Globals
+import inspect
+import ipaddress
+
+class DynamicAllowedHosts(list):
+    """
+    Custom list subclass that dynamically permits requests targeting:
+    - Any valid IPv4 or IPv6 address (safe from Host Header Injection)
+    - Any local single-label hostname (no dots)
+    - Any explicitly configured allowed hosts (including DOMAIN_NAME)
+    """
+    def __iter__(self):
+        """
+        Iterates over explicitly configured allowed hosts first.
+        Then, inspects the current request's target host via stack frame matching,
+        allowing any valid IP address or local single-label hostname.
+        """
+        # First, yield the explicitly configured hosts
+        for pattern in super().__iter__():
+            yield pattern
+        try:
+            # Walk up the stack to find the host being validated by Django
+            frame = inspect.currentframe().f_back
+            while frame:
+                if 'host' in frame.f_locals:
+                    host = frame.f_locals['host']
+                    if host:
+                        is_ip = False
+                        try:
+                            ipaddress.ip_address(host)
+                            is_ip = True
+                        except ValueError:
+                            pass
+                        is_local = '.' not in host
+                        if is_ip or is_local:
+                            yield host
+                    break
+                frame = frame.f_back
+        except Exception:
+            pass
+
 # Set ALLOWED_HOSTS via environment variable in production
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = DynamicAllowedHosts(env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1']))
+
+# Automatically extract host from DOMAIN_NAME and add it to ALLOWED_HOSTS
+# to ensure out-of-the-box support for the configured domain name.
+if DOMAIN_NAME:
+    # Strip protocol if present (e.g. http:// or https://)
+    domain_clean = DOMAIN_NAME
+    if '://' in domain_clean:
+        domain_clean = domain_clean.split('://')[1]
+    # Strip port if present (e.g. :8000)
+    domain_host = domain_clean.split(':')[0]
+    if domain_host and domain_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(domain_host)
+
+
 SECRET_KEY = first_run(SECRET_FILE, BASE_DIR)
 
 # Rengine version

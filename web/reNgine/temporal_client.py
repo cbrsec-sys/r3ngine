@@ -16,6 +16,27 @@ from temporalio.client import Client
 logger = logging.getLogger(__name__)
 
 
+def run_and_close(loop: asyncio.AbstractEventLoop, coro):
+    """Run coro synchronously from a non-async context (Django view, activity thread).
+
+    Uses asyncio.run() which internally:
+      1. Creates its own managed event loop
+      2. Runs the coroutine to completion
+      3. Cancels ALL remaining tasks (including Temporal gRPC background tasks)
+      4. Awaits their cancellation before closing the loop
+
+    The `loop` argument is kept for call-site compatibility but is immediately
+    closed unused — asyncio.run() must manage its own loop to guarantee cleanup.
+    Passing a pre-created loop caused 'Task was destroyed but it is pending!'
+    because gRPC-backed futures cannot be cancelled synchronously via task.cancel().
+    """
+    try:
+        loop.close()
+    except Exception:
+        pass
+    return asyncio.run(coro)
+
+
 class TemporalClientProvider:
     """Factory for Temporal client connections.
 
@@ -31,17 +52,12 @@ class TemporalClientProvider:
 
     @classmethod
     def cancel_workflow(cls, workflow_id: str) -> None:
-        """Cancel a running Temporal workflow synchronously (safe for Django views).
-
-        Args:
-            workflow_id: The Temporal workflow execution ID to cancel.
-        """
+        """Cancel a running Temporal workflow synchronously (safe for Django views)."""
         loop = asyncio.new_event_loop()
-        try:
-            async def _cancel():
-                client = await cls.get_client()
-                handle = client.get_workflow_handle(workflow_id)
-                await handle.cancel()
-            loop.run_until_complete(_cancel())
-        finally:
-            loop.close()
+
+        async def _cancel():
+            client = await cls.get_client()
+            handle = client.get_workflow_handle(workflow_id)
+            await handle.cancel()
+
+        run_and_close(loop, _cancel())

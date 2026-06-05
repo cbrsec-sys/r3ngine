@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 	"sync"
@@ -71,6 +72,8 @@ func (a *Activities) SubprocessActivity(ctx context.Context, input ToolExecution
 	// MultiWriter to write to both the buffer, the Redis stream pipe, and os.Stdout/os.Stderr
 	cmd.Stdout = io.MultiWriter(&stdoutBuf, pw, os.Stdout)
 	cmd.Stderr = io.MultiWriter(&stderrBuf, pw, os.Stderr)
+
+	fmt.Printf("[GO-EXECUTOR] Running (scan_id=%d): %s\n", input.ScanID, strings.Join(input.Command, " "))
 
 	start := time.Now()
 	if err := cmd.Start(); err != nil {

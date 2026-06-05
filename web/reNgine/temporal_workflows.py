@@ -596,7 +596,7 @@ class MasterScanWorkflow:
                             await workflow.execute_activity(
                                 "CorrelateVulnerabilitiesActivity",
                                 ctx,
-                                start_to_close_timeout=timedelta(minutes=30),
+                                start_to_close_timeout=timedelta(minutes=60),
                                 heartbeat_timeout=timedelta(minutes=5),
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue"
@@ -604,7 +604,7 @@ class MasterScanWorkflow:
                             await workflow.execute_activity(
                                 "CalculateRiskScoresActivity",
                                 ctx,
-                                start_to_close_timeout=timedelta(minutes=15),
+                                start_to_close_timeout=timedelta(minutes=30),
                                 heartbeat_timeout=timedelta(minutes=5),
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue"
@@ -645,21 +645,6 @@ class MasterScanWorkflow:
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue"
                             )
-
-                        # ------------------------------------------------------------------
-                        # FINAL: Mark scan complete and send notification
-                        # ------------------------------------------------------------------
-                        await workflow.execute_activity(
-                            "SendScanNotificationActivity",
-                            ctx,
-                            start_to_close_timeout=timedelta(minutes=5),
-                            heartbeat_timeout=timedelta(minutes=5),
-                            retry_policy=_RETRY_INTERNAL,
-                            task_queue="python-orchestrator-queue"
-                        )
-                        workflow.logger.info(
-                            f"MasterScanWorkflow COMPLETE for scan_id={ctx.get('scan_history_id')}"
-                        )
                     except asyncio.CancelledError:
                         raise
                     except Exception as post_e:
@@ -667,6 +652,26 @@ class MasterScanWorkflow:
                             f"MasterScanWorkflow post-scan tasks failed for "
                             f"scan_id={ctx.get('scan_history_id')}: {post_e}"
                         )
+
+                    # ------------------------------------------------------------------
+                    # FINAL: Mark scan complete and send notification.
+                    # Outside the Tier 7 try/except so it always runs even when
+                    # post-processing (correlation, graph sync, APME) raises — without
+                    # this guarantee a swallowed Tier 7 exception leaves scan_status as
+                    # RUNNING_TASK indefinitely and recover_stuck_scans incorrectly
+                    # marks the scan FAILED on the next orchestrator restart.
+                    # ------------------------------------------------------------------
+                    await workflow.execute_activity(
+                        "SendScanNotificationActivity",
+                        ctx,
+                        start_to_close_timeout=timedelta(minutes=5),
+                        heartbeat_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_INTERNAL,
+                        task_queue="python-orchestrator-queue"
+                    )
+                    workflow.logger.info(
+                        f"MasterScanWorkflow COMPLETE for scan_id={ctx.get('scan_history_id')}"
+                    )
                 else:
                     # Scan tiers failed — finalize the scan record in Django DB.
                     try:

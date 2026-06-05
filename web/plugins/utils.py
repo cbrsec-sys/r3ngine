@@ -54,7 +54,7 @@ class MarketplaceManager:
 
     @classmethod
     def download_plugin(cls, slug):
-        download_url = f"https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/main/{slug}/{slug}.r3n"
+        download_url = f"https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/master/{slug}/{slug}.r3n"
         temp_zip_path = os.path.join(PluginManager.BASE_PLUGINS_DIR, f"download_{slug}.r3n")
         PluginManager.ensure_dirs()
         
