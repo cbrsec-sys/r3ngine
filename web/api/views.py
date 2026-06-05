@@ -1894,7 +1894,8 @@ class InitiateScan(APIView):
 					scan_history_id = create_scan_object(
 						host_id=domain_id,
 						engine_id=engine_id,
-						initiated_by_id=request.user.id
+						initiated_by_id=request.user.id,
+						hardware_profile_id=data.get('hardware_profile_id')
 					)
 					scan = ScanHistory.objects.get(pk=scan_history_id)
 					if custom_dorks:
@@ -2846,6 +2847,12 @@ class ListEngines(APIView):
 		engines = EngineType.objects.order_by('engine_name').all()
 		engine_serializer = EngineSerializer(engines, many=True)
 		return Response({'engines': engine_serializer.data})
+
+
+class HardwareProfileViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsAuditor]
+	queryset = HardwareProfile.objects.all().order_by('id')
+	serializer_class = HardwareProfileSerializer
 
 
 class ListOrganizations(APIView):
@@ -4728,33 +4735,67 @@ class GetNodeDetails(APIView):
 		return Response(data)
 
 class GetSystemLogs(APIView):
-	"""Fetch the tail of the system logs. Restricted to SysAdmins."""
-	permission_classes = [IsSysAdmin]
-	def get(self, request):
-		# SECURITY: Path is hardcoded and validated to prevent directory traversal
-		log_file = os.path.normpath(os.path.join(settings.BASE_DIR, 'scan.log'))
+	"""Fetch the tail of system, database, temporal, or scan logs.
 
-		# Ensure we only read from the allowed directory
+	Restricted to SysAdmins. The request takes an optional 'type' parameter
+	to specify which log file to retrieve.
+	"""
+	permission_classes = [IsSysAdmin]
+
+	def get(self, request):
+		"""Fetch system logs based on log type query parameter.
+
+		Args:
+			request (HttpRequest): The incoming HTTP request.
+				Query parameter 'type' specifies the log log_type. Options:
+				- 'system': Retrieve errors.log (system errors)
+				- 'db': Retrieve db.log (database backend errors/queries)
+				- 'temporal': Retrieve temporal.log (temporal workflow events)
+				- 'scan': Retrieve scan.log (legacy scan runner events)
+
+		Returns:
+			Response: JSON response containing operation status and list of log lines.
+		"""
+		# Extract log type query parameter (default to 'system')
+		log_type = request.query_params.get('type', 'system')
+
+		# Hardcoded, safe mapping of log types to file names
+		log_map = {
+			'system': 'errors.log',
+			'db': 'db.log',
+			'temporal': 'temporal.log',
+			'scan': 'scan.log'
+		}
+
+		filename = log_map.get(log_type)
+		if not filename:
+			return Response({'status': False, 'message': 'Invalid log type'}, status=400)
+
+		# SECURITY: Prevent directory traversal by sanitizing and verifying the path
+		log_file = os.path.normpath(os.path.join(settings.BASE_DIR, filename))
+
+		# Strict assertion: Ensure the log file sits strictly within BASE_DIR
 		if not log_file.startswith(os.path.normpath(settings.BASE_DIR)):
 			return Response({'status': False, 'message': 'Forbidden log path'}, status=403)
 
+		# Return an empty list if the log file does not exist yet to avoid 404 spam in frontend
 		if not os.path.exists(log_file):
-			return Response({'status': False, 'message': 'Log file not found'}, status=404)
+			return Response({'status': True, 'logs': []})
 
 		try:
-			with open(log_file, 'r') as f:
-				# Efficiently read last ~50KB (~500 lines)
+			with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+				# Efficiently read the last ~50KB to fetch roughly the last 500 lines
 				f.seek(0, os.SEEK_END)
 				filesize = f.tell()
 				offset = min(filesize, 50000)
 				f.seek(filesize - offset)
-				# read() then splitlines() to handle partial first line
+				# Read remaining content and split into lines safely
 				data = f.read()
 				lines = data.splitlines()
-				# Return at most 500 lines
+				# Return at most 500 lines to keep responses lightweight
 				return Response({'status': True, 'logs': lines[-500:]})
 		except Exception as e:
-			logger.error(f"Error reading system logs: {str(e)}")
+			logger.error(f"Error reading system logs ({log_type}): {str(e)}")
 			return Response({'status': False, 'message': 'Internal error reading logs'}, status=500)
 
 

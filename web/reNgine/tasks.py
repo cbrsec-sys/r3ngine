@@ -318,6 +318,38 @@ def initiate_scan_temporal(
 				subdomain.technologies.add(tech)
 			subdomain.save()
 
+		# ---- Get Hardware Profile Details ----
+		from scanEngine.models import HardwareProfile
+		hardware_profile_ctx = None
+		if scan.hardware_profile:
+			profile = scan.hardware_profile
+			hardware_profile_ctx = {
+				'id': profile.id,
+				'name': profile.name,
+				'threads': profile.threads,
+				'rate_limit': profile.rate_limit,
+				'timeout': profile.timeout,
+				'delay': profile.delay,
+				'retries': profile.retries,
+			}
+		else:
+			try:
+				profile = HardwareProfile.objects.filter(is_default=True, is_active=True).first()
+				if not profile:
+					profile = HardwareProfile.objects.filter(is_active=True).first()
+				if profile:
+					hardware_profile_ctx = {
+						'id': profile.id,
+						'name': profile.name,
+						'threads': profile.threads,
+						'rate_limit': profile.rate_limit,
+						'timeout': profile.timeout,
+						'delay': profile.delay,
+						'retries': profile.retries,
+					}
+			except Exception:
+				pass
+
 		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
 		_proxy = Proxy.objects.first()
 		temporal_ctx = {
@@ -335,6 +367,7 @@ def initiate_scan_temporal(
 			'tasks': tasks,
 			'use_tor': bool(_proxy and _proxy.use_tor),
 			'selected_plugin_slugs': selected_plugin_slugs or [],
+			'hardware_profile': hardware_profile_ctx,
 		}
 
 		# ---- Start MasterScanWorkflow on Temporal ----
@@ -531,6 +564,38 @@ def initiate_subscan_temporal(
 		except Exception as notif_err:
 			logger.warning(f"Could not send subscan start notification: {notif_err}")
 
+		# ---- Get Hardware Profile Details ----
+		from scanEngine.models import HardwareProfile
+		hardware_profile_ctx = None
+		if scan.hardware_profile:
+			profile = scan.hardware_profile
+			hardware_profile_ctx = {
+				'id': profile.id,
+				'name': profile.name,
+				'threads': profile.threads,
+				'rate_limit': profile.rate_limit,
+				'timeout': profile.timeout,
+				'delay': profile.delay,
+				'retries': profile.retries,
+			}
+		else:
+			try:
+				profile = HardwareProfile.objects.filter(is_default=True, is_active=True).first()
+				if not profile:
+					profile = HardwareProfile.objects.filter(is_active=True).first()
+				if profile:
+					hardware_profile_ctx = {
+						'id': profile.id,
+						'name': profile.name,
+						'threads': profile.threads,
+						'rate_limit': profile.rate_limit,
+						'timeout': profile.timeout,
+						'delay': profile.delay,
+						'retries': profile.retries,
+					}
+			except Exception:
+				pass
+
 		# ---- Build Temporal workflow context (mirrors Celery ctx) ----
 		_proxy = Proxy.objects.first()
 		temporal_ctx = {
@@ -550,6 +615,7 @@ def initiate_subscan_temporal(
 			'kr_wordlist': kr_wordlist,
 			'use_tor': bool(_proxy and _proxy.use_tor),
 			'selected_plugin_slugs': selected_plugin_slugs or [],
+			'hardware_profile': hardware_profile_ctx,
 		}
 
 		# ---- Create initial endpoints in DB ----

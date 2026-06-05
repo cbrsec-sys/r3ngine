@@ -49,6 +49,7 @@ router.register(r'hackerone-programs', HackerOneProgramViewSet, basename='hacker
 router.register(r'monitoring', MonitoringDiscoveryViewSet, basename='monitoring')
 router.register(r'projects', ProjectViewSet, basename='projects')
 router.register(r'secretLeaks', SecretLeakViewSet, basename='secret-leaks')
+router.register(r'hardwareProfiles', HardwareProfileViewSet, basename='hardware-profiles')
 
 router.register(r'screenshots', ScreenshotViewSet, basename='screenshots')
 router.register(r'osintStaging', OsintStagingViewSet, basename='osint-staging')

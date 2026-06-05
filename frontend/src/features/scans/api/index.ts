@@ -68,6 +68,7 @@ export const useInitiateScan = (projectSlug: string) => {
     mutationFn: async (params: {
       domain_id: number | number[];
       engine_id: number;
+      hardware_profile_id?: number;
       importSubdomainTextArea?: string[];
       outOfScopeSubdomainTextarea?: string[];
       startingPointPath?: string;
