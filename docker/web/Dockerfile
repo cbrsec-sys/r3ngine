@@ -430,17 +430,19 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel pyOpenSSL h8mail 
 RUN python3 -m pip install --no-cache-dir pipx && \
     pipx install git+https://github.com/blacklanternsecurity/baddns
 
-# Install conflicting tools in isolated pipx environments
+# Install conflicting tools in isolated pipx environments.
+# Each venv gets setuptools installed via its own pip to guarantee pkg_resources
+# is available under Python 3.12 (pipx inject can be silently skipped by layer cache).
 RUN pipx install dirsearch && \
-    pipx inject dirsearch setuptools && \
+    /root/.local/share/pipx/venvs/dirsearch/bin/pip install --no-cache-dir setuptools && \
     pipx install maigret && \
-    pipx inject maigret setuptools && \
+    /root/.local/share/pipx/venvs/maigret/bin/pip install --no-cache-dir setuptools && \
     pipx install semgrep && \
-    pipx inject semgrep setuptools && \
+    /root/.local/share/pipx/venvs/semgrep/bin/pip install --no-cache-dir setuptools && \
     pipx install fierce && \
-    pipx inject fierce setuptools && \
+    /root/.local/share/pipx/venvs/fierce/bin/pip install --no-cache-dir setuptools && \
     pipx install dnsrecon && \
-    pipx inject dnsrecon setuptools
+    /root/.local/share/pipx/venvs/dnsrecon/bin/pip install --no-cache-dir setuptools
 
 RUN git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop \
     && pip3 install --no-cache-dir -r /usr/src/github/graphql-cop/requirements.txt \

@@ -450,19 +450,21 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               }}>
                 r3ngine
               </Typography>
-              <Chip
-                label={version}
-                size="small"
-                sx={{
-                  height: 18,
-                  fontSize: '0.6rem',
-                  fontWeight: 800,
-                  bgcolor: 'transparent',
-                  border: '1px solid #8c2a83 !important',
-                  color: '#d846cb !important',
-                  borderRadius: 1
-                }}
-              />
+              {version && (
+                <Chip
+                  label={version}
+                  size="small"
+                  sx={{
+                    height: 18,
+                    fontSize: '0.6rem',
+                    fontWeight: 800,
+                    bgcolor: 'transparent',
+                    border: '1px solid #8c2a83 !important',
+                    color: '#d846cb !important',
+                    borderRadius: 1
+                  }}
+                />
+              )}
             </Box>
 
             {/* Center: TOR exit IP (visible only when TOR mode is active) */}

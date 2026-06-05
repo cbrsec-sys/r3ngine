@@ -1,11 +1,22 @@
-threads = 2
+threads = 10
 verbose = false
-retries = 15
-subdomains = false
-parameters = false
-providers = ["wayback","commoncrawl","otx","urlscan"]
-blacklist = ["ttf","woff","svg","png","jpg"]
+retries = 5
+subdomains = true
+parameters = true
+providers = ["wayback", "commoncrawl", "otx", "urlscan"]
+blacklist = [
+  "ttf", "woff", "woff2", "eot", "otf",
+  "png", "jpg", "jpeg", "gif", "bmp", "ico", "webp", "tif", "tiff", "svg",
+  "mp4", "mp3", "mpeg", "mpg", "avi", "mov", "wmv", "flv", "webm", "ogg", "wav",
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx",
+  "zip", "tar", "gz", "bz2", "rar", "7z", "cab",
+  "exe", "dll", "bin", "dmg", "apk", "deb", "rpm", "msi",
+  "css", "map"
+]
 json = false
+random-agent = true
+monochrome = false
+timeout = 45
 
 [urlscan]
   apikey = ""
@@ -16,4 +27,15 @@ json = false
   matchstatuscodes = []
   matchmimetypes = []
   filterstatuscodes = []
-  filtermimetypes = ["image/png", "image/jpg", "image/svg+xml"]
+  filtermimetypes = [
+    "image/png", "image/jpg", "image/jpeg", "image/gif",
+    "image/svg+xml", "image/webp", "image/x-icon", "image/tiff",
+    "image/bmp", "image/avif",
+    "font/woff", "font/woff2", "font/ttf", "font/otf",
+    "application/font-woff", "application/x-font-ttf", "application/font-woff2",
+    "text/css",
+    "audio/mpeg", "audio/ogg", "audio/wav",
+    "video/mp4", "video/webm", "video/mpeg", "video/ogg",
+    "application/zip", "application/gzip", "application/x-rar-compressed",
+    "application/x-tar", "application/pdf", "application/octet-stream"
+  ]
