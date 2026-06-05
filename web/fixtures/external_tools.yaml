@@ -932,3 +932,20 @@
     is_github_cloned: true
     github_clone_path: /usr/src/github/rdp-sec-check
     subdomain_gathering_command: null
+- model: scanEngine.installedexternaltool
+  pk: 54
+  fields:
+    logo_url: https://raw.githubusercontent.com/projectdiscovery/vulnx/main/static/vulnx-logo.png
+    name: vulnx
+    description: vulnx is a fast CVE lookup and intelligence tool by ProjectDiscovery. It fetches enriched vulnerability metadata including CVSS scores, EPSS, CISA KEV status, PoC availability, and Nuclei template coverage from the ProjectDiscovery Cloud Platform (PDCP).
+    github_url: https://github.com/projectdiscovery/vulnx
+    license_url: https://github.com/projectdiscovery/vulnx/blob/main/LICENSE.md
+    version_lookup_command: vulnx version --disable-update-check
+    update_command: go install -ldflags="-s -w" -v github.com/projectdiscovery/vulnx/v2/cmd/vulnx@latest
+    install_command: go install -ldflags="-s -w" -v github.com/projectdiscovery/vulnx/v2/cmd/vulnx@latest
+    version_match_regex: 'v(?i:v)?\d+\.\d+(?:\.\d+)*'
+    is_default: true
+    is_subdomain_gathering: false
+    is_github_cloned: false
+    github_clone_path: null
+    subdomain_gathering_command: null
