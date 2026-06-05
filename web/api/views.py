@@ -2193,6 +2193,7 @@ class ProxyFetchAPIView(APIView):
 			except Exception:
 				limit = 1000
 			job_id = create_job()
+			logger.info("[ProxyFetch] Starting proxy fetch workflow (limit=%d, job_id=%s)", limit, job_id)
 			from reNgine.temporal_client import TemporalClientProvider
 			import asyncio
 			async def _start():
@@ -2209,10 +2210,12 @@ class ProxyFetchAPIView(APIView):
 			except Exception as e:
 				from reNgine.job_tracker import update_job
 				update_job(job_id, "FAILED", 100, f"Failed to start workflow: {e}")
+				logger.error("[ProxyFetch] Failed to start proxy fetch workflow: %s", e)
 			finally:
 				loop.close()
 			return Response({'status': True, 'task_id': job_id})
 		except Exception as e:
+			logger.exception("[ProxyFetch] Unexpected error in ProxyFetchAPIView: %s", e)
 			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
