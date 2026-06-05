@@ -1245,7 +1245,6 @@ def osint(self, host=None, ctx={}, description=None):
 
 	if results:
 		finish_osint(results, scan_history_id=self.scan.id)
-		return True
 
 	logger.info('Standard OSINT Tasks finished...')
 
@@ -1941,7 +1940,12 @@ def secret_scanning(self, config=None, host=None, ctx=None, **kwargs):
 		return "No scan history found."
 
 	if config is None:
-		config = self.yaml_configuration.get('leaks_and_secrets') or self.yaml_configuration.get('osint', {}).get('leaks_and_secrets') or {}
+		config = (
+			self.yaml_configuration.get('secret_scanning') or
+			self.yaml_configuration.get('leaks_and_secrets') or
+			self.yaml_configuration.get('osint', {}).get('leaks_and_secrets') or
+			{}
+		)
 
 	endpoints = EndPoint.objects.filter(scan_history=self.scan)
 	# Sensitive extensions to scan

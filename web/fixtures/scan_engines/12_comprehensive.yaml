@@ -212,3 +212,7 @@
       attack_path_modeling:
         enabled: true
         top_n: 10
+      secret_scanning:
+        trufflehog: true
+        gitleaks: true
+        leaklookup: true
