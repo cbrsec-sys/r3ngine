@@ -23,6 +23,18 @@ from startScan.models import Subdomain
 logger = logging.getLogger(__name__)
 
 
+def _ensure_duration(value) -> str:
+    """Return *value* as a Go duration string (e.g. '30s').
+
+    Vigolium requires a unit suffix; bare integers from YAML configs are
+    treated as seconds.
+    """
+    s = str(value).strip()
+    if s and s[-1].isdigit():
+        return s + 's'
+    return s
+
+
 def _iter_jsonl(output_file):
     """Yield parsed JSON objects from a vigolium JSONL output file."""
     if not os.path.exists(output_file) or os.path.getsize(output_file) == 0:
@@ -183,7 +195,7 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
     strategy = vig_config.get(VIGOLIUM_STRATEGY, 'balanced')
     concurrency = vig_config.get(VIGOLIUM_CONCURRENCY, 50)
     rate_limit = vig_config.get(VIGOLIUM_RATE_LIMIT, 100)
-    timeout = vig_config.get(VIGOLIUM_TIMEOUT, '300s')
+    timeout = _ensure_duration(vig_config.get(VIGOLIUM_TIMEOUT, '300s'))
     modules = vig_config.get(VIGOLIUM_MODULES, [])
     severity_filter = vig_config.get(VIGOLIUM_SEVERITY_FILTER, [])
 
@@ -258,7 +270,7 @@ def vigolium_discovery(self, ctx={}, description=None):
     strategy = discovery_config.get(VIGOLIUM_STRATEGY, 'balanced')
     concurrency = discovery_config.get(VIGOLIUM_CONCURRENCY, 20)
     rate_limit = discovery_config.get(VIGOLIUM_RATE_LIMIT, 50)
-    timeout = discovery_config.get(VIGOLIUM_TIMEOUT, '10s')
+    timeout = _ensure_duration(discovery_config.get(VIGOLIUM_TIMEOUT, '10s'))
 
     if self.subscan and self.subdomain:
         subdomains = Subdomain.objects.filter(pk=self.subdomain.id)
@@ -316,7 +328,7 @@ def vigolium_analysis(self, ctx={}, description=None):
     strategy = analysis_config.get(VIGOLIUM_STRATEGY, 'balanced')
     concurrency = analysis_config.get(VIGOLIUM_CONCURRENCY, 20)
     rate_limit = analysis_config.get(VIGOLIUM_RATE_LIMIT, 50)
-    timeout = analysis_config.get(VIGOLIUM_TIMEOUT, '10s')
+    timeout = _ensure_duration(analysis_config.get(VIGOLIUM_TIMEOUT, '10s'))
 
     if self.subscan and self.subdomain:
         subdomains = Subdomain.objects.filter(pk=self.subdomain.id)

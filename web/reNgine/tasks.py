@@ -2940,7 +2940,7 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 	# Vigolium spidering — runs ingestion+discovery phases to collect additional URLs.
 	# Activated by adding 'vigolium' to fetch_url.uses_tools in the YAML config.
 	if 'vigolium' in tools and os.path.isfile(input_path):
-		from reNgine.vigolium_tasks import _iter_jsonl
+		from reNgine.vigolium_tasks import _ensure_duration as _ensure_vigolium_duration, _iter_jsonl
 
 		vigolium_jsonl = f'{self.results_dir}/urls_vigolium.jsonl'
 		vigolium_urls_file = f'{self.results_dir}/urls_vigolium.txt'
@@ -2948,7 +2948,7 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		vig_spider_config = config.get('vigolium_spider', {})
 		vig_concurrency = vig_spider_config.get(VIGOLIUM_CONCURRENCY, 20)
 		vig_rate_limit = vig_spider_config.get(VIGOLIUM_RATE_LIMIT, 50)
-		vig_timeout = vig_spider_config.get(VIGOLIUM_TIMEOUT, '10s')
+		vig_timeout = _ensure_vigolium_duration(vig_spider_config.get(VIGOLIUM_TIMEOUT, '10s'))
 		vig_strategy = vig_spider_config.get(VIGOLIUM_STRATEGY, 'balanced')
 
 		vig_cmd = (
