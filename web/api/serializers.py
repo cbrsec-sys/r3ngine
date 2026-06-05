@@ -970,10 +970,10 @@ class VisualiseDataSerializer(serializers.ModelSerializer):
 						'description': 'OS',
 						'children': os})
 
-			if metainfo_data:
-				osint_data.append({
-					'description': 'Documents',
-					'children': metainfo_data})
+				if metainfo_data:
+					osint_data.append({
+						'description': 'Documents',
+						'children': metainfo_data})
 
 			if osint_data:
 				return_data.append({

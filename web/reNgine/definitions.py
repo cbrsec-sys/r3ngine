@@ -17,7 +17,7 @@ EMAIL_REGEX = re.compile(r'[\w\.-]+@[\w\.-]+')
 # TOOL COLORS DEFINITIONS (ANSI Escape Codes)
 ###############################################################################
 COLOR_RESET = "\033[0m"
-COLOR_WHITE = "\033[97m"
+COLOR_WHITE = "\033[37m"
 COLOR_RED = "\033[91m"
 COLOR_GREEN = "\033[92m"
 COLOR_YELLOW = "\033[93m"

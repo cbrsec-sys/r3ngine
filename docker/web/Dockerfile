@@ -50,6 +50,7 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/sa7mon/s3scanner@b6c26d67bc2abe346555dd7010e6065889d66039 && \
     go install -ldflags="-s -w" -v github.com/zricethezav/gitleaks/v8@latest && \
     go install -ldflags="-s -w" -v github.com/xalgord/reconx/cmd/reconx@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/vulnx/v2/cmd/vulnx@latest && \
     rm -rf /go/pkg /root/.cache/go-build
 
 # betterleaks has no published go install path — clone and build directly.

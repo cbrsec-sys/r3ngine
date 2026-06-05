@@ -205,6 +205,34 @@ export const CVELookupModal: React.FC<ToolModalProps> = ({ open, onClose }) => {
                       }}
                     />
                   )}
+                  {data.result.is_poc && (
+                    <Chip
+                      label="HAS EXPLOIT / POC"
+                      size="small"
+                      sx={{
+                        bgcolor: 'rgba(236, 72, 153, 0.15)',
+                        color: '#ec4899',
+                        border: '1px solid #ec4899',
+                        fontSize: '0.6rem',
+                        fontWeight: 900,
+                        height: 18
+                      }}
+                    />
+                  )}
+                  {data.result.is_template && (
+                    <Chip
+                      label="NUCLEI TEMPLATE"
+                      size="small"
+                      sx={{
+                        bgcolor: 'rgba(168, 85, 247, 0.15)',
+                        color: '#a855f7',
+                        border: '1px solid #a855f7',
+                        fontSize: '0.6rem',
+                        fontWeight: 900,
+                        height: 18
+                      }}
+                    />
+                  )}
                 </Box>
                 <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', lineHeight: 1.5 }}>
                   {data.result.summary}
