@@ -489,6 +489,8 @@ class CveId(models.Model):
 	published_date = models.DateTimeField(null=True, blank=True)
 	last_modified_date = models.DateTimeField(null=True, blank=True)
 	vulnerability_type = models.CharField(max_length=50, null=True, blank=True)  # SCA, DAST, SAST, Config
+	is_poc = models.BooleanField(default=False)
+	is_template = models.BooleanField(default=False)
 	
 	related_cves = models.ManyToManyField(
 		'self', 

@@ -1311,6 +1311,8 @@ class CVEDetails(APIView):
 			
 			# Threat Data
 			'is_cisa_kev': cve_obj.is_cisa_kev,
+			'is_poc': getattr(cve_obj, 'is_poc', False),
+			'is_template': getattr(cve_obj, 'is_template', False),
 			'vulnerability_type': cve_obj.vulnerability_type,
 			
 			# Timeline
