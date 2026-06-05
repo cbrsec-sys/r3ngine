@@ -90,7 +90,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const theme = useTheme();
   const { themeName } = useAppTheme();
   const isEnterprise = themeName === 'enterprise';
-  const { version, projectName } = useAppContext();
+  const { version, projectName, setVersion } = useAppContext();
   const [isHovered, setIsHovered] = useState(false);
   const [openItems, setOpenItems] = useState<string[]>([]);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -212,6 +212,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
     if (lastCheck !== today) {
       updateCheck.mutateAsync().then(data => {
+        if (data.current_version) {
+          setVersion(data.current_version);
+        }
         if (data.update_available) {
           setUpdateAvailable(true);
           localStorage.setItem('update_available', 'true');
