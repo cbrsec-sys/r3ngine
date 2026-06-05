@@ -3782,17 +3782,17 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	custom_nuclei_templates = nuclei_specific_config.get(NUCLEI_CUSTOM_TEMPLATE)
 	severities_str = ','.join(severities)
 
-	# Get alive endpoints
+	# Collect all URLs: DB endpoints (no alive-only filter) + spidering result files
 	if urls:
-		with open(input_path, 'w') as f:
-			f.write('\n'.join(urls))
+		combined = list(set(urls))
 	else:
-		get_http_urls(
-			is_alive=enable_http_crawl,
+		combined = collect_all_scan_urls(
+			ctx=ctx,
+			results_dir=self.results_dir,
 			ignore_files=True,
-			write_filepath=input_path,
-			ctx=ctx
 		)
+	with open(input_path, 'w') as f:
+		f.write('\n'.join(combined))
 
 	if intensity == 'normal': # reduce number of endpoints to scan
 		unfurl_filter = f'{self.results_dir}/urls_unfurled{severity_suffix}.txt'

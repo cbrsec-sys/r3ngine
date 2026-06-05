@@ -1,6 +1,7 @@
 import whatportis
 import socket
 import json
+import glob
 import os
 import pickle
 import subprocess
@@ -360,6 +361,86 @@ def get_http_urls(
 			f.write('\n'.join(endpoints))
 
 	return endpoints
+
+def collect_all_scan_urls(ctx, results_dir, ignore_files=True):
+	"""Collect all discovered URLs for a scan from both DB and spidering result files.
+
+	Combines:
+	- All EndPoint records in DB for this scan (no alive-only filter)
+	- {results_dir}/fetch_url.txt  (consolidated spidering output from all tools)
+	- {results_dir}/urls_*.txt     (individual tool outputs as a safety net)
+
+	Returns a sorted, deduplicated list of validated HTTP/HTTPS URLs.
+
+	Args:
+		ctx (dict): Scan context with at least 'scan_history_id' and 'domain_id'.
+		results_dir (str): Path to the scan results directory.
+		ignore_files (bool): When True, strip URLs whose path ends with a known
+			static-file extension (uses fixtures/extensions.txt).
+
+	Returns:
+		list[str]: Sorted, deduplicated, validated URLs.
+	"""
+	all_urls = set()
+
+	# --- Source 1: DB endpoints (all, not filtered by alive status) ---
+	db_urls = get_http_urls(
+		is_alive=False,
+		ignore_files=ignore_files,
+		ctx=ctx,
+	)
+	all_urls.update(db_urls)
+	logger.info(
+		'collect_all_scan_urls: %d URLs from DB (scan_id=%s)',
+		len(db_urls),
+		ctx.get('scan_history_id'),
+	)
+
+	# --- Source 2: Spidering result files ---
+	file_urls_before = len(all_urls)
+	if results_dir and os.path.isdir(results_dir):
+		# fetch_url.txt is the primary consolidated file; urls_*.txt are per-tool outputs
+		candidates = [os.path.join(results_dir, 'fetch_url.txt')]
+		candidates += glob.glob(os.path.join(results_dir, 'urls_*.txt'))
+		for filepath in candidates:
+			if not os.path.isfile(filepath):
+				continue
+			try:
+				with open(filepath, 'r', errors='replace') as fh:
+					for raw_line in fh:
+						url = raw_line.strip()
+						if url and is_valid_url(url):
+							all_urls.add(url)
+			except OSError as exc:
+				logger.warning(
+					'collect_all_scan_urls: cannot read %s: %s', filepath, exc
+				)
+	logger.info(
+		'collect_all_scan_urls: %d additional URLs from result files',
+		len(all_urls) - file_urls_before,
+	)
+
+	# --- Extension filter for file-sourced URLs not yet filtered by get_http_urls ---
+	if ignore_files:
+		extensions_path = os.path.join(RENGINE_HOME, 'fixtures', 'extensions.txt')
+		if os.path.isfile(extensions_path):
+			with open(extensions_path, 'r') as fh:
+				extensions = tuple(
+					line.strip() for line in fh if line.strip()
+				)
+			all_urls = {
+				u for u in all_urls
+				if not urlparse(u).path.endswith(extensions)
+			}
+
+	result = sorted(all_urls)
+	logger.info(
+		'collect_all_scan_urls: %d total deduplicated URLs for scan_id=%s',
+		len(result),
+		ctx.get('scan_history_id'),
+	)
+	return result
+
 
 def get_interesting_endpoints(scan_history=None, target=None):
 	"""Get EndPoint objects matching InterestingLookupModel conditions.
