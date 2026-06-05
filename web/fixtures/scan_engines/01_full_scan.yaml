@@ -262,3 +262,7 @@
         rate_limit: 100
         kill_switch: true
         intensity: normal
+      secret_scanning:
+        trufflehog: true
+        gitleaks: true
+        leaklookup: true

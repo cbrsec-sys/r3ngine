@@ -108,3 +108,7 @@
         amplification_threshold: 10
       spiderfoot_scan:
         modules: all
+      secret_scanning:
+        trufflehog: true
+        gitleaks: true
+        leaklookup: true
