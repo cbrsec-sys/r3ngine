@@ -379,92 +379,92 @@ LOGGING settings
 '''
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': True,
+    'disable_existing_loggers': False,
     'handlers': {
-        'file': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            # In containers, the working directory may not be writable.
-            # Use a universally writable path to avoid boot-time logging failures.
-            'filename': '/tmp/errors.log',
-        },
-        'null': {
-            'class': 'logging.NullHandler'
-        },
-        'default': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'default',
-        },
-        'brief': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'brief'
-        },
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'brief'
+            'formatter': 'brief',
         },
         'task': {
             'class': 'logging.StreamHandler',
-            'formatter': 'task'
+            'formatter': 'task',
         },
-        'db': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'formatter': 'brief',
-            'filename': 'db.log',
-            'maxBytes': 1024,
-            'backupCount': 3
+        'error_file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': '/usr/src/app/errors.log',
+            'formatter': 'verbose',
+        },
+        'null': {
+            'class': 'logging.NullHandler',
         },
     },
     'formatters': {
-        'default': {
-            'format': '%(message)s'
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
         },
         'brief': {
-            'format': '%(name)-10s | %(message)s'
+            'format': '%(levelname)s %(asctime)s %(name)s %(message)s',
+            'datefmt': '%H:%M:%S',
         },
         'task': {
-            '()': lambda : RengineTaskFormatter('%(task_name)-34s | %(levelname)s | %(message)s')
+            '()': lambda: RengineTaskFormatter('%(task_name)-34s | %(levelname)s | %(message)s'),
         },
-        'simple': {
-            'format': '%(levelname)s %(message)s',
-            'datefmt': '%y %b %d, %H:%M:%S',
-        }
     },
     'loggers': {
-        'django': {
-            'handlers': ['file'],
-            'level': 'ERROR' if DEBUG else 'CRITICAL',
-            'propagate': True,
-        },
+        # Root — catches everything not explicitly routed below
         '': {
-            'handlers': ['brief'],
+            'handlers': ['console', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False
+            'propagate': False,
+        },
+        # Django internals — only errors to file, not console spam
+        'django': {
+            'handlers': ['error_file'],
+            'level': 'ERROR',
+            'propagate': False,
         },
         'django.server': {
             'handlers': ['console'],
-            'propagate': False
+            'level': 'WARNING',
+            'propagate': False,
         },
         'django.db.backends': {
-            'handlers': ['db'],
-            'level': 'INFO',
-            'propagate': False
+            'handlers': ['null'],
+            'level': 'ERROR',
+            'propagate': False,
         },
+        # Scan tasks — use the task formatter so output is easy to grep
         'reNgine.tasks': {
-            'handlers': ['task'],
+            'handlers': ['task', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False
+            'propagate': False,
         },
+        # All other reNgine modules (utils.graph, cve_enrichment, etc.)
+        'reNgine': {
+            'handlers': ['console', 'error_file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        # Plugin code
         'plugins': {
-            'handlers': ['task', 'console'],
+            'handlers': ['task', 'console', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False
+            'propagate': False,
         },
-        'api.views': {
-            'handlers': ['console'],
+        # API views
+        'api': {
+            'handlers': ['console', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False
-        }
+            'propagate': False,
+        },
+        # Temporal SDK — suppress noise, only errors
+        'temporalio': {
+            'handlers': ['error_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
     },
 }
 
@@ -552,50 +552,3 @@ CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:5173', 'http://127.0.0.1:5173', 'https://localhost:5173', 'https://127.0.0.1:5173'])
 CORS_ALLOW_CREDENTIALS = True
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
-            'style': '{',
-        },
-    },
-    'handlers': {
-        'system_file': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': '/usr/src/app/errors.log',
-            'formatter': 'verbose',
-        },
-        'db_file': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': '/usr/src/app/db.log',
-            'formatter': 'verbose',
-        },
-        'temporal_file': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': '/usr/src/app/temporal.log',
-            'formatter': 'verbose',
-        },
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['system_file'],
-            'level': 'ERROR',
-            'propagate': True,
-        },
-        'django.db.backends': {
-            'handlers': ['db_file'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-        'temporal': {
-            'handlers': ['temporal_file'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
-    },
-}
