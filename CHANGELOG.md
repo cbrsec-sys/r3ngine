@@ -2,6 +2,13 @@
 
 ### [v3.5.0] - 2026-06-04
 
+- **Python 3.12 Runtime Upgrade**:
+  - Upgraded the container execution runtime from Python 3.10 to Python 3.12 to improve performance by ~25% and ensure support until October 2028.
+  - Configured the trusted deadsnakes PPA signing keyring (`/usr/share/keyrings/deadsnakes.gpg`) to install `python3.12`, `python3.12-dev`, and `python3.12-venv` in the Ubuntu 22.04 base image.
+  - Avoided installing the system `python3-pip` package (which forces default Python 3.10 installation) by bootstrapping Python 3.12's `ensurepip` module directly.
+  - Linked pip wrappers and updated `update-alternatives` to redirect global `python`/`python3` and `pip`/`pip3` to 3.12.
+  - Replaced the hardcoded Python 3.10 path inside `temporal-entrypoint.sh` (whatportis bugfix) with a dynamic module path lookup (`python3 -c "import whatportis.cli; print(whatportis.cli.__file__)"`).
+
 - **Fix gRPC Connection Cancellation Error**:
   - Resolved `temporalio.service.RPCError: operation was canceled` in the python container during workflow execution result retrieval.
   - Refactored `stream_command` in `web/reNgine/utils/task.py` to create a single `asyncio.Task` wrapper around `handle.result()` and poll it using `asyncio.wait()`, preventing the accumulation of leaked history-fetching coroutines on timeout.

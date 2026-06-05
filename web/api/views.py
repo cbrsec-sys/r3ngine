@@ -15,6 +15,7 @@ from packaging import version
 from django.template.defaultfilters import slugify
 from datetime import datetime
 from rest_framework import viewsets, status
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -4248,7 +4249,14 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 
 
 
+class VulnerabilityPagination(PageNumberPagination):
+	page_size = 10
+	page_size_query_param = 'length'
+	max_page_size = 200
+
+
 class VulnerabilityViewSet(viewsets.ModelViewSet):
+	pagination_class = VulnerabilityPagination
 	permission_classes = [IsPenetrationTester]
 	serializer_class = VulnerabilitySerializer
 	queryset = Vulnerability.objects.none()

@@ -29,7 +29,7 @@ RUN apt-get update && \
 ENV GO111MODULE=on
 
 # All tools in one RUN: single cache-invalidation point, no intermediate layers
-# retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols.      # v3.3.8 && \
+# retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols. 
 RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && \
     go install -ldflags="-s -w" -v github.com/jaeles-project/gospider@latest && \
     go install -ldflags="-s -w" -v github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006 && \
@@ -38,7 +38,7 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest && \
-    go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8 && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
     go install -ldflags="-s -w" -v github.com/hakluke/hakrawler@latest && \
     go install -ldflags="-s -w" -v github.com/lc/gau/v2/cmd/gau@latest && \
@@ -174,7 +174,12 @@ RUN apt-get update -y && \
     curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
         | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg && \
     echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
-        > /etc/apt/sources.list.d/pgdg.list
+        > /etc/apt/sources.list.d/pgdg.list && \
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF23C5A6CF475977595C89F51BA6932366A755776" \
+        | gpg --dearmor -o /usr/share/keyrings/deadsnakes.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/deadsnakes.gpg] https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy main" \
+        > /etc/apt/sources.list.d/deadsnakes.list
+
 
 # ---------------------------------------------------------------------------
 # System packages — single combined RUN to keep the layer count low.
@@ -183,12 +188,10 @@ RUN apt-get update -y && \
 # ---------------------------------------------------------------------------
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
-    # Python 3 runtime
-    python3.10 \
-    python3-dev \
-    python3-pip \
-    python3-venv \
-    python3-netaddr \
+    # Python 3.12 runtime
+    python3.12 \
+    python3.12-dev \
+    python3.12-venv \
     # Ruby (WPScan)
     ruby-full \
     ruby-dev \
@@ -251,6 +254,18 @@ RUN apt-get update -y && \
     ninja-build \
     gcc \
     && rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
+# Make Python 3.12 the system default and redirect pip3 to it.
+# ensurepip installs pip into 3.12's site-packages; the symlinks ensure
+# all pip3/pip invocations in subsequent RUN blocks use 3.12.
+# ---------------------------------------------------------------------------
+RUN python3.12 -m ensurepip --upgrade && \
+    python3.12 -m pip install --upgrade pip && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 && \
+    update-alternatives --install /usr/bin/python  python  /usr/bin/python3.12 1 && \
+    ln -sf /usr/local/bin/pip3 /usr/bin/pip3 && \
+    ln -sf /usr/local/bin/pip3 /usr/bin/pip
 
 # ---------------------------------------------------------------------------
 # Install uv (fast Python package manager — used by theHarvester)
@@ -416,10 +431,15 @@ RUN python3 -m pip install --no-cache-dir pipx && \
 
 # Install conflicting tools in isolated pipx environments
 RUN pipx install dirsearch && \
+    pipx inject dirsearch setuptools && \
     pipx install maigret && \
+    pipx inject maigret setuptools && \
     pipx install semgrep && \
-    pipx install fierce && \ 
-    pipx install dnsrecon
+    pipx inject semgrep setuptools && \
+    pipx install fierce && \
+    pipx inject fierce setuptools && \
+    pipx install dnsrecon && \
+    pipx inject dnsrecon setuptools
 
 RUN git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop \
     && pip3 install --no-cache-dir -r /usr/src/github/graphql-cop/requirements.txt \

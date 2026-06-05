@@ -1168,14 +1168,71 @@ def correlate_vulnerabilities_activity(ctx: dict) -> bool:
     """
     from reNgine.tasks import correlate_vulnerabilities
     scan_id = ctx.get('scan_history_id')
-    activity.logger.info(f"[CorrelateVulnerabilitiesActivity] scan_id={scan_id}")
-    return _run_task(
+    activity.logger.warning("[TIER7][CORRELATE] Activity starting | scan_id=%s", scan_id)
+    result = _run_task(
         correlate_vulnerabilities,
         ctx,
         task_name='correlate_vulnerabilities',
         description='Correlate Vulnerabilities',
         scan_history_id=scan_id
     )
+    activity.logger.warning("[TIER7][CORRELATE] Activity complete | scan_id=%s result=%s", scan_id, result)
+    return result
+
+
+@activity.defn(name="EnrichScanCVEsActivity")
+def enrich_scan_cves_activity(ctx: dict) -> bool:
+    """Enrich CVE records linked to vulnerabilities discovered in this scan.
+
+    Queries all CveId objects linked to findings from this scan and fetches
+    NVD CVSS v3.1, FIRST EPSS, and CISA KEV metadata for any that have not
+    yet been enriched (or were enriched more than 7 days ago).
+
+    Runs after CorrelateVulnerabilitiesActivity so all CVE links are committed
+    and before CalculateRiskScoresActivity so risk scores can use the enriched
+    CVSS/EPSS values. Failures on individual CVEs are non-fatal — the activity
+    always returns True to keep the pipeline moving.
+
+    Args:
+        ctx (dict): Temporal workflow context containing scan_history_id.
+
+    Returns:
+        bool: True in all cases (enrichment failures are logged, not raised).
+    """
+    from startScan.models import CveId
+    from reNgine.cve_enrichment import CVEEnrichmentService
+
+    scan_id = ctx.get('scan_history_id')
+    activity.logger.warning("[TIER7][CVE_ENRICH] Activity starting | scan_id=%s", scan_id)
+
+    cve_names = list(
+        CveId.objects
+        .filter(cve_ids__scan_history_id=scan_id)
+        .values_list('name', flat=True)
+        .distinct()
+    )
+
+    if not cve_names:
+        activity.logger.warning("[TIER7][CVE_ENRICH] No CVEs found for this scan | scan_id=%s", scan_id)
+        return True
+
+    activity.logger.warning("[TIER7][CVE_ENRICH] Enriching %d CVE(s) | scan_id=%s", len(cve_names), scan_id)
+    service = CVEEnrichmentService()
+    enriched = 0
+
+    for cve_name in cve_names:
+        try:
+            activity.heartbeat(f"enriching {cve_name}")
+            if service.enrich_cve(cve_name):
+                enriched += 1
+        except Exception as exc:
+            activity.logger.warning("[TIER7][CVE_ENRICH] Skipping %s: %s", cve_name, exc)
+
+    activity.logger.warning(
+        "[TIER7][CVE_ENRICH] Complete | scan_id=%s enriched=%d/%d",
+        scan_id, enriched, len(cve_names),
+    )
+    return True
 
 
 @activity.defn(name="CalculateRiskScoresActivity")
@@ -1192,14 +1249,16 @@ def calculate_risk_scores_activity(ctx: dict) -> bool:
     """
     from reNgine.tasks import calculate_risk_scores
     scan_id = ctx.get('scan_history_id')
-    activity.logger.info(f"[CalculateRiskScoresActivity] scan_id={scan_id}")
-    return _run_task(
+    activity.logger.warning("[TIER7][RISK] Activity starting | scan_id=%s", scan_id)
+    result = _run_task(
         calculate_risk_scores,
         ctx,
         task_name='calculate_risk_scores',
         description='Calculate Risk Scores',
         scan_history_id=scan_id
     )
+    activity.logger.warning("[TIER7][RISK] Activity complete | scan_id=%s result=%s", scan_id, result)
+    return result
 
 
 @activity.defn(name="GenerateImpactAssessmentActivity")
@@ -1216,14 +1275,16 @@ def generate_impact_assessment_activity(ctx: dict) -> bool:
     """
     from reNgine.tasks import generate_impact_assessment
     scan_id = ctx.get('scan_history_id')
-    activity.logger.info(f"[GenerateImpactAssessmentActivity] scan_id={scan_id}")
-    return _run_task(
+    activity.logger.warning("[TIER7][IMPACT] Activity starting | scan_id=%s", scan_id)
+    result = _run_task(
         generate_impact_assessment,
         ctx,
         task_name='generate_impact_assessment',
         description='AI Impact Assessment',
         scan_history_id=scan_id
     )
+    activity.logger.warning("[TIER7][IMPACT] Activity complete | scan_id=%s result=%s", scan_id, result)
+    return result
 
 
 @activity.defn(name="SyncGraphActivity")
@@ -1246,20 +1307,18 @@ def sync_graph_activity(ctx: dict) -> bool:
     scan_id = ctx.get('scan_history_id')
     proxy = TemporalTaskProxy(ctx, 'sync_graph', 'Graph Sync (Neo4j)')
 
-    activity.logger.info(f"[SyncGraphActivity] Syncing scan_id={scan_id} to Neo4j")
-    # Heartbeat before the Neo4j connection attempt so Temporal sees the
-    # activity is alive even if driver init is slow.
-    activity.heartbeat(f"SyncGraphActivity starting neo4j sync for scan_id={scan_id}")
+    activity.logger.warning("[TIER7][GRAPH] SyncGraphActivity starting | scan_id=%s", scan_id)
+    activity.heartbeat("SyncGraphActivity starting neo4j sync for scan_id=%s" % scan_id)
 
     nm = Neo4jManager()
     try:
         nm.sync_scan_results(scan_id)
-        activity.logger.info(f"[SyncGraphActivity] Neo4j sync complete for scan_id={scan_id}")
+        activity.logger.warning("[TIER7][GRAPH] Neo4j sync complete | scan_id=%s", scan_id)
         proxy.update_scan_activity(SUCCESS_TASK)
         return True
     except Exception as e:
-        activity.logger.error(f"[SyncGraphActivity] Neo4j sync failed: {e}")
-        logger.error(f"Neo4j sync failed: {e}")
+        activity.logger.error("[TIER7][GRAPH] Neo4j sync failed | scan_id=%s: %s", scan_id, e)
+        logger.error("Neo4j sync failed for scan_id=%s: %s", scan_id, e)
         proxy.update_scan_activity(FAILED_TASK, error_message=str(e))
         return False
     finally:
@@ -1287,11 +1346,11 @@ def send_scan_notification_activity(ctx: dict) -> bool:
     engine_id = ctx.get('engine_id')
     proxy = TemporalTaskProxy(ctx, 'scan_notification', 'Send Scan Notification')
 
-    activity.logger.info(f"[SendScanNotificationActivity] Finalizing scan_id={scan_id}")
+    activity.logger.warning("[SCAN_COMPLETE] SendScanNotificationActivity starting | scan_id=%s", scan_id)
 
     scan = ScanHistory.objects.filter(pk=scan_id).first()
     if not scan:
-        activity.logger.error(f"[SendScanNotificationActivity] ScanHistory {scan_id} not found.")
+        activity.logger.error("[SCAN_COMPLETE] ScanHistory not found | scan_id=%s", scan_id)
         proxy.update_scan_activity(FAILED_TASK, error_message="ScanHistory not found.")
         return False
 
@@ -1309,35 +1368,65 @@ def send_scan_notification_activity(ctx: dict) -> bool:
     )
     success_names = set(
         ScanActivity.objects.filter(scan_of=scan, status=SUCCESS_TASK)
-        .exclude(name='scan_notification') # exclude self
+        .exclude(name='scan_notification')
         .values_list('name', flat=True)
     )
     true_failures = failed_names - success_names  # failed and never recovered
 
+    if true_failures:
+        activity.logger.warning(
+            "[SCAN_COMPLETE] True task failures detected (failed and never recovered): %s | scan_id=%s",
+            sorted(true_failures), scan_id,
+        )
+    else:
+        activity.logger.warning(
+            "[SCAN_COMPLETE] All tasks completed successfully (%d succeeded) | scan_id=%s",
+            len(success_names), scan_id,
+        )
+
     status = SUCCESS_TASK if not true_failures else FAILED_TASK
     status_h = 'SUCCESS' if not true_failures else 'FAILED'
+    te_status = 'COMPLETED' if not true_failures else 'FAILED'
 
     scan.scan_status = status
     scan.stop_scan_date = timezone.now()
     scan.save()
 
-    activity.logger.info(
-        f"[SendScanNotificationActivity] scan_id={scan_id} finished with status={status_h}"
-    )
+    for te in scan.temporal_executions.filter(status='RUNNING'):
+        te.status = te_status
+        te.ended_at = scan.stop_scan_date
+        te.save()
+
+    # Log scan summary stats
+    try:
+        from startScan.models import Subdomain, EndPoint, Vulnerability
+        subdomain_count = Subdomain.objects.filter(scan_history_id=scan_id).count()
+        endpoint_count = EndPoint.objects.filter(scan_history_id=scan_id).count()
+        vuln_count = Vulnerability.objects.filter(scan_history_id=scan_id).count()
+        activity.logger.warning(
+            "[SCAN_COMPLETE] Scan summary | scan_id=%s status=%s | subdomains=%d endpoints=%d vulnerabilities=%d",
+            scan_id, status_h, subdomain_count, endpoint_count, vuln_count,
+        )
+    except Exception as stats_e:
+        activity.logger.warning("[SCAN_COMPLETE] Could not gather scan summary stats: %s", stats_e)
+
     proxy.update_scan_activity(SUCCESS_TASK)
 
     # Send notification directly (no Celery)
     try:
+        activity.logger.warning("[SCAN_COMPLETE] Dispatching scan notification | scan_id=%s status=%s", scan_id, status_h)
         send_scan_notif(
             scan_history_id=scan_id,
             subscan_id=None,
             engine_id=engine_id,
             status=status_h
         )
+        activity.logger.warning("[SCAN_COMPLETE] Notification dispatched | scan_id=%s", scan_id)
     except Exception as e:
         # Non-fatal: log and continue
-        logger.warning(f"Could not send scan notification: {e}")
+        logger.warning("[SCAN_COMPLETE] Could not send scan notification for scan_id=%s: %s", scan_id, e)
 
+    activity.logger.warning("[SCAN_COMPLETE] SendScanNotificationActivity complete | scan_id=%s status=%s", scan_id, status_h)
     return True
 
 
@@ -2101,6 +2190,11 @@ def finalize_failed_scan_activity(ctx: dict, error_msg: str) -> None:
         scan.stop_scan_date = timezone.now()
         scan.save()
         logger.info(f"Scan {scan_id} marked as FAILED_TASK due to workflow crash.")
+
+        for te in scan.temporal_executions.filter(status='RUNNING'):
+            te.status = 'FAILED'
+            te.ended_at = scan.stop_scan_date
+            te.save()
 
         # Mark any activities still in RUNNING or INITIATED state as FAILED
         # (previously filtered status=0 which is FAILED_TASK itself — a no-op)

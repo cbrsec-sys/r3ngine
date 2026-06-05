@@ -41,6 +41,12 @@ export interface OllamaPullStatus {
   log: string;
 }
 
+export interface TestLlmConnectionResult {
+  status: 'success' | 'error';
+  message: string;
+  response: string;
+}
+
 
 
 export interface ProxySettings {
@@ -584,6 +590,26 @@ export const useOllamaPullStatus = (slug: string, model: string | null) => {
         return false;
       }
       return 2000;
+    },
+  });
+};
+
+export const useTestLlmConnection = (slug: string) => {
+  return useMutation<TestLlmConnectionResult, Error, { provider: string; api_key: string; model: string }>({
+    mutationFn: async (data) => {
+      const formData = new FormData();
+      formData.append('provider', data.provider);
+      formData.append('api_key', data.api_key);
+      formData.append('model', data.model);
+
+      const response = await axios.post(`/scanEngine/${slug}/test_llm_connection`, formData, {
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'Accept': 'application/json',
+        },
+        validateStatus: () => true,
+      });
+      return response.data as TestLlmConnectionResult;
     },
   });
 };
