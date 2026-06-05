@@ -1,0 +1,13 @@
+- model: scanEngine.hardwareprofile
+  pk: 3
+  fields:
+    name: desktop
+    description: Standard desktop (e.g. i5 / 8GB RAM)
+    threads: 8
+    rate_limit: 80
+    timeout: 10
+    delay: 0.0
+    retries: 3
+    profile_type: builtin
+    is_active: true
+    is_default: false

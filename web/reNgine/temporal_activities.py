@@ -71,7 +71,27 @@ class TemporalTaskProxy:
         self.subdomain_id = ctx.get('subdomain_id')
         self.results_dir = ctx.get('results_dir', RENGINE_RESULTS)
         os.makedirs(self.results_dir, exist_ok=True)
-        self.yaml_configuration = ctx.get('yaml_configuration', {})
+        import copy
+        self.yaml_configuration = copy.deepcopy(ctx.get('yaml_configuration', {}))
+        
+        hw_profile = ctx.get('hardware_profile')
+        if hw_profile:
+            # Enforce hardware profile limits globally in the configuration
+            self.yaml_configuration['threads'] = hw_profile.get('threads')
+            self.yaml_configuration['rate_limit'] = hw_profile.get('rate_limit')
+            self.yaml_configuration['timeout'] = hw_profile.get('timeout')
+            self.yaml_configuration['delay'] = hw_profile.get('delay')
+            self.yaml_configuration['retries'] = hw_profile.get('retries')
+            
+            # Enforce limits inside each subsection (e.g. port_scan, subdomain_discovery)
+            for section_name, section_config in self.yaml_configuration.items():
+                if isinstance(section_config, dict):
+                    section_config['threads'] = hw_profile.get('threads')
+                    section_config['rate_limit'] = hw_profile.get('rate_limit')
+                    section_config['timeout'] = hw_profile.get('timeout')
+                    section_config['delay'] = hw_profile.get('delay')
+                    section_config['retries'] = hw_profile.get('retries')
+
         self.out_of_scope_subdomains = ctx.get('out_of_scope_subdomains', [])
         self.starting_point_path = ctx.get('starting_point_path', '')
         self.excluded_paths = ctx.get('excluded_paths', [])

@@ -9,7 +9,7 @@ from django.utils import timezone
 from reNgine.definitions import (TASK_STATUSES,
 								 NUCLEI_REVERSE_SEVERITY_MAP)
 from reNgine.utilities import *
-from scanEngine.models import EngineType
+from scanEngine.models import EngineType, HardwareProfile
 from targetApp.models import Domain
 
 
@@ -39,6 +39,8 @@ class ScanHistory(models.Model):
 	results_dir = models.CharField(max_length=100, blank=True)
 	domain = models.ForeignKey(Domain, on_delete=models.CASCADE)
 	scan_type = models.ForeignKey(EngineType, on_delete=models.CASCADE)
+	hardware_profile = models.ForeignKey(HardwareProfile, on_delete=models.SET_NULL, null=True, blank=True)
+
 	workflow_ids = ArrayField(models.CharField(max_length=100), blank=True, default=list)
 	tasks = ArrayField(models.CharField(max_length=200), null=True)
 	stop_scan_date = models.DateTimeField(null=True, blank=True)

@@ -12,3 +12,17 @@ export interface Wordlist {
   short_name: string;
   count: number;
 }
+
+export interface HardwareProfile {
+  id: number;
+  name: string;
+  description?: string;
+  threads: number;
+  rate_limit: number;
+  timeout: number;
+  delay: number;
+  retries: number;
+  profile_type: 'builtin' | 'custom';
+  is_active: boolean;
+  is_default: boolean;
+}

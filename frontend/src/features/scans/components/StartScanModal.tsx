@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -20,8 +20,8 @@ import {
   Divider,
   Grid
 } from '@mui/material';
-import { X, Zap, Shield, Terminal, ChevronDown, ChevronUp, Puzzle } from 'lucide-react';
-import { useEngines } from '../../engines/api';
+import { X, Zap, Shield, Cpu, Terminal, ChevronDown, ChevronUp, Puzzle } from 'lucide-react';
+import { useEngines, useHardwareProfiles } from '../../engines/api';
 import { usePlugins } from '../../plugins/api/pluginsApi';
 import { useInitiateScan } from '../api';
 import { useNavigate } from '@tanstack/react-router';
@@ -44,6 +44,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     engine_id: '' as number | '',
+    hardware_profile_id: '' as number | '',
     customDorkSwitch: false,
     customDorkTextarea: '',
     spiderfoot_scan: false,
@@ -54,18 +55,34 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
   const [pluginSectionOpen, setPluginSectionOpen] = useState(false);
 
   const { data: engines, isLoading: loadingEngines } = useEngines();
+  const { data: hardwareProfiles } = useHardwareProfiles();
   const { data: allPlugins } = usePlugins();
   const enabledPlugins = (allPlugins ?? []).filter(p => p.is_enabled);
   const { mutate: initiateScan, isPending, error, reset } = useInitiateScan(projectSlug);
   const navigate = useNavigate();
 
+  useEffect(() => {
+    if (hardwareProfiles && !formData.hardware_profile_id) {
+      const defaultProfile = hardwareProfiles.find(p => p.is_default && p.is_active);
+      if (defaultProfile) {
+        setFormData(prev => ({ ...prev, hardware_profile_id: defaultProfile.id }));
+      } else {
+        const firstActive = hardwareProfiles.find(p => p.is_active);
+        if (firstActive) {
+          setFormData(prev => ({ ...prev, hardware_profile_id: firstActive.id }));
+        }
+      }
+    }
+  }, [hardwareProfiles]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.engine_id || domainIds.length === 0) return;
+    if (!formData.engine_id || !formData.hardware_profile_id || domainIds.length === 0) return;
 
     initiateScan({
       domain_id: domainIds.length === 1 ? domainIds[0] : domainIds as any,
       engine_id: formData.engine_id as number,
+      hardware_profile_id: formData.hardware_profile_id as number,
       customDorkSwitch: formData.customDorkSwitch,
       customDorkTextarea: formData.customDorkTextarea,
       spiderfoot_scan: formData.spiderfoot_scan,
@@ -184,6 +201,32 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
                   {engines?.map((engine) => (
                     <MenuItem key={engine.id} value={engine.id}>
                       {engine.engine_name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+
+                <TextField
+                  label="Hardware Profile / Speed"
+                  select
+                  fullWidth
+                  required
+                  value={formData.hardware_profile_id}
+                  onChange={(e) => setFormData({ ...formData, hardware_profile_id: Number(e.target.value) })}
+                  sx={fieldStyles}
+                  slotProps={{
+                    input: {
+                      startAdornment: <Cpu size={18} style={{ marginRight: 12, color: '#00ff62' }} />
+                    }
+                  }}
+                  helperText={
+                    formData.hardware_profile_id && hardwareProfiles
+                      ? hardwareProfiles.find(p => p.id === formData.hardware_profile_id)?.description || ''
+                      : 'Select concurrency / speed profile'
+                  }
+                >
+                  {hardwareProfiles?.filter(p => p.is_active).map((profile) => (
+                    <MenuItem key={profile.id} value={profile.id}>
+                      {profile.name.toUpperCase()} {profile.is_default ? '(DEFAULT)' : ''} (Threads: {profile.threads}, Rate: {profile.rate_limit}/s)
                     </MenuItem>
                   ))}
                 </TextField>

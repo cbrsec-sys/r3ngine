@@ -1521,7 +1521,7 @@ def parse_llm_vulnerability_report(report):
 	return data
 
 
-def create_scan_object(host_id, engine_id, initiated_by_id=None):
+def create_scan_object(host_id, engine_id, initiated_by_id=None, hardware_profile_id=None):
 	'''
 	create task with pending status so that celery task will execute when
 	threads are free
@@ -1529,6 +1529,7 @@ def create_scan_object(host_id, engine_id, initiated_by_id=None):
 		host_id: int: id of Domain model
 		engine_id: int: id of EngineType model
 		initiated_by_id: int : id of User model (Optional)
+		hardware_profile_id: int: id of HardwareProfile model (Optional)
 	'''
 	# get current time
 	current_scan_time = timezone.now()
@@ -1543,6 +1544,12 @@ def create_scan_object(host_id, engine_id, initiated_by_id=None):
 	if initiated_by_id:
 		user = User.objects.get(pk=initiated_by_id)
 		scan.initiated_by = user
+	if hardware_profile_id:
+		try:
+			profile = HardwareProfile.objects.get(pk=hardware_profile_id)
+			scan.hardware_profile = profile
+		except HardwareProfile.DoesNotExist:
+			pass
 	scan.save()
 	# save last scan date for domain model
 	domain.start_scan_date = current_scan_time

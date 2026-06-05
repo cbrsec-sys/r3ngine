@@ -1,0 +1,13 @@
+- model: scanEngine.hardwareprofile
+  pk: 4
+  fields:
+    name: powerful
+    description: High-end machine (i7+ / 24GB+ RAM)
+    threads: 20
+    rate_limit: 200
+    timeout: 5
+    delay: 0.0
+    retries: 2
+    profile_type: builtin
+    is_active: true
+    is_default: false

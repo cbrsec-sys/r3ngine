@@ -32,6 +32,9 @@ python3 manage.py sync_roles
 echo "Loading default fixtures..."
 python3 manage.py loaddata fixtures/external_tools.yaml
 python3 manage.py loaddata fixtures/default_keywords.yaml
+for f in fixtures/hardware_profiles/*.yaml; do
+    python3 manage.py loaddata "$f"
+done
 
 # Start the server
 echo "Starting reNgine server..."

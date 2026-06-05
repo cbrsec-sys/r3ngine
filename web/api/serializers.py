@@ -1414,3 +1414,9 @@ class NotificationSettingsSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = Notification
 		fields = '__all__'
+
+
+class HardwareProfileSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = HardwareProfile
+		fields = '__all__'
