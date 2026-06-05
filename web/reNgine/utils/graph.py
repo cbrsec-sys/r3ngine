@@ -6,6 +6,35 @@ from targetApp.models import Domain
 
 logger = logging.getLogger(__name__)
 
+
+def _scan_severity_summary(scan_id: int) -> str:
+    """Return a one-line severity/CVE breakdown for a scan, e.g.
+    'Critical: 2 High: 5 Medium: 12 Low: 8 Unknown: 1 CVEs: 3'
+    """
+    from startScan.models import Vulnerability
+    from django.db.models import Count
+
+    qs = Vulnerability.objects.filter(scan_history_id=scan_id)
+    counts = dict(
+        qs.values_list('severity')
+          .annotate(n=Count('id'))
+          .values_list('severity', 'n')
+    )
+    cve_count = (
+        qs.filter(cve_ids__isnull=False)
+          .values('cve_ids')
+          .distinct()
+          .count()
+    )
+    return (
+        f"Critical: {counts.get(4, 0)} "
+        f"High: {counts.get(3, 0)} "
+        f"Medium: {counts.get(2, 0)} "
+        f"Low: {counts.get(1, 0)} "
+        f"Unknown: {counts.get(-1, 0)} "
+        f"CVEs: {cve_count}"
+    )
+
 # Suppress Neo4j notification logs (like CartesianProduct) unless DEBUG is enabled
 import os
 if os.environ.get("DEBUG", "0") != "1":
@@ -575,13 +604,15 @@ class Neo4jManager:
         logger.info(f"Starting global graph synchronization for {total_scans} scans.")
 
         for index, scan in enumerate(scans, 1):
+            summary = _scan_severity_summary(scan.id)
             logger.info(
-                f"[{index}/{total_scans}] Syncing scan: {scan.domain.name} (ID: {scan.id})"
+                "[%d/%d] Syncing scan #%d (%s) — %s",
+                index, total_scans, scan.id, scan.domain.name, summary
             )
             try:
                 self.sync_scan_results(scan.id)
             except Exception as e:
-                logger.error(f"Failed to sync scan {scan.id}: {e}")
+                logger.error("Failed to sync scan %d: %s", scan.id, e)
 
         logger.info("Global graph synchronization completed successfully.")
 
@@ -747,10 +778,15 @@ class Neo4jManager:
         from startScan.models import ScanHistory
 
         scans = ScanHistory.objects.all().order_by("id")
-        logger.info("Starting re-sync of %d scans...", scans.count())
-        for scan in scans:
+        total = scans.count()
+        logger.info("Starting re-sync of %d scans...", total)
+        for index, scan in enumerate(scans, 1):
+            summary = _scan_severity_summary(scan.id)
+            logger.info(
+                "[%d/%d] Syncing scan #%d (%s) — %s",
+                index, total, scan.id, scan.domain.name, summary
+            )
             try:
-                logger.info("Syncing scan %d for %s...", scan.id, scan.domain.name)
                 self.sync_scan_results(scan.id)
             except Exception as e:
                 logger.error("Error syncing scan %d: %s", scan.id, e)
