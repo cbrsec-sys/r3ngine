@@ -33,7 +33,7 @@
         enable_http_crawl: true
         timeout: 5
         ports:
-          - top-100
+          - top-1000
         rate_limit: 150
         threads: 20
         passive: false
