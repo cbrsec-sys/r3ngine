@@ -1,7 +1,9 @@
+import hashlib
 import logging
 import os
 import base64
 import json
+import threading
 from urllib.parse import urlparse
 from django.utils import timezone
 from redis import Redis
@@ -37,18 +39,164 @@ from reNgine.settings import (
 	DEFAULT_THREADS
 )
 from reNgine.utils.opsec import OpSecManager
-from reNgine.common_func import get_http_urls, get_subdomain_from_url, extract_path_from_url, get_random_proxy
+from reNgine.common_func import get_http_urls, get_subdomain_from_url, extract_path_from_url, get_random_proxy, sanitize_url
 from reNgine.utils.task import (
 	run_command,
 	stream_command,
-	save_endpoint,
 	ensure_endpoints_crawled_and_execute,
-	save_fuzzing_file,
-	parse_custom_header_to_list
+	parse_custom_header_to_list,
+	bulk_persist_fetch_urls,
+	bulk_get_or_create_directory_files,
+	activity_heartbeat_safe,
 )
-from startScan.models import DirectoryScan, DirectoryFile, Subdomain
+from startScan.models import DirectoryScan, Subdomain, EndPoint, ScanHistory
 
 logger = logging.getLogger(__name__)
+
+_FUZZ_BATCH_SIZE = 100
+
+
+def _fuzz_target_marker(results_dir, target_url):
+	digest = hashlib.md5(target_url.encode('utf-8')).hexdigest()
+	return os.path.join(results_dir, f'fuzz_done_{digest}.marker')
+
+
+def _flush_ffuf_batch(batch, dirscan, ctx, scan):
+	"""Persist a batch of ffuf JSON result dicts with batched DB writes."""
+	if not batch or not scan:
+		return
+
+	rows = []
+	urls = []
+	for line in batch:
+		res_url = line.get('url')
+		if not res_url:
+			continue
+		name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
+		if not name:
+			continue
+		http_url = sanitize_url(res_url)
+		urls.append(http_url)
+		rows.append({
+			'line': line,
+			'name': name,
+			'url': res_url,
+			'http_url': http_url,
+		})
+
+	if not urls:
+		return
+
+	bulk_persist_fetch_urls(urls, ctx, batch_size=len(urls))
+	endpoints = {
+		ep.http_url: ep
+		for ep in EndPoint.objects.filter(scan_history=scan, http_url__in=urls)
+	}
+
+	ep_updates = []
+	dfile_candidates = []
+	for row in rows:
+		line = row['line']
+		ep = endpoints.get(row['http_url'])
+		if not ep:
+			continue
+		status = line.get('status', 0)
+		length = line.get('length', 0)
+		words = line.get('words', 0)
+		lines_count = line.get('lines', 0)
+		content_type = line.get('content-type', '')
+		duration = line.get('duration', 0)
+		ep.http_status = status
+		ep.content_length = length
+		ep.response_time = duration / 1000000000 if duration else ep.response_time
+		ep.content_type = content_type
+		ep_updates.append(ep)
+		dfile_candidates.append({
+			'name': row['name'],
+			'url': row['url'],
+			'http_status': status,
+			'length': length,
+			'words': words,
+			'lines': lines_count,
+			'content_type': content_type,
+		})
+
+	if ep_updates:
+		EndPoint.objects.bulk_update(
+			ep_updates,
+			['http_status', 'content_length', 'response_time', 'content_type'],
+			batch_size=_FUZZ_BATCH_SIZE,
+		)
+
+	dfiles = bulk_get_or_create_directory_files(dfile_candidates)
+	if dfiles:
+		dirscan.directory_files.add(*dfiles)
+
+
+def _flush_ds_batch(batch, dirscan_ds, ctx, scan):
+	"""Persist a batch of dirsearch result dicts with batched DB writes."""
+	if not batch or not scan:
+		return
+
+	rows = []
+	urls = []
+	for ds_res in batch:
+		res_url = ds_res.get('url')
+		if not res_url:
+			continue
+		name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
+		if not name:
+			continue
+		http_url = sanitize_url(res_url)
+		urls.append(http_url)
+		rows.append({
+			'ds_res': ds_res,
+			'name': name,
+			'url': res_url,
+			'http_url': http_url,
+		})
+
+	if not urls:
+		return
+
+	bulk_persist_fetch_urls(urls, ctx, batch_size=len(urls))
+	endpoints = {
+		ep.http_url: ep
+		for ep in EndPoint.objects.filter(scan_history=scan, http_url__in=urls)
+	}
+
+	ep_updates = []
+	dfile_candidates = []
+	for row in rows:
+		ds_res = row['ds_res']
+		ep = endpoints.get(row['http_url'])
+		if not ep:
+			continue
+		status = ds_res.get('status', 0)
+		length = ds_res.get('content-length', 0)
+		content_type = ds_res.get('content-type', '')
+		ep.http_status = status
+		ep.content_length = length
+		ep.content_type = content_type
+		ep_updates.append(ep)
+		dfile_candidates.append({
+			'name': row['name'],
+			'url': row['url'],
+			'http_status': status,
+			'length': length,
+			'content_type': content_type,
+		})
+
+	if ep_updates:
+		EndPoint.objects.bulk_update(
+			ep_updates,
+			['http_status', 'content_length', 'content_type'],
+			batch_size=_FUZZ_BATCH_SIZE,
+		)
+
+	dfiles = bulk_get_or_create_directory_files(dfile_candidates)
+	if dfiles:
+		dirscan_ds.directory_files.add(*dfiles)
 
 
 def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_only=None):
@@ -68,22 +216,15 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		ctx = {}
 
 	def _execute_dir_file_fuzz(ctx, description, prepare_only=False, parse_only=None):
-		"""Inner execution logic for FFUF and Dirsearch fuzzing.
-
-		Args:
-			ctx (dict): Task context containing scan information.
-			description (str): Task description shown in UI.
-		"""
+		"""Inner execution logic for FFUF and Dirsearch fuzzing."""
 		from scanEngine.models import Wordlist
 		from reNgine.tasks import http_crawl
 
-		# Config parsing from yaml configuration
 		config = self.yaml_configuration.get(DIR_FILE_FUZZ) or {}
 		enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
 		rate_limit = config.get(RATE_LIMIT) or self.yaml_configuration.get(RATE_LIMIT, DEFAULT_RATE_LIMIT)
 		extensions = config.get(EXTENSIONS, DEFAULT_DIR_FILE_FUZZ_EXTENSIONS)
-		
-		# prepend . on extensions if not already present
+
 		extensions = [ext if ext.startswith('.') else f'.{ext}' for ext in extensions]
 		extensions_str = ','.join(map(str, extensions))
 		follow_redirect = config.get(FOLLOW_REDIRECT, False)
@@ -98,13 +239,10 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		auto_calibration = config.get(AUTO_CALIBRATION, True)
 		delay = rate_limit / (threads * 100) if threads else 0
 		custom_headers = config.get(CUSTOM_HEADERS) or config.get(CUSTOM_HEADER) or []
-		# Toggle for optional dirsearch tool (ffuf always runs)
 		run_dirsearch = config.get(RUN_DIRSEARCH, True)
-		
-		# Standardize headers into a list using helper
+
 		custom_headers_list = parse_custom_header_to_list(custom_headers)
 
-		# Resolve wordlist path
 		wordlist_path = f'/usr/src/wordlist/{wordlist_name}.txt'
 		if not os.path.exists(wordlist_path):
 			db_wl = Wordlist.objects.filter(short_name=wordlist_name).first()
@@ -113,14 +251,11 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 			else:
 				wordlist_path = FFUF_DEFAULT_WORDLIST_PATH
 
-		# Override with API-specific wordlist when use_api_wordlist is enabled
 		from reNgine.api_tasks import resolve_wordlist_path
 		wordlist_path = resolve_wordlist_path(config, wordlist_path)
 
-		# Define input path for URLs to fuzz
 		input_path = f'{self.results_dir}/input_endpoints_dir_file_fuzz.txt'
 
-		# Build ffuf base command
 		ffuf_base_cmd = 'ffuf'
 		ffuf_base_cmd += f' -w {wordlist_path}'
 		ffuf_base_cmd += f' -e {extensions_str}' if extensions else ''
@@ -136,17 +271,15 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		ffuf_base_cmd += ' -ac' if auto_calibration else ''
 		ffuf_base_cmd += f' -mc {mc}' if mc else ''
 
-		# Check if User-Agent is already in custom headers
 		has_ua = any('user-agent' in h.lower() for h in custom_headers_list)
 		if not has_ua:
 			ffuf_base_cmd += ' -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"'
-		
+
 		for header in custom_headers_list:
 			ffuf_base_cmd += f' -H "{header}"'
 			if 'cookie' in header.lower() or 'authorization' in header.lower():
 				logger.warning(f'Authenticated FFUF fuzzing enabled via header: {header}')
 
-		# Build dirsearch base command (only when run_dirsearch is enabled)
 		dirsearch_base_cmd = None
 		if run_dirsearch:
 			dirsearch_base_cmd = 'dirsearch'
@@ -161,7 +294,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 			dirsearch_base_cmd += f' --max-time {max_time}' if max_time > 0 else ''
 			dirsearch_base_cmd += f' --delay {delay}' if delay > 0 else ''
 			dirsearch_base_cmd += ' --exit-on-error' if stop_on_error else ''
-			
+
 			if not has_ua:
 				dirsearch_base_cmd += ' --random-agent'
 
@@ -175,7 +308,6 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		if ctx.get("urls_override"):
 			urls = ctx["urls_override"]
 		else:
-			# Grab URLs to fuzz
 			raw_urls = get_http_urls(
 				is_alive=True,
 				ignore_files=False,
@@ -186,25 +318,24 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 			if not raw_urls:
 				logger.error('No alive URLs found for directory fuzzing. Skipping.')
 				return []
-				
-			# Group by base_url and extract unique directories up to depth 2
+
 			base_url_map = {}
 			for u in raw_urls:
 				parsed = urlparse(u)
 				base = f"{parsed.scheme}://{parsed.netloc}"
 				if base not in base_url_map:
 					base_url_map[base] = set()
-					
+
 				path = parsed.path
 				if path and '.' in path.split('/')[-1]:
 					path = '/'.join(path.split('/')[:-1])
 				if not path.endswith('/'):
 					path += '/'
-					
+
 				segments = [s for s in path.strip('/').split('/') if s]
 				if len(segments) <= 2:
 					base_url_map[base].add(path)
-					
+
 			urls = []
 			for base, paths in base_url_map.items():
 				for path in list(paths)[:10]:
@@ -223,8 +354,14 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		results = []
 		redis_client = Redis.from_url(os.environ.get('REDIS_URL', 'redis://redis:6379/0'))
 		opsec = OpSecManager()
+		scan = ScanHistory.objects.filter(pk=ctx.get('scan_history_id')).first()
 
 		for target_url in urls:
+			done_marker = _fuzz_target_marker(self.results_dir, target_url)
+			if parse_only is None and os.path.exists(done_marker):
+				logger.info(f'Skipping already-fuzzed target (marker present): {target_url}')
+				continue
+
 			logger.warning(f'Fuzzing URL: {target_url}')
 			url_parse = urlparse(target_url)
 			base_url = url_parse.scheme + '://' + url_parse.netloc
@@ -238,104 +375,15 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 				if not any(proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
 					proxy = 'http://' + proxy
 
-			# Per-scan lock: prevents concurrent ffuf/dirsearch for the same scan,
-			# but allows different scans to fuzz in parallel. Timeout = 30 min per
-			# URL window (generous for slow targets; auto-releases on crash).
-			_fuzz_lock_name = f"fuzz_execution_lock_{self.scan_id}"
-			with redis_client.lock(_fuzz_lock_name, timeout=1800):
+			lock_key = f"fuzz_execution_lock_{self.scan_id}_{hashlib.md5(target_url.encode()).hexdigest()}"
+			with redis_client.lock(lock_key, timeout=1800):
 				ffuf_results_local = []
 				ffuf_exc = [None]
 				ds_exc = [None]
 
-				_FUZZ_BATCH_SIZE = 100
-
-				def _flush_ffuf_batch(batch, dirscan):
-					"""Persist a batch of ffuf result dicts and link files to dirscan."""
-					from django.db import transaction
-					if not batch:
-						return
-					dfiles = []
-					with transaction.atomic():
-						for line in batch:
-							res_url = line.get('url')
-							if not res_url:
-								continue
-							name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
-							if not name:
-								continue
-							length = line.get('length', 0)
-							status = line.get('status', 0)
-							words = line.get('words', 0)
-							lines_count = line.get('lines', 0)
-							content_type = line.get('content-type', '')
-							duration = line.get('duration', 0)
-							endpoint, _ = save_endpoint(res_url, ctx=ctx)
-							if endpoint is None:
-								continue
-							endpoint.http_status = status
-							endpoint.content_length = length
-							endpoint.response_time = duration / 1000000000
-							endpoint.content_type = content_type
-							endpoint.save()
-							try:
-								dfile, d_created = save_fuzzing_file(
-									name=name,
-									url=res_url,
-									http_status=status,
-									length=length,
-									words=words,
-									lines=lines_count,
-									content_type=content_type
-								)
-								dfiles.append(dfile)
-								logger.info(f'Saved ffuf DirectoryFile {res_url} (created={d_created})')
-							except Exception as e:
-								logger.error(f'Failed to save ffuf DirectoryFile for {res_url}: {e}')
-					if dfiles:
-						dirscan.directory_files.add(*dfiles)
-
-				def _flush_ds_batch(batch, dirscan_ds):
-					"""Persist a batch of dirsearch result dicts and link files to dirscan_ds."""
-					from django.db import transaction
-					if not batch:
-						return
-					dfiles = []
-					with transaction.atomic():
-						for ds_res in batch:
-							res_url = ds_res.get('url')
-							if not res_url:
-								continue
-							name = base64.b64encode(extract_path_from_url(res_url).encode()).decode()
-							if not name:
-								continue
-							status = ds_res.get('status', 0)
-							length = ds_res.get('content-length', 0)
-							content_type = ds_res.get('content-type', '')
-							endpoint, _ = save_endpoint(res_url, ctx=ctx)
-							if endpoint is None:
-								continue
-							endpoint.http_status = status
-							endpoint.content_length = length
-							endpoint.content_type = content_type
-							endpoint.save()
-							try:
-								dfile, d_created = save_fuzzing_file(
-									name=name,
-									url=res_url,
-									http_status=status,
-									length=length,
-									content_type=content_type
-								)
-								dfiles.append(dfile)
-								logger.info(f'Saved ds DirectoryFile {res_url} (created={d_created})')
-							except Exception as e:
-								logger.error(f'Failed to save ds DirectoryFile for {res_url}: {e}')
-					if dfiles:
-						dirscan_ds.directory_files.add(*dfiles)
-
 				def _run_ffuf():
 					try:
-						fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json' # -s
+						fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json'
 						fcmd += f' -x {proxy}' if proxy else ''
 						fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=proxy)
 
@@ -363,7 +411,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 								except Exception:
 									pass
 								if len(batch) >= _FUZZ_BATCH_SIZE:
-									_flush_ffuf_batch(batch, dirscan)
+									_flush_ffuf_batch(batch, dirscan, ctx, scan)
 									batch = []
 						else:
 							for line in stream_command(
@@ -371,17 +419,18 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 									shell=True,
 									history_file=self.history_file,
 									scan_id=self.scan_id,
-									activity_id=self.activity_id):
+									activity_id=self.activity_id,
+									route_to_executor=False):
 								if not isinstance(line, dict):
 									continue
 								batch.append(line)
 								ffuf_results_local.append(line)
 								if len(batch) >= _FUZZ_BATCH_SIZE:
-									_flush_ffuf_batch(batch, dirscan)
+									_flush_ffuf_batch(batch, dirscan, ctx, scan)
 									batch = []
+									activity_heartbeat_safe(f'ffuf {target_url} {len(ffuf_results_local)} hits')
 
-						# Flush remaining results
-						_flush_ffuf_batch(batch, dirscan)
+						_flush_ffuf_batch(batch, dirscan, ctx, scan)
 
 						if self.subscan:
 							from startScan.models import SubScan
@@ -398,10 +447,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 						dirsearch_output = f'{self.results_dir}/dirsearch_{subdomain_name}.json'
 						target_url_stripped = target_url.rstrip('/')
 						dcmd = f'{dirsearch_base_cmd} -u {target_url_stripped} --format=json -o {dirsearch_output} --no-color'
-						# if proxy:
-						#	dcmd += f' --proxy={proxy}'
-
-						dcmd = opsec.apply_stealth('dirsearch', dcmd) # , proxy=proxy
+						dcmd = opsec.apply_stealth('dirsearch', dcmd)
 
 						dirscan_ds = DirectoryScan.objects.create(
 							scanned_date=timezone.now(),
@@ -428,7 +474,12 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 									results_list = json.load(f).get('results', [])
 								logger.info(f'dirsearch collected {len(results_list)} results for {target_url}')
 								for i in range(0, len(results_list), _FUZZ_BATCH_SIZE):
-									_flush_ds_batch(results_list[i:i + _FUZZ_BATCH_SIZE], dirscan_ds)
+									_flush_ds_batch(
+										results_list[i:i + _FUZZ_BATCH_SIZE],
+										dirscan_ds,
+										ctx,
+										scan,
+									)
 							except Exception as e:
 								logger.error(f'Error parsing dirsearch output for {base_url}: {e}')
 
@@ -440,9 +491,13 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 					except Exception as e:
 						ds_exc[0] = e
 
-				_run_ffuf()
+				worker_threads = [threading.Thread(target=_run_ffuf, name='ffuf')]
 				if run_dirsearch and dirsearch_base_cmd:
-					_run_dirsearch()
+					worker_threads.append(threading.Thread(target=_run_dirsearch, name='dirsearch'))
+				for worker in worker_threads:
+					worker.start()
+				for worker in worker_threads:
+					worker.join()
 
 				if ffuf_exc[0]:
 					raise ffuf_exc[0]
@@ -451,7 +506,10 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 
 				results.extend(ffuf_results_local)
 
-		# Crawl discovered URLs if enabled
+			if parse_only is None:
+				with open(done_marker, 'w', encoding='utf-8') as marker:
+					marker.write('ok')
+
 		if enable_http_crawl:
 			ctx['track'] = True
 			http_crawl(self, urls, ctx=ctx)
@@ -459,8 +517,8 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		return results
 
 	return ensure_endpoints_crawled_and_execute(
-		self, 
-		lambda ctx, description: _execute_dir_file_fuzz(ctx, description, prepare_only=prepare_only, parse_only=parse_only), 
-		ctx, 
+		self,
+		lambda ctx, description: _execute_dir_file_fuzz(ctx, description, prepare_only=prepare_only, parse_only=parse_only),
+		ctx,
 		description
 	)

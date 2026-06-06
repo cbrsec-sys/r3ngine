@@ -334,6 +334,18 @@ class CVEEnrichmentService:
 
         pdcp_key_obj = ProjectDiscoveryAPIKey.objects.first()
         pdcp_key = pdcp_key_obj.key if pdcp_key_obj else None
+        ensureAuthCmd = ["vulnx", "auth", "--api-key", pdcp_key] if pdcp_key else None
+        logger.debug("Ensuring authentication: %s", ensureAuthCmd)
+        if ensureAuthCmd:
+            result = subprocess.run(
+                ensureAuthCmd,
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode != 0:
+                logger.warning("vulnx authentication failed with code %d: %s", result.returncode, result.stderr)
+                return
 
         cmd = ["vulnx", "id", "--json", cve_obj.name]
         env = os.environ.copy()

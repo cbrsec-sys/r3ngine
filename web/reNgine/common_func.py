@@ -338,15 +338,18 @@ def get_http_urls(
 		else:
 			query = query.filter(http_url__contains=url)
 
-	# Select distinct endpoints and order
-	endpoints = query.distinct('http_url').order_by('http_url').all()
-
-	# If is_alive is True, select only endpoints that are alive
+	# Filter alive endpoints in the database (matches EndPoint.is_alive hybrid_property).
 	if is_alive:
-		endpoints = [e for e in endpoints if e.is_alive]
+		query = query.filter(
+			http_status__gt=0,
+			http_status__lt=500,
+		).exclude(http_status=404)
 
-	# Grab only http_url from endpoint objects
-	endpoints = [e.http_url for e in endpoints if is_valid_url(e.http_url)]
+	# Distinct URLs only — values_list avoids loading full ORM rows for large scans.
+	endpoints = list(
+		query.order_by('http_url').values_list('http_url', flat=True).distinct()
+	)
+	endpoints = [u for u in endpoints if is_valid_url(u)]
 	if ignore_files: # ignore all files
 		extensions_path = f'{RENGINE_HOME}/fixtures/extensions.txt'
 		with open(extensions_path, 'r') as f:
@@ -569,6 +572,43 @@ def sanitize_url(http_url):
 		url = url._replace(netloc=url.netloc.replace(':443', ''))
 	return url.geturl().rstrip('/')
 
+def parse_fetched_url_line(raw_line, starting_point_path=''):
+	"""Normalize a single line from fetch_url tool output into a usable URL.
+
+	Handles gospider-style lines like ``https://host/path] - /extra`` and
+	``https://host - /path``. Invalid or filtered lines return None.
+	"""
+	url = (raw_line or '').strip()
+	if not url:
+		return None
+
+	urlpath = None
+	base_url = None
+	if '] ' in url:
+		split = tuple(url.split('] ', 1))
+		if len(split) != 2:
+			return None
+		base_url, urlpath = split
+		urlpath = urlpath.lstrip('- ')
+	elif ' - ' in url:
+		parts = url.split(' - ', 1)
+		if len(parts) == 2:
+			base_url, urlpath = parts
+
+	if base_url and urlpath:
+		if '://' not in base_url:
+			base_url = f'http://{base_url}'
+		parsed_base = urlparse(base_url)
+		path = urlpath if urlpath.startswith('/') else f'/{urlpath}'
+		url = f'{parsed_base.scheme}://{parsed_base.netloc}{path}'
+
+	if starting_point_path and starting_point_path not in url:
+		return None
+	if not is_valid_url(url):
+		return None
+	return url
+
+
 def url_param_signature(url):
 	"""Return a dedup key based on scheme, netloc, path, and sorted param names (ignoring values).
 
@@ -661,13 +701,14 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 	target_domain = vuln_data.get('target_domain')
 
 	if not subdomain and http_url and scan_history and target_domain:
+		from reNgine.utils.task import save_subdomain
 		subdomain_name = get_subdomain_from_url(http_url)
-		subdomain, _ = Subdomain.objects.get_or_create(
-			name=subdomain_name,
-			scan_history=scan_history,
-			target_domain=target_domain
-		)
-		vuln_data['subdomain'] = subdomain
+		subdomain, _ = save_subdomain(subdomain_name, ctx={
+			'scan_history_id': scan_history.id,
+			'domain_id': target_domain.id,
+		})
+		if subdomain:
+			vuln_data['subdomain'] = subdomain
 
 	# remove nulls
 	vuln_data = replace_nulls(vuln_data)

@@ -1954,12 +1954,12 @@ export const ScanDetailPage = () => {
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN DETAIL</Typography>
             <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
               IDENTIFIER: <Box component="span" sx={{
-                color: '#c0521a',
-                '@keyframes subtlePulse': {
-                  '0%, 100%': { opacity: 1 },
-                  '50%': { opacity: 0.55 }
-                },
-                animation: 'subtlePulse 3s ease-in-out infinite'
+                color: '#c0521a'
+                // '@keyframes subtlePulse': {
+                //   '0%, 100%': { opacity: 1 },
+                //   '50%': { opacity: 0.55 }
+                // },
+                // animation: 'subtlePulse 3s ease-in-out infinite'
               }}>{scanId}</Box>
               {' | '}
               TARGET: <Box component="span" sx={{
