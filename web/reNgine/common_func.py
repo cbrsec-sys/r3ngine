@@ -1025,11 +1025,11 @@ def get_random_proxy():
 		if not proxy_name.startswith('http') and not proxy_name.startswith('socks'):
 			proxy_name = f"http://{proxy_name}"
 			
-		logger.info(f'Validating proxy: {proxy_name}')
+		logger.info("Validating proxy: %s", proxy_name)
 		if check_proxy_robust(proxy_name, timeout=5):
-			logger.warning('Using valid proxy: ' + proxy_name)
+			logger.warning("Using valid proxy: %s", proxy_name)
 			return proxy_name
-		logger.warning(f'Proxy {proxy_name} validation failed.')
+		logger.warning("Proxy %s validation failed.", proxy_name)
 
 	logger.error('No valid proxies found in the list!')
 	return ''

@@ -180,9 +180,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
+          memory: 3G
         reservations:
-          memory: 2G
+          memory: 1G
 
   tor:
     build:
@@ -279,7 +279,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 6G
+          memory: 4G
         reservations:
           memory: 3G
 
@@ -323,7 +323,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 10G
+          memory: 20G
         reservations:
           memory: 5G
     #memswap_limit: 9G
@@ -357,8 +357,8 @@ volumes:
 
 secrets:
   proxy.ca:
-    file: ../secrets/certs/rengine_chain.pem
+    file: ../secrets/certs/r3ngine_chain.pem
   proxy.key:
-    file: ../secrets/certs/rengine_rsa.key
+    file: ../secrets/certs/r3ngine_rsa.key
   proxy.cert:
-    file: ../secrets/certs/rengine.pem
+    file: ../secrets/certs/r3ngine.pem

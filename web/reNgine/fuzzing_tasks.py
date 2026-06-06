@@ -267,8 +267,8 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		ffuf_base_cmd += f' -t {threads}' if threads and threads > 0 else ''
 		ffuf_base_cmd += f' -timeout {timeout}' if timeout and timeout > 0 else ''
 		ffuf_base_cmd += ' -se' if stop_on_error else ''
-		ffuf_base_cmd += ' -fr' if follow_redirect else ''
-		ffuf_base_cmd += ' -ac' if auto_calibration else ''
+		ffuf_base_cmd += ' -fr' if follow_redirect else ' -fr'
+		ffuf_base_cmd += ' -ac' if auto_calibration else ' -ac'
 		ffuf_base_cmd += f' -mc {mc}' if mc else ''
 
 		has_ua = any('user-agent' in h.lower() for h in custom_headers_list)
@@ -491,16 +491,17 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 					except Exception as e:
 						ds_exc[0] = e
 
-				worker_threads = [threading.Thread(target=_run_ffuf, name='ffuf')]
-				if run_dirsearch and dirsearch_base_cmd:
-					worker_threads.append(threading.Thread(target=_run_dirsearch, name='dirsearch'))
-				for worker in worker_threads:
-					worker.start()
-				for worker in worker_threads:
-					worker.join()
-
+				# Run ffuf first
+				logger.info(f'Starting sequential execution: ffuf first, then dirsearch for {target_url}')
+				_run_ffuf()
+				
 				if ffuf_exc[0]:
 					raise ffuf_exc[0]
+
+				# Run dirsearch after ffuf completes
+				if run_dirsearch and dirsearch_base_cmd:
+					_run_dirsearch()
+				
 				if ds_exc[0]:
 					logger.error(f'dirsearch failed for {target_url}: {ds_exc[0]}')
 
