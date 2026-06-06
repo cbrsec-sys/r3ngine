@@ -393,7 +393,7 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunFetchURLActivity",
                         ctx,
-                        start_to_close_timeout=timedelta(hours=2),
+                        start_to_close_timeout=timedelta(hours=6),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_LONG_SCAN,
                         task_queue="python-orchestrator-queue"
@@ -877,7 +877,7 @@ _SUBSCAN_DISPATCH = {
     },
     "fetch_url": {
         "activity": "RunGenericTaskActivity",
-        "timeout": timedelta(hours=2),
+        "timeout": timedelta(hours=6),
         "args_builder": lambda ctx: [
             ctx, "fetch_url", "Fetch URL",
             {"urls": [ctx.get("subdomain_http_url") or f"http://{ctx.get('subdomain_name', '')}/"]},
@@ -885,7 +885,7 @@ _SUBSCAN_DISPATCH = {
     },
     "dir_file_fuzz": {
         "activity": "RunGenericTaskActivity",
-        "timeout": timedelta(hours=2),
+        "timeout": timedelta(hours=4),
         "args_builder": lambda ctx: [ctx, "dir_file_fuzz", "Dir File Fuzz", {}],
     },
     "screenshot": {
@@ -1676,11 +1676,21 @@ class StartupSyncWorkflow:
 
     @workflow.run
     async def run(self, task_name: str) -> None:
+        if task_name == "sync_all_scans_to_graph":
+            start_to_close_timeout = timedelta(hours=3)
+            heartbeat_timeout = timedelta(minutes=2)
+        elif task_name == "sync_cve_data":
+            start_to_close_timeout = timedelta(hours=2)
+            heartbeat_timeout = timedelta(minutes=5)
+        else:
+            start_to_close_timeout = timedelta(minutes=30)
+            heartbeat_timeout = timedelta(minutes=5)
+
         await workflow.execute_activity(
             "RunStartupSyncActivity",
             args=[task_name],
-            start_to_close_timeout=timedelta(minutes=30),
-            heartbeat_timeout=timedelta(minutes=5),
+            start_to_close_timeout=start_to_close_timeout,
+            heartbeat_timeout=heartbeat_timeout,
             retry_policy=RetryPolicy(maximum_attempts=3),
             task_queue="python-orchestrator-queue",
         )

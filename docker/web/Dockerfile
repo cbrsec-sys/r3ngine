@@ -2,7 +2,7 @@
 # Stage 1: Frontend Builder
 # Compiles the React/Vite frontend. Only the /dist output is used downstream.
 # ===========================================================================
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install

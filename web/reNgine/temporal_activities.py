@@ -827,11 +827,9 @@ def parse_fuzz_results_activity(ctx: dict) -> bool:
         bool: True on success.
     """
     from startScan.models import DirectoryFile
-    from startScan.models import Subdomain
     scan_id = ctx.get('scan_history_id')
-    # Count DirectoryFile objects linked to this scan's subscans
     fuzz_count = DirectoryFile.objects.filter(
-        directory_files__dir_subscan_ids__scan_history_id=scan_id
+        directory_files__directories__scan_history_id=scan_id
     ).distinct().count()
     activity.logger.info(
         f"[ParseFuzzResultsActivity] scan_id={scan_id}: {fuzz_count} fuzz entries."
@@ -1307,12 +1305,14 @@ def sync_graph_activity(ctx: dict) -> bool:
     scan_id = ctx.get('scan_history_id')
     proxy = TemporalTaskProxy(ctx, 'sync_graph', 'Graph Sync (Neo4j)')
 
+    from reNgine.utils.graph import _graph_heartbeat
+
     activity.logger.warning("[TIER7][GRAPH] SyncGraphActivity starting | scan_id=%s", scan_id)
-    activity.heartbeat("SyncGraphActivity starting neo4j sync for scan_id=%s" % scan_id)
+    _graph_heartbeat("SyncGraphActivity starting neo4j sync for scan_id=%s" % scan_id)
 
     nm = Neo4jManager()
     try:
-        nm.sync_scan_results(scan_id)
+        nm.sync_scan_results(scan_id, heartbeat_callback=_graph_heartbeat)
         activity.logger.warning("[TIER7][GRAPH] Neo4j sync complete | scan_id=%s", scan_id)
         proxy.update_scan_activity(SUCCESS_TASK)
         return True
@@ -1944,7 +1944,9 @@ def run_startup_sync_activity(task_name: str) -> None:
     activity.logger.info(f"[RunStartupSyncActivity] Starting: {task_name}")
     if task_name == 'sync_all_scans_to_graph':
         from reNgine.tasks import sync_all_scans_to_graph
-        sync_all_scans_to_graph(None)
+        from reNgine.utils.graph import _graph_heartbeat
+        activity.heartbeat("startup graph sync starting")
+        sync_all_scans_to_graph(None, heartbeat_callback=_graph_heartbeat)
     elif task_name == 'sync_cisa_kev_catalog':
         from reNgine.tasks import sync_cisa_kev_catalog
         sync_cisa_kev_catalog()

@@ -240,6 +240,13 @@ class Subdomain(models.Model):
 	criticality_level = models.IntegerField(default=1, null=True, blank=True)
 	criticality_reason = models.TextField(null=True, blank=True)
 
+	class Meta:
+		constraints = [
+			models.UniqueConstraint(
+				fields=['scan_history', 'name'],
+				name='unique_subdomain_per_scan',
+			),
+		]
 
 	def __str__(self):
 		return str(self.name)

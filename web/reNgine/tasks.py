@@ -57,7 +57,8 @@ from reNgine.osint_tasks import *
 from reNgine.utils.task import (
     run_command, run_command_with_retry, stream_command, save_email, save_employee, save_subdomain, save_endpoint, save_parameter,
     sanitize_command_for_db, get_tool_color, ensure_endpoints_crawled_and_execute, save_fuzzing_file,
-    parse_custom_header_to_list, save_subdomain_metadata
+    parse_custom_header_to_list, save_subdomain_metadata,
+    bulk_persist_fetch_urls, bulk_apply_gf_pattern_from_file, activity_heartbeat_safe,
 )
 from reNgine.report_tasks import *
 from reNgine.wpscan_tasks import wpscan_scan
@@ -135,12 +136,14 @@ SCAN_PIPELINE_DEFINITION = [
 #----------------------#
 
 
-def sync_all_scans_to_graph(self):
+def sync_all_scans_to_graph(self, heartbeat_callback=None):
 	"""Sync all pre-existing scan results to Neo4j graph."""
 	logger.warning("Starting global graph synchronization...")
 	nm = Neo4jManager()
-	nm.sync_all_scans()
-	nm.close()
+	try:
+		nm.sync_all_scans(heartbeat_callback=heartbeat_callback)
+	finally:
+		nm.close()
 	logger.warning("Global graph synchronization completed.")
 
 def finish_osint(results, scan_history_id):
@@ -2755,7 +2758,9 @@ def waf_detection(self, ctx={}, description=None):
 		# Add waf info to Subdomain in DB
 		subdomain = get_subdomain_from_url(http_url)
 		logger.info(f'Wafw00f Subdomain : {subdomain}')
-		subdomain_query, _ = Subdomain.objects.get_or_create(scan_history=self.scan, name=subdomain)
+		subdomain_query, _ = save_subdomain(subdomain, ctx=ctx)
+		if not subdomain_query:
+			continue
 		subdomain_query.waf.add(waf)
 		subdomain_query.save()
 
@@ -2917,6 +2922,11 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 				elif tool == 'gau': tool_cmd += f' --proxy {p}'
 
 			url_results_file = f'{self.results_dir}/urls_{tool}.txt'
+			if os.path.exists(url_results_file) and os.path.getsize(url_results_file) > 0:
+				logger.info(f'{tool}: reusing cached results in {url_results_file}')
+				recon_run = True
+				continue
+
 			full_cmd = f'cat {input_path} | {tool_cmd} | grep -Eo {host_regex} | tee {url_results_file}'
 			logger.info(f'Running {tool}')
 			logger.warning(f'{tool} command: {full_cmd}')
@@ -2968,14 +2978,17 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		if proxy:
 			vig_cmd += f" --proxy {proxy}"
 
-		logger.info("fetch_url: running vigolium spidering")
-		logger.warning(f"vigolium spider command: {vig_cmd}")
-		run_command_with_retry(
-			vig_cmd,
-			results_file=vigolium_jsonl,
-			scan_id=self.scan_id,
-			activity_id=self.activity_id
-		)
+		if os.path.exists(vigolium_jsonl) and os.path.getsize(vigolium_jsonl) > 0:
+			logger.info(f'fetch_url: reusing cached vigolium results in {vigolium_jsonl}')
+		else:
+			logger.info("fetch_url: running vigolium spidering")
+			logger.warning(f"vigolium spider command: {vig_cmd}")
+			run_command_with_retry(
+				vig_cmd,
+				results_file=vigolium_jsonl,
+				scan_id=self.scan_id,
+				activity_id=self.activity_id
+			)
 
 		spider_urls = [
 			record['data']['url']
@@ -2992,9 +3005,9 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		logger.warning('No reconnaissance tools enabled for fetch_url. Skipping.')
 		return
 
-	# Cleanup task
+	# Cleanup task — only merge plain-text url lists (exclude .jsonl artifacts)
 	sort_output = [
-		f'cat {self.results_dir}/urls_* > {self.output_path}',
+		f'cat {self.results_dir}/urls_*.txt > {self.output_path} 2>/dev/null || true',
 		f'cat {input_path} >> {self.output_path}',
 		f'sort -u {self.output_path} -o {self.output_path}',
 	]
@@ -3019,56 +3032,38 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		logger.warning('fetch_url: output file not found at %s, no URLs to process.', self.output_path)
 		return
 
-	with open(self.output_path) as f:
-		discovered_urls = f.readlines()
-		self.notify(fields={'Discovered URLs': len(discovered_urls)})
-
-	# Some tools can have an URL in the format <URL>] - <PATH> or <URL> - <PATH>, add them
-	# to the final URL list
-	all_urls = []
-	for url in discovered_urls:
-		url = url.strip()
-		urlpath = None
-		base_url = None
-		if '] ' in url: # found JS scraped endpoint e.g from gospider
-			split = tuple(url.split('] '))
-			if not len(split) == 2:
-				logger.warning(f'URL format not recognized for "{url}". Skipping.')
+	all_urls_set = set()
+	raw_line_count = 0
+	with open(self.output_path, encoding='utf-8', errors='replace') as f:
+		for raw_line in f:
+			raw_line_count += 1
+			parsed = parse_fetched_url_line(raw_line, self.starting_point_path)
+			if not parsed:
 				continue
-			base_url, urlpath = split
-			urlpath = urlpath.lstrip('- ')
-		elif ' - ' in url: # found JS scraped endpoint e.g from gospider
-			base_url, urlpath = tuple(url.split(' - '))
+			if not validators.url(parsed):
+				logger.warning(f'Invalid URL "{parsed}". Skipping.')
+				continue
+			all_urls_set.add(parsed)
+			if raw_line_count % 25000 == 0:
+				activity_heartbeat_safe(f'fetch_url parse {raw_line_count} lines')
 
-		if base_url and urlpath:
-			subdomain = urlparse(base_url)
-			url = f'{subdomain.scheme}://{subdomain.netloc}{self.starting_point_path}'
+	self.notify(fields={'Discovered URLs': len(all_urls_set)})
 
-		if not validators.url(url):
-			logger.warning(f'Invalid URL "{url}". Skipping.')
-
-		if url not in all_urls:
-			all_urls.append(url)
-
-	# Filter out URLs if a path filter was passed
-	if self.starting_point_path:
-		all_urls = [url for url in all_urls if self.starting_point_path in url]
+	all_urls = list(all_urls_set)
 
 	# if exclude_paths is found, then remove urls matching those paths
 	if self.excluded_paths:
 		all_urls = exclude_urls_by_patterns(self.excluded_paths, all_urls)
 
 	# Pass 1: URL signature dedup — collapse parametric variants (same path, different param values).
-	# e.g. /page?id=1, /page?id=2, /page?id=3 all share signature /page?id and collapse to one.
-	# URLs with different parameter names are treated as structurally distinct and kept.
 	if should_remove_duplicate_endpoints:
 		pre_count = len(all_urls)
-		seen_sigs = {}
+		seen_sigs = set()
 		deduped = []
 		for url in all_urls:
 			sig = url_param_signature(url)
 			if sig not in seen_sigs:
-				seen_sigs[sig] = True
+				seen_sigs.add(sig)
 				deduped.append(url)
 		all_urls = deduped
 		logger.warning(
@@ -3081,19 +3076,9 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 		f.write('\n'.join(all_urls))
 	logger.warning(f'Found {len(all_urls)} usable URLs')
 
-	# Save discovered URLs immediately to database as skeleton endpoints.
-	# Crawling is delegated to the next stage in the pipeline to avoid collisions.
-	for url in all_urls:
-		http_url = sanitize_url(url)
-		subdomain_name = get_subdomain_from_url(http_url)
-		subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
-		if not isinstance(subdomain, Subdomain):
-			continue
-		save_endpoint(
-			http_url,
-			ctx=ctx,
-			subdomain=subdomain
-		)
+	# Save discovered URLs immediately to database as skeleton endpoints (batched).
+	created_count = bulk_persist_fetch_urls(all_urls, ctx)
+	logger.warning(f'fetch_url persisted {created_count} new skeleton endpoints')
 
 	# Pass 2: Content-based dedup — delete endpoints already enriched by http_crawl
 	# whose (subdomain, content_length, page_title) signature matches a shorter sibling.
@@ -3114,7 +3099,7 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 
 			seen_content_sigs = {}
 			to_delete = []
-			for ep in crawled_eps:
+			for ep in crawled_eps.iterator(chunk_size=2000):
 				sig = tuple(getattr(ep, f, None) for f in duplicate_removal_fields)
 				subdomain_key = (ep.subdomain_id,) + sig
 				if subdomain_key in seen_content_sigs:
@@ -3159,35 +3144,12 @@ def fetch_url(self, urls=[], ctx={}, description=None):
 			scan_id=self.scan_id,
 			activity_id=self.activity_id)
 
-		# Check output file
 		if not os.path.exists(gf_output_file):
 			logger.error(f'Could not find GF output file {gf_output_file}. Skipping GF pattern "{gf_pattern}"')
 			continue
 
-		# Read output file line by line and
-		with open(gf_output_file, 'r') as f:
-			lines = f.readlines()
-
-		# Add endpoints / subdomains to DB
-		for url in lines:
-			http_url = sanitize_url(url)
-			subdomain_name = get_subdomain_from_url(http_url)
-			subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
-			if not subdomain:
-				continue
-			endpoint, created = save_endpoint(
-				http_url,
-				crawl=False,
-				subdomain=subdomain,
-				ctx=ctx)
-			if not endpoint:
-				continue
-			earlier_pattern = None
-			if not created:
-				earlier_pattern = endpoint.matched_gf_patterns
-			pattern = f'{earlier_pattern},{gf_pattern}' if earlier_pattern else gf_pattern
-			endpoint.matched_gf_patterns = pattern
-			endpoint.save()
+		updated = bulk_apply_gf_pattern_from_file(gf_output_file, gf_pattern, ctx)
+		logger.warning(f'GF pattern "{gf_pattern}" updated {updated} endpoints')
 
 	return all_urls
 
@@ -3727,7 +3689,6 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	Unfurl the urls to keep only domain and path, will be sent to vuln scan and
 	ignore certain file extensions. Thanks: https://github.com/six2dez/reconftw
 	"""
-	from startScan.models import Subdomain
 	# Config
 	config = self.yaml_configuration.get(VULNERABILITY_SCAN) or {}
 	severity_filter = severity or ctx.get('nuclei_severity_filter')
@@ -3940,12 +3901,9 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		http_url = sanitize_url(line.get('matched-at'))
 		subdomain_name = get_subdomain_from_url(http_url)
 
-		# TODO: this should be get only
-		subdomain, _ = Subdomain.objects.get_or_create(
-			name=subdomain_name,
-			scan_history=self.scan,
-			target_domain=self.domain
-		)
+		subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
+		if not subdomain:
+			continue
 
 		severity_value = line['info'].get('severity', 'unknown')
 
@@ -4194,12 +4152,9 @@ def dalfox_xss_scan(self, urls=[], ctx={}, description=None):
 		http_url = sanitize_url(line.get('data'))
 		subdomain_name = get_subdomain_from_url(http_url)
 
-		# TODO: this should be get only
-		subdomain, _ = Subdomain.objects.get_or_create(
-			name=subdomain_name,
-			scan_history=self.scan,
-			target_domain=self.domain
-		)
+		subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
+		if not subdomain:
+			continue
 		endpoint, _ = save_endpoint(
 			http_url,
 			crawl=False,
@@ -4332,11 +4287,9 @@ def crlfuzz_scan(self, urls=[], ctx={}, description=None):
 		http_url = sanitize_url(url)
 		subdomain_name = get_subdomain_from_url(http_url)
 
-		subdomain, _ = Subdomain.objects.get_or_create(
-			name=subdomain_name,
-			scan_history=self.scan,
-			target_domain=self.domain
-		)
+		subdomain, _ = save_subdomain(subdomain_name, ctx=ctx)
+		if not subdomain:
+			continue
 
 		endpoint, _ = save_endpoint(
 			http_url,
@@ -6267,57 +6220,6 @@ def save_endpoint(
 			endpoint.save()
 
 	return endpoint, created
-
-
-def save_subdomain(subdomain_name, ctx={}):
-	"""Get or create Subdomain object.
-
-	Args:
-		subdomain_name (str): Subdomain name.
-		scan_history (startScan.models.ScanHistory): ScanHistory object.
-
-	Returns:
-		tuple: (startScan.models.Subdomain, created) where `created` is a
-			boolean indicating if the object has been created in DB.
-	"""
-	scan_id = ctx.get('scan_history_id')
-	subscan_id = ctx.get('subscan_id')
-	out_of_scope_subdomains = ctx.get('out_of_scope_subdomains', [])
-	subdomain_checker = SubdomainScopeChecker(out_of_scope_subdomains)
-	valid_domain = (
-		validators.domain(subdomain_name) or
-		validators.ipv4(subdomain_name) or
-		validators.ipv6(subdomain_name)
-	)
-	if not valid_domain:
-		logger.error(f'{subdomain_name} is not an invalid domain. Skipping.')
-		return None, False
-
-	if subdomain_checker.is_out_of_scope(subdomain_name):
-		logger.error(f'{subdomain_name} is out-of-scope. Skipping.')
-		return None, False
-
-	if ctx.get('domain_id'):
-		domain = Domain.objects.get(id=ctx.get('domain_id'))
-		if domain.name not in subdomain_name:
-			logger.error(f"{subdomain_name} is not a subdomain of domain {domain.name}. Skipping.")
-			return None, False
-
-	scan = ScanHistory.objects.filter(pk=scan_id).first()
-	domain = scan.domain if scan else None
-	subdomain, created = Subdomain.objects.get_or_create(
-		scan_history=scan,
-		target_domain=domain,
-		name=subdomain_name)
-	if created:
-		# logger.warning(f'Found new subdomain {subdomain_name}')
-		subdomain.discovered_date = timezone.now()
-		subdomain.save()
-		if subscan_id:
-			from startScan.models import SubScan
-			if SubScan.objects.filter(pk=subscan_id).exists():
-				subdomain.subdomain_subscan_ids.add(subscan_id)
-	return subdomain, created
 
 
 # save_email and save_employee moved to task_utils.py

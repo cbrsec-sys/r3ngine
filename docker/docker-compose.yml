@@ -31,9 +31,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 2G
         reservations:
-          memory: 512M
+          memory: 1G
 
   redis:
     restart: always
@@ -180,9 +180,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 4G
         reservations:
-          memory: 1G
+          memory: 2G
 
   tor:
     build:
@@ -279,9 +279,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 4G
+          memory: 6G
         reservations:
-          memory: 2G
+          memory: 3G
 
   temporal-go-executor:
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
@@ -323,9 +323,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 8G
+          memory: 10G
         reservations:
-          memory: 3G
+          memory: 5G
     #memswap_limit: 9G
 
 networks:
