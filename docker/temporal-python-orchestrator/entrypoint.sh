@@ -5,14 +5,7 @@
 # Ensure OpenSSL compatibility
 pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
 
-# Removed migrations and collectstatic per user request
-# Load default fixtures
-for f in fixtures/scan_engines/*.yaml; do
-  python3 manage.py loaddata "$f" --app scanEngine.EngineType
-done
-for f in fixtures/hardware_profiles/*.yaml; do
-  python3 manage.py loaddata "$f" --app scanEngine.HardwareProfile
-done
+
 python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.InterestingLookupModel
 python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
 

@@ -527,6 +527,8 @@ SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
 # Login required middleware configurations
 LOGIN_REQUIRED_IGNORE_PATHS = [
+    r'^/logout/',
+    r'^/login/',
     r'^/api/auth/token/',
     r'^/api/auth/token/refresh/',
     r'^/mapi/auth/token/',
