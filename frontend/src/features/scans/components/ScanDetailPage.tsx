@@ -400,36 +400,36 @@ const getFrontendEngineColor = (activityTitle: string) => {
 };
 
 const StatusBadge: React.FC<{ status: number, compact?: boolean, isSpiderFootRunning?: boolean }> = ({ status, compact = false, isSpiderFootRunning = false }) => {
-    if (isSpiderFootRunning) {
-      return (
-        <MuiTooltip title="SpiderFoot OSINT Scan is running in the background">
-          <Box sx={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 1,
-            px: compact ? 2 : 3,
-            py: compact ? 0.4 : 1,
-            borderRadius: '20px',
-            border: `1px solid #ff00ff40`,
-            color: '#ff00ff',
-            fontSize: '0.9rem',
-            fontWeight: 900,
-            fontFamily: 'Orbitron',
-            animation: 'pulse-spider 2s infinite ease-in-out',
-            textShadow: `0 0 10px #ff00ff40`,
-            boxShadow: `inset 0 0 10px #ff00ff10`,
-            '@keyframes pulse-spider': {
-              '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
-              '50%': { transform: 'scale(1.05)', filter: 'drop-shadow(0 0 8px #ff00ff)' },
-              '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
-            }
-          }}>
-            <Bug size={compact ? 12 : 18} />
-            {compact ? 'SF ACTIVE' : 'SPIDERFOOT ACTIVE'}
-          </Box>
-        </MuiTooltip>
-      );
-    }
+  if (isSpiderFootRunning) {
+    return (
+      <MuiTooltip title="SpiderFoot OSINT Scan is running in the background">
+        <Box sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 1,
+          px: compact ? 2 : 3,
+          py: compact ? 0.4 : 1,
+          borderRadius: '20px',
+          border: `1px solid #ff00ff40`,
+          color: '#ff00ff',
+          fontSize: '0.9rem',
+          fontWeight: 900,
+          fontFamily: 'Orbitron',
+          animation: 'pulse-spider 2s infinite ease-in-out',
+          textShadow: `0 0 10px #ff00ff40`,
+          boxShadow: `inset 0 0 10px #ff00ff10`,
+          '@keyframes pulse-spider': {
+            '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+            '50%': { transform: 'scale(1.05)', filter: 'drop-shadow(0 0 8px #ff00ff)' },
+            '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+          }
+        }}>
+          <Bug size={compact ? 12 : 18} />
+          {compact ? 'SF ACTIVE' : 'SPIDERFOOT ACTIVE'}
+        </Box>
+      </MuiTooltip>
+    );
+  }
   const configs: any = {
     [-1]: { label: 'PENDING', color: '#ff9f00', icon: Clock },
     [0]: { label: 'FAILED', color: '#ff003c', icon: AlertTriangle },
@@ -566,7 +566,7 @@ const TaskOverlay: React.FC<{
                   const toolColor = getToolColor(binaryName);
                   const parts = cmdStr.trim().split(/\s+/);
                   const displayArgs = parts.length > 0 ? cmdStr.replace(parts[0], '').trim() : '';
-                  
+
                   return (
                     <ListItem
                       key={log.id}
@@ -684,7 +684,7 @@ const TaskOverlay: React.FC<{
                       STATUS: {selectedLog.return_code === 0 ? 'SUCCESS' : selectedLog.return_code === null ? 'RUNNING' : `EXIT CODE: ${selectedLog.return_code}`}
                     </Box>
                   </Stack>
-                  
+
                   {/* The Executed Command */}
                   <Box sx={{
                     p: 1.5,
@@ -908,7 +908,7 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
   const colors = ['#ff003c', '#ff5722', '#ff9800', '#ffeb3b', '#2196f3', '#9e9e9e', '#00ff62'];
 
   return (
-    <TacticalPanel title="Vulnerability Breakdown" icon={<Bug size={14} />} sx={{ height: '100%', '& .MuiCardContent-root': { pb: '10px !important' } }}>
+    <TacticalPanel title="Vulnerability Breakdown" icon={<Bug size={14} color='#ef4a04ff' />} sx={{ height: '100%', '& .MuiCardContent-root': { pb: '10px !important' } }}>
       <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, textAlign: 'center', width: '100%', px: 1 }}>
           {labels.map((l, i) => (
@@ -959,7 +959,7 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
 };
 
 const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: any) => void }> = ({ highlights, onVulnClick }) => (
-  <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+  <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} color="#ef4a04ff" />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
     <TableContainer sx={{ flex: 1, overflow: 'auto', maxHeight: 380 }}>
       <Table size="small" stickyHeader>
         <TableHead>
@@ -1408,9 +1408,9 @@ export const ScanDetailPage = () => {
         <Box sx={{ p: 2 }}>
           <Stack spacing={4}>
             <Box sx={{ textAlign: 'center', position: 'relative' }}>
-              <StatusBadge 
-                status={data.scan_info.scan_status} 
-                isSpiderFootRunning={data.scan_info.is_spiderfoot_running} 
+              <StatusBadge
+                status={data.scan_info.scan_status}
+                isSpiderFootRunning={data.scan_info.is_spiderfoot_running}
               />
             </Box>
 
@@ -1496,59 +1496,59 @@ export const ScanDetailPage = () => {
           ) : (
             <Stack>
               {groupedTimeline.map(([tier, activities]) => (
-                  <Box key={tier}>
-                    <Typography sx={{
-                      display: 'block',
-                      fontSize: '0.55rem',
-                      fontWeight: 800,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      color: 'rgba(255,255,255,0.25)',
-                      mt: 1.5,
-                      mb: 0.5,
-                      px: 1,
-                    }}>
-                      Tier {tier} — {TIER_LABELS[tier] ?? 'Unknown'}
-                    </Typography>
-                    <Box sx={{ position: 'relative' }}>
-                      {activities.map((activity) => (
-                        <TimelineItem
-                          key={activity.task_uid ?? activity.id}
-                          activity={activity}
-                          onClick={() => handleTimelineItemClick(activity)}
-                        />
-                      ))}
-                    </Box>
+                <Box key={tier}>
+                  <Typography sx={{
+                    display: 'block',
+                    fontSize: '0.55rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(255,255,255,0.25)',
+                    mt: 1.5,
+                    mb: 0.5,
+                    px: 1,
+                  }}>
+                    Tier {tier} — {TIER_LABELS[tier] ?? 'Unknown'}
+                  </Typography>
+                  <Box sx={{ position: 'relative' }}>
+                    {activities.map((activity) => (
+                      <TimelineItem
+                        key={activity.task_uid ?? activity.id}
+                        activity={activity}
+                        onClick={() => handleTimelineItemClick(activity)}
+                      />
+                    ))}
                   </Box>
-                ))}
-                {[2, 3, 4].includes(data.scan_info.scan_status) && (
-                  <TimelineItem
-                    activity={{
-                      id: 'raw-scan-history',
-                      task_uid: null,
-                      title: 'Raw Scan History',
-                      name: 'raw_scan_history',
-                      status: 'SUCCESS',
-                      time: new Date().toISOString(),
-                      time_started: null,
-                      time_ended: null,
-                      tier: null,
-                      has_commands: true
-                    }}
-                    onClick={() => handleTimelineItemClick({
-                      id: 'raw-scan-history',
-                      task_uid: null,
-                      title: 'Raw Scan History',
-                      name: 'raw_scan_history',
-                      status: 'SUCCESS',
-                      time: new Date().toISOString(),
-                      time_started: null,
-                      time_ended: null,
-                      tier: null,
-                      has_commands: true
-                    })}
-                  />
-                )}
+                </Box>
+              ))}
+              {[2, 3, 4].includes(data.scan_info.scan_status) && (
+                <TimelineItem
+                  activity={{
+                    id: 'raw-scan-history',
+                    task_uid: null,
+                    title: 'Raw Scan History',
+                    name: 'raw_scan_history',
+                    status: 'SUCCESS',
+                    time: new Date().toISOString(),
+                    time_started: null,
+                    time_ended: null,
+                    tier: null,
+                    has_commands: true
+                  }}
+                  onClick={() => handleTimelineItemClick({
+                    id: 'raw-scan-history',
+                    task_uid: null,
+                    title: 'Raw Scan History',
+                    name: 'raw_scan_history',
+                    status: 'SUCCESS',
+                    time: new Date().toISOString(),
+                    time_started: null,
+                    time_ended: null,
+                    tier: null,
+                    has_commands: true
+                  })}
+                />
+              )}
             </Stack>
           )}
         </Box>
