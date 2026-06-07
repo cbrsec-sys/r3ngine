@@ -4711,10 +4711,10 @@ def generate_inapp_notification(scan, subscan, status, engine, fields):
 		notif_status = 'warning'
 		duration_msg = f'Partially completed in {fields.get("Duration")}'
 
-	description += f"<br>Engine: {engine.engine_name if engine else 'N/A'}"
+	description += f"\n• Engine: {engine.engine_name if engine else 'N/A'}"
 	slug = scan.domain.project.slug if scan else subscan.scan_history.domain.project.slug
 	if duration_msg:
-		description += f"<br>{duration_msg}"
+		description += f"\n• {duration_msg}"
 
 	if status != 'RUNNING':
 		redirect_link = f"/scan/{slug}/detail/{scan.id}" if scan else None
