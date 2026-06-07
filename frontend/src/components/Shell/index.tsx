@@ -54,7 +54,10 @@ import {
   List as ListIcon,
   Bug,
   Menu as MenuIcon,
-  X
+  X,
+  Heart,
+  Scan,
+  ScanEyeIcon
 } from 'lucide-react';
 import { useTheme } from '@mui/material/styles';
 import { Link, useRouterState, useParams } from '@tanstack/react-router';
@@ -98,6 +101,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   const [toolboxAnchorEl, setToolboxAnchorEl] = useState<null | HTMLElement>(null);
   const [openTool, setOpenTool] = useState<string | null>(null);
   const [notificationAnchorEl, setNotificationAnchorEl] = useState<null | HTMLElement>(null);
+  const [scanHistoryAnchorEl, setScanHistoryAnchorEl] = useState<null | HTMLElement>(null);
   const [scanHistoryOpen, setScanHistoryOpen] = useState(false);
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [updateAvailable, setUpdateAvailable] = useState(false);
@@ -148,10 +152,10 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     { title: 'Todo', icon: <CheckSquare size={20} />, path: `/${projectSlug}/todo`, color: theme.palette.primary.main },
     { title: 'Organization', icon: <Briefcase size={20} />, path: `/${projectSlug}/org`, color: theme.palette.primary.main },
     { title: 'Scan Engine', icon: <Cpu size={20} />, path: `/${projectSlug}/engines`, color: theme.palette.primary.main },
-    { 
-      title: 'Plugins', 
-      icon: <LayoutGrid size={20} />, 
-      path: `/${projectSlug}/plugins`, 
+    {
+      title: 'Plugins',
+      icon: <LayoutGrid size={20} />,
+      path: `/${projectSlug}/plugins`,
       color: theme.palette.primary.main,
       children: pluginMenuChildren.length > 0 ? [
         { title: 'Manage Plugins', path: `/${projectSlug}/plugins` },
@@ -200,6 +204,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
 
   const handleNotificationOpen = (event: React.MouseEvent<HTMLElement>) => setNotificationAnchorEl(event.currentTarget);
   const handleNotificationClose = () => setNotificationAnchorEl(null);
+  const handleScanHistoryOpen = (event: React.MouseEvent<HTMLElement>) => setScanHistoryOpen(true);
+  const handleScanHistoryClose = () => setScanHistoryOpen(false);
 
   const routerState = useRouterState();
   const activePath = routerState.location.pathname;
@@ -563,6 +569,22 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                         <Bell size={18} />
                       </Badge>
                     </IconButton>
+                    <IconButton
+                      onClick={handleScanHistoryOpen}
+                      size="small"
+                      sx={{
+                        color: scanHistoryAnchorEl ? theme.palette.primary.main : alpha(theme.palette.text.secondary, 0.5),
+                        bgcolor: scanHistoryAnchorEl ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
+                        '&:hover': {
+                          color: theme.palette.primary.main,
+                          bgcolor: alpha(theme.palette.primary.main, 0.05),
+                        }
+                      }}
+                    >
+                      <Badge badgeContent={unreadData?.count} color="error" sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
+                        <ScanEyeIcon size={18} />
+                      </Badge>
+                    </IconButton>
                   </Box>
 
                   <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', ml: 1 }} onClick={handleMenuOpen}>
@@ -672,7 +694,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       left: 0,
                       right: 0,
                       height: '2px',
-                      background: isEnterprise 
+                      background: isEnterprise
                         ? `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`
                         : 'linear-gradient(90deg, #00f3ff, #ff00ff)',
                       zIndex: 1

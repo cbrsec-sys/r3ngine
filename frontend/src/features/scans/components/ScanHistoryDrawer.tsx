@@ -38,10 +38,10 @@ interface ScanHistoryDrawerProps {
 
 const getStatusColor = (status: number) => {
   switch (status) {
-    case 0: return '#00f3ff'; // Completed
-    case 1: return '#fffc00'; // Scanning
-    case 2: return '#00f3ff'; // Success
-    case 3: return '#ff003c'; // Aborted/Failed
+    case 0: return '#0091ffff'; // Completed
+    case 1: return '#b36105ff'; // Scanning
+    case 2: return '#386c05ff'; // Success
+    case 3: return '#800000ff'; // Aborted/Failed
     default: return 'rgba(255,255,255,0.5)';
   }
 };
@@ -313,7 +313,7 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
       <Box sx={{ flexGrow: 1, overflow: 'auto', p: 3 }}>
         {isLoading ? (
           <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, opacity: 0.5 }}>
-            <CircularProgress size={24} sx={{ color: '#00f3ff' }} />
+            <CircularProgress size={24} sx={{ color: '#057e85ff' }} />
             <Typography sx={{ fontFamily: 'Orbitron', fontSize: '0.6rem', letterSpacing: 2 }}>SYNCING DATA...</Typography>
           </Box>
         ) : activeTab === 0 ? (
