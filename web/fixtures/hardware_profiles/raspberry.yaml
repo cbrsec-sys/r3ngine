@@ -1,0 +1,13 @@
+- model: scanEngine.hardwareprofile
+  pk: 1
+  fields:
+    name: raspberry
+    description: Light node (e.g. Raspberry Pi), low CPU/RAM
+    threads: 2
+    rate_limit: 15
+    timeout: 15
+    delay: 0.5
+    retries: 3
+    profile_type: builtin
+    is_active: true
+    is_default: false

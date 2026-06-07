@@ -9,6 +9,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"strings"
 	"syscall"
 	"time"
 	"sync"
@@ -20,9 +21,10 @@ import (
 )
 
 type ToolExecutionInput struct {
-	Command   []string `json:"command"`
-	ScanID    int      `json:"scan_id"`
-	CommandID int      `json:"command_id"`
+	Command    []string `json:"command"`
+	ScanID     int      `json:"scan_id"`
+	CommandID  int      `json:"command_id"`
+	WorkingDir string   `json:"working_dir"`
 }
 
 type ToolExecutionResult struct {
@@ -56,6 +58,9 @@ func (a *Activities) SubprocessActivity(ctx context.Context, input ToolExecution
 	} else {
 		cmd = exec.CommandContext(ctx, input.Command[0], input.Command[1:]...)
 	}
+	if input.WorkingDir != "" {
+		cmd.Dir = input.WorkingDir
+	}
 	// Place the subprocess in its own process group so all children (nuclei, amass, etc.)
 	// receive SIGKILL when the Temporal context is cancelled, not just the bash shell.
 	// setCmdProcessGroup is defined in pgid_linux.go (Linux) / pgid_other.go (other OS).
@@ -67,6 +72,8 @@ func (a *Activities) SubprocessActivity(ctx context.Context, input ToolExecution
 	// MultiWriter to write to both the buffer, the Redis stream pipe, and os.Stdout/os.Stderr
 	cmd.Stdout = io.MultiWriter(&stdoutBuf, pw, os.Stdout)
 	cmd.Stderr = io.MultiWriter(&stderrBuf, pw, os.Stderr)
+
+	fmt.Printf("[GO-EXECUTOR] Running (scan_id=%d): %s\n", input.ScanID, strings.Join(input.Command, " "))
 
 	start := time.Now()
 	if err := cmd.Start(); err != nil {

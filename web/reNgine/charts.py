@@ -1,5 +1,8 @@
 import base64
 import colorsys
+import logging
+
+logger = logging.getLogger(__name__)
 
 import plotly.graph_objs as go
 from plotly.io import to_image
@@ -274,7 +277,7 @@ def generate_attack_surface_map(graph_data):
         img_base64 = base64.b64encode(img_bytes).decode('utf-8')
         return img_base64
     except Exception as e:
-        print(f"Error generating graph image: {e}")
+        logger.error("Error generating graph image: %s", e)
         return None
 
 

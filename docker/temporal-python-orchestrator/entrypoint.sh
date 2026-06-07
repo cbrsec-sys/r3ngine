@@ -5,11 +5,7 @@
 # Ensure OpenSSL compatibility
 pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
 
-# Removed migrations and collectstatic per user request
-# Load default fixtures
-for f in fixtures/scan_engines/*.yaml; do
-  python3 manage.py loaddata "$f" --app scanEngine.EngineType
-done
+
 python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.InterestingLookupModel
 python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
 
@@ -18,7 +14,7 @@ pip install requests==2.32.3 "urllib3>=1.26.0,<3.0.0" "charset-normalizer>=3.0.0
 pip install tenacity==8.2.2
 
 # Temporary fix for whatportis bug
-sed -i 's/purge()/truncate()/g' /usr/local/lib/python3.10/dist-packages/whatportis/cli.py
+sed -i 's/purge()/truncate()/g' "$(python3 -c "import whatportis.cli; print(whatportis.cli.__file__)")"
 
 # update whatportis
 yes | whatportis --update

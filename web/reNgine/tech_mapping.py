@@ -116,7 +116,7 @@ TECH_TO_NUCLEI_TAGS = {
     'lumen': ['lumen', 'laravel', 'php'],
     'phalcon': ['phalcon', 'php'],
     'spring': ['spring', 'java'],
-    'spring boot': ['spring-boot', 'spring', 'java'],
+    'spring boot': ['spring-boot', 'springboot', 'spring', 'java'],
     'spring mvc': ['spring', 'java'],
     'struts': ['struts', 'apache-struts', 'java'],
     'apache struts': ['struts', 'apache-struts', 'java'],
@@ -358,10 +358,10 @@ TECH_TO_NUCLEI_TAGS = {
     'f5': ['f5', 'bigip'],
     'f5 big-ip': ['f5', 'bigip'],
     'bigip': ['f5', 'bigip'],
-    'fortinet': ['fortinet', 'fortigate'],
-    'fortigate': ['fortinet', 'fortigate'],
-    'palo alto': ['paloalto', 'pan-os'],
-    'pan-os': ['paloalto', 'pan-os'],
+    'fortinet': ['fortinet', 'fortigate', 'fortios'],
+    'fortigate': ['fortinet', 'fortigate', 'fortios'],
+    'palo alto': ['paloalto', 'pan-os', 'panos'],
+    'pan-os': ['paloalto', 'pan-os', 'panos'],
     'citrix': ['citrix', 'netscaler'],
     'netscaler': ['citrix', 'netscaler'],
     'citrix netscaler': ['citrix', 'netscaler'],
@@ -495,6 +495,130 @@ TECH_TO_NUCLEI_TAGS = {
     'mimir': ['mimir', 'grafana'],
     'open webui': ['ollama'],
     'ollama': ['ollama'],
+
+    # --- Virtualization / Enterprise IT ---
+    'vmware': ['vmware', 'vcenter'],
+    'vmware esxi': ['vmware', 'vcenter'],
+    'vmware vsphere': ['vmware', 'vcenter'],
+    'vmware horizon': ['vmware', 'vcenter'],
+    'vcenter': ['vmware', 'vcenter'],
+    'vsphere': ['vmware', 'vcenter'],
+    'manageengine': ['manageengine', 'zoho'],
+    'zoho manageengine': ['manageengine', 'zoho'],
+
+    # --- Network Security Appliances (additional) ---
+    'sonicwall': ['sonicwall'],
+    'sonic wall': ['sonicwall'],
+    'sangfor': ['sangfor'],
+
+    # --- Chinese CMS / OA / ERP ---
+    'dedecms': ['dedecms', 'php'],
+    'dedecms cms': ['dedecms', 'php'],
+    'thinkphp': ['thinkphp', 'php'],
+    'thinkcmf': ['thinkcmf', 'php'],
+    'tongda': ['tongda'],
+    'tongda oa': ['tongda'],
+    'seeyon': ['seeyon'],
+    'seeyon oa': ['seeyon'],
+    'weaver': ['weaver', 'ecology'],
+    'e-cology': ['weaver', 'ecology'],
+    'ecology': ['weaver', 'ecology'],
+    'weaver oa': ['weaver', 'ecology'],
+    'yonyou': ['yonyou'],
+    'nc cloud': ['yonyou'],
+    'ufida': ['ufida', 'yonyou'],
+    '74cms': ['74cms', 'php'],
+    'eyoucms': ['eyoucms', 'php'],
+    'zzzcms': ['zzzcms', 'php'],
+    'chanjet': ['chanjet', 'yonyou'],
+    'wanhu': ['wanhu'],
+
+    # --- IoT / Cameras / Routers ---
+    'hikvision': ['hikvision', 'iot'],
+    'dahua': ['dahua', 'iot'],
+    'avtech': ['avtech', 'iot'],
+    'samsung': ['samsung'],
+    'ruijie': ['ruijie'],
+    'totolink': ['totolink', 'router'],
+    'tenda': ['tenda', 'router'],
+    'asus router': ['asus', 'router'],
+
+    # --- Java Middleware / Serialization ---
+    'jolokia': ['jolokia', 'java'],
+    'fastjson': ['fastjson', 'java'],
+    'apache ofbiz': ['ofbiz', 'apache', 'java'],
+    'ofbiz': ['ofbiz', 'apache', 'java'],
+    'xstream': ['xstream', 'java'],
+
+    # --- ML / Data Science / AI Platforms ---
+    'gradio': ['gradio', 'python'],
+    'mlflow': ['mlflow', 'python'],
+    'jupyter': ['jupyter', 'python'],
+    'jupyter notebook': ['jupyter', 'python'],
+    'jupyterlab': ['jupyter', 'python'],
+    'flowise': ['flowise'],
+    'langflow': ['langflow', 'python'],
+
+    # --- IT Service Management / Monitoring (additional) ---
+    'osticket': ['osticket'],
+    'glpi': ['glpi'],
+    'servicenow': ['servicenow'],
+    'papercut': ['papercut'],
+    'papercut ng': ['papercut'],
+    'papercut mf': ['papercut'],
+    'cacti': ['cacti'],
+    'solarwinds': ['solarwinds'],
+    'nagiosxi': ['nagiosxi', 'nagios'],
+    'rconfig': ['rconfig'],
+
+    # --- Collaboration / Wiki / Survey (additional) ---
+    'xwiki': ['xwiki'],
+    'squirrelmail': ['squirrelmail'],
+    'limesurvey': ['limesurvey'],
+    'chamilo': ['chamilo'],
+    'mantisbt': ['mantisbt'],
+    'mantis bug tracker': ['mantisbt'],
+
+    # --- Telephony / Unified Comms ---
+    'freepbx': ['freepbx'],
+    '3cx': ['3cx'],
+    '3cx phone system': ['3cx'],
+    'avaya': ['avaya'],
+    'mitel': ['mitel'],
+    'icewarp': ['icewarp'],
+
+    # --- Low-code / API / Modern SaaS ---
+    'nacos': ['nacos', 'alibaba'],
+    'alibaba nacos': ['nacos', 'alibaba'],
+    'apisix': ['apisix', 'apache'],
+    'apache apisix': ['apisix', 'apache'],
+    'telerik': ['telerik', 'dotnet'],
+    'telerik ui': ['telerik', 'dotnet'],
+    'n8n': ['n8n'],
+    'nocobase': ['nocobase'],
+    'nocodb': ['nocodb'],
+    'casdoor': ['casdoor'],
+    'goanywhere': ['goanywhere'],
+    'fortra goanywhere': ['goanywhere'],
+    'microweber': ['microweber'],
+    'bitrix': ['bitrix'],
+    '1c-bitrix': ['bitrix'],
+    'bitrix24': ['bitrix'],
+
+    # --- MDM / Device Management ---
+    'mobileiron': ['mobileiron', 'ivanti'],
+    'connectwise': ['connectwise'],
+    'connectwise control': ['connectwise'],
+
+    # --- GIS / Geospatial ---
+    'geoserver': ['geoserver'],
+
+    # --- Healthcare ---
+    'openemr': ['openemr'],
+
+    # --- File Transfer / Messaging ---
+    'crushftp': ['crushftp'],
+    'openfire': ['openfire'],
 }
 
 # Version string pattern — strips version suffixes starting with /, :, space or hyphen when followed by a digit or v+digit

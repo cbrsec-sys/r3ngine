@@ -1,6 +1,7 @@
 import whatportis
 import socket
 import json
+import glob
 import os
 import pickle
 import subprocess
@@ -337,15 +338,18 @@ def get_http_urls(
 		else:
 			query = query.filter(http_url__contains=url)
 
-	# Select distinct endpoints and order
-	endpoints = query.distinct('http_url').order_by('http_url').all()
-
-	# If is_alive is True, select only endpoints that are alive
+	# Filter alive endpoints in the database (matches EndPoint.is_alive hybrid_property).
 	if is_alive:
-		endpoints = [e for e in endpoints if e.is_alive]
+		query = query.filter(
+			http_status__gt=0,
+			http_status__lt=500,
+		).exclude(http_status=404)
 
-	# Grab only http_url from endpoint objects
-	endpoints = [e.http_url for e in endpoints if is_valid_url(e.http_url)]
+	# Distinct URLs only — values_list avoids loading full ORM rows for large scans.
+	endpoints = list(
+		query.order_by('http_url').values_list('http_url', flat=True).distinct()
+	)
+	endpoints = [u for u in endpoints if is_valid_url(u)]
 	if ignore_files: # ignore all files
 		extensions_path = f'{RENGINE_HOME}/fixtures/extensions.txt'
 		with open(extensions_path, 'r') as f:
@@ -360,6 +364,86 @@ def get_http_urls(
 			f.write('\n'.join(endpoints))
 
 	return endpoints
+
+def collect_all_scan_urls(ctx, results_dir, ignore_files=True):
+	"""Collect all discovered URLs for a scan from both DB and spidering result files.
+
+	Combines:
+	- All EndPoint records in DB for this scan (no alive-only filter)
+	- {results_dir}/fetch_url.txt  (consolidated spidering output from all tools)
+	- {results_dir}/urls_*.txt     (individual tool outputs as a safety net)
+
+	Returns a sorted, deduplicated list of validated HTTP/HTTPS URLs.
+
+	Args:
+		ctx (dict): Scan context with at least 'scan_history_id' and 'domain_id'.
+		results_dir (str): Path to the scan results directory.
+		ignore_files (bool): When True, strip URLs whose path ends with a known
+			static-file extension (uses fixtures/extensions.txt).
+
+	Returns:
+		list[str]: Sorted, deduplicated, validated URLs.
+	"""
+	all_urls = set()
+
+	# --- Source 1: DB endpoints (all, not filtered by alive status) ---
+	db_urls = get_http_urls(
+		is_alive=False,
+		ignore_files=ignore_files,
+		ctx=ctx,
+	)
+	all_urls.update(db_urls)
+	logger.info(
+		'collect_all_scan_urls: %d URLs from DB (scan_id=%s)',
+		len(db_urls),
+		ctx.get('scan_history_id'),
+	)
+
+	# --- Source 2: Spidering result files ---
+	file_urls_before = len(all_urls)
+	if results_dir and os.path.isdir(results_dir):
+		# fetch_url.txt is the primary consolidated file; urls_*.txt are per-tool outputs
+		candidates = [os.path.join(results_dir, 'fetch_url.txt')]
+		candidates += glob.glob(os.path.join(results_dir, 'urls_*.txt'))
+		for filepath in candidates:
+			if not os.path.isfile(filepath):
+				continue
+			try:
+				with open(filepath, 'r', errors='replace') as fh:
+					for raw_line in fh:
+						url = raw_line.strip()
+						if url and is_valid_url(url):
+							all_urls.add(url)
+			except OSError as exc:
+				logger.warning(
+					'collect_all_scan_urls: cannot read %s: %s', filepath, exc
+				)
+	logger.info(
+		'collect_all_scan_urls: %d additional URLs from result files',
+		len(all_urls) - file_urls_before,
+	)
+
+	# --- Extension filter for file-sourced URLs not yet filtered by get_http_urls ---
+	if ignore_files:
+		extensions_path = os.path.join(RENGINE_HOME, 'fixtures', 'extensions.txt')
+		if os.path.isfile(extensions_path):
+			with open(extensions_path, 'r') as fh:
+				extensions = tuple(
+					line.strip() for line in fh if line.strip()
+				)
+			all_urls = {
+				u for u in all_urls
+				if not urlparse(u).path.endswith(extensions)
+			}
+
+	result = sorted(all_urls)
+	logger.info(
+		'collect_all_scan_urls: %d total deduplicated URLs for scan_id=%s',
+		len(result),
+		ctx.get('scan_history_id'),
+	)
+	return result
+
 
 def get_interesting_endpoints(scan_history=None, target=None):
 	"""Get EndPoint objects matching InterestingLookupModel conditions.
@@ -488,6 +572,43 @@ def sanitize_url(http_url):
 		url = url._replace(netloc=url.netloc.replace(':443', ''))
 	return url.geturl().rstrip('/')
 
+def parse_fetched_url_line(raw_line, starting_point_path=''):
+	"""Normalize a single line from fetch_url tool output into a usable URL.
+
+	Handles gospider-style lines like ``https://host/path] - /extra`` and
+	``https://host - /path``. Invalid or filtered lines return None.
+	"""
+	url = (raw_line or '').strip()
+	if not url:
+		return None
+
+	urlpath = None
+	base_url = None
+	if '] ' in url:
+		split = tuple(url.split('] ', 1))
+		if len(split) != 2:
+			return None
+		base_url, urlpath = split
+		urlpath = urlpath.lstrip('- ')
+	elif ' - ' in url:
+		parts = url.split(' - ', 1)
+		if len(parts) == 2:
+			base_url, urlpath = parts
+
+	if base_url and urlpath:
+		if '://' not in base_url:
+			base_url = f'http://{base_url}'
+		parsed_base = urlparse(base_url)
+		path = urlpath if urlpath.startswith('/') else f'/{urlpath}'
+		url = f'{parsed_base.scheme}://{parsed_base.netloc}{path}'
+
+	if starting_point_path and starting_point_path not in url:
+		return None
+	if not is_valid_url(url):
+		return None
+	return url
+
+
 def url_param_signature(url):
 	"""Return a dedup key based on scheme, netloc, path, and sorted param names (ignoring values).
 
@@ -580,13 +701,14 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 	target_domain = vuln_data.get('target_domain')
 
 	if not subdomain and http_url and scan_history and target_domain:
+		from reNgine.utils.task import save_subdomain
 		subdomain_name = get_subdomain_from_url(http_url)
-		subdomain, _ = Subdomain.objects.get_or_create(
-			name=subdomain_name,
-			scan_history=scan_history,
-			target_domain=target_domain
-		)
-		vuln_data['subdomain'] = subdomain
+		subdomain, _ = save_subdomain(subdomain_name, ctx={
+			'scan_history_id': scan_history.id,
+			'domain_id': target_domain.id,
+		})
+		if subdomain:
+			vuln_data['subdomain'] = subdomain
 
 	# remove nulls
 	vuln_data = replace_nulls(vuln_data)
@@ -667,7 +789,11 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 		# Ignore empty/null CVE IDs
 		if not cve_id or not str(cve_id).strip():
 			continue
-		cve, created = CveId.objects.get_or_create(name=str(cve_id).strip())
+		normalized = str(cve_id).strip().upper()
+		# Accept bare YYYY-NNNNN values (missing the CVE- prefix)
+		if re.match(r'^\d{4}-\d+$', normalized):
+			normalized = 'CVE-' + normalized
+		cve, created = CveId.objects.get_or_create(name=normalized)
 		if cve:
 			vuln.cve_ids.add(cve)
 			vuln.save()
@@ -899,11 +1025,11 @@ def get_random_proxy():
 		if not proxy_name.startswith('http') and not proxy_name.startswith('socks'):
 			proxy_name = f"http://{proxy_name}"
 			
-		logger.info(f'Validating proxy: {proxy_name}')
+		logger.info("Validating proxy: %s", proxy_name)
 		if check_proxy_robust(proxy_name, timeout=5):
-			logger.warning('Using valid proxy: ' + proxy_name)
+			logger.warning("Using valid proxy: %s", proxy_name)
 			return proxy_name
-		logger.error(f'Proxy {proxy_name} validation failed.')
+		logger.warning("Proxy %s validation failed.", proxy_name)
 
 	logger.error('No valid proxies found in the list!')
 	return ''
@@ -1517,7 +1643,7 @@ def parse_llm_vulnerability_report(report):
 	return data
 
 
-def create_scan_object(host_id, engine_id, initiated_by_id=None):
+def create_scan_object(host_id, engine_id, initiated_by_id=None, hardware_profile_id=None):
 	'''
 	create task with pending status so that celery task will execute when
 	threads are free
@@ -1525,6 +1651,7 @@ def create_scan_object(host_id, engine_id, initiated_by_id=None):
 		host_id: int: id of Domain model
 		engine_id: int: id of EngineType model
 		initiated_by_id: int : id of User model (Optional)
+		hardware_profile_id: int: id of HardwareProfile model (Optional)
 	'''
 	# get current time
 	current_scan_time = timezone.now()
@@ -1539,6 +1666,12 @@ def create_scan_object(host_id, engine_id, initiated_by_id=None):
 	if initiated_by_id:
 		user = User.objects.get(pk=initiated_by_id)
 		scan.initiated_by = user
+	if hardware_profile_id:
+		try:
+			profile = HardwareProfile.objects.get(pk=hardware_profile_id)
+			scan.hardware_profile = profile
+		except HardwareProfile.DoesNotExist:
+			pass
 	scan.save()
 	# save last scan date for domain model
 	domain.start_scan_date = current_scan_time

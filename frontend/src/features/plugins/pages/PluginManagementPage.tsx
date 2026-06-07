@@ -190,6 +190,7 @@ const PluginManagementPage: React.FC = () => {
               marketplacePlugins={marketplaceData}
               onRefreshMarketplace={handleRefreshMarketplace}
               isRefreshingMarketplace={refreshMarketplaceMutation.isPending}
+              onInstallStarted={setInstallId}
             />
           ) : (
             <PipelineBuilder plugins={plugins || []} />

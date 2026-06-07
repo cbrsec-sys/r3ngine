@@ -30,9 +30,15 @@ python3 manage.py sync_roles
 
 # Load default fixtures (Scan Engines, Tools, Keywords)
 echo "Loading default fixtures..."
-python3 manage.py loaddata fixtures/default_scan_engines.yaml
 python3 manage.py loaddata fixtures/external_tools.yaml
 python3 manage.py loaddata fixtures/default_keywords.yaml
+# Load default fixtures
+for f in fixtures/scan_engines/*.yaml; do
+  python3 manage.py loaddata "$f" --app scanEngine.EngineType
+done
+for f in fixtures/hardware_profiles/*.yaml; do
+  python3 manage.py loaddata "$f" --app scanEngine.HardwareProfile
+done
 
 # Start the server
 echo "Starting reNgine server..."

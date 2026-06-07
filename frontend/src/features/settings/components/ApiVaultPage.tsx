@@ -51,7 +51,8 @@ export const ApiVaultPage: React.FC = () => {
     linkedin_username: '',
     linkedin_password: '',
     hunterio_key: '',
-    wpscan_key: ''
+    wpscan_key: '',
+    projectdiscovery_key: ''
   });
 
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
@@ -80,7 +81,8 @@ export const ApiVaultPage: React.FC = () => {
         linkedin_username: settings.linkedin_username || '',
         linkedin_password: settings.linkedin_password || '',
         hunterio_key: settings.hunterio_key || '',
-        wpscan_key: settings.wpscan_key || ''
+        wpscan_key: settings.wpscan_key || '',
+        projectdiscovery_key: settings.projectdiscovery_key || ''
       });
     }
   }, [settings]);
@@ -226,6 +228,14 @@ export const ApiVaultPage: React.FC = () => {
                   field="chaos_key"
                   placeholder="Enter Chaos Key"
                   icon={Zap}
+                  url="https://cloud.projectdiscovery.io"
+                />
+                <KeyField
+                  label="PROJECTDISCOVERY (PDCP)"
+                  description="Used by vulnx to search and retrieve enriched vulnerability details from PDCP."
+                  field="projectdiscovery_key"
+                  placeholder="Enter PDCP Key"
+                  icon={Shield}
                   url="https://cloud.projectdiscovery.io"
                 />
                 <KeyField

@@ -41,6 +41,12 @@ export interface OllamaPullStatus {
   log: string;
 }
 
+export interface TestLlmConnectionResult {
+  status: 'success' | 'error';
+  message: string;
+  response: string;
+}
+
 
 
 export interface ProxySettings {
@@ -94,6 +100,7 @@ export interface ApiVaultSettings {
   linkedin_password?: string;
   hunterio_key?: string;
   wpscan_key?: string;
+  projectdiscovery_key?: string;
 }
 
 export interface ReportSettings {
@@ -503,6 +510,7 @@ export const useUpdateApiVault = (slug: string) => {
       formData.append('linkedin_password', data.linkedin_password || '');
       formData.append('hunterio_key', data.hunterio_key || '');
       formData.append('wpscan_key', data.wpscan_key || '');
+      formData.append('key_projectdiscovery', data.projectdiscovery_key || '');
 
       const response = await axios.post(`/scanEngine/${slug}/api_vault`, formData, {
         headers: {
@@ -584,6 +592,26 @@ export const useOllamaPullStatus = (slug: string, model: string | null) => {
         return false;
       }
       return 2000;
+    },
+  });
+};
+
+export const useTestLlmConnection = (slug: string) => {
+  return useMutation<TestLlmConnectionResult, Error, { provider: string; api_key: string; model: string }>({
+    mutationFn: async (data) => {
+      const formData = new FormData();
+      formData.append('provider', data.provider);
+      formData.append('api_key', data.api_key);
+      formData.append('model', data.model);
+
+      const response = await axios.post(`/scanEngine/${slug}/test_llm_connection`, formData, {
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'Accept': 'application/json',
+        },
+        validateStatus: () => true,
+      });
+      return response.data as TestLlmConnectionResult;
     },
   });
 };

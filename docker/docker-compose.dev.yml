@@ -1,3 +1,4 @@
+name: r3ngine
 services:
   db:
     restart: always
@@ -53,6 +54,7 @@ services:
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     environment:
       - DEBUG=1
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
       - REDIS_URL=redis://redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}
       - POSTGRES_DB=${POSTGRES_DB}

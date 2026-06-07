@@ -53,8 +53,11 @@ def bulk_import_targets(
 	from targetApp.views import manage_monitoring_task
 
 	monitor_engine = None
-	if monitor_engine_id:
-		monitor_engine = EngineType.objects.filter(id=monitor_engine_id).first()
+	if monitor_engine_id and str(monitor_engine_id).lower() not in ['null', 'undefined', 'none', '']:
+		try:
+			monitor_engine = EngineType.objects.filter(id=int(monitor_engine_id)).first()
+		except (ValueError, TypeError):
+			logger.warning(f"Invalid monitor_engine_id: {monitor_engine_id}")
 
 	for target in targets:
 		name = target.get('name', '').strip()

@@ -126,11 +126,12 @@ from reNgine.temporal_activities import (
     run_vigolium_analysis_activity,
     mark_vulnerability_scan_complete_activity,
     run_waf_bypass_activity,
-    run_brute_force_scan_activity,
+
     parse_assessment_results_activity,
 
     # Tier 7: Post-Processing & Intel
     correlate_vulnerabilities_activity,
+    enrich_scan_cves_activity,
     calculate_risk_scores_activity,
     generate_impact_assessment_activity,
     sync_graph_activity,
@@ -156,23 +157,40 @@ from reNgine.temporal_activities import (
 )
 
 
+# (task_name, first_fire_delay_seconds, always_run_per_restart)
+# sync_cve_data fires after 5 minutes to allow sync_all_scans_to_graph to complete first.
+# always_run_per_restart=True: workflow ID uses a timestamp so Temporal never skips it on
+# multiple restarts within the same calendar day (date-based deduplication is intentional
+# for the other tasks but must NOT apply to recover_stuck_scans).
 _STARTUP_SYNC_TASKS = [
-    "sync_all_scans_to_graph",
-    "sync_cisa_kev_catalog",
-    "sync_semgrep_rules",
-    "recover_stuck_scans",
+    ("sync_all_scans_to_graph", 30, False),
+    ("sync_cisa_kev_catalog", 30, False),
+    ("sync_semgrep_rules", 30, False),
+    ("recover_stuck_scans", 30, True),
+    ("sync_cve_data", 300, False),
 ]
 
 
-async def _register_startup_schedule(client: Client, task_name: str, today: str) -> None:
+async def _register_startup_schedule(
+    client: Client, task_name: str, today: str, interval_seconds: int = 30, always_run: bool = False
+) -> None:
     """Create (or recreate) a one-shot Temporal Schedule for a startup sync task.
 
     The schedule is deleted first so each orchestrator restart gets a fresh one-shot
-    trigger. The workflow ID embeds today's date so successful runs are not repeated
-    within the same calendar day (workflow ID embeds today's date).
+    trigger. By default the workflow ID embeds today's date so successful runs are not
+    repeated within the same calendar day.
+
+    always_run=True: uses a per-restart timestamp so Temporal never deduplicates the
+    workflow away when the container restarts multiple times on the same calendar day.
+    Use this for tasks that MUST execute on every restart (e.g. recover_stuck_scans).
+
+    interval_seconds controls how soon after registration the task fires (approximately).
     """
     schedule_id = f"startup-sync-{task_name.replace('_', '-')}"
-    workflow_id = f"{schedule_id}-{today}"
+    # always_run tasks get a unique timestamp so Temporal never skips a second restart
+    # on the same day. Other tasks keep the date suffix for once-per-day deduplication.
+    run_key = datetime.datetime.utcnow().strftime("%Y%m%d-%H%M%S") if always_run else today
+    workflow_id = f"{schedule_id}-{run_key}"
 
     # Remove stale schedule from the previous run (idempotent — ignore if absent)
     try:
@@ -191,7 +209,7 @@ async def _register_startup_schedule(client: Client, task_name: str, today: str)
                 task_queue="python-orchestrator-queue",
             ),
             spec=ScheduleSpec(
-                intervals=[ScheduleIntervalSpec(every=datetime.timedelta(seconds=30))],
+                intervals=[ScheduleIntervalSpec(every=datetime.timedelta(seconds=interval_seconds))],
             ),
             policy=SchedulePolicy(overlap=ScheduleOverlapPolicy.SKIP),
             state=ScheduleState(
@@ -201,7 +219,7 @@ async def _register_startup_schedule(client: Client, task_name: str, today: str)
             ),
         ),
     )
-    logger.info(f"[Startup] Registered one-shot schedule '{schedule_id}' → workflow '{workflow_id}'")
+    logger.info(f"[Startup] Registered one-shot schedule '{schedule_id}' → workflow '{workflow_id}' (fires in ~{interval_seconds}s)")
 
 
 class Command(BaseCommand):
@@ -286,9 +304,9 @@ class Command(BaseCommand):
             # Register one-shot startup sync schedules (Phase 4B)
             # -------------------------------------------------------------------
             today = datetime.date.today().isoformat()
-            for task_name in _STARTUP_SYNC_TASKS:
+            for task_name, interval_secs, always_run in _STARTUP_SYNC_TASKS:
                 try:
-                    await _register_startup_schedule(client, task_name, today)
+                    await _register_startup_schedule(client, task_name, today, interval_secs, always_run)
                 except Exception as sched_err:
                     # Non-fatal: log and continue — don't block worker startup
                     logger.error(f"[Startup] Failed to register schedule for '{task_name}': {sched_err}")
@@ -354,11 +372,12 @@ class Command(BaseCommand):
                 run_vigolium_analysis_activity,
                 mark_vulnerability_scan_complete_activity,
                 run_waf_bypass_activity,
-                run_brute_force_scan_activity,
+
                 parse_assessment_results_activity,
 
                 # Tier 7
                 correlate_vulnerabilities_activity,
+                enrich_scan_cves_activity,
                 calculate_risk_scores_activity,
                 generate_impact_assessment_activity,
                 sync_graph_activity,
@@ -475,8 +494,28 @@ class Command(BaseCommand):
 
         start_redis_listener()
 
+        def _make_exception_handler(stdout):
+            """Return an asyncio loop exception handler that suppresses expected
+            Temporal SDK cleanup noise ('Task exception was never retrieved' /
+            'Task was destroyed but it is pending!' for RPCError: operation was
+            canceled). These fire on every worker shutdown as the gRPC channel
+            tears down while SDK polling tasks are still pending — they are not
+            actionable and obscure real errors in the logs."""
+            def handler(loop, context):
+                exc = context.get('exception')
+                msg = context.get('message', '')
+                if isinstance(exc, Exception) and 'operation was canceled' in str(exc):
+                    return
+                if 'operation was canceled' in msg:
+                    return
+                loop.default_exception_handler(context)
+            return handler
+
         try:
-            asyncio.run(main())
+            loop = asyncio.new_event_loop()
+            loop.set_exception_handler(_make_exception_handler(self.stdout))
+            asyncio.set_event_loop(loop)
+            loop.run_until_complete(main())
         except KeyboardInterrupt:
             self.stdout.write(self.style.WARNING("\nWorker stopped by user request."))
             sys.exit(0)

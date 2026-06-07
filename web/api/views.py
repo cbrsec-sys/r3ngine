@@ -15,6 +15,8 @@ from packaging import version
 from django.template.defaultfilters import slugify
 from datetime import datetime
 from rest_framework import viewsets, status
+from rest_framework.pagination import PageNumberPagination
+from rest_framework_datatables.pagination import DatatablesPageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -748,6 +750,7 @@ class ListTargetsDatatableViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]
 	queryset = Domain.objects.all().order_by('-id')
 	serializer_class = DomainSerializer
+	pagination_class = DatatablesPageNumberPagination
 
 	def get_queryset(self):
 		queryset = Domain.objects.all()
@@ -1105,7 +1108,7 @@ class FetchMostCommonVulnerability(APIView):
 				response['status'] = True
 				response['result'] = most_common_vulnerabilities
 		except Exception as e:
-			print(str(e))
+			logger.exception("Unexpected error: %s", e)
 			response = {}
 
 		return Response(response)
@@ -1216,24 +1219,115 @@ class FetchMostVulnerable(APIView):
 
 
 class CVEDetails(APIView):
+	"""
+	API view for retrieving detailed CVE information.
+	Supports checking the local database first and falling back to live NVD/EPSS enrichment.
+	Also fetches additional threat intelligence context from cve.circl.lu.
+	"""
 	permission_classes = [IsPenetrationTester]
+	
 	def get(self, request):
-		req = self.request
+		"""
+		Retrieve CVE details, performing live enrichment if the CVE is not in the database.
 
+		Args:
+			request: DRF request object containing query parameters.
+				- query_params.cve_id (str): The CVE identifier, e.g., 'CVE-2024-1234'
+
+		Returns:
+			Response: A DRF Response object with either the CVE details or an error message.
+		"""
+		req = self.request
 		cve_id = req.query_params.get('cve_id')
 
 		if not cve_id:
-			return Response({'status': False, 'message': 'CVE ID not provided'})
+			return Response({
+				'status': False, 
+				'message': 'CVE ID not provided'
+			})
 
-		response = requests.get('https://cve.circl.lu/api/cve/' + cve_id)
+		from reNgine.cve_enrichment import CVEEnrichmentService
+		from startScan.models import CveId
+		
+		formatted_cve_id = cve_id.upper().strip()
+		
+		# 1. Check if the CVE exists in the local database
+		try:
+			cve_obj = CveId.objects.get(name__iexact=formatted_cve_id)
+			logger.info(f"Found {formatted_cve_id} in local database")
+		except CveId.DoesNotExist:
+			# 2. Attempt live enrichment from NVD and EPSS APIs
+			logger.info(f"CVE {formatted_cve_id} not in database, attempting enrichment...")
+			try:
+				service = CVEEnrichmentService()
+				cve_obj = service.enrich_cve(formatted_cve_id)
+				
+				if not cve_obj:
+					return Response({
+						'status': False, 
+						'message': f'CVE {formatted_cve_id} not found in official sources'
+					})
+				
+				logger.info(f"Successfully enriched {formatted_cve_id}")
+			except Exception as e:
+				logger.error(f"Enrichment failed for {formatted_cve_id}: {e}")
+				return Response({
+					'status': False, 
+					'message': f'Failed to enrich CVE data: {str(e)}'
+				})
 
-		if response.status_code != 200:
-			return  Response({'status': False, 'message': 'Unknown Error Occured!'})
+		# 3. Fetch additional context and references from CIRCL.LU API
+		circl_data = {}
+		try:
+			response = requests.get(f'https://cve.circl.lu/api/cve/{formatted_cve_id}', timeout=10)
+			if response.status_code == 200:
+				circl_data = response.json() or {}
+		except Exception as e:
+			logger.warning(f"CIRCL.LU lookup failed for {formatted_cve_id}: {e}")
 
-		if not response.json():
-			return  Response({'status': False, 'message': 'CVE ID does not exists.'})
+		# 4. Compile the full enriched data dictionary
+		result = {
+			'id': formatted_cve_id,
+			'summary': circl_data.get('summary', 'No summary available'),
+			'assigner': circl_data.get('assigner', 'N/A'),
+			
+			# NVD Data
+			'cvss': circl_data.get('cvss') or cve_obj.cvss_v31_base_score,
+			'cvss_v31_base_score': cve_obj.cvss_v31_base_score,
+			'cvss_vector': circl_data.get('cvss-vector', 'N/A'),
+			
+			# CVSS Impact Breakdown
+			'attack_vector': cve_obj.attack_vector,
+			'attack_complexity': cve_obj.attack_complexity,
+			'privileges_required': cve_obj.privileges_required,
+			'user_interaction': cve_obj.user_interaction,
+			'confidentiality_impact': cve_obj.confidentiality_impact,
+			'integrity_impact': cve_obj.integrity_impact,
+			'availability_impact': cve_obj.availability_impact,
+			
+			# EPSS Data
+			'epss_score': cve_obj.epss_score,
+			'epss_percentile': cve_obj.epss_percentile,
+			
+			# Threat Data
+			'is_cisa_kev': cve_obj.is_cisa_kev,
+			'is_poc': getattr(cve_obj, 'is_poc', False),
+			'is_template': getattr(cve_obj, 'is_template', False),
+			'vulnerability_type': cve_obj.vulnerability_type,
+			
+			# Timeline
+			'published_date': cve_obj.published_date.isoformat() if cve_obj.published_date else None,
+			'last_modified_date': cve_obj.last_modified_date.isoformat() if cve_obj.last_modified_date else None,
+			
+			# References
+			'references': circl_data.get('references', []),
+		}
 
-		return Response({'status': True, 'result': response.json()})
+		return Response({
+			'status': True, 
+			'result': result
+		})
+
 
 
 class AddReconNote(APIView):
@@ -1805,7 +1899,8 @@ class InitiateScan(APIView):
 					scan_history_id = create_scan_object(
 						host_id=domain_id,
 						engine_id=engine_id,
-						initiated_by_id=request.user.id
+						initiated_by_id=request.user.id,
+						hardware_profile_id=data.get('hardware_profile_id')
 					)
 					scan = ScanHistory.objects.get(pk=scan_history_id)
 					if custom_dorks:
@@ -2102,6 +2197,7 @@ class ProxyFetchAPIView(APIView):
 			except Exception:
 				limit = 1000
 			job_id = create_job()
+			logger.info("[ProxyFetch] Starting proxy fetch workflow (limit=%d, job_id=%s)", limit, job_id)
 			from reNgine.temporal_client import TemporalClientProvider
 			import asyncio
 			async def _start():
@@ -2118,10 +2214,12 @@ class ProxyFetchAPIView(APIView):
 			except Exception as e:
 				from reNgine.job_tracker import update_job
 				update_job(job_id, "FAILED", 100, f"Failed to start workflow: {e}")
+				logger.error("[ProxyFetch] Failed to start proxy fetch workflow: %s", e)
 			finally:
 				loop.close()
 			return Response({'status': True, 'task_id': job_id})
 		except Exception as e:
+			logger.exception("[ProxyFetch] Unexpected error in ProxyFetchAPIView: %s", e)
 			return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -2441,7 +2539,7 @@ class Whois(APIView):
 		if not target:
 			return Response({'status': False, 'message': 'Target IP/Domain required!'})
 		if not (validators.domain(target) or validators.ipv4(target) or validators.ipv6(target)):
-			print(f'Ip address or domain "{target}" did not pass validator.')
+			logger.warning('Ip address or domain "%s" did not pass validator.', target)
 			return Response({'status': False, 'message': 'Invalid domain or IP'})
 		is_force_update = req.query_params.get('is_reload')
 		is_force_update = True if is_force_update and 'true' == is_force_update.lower() else False
@@ -2757,6 +2855,12 @@ class ListEngines(APIView):
 		engines = EngineType.objects.order_by('engine_name').all()
 		engine_serializer = EngineSerializer(engines, many=True)
 		return Response({'engines': engine_serializer.data})
+
+
+class HardwareProfileViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsAuditor]
+	queryset = HardwareProfile.objects.all().order_by('id')
+	serializer_class = HardwareProfileSerializer
 
 
 class ListOrganizations(APIView):
@@ -3641,13 +3745,13 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 					int_http_status = int(content)
 					qs = self.queryset.filter(http_status=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in title:
 				try:
 					int_http_status = int(content)
 					qs = self.queryset.filter(content_length=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		elif '>' in search_value:
 			search_param = search_value.split(">")
@@ -3658,13 +3762,13 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 					int_val = int(content)
 					qs = self.queryset.filter(http_status__gt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in title:
 				try:
 					int_val = int(content)
 					qs = self.queryset.filter(content_length__gt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		elif '<' in search_value:
 			search_param = search_value.split("<")
@@ -3675,13 +3779,13 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 					int_val = int(content)
 					qs = self.queryset.filter(http_status__lt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in title:
 				try:
 					int_val = int(content)
 					qs = self.queryset.filter(content_length__lt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		elif '!' in search_value:
 			search_param = search_value.split("!")
@@ -3726,13 +3830,13 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 					int_http_status = int(content)
 					qs = self.queryset.exclude(http_status=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in title:
 				try:
 					int_http_status = int(content)
 					qs = self.queryset.exclude(content_length=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		return qs
 
@@ -3952,13 +4056,13 @@ class EndPointViewSet(viewsets.ModelViewSet):
 					int_http_status = int(lookup_content)
 					qs = self.queryset.filter(http_status=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in lookup_title:
 				try:
 					int_http_status = int(lookup_content)
 					qs = self.queryset.filter(content_length=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'parameter' in lookup_title:
 				qs = (
 					self.queryset
@@ -3976,13 +4080,13 @@ class EndPointViewSet(viewsets.ModelViewSet):
 						.filter(http_status__gt=int_val)
 					)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in lookup_title:
 				try:
 					int_val = int(lookup_content)
 					qs = self.queryset.filter(content_length__gt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 		elif '<' in search_value:
 			search_param = search_value.split("<")
 			lookup_title = search_param[0].lower().strip()
@@ -3992,13 +4096,13 @@ class EndPointViewSet(viewsets.ModelViewSet):
 					int_val = int(lookup_content)
 					qs = self.queryset.filter(http_status__lt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in lookup_title:
 				try:
 					int_val = int(lookup_content)
 					qs = self.queryset.filter(content_length__lt=int_val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 		elif '!' in search_value:
 			search_param = search_value.split("!")
 			lookup_title = search_param[0].lower().strip()
@@ -4038,13 +4142,13 @@ class EndPointViewSet(viewsets.ModelViewSet):
 					int_http_status = int(lookup_content)
 					qs = self.queryset.exclude(http_status=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 			elif 'content_length' in lookup_title:
 				try:
 					int_http_status = int(lookup_content)
 					qs = self.queryset.exclude(content_length=int_http_status)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 		return qs
 
 
@@ -4152,7 +4256,14 @@ class DirectoryViewSet(viewsets.ModelViewSet):
 
 
 
+class VulnerabilityPagination(PageNumberPagination):
+	page_size = 10
+	page_size_query_param = 'length'
+	max_page_size = 200
+
+
 class VulnerabilityViewSet(viewsets.ModelViewSet):
+	pagination_class = VulnerabilityPagination
 	permission_classes = [IsPenetrationTester]
 	serializer_class = VulnerabilitySerializer
 	queryset = Vulnerability.objects.none()
@@ -4442,7 +4553,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 					val = float(lookup_content)
 					qs = self.queryset.filter(cvss_score__gt=val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		elif '<' in search_value:
 			search_param = search_value.split("<")
@@ -4453,7 +4564,7 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 					val = int(lookup_content)
 					qs = self.queryset.filter(cvss_score__lt=val)
 				except Exception as e:
-					print(e)
+					logger.exception("Unexpected error: %s", e)
 
 		return qs
 
@@ -4639,33 +4750,67 @@ class GetNodeDetails(APIView):
 		return Response(data)
 
 class GetSystemLogs(APIView):
-	"""Fetch the tail of the system logs. Restricted to SysAdmins."""
-	permission_classes = [IsSysAdmin]
-	def get(self, request):
-		# SECURITY: Path is hardcoded and validated to prevent directory traversal
-		log_file = os.path.normpath(os.path.join(settings.BASE_DIR, 'scan.log'))
+	"""Fetch the tail of system, database, temporal, or scan logs.
 
-		# Ensure we only read from the allowed directory
+	Restricted to SysAdmins. The request takes an optional 'type' parameter
+	to specify which log file to retrieve.
+	"""
+	permission_classes = [IsSysAdmin]
+
+	def get(self, request):
+		"""Fetch system logs based on log type query parameter.
+
+		Args:
+			request (HttpRequest): The incoming HTTP request.
+				Query parameter 'type' specifies the log log_type. Options:
+				- 'system': Retrieve errors.log (system errors)
+				- 'db': Retrieve db.log (database backend errors/queries)
+				- 'temporal': Retrieve temporal.log (temporal workflow events)
+				- 'scan': Retrieve scan.log (legacy scan runner events)
+
+		Returns:
+			Response: JSON response containing operation status and list of log lines.
+		"""
+		# Extract log type query parameter (default to 'system')
+		log_type = request.query_params.get('type', 'system')
+
+		# Hardcoded, safe mapping of log types to file names
+		log_map = {
+			'system': 'errors.log',
+			'db': 'db.log',
+			'temporal': 'temporal.log',
+			'scan': 'scan.log'
+		}
+
+		filename = log_map.get(log_type)
+		if not filename:
+			return Response({'status': False, 'message': 'Invalid log type'}, status=400)
+
+		# SECURITY: Prevent directory traversal by sanitizing and verifying the path
+		log_file = os.path.normpath(os.path.join(settings.BASE_DIR, filename))
+
+		# Strict assertion: Ensure the log file sits strictly within BASE_DIR
 		if not log_file.startswith(os.path.normpath(settings.BASE_DIR)):
 			return Response({'status': False, 'message': 'Forbidden log path'}, status=403)
 
+		# Return an empty list if the log file does not exist yet to avoid 404 spam in frontend
 		if not os.path.exists(log_file):
-			return Response({'status': False, 'message': 'Log file not found'}, status=404)
+			return Response({'status': True, 'logs': []})
 
 		try:
-			with open(log_file, 'r') as f:
-				# Efficiently read last ~50KB (~500 lines)
+			with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+				# Efficiently read the last ~50KB to fetch roughly the last 500 lines
 				f.seek(0, os.SEEK_END)
 				filesize = f.tell()
 				offset = min(filesize, 50000)
 				f.seek(filesize - offset)
-				# read() then splitlines() to handle partial first line
+				# Read remaining content and split into lines safely
 				data = f.read()
 				lines = data.splitlines()
-				# Return at most 500 lines
+				# Return at most 500 lines to keep responses lightweight
 				return Response({'status': True, 'logs': lines[-500:]})
 		except Exception as e:
-			logger.error(f"Error reading system logs: {str(e)}")
+			logger.error(f"Error reading system logs ({log_type}): {str(e)}")
 			return Response({'status': False, 'message': 'Internal error reading logs'}, status=500)
 
 

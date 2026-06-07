@@ -7,13 +7,18 @@ interface AppContextType {
   setProjectName: (n: string) => void;
 }
 
-declare const __APP_VERSION__: string;
-
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const VERSION_KEY = 'r3ngine_version';
+
 export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [version, setVersion] = useState(__APP_VERSION__ ?? '3.4.1');
+  const [version, setVersionState] = useState(() => localStorage.getItem(VERSION_KEY) ?? '');
   const [projectName, setProjectName] = useState('RENGINE');
+
+  const setVersion = (v: string) => {
+    localStorage.setItem(VERSION_KEY, v);
+    setVersionState(v);
+  };
 
   return (
     <AppContext.Provider value={{ version, projectName, setVersion, setProjectName }}>

@@ -400,36 +400,36 @@ const getFrontendEngineColor = (activityTitle: string) => {
 };
 
 const StatusBadge: React.FC<{ status: number, compact?: boolean, isSpiderFootRunning?: boolean }> = ({ status, compact = false, isSpiderFootRunning = false }) => {
-    if (isSpiderFootRunning) {
-      return (
-        <MuiTooltip title="SpiderFoot OSINT Scan is running in the background">
-          <Box sx={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 1,
-            px: compact ? 2 : 3,
-            py: compact ? 0.4 : 1,
-            borderRadius: '20px',
-            border: `1px solid #ff00ff40`,
-            color: '#ff00ff',
-            fontSize: '0.9rem',
-            fontWeight: 900,
-            fontFamily: 'Orbitron',
-            animation: 'pulse-spider 2s infinite ease-in-out',
-            textShadow: `0 0 10px #ff00ff40`,
-            boxShadow: `inset 0 0 10px #ff00ff10`,
-            '@keyframes pulse-spider': {
-              '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
-              '50%': { transform: 'scale(1.05)', filter: 'drop-shadow(0 0 8px #ff00ff)' },
-              '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
-            }
-          }}>
-            <Bug size={compact ? 12 : 18} />
-            {compact ? 'SF ACTIVE' : 'SPIDERFOOT ACTIVE'}
-          </Box>
-        </MuiTooltip>
-      );
-    }
+  if (isSpiderFootRunning) {
+    return (
+      <MuiTooltip title="SpiderFoot OSINT Scan is running in the background">
+        <Box sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 1,
+          px: compact ? 2 : 3,
+          py: compact ? 0.4 : 1,
+          borderRadius: '20px',
+          border: `1px solid #ff00ff40`,
+          color: '#ff00ff',
+          fontSize: '0.9rem',
+          fontWeight: 900,
+          fontFamily: 'Orbitron',
+          animation: 'pulse-spider 2s infinite ease-in-out',
+          textShadow: `0 0 10px #ff00ff40`,
+          boxShadow: `inset 0 0 10px #ff00ff10`,
+          '@keyframes pulse-spider': {
+            '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+            '50%': { transform: 'scale(1.05)', filter: 'drop-shadow(0 0 8px #ff00ff)' },
+            '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+          }
+        }}>
+          <Bug size={compact ? 12 : 18} />
+          {compact ? 'SF ACTIVE' : 'SPIDERFOOT ACTIVE'}
+        </Box>
+      </MuiTooltip>
+    );
+  }
   const configs: any = {
     [-1]: { label: 'PENDING', color: '#ff9f00', icon: Clock },
     [0]: { label: 'FAILED', color: '#ff003c', icon: AlertTriangle },
@@ -566,7 +566,7 @@ const TaskOverlay: React.FC<{
                   const toolColor = getToolColor(binaryName);
                   const parts = cmdStr.trim().split(/\s+/);
                   const displayArgs = parts.length > 0 ? cmdStr.replace(parts[0], '').trim() : '';
-                  
+
                   return (
                     <ListItem
                       key={log.id}
@@ -684,7 +684,7 @@ const TaskOverlay: React.FC<{
                       STATUS: {selectedLog.return_code === 0 ? 'SUCCESS' : selectedLog.return_code === null ? 'RUNNING' : `EXIT CODE: ${selectedLog.return_code}`}
                     </Box>
                   </Stack>
-                  
+
                   {/* The Executed Command */}
                   <Box sx={{
                     p: 1.5,
@@ -908,7 +908,7 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
   const colors = ['#ff003c', '#ff5722', '#ff9800', '#ffeb3b', '#2196f3', '#9e9e9e', '#00ff62'];
 
   return (
-    <TacticalPanel title="Vulnerability Breakdown" icon={<Bug size={14} />} sx={{ height: '100%', '& .MuiCardContent-root': { pb: '10px !important' } }}>
+    <TacticalPanel title="Vulnerability Breakdown" icon={<Bug size={14} color='#ef4a04ff' />} sx={{ height: '100%', '& .MuiCardContent-root': { pb: '10px !important' } }}>
       <Box sx={{ p: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3, textAlign: 'center', width: '100%', px: 1 }}>
           {labels.map((l, i) => (
@@ -959,7 +959,7 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
 };
 
 const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: any) => void }> = ({ highlights, onVulnClick }) => (
-  <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+  <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} color="#ef4a04ff" />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
     <TableContainer sx={{ flex: 1, overflow: 'auto', maxHeight: 380 }}>
       <Table size="small" stickyHeader>
         <TableHead>
@@ -1032,63 +1032,107 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: a
   </TacticalPanel>
 );
 
+interface SubdomainVulnCounts {
+  host: string;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  total: number;
+}
+
 const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?: any }> = ({ vulnerabilities = [], sx = {} }) => {
   const [ignoreInfo, setIgnoreInfo] = useState(false);
 
   const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) > 0) : vulnerabilities;
 
-  const subdomainCounts = filteredVulns.reduce(
-    (acc: Record<string, number>, v: Vulnerability) => {
+  const subdomainMap = filteredVulns.reduce(
+    (acc: Record<string, SubdomainVulnCounts>, v: Vulnerability) => {
       try {
         if (!v.http_url) return acc;
-
-        // Ensure protocol exists
-        const normalizedUrl = v.http_url.match(/^https?:\/\//)
-          ? v.http_url
-          : `http://${v.http_url}`;
-
+        const normalizedUrl = v.http_url.match(/^https?:\/\//) ? v.http_url : `http://${v.http_url}`;
         const host = new URL(normalizedUrl).hostname;
-
         if (!host) return acc;
-
-        acc[host] = (acc[host] || 0) + 1;
-      } catch (err) {
-        console.warn('Invalid URL:', v.http_url);
+        if (!acc[host]) acc[host] = { host, critical: 0, high: 0, medium: 0, low: 0, total: 0 };
+        const sev = Number(v.severity);
+        if (sev === 4) acc[host].critical += 1;
+        else if (sev === 3) acc[host].high += 1;
+        else if (sev === 2) acc[host].medium += 1;
+        else if (sev === 1) acc[host].low += 1;
+        acc[host].total += 1;
+      } catch {
+        // ignore invalid URLs
       }
-
       return acc;
     },
     {}
   );
 
-  const sorted = Object.entries(subdomainCounts).sort((a: [string, number], b: [string, number]) => b[1] - a[1]);
-  const mostVulnerable = sorted[0];
+  const rows = Object.values(subdomainMap).sort((a, b) => b.total - a.total);
+
+  const cellStyle = { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 0.75 };
 
   return (
     <TacticalPanel
-      title="MOST VULNERABLE SUBDOMAIN"
+      title="MOST VULNERABLE SUBDOMAINS"
       icon={<ShieldAlert size={14} color="#ff003c" />}
       sx={{ height: '100%', ...sx }}
       headerAction={
         <FormControlLabel
           control={<Checkbox size="small" checked={ignoreInfo} onChange={(e) => setIgnoreInfo(e.target.checked)} sx={{ color: 'rgba(255,255,255,0.4)', '&.Mui-checked': { color: '#00f3ff' } }} />}
-          label={<Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 800 }}>Ignore Info Vulnerabilities</Typography>}
+          label={<Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 800 }}>Ignore Info</Typography>}
         />
       }
     >
-      <Box sx={{ p: 2 }}>
-        {mostVulnerable ? (
-          <Box sx={{ bgcolor: 'rgba(255,0,60,0.05)', border: '1px solid rgba(255,0,60,0.1)', p: 2, borderRadius: 1 }}>
-            <Typography sx={{ fontSize: '1rem', fontWeight: 900, color: '#ff003c', mb: 1 }}>{mostVulnerable[0]}</Typography>
-            <Typography sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.5)' }}>Total Vulnerabilities: <Box component="span" sx={{ color: '#ff003c', fontWeight: 900 }}>{String(mostVulnerable[1])}</Box></Typography>
-          </Box>
-        ) : (
+      {rows.length > 0 ? (
+        <TableContainer sx={{ maxHeight: 320 }}>
+          <Table size="small" stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase', letterSpacing: 1 }}>Subdomain</TableCell>
+                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#ff003c', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Crit</TableCell>
+                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#ff9f00', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>High</TableCell>
+                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#fffc00', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Med</TableCell>
+                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#00ff62', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Low</TableCell>
+                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#00f3ff', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Total</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map((row) => (
+                <TableRow key={row.host} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
+                  <TableCell sx={cellStyle}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#c7c7c7' }}>{row.host}</Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={cellStyle}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.critical > 0 ? '#ff003c' : 'rgba(255,255,255,0.1)' }}>{row.critical}</Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={cellStyle}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.high > 0 ? '#ff9f00' : 'rgba(255,255,255,0.1)' }}>{row.high}</Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={cellStyle}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.medium > 0 ? '#fffc00' : 'rgba(255,255,255,0.1)' }}>{row.medium}</Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={cellStyle}>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.low > 0 ? '#00ff62' : 'rgba(255,255,255,0.1)' }}>{row.low}</Typography>
+                  </TableCell>
+                  <TableCell align="center" sx={cellStyle}>
+                    <Box sx={{ px: 1, py: 0.25, borderRadius: 0.5, bgcolor: 'rgba(0,243,255,0.1)', display: 'inline-block' }}>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#00f3ff' }}>{row.total}</Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : (
+        <Box sx={{ p: 2 }}>
           <Box sx={{ bgcolor: 'rgba(255,252,0,0.1)', border: '1px solid rgba(255,252,0,0.2)', p: 2, borderRadius: 1 }}>
             <Typography sx={{ fontSize: '0.75rem', color: '#fffc00', fontWeight: 700, mb: 1 }}>Could not find most vulnerable targets.</Typography>
             <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,252,0,0.6)' }}>Once the vulnerability scan is performed, reNgine will identify the most vulnerable targets.</Typography>
           </Box>
-        )}
-      </Box>
+        </Box>
+      )}
     </TacticalPanel>
   );
 };
@@ -1364,9 +1408,9 @@ export const ScanDetailPage = () => {
         <Box sx={{ p: 2 }}>
           <Stack spacing={4}>
             <Box sx={{ textAlign: 'center', position: 'relative' }}>
-              <StatusBadge 
-                status={data.scan_info.scan_status} 
-                isSpiderFootRunning={data.scan_info.is_spiderfoot_running} 
+              <StatusBadge
+                status={data.scan_info.scan_status}
+                isSpiderFootRunning={data.scan_info.is_spiderfoot_running}
               />
             </Box>
 
@@ -1452,59 +1496,59 @@ export const ScanDetailPage = () => {
           ) : (
             <Stack>
               {groupedTimeline.map(([tier, activities]) => (
-                  <Box key={tier}>
-                    <Typography sx={{
-                      display: 'block',
-                      fontSize: '0.55rem',
-                      fontWeight: 800,
-                      letterSpacing: '0.1em',
-                      textTransform: 'uppercase',
-                      color: 'rgba(255,255,255,0.25)',
-                      mt: 1.5,
-                      mb: 0.5,
-                      px: 1,
-                    }}>
-                      Tier {tier} — {TIER_LABELS[tier] ?? 'Unknown'}
-                    </Typography>
-                    <Box sx={{ position: 'relative' }}>
-                      {activities.map((activity) => (
-                        <TimelineItem
-                          key={activity.task_uid ?? activity.id}
-                          activity={activity}
-                          onClick={() => handleTimelineItemClick(activity)}
-                        />
-                      ))}
-                    </Box>
+                <Box key={tier}>
+                  <Typography sx={{
+                    display: 'block',
+                    fontSize: '0.55rem',
+                    fontWeight: 800,
+                    letterSpacing: '0.1em',
+                    textTransform: 'uppercase',
+                    color: 'rgba(255,255,255,0.25)',
+                    mt: 1.5,
+                    mb: 0.5,
+                    px: 1,
+                  }}>
+                    Tier {tier} — {TIER_LABELS[tier] ?? 'Unknown'}
+                  </Typography>
+                  <Box sx={{ position: 'relative' }}>
+                    {activities.map((activity) => (
+                      <TimelineItem
+                        key={activity.task_uid ?? activity.id}
+                        activity={activity}
+                        onClick={() => handleTimelineItemClick(activity)}
+                      />
+                    ))}
                   </Box>
-                ))}
-                {[2, 3, 4].includes(data.scan_info.scan_status) && (
-                  <TimelineItem
-                    activity={{
-                      id: 'raw-scan-history',
-                      task_uid: null,
-                      title: 'Raw Scan History',
-                      name: 'raw_scan_history',
-                      status: 'SUCCESS',
-                      time: new Date().toISOString(),
-                      time_started: null,
-                      time_ended: null,
-                      tier: null,
-                      has_commands: true
-                    }}
-                    onClick={() => handleTimelineItemClick({
-                      id: 'raw-scan-history',
-                      task_uid: null,
-                      title: 'Raw Scan History',
-                      name: 'raw_scan_history',
-                      status: 'SUCCESS',
-                      time: new Date().toISOString(),
-                      time_started: null,
-                      time_ended: null,
-                      tier: null,
-                      has_commands: true
-                    })}
-                  />
-                )}
+                </Box>
+              ))}
+              {[2, 3, 4].includes(data.scan_info.scan_status) && (
+                <TimelineItem
+                  activity={{
+                    id: 'raw-scan-history',
+                    task_uid: null,
+                    title: 'Raw Scan History',
+                    name: 'raw_scan_history',
+                    status: 'SUCCESS',
+                    time: new Date().toISOString(),
+                    time_started: null,
+                    time_ended: null,
+                    tier: null,
+                    has_commands: true
+                  }}
+                  onClick={() => handleTimelineItemClick({
+                    id: 'raw-scan-history',
+                    task_uid: null,
+                    title: 'Raw Scan History',
+                    name: 'raw_scan_history',
+                    status: 'SUCCESS',
+                    time: new Date().toISOString(),
+                    time_started: null,
+                    time_ended: null,
+                    tier: null,
+                    has_commands: true
+                  })}
+                />
+              )}
             </Stack>
           )}
         </Box>
@@ -1758,10 +1802,10 @@ export const ScanDetailPage = () => {
 
       {/* Row 4: Vulnerability Deep Dive */}
       <Grid container spacing={2} sx={{ mb: 2, width: '100%', m: 0 }}>
-        <Grid size={{ xs: 12, md: 4 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <MostVulnerableSubdomain vulnerabilities={data.vulnerabilities} sx={{ height: '100%' }} />
         </Grid>
-        <Grid size={{ xs: 12, md: 8 }}>
+        <Grid size={{ xs: 12, md: 6 }}>
           <MostCommonVulnsWidget vulnerabilities={data.vulnerabilities} onVulnClick={handleVulnClick} sx={{ height: '100%' }} />
         </Grid>
       </Grid>
@@ -1910,12 +1954,12 @@ export const ScanDetailPage = () => {
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN DETAIL</Typography>
             <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
               IDENTIFIER: <Box component="span" sx={{
-                color: '#c0521a',
-                '@keyframes subtlePulse': {
-                  '0%, 100%': { opacity: 1 },
-                  '50%': { opacity: 0.55 }
-                },
-                animation: 'subtlePulse 3s ease-in-out infinite'
+                color: '#c0521a'
+                // '@keyframes subtlePulse': {
+                //   '0%, 100%': { opacity: 1 },
+                //   '50%': { opacity: 0.55 }
+                // },
+                // animation: 'subtlePulse 3s ease-in-out infinite'
               }}>{scanId}</Box>
               {' | '}
               TARGET: <Box component="span" sx={{

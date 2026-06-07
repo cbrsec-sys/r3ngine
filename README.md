@@ -3,8 +3,8 @@
 </p>
 
 <p align="center">
-  <h4 align="center"><strong>Phoenix: From the Ashes even Stronger</strong></h4> 
-  <h3 align="center">Official v3 Rebirth: The Ultimate Web Reconnaissance & Vulnerability Scanner 🚀</h3>
+  <h4 align="center"><strong>Phoenix: From the Ashes even Stronger</strong></h4>
+  <h3 align="center">r3ngine v3 — The Ultimate Web Reconnaissance & Vulnerability Scanner</h3>
 </p>
 
 <p align="center">
@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank">
-    <img src="https://img.shields.io/badge/version-v3.4.1-informational?&logo=none" alt="r3ngine Latest Version" />
+    <img src="https://img.shields.io/badge/version-v3.5.0-informational?&logo=none" alt="r3ngine Latest Version" />
   </a>
   &nbsp;
   <a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank">
@@ -26,14 +26,14 @@
   </a>
 </p>
 
-<h3 align="center">r3ngine 3.4.1: The Phoenix Rebirth</h4>
+<h3 align="center">r3ngine 3.5.0: The Phoenix Rebirth</h3>
 <p>
-  r3ngine 3.4.1 marks the official rebirth and production stabilization of the project. This version features the new <b>Cyberpunk Phoenix</b> identity, <b>Human-in-the-Loop OSINT Staging</b>, and a <b>Reinforced Security Discovery Stack</b>. Most significantly, v3.2.0 completes the full migration from Celery to <b>Temporal</b> — replacing the legacy at-most-once task broker with a durable workflow engine that provides crash-safe scan execution, full replay history, and pause/resume signaling. Built on the massive v3.0 core, it represents a complete architectural overhaul designed for the modern threat landscape.
+  r3ngine v3.5.0 is the production-stabilized, enterprise-grade evolution of the platform. This release delivers a complete <b>CVE Enrichment System</b> (NVD, EPSS, CISA KEV), a <b>Burp Suite Professional Integration Plugin</b>, and deep <b>Neo4j graph sync</b> with CVE metadata. The infrastructure has been hardened with <b>Django 5.2.3 LTS</b>, <b>PostgreSQL 16</b>, and <b>Gunicorn + Uvicorn ASGI</b> production serving. Building on the v3.2.0 Celery → Temporal migration — which replaced the legacy at-most-once task broker with a durable workflow engine providing crash-safe execution, full replay history, and pause/resume signaling — v3.5.0 focuses on intelligence enrichment, operational security, and production reliability at scale.
 </p>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
-<h4 align="center">Attack Path Modeling Engine<h4>
+<h4 align="center">Attack Path Modeling Engine</h4>
 <p align="center">
 <img src=".github/screenshots/apme.png" height="700px" width="1020px" alt=""/>
 </p>
@@ -49,11 +49,13 @@
 | :---: | :---: | :---: | :---: |
 | <img src=".github/screenshots/dashboard.png" width="200px" /> | <img src=".github/screenshots/geomap.png" width="200px" /> | <img src=".github/screenshots/scan_details.png" width="200px" /> | <img src=".github/screenshots/scan_drawer.png" width="200px" /> |
 
+The r3ngine Mobile SOC companion app provides a full command-and-control interface for managing scans, reviewing findings, and monitoring targets from any device. Features include a 4-step scan wizard, plugin selector, real-time task log streaming, animated activity badge, ReconX monitoring settings, and geo-tactical map visualization.
+
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
 <h2 align="center"><a href="https://github.com/whiterabb17/r3ngine-plugins" target="_blank">r3Ngine Plugins</a>: Alpha Release Out Now</h2>
 <p align="center">
-<img src="https://img.shields.io/badge/r3ngine--plugins-1.0.0-orange.svg?logo=none" alt="r3ngine Pluings" />
+<img src="https://img.shields.io/badge/r3ngine--plugins-1.0.0-orange.svg?logo=none" alt="r3ngine Plugins" />
 </p>
 
 | Active Directory |
@@ -68,10 +70,13 @@
 | :---: |
 | <img src="https://raw.githubusercontent.com/whiterabb17/r3ngine-plugins/refs/heads/master/exploit_readiness_layer/docs/dashboard.png" width="1000px" height="450px" /> |
 
+The plugin system supports dynamic installation, signed `.r3n` packages with Ed25519 verification, Temporal-wired activities, and Module Federation UI loaded directly into the host router. Available plugins include Active Directory Intelligence, Active Exploitation, Exploit Readiness Layer, Burp Suite Integration, and Email Security.
+
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-> **IMPORTANT — Upgrading to v3.2.0 from an existing installation**
+
+> **IMPORTANT — Upgrading from an existing installation**
 >
-> v3.2.0 replaces Celery with Temporal as the scan orchestration engine. This is a **breaking infrastructure change** — the old `celery` and `celery-beat` containers are removed, new `temporal`, `temporal-python-orchestrator`, and `temporal-go-executor` containers are added, and database migrations must be applied to create the new Temporal models and remove legacy Celery Beat tables.
+> v3.4.1 upgraded the infrastructure stack: **Django 3.2 → 5.2.3 LTS**, **PostgreSQL 12 → 16**, and the production server changed from `runserver` to **Gunicorn + Uvicorn ASGI**. v3.2.0 replaced Celery with Temporal. Both are breaking infrastructure changes that require a full upgrade run.
 >
 > **You must run the full upgrade script before starting services:**
 >
@@ -87,14 +92,15 @@
 >
 > The script will:
 > - Warn you of all changes and ask for explicit confirmation before proceeding
-> - Stop and remove all existing containers (including any running `celery` / `celery-beat` services)
+> - Stop and remove all existing containers
+> - Back up the PostgreSQL database and upgrade it from pg12 → pg16 (automated, idempotent)
 > - Rebuild all images from scratch with `--no-cache`
-> - Apply database migrations (`TemporalWorkflowExecution`, `TemporalSchedule`, removal of `django_celery_beat_*` tables)
-> - Start the full updated stack
+> - Apply all database migrations
+> - Start the full updated stack and verify Gunicorn is serving
 >
-> **Your data is safe.** All Docker volumes (`scan_results`, `postgres_data`, `nuclei_templates`, `wordlist`, etc.) are fully preserved. Only containers and images are rebuilt — no volume data is deleted or modified.
+> **Your data is safe.** All Docker volumes (`scan_results`, `postgres_data`, `nuclei_templates`, `wordlist`, etc.) are fully preserved.
 >
-> **Do not run `make up` or `docker compose up` directly** on an existing v3.1.x install — the old Celery containers will conflict and migrations will not be applied automatically.
+> **Do not run `make up` or `docker compose up` directly** on an existing install without running `fullupgrade` first — migrations will not be applied automatically.
 >
 > Any scans running at the time of upgrade **will be interrupted**. Ensure no critical scans are in progress before upgrading.
 
@@ -108,42 +114,29 @@
 * [Features](#features)
 * [Quick Installation](#quick-installation)
 * [Administration & Recovery](#-administration--recovery)
-* [Installation Video](#installation-video-tutorial)
-* [Community-Curated Videos](#community-curated-videos)
-* [Screenshots](#screenshots)
-* [What's new in reNgine](https://github.com/whiterabb17/r3ngine/releases)
 * [Contributing](#contributing)
 * [Reporting Security Vulnerabilities](#reporting-security-vulnerabilities)
 * [License](#license)
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
-## About reNgine
+## About r3ngine
 
-reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turbocharged the traditional workflow with groundbreaking features that ease your reconnaissance game. reNgine redefines the art of reconnaissance with highly configurable scan engines, recon data correlation, continuous monitoring, GPT powered Vulnerability Report, Project Management and role based access control etc.
+r3ngine is a production-grade web reconnaissance and vulnerability scanning platform. It combines a 7-tier scan pipeline with AI-powered intelligence gathering, graph-based attack path modeling, CVE enrichment from official threat intel feeds, and operational security controls — all orchestrated by [Temporal](https://temporal.io) for durable, crash-safe execution.
 
+🦾&nbsp;&nbsp; **End-to-end reconnaissance** via 30+ integrated security tools: subdomain discovery, port scanning, HTTP crawling, directory fuzzing, screenshot capture, secret scanning, vulnerability assessment (Nuclei, Semgrep, WPScan, Dalfox), and more.
 
-🦾&nbsp;&nbsp; reNgine has advanced reconnaissance capabilities, harnessing a range of open-source tools to deliver a comprehensive web application reconnaissance experience. With its intuitive User Interface, it excels in subdomain discovery, pinpointing IP addresses and open ports, collecting endpoints, conducting directory and file fuzzing, capturing screenshots, and performing vulnerability scans. To summarize, it does end-to-end reconnaissance. With WHOIS identification and WAF detection, it offers deep insights into target domains. Additionally, reNgine also identifies misconfigured S3 buckets and find interesting subdomains and URLS, based on specific keywords to helps you identify your next target, making it a go-to tool for efficient reconnaissance.
+🗃️&nbsp;&nbsp; **Unified data model** with a custom query language. Filter reconnaissance data using natural-language operators like `http_status=200&name=admin` across all finding types.
 
-🗃️&nbsp; &nbsp; Say goodbye to recon data chaos! reNgine seamlessly integrates with a database, providing you with unmatched data correlation and organization. Forgot the hassle of grepping through json, txt or csv files. Plus, our custom query language lets you filter reconnaissance data effortlessly using natural language like operators such as filtering all alive subdomains with `http_status=200` and also filter all subdomains that are alive and has admin in name `http_status=200&name=admin`
+🔧&nbsp;&nbsp; **Highly configurable scan engines** via YAML configuration. Pre-built profiles include Full Scan, Passive Scan, Screenshot Gathering, and OSINT Scan. Every parameter — threads, timeouts, rate limits — is tunable.
 
-🔧&nbsp;&nbsp; reNgine offers unparalleled flexibility through its highly configurable scan engines, based on a YAML-based configuration. It offers the freedom to create and customize recon scan engines based on any kind of requirement, users can tailor them to their specific objectives and preferences, from thread management to timeout settings and rate-limit configurations, everything is customizable. Additionally, reNgine offers a range of pre-configured scan engines right out of the box, including Full Scan, Passive Scan, Screenshot Gathering, and the OSINT Scan Engine. These ready-to-use engines eliminate the need for extensive manual setup, aligning perfectly with reNgine's core mission of simplifying the reconnaissance process and enabling users to effortlessly access the right reconnaissance data with minimal effort.
+💎&nbsp;&nbsp; **Subscans**: respond immediately to in-progress discoveries. Launch a targeted port scan or vulnerability assessment against any subdomain without waiting for the full pipeline.
 
-💎&nbsp;&nbsp;Subscans: Subscan is a game-changing feature in reNgine, setting it apart as the only open-source tool of its kind to offer this capability. With Subscan, waiting for the entire pipeline to complete is a thing of the past. Now, users can swiftly respond to newfound discoveries during reconnaissance. Whether you've stumbled upon an intriguing subdomain and wish to conduct a focused port scan or want to delve deeper with a vulnerability assessment, reNgine has you covered.
+🧠&nbsp;&nbsp; **CVE Intelligence**: automatic CVSS v3.1 scoring from NVD, EPSS exploitation probability from FIRST, and CISA KEV marking — enriched on every startup and queryable via the API.
 
-📃&nbsp;&nbsp; PDF Reports: In addition to its robust reconnaissance capabilities, reNgine goes the extra mile by simplifying the report generation process, recognizing the crucial role that PDF reports play in the realm of end-to-end reconnaissance. Users can effortlessly generate and customize PDF reports to suit their exact needs. Whether it's a Full Scan Report, Vulnerability Report, or a concise reconnaissance report, reNgine provides the flexibility to choose the report type that best communicates your findings. Moreover, the level of customization is unparalleled, allowing users to select report colors, fine-tune executive summaries, and even add personalized touches like company names and footers. With GPT and LLM integration, your reports aren't just a report; with Assessment Overviews, Executive Briefs, Final Conclusions, remediation steps, and impacts, you get a 360-degree view of the vulnerabilities you've uncovered.
+📃&nbsp;&nbsp; **PDF Reports**: Full Scan, Vulnerability, and OSINT report types with customizable templates, executive summaries, LLM-generated impact narratives, and remediation priorities.
 
-🔖&nbsp; &nbsp; Say Hello to Projects! reNgine 3.0 introduces many many more powerful additions to really boost your recon experience. Checkout all the features below. 
-
-⚙&nbsp; &nbsp; Roles and Permissions! In reNgine 3.0, we've taken your web application reconnaissance to a whole new level of control and security. Now, you can assign distinct roles to your team members—Sys Admin, Penetration Tester, and Auditor—each with precisely defined permissions to tailor their access and actions within the reNgine ecosystem.
-
-  - 🔐 Sys Admin: Sys Admin is a superuser that has permission to modify system and scan related configurations, scan engines, create new users, add new tools etc. Superuser can initiate scans and subscans effortlessly.
-  - 🔍 Penetration Tester: Penetration Tester will be allowed to modify and initiate scans and subscans, add or update targets, etc. A penetration tester will not be allowed to modify system configurations.
-  - 📊 Auditor: Auditor can only view and download the report. An auditor can not change any system or scan related configurations nor can initiate any scans or subscans.
-
-🧭&nbsp;&nbsp;**Continuous Monitoring**: r3ngine's automated monitoring engine ensures your targets are under constant scrutiny. Schedule scans at regular intervals and receive real-time alerts via Discord, Slack, and Telegram for new subdomains, vulnerabilities, or asset changes.
-
-⚡&nbsp;&nbsp;**Adaptive Stress & Resilience Engine (ASRE)**: r3ngine v3 introduces the **Adaptive Stress & Resilience Engine (ASRE)**, a production-grade endpoint testing suite designed to evaluate the stability and resilience of target infrastructure. Unlike traditional scanners, ASRE orchestrates high-performance tools like `k6`, `wrk`, `hping3`, and `Locust` directly within your reconnaissance workflow. It provides real-time telemetry ingestion into the Attack Surface Graph (Neo4j), allowing you to visualize how endpoints behave under load and identify potential bottlenecks or denial-of-service vulnerabilities before they become critical failures.
+⚙️&nbsp;&nbsp; **Role-based access control**: Sys Admin, Penetration Tester, and Auditor roles with precisely defined permissions.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -151,7 +144,7 @@ reNgine is not an ordinary reconnaissance suite; it's a game-changer! We've turb
 
 <img src=".github/workflows/workflows.png">
 
-### Temporal Scan Pipeline (v3.2.0)
+### Temporal Scan Pipeline (v3.2.0+)
 
 The full scan pipeline is orchestrated by `MasterScanWorkflow` on Temporal. Every tier boundary is a hard synchronisation point — no tier starts until all activities in the previous tier have completed and their results are persisted to the database.
 
@@ -260,89 +253,74 @@ flowchart TD
 
 ## Features
 
+### 🔬 CVE Intelligence & Enrichment (v3.5.0)
+*   **CVE Enrichment Service**: Fetches CVSS v3.1 metrics from **NVD API v2.0**, exploitation probability scores from **FIRST EPSS**, and syncs the **CISA KEV** (Known Exploited Vulnerabilities) catalog. Enriched data is cached (7-day TTL for CVEs, 1-hour for KEV) and gracefully degrades when external APIs are unavailable.
+*   **Vulnerability History Tracking**: `VulnerabilityHistory` model traces vulnerabilities across historical scans, automatically classifying findings as new, persistent, or remediated.
+*   **Multi-Criteria Correlation Scoring**: Composite scores using configurable tool weights, asset criticality, CISA KEV/EPSS exploitability factors, and temporal modifiers. In-scan duplicate suppression groups findings under a `group_key` before writing.
+*   **Neo4j ID-Based Graph Sync**: CVE nodes in Neo4j are linked by precise CVE ID with CVSS base score and EPSS score ingested as node properties for attack path enrichment.
+*   **Startup Enrichment**: On every orchestrator start, `sync_cve_data` fires 5 minutes after graph sync completes — enriching all unenriched CVEs and refreshing the KEV catalog automatically.
+*   **Management Command**: `python manage.py sync_cve_data --all` for full manual synchronization.
+
 ### 🧠 Intelligence & AI Hub
-r3ngine is an AI-native reconnaissance suite, moving beyond simple tool automation to intelligent analysis.
-*   **Centralized AI Management**: A unified management interface supporting **OpenAI, Anthropic (Claude 3), Google Gemini, and local Ollama models**.
-*   **Vulnerability Impact Intelligence**: Automated generation of detailed impact narratives, remediation strategies, and remediation priorities using LLMs, visualized through interactive **Cytoscape.js attack paths** and a state-aware **Impact Explorer** with real-time assessment monitoring and persistent synchronization.
-*   **PII Gate Security**: Advanced privacy layer that anonymizes sensitive reconnaissance data (IPs, emails, hostnames) before sending it to external LLMs, ensuring enterprise-grade data protection.
+*   **Centralized AI Management**: Unified interface supporting **OpenAI, Anthropic (Claude 3), Google Gemini, and local Ollama models**.
+*   **Vulnerability Impact Intelligence**: Automated impact narratives, remediation strategies, and priorities via LLMs, visualized through interactive **Cytoscape.js attack paths** and a state-aware **Impact Explorer**.
+*   **PII Gate Security**: Advanced privacy layer that anonymizes sensitive data (IPs, emails, hostnames) before sending to external LLMs.
 *   **GPT Attack Surface Generator**: Automated generation of target profiles and high-value asset identification.
-*   **Dynamic Model Discovery**: Real-time fetching of available models with hardware requirement insights for local deployments.
-*   **Natural Language Querying**: Perform complex database lookups using intuitive, human-like operators.
+*   **Natural Language Querying**: Complex database lookups using human-like operators.
 
 ### 🛠️ Advanced Scan & Execution Engines
-*   **Active Directory Intelligence**: Full AD attack surface analysis plugin featuring:
-    *   **Graph Visualization**: Interactive Cytoscape.js graph with 5 layout presets (hierarchical, radial, force, bipartite, cluster), semantic node styling for domain controllers, trust bridges, and exposed accounts, plus an animated real-time ingest mode (with a 300-node default cap and auto-disabled animations above 400 nodes).
-    *   **Findings & Trust Enumeration**: Paginated API endpoints (50 records/page) for all AD objects (users, groups, computers, trusts, and exposures) with inline search and column-level filtering.
-    *   **Real-Time WebSocket Streaming**: Backend events streamed through Django Channels with 150 ms client-side batching during LDAP/BloodHound ingests.
-    *   **7-Section Intelligence Reports**: Executive summary, domain inventory, trust topology, exposure analysis, and recommendations compiled into PDF (`cyber_pro`, `ad_modern` templates) or JSON.
-    *   **RBAC & Evidence Logs**: Assessment actions require `can_run_ad_assessment` permission and are logged to an immutable evidence log.
-    *   **Subdomain-Triggered Assessment**: Launch AD assessments directly from any subdomain record.
-*   **Attack Path Modeling Engine (APME)**: A production-grade, graph-based modeling system utilizing **Neo4j** to discover feasible attack routes (e.g., SQLi → DB Access → Pivot) based on a dynamic rules engine. Features 20+ security patterns and automated "Goal Injection".
-*   **Adaptive Stress & Resilience Engine (ASRE)**: High-performance real-time stress testing dashboard integrated with `k6`, `wrk`, `hping3`, and `Locust`. Features real-time telemetry (ECharts for Latency/RPS/Throughput via Redis Streams and WebSockets), headless Locust execution with dynamic scenarios, safety kill-switches, and LLM-powered bottleneck PDF reports (`stress_cyber_pro` and `stress_modern` templates).
-*   **Exploit Readiness Layer (ERL)**: Hardened automated vulnerability verification system with containerized, non-destructive validation tools. Features native **proxy rotation** and **OpSec compliance** (User-Agent randomization, custom headers) directly in the ERL adapter layer.
-*   **Autonomous Recon Orchestration**: Temporal-powered durable workflow pipeline with non-blocking orchestration, crash-safe execution, full execution history UI, a 10-attempt retry cap, and UI-based resume options.
-*   **Vulnerability Correlation Engine**: Unifies findings from Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, Retire.js, and more into a prioritized threat landscape with **Persistent Vulnerability State Tracking**.
-*   **Autonomous Tooling & Plugin System**: Background tool management ensuring all plugin dependencies (e.g., sqlmap, XSStrike) are installed and verified automatically at runtime using `tools.yaml` and persistent startup verification.
-*   **Continuous Monitoring**: Periodic discovery of new subdomains, endpoints, and data changes with automated diffing and real-time alerts.
+*   **Burp Suite Professional Integration** (v3.4.0 plugin): Two-phase Temporal sync (import → correlate), bidirectional scope push, filterable issues grid, and live connection health badge.
+*   **Active Directory Intelligence Plugin**: Full AD attack surface analysis — Cytoscape.js graph with 5 layout presets, real-time WebSocket streaming (150 ms batching), paginated findings API, 7-section PDF reports (`ad_modern`, `cyber_pro` templates), and RBAC evidence logs.
+*   **Attack Path Modeling Engine (APME)**: Neo4j-based graph discovery of feasible attack routes (e.g., SQLi → DB Access → Pivot) with 20+ security patterns and automated "Goal Injection".
+*   **Adaptive Stress & Resilience Engine (ASRE)**: `k6`, `wrk`, `hping3`, and `Locust` orchestration with real-time ECharts telemetry via Redis Streams and WebSockets, safety kill-switches, and LLM-powered bottleneck PDF reports.
+*   **Exploit Readiness Layer (ERL)**: Containerized, non-destructive vulnerability validation with native proxy rotation and OpSec compliance built into the adapter layer.
+*   **Autonomous Recon Orchestration**: Temporal durable workflows with crash-safe execution, 10-attempt retry cap, full history replay at `localhost:8080`, and UI-based resume.
+*   **Nmap Vulners NSE Grouped Findings**: Product-version grouped vulnerability display in UI and PDF reports with collapsed/expandable CVE sub-tables.
+*   **Nuclei Sequential Severity Execution**: `NucleiPlannerWorkflow` runs severities sequentially to prevent OOM on large target sets, with per-severity activity status in the timeline.
+*   **Vulnerability Correlation Engine**: Unifies findings from Nuclei, Semgrep, Trivy, Gitleaks, Acunetix, Retire.js, and more into a prioritized threat landscape with persistent state tracking.
+*   **Scan Queueing**: Optional concurrency limiter (`max 1 main + 1 subscan`) with Temporal polling loop and settings panel toggle.
 
 ### 🕵️ Surgical Reconnaissance & OSINT
-*   **Advanced Web API Discovery**: Dedicated pipeline featuring Kiterunner, Arjun, ParamSpider, LinkFinder, and InQL.
-*   **Deep Pursuit OSINT Engine**: A modernized, high-performance modular pipeline replacing heavy Spiderfoot scans with surgical discovery. Features email pivoting (**holehe**), cross-platform social profile mapping (**maigret**), social presence discovery (**gosearch**), tactical identity permutation (**username-anarchy**), and a custom **Playwright-driven Social Intelligence Engine** that mimics human behavior to identify corporate personnel under high OpSec.
-*   **OSINT Intelligence Dashboard**: Aggregated view of emails, leaks, employees, dorks, and document metadata.
-*   **ReconX 24/7 Monitoring**: Dedicated, domain-specific background monitoring engine for continuous asset tracking and automated findings ingestion.
-*   **Vulnerability Scanning**:
-    *   **Nuclei**: Specialized templates and intelligence-driven targeted scanning.
-    *   **Semgrep**: Automated static analysis for discovered endpoints (JS, PHP, Env, etc.) with automated rule synchronization (OWASP Top 10, Secrets).
-    *   **WPScan**: Automated WordPress reconnaissance and vulnerability identification.
-    *   **baddns**: Automated subdomain takeover detection with critical severity mapping.
-    *   **betterleaks**: High-precision secret and leak identification in discovered assets.
-    *   **Dalfox**: Advanced XSS discovery.
-    *   **Additional Integration**: CRLFuzzer, S3Scanner, Gitleaks, Retire.js.
+*   **Advanced Web API Discovery**: Kiterunner, Arjun, ParamSpider, LinkFinder, and InQL pipeline.
+*   **Deep Pursuit OSINT Engine**: Email pivoting (**holehe**), cross-platform social profile mapping (**maigret**), social presence discovery (**gosearch**), tactical identity permutation (**username-anarchy**), and a **Playwright-driven Social Intelligence Engine**.
+*   **URL Deduplication**: Two-pass dedup after `fetch_url` — URL signature dedup (pre-save) collapses parametric variants, content-based dedup (post-save) removes duplicate HTTP responses — reducing Tier 4–6 load.
+*   **Vulnerability Scanning**: Nuclei (sequential severity, auto-template updates), Semgrep (parallel downloads, 500-file cap, 5 MB per-file limit), WPScan, Dalfox (deep scan, WAF bypass, remote payloads), CRLFuzzer, S3Scanner, Gitleaks, Retire.js.
 *   **WHOIS, WAF Detection, and IP Geolocation**.
 
 ### 🥷 Stealth & Operational Security (OpSec)
-*   **Enhanced Proxy Orchestration**: Automated fetching, validation, and per-tool rotation of high-quality proxies across all discovery modules to bypass rate-limiting and WAF blocks.
-*   **Centralized Brute-Force Orchestration**: High-performance Hydra and Medusa integration with Proxychains4. Centralizes Nmap/Nuclei targets into a unified `AuthCandidate` queue supporting **multi-service targeting (SSH, FTP, HTTP, SMB, RDP, Telnet)**, automated service mapping, and configurable `max_retries`.
-*   **OpSec Presets**: User-Agent rotation, stealth timing, custom DNS resolvers, and WAF bypass headers.
-*   **Hardened Scan Termination**: Centralized `abort_scan_history()` / `abort_subscan()` utility to cancel all child subscans and Temporal workflows before database updates, eliminating orphaned processes.
-*   **Workflow Retry Cap**: Limit of 10 retries on workflows before marking as FAILED, allowing checkpoint resumes.
-*   **Metadata Stripping**: Automated removal of sensitive information from discovered assets.
+*   **Enhanced Proxy Orchestration**: Automated fetching, validation, and per-tool rotation of proxies across all discovery modules.
+*   **Centralized Brute-Force Orchestration**: Hydra and Medusa integration with Proxychains4. Multi-service targeting: SSH, FTP, HTTP, SMB, RDP, Telnet.
+*   **OpSec Presets**: User-Agent rotation, stealth timing, custom DNS resolvers, WAF bypass headers, and TOR circuit rotation.
+*   **Hardened Scan Termination**: `abort_scan_history()` / `abort_subscan()` cancels all child subscans and Temporal workflows before database updates, eliminating orphaned processes.
 
 ### 🎨 Visual & Administrative Interface
-*   **Cyberpunk V3 UI**: Premium glassmorphic dashboard supporting Hacker (Cyberpunk), Hybrid (Modern Dark), and Enterprise (Professional Slate) themes.
-*   **Interactive Subdomain Management**: Wireframes for on-demand LLM Attack Surface Analysis, targeted subscans, and TODO/Note management directly from the subdomain inventory.
-*   **Attack Surface Map v4.0**: Interactive, high-fidelity infrastructure visualization with **Hierarchical Asset Clustering** (Domains > Subdomains > Endpoints), advanced layouts (**fCoSE** and **KLay**), semantic cluster management, and AI-driven graph search.
-*   **Tactical GeoMap Visualization**: Custom high-performance CSS-animated markers and tooltip interactions for global asset positioning.
-*   **Bounty Hub**: Centralized platform for managing HackerOne programs, assets, and direct vulnerability reporting.
-*   **Automated Startup Sync**: A Redis-locked sequence ensures Attack Surface graphs and CISA KEV (Known Exploited Vulnerabilities) catalogs are synchronized immediately upon boot.
-*   **Administrative Robustness**:
-    *   **Scan Detail Header Reorganization**: Better layout with breadcrumbs below action buttons and right-aligned controls.
-    *   **Chronological Ordering**: Standardized descending ID ordering across Scan History and Target Lists.
-    *   📊 **Enhanced Telemetry**: Fixed HTTP status breakdown logic and stabilized Scan Summary API via target-wide cumulative data queries.
-    *   **Target Deletion API**: Resolved 404 errors by synchronizing frontend requests with the correct backend orchestration endpoint.
-    *   **Onboarding Authentication Resilience**: Fixed application crash for unauthenticated users accessing onboarding.
+*   **Cyberpunk V3 UI**: Glassmorphic dashboard — Hacker (Cyberpunk), Hybrid (Modern Dark), and Enterprise (Professional Slate) themes.
+*   **Attack Surface Map v4.0**: fCoSE and KLay layouts, hierarchical asset clustering (Domains > Subdomains > Endpoints), AI-driven graph search.
+*   **Tactical GeoMap Visualization**: CSS-animated markers and tooltip interactions for global asset positioning.
+*   **Bounty Hub**: HackerOne program management, asset tracking, and direct vulnerability reporting.
+*   **Automated Startup Sync**: On every orchestrator start — graph sync, CISA KEV catalog refresh, Semgrep rule sync, stuck scan recovery, and full CVE enrichment — all fire as one-shot Temporal schedules.
+*   **Configuration Export/Import**: Backup and restore API keys, wordlists, tool configs, and scan engines to/from a single `.zip`.
+*   **Scan Result Recovery**: `recover_scan_results` management command reconstructs the database from the `scan_results` volume on disk — idempotent, dry-run by default.
 *   **Customizable Alerts**: Notifications via Slack, Discord, Telegram, and Lark.
-*   **Screenshot Gallery**: Automated visual captures with advanced filtering and tagging.
-*   **Export/Import**: Interoperable with other tools via JSON, CSV, and TXT.
-*   **Configuration Portability**: Export/restore custom API keys, tool configurations, scan engines, and wordlists to/from a backup zip.
-*   **Integrated Tools**: Chaos, TLSX, CTFR, Netlas, Katana, Medusa, baddns, betterleaks, gosearch, username-anarchy.
 
-### ⚡ Resource Management & Efficiency
-*   **Temporal Workflow Engine**: Replaced Celery with [Temporal](https://temporal.io) for all scan orchestration, utilizing a single `temporal-python-orchestrator` container to reduce base memory overhead.
-*   **Durable Execution**: Automatic retry on activity failures with configurable backoff to survive container restarts and blips.
-*   **Global Redis Caching**: Unified Redis-backed caching layer replacing per-process local memory caching for shared state efficiency.
-*   **Deterministic Resource Limits**: Native Docker `deploy.resources` limits and reservations configured for all production services (Temporal, Ollama, Neo4j, Web) to prevent host resource starvation.
+### ⚡ Infrastructure & Performance
+*   **Django 5.2.3 LTS** (supported until April 2028) + **PostgreSQL 16** (supported until November 2028).
+*   **Gunicorn + Uvicorn ASGI**: 4-worker production server with full ASGI support for HTTP and Django Channels WebSocket streams.
+*   **Temporal Workflow Engine**: Durable execution, automatic retry with configurable backoff, per-workflow cancellation.
+*   **Automated Infrastructure Upgrade** (`make fullupgrade`): 8-step procedure covering DB backup, PostgreSQL major-version upgrade (idempotent), image rebuild, migration apply, and health verification.
+*   **Global Redis Caching**: Unified Redis-backed caching replacing per-process local memory for shared state efficiency.
+*   **Deterministic Resource Limits**: Docker `deploy.resources` limits for all production services.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
-## 🛠️ Development & Strict Type Safety
+## 🛠️ Development & Type Safety
 
-The r3ngine v3 frontend is built with a "Safety-First" philosophy, enforcing strict TypeScript constraints to ensure production reliability.
+The r3ngine frontend is built with a "Safety-First" philosophy under `strict: true` TypeScript throughout.
 
-*   **Full Strict Mode**: The entire React codebase compiles under `strict: true`, eliminating hidden null pointers and undefined property access at build time.
-*   **Contract Integrity**: Frontend models are strictly mapped to the auto-generated OpenAPI schema (`src/types/api.ts`). We enforce `verbatimModuleSyntax` to optimize build-time tree shaking and ensure type-only imports are explicitly marked.
-*   **Modular Architecture**: Following a feature-based structure, each module (`targets`, `scans`, `vulnerabilities`) maintains its own API hooks and types, inheriting from the global contract while providing specialized UI adaptations.
-*   **Production Hardening**: Our CI/CD pipeline validates every commit against `tsc -b` and `vite build`. We prioritize type-safe UI components over loose `any` declarations, utilizing safe type guards and defensive casting for robust API integration.
+*   **Full Strict Mode**: Eliminates hidden null pointers and undefined property access at build time.
+*   **Contract Integrity**: Frontend models mapped to the auto-generated OpenAPI schema (`src/types/api.ts`) with `verbatimModuleSyntax` for tree-shaking.
+*   **Modular Architecture**: Feature-based structure — each module (`targets`, `scans`, `vulnerabilities`) maintains its own API hooks and types.
+*   **Production Hardening**: CI/CD validates every commit against `tsc -b` and `vite build`.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -371,13 +349,6 @@ The r3ngine v3 frontend is built with a "Safety-First" philosophy, enforcing str
     DJANGO_SUPERUSER_EMAIL=YourMail@example.com
     DJANGO_SUPERUSER_PASSWORD=yourStrongPassword
     ```
-    If you need to carry out a non-interactive installation, you can setup the login, email and password of the web interface admin directly from the .env file (instead of manually setting them from prompts during the installation process). This option can be interesting for automated installation (via ansible, vagrant, etc.).
-
-    * `DJANGO_SUPERUSER_USERNAME`: web interface admin username (used to login to the web interface).
-
-    * `DJANGO_SUPERUSER_EMAIL`: web interface admin email.
-
-    * `DJANGO_SUPERUSER_PASSWORD`: web interface admin password (used to login to the web interface).
 
 1. Configure Temporal worker concurrency in `.env` (optional)
 
@@ -386,13 +357,11 @@ The r3ngine v3 frontend is built with a "Safety-First" philosophy, enforcing str
     TEMPORAL_MAX_CONCURRENT_WORKFLOWS=10
     ```
 
-    r3ngine v3.2.0 uses [Temporal](https://temporal.io) for all scan orchestration. The `temporal-python-orchestrator` container runs a single worker that polls for workflow and activity tasks. Concurrency is controlled by the variables above; the defaults are sensible for most machines.
-
     Recommended values by available RAM:
 
-    * 4GB: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=10`
-    * 8GB: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=20`
-    * 16GB+: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=40`
+    * 4 GB: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=10`
+    * 8 GB: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=20`
+    * 16 GB+: `TEMPORAL_MAX_CONCURRENT_ACTIVITIES=40`
 
     The Temporal UI is available at `http://localhost:8080` for workflow inspection, history replay, and manual intervention.
 
@@ -404,35 +373,21 @@ The r3ngine v3 frontend is built with a "Safety-First" philosophy, enforcing str
 
     For non-interactive install: `sudo ./install.sh -n`
 
-    *Note: If needed, run `chmod +x install.sh` to grant execution permissions.*
+    *Note: If needed, run `chmod +x install.sh` first.*
 
-**reNgine can now be accessed from <https://127.0.0.1> or if you're on the VPS <https://your_vps_ip_address>**
-
-**Unless you are on development branch, please do not access reNgine via any ports**
+**r3ngine is accessible at `https://127.0.0.1` (or your VPS IP). Do not expose via direct port access in production.**
 
 ### Installation on Other Platforms
 
-For Mac, Windows, or other systems, refer to our detailed installation guide [https://reNgine.wiki/install/detailed/](https://reNgine.wiki/install/detailed/)
-
-### Installation Video Tutorial
-
-If you encounter any issues during installation or prefer a visual guide, one of our community members has created an excellent installation video for Kali Linux installation. You can find it here: [https://www.youtube.com/watch?v=7OFfrU6VrWw](https://www.youtube.com/watch?v=7OFfrU6VrWw)
-
-Please note: This is community-curated content and is not owned by reNgine. The installation process may change, so please refer to the official documentation for the most up-to-date instructions.
+For Mac, Windows, or other systems, refer to the installation notes in [`docker/`](docker/) or open an issue for platform-specific guidance.
 
 ## Updating
 
-1. To update reNgine, run:
+```bash
+cd r3ngine && sudo ./update.sh
+```
 
-    ```bash
-    cd r3ngine &&  sudo ./update.sh
-    ```
-
-    If `update.sh` lacks execution permissions, use:
-
-    ```bash
-    sudo chmod +x update.sh
-    ```
+For major version upgrades (including infrastructure changes), always use `make fullupgrade` instead of a plain `docker compose up`.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
@@ -440,7 +395,7 @@ Please note: This is community-curated content and is not owned by reNgine. The 
 
 ### Scan Result Recovery
 
-If the database is lost or corrupted but the `scan_results` Docker volume is intact, the `recover_scan_results` management command can reconstruct the database from the files on disk.
+If the database is lost or corrupted but the `scan_results` Docker volume is intact, the `recover_scan_results` management command can reconstruct the database from files on disk.
 
 **What is recovered** (when the corresponding output files exist):
 
@@ -464,39 +419,38 @@ python manage.py recover_scan_results
 python manage.py recover_scan_results --apply
 
 # Recover a single scan folder
-python manage.py recover_scan_results --apply --scan-dir /usr/src/scan_results/defijn.io_108
+python manage.py recover_scan_results --apply --scan-dir /usr/src/scan_results/example.io_108
 
 # Use a non-default results root
 python manage.py recover_scan_results --apply --results-root /alt/path/scan_results
 ```
 
-**Docker Compose shortcut:**
-
 ```bash
 docker-compose exec web python manage.py recover_scan_results --apply
 ```
 
-The command is **idempotent** — scans already tracked in the database are skipped on every run, so it is safe to re-run after partial recoveries.
+The command is **idempotent** — scans already in the database are skipped on every run.
+
+### CVE Data Synchronization
+
+```bash
+# Inside the web container:
+python manage.py sync_cve_data              # Enrich unenriched CVEs
+python manage.py sync_cve_data --kev        # Sync CISA KEV catalog only
+python manage.py sync_cve_data --refresh 30 # Re-enrich CVEs from last 30 days
+python manage.py sync_cve_data --all        # Full sync (KEV + unenriched)
+```
+
+CVE enrichment also runs automatically 5 minutes after every orchestrator startup.
+
+### Debugging
+
+1. Enable debug mode — edit `docker/web/entrypoint.sh` and add `export DEBUG=1` at the top, then `docker-compose restart web`.
+2. View logs: `make logs` or `docker compose logs temporal-python-orchestrator`.
+3. Temporal UI: `http://localhost:8080` — full workflow history, signals, event replay.
+4. Disable debug mode when done: set `DEBUG=0` and restart.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## Community-Curated Videos
-
-reNgine has a vibrant community that often creates helpful content about installation, features, and usage. Below is a collection of community-curated videos that you might find useful. Please note that these videos are not official reNgine content, and the information they contain may become outdated as reNgine evolves.
-
-Always refer to the official documentation for the most up-to-date and accurate information. If you've created a video about reNgine and would like it featured here, please send a pull request updating this table.
-
-| Video Title | Language | Publisher | Date | Link |
-|-------------|----------|----------|------|------|
-| reNgine Installation on Kali Linux | English | Secure the Cyber World | 2024-02-29 | [Watch](https://www.youtube.com/watch?v=7OFfrU6VrWw) |
-| Resultados do ReNgine - Automação para Recon | Portuguese | Guia Anônima | 2023-04-18 | [Watch](https://www.youtube.com/watch?v=6aNvDy1FzIM) |
-| reNgine Introduction | Moroccan Arabic | Th3 Hacker News Bdarija | 2021-07-27 | [Watch](https://www.youtube.com/watch?v=9FuRrcmWgWU) |
-| Automated recon? ReNgine - Hacker Tools | English | Intigriti | 2021-08-24 | [Watch](https://www.youtube.com/watch?v=vP7tBopQSEc) |
-
-We appreciate the community's contributions in creating these resources.
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
 
 ## Screenshots
 
@@ -504,133 +458,56 @@ We appreciate the community's contributions in creating these resources.
 
 ![](.github/screenshots/scan_results.gif)
 
-### General Usage
+### Live Logs
 
-<img src="https://user-images.githubusercontent.com/17223002/164993781-b6012995-522b-480a-a8bf-911193d35894.gif">
+![](.github/screenshots/live_logs.gif)
 
-### Initiating Subscan
+### Mobile Interface
 
-<img src="https://user-images.githubusercontent.com/17223002/164993749-1ad343d6-8ce7-43d6-aee7-b3add0321da7.gif">
-
-### Recon Data filtering
-
-<img src="https://user-images.githubusercontent.com/17223002/164993687-b63f3de8-e033-4ac0-808e-a2aa377d3cf8.gif">
-
-### Report Generation
-
-<img src="https://user-images.githubusercontent.com/17223002/164993689-c796c6cd-eb61-43f4-800d-08aba9740088.gif">
-
-### Toolbox
-
-<img src="https://user-images.githubusercontent.com/17223002/164993751-d687e88a-eb79-440f-9dc0-0ad006901620.gif">
-
-### Adding Custom tool in Tools Arsenal
-
-<img src="https://user-images.githubusercontent.com/17223002/164993670-466f6459-9499-498b-a9bd-526476d735a7.gif">
+![](.github/screenshots/mobile_interface.gif)
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
 ## Contributing
 
-We welcome contributions of all sizes! The open-source community thrives on collaboration, and your input is invaluable. Whether you're fixing a typo, improving UI, or adding new features, every contribution matters.
+Contributions of all sizes are welcome. Whether fixing a typo, improving UI, or adding new features — every contribution matters.
 
 How you can contribute:
-  * Code improvements
+  * Code improvements and bug fixes
   * Documentation updates
-  * Bug reports and fixes
   * New feature suggestions and implementations
   * UI/UX enhancements
+  * Plugin development
 
 To get started:
-
   1. Check our [Contributing Guide](.github/CONTRIBUTING.md)
   2. Pick an [open issue](https://github.com/whiterabb17/r3ngine/issues) or propose a new one
   3. Fork the repository and create your branch
   4. Make your changes and submit a pull request
 
-Remember, no contribution is too small. Your efforts help make reNgine better for everyone!
-
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
-## Submitting issues
+## Submitting Issues
 
-When submitting issues, provide as much valuable information as possible to help developers resolve the problem quickly. Follow these steps to gather detailed debug information:
+When submitting issues, provide as much detail as possible:
 
-1. Enable Debug Mode:
-   - Edit `web/entrypoint.sh` in the project root
-   - Add `export DEBUG=1` at the top of the file:
-     ```bash
-     #!/bin/bash
-
-     export DEBUG=1
-
-     python3 manage.py migrate
-     python3 manage.py runserver 0.0.0.0:8000
-
-     exec "$@"
-     ```
-   - Restart the web container: `docker-compose restart web`
-
-2. View Debug Output:
-   - Run `make logs` to see the full stack trace
-   - Check the browser's developer console for XHR requests with 500 errors
-
-3. Example Debug Output:
-    ```
-    web_1          | TypeError: run_command() got an unexpected keyword argument 'echo'
-    web_1          |   File "/usr/src/app/reNgine/tasks.py", line 42, in run_command
-    web_1          |     subprocess.run(cmd, **kwargs)
-    ```
-
-4. Submit Your Issue:
-    - Include the full stack trace in your GitHub issue
-    - Describe the steps to reproduce the problem
-    - Mention any relevant system information
-
-5. Disable Debug Mode:
-    - Set `DEBUG=0` in `web/entrypoint.sh`
-    - Restart the web container
-
-By providing this detailed information, you significantly help developers identify and fix issues more efficiently.
-
-![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
-
-## First-time Open Source contributors
-
-reNgine is an open-source project that welcomes contributors of all experience levels, including beginners. If you've never contributed to open source before, we encourage you to start here!
-
-* We're proud to support your first Pull Request (PR)
-* Check our [open issues](https://github.com/whiterabb17/r3ngine/issues) for starter-friendly tasks
-* Don't hesitate to ask questions in our community channels
-
-Your contribution, no matter how small, is valuable to us.
+1. Enable debug mode (see [Debugging](#debugging) above)
+2. Run `make logs` to capture the full stack trace
+3. Check the browser developer console for XHR 500 errors
+4. Submit a GitHub issue with the stack trace, reproduction steps, and system information
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
 ## Reporting Security Vulnerabilities
 
-We appreciate your efforts to responsibly disclose your findings and will make every effort to acknowledge your contributions.
+**Do not** disclose security vulnerabilities publicly on GitHub issues.
 
-To report a security vulnerability, please follow these steps:
+Go to the [Security tab](https://github.com/whiterabb17/r3ngine/security) and click **"Report a vulnerability"** to open GitHub's private vulnerability reporting form. Include:
+- Steps to reproduce
+- Potential impact
+- Suggested fixes or mitigations (if any)
 
-1. **Do Not** disclose the vulnerability publicly on GitHub issues or any other public forum.
-
-2. Go to the [Security tab](https://github.com/whiterabb17/r3ngine/security) of the reNgine repository.
-
-3. Click on "Report a vulnerability" to open GitHub's private vulnerability reporting form.
-
-4. Provide a detailed description of the vulnerability, including:
-   - Steps to reproduce
-   - Potential impact
-   - Any suggested fixes or mitigations (if you have them)
-
-5. I will review your report and respond as quickly as possible, usually within 48-72 hours.
-
-6. Please allow some time to investigate and address the vulnerability before disclosing it to others.
-
-We are committed to working with security researchers to verify and address any potential vulnerabilities reported to us. After fixing the issue, we will publicly acknowledge your responsible disclosure, unless you prefer to remain anonymous.
-
-Thank you for helping to keep reNgine and its users safe!
+Reports are reviewed within 48–72 hours. Responsible disclosure will be publicly acknowledged after the fix is released, unless you prefer to remain anonymous.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 

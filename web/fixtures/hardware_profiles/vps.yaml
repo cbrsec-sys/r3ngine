@@ -1,0 +1,13 @@
+- model: scanEngine.hardwareprofile
+  pk: 2
+  fields:
+    name: vps
+    description: VPS / cloud droplet (2–4 vCPU, 2–8GB)
+    threads: 4
+    rate_limit: 50
+    timeout: 10
+    delay: 0.1
+    retries: 3
+    profile_type: builtin
+    is_active: true
+    is_default: true

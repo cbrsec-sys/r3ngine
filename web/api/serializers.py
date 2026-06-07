@@ -970,10 +970,10 @@ class VisualiseDataSerializer(serializers.ModelSerializer):
 						'description': 'OS',
 						'children': os})
 
-			if metainfo_data:
-				osint_data.append({
-					'description': 'Documents',
-					'children': metainfo_data})
+				if metainfo_data:
+					osint_data.append({
+						'description': 'Documents',
+						'children': metainfo_data})
 
 			if osint_data:
 				return_data.append({
@@ -1413,4 +1413,10 @@ class VulnerabilityReportSettingSerializer(serializers.ModelSerializer):
 class NotificationSettingsSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = Notification
+		fields = '__all__'
+
+
+class HardwareProfileSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = HardwareProfile
 		fields = '__all__'
