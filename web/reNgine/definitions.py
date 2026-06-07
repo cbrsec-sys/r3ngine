@@ -17,7 +17,7 @@ EMAIL_REGEX = re.compile(r'[\w\.-]+@[\w\.-]+')
 # TOOL COLORS DEFINITIONS (ANSI Escape Codes)
 ###############################################################################
 COLOR_RESET = "\033[0m"
-COLOR_WHITE = "\033[97m"
+COLOR_WHITE = "\033[37m"
 COLOR_RED = "\033[91m"
 COLOR_GREEN = "\033[92m"
 COLOR_YELLOW = "\033[93m"
@@ -155,7 +155,7 @@ USER_AGENT = 'user_agent'
 DELAY = 'delay'
 PROVIDERS = 'providers'
 FIREWALL_VPN_SCAN = 'firewall_vpn_scan'
-BRUTE_FORCE_SCAN = 'brute_force_scan'
+
 SPIDERFOOT_SCAN = 'spiderfoot_scan'
 WEB_API_DISCOVERY = 'web_api_discovery'
 ATTACK_PATH_MODELING = 'attack_path_modeling'
@@ -625,7 +625,7 @@ DEFAULT_EXCLUDED_PATHS = [
     '/fonts/.*',
 
     # File types (using regex patterns)
-    '.*\.ico',
+    r'.*\.ico',
 ]
 
 # Roles and Permissions

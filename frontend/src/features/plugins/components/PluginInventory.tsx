@@ -9,13 +9,16 @@ interface Props {
   marketplacePlugins?: MarketplacePlugin[];
   onRefreshMarketplace?: () => void;
   isRefreshingMarketplace?: boolean;
+  /** Forwarded to marketplace PluginCards so the install_id reaches the parent page. */
+  onInstallStarted?: (installId: string) => void;
 }
 
 const PluginInventory: React.FC<Props> = ({
   plugins,
   marketplacePlugins = [],
   onRefreshMarketplace,
-  isRefreshingMarketplace
+  isRefreshingMarketplace,
+  onInstallStarted,
 }) => {
   return (
     <Box>
@@ -78,7 +81,7 @@ const PluginInventory: React.FC<Props> = ({
         <Grid container spacing={3}>
           {marketplacePlugins.map((plugin) => (
             <Grid size={{ xs: 12, md: 6, lg: 4 }} key={plugin.slug}>
-              <PluginCard marketplacePlugin={plugin} />
+              <PluginCard marketplacePlugin={plugin} onInstallStarted={onInstallStarted} />
             </Grid>
           ))}
         </Grid>

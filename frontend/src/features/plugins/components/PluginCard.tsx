@@ -55,6 +55,9 @@ import { ConfirmDialog } from '../../../components/ConfirmDialog';
 interface Props {
   plugin?: Plugin;
   marketplacePlugin?: MarketplacePlugin;
+  /** Called immediately after a marketplace install request is accepted, with the
+   *  polling install_id so the parent can show the InstallProgressOverlay. */
+  onInstallStarted?: (installId: string) => void;
 }
 
 // ── Trust badge ───────────────────────────────────────────────────────────────
@@ -635,7 +638,7 @@ const BurpConfigModal: React.FC<BurpConfigModalProps> = ({ open, onClose }) => {
 
 // ── Main card ─────────────────────────────────────────────────────────────────
 
-const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
+const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin, onInstallStarted }) => {
   const toggleMutation = useTogglePlugin();
   const deleteMutation = useDeletePlugin();
   const installMutation = useInstallMarketplacePlugin();
@@ -678,7 +681,14 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
 
   const handleInstall = () => {
     if (marketplacePlugin) {
-      installMutation.mutate(marketplacePlugin.slug);
+      installMutation.mutate(marketplacePlugin.slug, {
+        onSuccess: (result) => {
+          // Bubble the install_id up so the parent page can open InstallProgressOverlay
+          if (onInstallStarted) {
+            onInstallStarted(result.install_id);
+          }
+        },
+      });
     }
   };
 
@@ -699,9 +709,10 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin }) => {
             <Box sx={{ display: "flex", alignItems: "center", gap: 2 }}>
               <Avatar
                 variant="rounded"
+                src={plugin?.icon_path ? `/api/plugins/${plugin.slug}/icon/` : undefined}
                 sx={{ bgcolor: isMarketplace && !isInstalled ? '#00ffaa' : '#0076FF', width: 48, height: 48, color: '#000' }}
               >
-                {data.name[0]}
+                {!plugin?.icon_path && data.name[0]}
               </Avatar>
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: "bold", color: '#fff', minHeight: '3.1em', lineHeight: 1.235, display: 'flex', alignItems: 'flex-start' }}>

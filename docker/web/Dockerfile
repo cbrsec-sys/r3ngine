@@ -2,7 +2,7 @@
 # Stage 1: Frontend Builder
 # Compiles the React/Vite frontend. Only the /dist output is used downstream.
 # ===========================================================================
-FROM node:20-alpine AS frontend-builder
+FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
 RUN npm install
@@ -29,7 +29,7 @@ RUN apt-get update && \
 ENV GO111MODULE=on
 
 # All tools in one RUN: single cache-invalidation point, no intermediate layers
-# retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols.
+# retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols. 
 RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && \
     go install -ldflags="-s -w" -v github.com/jaeles-project/gospider@latest && \
     go install -ldflags="-s -w" -v github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006 && \
@@ -50,6 +50,7 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/sa7mon/s3scanner@b6c26d67bc2abe346555dd7010e6065889d66039 && \
     go install -ldflags="-s -w" -v github.com/zricethezav/gitleaks/v8@latest && \
     go install -ldflags="-s -w" -v github.com/xalgord/reconx/cmd/reconx@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/vulnx/v2/cmd/vulnx@latest && \
     rm -rf /go/pkg /root/.cache/go-build
 
 # betterleaks has no published go install path — clone and build directly.
@@ -164,18 +165,34 @@ LABEL \
     description="reNgine is an automated recon pipeline for web application penetration testing."
 
 # ---------------------------------------------------------------------------
+# Add the PostgreSQL 16 APT repository.
+# Ubuntu 22.04 ships postgresql-client 14 by default; pg_dump requires the
+# client version to be >= the server version (now 16), so we pin to 16.
+# ---------------------------------------------------------------------------
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends ca-certificates gnupg curl lsb-release && \
+    rm -rf /var/lib/apt/lists/* && \
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+        | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list && \
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF23C5A6CF475977595C89F51BA6932366A755776" \
+        | gpg --dearmor -o /usr/share/keyrings/deadsnakes.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/deadsnakes.gpg] https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy main" \
+        > /etc/apt/sources.list.d/deadsnakes.list
+
+
+# ---------------------------------------------------------------------------
 # System packages — single combined RUN to keep the layer count low.
 # build-essential is kept because pip installs some packages that compile
 # C extensions (cryptography, pycairo, etc.) and gems (wpscan) need gcc.
 # ---------------------------------------------------------------------------
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
-    # Python 3 runtime
-    python3.10 \
-    python3-dev \
-    python3-pip \
-    python3-venv \
-    python3-netaddr \
+    # Python 3.12 runtime
+    python3.12 \
+    python3.12-dev \
+    python3.12-venv \
     # Ruby (WPScan)
     ruby-full \
     ruby-dev \
@@ -219,7 +236,7 @@ RUN apt-get update -y && \
     proxychains4 \
     hping3 \
     wrk \
-    postgresql-client \
+    postgresql-client-16 \
     # Network protocol enumeration tools
     onesixtyone \
     snmp \
@@ -238,6 +255,18 @@ RUN apt-get update -y && \
     ninja-build \
     gcc \
     && rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
+# Make Python 3.12 the system default and redirect pip3 to it.
+# ensurepip installs pip into 3.12's site-packages; the symlinks ensure
+# all pip3/pip invocations in subsequent RUN blocks use 3.12.
+# ---------------------------------------------------------------------------
+RUN python3.12 -m ensurepip --upgrade && \
+    python3.12 -m pip install --upgrade pip && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 && \
+    update-alternatives --install /usr/bin/python  python  /usr/bin/python3.12 1 && \
+    ln -sf /usr/local/bin/pip3 /usr/bin/pip3 && \
+    ln -sf /usr/local/bin/pip3 /usr/bin/pip
 
 # ---------------------------------------------------------------------------
 # Install uv (fast Python package manager — used by theHarvester)
@@ -380,12 +409,36 @@ RUN git clone --depth 1 https://github.com/ticarpi/jwt_tool /usr/src/github/jwt_
 # ---------------------------------------------------------------------------
 # Install Python security tools via pip (no source clone needed)
 #
-# NOTE: semgrep is installed via pip ONLY. The source clone that was here
-# previously was completely redundant (pip handles it) and has been removed.
+# Tools with no version conflicts are installed into system site-packages.
+# Tools that conflict with each other or with the Django app's requirements
+# (dirsearch, maigret, semgrep) are isolated in their own pipx virtual
+# environments so their transitive dependencies cannot clash.
+#
+# Conflicts resolved by pipx isolation:
+#   dirsearch 0.4.3.post1 — requires requests>=2.27.0  (system: 2.25.1)
+#   maigret   0.6.1       — requires requests>=2.32.4, chardet>=5, idna>=3.4
+#   semgrep   1.165.0     — requires urllib3~=2.0       (system: 1.26.x)
+#
+# /root/.local/bin is already on PATH (set earlier in this Dockerfile), so
+# all pipx shims are immediately available to subsequent RUN steps and at
+# container runtime without any additional PATH configuration.
 # ---------------------------------------------------------------------------
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel pyOpenSSL h8mail && \
-    pip3 install --no-cache-dir semgrep && \
-    pip3 install --no-cache-dir --upgrade meson ninja arjun inql netlas holehe maigret dirsearch
+    pip3 install --no-cache-dir --upgrade fierce dirsearch meson ninja arjun inql netlas holehe
+
+# Ensure pipx is available and install baddns
+RUN python3 -m pip install --no-cache-dir pipx && \
+    pipx install git+https://github.com/blacklanternsecurity/baddns
+
+# Install conflicting tools in isolated pipx environments.
+# Each venv gets setuptools installed via its own pip to guarantee pkg_resources
+# is available under Python 3.12 (pipx inject can be silently skipped by layer cache).
+RUN pipx install maigret && \
+    pipx inject maigret setuptools && \
+    pipx install semgrep && \
+    pipx inject semgrep setuptools && \
+    pipx install dnsrecon && \
+    pipx inject dnsrecon setuptools
 
 RUN git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop \
     && pip3 install --no-cache-dir -r /usr/src/github/graphql-cop/requirements.txt \
@@ -399,11 +452,6 @@ RUN git clone --depth 1 https://github.com/cddmp/enum4linux-ng /usr/src/github/e
 RUN git clone --depth 1 https://github.com/CiscoCXSecurity/rdp-sec-check /usr/src/github/rdp-sec-check \
     && cpan install Encoding::BER \
     && ln -sf /usr/src/github/rdp-sec-check/rdp-sec-check.pl /usr/local/bin/rdp-sec-check
-
-RUN pip3 install --no-cache-dir dnsrecon fierce
-
-RUN python3 -m pip install --no-cache-dir pipx && \
-    pipx install git+https://github.com/blacklanternsecurity/baddns
 
 # ---------------------------------------------------------------------------
 # Copy and install the application's Python requirements

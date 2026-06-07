@@ -9,7 +9,7 @@ from django.utils import timezone
 from reNgine.definitions import (TASK_STATUSES,
 								 NUCLEI_REVERSE_SEVERITY_MAP)
 from reNgine.utilities import *
-from scanEngine.models import EngineType
+from scanEngine.models import EngineType, HardwareProfile
 from targetApp.models import Domain
 
 
@@ -39,6 +39,8 @@ class ScanHistory(models.Model):
 	results_dir = models.CharField(max_length=100, blank=True)
 	domain = models.ForeignKey(Domain, on_delete=models.CASCADE)
 	scan_type = models.ForeignKey(EngineType, on_delete=models.CASCADE)
+	hardware_profile = models.ForeignKey(HardwareProfile, on_delete=models.SET_NULL, null=True, blank=True)
+
 	workflow_ids = ArrayField(models.CharField(max_length=100), blank=True, default=list)
 	tasks = ArrayField(models.CharField(max_length=200), null=True)
 	stop_scan_date = models.DateTimeField(null=True, blank=True)
@@ -238,6 +240,13 @@ class Subdomain(models.Model):
 	criticality_level = models.IntegerField(default=1, null=True, blank=True)
 	criticality_reason = models.TextField(null=True, blank=True)
 
+	class Meta:
+		constraints = [
+			models.UniqueConstraint(
+				fields=['scan_history', 'name'],
+				name='unique_subdomain_per_scan',
+			),
+		]
 
 	def __str__(self):
 		return str(self.name)
@@ -466,12 +475,39 @@ class VulnerabilityReference(models.Model):
 
 
 class CveId(models.Model):
+	"""
+	Represents a CVE record containing vulnerability metadata such as CVSS severity, exploitability, and relationships.
+	"""
 	id = models.AutoField(primary_key=True)
-	name = models.CharField(max_length=100)
+	name = models.CharField(max_length=100, unique=True, db_index=True)
 	is_cisa_kev = models.BooleanField(default=False)
+	
+	cvss_v31_base_score = models.FloatField(null=True, blank=True)  # 0-10
+	attack_vector = models.CharField(max_length=20, null=True, blank=True)  # NETWORK, ADJACENT, LOCAL, PHYSICAL
+	attack_complexity = models.CharField(max_length=20, null=True, blank=True)  # LOW, HIGH
+	privileges_required = models.CharField(max_length=20, null=True, blank=True)  # NONE, LOW, HIGH
+	user_interaction = models.CharField(max_length=20, null=True, blank=True)  # NONE, REQUIRED
+	confidentiality_impact = models.CharField(max_length=20, null=True, blank=True)  # NONE, LOW, HIGH
+	integrity_impact = models.CharField(max_length=20, null=True, blank=True)  # NONE, LOW, HIGH
+	availability_impact = models.CharField(max_length=20, null=True, blank=True)  # NONE, LOW, HIGH
+	
+	epss_score = models.FloatField(null=True, blank=True)  # 0-1
+	epss_percentile = models.FloatField(null=True, blank=True)  # 0-100
+	published_date = models.DateTimeField(null=True, blank=True)
+	last_modified_date = models.DateTimeField(null=True, blank=True)
+	vulnerability_type = models.CharField(max_length=50, null=True, blank=True)  # SCA, DAST, SAST, Config
+	is_poc = models.BooleanField(default=False)
+	is_template = models.BooleanField(default=False)
+	
+	related_cves = models.ManyToManyField(
+		'self', 
+		symmetrical=False, 
+		blank=True,
+		related_name='related_from'
+	)
 
 	def __str__(self):
-		return self.name
+		return f"{self.name} (CVSS: {self.cvss_v31_base_score})"
 
 
 class CweId(models.Model):
@@ -583,22 +619,53 @@ class ValidationResult(models.Model):
 		return f"Validation for {self.vulnerability.name} by {self.tool}"
 
 	def get_severity(self):
-		return self.severity
+		"""Retrieve severity from the linked vulnerability.
+
+		Returns:
+			int: The severity level (0-4 or -1) of the vulnerability.
+		"""
+		return self.vulnerability.severity
 
 	def get_cve_str(self):
-		return ', '.join(f'`{cve.name}`' for cve in self.cve_ids.all())
+		"""Format the associated CVE names as a comma-separated list of code blocks.
+
+		Returns:
+			str: A string of comma-separated CVE names wrapped in markdown backticks.
+		"""
+		return ', '.join(f'`{cve.name}`' for cve in self.vulnerability.cve_ids.all())
 
 	def get_cwe_str(self):
-		return ', '.join(f'`{cwe.name}`' for cwe in self.cwe_ids.all())
+		"""Format the associated CWE names as a comma-separated list of code blocks.
+
+		Returns:
+			str: A string of comma-separated CWE names wrapped in markdown backticks.
+		"""
+		return ', '.join(f'`{cwe.name}`' for cwe in self.vulnerability.cwe_ids.all())
 
 	def get_tags_str(self):
-		return ', '.join(f'`{tag.name}`' for tag in self.tags.all())
+		"""Format the associated tags as a comma-separated list of code blocks.
+
+		Returns:
+			str: A string of comma-separated vulnerability tag names wrapped in markdown backticks.
+		"""
+		return ', '.join(f'`{tag.name}`' for tag in self.vulnerability.tags.all())
 
 	def get_refs_str(self):
-		return '•' + '\n• '.join(f'`{ref.url}`' for ref in self.references.all())
+		"""Format references as a bulleted list of code blocks.
+
+		Returns:
+			str: A formatted list of references separated by bullet points and wrapped in backticks.
+		"""
+		return '•' + '\n• '.join(f'`{ref.url}`' for ref in self.vulnerability.references.all())
 
 	def get_path(self):
-		return urlparse(self.http_url).path
+		"""Extract path from the linked vulnerability URL.
+
+		Returns:
+			str: The path string of the vulnerability's HTTP URL, or '/' if empty.
+		"""
+		from urllib.parse import urlparse
+		return urlparse(self.vulnerability.http_url).path if self.vulnerability.http_url else "/"
 
 
 class ImpactAssessment(models.Model):
@@ -1228,3 +1295,144 @@ class TemporalSchedule(models.Model):
 
 	def __str__(self):
 		return f'{self.name} ({self.schedule_id})'
+
+
+class VulnerabilityHistory(models.Model):
+    """
+    Tracks the lifecycle, persistence, and remediation status of vulnerabilities 
+    across scan runs. Enables trend analysis and remediation tracking.
+    
+    Attributes:
+        group_key: SHA-256 hash uniquely identifying a vulnerability class
+        first_seen: Timestamp of initial discovery
+        last_seen: Timestamp of most recent discovery
+        is_remediated: Boolean flag indicating if vulnerability has been fixed
+        remediation_date: Timestamp when vulnerability was first remediated
+        total_occurrences: Count of how many times this vulnerability has appeared
+        affected_subdomains_count: Number of distinct subdomains affected
+        scan_history: Reference to the scan that found this record
+        vulnerability: Reference to the Vulnerability that triggered history creation
+        cve: Optional reference to associated CVE record
+    """
+    id = models.AutoField(primary_key=True)
+    
+    # Linking to scans and vulnerabilities
+    scan_history = models.ForeignKey(
+        ScanHistory, 
+        on_delete=models.CASCADE, 
+        related_name='vulnerability_history',
+        help_text='Scan that generated this history record'
+    )
+    vulnerability = models.ForeignKey(
+        Vulnerability, 
+        on_delete=models.CASCADE, 
+        related_name='history_records',
+        help_text='Vulnerability that triggered this record'
+    )
+    cve = models.ForeignKey(
+        CveId, 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        help_text='Associated CVE, if available'
+    )
+    
+    # Deduplication & grouping
+    group_key = models.CharField(
+        max_length=500, 
+        db_index=True,
+        help_text='SHA-256 hash for grouping identical vulnerabilities'
+    )
+    
+    # Timeline tracking
+    first_seen = models.DateTimeField(
+        auto_now_add=True,
+        help_text='First discovery timestamp'
+    )
+    last_seen = models.DateTimeField(
+        auto_now=True,
+        help_text='Most recent discovery timestamp'
+    )
+    
+    # Remediation status
+    is_remediated = models.BooleanField(
+        default=False,
+        help_text='Whether vulnerability has been fixed'
+    )
+    remediation_date = models.DateTimeField(
+        null=True, 
+        blank=True,
+        help_text='Date when vulnerability was remediated'
+    )
+    
+    # Trending & impact metrics
+    total_occurrences = models.IntegerField(
+        default=1,
+        help_text='Total times this vulnerability appeared'
+    )
+    affected_subdomains_count = models.IntegerField(
+        default=0,
+        help_text='Number of distinct subdomains affected'
+    )
+    
+    class Meta:
+        verbose_name = 'Vulnerability History'
+        verbose_name_plural = 'Vulnerability Histories'
+        ordering = ['-last_seen']
+        
+        # Enforce one history record per (group_key, scan_history) pair
+        unique_together = ('group_key', 'scan_history')
+        
+        # Performance indexes
+        indexes = [
+            models.Index(
+                fields=['group_key', '-last_seen'],
+                name='vh_groupkey_lastseen_idx'
+            ),
+            models.Index(
+                fields=['is_remediated', '-last_seen'],
+                name='vh_remediated_lastseen_idx'
+            ),
+            models.Index(
+                fields=['scan_history', '-last_seen'],
+                name='vh_scan_lastseen_idx'
+            ),
+        ]
+    
+    def __str__(self):
+        status = "✓ Remediated" if self.is_remediated else "✗ Active"
+        return f"{self.vulnerability.name} [{self.group_key[:8]}...] - {status}"
+    
+    def days_since_discovery(self):
+        """Calculate days between first discovery and now."""
+        from django.utils import timezone
+        return (timezone.now() - self.first_seen).days
+    
+    def days_to_remediation(self):
+        """Calculate time from first discovery to remediation."""
+        if not self.remediation_date:
+            return None
+        return (self.remediation_date - self.first_seen).days
+    
+    @classmethod
+    def get_trending_vulns(cls, domain, days=30):
+        """Get vulnerabilities discovered in last N days."""
+        from django.utils import timezone
+        from datetime import timedelta
+        
+        cutoff = timezone.now() - timedelta(days=days)
+        return cls.objects.filter(
+            scan_history__domain=domain,
+            first_seen__gte=cutoff
+        ).order_by('-total_occurrences')
+    
+    @classmethod
+    def get_persistent_vulns(cls, domain, min_days=90):
+        """Get vulnerabilities that have persisted for N+ days."""
+        from django.utils import timezone
+        
+        return cls.objects.filter(
+            scan_history__domain=domain,
+            is_remediated=False,
+            days_since_discovery__gte=min_days
+        ).order_by('first_seen')

@@ -1,5 +1,8 @@
+import io
+import os
 import secrets
 import socket
+import tarfile
 import time
 import logging
 
@@ -48,6 +51,34 @@ class TorManager:
             logger.debug(f"[TorManager] Could not discover network, using fallback: {e}")
             return 'r3ngine_r3ngine_network'
 
+    def _build_image(self, client):
+        """Build the Tor image from the local build context (web/tor/)."""
+        build_context_dir = os.path.realpath(
+            os.path.join(os.path.dirname(__file__), '..', 'tor')
+        )
+        if not os.path.isdir(build_context_dir):
+            raise TorStartError(
+                f"Tor build context not found at '{build_context_dir}'. "
+                "Run: docker compose build tor"
+            )
+        logger.info("[TorManager] Building '%s' from %s — this may take a minute...", TOR_IMAGE_NAME, build_context_dir)
+        tar_stream = io.BytesIO()
+        with tarfile.open(fileobj=tar_stream, mode='w') as tar:
+            tar.add(build_context_dir, arcname='.')
+        tar_stream.seek(0)
+        try:
+            client.images.build(
+                fileobj=tar_stream,
+                custom_context=True,
+                tag=TOR_IMAGE_NAME,
+                rm=True,
+            )
+            logger.info("[TorManager] Image '%s' built successfully.", TOR_IMAGE_NAME)
+        except docker.errors.BuildError as e:
+            raise TorStartError(f"Failed to build TOR image: {e}")
+        except docker.errors.APIError as e:
+            raise TorStartError(f"Docker API error during TOR image build: {e}")
+
     def start(self):
         client = self._get_client()
 
@@ -57,6 +88,13 @@ class TorManager:
             existing.remove(force=True)
         except docker.errors.NotFound:
             pass
+
+        # Build the image on first use if it doesn't exist yet
+        try:
+            client.images.get(TOR_IMAGE_NAME)
+        except docker.errors.ImageNotFound:
+            logger.info("[TorManager] Image '%s' not found — building from source.", TOR_IMAGE_NAME)
+            self._build_image(client)
 
         # Generate a fresh random control password for this session
         password = secrets.token_hex(32)
@@ -73,11 +111,6 @@ class TorManager:
                 network=network,
                 restart_policy={'Name': 'no'},
                 mem_limit='256m',
-            )
-        except docker.errors.ImageNotFound:
-            cache.delete(CACHE_KEY_PASSWORD)
-            raise TorStartError(
-                f"Image '{TOR_IMAGE_NAME}' not found. Run: docker compose build tor"
             )
         except docker.errors.APIError as e:
             cache.delete(CACHE_KEY_PASSWORD)

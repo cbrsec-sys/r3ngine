@@ -6,6 +6,70 @@ from targetApp.models import Domain
 
 logger = logging.getLogger(__name__)
 
+# Rows per Neo4j UNWIND transaction — keeps memory and txn duration bounded.
+GRAPH_SYNC_BATCH_SIZE = 500
+# ORM read chunk — separate from Neo4j batch size.
+GRAPH_SYNC_ORM_CHUNK = 2000
+
+
+def _chunk_list(items, size=GRAPH_SYNC_BATCH_SIZE):
+    """Yield fixed-size slices from a list."""
+    for offset in range(0, len(items), size):
+        yield items[offset:offset + size]
+
+
+def _graph_heartbeat(message, *details):
+    """Send a Temporal heartbeat when running inside an activity context."""
+    try:
+        from temporalio import activity
+        if details:
+            activity.heartbeat(message, *details)
+        else:
+            activity.heartbeat(message)
+    except Exception:
+        pass
+
+
+def _last_graph_sync_scan_id():
+    """Return the last scan_id checkpoint from a prior activity heartbeat, if any."""
+    try:
+        from temporalio import activity
+        details = activity.info().heartbeat_details
+        if details:
+            return int(details[0])
+    except Exception:
+        pass
+    return 0
+
+
+def _scan_severity_summary(scan_id: int) -> str:
+    """Return a one-line severity/CVE breakdown for a scan, e.g.
+    'Critical: 2 High: 5 Medium: 12 Low: 8 Unknown: 1 CVEs: 3'
+    """
+    from startScan.models import Vulnerability
+    from django.db.models import Count
+
+    qs = Vulnerability.objects.filter(scan_history_id=scan_id)
+    counts = dict(
+        qs.values_list('severity')
+          .annotate(n=Count('id'))
+          .values_list('severity', 'n')
+    )
+    cve_count = (
+        qs.filter(cve_ids__isnull=False)
+          .values('cve_ids')
+          .distinct()
+          .count()
+    )
+    return (
+        f"Critical: {counts.get(4, 0)} "
+        f"High: {counts.get(3, 0)} "
+        f"Medium: {counts.get(2, 0)} "
+        f"Low: {counts.get(1, 0)} "
+        f"Unknown: {counts.get(-1, 0)} "
+        f"CVEs: {cve_count}"
+    )
+
 # Suppress Neo4j notification logs (like CartesianProduct) unless DEBUG is enabled
 import os
 if os.environ.get("DEBUG", "0") != "1":
@@ -32,20 +96,62 @@ class Neo4jManager:
         if self.driver:
             self.driver.close()
 
-    def sync_scan_results(self, scan_history_id):
-        """Syncs scan results from PostgreSQL to Neo4j.
+    def _ensure_graph_indexes(self, session):
+        """Create lookup indexes once so large UNWIND MATCH steps do not table-scan."""
+        index_statements = [
+            "CREATE INDEX graph_subdomain_name IF NOT EXISTS FOR (n:Subdomain) ON (n.name)",
+            "CREATE INDEX graph_endpoint_url IF NOT EXISTS FOR (n:Endpoint) ON (n.url)",
+            "CREATE INDEX graph_scan_id IF NOT EXISTS FOR (n:Scan) ON (n.id)",
+            "CREATE INDEX graph_vuln_id IF NOT EXISTS FOR (n:Vulnerability) ON (n.id)",
+            "CREATE INDEX graph_domain_name IF NOT EXISTS FOR (n:Domain) ON (n.name)",
+            "CREATE INDEX graph_ip_address IF NOT EXISTS FOR (n:IPAddress) ON (n.address)",
+        ]
+        for statement in index_statements:
+            try:
+                session.run(statement)
+            except Exception as exc:
+                logger.debug("Neo4j index statement skipped: %s (%s)", statement, exc)
 
-        Uses batched UNWIND transactions instead of per-record execute_write calls
-        to avoid the N+1 pattern that caused activity timeouts on large scans.
-        Each entity type is synced in a single transaction regardless of count.
+    def _batch_execute(self, session, write_fn, rows, label="", heartbeat_callback=None):
+        """Flush rows to Neo4j in bounded UNWIND batches."""
+        if not rows:
+            return
+        total_batches = (len(rows) + GRAPH_SYNC_BATCH_SIZE - 1) // GRAPH_SYNC_BATCH_SIZE
+        for batch_idx, chunk in enumerate(_chunk_list(rows, GRAPH_SYNC_BATCH_SIZE), start=1):
+            session.execute_write(write_fn, chunk)
+            logger.info(
+                "[Neo4j] %s batch %d/%d (%d rows)",
+                label, batch_idx, total_batches, len(chunk),
+            )
+            if heartbeat_callback:
+                heartbeat_callback(
+                    f"neo4j {label} batch {batch_idx}/{total_batches} ({len(chunk)} rows)"
+                )
+
+    def _flush_row_buffers(self, session, buffers, heartbeat_callback=None):
+        """Write any pending row buffers to Neo4j."""
+        for write_fn, rows, label in buffers:
+            self._batch_execute(
+                session, write_fn, rows, label=label, heartbeat_callback=heartbeat_callback,
+            )
+
+    def sync_scan_results(self, scan_history_id, heartbeat_callback=None):
+        """Sync scan results from PostgreSQL to Neo4j.
+
+        Streams ORM rows and writes Neo4j UNWIND batches so large scans do not
+        load everything into memory or hold a single long-running transaction.
         """
         if not self.driver:
             return
 
         from startScan.models import ScanHistory, Vulnerability
 
+        heartbeat = heartbeat_callback or _graph_heartbeat
+
         try:
-            scan = ScanHistory.objects.get(id=scan_history_id)
+            scan = ScanHistory.objects.select_related(
+                'domain__project'
+            ).get(id=scan_history_id)
             project_id = scan.domain.project.id if scan.domain and scan.domain.project else 0
             project_name = scan.domain.project.name if scan.domain and scan.domain.project else "Default Project"
             target_name = scan.domain.name if scan.domain else "Unknown Target"
@@ -56,10 +162,15 @@ class Neo4jManager:
             logger.error(f"Failed to fetch scan details for sync: {e}")
             return
 
+        subdomain_count = 0
+        endpoint_count = 0
+        param_count = 0
+        tech_count = 0
+        vuln_count = 0
+        cve_count = 0
+
         with self.driver.session() as session:
-            # ----------------------------------------------------------------
-            # 1. Create Project / Scan / Domain scaffold (single transaction)
-            # ----------------------------------------------------------------
+            self._ensure_graph_indexes(session)
             session.execute_write(
                 self._initialize_scan_context,
                 project_id,
@@ -68,125 +179,209 @@ class Neo4jManager:
                 target_name,
                 scan_date,
             )
-
-            # ----------------------------------------------------------------
-            # 2. Subdomains — build batch list, one transaction for all
-            # ----------------------------------------------------------------
-            subdomains_qs = Subdomain.objects.filter(
-                scan_history_id=scan_history_id
-            ).select_related("target_domain").prefetch_related("technologies")
+            heartbeat(f"neo4j scan_id={scan_history_id} scaffold ready")
 
             subdomain_rows = []
             ip_rows = []
             tech_rows = []
+            subdomain_base_qs = Subdomain.objects.filter(scan_history_id=scan_history_id)
 
-            for sub in subdomains_qs:
-                domain_name = sub.target_domain.name if sub.target_domain else target_name
-                subdomain_name = sub.name or "unknown"
-                ip_address = sub.ip_addresses if hasattr(sub, "ip_addresses") else None
+            for row in subdomain_base_qs.values(
+                'name', 'target_domain__name'
+            ).iterator(chunk_size=GRAPH_SYNC_ORM_CHUNK):
+                subdomain_name = row['name'] or "unknown"
+                domain_name = row['target_domain__name'] or target_name
                 subdomain_rows.append({
                     "domain_name": domain_name,
                     "subdomain_name": subdomain_name,
                     "scan_id": scan_history_id,
                 })
-                if ip_address:
-                    for ip in [x.strip() for x in str(ip_address).split(",") if x.strip()]:
-                        ip_rows.append({
-                            "ip": ip,
-                            "subdomain_name": subdomain_name,
-                            "scan_id": scan_history_id,
-                        })
-                for tech in sub.technologies.all():
-                    if tech and tech.name:
-                        tech_rows.append({
-                            "subdomain_name": subdomain_name,
-                            "tech_name": tech.name,
-                            "scan_id": scan_history_id,
-                        })
+                subdomain_count += 1
+                if len(subdomain_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                    self._batch_execute(
+                        session, self._batch_merge_subdomains, subdomain_rows,
+                        label="subdomains", heartbeat_callback=heartbeat,
+                    )
+                    subdomain_rows = []
 
-            if subdomain_rows:
-                session.execute_write(self._batch_merge_subdomains, subdomain_rows)
-            if ip_rows:
-                session.execute_write(self._batch_merge_ips, ip_rows)
-            if tech_rows:
-                session.execute_write(self._batch_merge_technologies, tech_rows)
+            for row in subdomain_base_qs.values(
+                'name', 'ip_addresses__address'
+            ).iterator(chunk_size=GRAPH_SYNC_ORM_CHUNK):
+                ip = row.get('ip_addresses__address')
+                if not ip:
+                    continue
+                ip_rows.append({
+                    "ip": ip,
+                    "subdomain_name": row['name'] or "unknown",
+                    "scan_id": scan_history_id,
+                })
+                if len(ip_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                    self._batch_execute(
+                        session, self._batch_merge_ips, ip_rows,
+                        label="ips", heartbeat_callback=heartbeat,
+                    )
+                    ip_rows = []
 
-            # ----------------------------------------------------------------
-            # 3. Endpoints + Parameters — prefetch to avoid per-endpoint query
-            # ----------------------------------------------------------------
-            endpoints_qs = EndPoint.objects.filter(
-                scan_history_id=scan_history_id
-            ).select_related("subdomain").prefetch_related("parameters")
+            for row in subdomain_base_qs.values(
+                'name', 'technologies__name'
+            ).iterator(chunk_size=GRAPH_SYNC_ORM_CHUNK):
+                tech_name = row.get('technologies__name')
+                if not tech_name:
+                    continue
+                tech_rows.append({
+                    "subdomain_name": row['name'] or "unknown",
+                    "tech_name": tech_name,
+                    "scan_id": scan_history_id,
+                })
+                tech_count += 1
+                if len(tech_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                    self._batch_execute(
+                        session, self._batch_merge_technologies, tech_rows,
+                        label="technologies", heartbeat_callback=heartbeat,
+                    )
+                    tech_rows = []
+
+            self._flush_row_buffers(session, [
+                (self._batch_merge_subdomains, subdomain_rows, "subdomains"),
+                (self._batch_merge_ips, ip_rows, "ips"),
+                (self._batch_merge_technologies, tech_rows, "technologies"),
+            ], heartbeat_callback=heartbeat)
 
             endpoint_rows = []
             param_rows = []
+            endpoints_qs = EndPoint.objects.filter(scan_history_id=scan_history_id)
+            endpoint_total = endpoints_qs.count()
+            logger.info(
+                "[Neo4j] scan_id=%s syncing %d endpoints",
+                scan_history_id, endpoint_total,
+            )
 
-            for endpoint in endpoints_qs:
-                subdomain_name = endpoint.subdomain.name if endpoint.subdomain else target_name
-                url = endpoint.http_url or "unknown"
+            for row in endpoints_qs.values(
+                'http_url', 'subdomain__name'
+            ).iterator(chunk_size=GRAPH_SYNC_ORM_CHUNK):
                 endpoint_rows.append({
-                    "subdomain_name": subdomain_name,
-                    "url": url,
+                    "subdomain_name": row['subdomain__name'] or target_name,
+                    "url": row['http_url'] or "unknown",
                     "scan_id": scan_history_id,
                 })
-                for param in endpoint.parameters.all():
+                endpoint_count += 1
+                if endpoint_count % 10000 == 0:
+                    logger.info(
+                        "[Neo4j] scan_id=%s endpoints read %d/%d",
+                        scan_history_id, endpoint_count, endpoint_total,
+                    )
+                    heartbeat(
+                        f"neo4j scan_id={scan_history_id} endpoints {endpoint_count}/{endpoint_total}"
+                    )
+                if len(endpoint_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                    self._batch_execute(
+                        session, self._batch_merge_endpoints, endpoint_rows,
+                        label="endpoints", heartbeat_callback=heartbeat,
+                    )
+                    endpoint_rows = []
+
+            from startScan.models import Parameter
+            if Parameter.objects.filter(endpoint__scan_history_id=scan_history_id).exists():
+                for row in Parameter.objects.filter(
+                    endpoint__scan_history_id=scan_history_id
+                ).values('name', 'type', 'endpoint__http_url').iterator(
+                    chunk_size=GRAPH_SYNC_ORM_CHUNK
+                ):
                     param_rows.append({
-                        "url": url,
-                        "param_name": param.name or "unknown",
-                        "param_type": param.type,
+                        "url": row['endpoint__http_url'] or "unknown",
+                        "param_name": row['name'] or "unknown",
+                        "param_type": row['type'],
                         "scan_id": scan_history_id,
                     })
+                    param_count += 1
+                    if len(param_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                        self._batch_execute(
+                            session, self._batch_merge_parameters, param_rows,
+                            label="parameters", heartbeat_callback=heartbeat,
+                        )
+                        param_rows = []
 
-            if endpoint_rows:
-                session.execute_write(self._batch_merge_endpoints, endpoint_rows)
-            if param_rows:
-                session.execute_write(self._batch_merge_parameters, param_rows)
+            self._flush_row_buffers(session, [
+                (self._batch_merge_endpoints, endpoint_rows, "endpoints"),
+                (self._batch_merge_parameters, param_rows, "parameters"),
+            ], heartbeat_callback=heartbeat)
 
-            # ----------------------------------------------------------------
-            # 4. Vulnerabilities + CVEs — prefetch related
-            # ----------------------------------------------------------------
             vuln_rows = []
             cve_rows = []
+            vulns_qs = Vulnerability.objects.filter(scan_history_id=scan_history_id)
 
-            for vuln in Vulnerability.objects.filter(
-                scan_history_id=scan_history_id
-            ).select_related("subdomain", "endpoint").prefetch_related("cve_ids"):
-                asset_name = (
-                    vuln.subdomain.name if vuln.subdomain
-                    else (vuln.endpoint.http_url if vuln.endpoint else None)
-                )
-                asset_type = (
-                    "Subdomain" if vuln.subdomain
-                    else ("Endpoint" if vuln.endpoint else None)
-                )
-                if asset_name and asset_type:
-                    vuln_rows.append({
-                        "asset_name": asset_name,
-                        "asset_type": asset_type,
-                        "vuln_name": vuln.name or "Unknown Vulnerability",
-                        "severity": vuln.severity,
-                        "score": vuln.correlation_score,
-                        "scan_id": scan_history_id,
-                        "vuln_id": vuln.id,
-                    })
-                    for cve in vuln.cve_ids.all():
-                        if cve and cve.name:
-                            cve_rows.append({
-                                "vuln_name": vuln.name or "Unknown Vulnerability",
-                                "cve_name": cve.name,
-                                "scan_id": scan_history_id,
-                            })
+            for row in vulns_qs.values(
+                'id', 'name', 'severity', 'correlation_score',
+                'subdomain__name', 'endpoint__http_url',
+            ).iterator(chunk_size=GRAPH_SYNC_ORM_CHUNK):
+                if row['subdomain__name']:
+                    asset_name = row['subdomain__name']
+                    asset_type = "Subdomain"
+                elif row['endpoint__http_url']:
+                    asset_name = row['endpoint__http_url']
+                    asset_type = "Endpoint"
+                else:
+                    continue
 
-            if vuln_rows:
-                session.execute_write(self._batch_merge_vulnerabilities, vuln_rows)
-            if cve_rows:
-                session.execute_write(self._batch_merge_cves, cve_rows)
+                vuln_rows.append({
+                    "asset_name": asset_name,
+                    "asset_type": asset_type,
+                    "vuln_name": row['name'] or "Unknown Vulnerability",
+                    "severity": row['severity'],
+                    "score": row['correlation_score'],
+                    "scan_id": scan_history_id,
+                    "vuln_id": row['id'],
+                })
+                vuln_count += 1
+                if len(vuln_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                    self._batch_execute(
+                        session, self._batch_merge_vulnerabilities, vuln_rows,
+                        label="vulnerabilities", heartbeat_callback=heartbeat,
+                    )
+                    vuln_rows = []
 
+            for row in vulns_qs.values(
+                'id',
+                'cve_ids__name',
+                'cve_ids__cvss_v31_base_score',
+                'cve_ids__epss_score',
+                'cve_ids__is_cisa_kev',
+                'cve_ids__published_date',
+                'cve_ids__attack_vector',
+            ).iterator(chunk_size=GRAPH_SYNC_ORM_CHUNK):
+                cve_name = row.get('cve_ids__name')
+                if not cve_name:
+                    continue
+                published = row.get('cve_ids__published_date')
+                cve_rows.append({
+                    "vuln_id": row['id'],
+                    "cve_name": cve_name,
+                    "cvss_score": row.get('cve_ids__cvss_v31_base_score'),
+                    "epss_score": row.get('cve_ids__epss_score'),
+                    "is_cisa_kev": row.get('cve_ids__is_cisa_kev'),
+                    "published_date": published.isoformat() if published else None,
+                    "attack_vector": row.get('cve_ids__attack_vector'),
+                    "scan_id": scan_history_id,
+                })
+                cve_count += 1
+                if len(cve_rows) >= GRAPH_SYNC_BATCH_SIZE:
+                    self._batch_execute(
+                        session, self._batch_merge_cves, cve_rows,
+                        label="cves", heartbeat_callback=heartbeat,
+                    )
+                    cve_rows = []
+
+            self._flush_row_buffers(session, [
+                (self._batch_merge_vulnerabilities, vuln_rows, "vulnerabilities"),
+                (self._batch_merge_cves, cve_rows, "cves"),
+            ], heartbeat_callback=heartbeat)
+
+        heartbeat(f"neo4j scan_id={scan_history_id} complete")
         logger.info(
             f"[Neo4j] sync_scan_results scan_id={scan_history_id}: "
-            f"{len(subdomain_rows)} subdomains, {len(endpoint_rows)} endpoints, "
-            f"{len(param_rows)} params, {len(tech_rows)} techs, "
-            f"{len(vuln_rows)} vulns, {len(cve_rows)} CVEs synced."
+            f"{subdomain_count} subdomains, {endpoint_count} endpoints, "
+            f"{param_count} params, {tech_count} techs, "
+            f"{vuln_count} vulns, {cve_count} CVEs synced."
         )
 
     @staticmethod
@@ -329,17 +524,17 @@ class Neo4jManager:
         )
 
     @staticmethod
-    def _merge_cves(tx, vuln_name, cve_name, scan_id):
+    def _merge_cves(tx, vuln_id, cve_name, scan_id):
         tx.run(
             """
             MERGE (c:CVE {name: $cve_name})
             WITH c
-            MATCH (v:Vulnerability {name: $vuln_name}), (sc:Scan {id: $scan_id})
+            MATCH (v:Vulnerability {id: $vuln_id}), (sc:Scan {id: $scan_id})
             MERGE (v)-[:LINKED_TO_CVE]->(c)
             MERGE (sc)-[:FOUND]->(c)
         """,
             cve_name=cve_name,
-            vuln_name=vuln_name,
+            vuln_id=vuln_id,
             scan_id=scan_id,
         )
 
@@ -471,8 +666,13 @@ class Neo4jManager:
             """
             UNWIND $rows AS row
             MERGE (c:CVE {name: row.cve_name})
+            SET c.cvss_score = row.cvss_score,
+                c.epss_score = row.epss_score,
+                c.is_cisa_kev = row.is_cisa_kev,
+                c.published = row.published_date,
+                c.attack_vector = row.attack_vector
             WITH c, row
-            MATCH (v:Vulnerability {name: row.vuln_name}), (sc:Scan {id: row.scan_id})
+            MATCH (v:Vulnerability {id: row.vuln_id}), (sc:Scan {id: row.scan_id})
             MERGE (v)-[:LINKED_TO_CVE]->(c)
             MERGE (sc)-[:FOUND]->(c)
             """,
@@ -556,22 +756,47 @@ class Neo4jManager:
             logger.error(f"Failed to fetch stress telemetry: {e}")
         return data
 
-    def sync_all_scans(self):
-        """Syncs all scan results from PostgreSQL to Neo4j."""
+    def sync_all_scans(self, heartbeat_callback=None, resume_from_scan_id=None):
+        """Sync all scan results from PostgreSQL to Neo4j.
+
+        Sends Temporal heartbeats per scan so large startup syncs stay alive.
+        On activity retry, resumes after the last successfully synced scan_id.
+        """
         from startScan.models import ScanHistory
 
-        scans = ScanHistory.objects.all()
+        heartbeat = heartbeat_callback or _graph_heartbeat
+        start_after_id = resume_from_scan_id
+        if start_after_id is None:
+            start_after_id = _last_graph_sync_scan_id()
+
+        scans = (
+            ScanHistory.objects
+            .select_related('domain')
+            .filter(id__gt=start_after_id)
+            .order_by('id')
+        )
         total_scans = scans.count()
-        logger.info(f"Starting global graph synchronization for {total_scans} scans.")
+        if start_after_id:
+            logger.info(
+                "Resuming global graph sync after scan_id=%s (%d scans remaining).",
+                start_after_id, total_scans,
+            )
+        else:
+            logger.info("Starting global graph synchronization for %d scans.", total_scans)
 
         for index, scan in enumerate(scans, 1):
+            domain_name = scan.domain.name if scan.domain else "unknown"
+            summary = _scan_severity_summary(scan.id)
             logger.info(
-                f"[{index}/{total_scans}] Syncing scan: {scan.domain.name} (ID: {scan.id})"
+                "[%d/%d] Syncing scan #%d (%s) — %s",
+                index, total_scans, scan.id, domain_name, summary,
             )
+            heartbeat(f"graph sync starting scan {scan.id} ({index}/{total_scans})", scan.id)
             try:
-                self.sync_scan_results(scan.id)
+                self.sync_scan_results(scan.id, heartbeat_callback=heartbeat)
             except Exception as e:
-                logger.error(f"Failed to sync scan {scan.id}: {e}")
+                logger.error("Failed to sync scan %d: %s", scan.id, e)
+            heartbeat(f"graph sync completed scan {scan.id} ({index}/{total_scans})", scan.id)
 
         logger.info("Global graph synchronization completed successfully.")
 
@@ -730,18 +955,4 @@ class Neo4jManager:
         query = "MATCH (n) DETACH DELETE n"
         with self.driver.session() as session:
             session.run(query)
-        print("[*] Neo4j database has been reset (all nodes deleted).")
-
-    def sync_all_scans(self):
-        """Utility to re-sync all historical scans from Django DB to Neo4j."""
-        from startScan.models import ScanHistory
-
-        scans = ScanHistory.objects.all().order_by("id")
-        print(f"[*] Starting re-sync of {scans.count()} scans...")
-        for scan in scans:
-            try:
-                print(f"[*] Syncing scan {scan.id} for {scan.domain.name}...")
-                self.sync_scan_results(scan.id)
-            except Exception as e:
-                print(f"[!] Error syncing scan {scan.id}: {str(e)}")
-        print("[*] Re-sync complete.")
+        logger.info("Neo4j database has been reset (all nodes deleted).")

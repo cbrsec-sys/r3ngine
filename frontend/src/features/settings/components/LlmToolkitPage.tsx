@@ -18,14 +18,14 @@ import {
   Tooltip,
   Snackbar
 } from '@mui/material';
-import { 
-  Cpu, 
-  Settings, 
-  Save, 
-  Download, 
-  Eye, 
-  EyeOff, 
-  Info, 
+import {
+  Cpu,
+  Settings,
+  Save,
+  Download,
+  Eye,
+  EyeOff,
+  Info,
   Terminal as TerminalIcon,
   CheckCircle2,
   AlertCircle,
@@ -35,16 +35,19 @@ import {
   Ghost,
   Shield,
   ChevronRight,
-  Database
+  Database,
+  Wifi,
+  XCircle,
 } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
-import { 
-  useLlmToolkit, 
-  useLlmModels, 
-  useUpdateLlmSettings, 
+import {
+  useLlmToolkit,
+  useLlmModels,
+  useUpdateLlmSettings,
   useOllamaPullStatus,
+  useTestLlmConnection,
 } from '../api';
-import type { LLMConfig, LLMModel } from '../api';
+import type { LLMConfig, LLMModel, TestLlmConnectionResult } from '../api';
 
 import { TacticalPanel } from '../../../components/TacticalPanel';
 
@@ -52,7 +55,8 @@ export const LlmToolkitPage: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: toolkit, isLoading: isToolkitLoading } = useLlmToolkit(projectSlug);
   const updateSettings = useUpdateLlmSettings(projectSlug);
-  
+  const testConnection = useTestLlmConnection(projectSlug);
+
   const [selectedProvider, setSelectedProvider] = useState<string>('ollama');
   const [showKey, setShowKey] = useState(false);
   const [form, setForm] = useState({
@@ -60,6 +64,7 @@ export const LlmToolkitPage: React.FC = () => {
     selected_model: '',
     is_active: false
   });
+  const [testResult, setTestResult] = useState<TestLlmConnectionResult | null>(null);
   const [pullingModel, setPullingModel] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{
     open: boolean;
@@ -137,9 +142,21 @@ export const LlmToolkitPage: React.FC = () => {
     setSnackbar({ ...snackbar, open: false });
   };
 
+  // Clear test result when the user changes provider, model, or key
+  useEffect(() => {
+    setTestResult(null);
+  }, [selectedProvider, form.api_key, form.selected_model]);
+
   const handleProviderChange = (provider: string) => {
     setSelectedProvider(provider);
     setShowKey(false);
+  };
+
+  const handleTest = () => {
+    testConnection.mutate(
+      { provider: selectedProvider, api_key: form.api_key, model: form.selected_model },
+      { onSuccess: (data) => setTestResult(data) }
+    );
   };
 
   const handleSave = (action: 'save' | 'pull') => {
@@ -390,7 +407,7 @@ export const LlmToolkitPage: React.FC = () => {
               />
 
               {/* Actions */}
-              <Box sx={{ display: 'flex', gap: 2, pt: 2 }}>
+              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 2, pt: 2 }}>
                 <Button
                   variant="contained"
                   startIcon={<Save size={20} />}
@@ -407,6 +424,23 @@ export const LlmToolkitPage: React.FC = () => {
                   }}
                 >
                   {updateSettings.isPending ? 'SAVING...' : 'SAVE CONFIG'}
+                </Button>
+
+                <Button
+                  variant="outlined"
+                  startIcon={testConnection.isPending ? <CircularProgress size={16} sx={{ color: '#a78bfa' }} /> : <Wifi size={20} />}
+                  onClick={handleTest}
+                  disabled={testConnection.isPending}
+                  sx={{
+                    borderColor: 'rgba(167, 139, 250, 0.3)',
+                    color: '#a78bfa',
+                    fontFamily: 'Orbitron',
+                    fontWeight: 800,
+                    px: 4,
+                    '&:hover': { borderColor: '#a78bfa', bgcolor: 'rgba(167, 139, 250, 0.05)' }
+                  }}
+                >
+                  {testConnection.isPending ? 'TESTING...' : 'TEST CONNECTION'}
                 </Button>
 
                 {selectedProvider === 'ollama' && currentModel && !currentModel.is_local && (
@@ -428,6 +462,51 @@ export const LlmToolkitPage: React.FC = () => {
                   </Button>
                 )}
               </Box>
+
+              {/* Test Connection Result */}
+              {testResult && (
+                <Box sx={{
+                  mt: 1,
+                  p: 2,
+                  borderRadius: '12px',
+                  bgcolor: testResult.status === 'success'
+                    ? 'rgba(0, 243, 255, 0.05)'
+                    : 'rgba(255, 49, 49, 0.05)',
+                  border: `1px solid ${testResult.status === 'success' ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255, 49, 49, 0.2)'}`,
+                }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: testResult.response ? 1.5 : 0 }}>
+                    {testResult.status === 'success'
+                      ? <CheckCircle2 size={16} color="#00f3ff" />
+                      : <XCircle size={16} color="#ff3131" />
+                    }
+                    <Typography sx={{
+                      fontSize: '0.8rem',
+                      fontFamily: 'Orbitron',
+                      fontWeight: 700,
+                      color: testResult.status === 'success' ? '#00f3ff' : '#ff3131',
+                    }}>
+                      {testResult.message}
+                    </Typography>
+                  </Box>
+                  {testResult.response && (
+                    <Box sx={{
+                      mt: 1,
+                      p: 1.5,
+                      borderRadius: '8px',
+                      bgcolor: 'rgba(0,0,0,0.3)',
+                      fontFamily: 'monospace',
+                      fontSize: '0.78rem',
+                      color: 'rgba(255,255,255,0.7)',
+                      wordBreak: 'break-word',
+                    }}>
+                      <Typography component="span" sx={{ color: 'rgba(0,243,255,0.5)', fontSize: '10px', fontFamily: 'Orbitron', mr: 1 }}>
+                        RESPONSE:
+                      </Typography>
+                      {testResult.response}
+                    </Box>
+                  )}
+                </Box>
+              )}
 
               {/* Terminal */}
               {(pullingModel || pullStatus) && (

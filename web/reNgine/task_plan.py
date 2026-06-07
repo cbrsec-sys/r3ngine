@@ -41,7 +41,7 @@ _TASK_TITLES = {
     'cpanel_scan':                'cPanel Scanner',
     'react2shell_scan':           'React2Shell Scanner',
     'waf_bypass':                 'WAF Bypass',
-    'brute_force_scan':           'Brute Force',
+
     # Tier 7 (always present)
     'correlate_vulnerabilities':  'Vulnerability Correlation',
     'calculate_risk_scores':      'Risk Scoring',
@@ -81,7 +81,7 @@ _TASK_TIER = {
     'cpanel_scan':           6,
     'react2shell_scan':      6,
     'waf_bypass':            6,
-    'brute_force_scan':      6,
+
 }
 
 _TIER7_TASKS = [
@@ -100,7 +100,7 @@ _TIER1_TO_5 = [
     'fetch_url', 'screenshot',
     'dir_file_fuzz',
     'web_api_discovery', 'waf_detection', 'secret_scanning',
-    'waf_bypass', 'brute_force_scan',
+    'waf_bypass',
 ]
 
 

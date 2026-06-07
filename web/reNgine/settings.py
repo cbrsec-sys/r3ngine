@@ -49,8 +49,62 @@ NEO4J_USER = env('NEO4J_USER', default='neo4j')
 NEO4J_PASSWORD = env('NEO4J_PASSWORD', default='')
 
 # Globals
+import inspect
+import ipaddress
+
+class DynamicAllowedHosts(list):
+    """
+    Custom list subclass that dynamically permits requests targeting:
+    - Any valid IPv4 or IPv6 address (safe from Host Header Injection)
+    - Any local single-label hostname (no dots)
+    - Any explicitly configured allowed hosts (including DOMAIN_NAME)
+    """
+    def __iter__(self):
+        """
+        Iterates over explicitly configured allowed hosts first.
+        Then, inspects the current request's target host via stack frame matching,
+        allowing any valid IP address or local single-label hostname.
+        """
+        # First, yield the explicitly configured hosts
+        for pattern in super().__iter__():
+            yield pattern
+        try:
+            # Walk up the stack to find the host being validated by Django
+            frame = inspect.currentframe().f_back
+            while frame:
+                if 'host' in frame.f_locals:
+                    host = frame.f_locals['host']
+                    if host:
+                        is_ip = False
+                        try:
+                            ipaddress.ip_address(host)
+                            is_ip = True
+                        except ValueError:
+                            pass
+                        is_local = '.' not in host
+                        if is_ip or is_local:
+                            yield host
+                    break
+                frame = frame.f_back
+        except Exception:
+            pass
+
 # Set ALLOWED_HOSTS via environment variable in production
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1'])
+ALLOWED_HOSTS = DynamicAllowedHosts(env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1']))
+
+# Automatically extract host from DOMAIN_NAME and add it to ALLOWED_HOSTS
+# to ensure out-of-the-box support for the configured domain name.
+if DOMAIN_NAME:
+    # Strip protocol if present (e.g. http:// or https://)
+    domain_clean = DOMAIN_NAME
+    if '://' in domain_clean:
+        domain_clean = domain_clean.split('://')[1]
+    # Strip port if present (e.g. :8000)
+    domain_host = domain_clean.split(':')[0]
+    if domain_host and domain_host not in ALLOWED_HOSTS:
+        ALLOWED_HOSTS.append(domain_host)
+
+
 SECRET_KEY = first_run(SECRET_FILE, BASE_DIR)
 
 # Rengine version
@@ -77,7 +131,7 @@ DATABASES = {
         'PASSWORD': env('POSTGRES_PASSWORD'),
         'HOST': env('POSTGRES_HOST'),
         'PORT': env('POSTGRES_PORT'),
-        'CONN_MAX_AGE': 60,
+        'CONN_MAX_AGE': 0,
         'CONN_HEALTH_CHECKS': True,
         'OPTIONS': {
             'sslmode': env('POSTGRES_SSLMODE', default='prefer'),
@@ -188,9 +242,7 @@ REST_FRAMEWORK = {
     'DEFAULT_FILTER_BACKENDS': (
         'rest_framework_datatables.filters.DatatablesFilterBackend',
     ),
-    'DEFAULT_PAGINATION_CLASS':(
-        'rest_framework_datatables.pagination.DatatablesPageNumberPagination'
-    ),
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework_datatables.pagination.DatatablesPageNumberPagination',
     'PAGE_SIZE': 500,
     'DEFAULT_THROTTLE_CLASSES': [
         'rest_framework.throttling.AnonRateThrottle',
@@ -328,92 +380,92 @@ LOGGING settings
 '''
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': True,
+    'disable_existing_loggers': False,
     'handlers': {
-        'file': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            # In containers, the working directory may not be writable.
-            # Use a universally writable path to avoid boot-time logging failures.
-            'filename': '/tmp/errors.log',
-        },
-        'null': {
-            'class': 'logging.NullHandler'
-        },
-        'default': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'default',
-        },
-        'brief': {
-            'class': 'logging.StreamHandler',
-            'formatter': 'brief'
-        },
         'console': {
             'class': 'logging.StreamHandler',
-            'formatter': 'brief'
+            'formatter': 'brief',
         },
         'task': {
             'class': 'logging.StreamHandler',
-            'formatter': 'task'
+            'formatter': 'task',
         },
-        'db': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'formatter': 'brief',
-            'filename': 'db.log',
-            'maxBytes': 1024,
-            'backupCount': 3
+        'error_file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': '/usr/src/app/errors.log',
+            'formatter': 'verbose',
+        },
+        'null': {
+            'class': 'logging.NullHandler',
         },
     },
     'formatters': {
-        'default': {
-            'format': '%(message)s'
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
         },
         'brief': {
-            'format': '%(name)-10s | %(message)s'
+            'format': '%(levelname)s %(asctime)s %(name)s %(message)s',
+            'datefmt': '%H:%M:%S',
         },
         'task': {
-            '()': lambda : RengineTaskFormatter('%(task_name)-34s | %(levelname)s | %(message)s')
+            '()': lambda: RengineTaskFormatter('%(task_name)-34s | %(levelname)s | %(message)s'),
         },
-        'simple': {
-            'format': '%(levelname)s %(message)s',
-            'datefmt': '%y %b %d, %H:%M:%S',
-        }
     },
     'loggers': {
-        'django': {
-            'handlers': ['file'],
-            'level': 'ERROR' if DEBUG else 'CRITICAL',
-            'propagate': True,
-        },
+        # Root — catches everything not explicitly routed below
         '': {
-            'handlers': ['brief'],
+            'handlers': ['console', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False
+            'propagate': False,
+        },
+        # Django internals — only errors to file, not console spam
+        'django': {
+            'handlers': ['error_file'],
+            'level': 'ERROR',
+            'propagate': False,
         },
         'django.server': {
             'handlers': ['console'],
-            'propagate': False
+            'level': 'WARNING',
+            'propagate': False,
         },
         'django.db.backends': {
-            'handlers': ['db'],
-            'level': 'INFO',
-            'propagate': False
+            'handlers': ['null'],
+            'level': 'ERROR',
+            'propagate': False,
         },
+        # Scan tasks — use the task formatter so output is easy to grep
         'reNgine.tasks': {
-            'handlers': ['task'],
+            'handlers': ['task', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False
+            'propagate': False,
         },
+        # All other reNgine modules (utils.graph, cve_enrichment, etc.)
+        'reNgine': {
+            'handlers': ['console', 'error_file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
+            'propagate': False,
+        },
+        # Plugin code
         'plugins': {
-            'handlers': ['task', 'console'],
+            'handlers': ['task', 'console', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False
+            'propagate': False,
         },
-        'api.views': {
-            'handlers': ['console'],
+        # API views
+        'api': {
+            'handlers': ['console', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
-            'propagate': False
-        }
+            'propagate': False,
+        },
+        # Temporal SDK — suppress noise, only errors
+        'temporalio': {
+            'handlers': ['error_file'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
     },
 }
 
@@ -455,6 +507,10 @@ CSRF_COOKIE_SECURE = True  # HTTPS only
 # NOTE: Leave SECURE_SSL_REDIRECT=False — the upstream nginx reverse proxy handles
 # HTTP→HTTPS redirects. Enabling this in Django would cause a redirect loop.
 SECURE_SSL_REDIRECT = False
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['https://localhost', 'https://127.0.0.1', 'http://localhost:5173'])
+
 
 # HSTS — tell browsers to always use HTTPS for this domain (1 year)
 SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=31536000)
@@ -471,6 +527,8 @@ SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
 
 # Login required middleware configurations
 LOGIN_REQUIRED_IGNORE_PATHS = [
+    r'^/logout/',
+    r'^/login/',
     r'^/api/auth/token/',
     r'^/api/auth/token/refresh/',
     r'^/mapi/auth/token/',
@@ -494,5 +552,6 @@ SIMPLE_JWT = {
 }
 
 CORS_ALLOW_ALL_ORIGINS = False
-CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:3000', 'http://127.0.0.1:3000'])
+CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:5173', 'http://127.0.0.1:5173', 'https://localhost:5173', 'https://127.0.0.1:5173'])
 CORS_ALLOW_CREDENTIALS = True
+

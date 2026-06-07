@@ -184,7 +184,7 @@ class InstalledExternalTool(models.Model):
     version_lookup_command = models.CharField(max_length=500, null=True, blank=True)
     update_command = models.CharField(max_length=500, null=True, blank=True)
     install_command = models.CharField(max_length=500)
-    version_match_regex = models.CharField(max_length=100, default='[vV]*(\d+\.)?(\d+\.)?(\*|\d+)', null=True, blank=True)
+    version_match_regex = models.CharField(max_length=100, default=r'[vV]*(\d+\.)?(\d+\.)?(\*|\d+)', null=True, blank=True)
     is_default = models.BooleanField(default=False)
     is_subdomain_gathering = models.BooleanField(default=False)
     is_github_cloned = models.BooleanField(default=False)
@@ -193,3 +193,29 @@ class InstalledExternalTool(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class HardwareProfile(models.Model):
+    PROFILE_TYPE_CHOICES = [
+        ('builtin', 'Built-in'),
+        ('custom', 'Custom'),
+    ]
+
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=100, unique=True)
+    description = models.TextField(help_text="Description of the profile", blank=True, null=True)
+    threads = models.IntegerField(default=10)
+    rate_limit = models.IntegerField(default=150)
+    timeout = models.IntegerField(default=10, help_text="Timeout in minutes")
+    delay = models.FloatField(default=0.0, help_text="Delay between requests in seconds")
+    retries = models.IntegerField(default=2)
+    profile_type = models.CharField(
+        max_length=20,
+        choices=PROFILE_TYPE_CHOICES,
+        default='custom',
+    )
+    is_active = models.BooleanField(default=True)
+    is_default = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.name} ({self.profile_type})"

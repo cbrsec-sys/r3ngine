@@ -296,7 +296,7 @@ class ScanSummaryAPIView(APIView):
                     'description': v['description'],
                     'impact': v['impact'],
                     'remediation': v['remediation'],
-                    'url': v['http_url'],
+                    'http_url': v['http_url'],
                     'matched_at': v['discovered_date'],
                     'is_gpt_used': v['is_gpt_used'],
                     'domain_name': v['subdomain__name'] or v['target_domain__name'] or target.name

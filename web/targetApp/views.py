@@ -141,8 +141,11 @@ def add_target(request, slug):
                             monitor_scan_scope = request.POST.get('monitor_scan_scope', 'none')
                             monitor_engine_id = request.POST.get('monitor_engine')
                             monitor_engine = None
-                            if monitor_engine_id:
-                                monitor_engine = EngineType.objects.filter(id=monitor_engine_id).first()
+                            if monitor_engine_id and str(monitor_engine_id).lower() not in ['null', 'undefined', 'none', '']:
+                                try:
+                                    monitor_engine = EngineType.objects.filter(id=int(monitor_engine_id)).first()
+                                except (ValueError, TypeError):
+                                    logger.warning(f"Invalid monitor_engine_id: {monitor_engine_id}")
 
                             domain, created = Domain.objects.get_or_create(
                                 name=domain_name,
@@ -294,8 +297,11 @@ def add_target(request, slug):
                         monitor_scan_scope = request.POST.get('monitor_scan_scope', 'none')
                         monitor_engine_id = request.POST.get('monitor_engine')
                         monitor_engine = None
-                        if monitor_engine_id:
-                            monitor_engine = EngineType.objects.filter(id=monitor_engine_id).first()
+                        if monitor_engine_id and str(monitor_engine_id).lower() not in ['null', 'undefined', 'none', '']:
+                            try:
+                                monitor_engine = EngineType.objects.filter(id=int(monitor_engine_id)).first()
+                            except (ValueError, TypeError):
+                                logger.warning(f"Invalid monitor_engine_id: {monitor_engine_id}")
 
                         domain, created = Domain.objects.get_or_create(
                             name=ip,

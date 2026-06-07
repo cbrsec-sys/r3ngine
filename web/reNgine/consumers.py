@@ -55,13 +55,14 @@ class StressTelemetryConsumer(AsyncWebsocketConsumer):
         self.keep_running = False
         if hasattr(self, 'tail_task'):
             self.tail_task.cancel()
-        
-        # Leave group
-        await self.channel_layer.group_discard(
-            self.group_name,
-            self.channel_name
-        )
-        logger.info(f"WebSocket disconnected for scan {self.scan_id}")
+
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(
+                self.group_name,
+                self.channel_name
+            )
+        if hasattr(self, 'scan_id'):
+            logger.info(f"WebSocket disconnected for scan {self.scan_id}")
 
     async def tail_redis_stream(self):
         """Tails the Redis stream and sends updates to the client."""
@@ -131,13 +132,14 @@ class ScanLogConsumer(AsyncWebsocketConsumer):
         self.keep_running = False
         if hasattr(self, 'tail_task'):
             self.tail_task.cancel()
-        
-        # Leave group
-        await self.channel_layer.group_discard(
-            self.group_name,
-            self.channel_name
-        )
-        logger.info(f"ScanLog WebSocket disconnected for scan {self.scan_id}")
+
+        if hasattr(self, 'group_name'):
+            await self.channel_layer.group_discard(
+                self.group_name,
+                self.channel_name
+            )
+        if hasattr(self, 'scan_id'):
+            logger.info(f"ScanLog WebSocket disconnected for scan {self.scan_id}")
 
     async def tail_redis_stream(self):
         """Tails the Redis stream and sends updates to the client."""

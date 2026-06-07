@@ -7,6 +7,7 @@ import logging
 import validators
 import json
 from django.utils import timezone
+from django.db import IntegrityError
 
 from urllib.parse import urlparse
 from reNgine.utils.opsec import ProxychainsWrapper
@@ -18,11 +19,19 @@ from targetApp.models import Domain
 from reNgine.definitions import (
     COLOR_RESET, COLOR_WHITE, COLOR_RED, TOOL_COLORS
 )
-from reNgine.common_func import remove_ansi_escape_sequences, sanitize_url
+from reNgine.common_func import (
+    get_subdomain_from_url,
+    remove_ansi_escape_sequences,
+    sanitize_url,
+)
 from reNgine.utilities import SubdomainScopeChecker, replace_nulls
 from reNgine.settings import RENGINE_RESULTS
 
 logger = logging.getLogger(__name__)
+
+FETCH_URL_PERSIST_BATCH_SIZE = 2000
+_COMMAND_OUTPUT_MAX_CHARS = 512_000
+PRECRAWL_MAX_URLS = 500
 
 ROUTED_TOOLS = {
     'semgrep', 'nuclei', 'ffuf', 'naabu', 'amass', 'subfinder', 'httpx',
@@ -313,7 +322,8 @@ def run_command(
                 {
                     "command": [command_str],
                     "scan_id": scan_history_id or 0,
-                    "command_id": command_rec_id or 0
+                    "command_id": command_rec_id or 0,
+                    "working_dir": cwd or "",
                 },
                 id=f"go-exec-{tool}-{command_rec_id or int(time.time())}",
                 task_queue="python-orchestrator-queue"
@@ -555,12 +565,19 @@ def save_employee(name, designation='', scan_history=None):
     return employee, created
 
 def save_subdomain(subdomain_name, ctx={}):
-    """Get or create Subdomain object."""
+    """Get or create Subdomain; rediscovery updates the existing row instead of duplicating.
+
+    Idempotent across Temporal activity retries and discovery-phase restarts.
+    """
     scan_id = ctx.get('scan_history_id')
     subscan_id = ctx.get('subscan_id')
     out_of_scope_subdomains = ctx.get('out_of_scope_subdomains', [])
     subdomain_checker = SubdomainScopeChecker(out_of_scope_subdomains)
-    
+
+    subdomain_name = (subdomain_name or '').strip().lower()
+    if not subdomain_name:
+        return None, False
+
     valid_domain = (
         validators.domain(subdomain_name) or
         validators.ipv4(subdomain_name) or
@@ -582,19 +599,51 @@ def save_subdomain(subdomain_name, ctx={}):
 
     scan = ScanHistory.objects.filter(pk=scan_id).first()
     domain = scan.domain if scan else Domain.objects.filter(id=ctx.get('domain_id')).first()
-    
-    subdomain, created = Subdomain.objects.get_or_create(
-        scan_history=scan,
-        target_domain=domain,
-        name=subdomain_name)
-    
-    if created:
-        subdomain.discovered_date = timezone.now()
-        subdomain.save()
-        if subscan_id:
-            from startScan.models import SubScan
-            if SubScan.objects.filter(pk=subscan_id).exists():
-                subdomain.subdomain_subscan_ids.add(subscan_id)
+
+    subdomain = None
+    created = False
+    if scan:
+        subdomain = Subdomain.objects.filter(
+            scan_history=scan,
+            name__iexact=subdomain_name,
+        ).first()
+
+    if subdomain:
+        update_fields = []
+        if subdomain.name != subdomain_name:
+            subdomain.name = subdomain_name
+            update_fields.append('name')
+        if domain and subdomain.target_domain_id != domain.id:
+            subdomain.target_domain = domain
+            update_fields.append('target_domain')
+        if not subdomain.discovered_date:
+            subdomain.discovered_date = timezone.now()
+            update_fields.append('discovered_date')
+        if update_fields:
+            subdomain.save(update_fields=update_fields)
+    else:
+        try:
+            subdomain, created = Subdomain.objects.get_or_create(
+                scan_history=scan,
+                target_domain=domain,
+                name=subdomain_name,
+                defaults={'discovered_date': timezone.now()},
+            )
+        except IntegrityError:
+            subdomain = Subdomain.objects.filter(
+                scan_history=scan,
+                name__iexact=subdomain_name,
+            ).first()
+            created = False
+
+    if not subdomain:
+        return None, False
+
+    if subscan_id:
+        from startScan.models import SubScan
+        if SubScan.objects.filter(pk=subscan_id).exists():
+            subdomain.subdomain_subscan_ids.add(subscan_id)
+
     return subdomain, created
 
 def save_endpoint(
@@ -698,7 +747,9 @@ def stream_command(
 		activity_id=None, 
 		trunc_char=None,
 		proxy=None,
-		timeout=3600
+		timeout=3600,
+		route_to_executor=True,
+		max_output_chars=_COMMAND_OUTPUT_MAX_CHARS,
 	):
 	"""Run a command and yield output line by line.
 
@@ -747,7 +798,7 @@ def stream_command(
 		if tool in ROUTED_TOOLS:
 			should_route = True
 
-	if should_route:
+	if route_to_executor and should_route:
 		logger.info(f"Routing {tool} command execution to Go executor: {cmd}")
 		import asyncio
 		import time
@@ -771,59 +822,76 @@ def stream_command(
 				{
 					"command": [command_str],
 					"scan_id": scan_history_id or 0,
-					"command_id": command_rec_id or 0
+					"command_id": command_rec_id or 0,
+					"working_dir": cwd or "",
 				},
 				id=workflow_id,
 				task_queue="python-orchestrator-queue"
 			)
+			# Create a single task to await the workflow result.
+			# This avoids creating multiple handle.result() coroutines on every iteration,
+			# preventing gRPC connection leaks and RPC cancellation errors.
+			result_task = asyncio.create_task(handle.result())
 
-			# Poll with 10 s slices so we can react to cancellation promptly.
-			while True:
-				try:
-					result = await asyncio.wait_for(asyncio.shield(handle.result()), timeout=10.0)
-					return result
-				except asyncio.TimeoutError:
-					pass  # not done yet — check abort conditions below
-
-				# 1) Check the cancel_event set by _run_task's heartbeat thread.
-				try:
-					from reNgine.temporal_activities import _task_cancel_local
-					ce = getattr(_task_cancel_local, 'cancel_event', None)
-					if ce and ce.is_set():
-						logger.warning(
-							f"[stream_command] cancel_event set — cancelling GoExecutorTaskWorkflow {workflow_id}"
-						)
-						try:
-							await handle.cancel()
-						except Exception:
-							pass
-						return {"exit_code": -1, "stdout": "", "stderr": "Scan aborted"}
-				except Exception:
-					pass
-
-				# 2) Fallback: direct DB check.
-				if scan_history_id:
+			try:
+				# Poll until result_task is complete.
+				while not result_task.done():
+					# 1) Check the cancel_event set by _run_task's heartbeat thread.
 					try:
-						loop = asyncio.get_event_loop()
-						status = await loop.run_in_executor(
-							None,
-							lambda: __import__(
-								'startScan.models', fromlist=['ScanHistory']
-							).ScanHistory.objects.filter(pk=scan_history_id)
-							.values_list('scan_status', flat=True)
-							.first()
-						)
-						if status == ABORTED_TASK:
+						from reNgine.temporal_activities import _task_cancel_local
+						ce = getattr(_task_cancel_local, 'cancel_event', None)
+						if ce and ce.is_set():
 							logger.warning(
-								f"[stream_command] DB ABORTED_TASK — cancelling GoExecutorTaskWorkflow {workflow_id}"
+								f"[stream_command] cancel_event set — cancelling GoExecutorTaskWorkflow {workflow_id}"
 							)
 							try:
 								await handle.cancel()
-							except Exception:
-								pass
+							except Exception as cancel_err:
+								logger.error(f"[stream_command] Failed to cancel workflow {workflow_id}: {cancel_err}")
+							result_task.cancel()
 							return {"exit_code": -1, "stdout": "", "stderr": "Scan aborted"}
-					except Exception:
-						pass
+					except Exception as e:
+						logger.debug(f"[stream_command] Local cancel_event check failed: {e}")
+
+					# 2) Fallback: direct DB check.
+					if scan_history_id:
+						try:
+							loop = asyncio.get_event_loop()
+							status = await loop.run_in_executor(
+								None,
+								lambda: __import__(
+									'startScan.models', fromlist=['ScanHistory']
+								).ScanHistory.objects.filter(pk=scan_history_id)
+								.values_list('scan_status', flat=True)
+								.first()
+							)
+							if status == ABORTED_TASK:
+								logger.warning(
+									f"[stream_command] DB ABORTED_TASK — cancelling GoExecutorTaskWorkflow {workflow_id}"
+								)
+								try:
+									await handle.cancel()
+								except Exception as cancel_err:
+									logger.error(f"[stream_command] Failed to cancel workflow {workflow_id}: {cancel_err}")
+								result_task.cancel()
+								return {"exit_code": -1, "stdout": "", "stderr": "Scan aborted"}
+						except Exception as e:
+							logger.debug(f"[stream_command] DB abort status check failed: {e}")
+
+					# Wait for up to 10 seconds or until the workflow finishes.
+					# This yields control to the event loop, letting result_task run,
+					# without creating redundant coroutines or raising TimeoutError.
+					await asyncio.wait([result_task], timeout=10.0)
+
+				# Once result_task is done, return its result.
+				return await result_task
+			except Exception as e:
+				logger.error(f"[stream_command] Error waiting for GoExecutorTaskWorkflow: {e}")
+				raise
+			finally:
+				# Ensure result_task is cancelled if we exit early (e.g. on abort or error).
+				if not result_task.done():
+					result_task.cancel()
 
 		try:
 			try:
@@ -896,6 +964,7 @@ def stream_command(
 		universal_newlines=True,
 		errors='replace',
 		shell=shell,
+		cwd=cwd,
 		preexec_fn=os.setsid)
 
 	# Start a watchdog thread to terminate the command if it runs too long
@@ -961,7 +1030,10 @@ def stream_command(
 			output += '\n' + line
 			line_count += 1
 			if line_count % 10 == 0:
-				command_obj.output = output.replace('\x00', '')
+				stored_output = output.replace('\x00', '')
+				if max_output_chars and len(stored_output) > max_output_chars:
+					stored_output = stored_output[-max_output_chars:]
+				command_obj.output = stored_output
 				command_obj.save()
 
 				# Kill switch: abort the subprocess if the scan was stopped
@@ -1024,6 +1096,220 @@ def stream_command(
 			os.remove(conf_path)
 
 
+def activity_heartbeat_safe(message: str) -> None:
+	"""Send a Temporal activity heartbeat when running inside an activity context."""
+	try:
+		from temporalio import activity
+		activity.heartbeat(message)
+	except Exception:
+		pass
+
+
+def _link_endpoints_subscan(http_urls, scan, subscan_id):
+	"""Attach endpoints to a subscan via the M2M through table (idempotent)."""
+	from startScan.models import SubScan
+	if not subscan_id or not http_urls:
+		return
+	if not SubScan.objects.filter(pk=subscan_id).exists():
+		return
+	ep_ids = list(
+		EndPoint.objects.filter(scan_history=scan, http_url__in=http_urls)
+		.values_list('pk', flat=True)
+	)
+	if not ep_ids:
+		return
+	through = EndPoint.endpoint_subscan_ids.through
+	through.objects.bulk_create(
+		[through(endpoint_id=ep_id, subscan_id=subscan_id) for ep_id in ep_ids],
+		ignore_conflicts=True,
+	)
+
+
+def bulk_persist_fetch_urls(urls, ctx, batch_size=FETCH_URL_PERSIST_BATCH_SIZE, heartbeat_interval=5000):
+	"""Persist discovered URLs as skeleton EndPoint rows using batched bulk_create.
+
+	Returns the number of new endpoints queued for insert (not counting conflicts).
+	"""
+	scan_id = ctx.get('scan_history_id')
+	domain_id = ctx.get('domain_id')
+	subscan_id = ctx.get('subscan_id')
+
+	scan = ScanHistory.objects.filter(pk=scan_id).first()
+	domain = Domain.objects.filter(pk=domain_id).first()
+	if not scan or not domain:
+		return 0
+
+	existing_urls = set(
+		EndPoint.objects.filter(scan_history=scan, target_domain=domain)
+		.values_list('http_url', flat=True)
+	)
+
+	subdomain_cache = {}
+	now = timezone.now()
+	pending = []
+	created_count = 0
+	batch_urls = []
+	total = len(urls)
+
+	for idx, url in enumerate(urls):
+		http_url = sanitize_url(url)
+		if not http_url or not validators.url(http_url):
+			continue
+		if http_url in existing_urls:
+			continue
+
+		subdomain_name = get_subdomain_from_url(http_url)
+		if subdomain_name not in subdomain_cache:
+			sub, _ = save_subdomain(subdomain_name, ctx=ctx)
+			if not sub:
+				continue
+			subdomain_cache[subdomain_name] = sub
+
+		pending.append(EndPoint(
+			scan_history=scan,
+			target_domain=domain,
+			subdomain=subdomain_cache[subdomain_name],
+			http_url=http_url,
+			discovered_date=now,
+			is_default=False,
+		))
+		batch_urls.append(http_url)
+		existing_urls.add(http_url)
+
+		if len(pending) >= batch_size:
+			EndPoint.objects.bulk_create(pending, ignore_conflicts=True)
+			if subscan_id:
+				_link_endpoints_subscan(batch_urls, scan, subscan_id)
+			created_count += len(pending)
+			pending = []
+			batch_urls = []
+
+		if heartbeat_interval and total and (idx + 1) % heartbeat_interval == 0:
+			activity_heartbeat_safe(f'fetch_url persist {idx + 1}/{total}')
+
+	if pending:
+		EndPoint.objects.bulk_create(pending, ignore_conflicts=True)
+		if subscan_id:
+			_link_endpoints_subscan(batch_urls, scan, subscan_id)
+		created_count += len(pending)
+
+	return created_count
+
+
+def bulk_get_or_create_directory_files(candidates):
+	"""Return DirectoryFile instances for fuzzing hits, creating missing rows in bulk."""
+	from startScan.models import DirectoryFile
+	if not candidates:
+		return []
+
+	urls = [c['url'] for c in candidates if c.get('url')]
+	existing = {
+		(d.name, d.url, d.http_status): d
+		for d in DirectoryFile.objects.filter(url__in=urls)
+	}
+	result = []
+	new_objs = []
+	for candidate in candidates:
+		key = (candidate['name'], candidate['url'], candidate['http_status'])
+		if key in existing:
+			result.append(existing[key])
+			continue
+		obj = DirectoryFile(
+			name=candidate['name'],
+			url=candidate['url'],
+			http_status=candidate['http_status'],
+			length=candidate.get('length', 0),
+			words=candidate.get('words', 0),
+			lines=candidate.get('lines', 0),
+			content_type=candidate.get('content_type') or '',
+		)
+		new_objs.append(obj)
+
+	if new_objs:
+		DirectoryFile.objects.bulk_create(new_objs)
+		for obj in new_objs:
+			fetched = DirectoryFile.objects.filter(
+				name=obj.name,
+				url=obj.url,
+				http_status=obj.http_status,
+			).first()
+			if fetched:
+				key = (fetched.name, fetched.url, fetched.http_status)
+				existing[key] = fetched
+				result.append(fetched)
+
+	# Preserve order and uniqueness for callers linking M2M
+	seen = set()
+	ordered = []
+	for candidate in candidates:
+		key = (candidate['name'], candidate['url'], candidate['http_status'])
+		dfile = existing.get(key)
+		if dfile and key not in seen:
+			seen.add(key)
+			ordered.append(dfile)
+	return ordered
+
+
+def bulk_apply_gf_pattern_from_file(gf_output_file, gf_pattern, ctx, batch_size=500):
+	"""Apply a GF pattern match file to endpoints with batched bulk_update."""
+	scan_id = ctx.get('scan_history_id')
+	domain_id = ctx.get('domain_id')
+	scan = ScanHistory.objects.filter(pk=scan_id).first()
+	domain = Domain.objects.filter(pk=domain_id).first()
+	if not scan or not domain or not os.path.exists(gf_output_file):
+		return 0
+
+	updated = 0
+	url_batch = []
+	line_idx = 0
+
+	def _flush_url_batch(urls):
+		nonlocal updated
+		if not urls:
+			return
+		sanitized = [sanitize_url(u) for u in urls if u and validators.url(sanitize_url(u))]
+		if not sanitized:
+			return
+		bulk_persist_fetch_urls(sanitized, ctx, batch_size=len(sanitized))
+		endpoints = EndPoint.objects.filter(
+			scan_history=scan,
+			target_domain=domain,
+			http_url__in=sanitized,
+		)
+		to_update = []
+		for ep in endpoints:
+			earlier = ep.matched_gf_patterns or ''
+			if earlier:
+				if gf_pattern in {p.strip() for p in earlier.split(',') if p.strip()}:
+					continue
+				pattern = f'{earlier},{gf_pattern}'
+			else:
+				pattern = gf_pattern
+			ep.matched_gf_patterns = pattern
+			to_update.append(ep)
+		if to_update:
+			EndPoint.objects.bulk_update(to_update, ['matched_gf_patterns'], batch_size=batch_size)
+			updated += len(to_update)
+
+	with open(gf_output_file, 'r', encoding='utf-8', errors='replace') as gf_file:
+		for raw_line in gf_file:
+			line_idx += 1
+			url = raw_line.strip()
+			if not url:
+				continue
+			url_batch.append(url)
+			if len(url_batch) >= batch_size:
+				_flush_url_batch(url_batch)
+				url_batch = []
+			if line_idx % 5000 == 0:
+				activity_heartbeat_safe(f'gf pattern {gf_pattern} line {line_idx}')
+
+	if url_batch:
+		_flush_url_batch(url_batch)
+
+	return updated
+
+
 def ensure_endpoints_crawled_and_execute(task_proxy, task_function, ctx, description=None, max_wait_time=300):
 	"""
 	Ensure endpoints are crawled before executing a task that needs alive endpoints.
@@ -1060,7 +1346,8 @@ def ensure_endpoints_crawled_and_execute(task_proxy, task_function, ctx, descrip
 	custom_ctx['track'] = False  # Don't track this internal crawl
 
 	# Run synchronously — safe here because this function is called from Temporal activities
-	http_crawl(task_proxy, urls=uncrawled_endpoints[:50], ctx=custom_ctx)
+	precrawl_limit = min(len(uncrawled_endpoints), PRECRAWL_MAX_URLS)
+	http_crawl(task_proxy, urls=uncrawled_endpoints[:precrawl_limit], ctx=custom_ctx)
 
 	if alive_endpoints := get_http_urls(is_alive=True, ctx=ctx):
 		logger.info(f'Found {len(alive_endpoints)} alive endpoints after crawl, executing {task_function.__name__}')

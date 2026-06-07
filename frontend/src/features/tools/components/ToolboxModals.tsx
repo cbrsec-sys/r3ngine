@@ -10,7 +10,9 @@ import {
   IconButton,
   Stack,
   Paper,
-  Alert
+  Alert,
+  Chip,
+  Divider
 } from '@mui/material';
 import { X, Search, Globe, Bug, ShieldAlert } from 'lucide-react';
 import { useWhois, useCMSDetector, useCVEDetails, useWafDetector } from '../api';
@@ -183,18 +185,161 @@ export const CVELookupModal: React.FC<ToolModalProps> = ({ open, onClose }) => {
 
         {data && (
           <Paper sx={{ p: 3, bgcolor: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.05)' }}>
-            {data.id ? (
-              <Stack spacing={2}>
-                <Typography sx={{ color: '#ff00ff', fontWeight: 900, fontFamily: 'Orbitron' }}>{data.id}</Typography>
-                <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem' }}>{data.summary}</Typography>
-                <Stack direction="row" spacing={1}>
-                  <Alert icon={false} sx={{ py: 0, px: 1, bgcolor: 'rgba(255,0,0,0.1)', color: '#ff4444', border: '1px solid rgba(255,0,0,0.2)', fontSize: '0.7rem', fontWeight: 900 }}>
-                    CVSS: {data.cvss || 'N/A'}
-                  </Alert>
+            {data.status && data.result ? (
+              <Stack spacing={2.5}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <Typography sx={{ color: '#ff00ff', fontWeight: 900, fontFamily: 'Orbitron', fontSize: '1.1rem' }}>
+                    {data.result.id}
+                  </Typography>
+                  {data.result.is_cisa_kev && (
+                    <Chip
+                      label="CISA KEV"
+                      size="small"
+                      sx={{
+                        bgcolor: 'rgba(239, 68, 68, 0.15)',
+                        color: '#ef4444',
+                        border: '1px solid #ef4444',
+                        fontSize: '0.6rem',
+                        fontWeight: 900,
+                        height: 18
+                      }}
+                    />
+                  )}
+                  {data.result.is_poc && (
+                    <Chip
+                      label="HAS EXPLOIT / POC"
+                      size="small"
+                      sx={{
+                        bgcolor: 'rgba(236, 72, 153, 0.15)',
+                        color: '#ec4899',
+                        border: '1px solid #ec4899',
+                        fontSize: '0.6rem',
+                        fontWeight: 900,
+                        height: 18
+                      }}
+                    />
+                  )}
+                  {data.result.is_template && (
+                    <Chip
+                      label="NUCLEI TEMPLATE"
+                      size="small"
+                      sx={{
+                        bgcolor: 'rgba(168, 85, 247, 0.15)',
+                        color: '#a855f7',
+                        border: '1px solid #a855f7',
+                        fontSize: '0.6rem',
+                        fontWeight: 900,
+                        height: 18
+                      }}
+                    />
+                  )}
+                </Box>
+                <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '0.85rem', lineHeight: 1.5 }}>
+                  {data.result.summary}
+                </Typography>
+                
+                <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap', gap: 1 }}>
+                  {data.result.cvss !== null && data.result.cvss !== undefined && (
+                    <Chip
+                      label={`CVSS: ${Number(data.result.cvss).toFixed(1)}`}
+                      size="small"
+                      sx={{
+                        bgcolor: Number(data.result.cvss) >= 9.0 ? 'rgba(255, 0, 60, 0.15)' : Number(data.result.cvss) >= 7.0 ? 'rgba(249, 115, 22, 0.15)' : 'rgba(59, 130, 246, 0.15)',
+                        color: Number(data.result.cvss) >= 9.0 ? '#ff003c' : Number(data.result.cvss) >= 7.0 ? '#f97316' : '#3b82f6',
+                        border: `1px solid ${Number(data.result.cvss) >= 9.0 ? '#ff003c' : Number(data.result.cvss) >= 7.0 ? '#f97316' : '#3b82f6'}`,
+                        fontWeight: 800,
+                        fontFamily: 'Orbitron',
+                        fontSize: '0.65rem'
+                      }}
+                    />
+                  )}
+                  {data.result.epss_score !== null && data.result.epss_score !== undefined && (
+                    <Chip
+                      label={`EPSS: ${Number(data.result.epss_score).toFixed(5)} (${Number(data.result.epss_percentile || 0).toFixed(1)}%)`}
+                      size="small"
+                      sx={{
+                        bgcolor: 'rgba(0, 243, 255, 0.15)',
+                        color: '#00f3ff',
+                        border: '1px solid #00f3ff',
+                        fontWeight: 800,
+                        fontFamily: 'Orbitron',
+                        fontSize: '0.65rem'
+                      }}
+                    />
+                  )}
+                  {data.result.attack_vector && (
+                    <Chip
+                      label={`Vector: ${data.result.attack_vector}`}
+                      size="small"
+                      sx={{
+                        bgcolor: 'rgba(255, 255, 255, 0.05)',
+                        color: 'rgba(255, 255, 255, 0.8)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        fontWeight: 700,
+                        fontSize: '0.65rem'
+                      }}
+                    />
+                  )}
+                  {data.result.attack_complexity && (
+                    <Chip
+                      label={`Complexity: ${data.result.attack_complexity}`}
+                      size="small"
+                      sx={{
+                        bgcolor: 'rgba(255, 255, 255, 0.05)',
+                        color: 'rgba(255, 255, 255, 0.8)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        fontWeight: 700,
+                        fontSize: '0.65rem'
+                      }}
+                    />
+                  )}
                 </Stack>
+
+                <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)', my: 0.5 }} />
+
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr' }, gap: 2.5 }}>
+                  <Stack spacing={0.5}>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.5, fontFamily: 'Orbitron' }}>
+                      Execution Context
+                    </Typography>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.8rem' }}>
+                      Privileges Required: {data.result.privileges_required || 'N/A'} <br />
+                      User Interaction: {data.result.user_interaction || 'N/A'}
+                    </Typography>
+                  </Stack>
+                  <Stack spacing={0.5}>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.5, fontFamily: 'Orbitron' }}>
+                      CVSS Impacts
+                    </Typography>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.8rem' }}>
+                      Confidentiality: {data.result.confidentiality_impact || 'N/A'} <br />
+                      Integrity: {data.result.integrity_impact || 'N/A'} <br />
+                      Availability: {data.result.availability_impact || 'N/A'}
+                    </Typography>
+                  </Stack>
+                  <Stack spacing={0.5}>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.5, fontFamily: 'Orbitron' }}>
+                      Vulnerability Type
+                    </Typography>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.8rem' }}>
+                      {data.result.vulnerability_type || 'N/A'}
+                    </Typography>
+                  </Stack>
+                  <Stack spacing={0.5}>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.65rem', fontWeight: 900, textTransform: 'uppercase', letterSpacing: 1.5, fontFamily: 'Orbitron' }}>
+                      Timeline
+                    </Typography>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.85)', fontSize: '0.8rem' }}>
+                      Published: {data.result.published_date ? new Date(data.result.published_date).toLocaleDateString() : 'N/A'} <br />
+                      Modified: {data.result.last_modified_date ? new Date(data.result.last_modified_date).toLocaleDateString() : 'N/A'}
+                    </Typography>
+                  </Stack>
+                </Box>
               </Stack>
             ) : (
-              <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem' }}>{data.message || 'CVE not found.'}</Typography>
+              <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem' }}>
+                {data.message || 'CVE not found.'}
+              </Typography>
             )}
           </Paper>
         )}

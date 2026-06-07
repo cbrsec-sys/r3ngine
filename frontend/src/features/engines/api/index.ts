@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import type { Engine, Wordlist } from '../types';
+import type { Engine, Wordlist, HardwareProfile } from '../types';
 
 export const useEngines = () => {
   return useQuery<Engine[]>({
@@ -208,6 +208,20 @@ export const useFullYamlConfig = () => {
       }
       const data = await response.json();
       return data.content;
+    },
+  });
+};export const useHardwareProfiles = () => {
+  return useQuery<HardwareProfile[]>({
+    queryKey: ['hardwareProfiles'],
+    queryFn: async () => {
+      const response = await fetch('/api/hardwareProfiles/', {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data = await response.json();
+      return Array.isArray(data) ? data : (data.results || []);
     },
   });
 };

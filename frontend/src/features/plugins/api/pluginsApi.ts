@@ -18,6 +18,7 @@ export interface Plugin {
   needs_restart: boolean;
   author: string;
   trust_level: 'official' | 'signed_unknown' | 'unsigned' | 'legacy';
+  icon_path?: string;
 }
 
 export interface MarketplacePlugin {
@@ -160,7 +161,7 @@ export const fetchMarketplacePlugins = async (refresh = false): Promise<Marketpl
   return data;
 };
 
-export const installMarketplacePlugin = async (slug: string) => {
+export const installMarketplacePlugin = async (slug: string): Promise<{ install_id: string }> => {
   const { data } = await axios.post(`${API_URL}marketplace/install/`, { slug });
   return data;
 };

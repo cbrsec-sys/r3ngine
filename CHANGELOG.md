@@ -1,5 +1,56 @@
 # Changelog
 
+### [v3.5.0] - 2026-06-04
+
+- **Python 3.12 Runtime Upgrade**:
+  - Upgraded the container execution runtime from Python 3.10 to Python 3.12 to improve performance by ~25% and ensure support until October 2028.
+  - Configured the trusted deadsnakes PPA signing keyring (`/usr/share/keyrings/deadsnakes.gpg`) to install `python3.12`, `python3.12-dev`, and `python3.12-venv` in the Ubuntu 22.04 base image.
+  - Avoided installing the system `python3-pip` package (which forces default Python 3.10 installation) by bootstrapping Python 3.12's `ensurepip` module directly.
+  - Linked pip wrappers and updated `update-alternatives` to redirect global `python`/`python3` and `pip`/`pip3` to 3.12.
+  - Replaced the hardcoded Python 3.10 path inside `temporal-entrypoint.sh` (whatportis bugfix) with a dynamic module path lookup (`python3 -c "import whatportis.cli; print(whatportis.cli.__file__)"`).
+
+- **Fix gRPC Connection Cancellation Error**:
+  - Resolved `temporalio.service.RPCError: operation was canceled` in the python container during workflow execution result retrieval.
+  - Refactored `stream_command` in `web/reNgine/utils/task.py` to create a single `asyncio.Task` wrapper around `handle.result()` and poll it using `asyncio.wait()`, preventing the accumulation of leaked history-fetching coroutines on timeout.
+  - Ensured the task is cleanly cancelled on early exit or scan aborts.
+
+- **Mobile App Login and ALLOWED_HOSTS Fix**:
+  - Automatically dynamically extract and trust the host from `DOMAIN_NAME` inside `web/reNgine/settings.py` so the configured domain works out-of-the-box.
+  - Forward the `ALLOWED_HOSTS` environment variable to the `web` container in both production `docker-compose.yml` and development `docker-compose.dev.yml` (defaulting to `*` in development to ensure seamless mobile emulator/simulator connectivity).
+  - Updated Nginx's HTTP port 8082 redirect rule in `docker/proxy/config/rengine.conf` to use a `308 Permanent Redirect` instead of `301`, preventing HTTP POST methods (like mobile logins) from being converted to GET requests during HTTP-to-HTTPS redirects.
+
+- **Docker: Pipx Isolation for Conflicting Python Tools**:
+  - Migrated `dirsearch`, `maigret`, and `semgrep` out of the shared system `pip3` environment and into isolated `pipx` virtual environments in `docker/web/Dockerfile`.
+  - Resolves five pip dependency incompatibility warnings at build time: `requests` (2.25.1 vs ≥2.27.0 / ≥2.32.4), `chardet` (4.0.0 vs ≥5), `idna` (2.10 vs ≥3.4), and `urllib3` (1.26.x vs ~2.0).
+  - Each tool's transitive dependencies are now fully isolated and cannot conflict with the Django application's pinned `requirements.txt` packages or with each other.
+  - Follows the same `pipx` pattern already established for `baddns`. `/root/.local/bin` is on `PATH`, so all shims remain accessible at runtime without any additional configuration.
+
+
+
+- **CVE Enrichment System**:
+  - **CVE Enrichment Service**: `web/reNgine/cve_enrichment.py` fully operational - fetches CVSS v3.1 metrics from NVD API v2.0, EPSS probability scores from FIRST, and syncs the CISA KEV catalog. Enriched data is cached (7-day TTL for CVEs, 1-hour for KEV) and gracefully degrades on API unavailability.
+  - **Deployment Documentation** (`documents/CVE_ENRICHMENT.md`): Comprehensive documentation covering setup, programmatic usage, management commands, correlation integration, troubleshooting, data retention, performance, and monitoring.
+  - **Deployment Checklist** (`documents/DEPLOYMENT_CHECKLIST.md`): Step-by-step v3.5 upgrade procedure including migration verification, initial data load, cron job setup, rollback plan, and post-deployment verification.
+  - **End-to-End Integration Test** (`web/tests/test_integration.py`): Full pipeline integration test validating the CVE enrichment -> correlation -> in-scan deduplication -> VulnerabilityHistory creation -> cross-scan remediation detection flow. All 3 test suites pass (15 tests total: 7 enrichment + 7 correlation + 1 integration).
+  - **Database Migrations Applied**: Migrations `0035_add_cve_enrichment_fields` and `0036_create_vulnerability_history` confirmed applied in all environments.
+
+- **vulnx Integration (ProjectDiscovery CVE Intelligence)**:
+  - Integrated ProjectDiscovery `vulnx` CLI into the `go-tools-builder` Docker stage alongside other Go tools.
+  - Added `ProjectDiscoveryAPIKey` model and migration (`dashboard/migrations/0016`) for storing the PDCP API key.
+  - Added PDCP API key field to the API Vault settings page (backend + frontend) so users can save and update their key.
+  - Added `_enrich_from_vulnx` method to `CVEEnrichmentService` in `cve_enrichment.py`: runs `vulnx id --json <CVE>`, parses the JSON response, and populates `is_poc`, `is_template`, CVSS, EPSS, KEV, and date fields.
+  - Added `is_poc` and `is_template` boolean fields to the `CveId` model (migration `startScan/migrations/0039`).
+  - Exposed `is_poc` and `is_template` in the `CVEDetails` API response.
+  - CVE Lookup modal now renders "HAS EXPLOIT / POC" (pink) and "NUCLEI TEMPLATE" (purple) badges alongside the CISA KEV badge when the respective flags are set.
+
+- **CVE Correlation, Deduplication & Graph Sync Enhancements**:
+  - **Enhanced CveId Model**: Added CVSS v3.1 base score, EPSS score, EPSS percentile, attack complexity, attack vector, privileges required, user interaction, and scope fields to the database schema (migration `0035`).
+  - **Correlation Scoring & Deduplication**: Replaced basic CVSS severity lookups with a multi-criteria scoring algorithm in `correlation.py`. Calculates composite scores using configurable tool weights, asset criticality, exploitability factors (CISA KEV, EPSS), and temporal modifiers. Suppresses inside-scan duplicates in-memory and groups them under a unique `group_key` before writing.
+  - **Vulnerability History Tracking**: Introduced `VulnerabilityHistory` tracking model (migration `0036`) to trace vulnerabilities across historical scans, automatically detecting if a vulnerability is new, persistent, or remediated.
+  - **Durable Database Transactions**: Wrapped finding correlation, impact assessment creation, and history tracking inside atomic transaction blocks to prevent duplicate database insertions and race conditions.
+  - **Neo4j ID-Based Graph Sync**: Refactored Neo4j sync in `graph.py` to link vulnerability nodes to CVE nodes using precise ID matches (CVE ID) instead of string names. Ingests rich metadata (CVSS base score, EPSS score) directly onto Neo4j nodes.
+  - **Correlation Unit Testing**: Added comprehensive backend test coverage in `test_correlation.py` validating correlation scoring weights, duplicate suppression, and cross-scan history tracking.
+
 ### [v3.4.2] - 2026-06-03
 
 - **Semgrep Finding Name Normalization**:
