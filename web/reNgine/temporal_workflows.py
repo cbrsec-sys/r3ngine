@@ -200,7 +200,7 @@ class MasterScanWorkflow:
             await workflow.execute_activity(
                 "LoadCheckpointActivity",
                 ctx,
-                start_to_close_timeout=timedelta(seconds=10),
+                start_to_close_timeout=timedelta(seconds=15),
                 retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue"
             )
@@ -220,7 +220,7 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunSubdomainDiscoveryActivity",
                         ctx,
-                        start_to_close_timeout=timedelta(hours=2),
+                        start_to_close_timeout=timedelta(hours=4),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_LONG_SCAN,
                         task_queue="python-orchestrator-queue"
@@ -264,7 +264,7 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunGenericTaskActivity",
                         args=[ctx, "osint", "OSINT Scan"],
-                        start_to_close_timeout=timedelta(hours=2),
+                        start_to_close_timeout=timedelta(hours=4),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_LONG_SCAN,
                         task_queue="python-orchestrator-queue"
@@ -275,7 +275,7 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunGenericTaskActivity",
                         args=[ctx, "spiderfoot_scan", "SpiderFoot Attack Surface Intelligence"],
-                        start_to_close_timeout=timedelta(hours=4),
+                        start_to_close_timeout=timedelta(hours=24),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_LONG_SCAN,
                         task_queue="python-orchestrator-queue"
@@ -296,7 +296,7 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunGenericTaskActivity",
                         args=[ctx_baddns, "subdomain_discovery", "Baddns Scan", {}, "baddns"],
-                        start_to_close_timeout=timedelta(hours=2),
+                        start_to_close_timeout=timedelta(hours=4),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_LONG_SCAN,
                         task_queue="python-orchestrator-queue"
@@ -309,7 +309,7 @@ class MasterScanWorkflow:
                 await workflow.execute_activity(
                     "ParseDiscoveryResultsActivity",
                     ctx,
-                    start_to_close_timeout=timedelta(minutes=5),
+                    start_to_close_timeout=timedelta(minutes=15),
                     heartbeat_timeout=timedelta(minutes=5),
                     retry_policy=_RETRY_INTERNAL,
                     task_queue="python-orchestrator-queue"
@@ -345,7 +345,7 @@ class MasterScanWorkflow:
                     await workflow.execute_activity(
                         "ParseHTTPCrawlResultsActivity",
                         ctx,
-                        start_to_close_timeout=timedelta(minutes=5),
+                        start_to_close_timeout=timedelta(minutes=15),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
@@ -358,7 +358,7 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunPortScanActivity",
                         ctx,
-                        start_to_close_timeout=timedelta(hours=2),
+                        start_to_close_timeout=timedelta(hours=3),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_LONG_SCAN,
                         task_queue="python-orchestrator-queue"
@@ -371,7 +371,7 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunVigoliumDiscoveryActivity",
                         ctx,
-                        start_to_close_timeout=timedelta(hours=3),
+                        start_to_close_timeout=timedelta(hours=4),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_LONG_SCAN,
                         task_queue="python-orchestrator-queue"
@@ -393,8 +393,8 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunFetchURLActivity",
                         ctx,
-                        start_to_close_timeout=timedelta(hours=6),
-                        heartbeat_timeout=timedelta(minutes=5),
+                        start_to_close_timeout=timedelta(hours=8),
+                        heartbeat_timeout=timedelta(minutes=15),
                         retry_policy=_RETRY_LONG_SCAN,
                         task_queue="python-orchestrator-queue"
                     )
@@ -420,15 +420,15 @@ class MasterScanWorkflow:
                 await workflow.execute_activity(
                     "RunDirFileFuzzActivity",
                     ctx,
-                    start_to_close_timeout=timedelta(hours=4),
-                    heartbeat_timeout=timedelta(minutes=5),
+                    start_to_close_timeout=timedelta(hours=8),
+                    heartbeat_timeout=timedelta(minutes=15),
                     retry_policy=_RETRY_LONG_SCAN,
                     task_queue="python-orchestrator-queue"
                 )
                 await workflow.execute_activity(
                     "ParseFuzzResultsActivity",
                     ctx,
-                    start_to_close_timeout=timedelta(minutes=5),
+                    start_to_close_timeout=timedelta(minutes=15),
                     heartbeat_timeout=timedelta(minutes=5),
                     retry_policy=_RETRY_INTERNAL,
                     task_queue="python-orchestrator-queue"
@@ -490,7 +490,7 @@ class MasterScanWorkflow:
                     workflow.execute_activity(
                         "RunVigoliumAnalysisActivity",
                         ctx,
-                        start_to_close_timeout=timedelta(hours=2),
+                        start_to_close_timeout=timedelta(hours=8),
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_LONG_SCAN,
                         task_queue="python-orchestrator-queue"
@@ -596,7 +596,7 @@ class MasterScanWorkflow:
                             await workflow.execute_activity(
                                 "CorrelateVulnerabilitiesActivity",
                                 ctx,
-                                start_to_close_timeout=timedelta(minutes=60),
+                                start_to_close_timeout=timedelta(minutes=90),
                                 heartbeat_timeout=timedelta(minutes=5),
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue"
@@ -606,7 +606,7 @@ class MasterScanWorkflow:
                             await workflow.execute_activity(
                                 "EnrichScanCVEsActivity",
                                 ctx,
-                                start_to_close_timeout=timedelta(minutes=30),
+                                start_to_close_timeout=timedelta(minutes=45),
                                 heartbeat_timeout=timedelta(minutes=5),
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue"
@@ -794,38 +794,86 @@ class NucleiPlannerWorkflow:
                 )
         
         if vuln_config.get('run_crlfuzz', False):
-            await workflow.execute_activity("RunCRLFuzzActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            await workflow.execute_activity(
+                "RunCRLFuzzActivity", 
+                ctx, 
+                start_to_close_timeout=timedelta(hours=4), 
+                heartbeat_timeout=timedelta(minutes=5),
+                task_queue="python-orchestrator-queue"
+            )
             
         if vuln_config.get('run_dalfox', False):
-            await workflow.execute_activity("RunDalfoxActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            await workflow.execute_activity(
+                "RunDalfoxActivity", 
+                ctx, 
+                start_to_close_timeout=timedelta(hours=4), 
+                heartbeat_timeout=timedelta(minutes=5),
+                task_queue="python-orchestrator-queue"
+            )
             
         if vuln_config.get('run_s3scanner', True):
-            await workflow.execute_activity("RunS3ScannerActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            await workflow.execute_activity(
+                "RunS3ScannerActivity", 
+                ctx, 
+                start_to_close_timeout=timedelta(hours=2), 
+                heartbeat_timeout=timedelta(minutes=5),
+                task_queue="python-orchestrator-queue"
+            )
             
         # --- Stage 2: Additional scanners ---
         if vuln_config.get('run_acunetix', False):
-            await workflow.execute_activity("RunAcunetixActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            await workflow.execute_activity(
+                "RunAcunetixActivity", 
+                ctx, 
+                start_to_close_timeout=timedelta(hours=4), 
+                heartbeat_timeout=timedelta(minutes=5),
+                task_queue="python-orchestrator-queue"
+            )
             
         cpanel_cfg = vuln_config.get('cpanel_scanner', {})
         if cpanel_cfg.get('run_cpanel2shell', True):
-            await workflow.execute_activity("RunCpanelScanActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            await workflow.execute_activity(
+                "RunCpanelScanActivity", 
+                ctx, 
+                start_to_close_timeout=timedelta(hours=2), 
+                heartbeat_timeout=timedelta(minutes=5),
+                task_queue="python-orchestrator-queue"
+            )
             
         if vuln_config.get('run_wpscan', True):
-            await workflow.execute_activity("RunWpscanActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            await workflow.execute_activity(
+                "RunWpscanActivity", 
+                ctx, 
+                start_to_close_timeout=timedelta(hours=2), 
+                heartbeat_timeout=timedelta(minutes=5),
+                task_queue="python-orchestrator-queue"
+            )
             
         react_cfg = vuln_config.get('react_scanner', {})
         if react_cfg.get('run_react2shell', True):
-            await workflow.execute_activity("RunReact2ShellActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            await workflow.execute_activity(
+                "RunReact2ShellActivity", 
+                ctx, 
+                start_to_close_timeout=timedelta(hours=2), 
+                heartbeat_timeout=timedelta(minutes=5),
+                task_queue="python-orchestrator-queue"
+            )
             
         leaks_config = yaml_config.get('leaks_and_secrets', {})
         if leaks_config.get('run_semgrep', True):
-            await workflow.execute_activity("RunSemgrepActivity", ctx, start_to_close_timeout=timedelta(hours=2), heartbeat_timeout=timedelta(minutes=5), task_queue="python-orchestrator-queue")
+            await workflow.execute_activity(
+                "RunSemgrepActivity", 
+                ctx, 
+                start_to_close_timeout=timedelta(hours=2), 
+                heartbeat_timeout=timedelta(minutes=5),
+                task_queue="python-orchestrator-queue"
+            )
 
         if vuln_config.get('run_vigolium', True):
             await workflow.execute_activity(
                 "RunVigoliumScanActivity",
                 ctx,
-                start_to_close_timeout=timedelta(hours=4),
+                start_to_close_timeout=timedelta(hours=6),
                 heartbeat_timeout=timedelta(minutes=5),
                 retry_policy=_RETRY_LONG_SCAN,
                 task_queue="python-orchestrator-queue"
@@ -861,7 +909,7 @@ _SUBSCAN_DISPATCH = {
     },
     "subdomain_discovery": {
         "activity": "RunGenericTaskActivity",
-        "timeout": timedelta(hours=2),
+        "timeout": timedelta(hours=4),
         "args_builder": lambda ctx: [
             ctx, "subdomain_discovery", "Subdomain Discovery",
             {"host": ctx.get("subdomain_name", "")},
@@ -877,7 +925,7 @@ _SUBSCAN_DISPATCH = {
     },
     "fetch_url": {
         "activity": "RunGenericTaskActivity",
-        "timeout": timedelta(hours=6),
+        "timeout": timedelta(hours=8),
         "args_builder": lambda ctx: [
             ctx, "fetch_url", "Fetch URL",
             {"urls": [ctx.get("subdomain_http_url") or f"http://{ctx.get('subdomain_name', '')}/"]},
@@ -885,7 +933,7 @@ _SUBSCAN_DISPATCH = {
     },
     "dir_file_fuzz": {
         "activity": "RunGenericTaskActivity",
-        "timeout": timedelta(hours=4),
+        "timeout": timedelta(hours=8),
         "args_builder": lambda ctx: [ctx, "dir_file_fuzz", "Dir File Fuzz", {}],
     },
     "screenshot": {
@@ -926,7 +974,7 @@ _SUBSCAN_DISPATCH = {
     },
     "spiderfoot_scan": {
         "activity": "RunGenericTaskActivity",
-        "timeout": timedelta(hours=4),
+        "timeout": timedelta(hours=8),
         "args_builder": lambda ctx: [ctx, "spiderfoot_scan", "SpiderFoot Scan", {}],
     },
     "secret_scanning": {
@@ -946,12 +994,12 @@ _SUBSCAN_DISPATCH = {
     },
     "vigolium_analysis": {
         "activity": "RunVigoliumAnalysisActivity",
-        "timeout": timedelta(hours=2),
+        "timeout": timedelta(hours=3),
         "args_builder": lambda ctx: [ctx],
     },
     "vigolium_scan": {
         "activity": "RunVigoliumScanActivity",
-        "timeout": timedelta(hours=2),
+        "timeout": timedelta(hours=4),
         "args_builder": lambda ctx: [ctx],
     },
     # Special cases — handled with inline logic in SubScanWorkflow.run():
