@@ -3365,7 +3365,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		# LinkFinder - per URL (fast; fetches and extracts JS links)
 		if 'linkfinder' in uses_tools:
 			lf_output = f"{results_dir}/lf_{subdomain_name}.txt"
-			cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -i {url} -o cli | tee {lf_output}"
+			cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -d -i {url} -o cli | tee {lf_output}"
 			logger.warning('[WEB_API] LinkFinder: running on %s | cmd: %s', subdomain_name, cmd)
 			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(lf_output):
