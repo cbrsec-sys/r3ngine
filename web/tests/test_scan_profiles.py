@@ -46,3 +46,37 @@ class TestScanProfileModel(TestCase):
         ctx_zero = profile_zero_delay.to_ctx_dict()
         self.assertIn('delay', ctx_zero)
         self.assertEqual(ctx_zero['delay'], 0.0)
+
+
+class TestScanProfileFixtures(TestCase):
+    fixtures = ['scan_profiles']
+
+    def test_fixture_loads_20_profiles(self):
+        from scanEngine.models import ScanProfile
+        count = ScanProfile.objects.filter(is_builtin=True).count()
+        self.assertGreaterEqual(count, 20)
+
+    def test_vps_profile_has_correct_values(self):
+        from scanEngine.models import ScanProfile
+        vps = ScanProfile.objects.get(name='vps')
+        self.assertEqual(vps.threads, 4)
+        self.assertEqual(vps.rate_limit, 50)
+        self.assertAlmostEqual(vps.delay, 0.1)
+
+    def test_passive_profile_sets_passive_flag(self):
+        from scanEngine.models import ScanProfile
+        passive = ScanProfile.objects.get(name='passive')
+        self.assertTrue(passive.passive)
+        ctx = passive.to_ctx_dict()
+        self.assertTrue(ctx.get('passive'))
+
+    def test_stealth_profile_sets_stealth_flag(self):
+        from scanEngine.models import ScanProfile
+        stealth = ScanProfile.objects.get(name='stealth')
+        self.assertTrue(stealth.stealth)
+
+    def test_tor_profile_sets_tor_flag(self):
+        from scanEngine.models import ScanProfile
+        tor = ScanProfile.objects.get(name='tor')
+        self.assertTrue(tor.tor)
+
