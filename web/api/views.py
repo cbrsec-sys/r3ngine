@@ -14,7 +14,7 @@ from django.utils import timezone
 from packaging import version
 from django.template.defaultfilters import slugify
 from datetime import datetime
-from rest_framework import viewsets, status
+from rest_framework import viewsets, serializers, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework_datatables.pagination import DatatablesPageNumberPagination
 from rest_framework.response import Response
@@ -1949,6 +1949,21 @@ class InitiateScan(APIView):
 						scan.cfg_custom_dorks = custom_dorks
 						scan.save()
 
+					# Resolve optional ScanProfile and embed its context
+					_profile_ctx = {}
+					_profile_name = data.get('profile_name')
+					_profile_id = data.get('profile_id')
+					if _profile_name or _profile_id:
+						try:
+							from scanEngine.models import ScanProfile as _ScanProfile
+							if _profile_name:
+								_profile = _ScanProfile.objects.get(name=_profile_name)
+							else:
+								_profile = _ScanProfile.objects.get(pk=_profile_id)
+							_profile_ctx = _profile.to_ctx_dict()
+						except Exception:
+							pass
+
 					# Start the scan via Temporal durable workflow orchestration
 					kwargs = {
 						'scan_history_id': scan.id,
@@ -1964,6 +1979,7 @@ class InitiateScan(APIView):
 						'enable_spiderfoot_scan': spiderfoot_scan,
 						'initiated_by_id': request.user.id,
 						'selected_plugin_slugs': selected_plugins,
+						'profile_ctx': _profile_ctx,
 					}
 					initiate_scan_temporal(**kwargs)
 					results.append({'domain': domain.name, 'scan_id': scan.id})
@@ -4997,3 +5013,30 @@ class StartWorkflowView(APIView):
                 {'error': 'Failed to start workflow'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — ScanProfile CRUD API
+# ---------------------------------------------------------------------------
+
+class ScanProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ScanProfile
+        fields = '__all__'
+        read_only_fields = ['id', 'is_builtin', 'created_at', 'updated_at']
+
+
+class ScanProfileViewSet(viewsets.ModelViewSet):
+    queryset = ScanProfile.objects.all().order_by('category', 'name')
+    serializer_class = ScanProfileSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'name'
+
+    def destroy(self, request, *args, **kwargs):
+        profile = self.get_object()
+        if profile.is_builtin:
+            return Response(
+                {'error': 'Cannot delete built-in profiles.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)

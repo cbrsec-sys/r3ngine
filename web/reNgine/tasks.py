@@ -181,6 +181,7 @@ def initiate_scan_temporal(
 		custom_dorks=None,
 		enable_spiderfoot_scan=False,
 		selected_plugin_slugs=None,
+		profile_ctx=None,
 	):
 	"""Initiate a new scan using Temporal durable workflow orchestration.
 
@@ -372,6 +373,7 @@ def initiate_scan_temporal(
 			'use_tor': bool(_proxy and _proxy.use_tor),
 			'selected_plugin_slugs': selected_plugin_slugs or [],
 			'hardware_profile': hardware_profile_ctx,
+			'profile': profile_ctx or {},
 		}
 
 		# ---- Start MasterScanWorkflow on Temporal ----
