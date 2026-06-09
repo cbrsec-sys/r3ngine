@@ -84,7 +84,7 @@ ensure_script_perms() {
   echo "Setting correct execution permissions on entrypoints"
   chmod +x docker/web/entrypoint.sh
   chmod +x docker/temporal-go-executor/entrypoint.sh
-  chmod +x docker/temporal-python-executor/entrypoint.sh
+  chmod +x docker/temporal-python-orchestrator/entrypoint.sh
 }
 
 usageFunction()
