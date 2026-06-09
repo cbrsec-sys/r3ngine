@@ -1,5 +1,6 @@
 import yaml
 import logging
+from typing import Any
 from django.db import models
 
 logger = logging.getLogger('django')
@@ -276,8 +277,12 @@ class ScanProfile(models.Model):
     def __str__(self):
         return self.name
 
-    def to_ctx_dict(self) -> dict:
-        """Returns a profile dict ready to merge into a Temporal workflow ctx."""
+    def to_ctx_dict(self) -> dict[str, Any]:
+        """Return throttle + flag settings as a dict for merging into a workflow ctx.
+
+        Only non-None throttle values are included. Mode flags are only included when
+        True — absent keys mean False. Consumers must use ctx.get('flag', False).
+        """
         d = {}
         if self.rate_limit is not None:
             d['rate_limit'] = self.rate_limit

@@ -16,7 +16,6 @@ class TestScanProfileModel(TestCase):
         )
         self.assertEqual(profile.name, 'test_profile')
         self.assertEqual(profile.rate_limit, 100)
-        profile.delete()
 
     def test_profile_flags_default_false(self):
         from scanEngine.models import ScanProfile
@@ -25,7 +24,6 @@ class TestScanProfileModel(TestCase):
         self.assertFalse(profile.active)
         self.assertFalse(profile.stealth)
         self.assertFalse(profile.headless)
-        profile.delete()
 
     def test_profile_str_returns_name(self):
         from scanEngine.models import ScanProfile
@@ -44,4 +42,7 @@ class TestScanProfileModel(TestCase):
         self.assertEqual(ctx_dict['rate_limit'], 50)
         self.assertAlmostEqual(ctx_dict['delay'], 0.1)
         self.assertTrue(ctx_dict['passive'])
-        profile.delete()
+        profile_zero_delay = ScanProfile.objects.create(name='zero_delay_test', delay=0.0)
+        ctx_zero = profile_zero_delay.to_ctx_dict()
+        self.assertIn('delay', ctx_zero)
+        self.assertEqual(ctx_zero['delay'], 0.0)
