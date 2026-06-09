@@ -1,4 +1,91 @@
 #!/bin/bash
+ensure_postgres_sslmode() {
+    local env_file="${1:-.env}"
+
+    if [[ ! -f "$env_file" ]]; then
+        echo "ERROR: File not found: $env_file"
+        return 1
+    fi
+
+    if grep -q '^POSTGRES_SSLMODE=prefer$' "$env_file"; then
+        echo "POSTGRES_SSLMODE=prefer already present."
+    else
+        echo "" >> "$env_file"
+        echo "POSTGRES_SSLMODE=prefer" >> "$env_file"
+        echo "Added POSTGRES_SSLMODE=prefer to $env_file"
+    fi
+}
+fix_volumes_permissions() {
+  local user_id=$1
+  local group_id=$1
+  
+  log "Fixing permissions for Docker volumes..." $COLOR_CYAN
+  
+  declare -a volumes=(
+    "rengine_gf_patterns"
+    "rengine_nuclei_templates"
+    "rengine_scan_results"
+    "rengine_wordlist"
+  )
+
+  for volume in "${volumes[@]}"; do
+    if docker volume inspect "$volume" >/dev/null 2>&1; then
+      log "Setting permissions for volume: $volume" $COLOR_YELLOW
+      if ! docker run --rm -v "$volume:/data" alpine sh -c "chown -R $user_id:$group_id /data"; then
+        log "Failed to set permissions for volume: $volume" $COLOR_RED
+        return 1
+      fi
+    else
+      log "Volume $volume not found, skipping..." $COLOR_YELLOW
+    fi
+  done
+  
+  log "Volume permissions updated successfully" $COLOR_GREEN
+  return 0
+}
+# Define color codes.
+COLOR_BLACK=0
+COLOR_RED=1 # For errors and important messages
+COLOR_GREEN=2 # For succesful output/messages
+COLOR_YELLOW=3 # For questions and choices
+COLOR_BLUE=4
+COLOR_MAGENTA=5
+COLOR_CYAN=6 # For actions that are being executed
+COLOR_WHITE=7 # Default, we don't really use this explicitly
+COLOR_DEFAULT=$COLOR_WHITE # Use white as default for clarity
+
+# Log messages in different colors
+log() {
+  local color=${2:-$COLOR_DEFAULT}  # Use default color if $2 is not set
+  if [ "$color" -ne $COLOR_DEFAULT ]; then
+    tput setaf "$color"
+  fi
+  printf "$1\r\n"
+  tput sgr0  # Reset text color
+}
+fix_project_ownership() {
+  local user_id=$1
+  local group_id=$1
+  
+  log "Setting correct ownership of the project directory..." $COLOR_CYAN
+  project_dir=$(pwd)
+  
+  # Set ownership for both hidden and regular files in one command
+  if ! find "$project_dir" \( -name ".*" -o -true \) -exec chown ${user_id}:${group_id} {} +; then
+      log "Failed to set ownership of project directory to $user_id" $COLOR_RED
+      return 1
+  fi
+  
+  log "Project directory ownership set to $user_id" $COLOR_GREEN
+  return 0
+}
+
+ensure_script_perms() {
+  echo "Setting correct execution permissions on entrypoints"
+  chmod +x docker/web/entrypoint.sh
+  chmod +x docker/temporal-go-executor/entrypoint.sh
+  chmod +x docker/temporal-python-executor/entrypoint.sh
+}
 
 usageFunction()
 {
@@ -12,7 +99,7 @@ usageFunction()
 
 tput setaf 2;
 cat web/art/reNgine.txt
-
+ensure_postgres_sslmode
 tput setaf 1; echo "Before running this script, please make sure Docker is running and you have made changes to .env file."
 tput setaf 2; echo "Changing the postgres username & password from .env is highly recommended."
 
@@ -47,6 +134,8 @@ echo "#########################################################################"
 echo "Please note that, this installation script is only intended for Linux"
 echo "For Mac and Windows, refer to the official guide https://rengine.wiki"
 echo "#########################################################################"
+
+fix_project_ownership
 
 echo " "
 tput setaf 4;
@@ -84,6 +173,7 @@ else
   tput setaf 2; echo "Docker installed!!!"
 fi
 
+ensure_script_perms
 
 echo " "
 tput setaf 4;
@@ -133,7 +223,11 @@ tput setaf 4;
 echo "#########################################################################"
 echo "Installing reNgine"
 echo "#########################################################################"
-make certs && make build && make up && tput setaf 2 && echo "reNgine is installed!!!" && failed=0 || failed=1
+make certs 
+make build 
+make up 
+fix_volumes_permissions $SUDO_UID $SUDO_GID
+tput setaf 2 && echo "reNgine is installed!!!" && failed=0 || failed=1
 
 if [ "${failed}" -eq 0 ]; then
   sleep 3
@@ -143,8 +237,9 @@ if [ "${failed}" -eq 0 ]; then
   echo "#########################################################################"
   echo "Creating an account"
   echo "#########################################################################"
-  make username isNonInteractive=$isNonInteractive
   make migrate
+  make username isNonInteractive=$isNonInteractive
+
 
   tput setaf 2 && printf "\n%s\n" "Thank you for installing reNgine, happy recon!!"
   echo "In case you have unapplied migrations (see above in red), run 'make migrate'"
