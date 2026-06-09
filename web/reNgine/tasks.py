@@ -3674,7 +3674,7 @@ def add_gpt_description_db(title, path, description, impact, remediation, refere
 			gpt_report.references.add(ref)
 		gpt_report.save()
 
-def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, parse_only=None, severity=None):
+def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, parse_only=None, severity=None, tags_override=None):
 	"""HTTP vulnerability scan using Nuclei
 
 	Args:
@@ -3718,30 +3718,37 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		severities = [severity_filter]
 	else:
 		severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
-	tags = nuclei_specific_config.get(NUCLEI_TAGS, [])
-	
-	# Intelligence-Driven Scanning: Inject tags based on detected technologies
-	tech_tags = []
-	all_techs = set()
-	if self.scan:
-		# Get all technologies discovered for this scan
-		subdomains = Subdomain.objects.filter(scan_history=self.scan)
+	if tags_override is not None:
+		# Tags were pre-computed and batched by NucleiPlannerWorkflow via
+		# GatherNucleiTagsActivity.  Use them directly; skip the tech-detection
+		# block so we don't re-query the DB on every batch call.
+		tags = ','.join(tags_override) if tags_override else ''
 		all_techs = set()
-		for sub in subdomains:
-			# assuming technologies is a many-to-many field with 'name' attribute
-			all_techs.update(sub.technologies.values_list('name', flat=True))
-		
-		if all_techs:
-			tech_tags = get_nuclei_tags_from_techs(list(all_techs))
-			logger.info(f'Detected technologies: {list(all_techs)}. Adding targeted Nuclei tags: {tech_tags}')
-
-	if tech_tags:
-		# Combine user tags with tech tags
-		user_tags = set(tags if isinstance(tags, list) else tags.split(',') if tags else [])
-		user_tags.update(tech_tags)
-		tags = ','.join(user_tags)
 	else:
-		tags = ','.join(tags) if isinstance(tags, list) else tags
+		tags = nuclei_specific_config.get(NUCLEI_TAGS, [])
+
+		# Intelligence-Driven Scanning: Inject tags based on detected technologies
+		tech_tags = []
+		all_techs = set()
+		if self.scan:
+			# Get all technologies discovered for this scan
+			subdomains = Subdomain.objects.filter(scan_history=self.scan)
+			all_techs = set()
+			for sub in subdomains:
+				# assuming technologies is a many-to-many field with 'name' attribute
+				all_techs.update(sub.technologies.values_list('name', flat=True))
+
+			if all_techs:
+				tech_tags = get_nuclei_tags_from_techs(list(all_techs))
+				logger.info('Detected technologies: %s. Adding targeted Nuclei tags: %s', list(all_techs), tech_tags)
+
+		if tech_tags:
+			# Combine user tags with tech tags
+			user_tags = set(tags if isinstance(tags, list) else tags.split(',') if tags else [])
+			user_tags.update(tech_tags)
+			tags = ','.join(user_tags)
+		else:
+			tags = ','.join(tags) if isinstance(tags, list) else tags
 
 	nuclei_templates = nuclei_specific_config.get(NUCLEI_TEMPLATE)
 	custom_nuclei_templates = nuclei_specific_config.get(NUCLEI_CUSTOM_TEMPLATE)
@@ -3781,10 +3788,17 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	# Build templates
 	logger.info('Updating Nuclei templates ...')
 	# Wordfence Templates integration — 70k+ WordPress CVE templates, daily-updated
-	is_wordpress_detected = any(
-		'wordpress' in t.lower() or 'wp-' in t.lower()
-		for t in all_techs
-	) if all_techs else False
+	# When tags_override is used, all_techs is empty; check the batch tags instead.
+	if tags_override is not None:
+		is_wordpress_detected = any(
+			'wordpress' in t.lower() or 'wp-' in t.lower()
+			for t in (tags_override or [])
+		)
+	else:
+		is_wordpress_detected = any(
+			'wordpress' in t.lower() or 'wp-' in t.lower()
+			for t in all_techs
+		) if all_techs else False
 	wordfence_exists = False
 	if is_wordpress_detected:
 		logger.info("WordPress detected. Preparing Wordfence Nuclei Templates...")
@@ -5250,15 +5264,20 @@ def get_severity_from_cvss(cvss_score):
 def parse_nmap_vulners_output(script_output, url='', service_title=''):
 	"""Parse nmap vulners script output.
 
+	All findings for the same service are grouped into a single vulnerability
+	record. Individual findings are rendered as a formatted table in the
+	description so the UI shows one row per service rather than one row per CVE/ID.
+
 	Args:
 		script_output (str): Script output.
 
 	Returns:
-		list: List of found vulnerabilities.
+		list: Single-element list containing the grouped vulnerability, or [].
 	"""
 	if not script_output or not isinstance(script_output, str):
 		return []
-	vulns = []
+
+	findings = []
 	lines = script_output.split('\n')
 	for line in lines:
 		line = line.strip()
@@ -5270,21 +5289,11 @@ def parse_nmap_vulners_output(script_output, url='', service_title=''):
 			try:
 				vuln_cvss = float(parts[1])
 			except (ValueError, TypeError):
-				continue # Not a vuln line
+				continue  # Not a vuln line
 
 			vuln_url = parts[2]
 			is_exploit = '*EXPLOIT*' in line
 
-			# Determine a better vulnerability name
-			vuln_name = vuln_id
-			if service_title:
-				vuln_name = f"{service_title} ({vuln_id})"
-
-			# Extract tags
-			tags = []
-			if is_exploit:
-				tags.append('is exploit')
-			
 			source_tag = ''
 			vuln_url_lower = vuln_url.lower()
 			if 'packetstorm' in vuln_url_lower:
@@ -5297,73 +5306,79 @@ def parse_nmap_vulners_output(script_output, url='', service_title=''):
 				source_tag = '1337day'
 			elif 'exploit-db' in vuln_url_lower or 'edb' in vuln_id.lower():
 				source_tag = 'exploit-db'
-			
-			if source_tag:
-				tags.append(source_tag)
 
-			# Create a base vulnerability object
-			vuln = {
-				'name': vuln_name,
-				'type': 'nmap-vulners-nse',
-				'severity': get_severity_from_cvss(vuln_cvss),
-				'description': f"Vulnerability found by nmap vulners script: {vuln_id}. Product: {service_title}",
-				'cvss_score': vuln_cvss,
-				'references': [vuln_url],
-				'cve_ids': [],
-				'cwe_ids': [],
-				'tags': tags,
-				'group_key': service_title
-			}
+			findings.append({
+				'id': vuln_id,
+				'cvss': vuln_cvss,
+				'url': vuln_url,
+				'is_exploit': is_exploit,
+				'source_tag': source_tag,
+			})
 
-			# If it's a CVE, try to enrich it with cve_to_vuln
-			if vuln_id.startswith('CVE-'):
-				enriched_vuln = cve_to_vuln(vuln_id, vuln_type='nmap-vulners-nse')
-				if enriched_vuln:
-					# Use enriched data but keep some nmap specifics if needed
-					old_tags = vuln.get('tags', [])
-					vuln.update(enriched_vuln)
-					
-					# Merge tags
-					if 'tags' not in vuln:
-						vuln['tags'] = []
-					vuln['tags'].extend(old_tags)
-					vuln['tags'] = list(set(vuln['tags']))
-					vuln['group_key'] = service_title  # preserve group_key after CVE enrichment overwrites
-
-					# Improve name if service_title is present
-					if service_title:
-						# If enriched name is just the CVE, use service title
-						if enriched_vuln.get('name') == vuln_id:
-							vuln['name'] = f"{service_title} ({vuln_id})"
-						else:
-							# Combine them if they are different
-							if service_title.lower() not in enriched_vuln.get('name', '').lower():
-								vuln['name'] = f"{service_title}: {enriched_vuln.get('name')}"
-					
-					# Ensure the CVSS score from nmap is used if API has -1 or something
-					if vuln.get('cvss_score', -1) == -1:
-						vuln['cvss_score'] = vuln_cvss
-						vuln['severity'] = get_severity_from_cvss(vuln_cvss)
-
-			if vuln:
-				vuln['source'] = 'VULNERS'
-				if is_exploit:
-					vuln['exploit_url'] = vuln_url
-				vulns.append(vuln)
-
-	# If no structured findings found, fallback to the old regex
-	if not vulns:
-		# Check for CVE in script output
+	# Fallback to CVE regex when the script output uses a non-standard format
+	if not findings:
 		CVE_REGEX = re.compile(r'.*(CVE-\d\d\d\d-\d+).*')
-		matches = CVE_REGEX.findall(script_output)
-		matches = list(dict.fromkeys(matches))
-		for cve_id in matches: # get CVE info
-			vuln = cve_to_vuln(cve_id, vuln_type='nmap-vulners-nse')
-			if vuln:
-				vuln['source'] = 'VULNERS'
-				vuln['group_key'] = service_title
-				vulns.append(vuln)
-	return vulns
+		matches = list(dict.fromkeys(CVE_REGEX.findall(script_output)))
+		for cve_id in matches:
+			findings.append({'id': cve_id, 'cvss': 0.0, 'url': '', 'is_exploit': False, 'source_tag': ''})
+
+	if not findings:
+		return []
+
+	# Aggregate across all findings
+	max_cvss = max(f['cvss'] for f in findings)
+	all_tags = set()
+	all_references = []
+	best_exploit_url = None
+	for f in findings:
+		if f['is_exploit']:
+			all_tags.add('is exploit')
+			if best_exploit_url is None:
+				best_exploit_url = f['url']
+		if f['source_tag']:
+			all_tags.add(f['source_tag'])
+		if f['url']:
+			all_references.append(f['url'])
+
+	# Build a plain-text table for the description (rendered with pre-wrap in the UI)
+	col_id_w = max(len(f['id']) for f in findings)
+	col_id_w = max(col_id_w, 10)
+	header_line  = f"{'ID':<{col_id_w}}  {'CVSS':>6}  {'Source':<15}  Exploit"
+	divider_line = f"{'-' * col_id_w}  {'-' * 6}  {'-' * 15}  -------"
+	rows = []
+	for f in findings:
+		exploit_marker = 'Yes' if f['is_exploit'] else 'No'
+		rows.append(
+			f"{f['id']:<{col_id_w}}  {f['cvss']:>6.1f}  {f['source_tag'] or '':<15}  {exploit_marker}"
+		)
+
+	product_label = service_title or 'Unknown service'
+	description = (
+		f"Vulnerabilities found by nmap vulners NSE script for: {product_label}\n"
+		f"Total findings: {len(findings)}  |  Highest CVSS: {max_cvss}\n\n"
+		f"{header_line}\n{divider_line}\n"
+		+ '\n'.join(rows)
+	)
+
+	vuln_name = f"{service_title} (Vulners NSE)" if service_title else "Vulners NSE Findings"
+
+	grouped_vuln = {
+		'name': vuln_name,
+		'type': 'nmap-vulners-nse',
+		'severity': get_severity_from_cvss(max_cvss),
+		'description': description,
+		'cvss_score': max_cvss,
+		'references': all_references,
+		'cve_ids': [],
+		'cwe_ids': [],
+		'tags': list(all_tags),
+		'source': 'VULNERS',
+		'group_key': service_title,
+	}
+	if best_exploit_url:
+		grouped_vuln['exploit_url'] = best_exploit_url
+
+	return [grouped_vuln]
 
 
 def cve_to_vuln(cve_id, vuln_type=''):

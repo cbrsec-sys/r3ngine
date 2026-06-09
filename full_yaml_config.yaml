@@ -107,14 +107,14 @@ port_scan:
   rate_limit: 150
   threads: 30
   passive: false
-  use_naabu_config: false          # Use /root/.config/naabu/config.yaml
-  exclude_ports: []                # Ports to exclude
-  exclude_subdomains: false        # Exclude subdomains from scan
-  enable_nmap: true                # Run nmap post-scan for service/vuln detection
-  nmap_cmd: -sV --script vuln      # Raw nmap arguments appended to base command
-  nmap_script: ''                  # NSE script(s) e.g. 'http-headers,ssl-cert'
-  nmap_script_args: ''             # Arguments for NSE scripts
-  enable_network_enum: true        # Enable SMB/SNMP/LDAP/RDP protocol enumeration
+  use_naabu_config: false                           # Use /root/.config/naabu/config.yaml
+  exclude_ports: []                                 # Ports to exclude
+  exclude_subdomains: false                         # Exclude subdomains from scan
+  enable_nmap: true                                 # Run nmap post-scan for service/vuln detection
+  nmap_cmd: 'nmap -vv -Pn '                         # Raw nmap arguments appended to base command
+  nmap_script: '/usr/src/nmap/scripts/vulners.nse'  # NSE script(s) e.g. 'http-headers,ssl-cert'
+  nmap_script_args: ''                              # Arguments for NSE scripts
+  enable_network_enum: true                         # Enable SMB/SNMP/LDAP/RDP protocol enumeration
 
 # ---------------------------------------------------------------------------
 # TIER 2 — Vigolium Discovery

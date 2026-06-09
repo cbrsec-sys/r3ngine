@@ -11,7 +11,7 @@ from reNgine.common_func import (
     get_subdomain_from_url
 )
 from dashboard.models import WpScanAPIKey
-from startScan.models import ScanHistory, Subdomain, Vulnerability
+from startScan.models import EndPoint, ScanHistory, Subdomain, Vulnerability
 
 logger = logging.getLogger(__name__)
 
@@ -117,14 +117,41 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
         logger.info("WPScan is disabled in configuration. Skipping.")
         return
 
+    # Gate: only run when WordPress indicators are present, either from technology
+    # fingerprinting or from wp-like paths found by fetch_url / dir_file_fuzz.
+    # Mirrors the react2shell_scan gating pattern.
+    from django.db.models import Q
+    _WP_PATH_RE = r'(wp-login|wp-admin|wp-content|wp-json|xmlrpc\.php)'
+
+    if self.subscan and self.subdomain:
+        _sub_qs = Subdomain.objects.filter(pk=self.subdomain.id)
+        _ep_qs = EndPoint.objects.filter(
+            scan_history=self.scan,
+            subdomain=self.subdomain,
+            http_url__iregex=_WP_PATH_RE,
+        )
+    else:
+        _sub_qs = Subdomain.objects.filter(scan_history=self.scan)
+        _ep_qs = EndPoint.objects.filter(
+            scan_history=self.scan,
+            http_url__iregex=_WP_PATH_RE,
+        )
+
+    wp_via_tech = _sub_qs.filter(technologies__name__icontains='wordpress').exists()
+    wp_via_paths = _ep_qs.exists()
+
+    if not wp_via_tech and not wp_via_paths:
+        logger.info("No WordPress indicators (technology or wp-like paths) found. Skipping WPScan.")
+        return
+
     enumeration = vulnerability_config.get(WPSCAN_ENUMERATION, 'vp,vt,u')
     detection_mode = vulnerability_config.get(WPSCAN_DETECTION_MODE, 'mixed')
-    
+
     # Get API Key
     api_key_obj = WpScanAPIKey.objects.first()
     api_key = api_key_obj.key if api_key_obj else None
 
-    # Determine targets
+    # Determine targets — narrow to only WordPress-positive subdomains.
     targets = []
     if self.subscan and self.subdomain:
         targets.append((f"https://{self.subdomain.name}/", self.subdomain))
@@ -136,9 +163,19 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
             if subdomain:
                 targets.append((url, subdomain))
     else:
-        # Full scan on all subdomains
-        subdomains = Subdomain.objects.filter(scan_history=self.scan)
-        for subdomain in subdomains:
+        # Full scan — only subdomains with WP tech or WP-like endpoints.
+        wp_subdomain_ids = set(
+            _sub_qs.filter(technologies__name__icontains='wordpress')
+            .values_list('id', flat=True)
+        )
+        ep_subdomain_ids = set(
+            EndPoint.objects.filter(
+                scan_history=self.scan,
+                http_url__iregex=_WP_PATH_RE,
+            ).values_list('subdomain_id', flat=True)
+        )
+        wp_ids = wp_subdomain_ids | ep_subdomain_ids
+        for subdomain in Subdomain.objects.filter(scan_history=self.scan, id__in=wp_ids):
             targets.append((f"https://{subdomain.name}/", subdomain))
 
     if not targets:
