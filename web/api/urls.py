@@ -495,6 +495,12 @@ urlpatterns = [
         RegisterPushTokenView.as_view(),
         name='register_push_token',
     ),
+    # Phase 2 — standalone workflow launcher
+    path(
+        'workflows/<str:workflow_slug>/start/',
+        StartWorkflowView.as_view(),
+        name='start-workflow',
+    ),
 ]
 
 
