@@ -1961,8 +1961,10 @@ class InitiateScan(APIView):
 							else:
 								_profile = _ScanProfile.objects.get(pk=_profile_id)
 							_profile_ctx = _profile.to_ctx_dict()
-						except Exception:
-							pass
+						except ScanProfile.DoesNotExist:
+							pass  # Unknown profile — proceed with empty profile ctx
+						except Exception as exc:
+							logger.warning("[SCAN] Failed to load scan profile %s: %s", _profile_name or _profile_id, exc)
 
 					# Start the scan via Temporal durable workflow orchestration
 					kwargs = {
@@ -5018,13 +5020,6 @@ class StartWorkflowView(APIView):
 # ---------------------------------------------------------------------------
 # Phase 4 — ScanProfile CRUD API
 # ---------------------------------------------------------------------------
-
-class ScanProfileSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = ScanProfile
-        fields = '__all__'
-        read_only_fields = ['id', 'is_builtin', 'created_at', 'updated_at']
-
 
 class ScanProfileViewSet(viewsets.ModelViewSet):
     queryset = ScanProfile.objects.all().order_by('category', 'name')

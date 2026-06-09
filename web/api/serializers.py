@@ -1420,3 +1420,10 @@ class HardwareProfileSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = HardwareProfile
 		fields = '__all__'
+
+
+class ScanProfileSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = ScanProfile
+		fields = '__all__'
+		read_only_fields = ['id', 'is_builtin', 'created_at', 'updated_at']
