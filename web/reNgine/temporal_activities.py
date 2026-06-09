@@ -2601,6 +2601,42 @@ def run_feroxbuster_activity(ctx: dict) -> bool:
     )
 
 
+@activity.defn(name="GetDiscoveredServicesActivity")
+def get_discovered_services_activity(ctx: dict) -> list:
+    """Return services discovered by port scan for the current scan_history.
+
+    Queries: ScanHistory → Subdomain.ip_addresses → IpAddress.ports → Port
+    Returns list of {host, port, service, version} dicts.
+    Called by MasterScanWorkflow and HostReconWorkflow after RunPortScanActivity.
+    """
+    from startScan.models import IpAddress
+
+    scan_history_id = ctx.get('scan_history_id')
+    if not scan_history_id:
+        return []
+
+    services = []
+    ip_qs = IpAddress.objects.filter(
+        subdomain__scan_history_id=scan_history_id
+    ).prefetch_related('ports').distinct()
+
+    for ip in ip_qs:
+        for port in ip.ports.all():
+            if port.service_name:
+                services.append({
+                    'host': ip.address or '',
+                    'port': port.number,
+                    'service': port.service_name,
+                    'version': None,
+                })
+
+    activity.logger.info(
+        "[GetDiscoveredServicesActivity] scan_id=%s found %d services",
+        scan_history_id, len(services),
+    )
+    return services
+
+
 @activity.defn(name="RunGFActivity")
 def run_gf_activity(ctx: dict) -> list:
     """Run gf URL pattern matching. Returns matched URL list directly (not bool)."""

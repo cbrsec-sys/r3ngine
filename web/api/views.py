@@ -4871,3 +4871,87 @@ class LaunchADAssessmentFromSubdomain(APIView):
 			'target_domain': target_domain,
 			'status': 'created',
 		}, status=status.HTTP_201_CREATED)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Standalone workflow launcher API
+# ---------------------------------------------------------------------------
+
+_WORKFLOW_REGISTRY = {
+    'user-hunt':       ('UserHuntWorkflow',       ['target', 'target_type']),
+    'url-bypass':      ('URLBypassWorkflow',       ['urls']),
+    'wordpress':       ('WordPressWorkflow',       ['urls']),
+    'host-recon':      ('HostReconWorkflow',       ['target', 'target_type']),
+    'cidr-recon':      ('CIDRReconWorkflow',       ['cidr']),
+    'code-scan':       ('CodeScanWorkflow',        ['target', 'target_type']),
+    'domain-recon':    ('DomainReconWorkflow',     ['domain']),
+    'subdomain-recon': ('SubdomainReconWorkflow',  ['domain']),
+    'url-crawl':       ('URLCrawlWorkflow',        ['urls']),
+    'url-dirsearch':   ('URLDirSearchWorkflow',    ['urls']),
+    'url-fuzz':        ('URLFuzzWorkflow',         ['urls']),
+    'url-params-fuzz': ('URLParamsFuzzWorkflow',   ['urls']),
+    'url-vuln':        ('URLVulnWorkflow',         ['urls']),
+}
+
+
+class StartWorkflowView(APIView):
+    """Start any of the 13 rengine-ng standalone workflow types via a single endpoint.
+
+    POST /api/v1/workflows/<workflow_slug>/start/
+    Body: JSON dict with required fields per workflow type (see _WORKFLOW_REGISTRY).
+    Returns: {workflow_id, status}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, workflow_slug: str):
+        if workflow_slug not in _WORKFLOW_REGISTRY:
+            return Response(
+                {'error': f'Unknown workflow slug: {workflow_slug}'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        workflow_name, required_fields = _WORKFLOW_REGISTRY[workflow_slug]
+        data = request.data
+
+        ctx: dict = {
+            'yaml_configuration': data.get('yaml_configuration') or {},
+            'scan_history_id': data.get('scan_history_id'),
+        }
+        for field in required_fields:
+            if field in data:
+                ctx[field] = data[field]
+
+        import asyncio
+        from datetime import timedelta
+        from reNgine import temporal_client as _tc
+        from django.utils import timezone
+
+        try:
+            wf_id = f"{workflow_slug}-{request.user.id}-{int(timezone.now().timestamp())}"
+
+            async def _start():
+                client = await _tc.TemporalClientProvider.get_client()
+                handle = await client.start_workflow(
+                    workflow_name,
+                    ctx,
+                    id=wf_id,
+                    task_queue="python-orchestrator-queue",
+                    execution_timeout=timedelta(hours=24),
+                )
+                return handle.id
+
+            loop = asyncio.new_event_loop()
+            started_id = _tc.run_and_close(loop, _start())
+            return Response(
+                {'workflow_id': started_id or wf_id, 'status': 'started'},
+                status=status.HTTP_200_OK,
+            )
+        except Exception as exc:
+            logger.error(
+                "[StartWorkflowView] failed to start %s: %s",
+                workflow_name, str(exc),
+            )
+            return Response(
+                {'error': 'Failed to start workflow'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
