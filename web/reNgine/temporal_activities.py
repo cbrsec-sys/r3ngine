@@ -92,6 +92,24 @@ class TemporalTaskProxy:
                     section_config['delay'] = hw_profile.get('delay')
                     section_config['retries'] = hw_profile.get('retries')
 
+        # Apply ScanProfile settings if provided in ctx.
+        # Throttle values are stored as direct attributes (not merged into yaml_configuration)
+        # so task functions can apply them per-tool as needed.
+        profile_data: dict = ctx.get('profile') or {}
+        self.rate_limit: int | None = profile_data.get('rate_limit')
+        self.delay: float | None = profile_data.get('delay')
+        self.threads: int | None = profile_data.get('threads')
+        self.timeout: int | None = profile_data.get('timeout')
+        self.retries: int | None = profile_data.get('retries')
+        self.passive: bool = bool(profile_data.get('passive', False))
+        self.active: bool = bool(profile_data.get('active', False))
+        self.stealth: bool = bool(profile_data.get('stealth', False))
+        self.headless: bool = bool(profile_data.get('headless', False))
+        self.hunt_secrets: bool = bool(profile_data.get('hunt_secrets', False))
+        self.all_ports: bool = bool(profile_data.get('all_ports', False))
+        self.tor: bool = bool(profile_data.get('tor', False))
+        self.fragment: bool = bool(profile_data.get('fragment', False))
+
         self.out_of_scope_subdomains = ctx.get('out_of_scope_subdomains', [])
         self.starting_point_path = ctx.get('starting_point_path', '')
         self.excluded_paths = ctx.get('excluded_paths', [])

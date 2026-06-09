@@ -80,3 +80,46 @@ class TestScanProfileFixtures(TestCase):
         tor = ScanProfile.objects.get(name='tor')
         self.assertTrue(tor.tor)
 
+
+class TestProfileAppliedToActivity(TestCase):
+    def test_rate_limit_from_profile_applied_to_proxy(self):
+        from reNgine.temporal_activities import TemporalTaskProxy
+        ctx = {
+            'scan_history_id': None,
+            'profile': {
+                'rate_limit': 50,
+                'delay': 0.5,
+                'threads': 4,
+            },
+            'yaml_configuration': {},
+        }
+        proxy = TemporalTaskProxy(ctx, task_name='test_task')
+        self.assertEqual(proxy.rate_limit, 50)
+        self.assertAlmostEqual(proxy.delay, 0.5)
+        self.assertEqual(proxy.threads, 4)
+
+    def test_mode_flags_from_profile_applied_to_proxy(self):
+        from reNgine.temporal_activities import TemporalTaskProxy
+        ctx = {
+            'scan_history_id': None,
+            'profile': {
+                'passive': True,
+                'stealth': True,
+            },
+            'yaml_configuration': {},
+        }
+        proxy = TemporalTaskProxy(ctx, task_name='test_task')
+        self.assertTrue(proxy.passive)
+        self.assertTrue(proxy.stealth)
+        self.assertFalse(proxy.tor)
+
+    def test_no_profile_in_ctx_gives_none_attributes(self):
+        from reNgine.temporal_activities import TemporalTaskProxy
+        ctx = {
+            'scan_history_id': None,
+            'yaml_configuration': {},
+        }
+        proxy = TemporalTaskProxy(ctx, task_name='test_task')
+        self.assertIsNone(proxy.rate_limit)
+        self.assertFalse(proxy.passive)
+
