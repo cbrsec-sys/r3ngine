@@ -147,6 +147,24 @@ class Organization(models.Model):
 class Domain(models.Model):
 	id = models.AutoField(primary_key=True)
 	name = models.CharField(max_length=300, unique=True)
+	target_type = models.CharField(
+		max_length=32,
+		choices=[
+			('domain', 'Domain'),
+			('host', 'Host'),
+			('subdomain', 'Subdomain'),
+			('url', 'URL'),
+			('ip', 'IP Address'),
+			('cidr', 'CIDR Range'),
+			('email', 'Email Address'),
+			('username', 'Username'),
+			('phone', 'Phone Number'),
+			('crypto_address', 'Crypto Address'),
+			('code_path', 'Code Path / Repository'),
+		],
+		default='domain',
+		db_index=True,
+	)
 	h1_team_handle = models.CharField(max_length=100, blank=True, null=True)
 	ip_address_cidr = models.CharField(max_length=100, blank=True, null=True)
 	description = models.TextField(blank=True, null=True)
