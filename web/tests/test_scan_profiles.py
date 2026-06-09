@@ -123,3 +123,77 @@ class TestProfileAppliedToActivity(TestCase):
         self.assertIsNone(proxy.rate_limit)
         self.assertFalse(proxy.passive)
 
+
+class TestProfileEmbeddedInScan(TestCase):
+    fixtures = ['scan_profiles']
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        self.user = User.objects.create_user('profilescanuser', password='pass')
+        self.client.force_login(self.user)
+
+    def test_vps_profile_ctx_dict_has_rate_limit(self):
+        from scanEngine.models import ScanProfile
+        vps = ScanProfile.objects.get(name='vps')
+        ctx = vps.to_ctx_dict()
+        self.assertEqual(ctx['rate_limit'], 50)
+        self.assertEqual(ctx['threads'], 4)
+
+    def test_passive_profile_ctx_dict_has_passive_flag(self):
+        from scanEngine.models import ScanProfile
+        passive = ScanProfile.objects.get(name='passive')
+        ctx = passive.to_ctx_dict()
+        self.assertTrue(ctx.get('passive'))
+        self.assertNotIn('rate_limit', ctx)
+
+    def test_missing_profile_name_gives_empty_ctx(self):
+        from scanEngine.models import ScanProfile
+        try:
+            profile = ScanProfile.objects.get(name='nonexistent_profile_xyz')
+            ctx = profile.to_ctx_dict()
+        except ScanProfile.DoesNotExist:
+            ctx = {}
+        self.assertEqual(ctx, {})
+
+
+class TestScanProfileAPI(TestCase):
+    fixtures = ['scan_profiles']
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+        self.user = User.objects.create_user('scanprofileapiuser', password='pass')
+        self.client.force_login(self.user)
+
+    def test_list_profiles_returns_builtin(self):
+        response = self.client.get('/api/scanProfiles/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        items = data.get('results', data) if isinstance(data, dict) else data
+        names = [p['name'] for p in items]
+        self.assertIn('vps', names)
+        self.assertIn('passive', names)
+        self.assertIn('stealth', names)
+
+    def test_get_single_profile_by_name(self):
+        response = self.client.get('/api/scanProfiles/vps/')
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data['name'], 'vps')
+        self.assertEqual(data['rate_limit'], 50)
+
+    def test_create_custom_profile(self):
+        response = self.client.post('/api/scanProfiles/', {
+            'name': 'my_custom_test',
+            'description': 'Custom test profile',
+            'category': 'speed',
+            'rate_limit': 75,
+            'threads': 10,
+        }, content_type='application/json')
+        self.assertEqual(response.status_code, 201)
+        from scanEngine.models import ScanProfile
+        ScanProfile.objects.filter(name='my_custom_test').delete()
+
+    def test_cannot_delete_builtin_profile(self):
+        response = self.client.delete('/api/scanProfiles/vps/')
+        self.assertIn(response.status_code, [400, 403])
+
