@@ -927,8 +927,57 @@ def parse_analysis_results_activity(ctx: dict) -> bool:
 # Tier 6 — Assessment
 # ===========================================================================
 
+@activity.defn(name="GatherNucleiTagsActivity")
+def gather_nuclei_tags_activity(ctx: dict) -> list:
+    """Pre-compute Nuclei tags from YAML config + detected technologies.
+
+    Called once by NucleiPlannerWorkflow before the severity loop so that
+    the workflow can split tags into batches of 3 without performing any
+    DB work itself (which would violate Temporal determinism rules).
+
+    Returns a sorted, deduplicated list of tag strings.  An empty list
+    signals that no tag filter should be applied — Nuclei will run against
+    all default templates for that severity.
+
+    Args:
+        ctx (dict): Temporal workflow context (scan_history_id, yaml_configuration,
+                    and optionally subdomain_id for subscans).
+
+    Returns:
+        list[str]: Merged and sorted Nuclei tag strings.
+    """
+    from reNgine.tech_mapping import get_nuclei_tags_from_techs
+    from startScan.models import Subdomain
+
+    scan_id = ctx.get('scan_history_id')
+    subdomain_id = ctx.get('subdomain_id')
+
+    yaml_config = ctx.get('yaml_configuration', {})
+    nuclei_cfg = yaml_config.get('vulnerability_scan', {}).get('nuclei', {})
+    user_tags = nuclei_cfg.get('tags', [])
+    if isinstance(user_tags, str):
+        user_tags = [t.strip() for t in user_tags.split(',') if t.strip()]
+
+    qs = Subdomain.objects.filter(scan_history_id=scan_id)
+    if subdomain_id:
+        qs = qs.filter(pk=subdomain_id)
+
+    all_techs: set = set()
+    for sub in qs:
+        all_techs.update(sub.technologies.values_list('name', flat=True))
+
+    tech_tags = get_nuclei_tags_from_techs(list(all_techs)) if all_techs else []
+
+    merged = sorted(set(user_tags) | set(tech_tags))
+    activity.logger.info(
+        "[GatherNucleiTagsActivity] scan_id=%s subdomain_id=%s tags=%s",
+        scan_id, subdomain_id, merged,
+    )
+    return merged
+
+
 @activity.defn(name="RunNucleiActivity")
-def run_nuclei_activity(ctx: dict, severity: str = None) -> bool:
+def run_nuclei_activity(ctx: dict, severity: str = None, tag_batch: list = None) -> bool:
     """Run Nuclei vulnerability scan against all live endpoints discovered for this scan.
 
     Performs a pre-flight check against the EndPoint table before invoking nuclei_scan.
@@ -939,6 +988,8 @@ def run_nuclei_activity(ctx: dict, severity: str = None) -> bool:
     Args:
         ctx (dict): Temporal workflow context containing scan_history_id and engine config.
         severity (str, optional): The target severity level to filter the scan.
+        tag_batch (list, optional): Pre-computed tag batch from GatherNucleiTagsActivity.
+            None or empty list means no -tags flag is passed to Nuclei.
 
     Returns:
         bool: True on success (including graceful skip when no domain is found).
@@ -948,7 +999,10 @@ def run_nuclei_activity(ctx: dict, severity: str = None) -> bool:
 
     scan_id = ctx.get('scan_history_id')
     severity = severity or ctx.get('nuclei_severity_filter')
-    activity.logger.info(f"[RunNucleiActivity] scan_id={scan_id} severity={severity}")
+    activity.logger.info(
+        "[RunNucleiActivity] scan_id=%s severity=%s tags=%s",
+        scan_id, severity, tag_batch,
+    )
 
     # Pre-flight: count endpoints in DB for this scan
     endpoint_count = EndPoint.objects.filter(scan_history_id=scan_id).count()
@@ -960,32 +1014,37 @@ def run_nuclei_activity(ctx: dict, severity: str = None) -> bool:
         if scan and scan.domain:
             root_url = f"https://{scan.domain.name}"
             activity.logger.warning(
-                f"[RunNucleiActivity] No endpoints found in DB for scan_id={scan_id}. "
-                f"Falling back to root URL: {root_url}"
+                "[RunNucleiActivity] No endpoints found in DB for scan_id=%s. "
+                "Falling back to root URL: %s",
+                scan_id, root_url,
             )
             urls = [root_url]
         else:
             activity.logger.error(
-                f"[RunNucleiActivity] No endpoints and no domain found for scan_id={scan_id}. "
-                f"Skipping Nuclei scan."
+                "[RunNucleiActivity] No endpoints and no domain found for scan_id=%s. "
+                "Skipping Nuclei scan.",
+                scan_id,
             )
             return True
     else:
         activity.logger.info(
-            f"[RunNucleiActivity] {endpoint_count} endpoints in DB for scan_id={scan_id}. "
-            f"Nuclei will query get_http_urls() from DB."
+            "[RunNucleiActivity] %d endpoints in DB for scan_id=%s. "
+            "Nuclei will query get_http_urls() from DB.",
+            endpoint_count, scan_id,
         )
         # Let nuclei_scan call get_http_urls() to filter alive endpoints from DB
         urls = []
 
-    task_desc = f'Nuclei Scan ({severity})' if severity else 'Nuclei Scan'
+    tag_label = ','.join(tag_batch) if tag_batch else ''
+    task_desc = f'Nuclei Scan ({severity}{" [" + tag_label + "]" if tag_label else ""})' if severity else 'Nuclei Scan'
 
     return _run_task(
         nuclei_scan, ctx,
         task_name='nuclei_scan',
         description=task_desc,
         urls=urls,
-        severity=severity
+        severity=severity,
+        tags_override=tag_batch if tag_batch else None,
     )
 
 @activity.defn(name="RunCRLFuzzActivity")

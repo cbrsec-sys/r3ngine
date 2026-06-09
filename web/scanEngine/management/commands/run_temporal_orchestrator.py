@@ -113,6 +113,7 @@ from reNgine.temporal_activities import (
 
     # Tier 6: Assessment
     run_nuclei_activity,
+    gather_nuclei_tags_activity,
     run_crlfuzz_activity,
     run_dalfox_activity,
     run_s3scanner_activity,
@@ -359,6 +360,7 @@ class Command(BaseCommand):
 
                 # Tier 6
                 run_nuclei_activity,
+                gather_nuclei_tags_activity,
                 run_crlfuzz_activity,
                 run_dalfox_activity,
                 run_s3scanner_activity,
