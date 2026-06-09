@@ -1398,6 +1398,7 @@ class AddTarget(APIView):
 		domain_name_input = data.get('domain_name', '')
 		organization_name = data.get('organization')
 		slug = data.get('slug')
+		explicit_target_type = data.get('target_type') or None
 
 		# Monitoring settings
 		is_monitored = data.get('is_monitored', False)
@@ -1413,7 +1414,7 @@ class AddTarget(APIView):
 		# The user wants to add multiple domains/IPs to a target when creating a new target.
 		# This should create them as a SINGLE entry with secondary domains and in-scope IPs grouped.
 		target_names = [t.strip().replace('*', '') for t in domain_name_input.split('\n') if t.strip()]
-		
+
 		# Clean up targets (remove leading dots)
 		cleaned_targets = []
 		for name in target_names:
@@ -1428,6 +1429,47 @@ class AddTarget(APIView):
 		primary_target = cleaned_targets[0]
 		secondary_domains_list = []
 		in_scope_ips_list = []
+
+		# Handle extended target types that bulk_import_targets cannot auto-detect
+		# (email, username, phone, cidr, crypto_address, code_path).
+		from reNgine.target_router import infer_target_type
+		from reNgine.definitions import (
+			TARGET_TYPE_EMAIL, TARGET_TYPE_USERNAME, TARGET_TYPE_PHONE,
+			TARGET_TYPE_CIDR, TARGET_TYPE_CRYPTO_ADDRESS, TARGET_TYPE_CODE_PATH,
+		)
+		from targetApp.models import Domain as _Domain
+		from dashboard.models import Project as _Project
+
+		_EXTENDED_TYPES = {
+			TARGET_TYPE_EMAIL, TARGET_TYPE_USERNAME, TARGET_TYPE_PHONE,
+			TARGET_TYPE_CIDR, TARGET_TYPE_CRYPTO_ADDRESS, TARGET_TYPE_CODE_PATH,
+		}
+		effective_type = explicit_target_type or infer_target_type(primary_target)
+
+		if effective_type in _EXTENDED_TYPES:
+			try:
+				project = _Project.objects.get(slug=slug)
+			except _Project.DoesNotExist:
+				return Response({'status': False, 'message': 'Project not found'}, status=status.HTTP_400_BAD_REQUEST)
+			from django.utils import timezone as _tz
+			target_obj, _ = _Domain.objects.get_or_create(
+				name=primary_target,
+				defaults={
+					'description': description or '',
+					'project': project,
+					'insert_date': _tz.now(),
+					'target_type': effective_type,
+				}
+			)
+			if not _:
+				# Existed already — update target_type if changed
+				if target_obj.target_type != effective_type:
+					target_obj.target_type = effective_type
+					target_obj.save(update_fields=['target_type'])
+			return Response({
+				'status': True,
+				'message': f'Target {primary_target} ({effective_type}) created successfully.',
+			})
 
 		# Loop through subsequent items and classify them as In-Scope IPs or Secondary Domains
 		# IP checks are done via simple validator logic or typical patterns (checking for digits, colons, CIDRs)
