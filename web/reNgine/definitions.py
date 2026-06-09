@@ -884,3 +884,32 @@ NOTIFICATION_STATUS_TYPES = (
 
 # Bountyhub Definitions
 HACKERONE_ALLOWED_ASSET_TYPES = ["WILDCARD", "DOMAIN", "IP_ADDRESS", "URL"]
+
+# ---------------------------------------------------------------------------
+# Target type constants — used by Domain.target_type and target_router.py
+# ---------------------------------------------------------------------------
+TARGET_TYPE_DOMAIN = 'domain'
+TARGET_TYPE_HOST = 'host'
+TARGET_TYPE_SUBDOMAIN = 'subdomain'
+TARGET_TYPE_URL = 'url'
+TARGET_TYPE_IP = 'ip'
+TARGET_TYPE_CIDR = 'cidr'
+TARGET_TYPE_EMAIL = 'email'
+TARGET_TYPE_USERNAME = 'username'
+TARGET_TYPE_PHONE = 'phone'
+TARGET_TYPE_CRYPTO_ADDRESS = 'crypto_address'
+TARGET_TYPE_CODE_PATH = 'code_path'
+
+TARGET_TYPE_CHOICES = [
+    (TARGET_TYPE_DOMAIN, 'Domain'),
+    (TARGET_TYPE_HOST, 'Host'),
+    (TARGET_TYPE_SUBDOMAIN, 'Subdomain'),
+    (TARGET_TYPE_URL, 'URL'),
+    (TARGET_TYPE_IP, 'IP Address'),
+    (TARGET_TYPE_CIDR, 'CIDR Range'),
+    (TARGET_TYPE_EMAIL, 'Email Address'),
+    (TARGET_TYPE_USERNAME, 'Username'),
+    (TARGET_TYPE_PHONE, 'Phone Number'),
+    (TARGET_TYPE_CRYPTO_ADDRESS, 'Crypto Address'),
+    (TARGET_TYPE_CODE_PATH, 'Code Path / Repository'),
+]
