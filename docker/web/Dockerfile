@@ -51,6 +51,14 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/zricethezav/gitleaks/v8@latest && \
     go install -ldflags="-s -w" -v github.com/xalgord/reconx/cmd/reconx@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/vulnx/v2/cmd/vulnx@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
+    go install -ldflags="-s -w" -v github.com/Vulnpire/getasn@latest && \
+    go install -ldflags="-s -w" -v github.com/jschauma/jswhois@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/mapcidr/cmd/mapcidr@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest && \
+    go install -ldflags="-s -w" -v github.com/Chocapikk/wpprobe@latest && \
+    go install -ldflags="-s -w" -v github.com/hueristiq/xurlfind3r/cmd/xurlfind3r@latest && \
+    go install -ldflags="-s -w" -v github.com/edoardottt/cariddi/cmd/cariddi@latest && \
     rm -rf /go/pkg /root/.cache/go-build
 
 # betterleaks has no published go install path — clone and build directly.
@@ -254,6 +262,8 @@ RUN apt-get update -y && \
     cmake \
     ninja-build \
     gcc \
+    fping \
+    arp-scan \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
@@ -331,6 +341,20 @@ RUN ARCH=$(dpkg --print-architecture) && \
     unzip -o "aquatone_linux_${ARCH}_1.7.0.zip" aquatone && \
     mv aquatone /usr/local/bin/ && \
     rm -f "aquatone_linux_${ARCH}_1.7.0.zip"
+
+# Feroxbuster — recursive web content discovery
+RUN FEROX_VERSION=$(curl -s https://api.github.com/repos/epi052/feroxbuster/releases/latest \
+      | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'].lstrip('v'))") && \
+    wget -q "https://github.com/epi052/feroxbuster/releases/download/v${FEROX_VERSION}/x86-linux-feroxbuster.zip" \
+      -O /tmp/feroxbuster.zip && \
+    unzip /tmp/feroxbuster.zip feroxbuster -d /usr/local/bin && \
+    chmod +x /usr/local/bin/feroxbuster && \
+    rm /tmp/feroxbuster.zip
+
+# Searchsploit — offline Exploit-DB CLI search
+RUN git clone --depth 1 https://gitlab.com/exploit-database/exploitdb /usr/src/exploitdb && \
+    ln -sf /usr/src/exploitdb/searchsploit /usr/local/bin/searchsploit && \
+    cp /usr/src/exploitdb/.searchsploit_rc /root/.searchsploit_rc
 
 # WPScan — WordPress vulnerability scanner
 RUN gem install wpscan --no-document
@@ -438,7 +462,12 @@ RUN pipx install maigret && \
     pipx install semgrep && \
     pipx inject semgrep setuptools && \
     pipx install dnsrecon && \
-    pipx inject dnsrecon setuptools
+    pipx inject dnsrecon setuptools && \
+    pipx install ssh-audit --force && \
+    pipx install "git+https://github.com/EnableSecurity/wafw00f.git" --force && \
+    pipx install whoisdomain --force && \
+    pipx install "bypass-url-parser" --force && \
+    pipx install bbot --force
 
 RUN git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop \
     && pip3 install -r /usr/src/github/graphql-cop/requirements.txt \
