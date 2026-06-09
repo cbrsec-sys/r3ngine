@@ -155,6 +155,24 @@ from reNgine.temporal_activities import (
     import_hackerone_programs_activity,
     sync_bookmarked_programs_activity,
     fetch_proxies_activity,
+
+    # Phase 1 — rengine-ng workflow tool activities
+    run_dnsx_activity,
+    run_wafw00f_activity,
+    run_fping_activity,
+    run_arpscan_activity,
+    run_mapcidr_activity,
+    run_sshaudit_activity,
+    run_searchsploit_activity,
+    run_wpprobe_activity,
+    run_search_vulns_activity,
+    run_xurlfind3r_activity,
+    run_urlfinder_activity,
+    run_cariddi_activity,
+    run_bup_activity,
+    run_arjun_activity,
+    run_feroxbuster_activity,
+    run_gf_activity,
 )
 
 
@@ -406,6 +424,24 @@ class Command(BaseCommand):
                 import_hackerone_programs_activity,
                 sync_bookmarked_programs_activity,
                 fetch_proxies_activity,
+
+                # Phase 1 — rengine-ng workflow tool activities
+                run_dnsx_activity,
+                run_wafw00f_activity,
+                run_fping_activity,
+                run_arpscan_activity,
+                run_mapcidr_activity,
+                run_sshaudit_activity,
+                run_searchsploit_activity,
+                run_wpprobe_activity,
+                run_search_vulns_activity,
+                run_xurlfind3r_activity,
+                run_urlfinder_activity,
+                run_cariddi_activity,
+                run_bup_activity,
+                run_arjun_activity,
+                run_feroxbuster_activity,
+                run_gf_activity,
             ]
 
             # -------------------------------------------------------------------

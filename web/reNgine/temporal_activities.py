@@ -2422,3 +2422,197 @@ def get_enabled_plugins_for_tier_activity(params: dict) -> list:
         )
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# Phase 1 — rengine-ng workflow tool activities
+# ---------------------------------------------------------------------------
+
+@activity.defn(name="RunDNSXActivity")
+def run_dnsx_activity(ctx: dict) -> bool:
+    from reNgine.recon_tasks import dnsx_scan
+    activity.logger.info("[RunDNSXActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        dnsx_scan, ctx, task_name='dnsx_scan', description='DNS Resolution (dnsx)',
+        subdomain=ctx.get('subdomain'), subdomains=ctx.get('subdomains'),
+        wordlist=ctx.get('wordlist'),
+    )
+
+
+@activity.defn(name="RunWAFW00FActivity")
+def run_wafw00f_activity(ctx: dict) -> bool:
+    from reNgine.recon_tasks import wafw00f_scan
+    activity.logger.info("[RunWAFW00FActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        wafw00f_scan, ctx, task_name='wafw00f_scan', description='WAF Detection (wafw00f)',
+        url=ctx.get('url'), urls=ctx.get('urls'),
+    )
+
+
+@activity.defn(name="RunFPingActivity")
+def run_fping_activity(ctx: dict) -> list:
+    from reNgine.recon_tasks import fping_scan
+    activity.logger.info("[RunFPingActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        fping_scan, ctx, task_name='fping_scan', description='ICMP Host Discovery (fping)',
+        cidr=ctx.get('cidr'), targets=ctx.get('targets'),
+    )
+
+
+@activity.defn(name="RunARPScanActivity")
+def run_arpscan_activity(ctx: dict) -> list:
+    from reNgine.recon_tasks import arpscan_scan
+    activity.logger.info("[RunARPScanActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        arpscan_scan, ctx, task_name='arpscan_scan', description='ARP Host Discovery (arp-scan)',
+        cidr=ctx.get('cidr'),
+    )
+
+
+@activity.defn(name="RunMapCIDRActivity")
+def run_mapcidr_activity(ctx: dict) -> list:
+    from reNgine.recon_tasks import mapcidr_expand
+    activity.logger.info("[RunMapCIDRActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        mapcidr_expand, ctx, task_name='mapcidr_expand', description='CIDR Expansion (mapcidr)',
+        cidr=ctx.get('cidr'),
+    )
+
+
+@activity.defn(name="RunSSHAuditActivity")
+def run_sshaudit_activity(ctx: dict) -> bool:
+    from reNgine.recon_tasks import sshaudit_scan
+    activity.logger.info("[RunSSHAuditActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        sshaudit_scan, ctx, task_name='sshaudit_scan', description='SSH Audit (ssh-audit)',
+        host=ctx.get('host', ''), port=ctx.get('port', 22),
+    )
+
+
+@activity.defn(name="RunSearchsploitActivity")
+def run_searchsploit_activity(ctx: dict) -> bool:
+    from reNgine.recon_tasks import searchsploit_scan
+    activity.logger.info("[RunSearchsploitActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        searchsploit_scan, ctx, task_name='searchsploit_scan',
+        description='Exploit Search (searchsploit)',
+        service=ctx.get('service', ''), version=ctx.get('version'),
+    )
+
+
+@activity.defn(name="RunWPProbeActivity")
+def run_wpprobe_activity(ctx: dict) -> bool:
+    from reNgine.recon_tasks import wpprobe_scan
+    activity.logger.info("[RunWPProbeActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        wpprobe_scan, ctx, task_name='wpprobe_scan',
+        description='WordPress Plugin Scan (wpprobe)',
+        url=ctx.get('url', ''),
+    )
+
+
+@activity.defn(name="RunSearchVulnsActivity")
+def run_search_vulns_activity(ctx: dict) -> bool:
+    """Query vulners.com for CVEs/exploits for a single service+version.
+
+    Designed to be fanned out concurrently — one instance per discovered service
+    from RunPortScanActivity. Called from _fan_out_search_vulns in
+    MasterScanWorkflow Tier 2 after port scan returns.
+    """
+    from reNgine.recon_tasks import search_vulns_scan
+    activity.logger.info(
+        "[RunSearchVulnsActivity] service=%s host=%s scan_id=%s",
+        ctx.get('service'), ctx.get('host'), ctx.get('scan_history_id'),
+    )
+    proxy = TemporalTaskProxy(ctx, task_name='search_vulns_scan',
+                              description='Per-service CVE Lookup (vulners.com)')
+    return search_vulns_scan(
+        proxy,
+        scan_history_id=ctx.get('scan_history_id'),
+        service=ctx.get('service', ''),
+        version=ctx.get('version'),
+        host=ctx.get('host', ''),
+        port=ctx.get('port', 0),
+    )
+
+
+@activity.defn(name="RunXURLFind3rActivity")
+def run_xurlfind3r_activity(ctx: dict) -> bool:
+    from reNgine.crawl_tasks import xurlfind3r_scan
+    activity.logger.info("[RunXURLFind3rActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        xurlfind3r_scan, ctx, task_name='xurlfind3r_scan',
+        description='Passive URL Discovery (xurlfind3r)',
+        domain=ctx.get('domain'), domains=ctx.get('domains'),
+    )
+
+
+@activity.defn(name="RunURLFinderActivity")
+def run_urlfinder_activity(ctx: dict) -> bool:
+    from reNgine.crawl_tasks import urlfinder_scan
+    activity.logger.info("[RunURLFinderActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        urlfinder_scan, ctx, task_name='urlfinder_scan',
+        description='Passive URL Discovery (urlfinder)',
+        domain=ctx.get('domain'),
+    )
+
+
+@activity.defn(name="RunCariddiActivity")
+def run_cariddi_activity(ctx: dict) -> bool:
+    from reNgine.crawl_tasks import cariddi_scan
+    activity.logger.info("[RunCariddiActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        cariddi_scan, ctx, task_name='cariddi_scan',
+        description='Endpoint Crawl & Secret Hunt (cariddi)',
+        url=ctx.get('url'), urls=ctx.get('urls'),
+    )
+
+
+@activity.defn(name="RunBUPActivity")
+def run_bup_activity(ctx: dict) -> bool:
+    from reNgine.crawl_tasks import bup_scan
+    activity.logger.info("[RunBUPActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        bup_scan, ctx, task_name='bup_scan', description='4xx URL Bypass (bup)',
+        url=ctx.get('url'), urls=ctx.get('urls'),
+    )
+
+
+@activity.defn(name="RunArjunActivity")
+def run_arjun_activity(ctx: dict) -> bool:
+    from reNgine.crawl_tasks import arjun_scan
+    activity.logger.info("[RunArjunActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        arjun_scan, ctx, task_name='arjun_scan',
+        description='Parameter Discovery (arjun)',
+        url=ctx.get('url'), urls=ctx.get('urls'),
+    )
+
+
+@activity.defn(name="RunFeroxbusterActivity")
+def run_feroxbuster_activity(ctx: dict) -> bool:
+    from reNgine.crawl_tasks import feroxbuster_scan
+    activity.logger.info("[RunFeroxbusterActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        feroxbuster_scan, ctx, task_name='feroxbuster_scan',
+        description='Recursive Content Fuzzing (feroxbuster)',
+        url=ctx.get('url'), urls=ctx.get('urls'),
+    )
+
+
+@activity.defn(name="RunGFActivity")
+def run_gf_activity(ctx: dict) -> list:
+    """Run gf URL pattern matching. Returns matched URL list directly (not bool)."""
+    from reNgine.crawl_tasks import gf_scan
+    activity.logger.info(
+        "[RunGFActivity] pattern=%s scan_id=%s",
+        ctx.get('pattern'), ctx.get('scan_history_id'),
+    )
+    proxy = TemporalTaskProxy(ctx, task_name='gf_scan', description='URL Pattern Match (gf)')
+    return gf_scan(
+        proxy,
+        scan_history_id=ctx.get('scan_history_id'),
+        pattern=ctx.get('pattern', 'xss'),
+        urls=ctx.get('urls', []),
+    )
