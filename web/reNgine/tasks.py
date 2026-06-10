@@ -3424,6 +3424,8 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 					inql_findings = parse_inql_results(inql_output)
 					for finding in inql_findings:
 						save_endpoint(url, ctx=ctx, subdomain=subdomain, source='InQL (GraphQL Found)')
+					from reNgine.cpde.graphql_enricher import enrich_graphql_params
+					enrich_graphql_params(inql_output, url, subdomain, ctx)
 					logger.warning('[WEB_API] InQL: %s → %d GraphQL findings saved', subdomain_name, len(inql_findings))
 				except Exception as e:
 					logger.error('[WEB_API] InQL: error parsing results for %s: %s', subdomain_name, e)
@@ -7465,6 +7467,7 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 		return False, None
 
 	# Execute downloads in parallel using a ThreadPoolExecutor
+	file_to_url_map = {}
 	if unique_targets:
 		from concurrent.futures import ThreadPoolExecutor, as_completed
 		logger.warning("[SEMGREP] Downloading %d files in parallel (max_workers=10)...", len(unique_targets))
@@ -7472,9 +7475,10 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 			futures = {executor.submit(download_file, url): url for url in unique_targets}
 			for future in as_completed(futures):
 				try:
-					success, _ = future.result()
-					if success:
+					success, filepath = future.result()
+					if success and filepath:
 						downloaded_count += 1
+						file_to_url_map[os.path.basename(filepath)] = futures[future]
 				except Exception as e:
 					logger.error("[SEMGREP] Error in download thread: %s", e)
 		logger.warning("[SEMGREP] Download phase complete: %d / %d files downloaded successfully", downloaded_count, len(unique_targets))
@@ -7511,9 +7515,9 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 
 				for result in results:
 					if mode == 'secret':
-						save_semgrep_secret_finding(result, ctx, semgrep_dir)
+						save_semgrep_secret_finding(result, ctx, semgrep_dir, file_to_url_map)
 					else:
-						save_semgrep_vulnerability_finding(result, ctx, semgrep_dir)
+						save_semgrep_vulnerability_finding(result, ctx, semgrep_dir, file_to_url_map)
 
 			logger.warning("[SEMGREP] %s scan complete — %d matches found.", mode, len(results))
 		except Exception as e:
@@ -7527,13 +7531,14 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 	return return_code
 
 
-def save_semgrep_vulnerability_finding(result, ctx, base_dir):
+def save_semgrep_vulnerability_finding(result, ctx, base_dir, file_to_url_map=None):
 	"""Saves a Semgrep finding as a Vulnerability.
 
 	Args:
 		result (dict): Semgrep finding match dictionary.
 		ctx (dict): Scan context containing history and domain IDs.
 		base_dir (str): Base directory path of the cloned repo.
+		file_to_url_map (dict): Optional map from downloaded file basename to original URL.
 	"""
 	extra = result.get('extra', {})
 	path = result.get('path', '')
@@ -7545,13 +7550,17 @@ def save_semgrep_vulnerability_finding(result, ctx, base_dir):
 		check_id = result.get('check_id', '')
 		cleaned_check_id = clean_semgrep_check_id(check_id)
 		
+		source_file = path.replace(base_dir, '').lstrip('/')
+		mapped_url = file_to_url_map.get(os.path.basename(source_file)) if file_to_url_map else None
+		final_url = mapped_url if mapped_url else source_file
+		
 		vuln_data = {
 			'name': f"Semgrep: {cleaned_check_id}",
 			'description': extra.get('message', ''),
 			'severity': SEMGREP_SEVERITY_MAP.get(extra.get('severity', 'INFO'), 0),
-			'http_url': path.replace(base_dir, '').lstrip('/'),
+			'http_url': final_url,
 			'type': 'SAST',
-			'request': f"File: {path}\nLine: {result.get('start', {}).get('line')}",
+			'request': f"File: {source_file}\nLine: {result.get('start', {}).get('line')}",
 			'response': extra.get('lines', ''),
 			'source': 'Semgrep',
 		}
@@ -7560,13 +7569,14 @@ def save_semgrep_vulnerability_finding(result, ctx, base_dir):
 		logger.error(f"Error saving Semgrep vulnerability: {e}")
 
 
-def save_semgrep_secret_finding(result, ctx, base_dir):
+def save_semgrep_secret_finding(result, ctx, base_dir, file_to_url_map=None):
 	"""Saves a Semgrep finding as a SecretLeak.
 
 	Args:
 		result (dict): Semgrep finding match dictionary.
 		ctx (dict): Scan context containing history and domain IDs.
 		base_dir (str): Base directory path of the cloned repo.
+		file_to_url_map (dict): Optional map from downloaded file basename to original URL.
 	"""
 	extra = result.get('extra', {})
 	path = result.get('path', '')
@@ -7577,11 +7587,15 @@ def save_semgrep_secret_finding(result, ctx, base_dir):
 		check_id = result.get('check_id', '')
 		cleaned_check_id = clean_semgrep_check_id(check_id)
 		
+		source_file = path.replace(base_dir, '').lstrip('/')
+		mapped_url = file_to_url_map.get(os.path.basename(source_file)) if file_to_url_map else None
+		final_url = mapped_url if mapped_url else source_file
+		
 		leak_data = {
 			'scan_history': scan,
 			'tool_name': 'Semgrep',
 			'secret_type': cleaned_check_id or 'Secret',
-			'source_url': path.replace(base_dir, '').lstrip('/'),
+			'source_url': final_url,
 			'match_content': extra.get('lines', '').strip(),
 			'status': 'unverified'
 		}

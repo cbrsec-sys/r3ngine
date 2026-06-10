@@ -1,5 +1,13 @@
 # Changelog
 
+### [v3.6.0] - Unreleased
+
+- **Custom Parameter Discovery Engine (CPDE)**:
+  - Added the Custom Parameter Discovery Engine (CPDE) to allow users to define custom regular expressions and keyword matchers to extract sensitive or high-value parameters across scan results.
+  - **Backend**: Added the `Parameter` model with `type` (`regex`/`string`), `severity`, and `description` fields. Implemented REST API endpoints (`/api/settings/parameters/`) for full CRUD management.
+  - **Frontend Configuration**: Built a dedicated "Custom Parameters" panel in the Settings page for managing parameters.
+  - **Scan Integration**: Scan results now include a "Parameters" tab detailing all discovered custom parameters, their occurrence counts, severity levels, and the specific endpoint URLs where they were found.
+
 ### [v3.5.0] - 2026-06-04
 
 - **Python 3.12 Runtime Upgrade**:
@@ -24,8 +32,6 @@
   - Resolves five pip dependency incompatibility warnings at build time: `requests` (2.25.1 vs ≥2.27.0 / ≥2.32.4), `chardet` (4.0.0 vs ≥5), `idna` (2.10 vs ≥3.4), and `urllib3` (1.26.x vs ~2.0).
   - Each tool's transitive dependencies are now fully isolated and cannot conflict with the Django application's pinned `requirements.txt` packages or with each other.
   - Follows the same `pipx` pattern already established for `baddns`. `/root/.local/bin` is on `PATH`, so all shims remain accessible at runtime without any additional configuration.
-
-
 
 - **CVE Enrichment System**:
   - **CVE Enrichment Service**: `web/reNgine/cve_enrichment.py` fully operational - fetches CVSS v3.1 metrics from NVD API v2.0, EPSS probability scores from FIRST, and syncs the CISA KEV catalog. Enriched data is cached (7-day TTL for CVEs, 1-hour for KEV) and gracefully degrades on API unavailability.

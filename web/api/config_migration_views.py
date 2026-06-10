@@ -25,6 +25,8 @@ from scanEngine.models import (
     Notification, Proxy, OpSec, Hackerone, VulnerabilityReportSetting,
     InstalledExternalTool
 )
+import shutil
+import tempfile
 
 DASHBOARD_MODELS = [
     OpenAiAPIKey, OllamaSettings, NetlasAPIKey, ChaosAPIKey, HackerOneAPIKey,
@@ -208,3 +210,24 @@ class ImportConfig(APIView):
                 except Exception as e:
                     # Log exception and continue
                     print(f"Error restoring {model_name}: {e}")
+
+class ExportScanResults(APIView):
+    permission_classes = [IsAuthenticated, HasPermission]
+    permission_required = PERM_MODIFY_SYSTEM_CONFIGURATIONS
+
+    def get(self, request):
+        scan_results_dir = '/usr/src/scan_results'
+        if not os.path.exists(scan_results_dir):
+            return Response({'status': False, 'message': 'Scan results directory not found.'}, status=status.HTTP_404_NOT_FOUND)
+        
+        temp_dir = tempfile.gettempdir()
+        zip_path = os.path.join(temp_dir, 'scan_results_backup')
+        
+        try:
+            shutil.make_archive(zip_path, 'zip', scan_results_dir)
+            zip_file_path = f"{zip_path}.zip"
+            
+            response = FileResponse(open(zip_file_path, 'rb'), as_attachment=True, filename='scan_results_backup.zip')
+            return response
+        except Exception as e:
+            return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
