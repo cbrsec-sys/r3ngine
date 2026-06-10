@@ -36,6 +36,7 @@ export const useAddTarget = (projectSlug: string) => {
       monitor_scan_scope?: string;
       starting_point_path?: string;
       excluded_paths?: string[];
+      target_type?: string;
     }) => {
       const response = await fetch('/api/add/target/', {
         method: 'POST',
