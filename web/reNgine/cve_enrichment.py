@@ -112,6 +112,16 @@ class CVEEnrichmentService:
         except Exception as e:
             logger.warning(f"vulnx enrichment failed for {cve_name}: {e}")
 
+        try:
+            self._enrich_from_sploitscan(cve_obj)
+        except Exception as e:
+            logger.warning(f"SploitScan enrichment failed for {cve_name}: {e}")
+
+        try:
+            self._generate_cve_ai_analysis(cve_obj)
+        except Exception as e:
+            logger.warning(f"AI risk assessment failed for {cve_name}: {e}")
+
         # Save and return
         cve_obj.save()
         return cve_obj
@@ -457,6 +467,120 @@ class CVEEnrichmentService:
         except (ValueError, TypeError) as e:
             logger.warning(f"Failed to parse datetime '{date_str}': {e}")
             return None
+
+    def _enrich_from_sploitscan(self, cve_obj: CveId) -> None:
+        """
+        Fetch exploits and hackerone metadata using sploitscan.
+        """
+        import subprocess
+        import json
+        import os
+        import tempfile
+        import glob
+        
+        logger.debug(f"Fetching SploitScan data for {cve_obj.name}...")
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cmd = ["sploitscan", cve_obj.name, "-e", "json"]
+            try:
+                result = subprocess.run(
+                    cmd,
+                    cwd=tmpdir,
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                
+                json_files = glob.glob(os.path.join(tmpdir, "*.json"))
+                if not json_files:
+                    logger.warning(f"SploitScan failed to produce JSON for {cve_obj.name}")
+                    return
+                
+                with open(json_files[0], 'r') as f:
+                    data = json.load(f)
+                    
+                if not isinstance(data, list) or len(data) == 0:
+                    return
+                
+                cve_data = data[0]
+                
+                # Public exploits
+                public_exploits = []
+                # ExploitDB
+                edb_data = cve_data.get("ExploitDB Data", [])
+                for e in edb_data:
+                    public_exploits.append({"source": "ExploitDB", "exploit": e.get("id")})
+                
+                # Metasploit
+                msf_data = cve_data.get("Metasploit Data", {}).get("modules", [])
+                for m in msf_data:
+                    public_exploits.append({"source": "Metasploit", "exploit": m})
+                
+                # GitHub
+                github_data = cve_data.get("GitHub Data", {}).get("pocs", [])
+                for g in github_data:
+                    public_exploits.append({"source": "GitHub", "exploit": g})
+                    
+                if public_exploits:
+                    cve_obj.public_exploits = public_exploits
+                    
+                # HackerOne data
+                h1_data = cve_data.get("HackerOne Data", {}).get("data", {}).get("cve_entry", {})
+                if h1_data:
+                    cve_obj.hackerone_data = h1_data
+                    
+                # Priority
+                priority = cve_data.get("Priority", {}).get("Priority")
+                if priority:
+                    cve_obj.patching_priority = priority
+                    
+                logger.info(f"SploitScan enrichment successful for {cve_obj.name}")
+                
+            except subprocess.TimeoutExpired:
+                logger.warning(f"SploitScan request timed out for {cve_obj.name}")
+            except Exception as e:
+                logger.error(f"Error enriching {cve_obj.name} from SploitScan: {e}")
+
+    def _generate_cve_ai_analysis(self, cve_obj: CveId) -> None:
+        """
+        Generate AI risk assessment using the internal LLM module.
+        """
+        from reNgine.llm import LLMVulnerabilityReportGenerator
+        
+        # We only generate if we don't have it yet
+        if cve_obj.ai_risk_assessment:
+            return
+            
+        logger.debug(f"Generating AI risk assessment for {cve_obj.name}...")
+        try:
+            # We can use the existing report generator
+            report_gen = LLMVulnerabilityReportGenerator(logger=logger)
+            
+            # Create a simple description prompt
+            prompt = f"Analyze the CVE {cve_obj.name}. "
+            if cve_obj.cvss_v31_base_score:
+                prompt += f"It has a CVSS v3.1 base score of {cve_obj.cvss_v31_base_score}. "
+            if cve_obj.public_exploits:
+                prompt += f"Public exploits exist in {len(cve_obj.public_exploits)} sources. "
+            if cve_obj.patching_priority:
+                prompt += f"Patching priority is {cve_obj.patching_priority}. "
+                
+            prompt += "Provide a detailed risk assessment, potential impact, and mitigation ideas."
+            
+            response = report_gen.get_vulnerability_description(prompt)
+            if response and response.get('status'):
+                desc = response.get('description', '')
+                impact = response.get('impact', '')
+                remediation = response.get('remediation', '')
+                
+                assessment = f"**Description**:\n{desc}\n\n**Impact**:\n{impact}\n\n**Mitigation**:\n{remediation}"
+                cve_obj.ai_risk_assessment = assessment
+                cve_obj.mitigation_ideas = remediation
+                logger.info(f"AI risk assessment generated for {cve_obj.name}")
+            else:
+                logger.warning(f"AI risk assessment failed for {cve_obj.name}: {response.get('error') if response else 'Unknown'}")
+        except Exception as e:
+            logger.error(f"Error generating AI risk assessment for {cve_obj.name}: {e}")
 
 
 class CVEBatchEnricher:
