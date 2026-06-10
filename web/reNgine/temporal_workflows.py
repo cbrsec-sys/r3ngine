@@ -2191,6 +2191,20 @@ class CIDRReconWorkflow:
         cidr_config = yaml_config.get('cidr_recon', {})
         use_arp = cidr_config.get('use_arp', False)
 
+        # Auto-detect CIDR from local network interfaces when no target is given
+        if not cidr:
+            detected = await workflow.execute_activity(
+                "RunNetDetectActivity",
+                ctx,
+                start_to_close_timeout=timedelta(minutes=2),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue",
+            )
+            if not detected:
+                return True
+            cidr = detected[0]
+            ctx = {**ctx, 'cidr': cidr}
+
         if use_arp:
             await workflow.execute_activity(
                 "RunARPScanActivity",

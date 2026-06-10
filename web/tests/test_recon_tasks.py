@@ -500,3 +500,58 @@ class TestBBotScan(TestCase):
         result = bbot_scan(_make_proxy(), scan_history_id=1, domain_id=1,
                            domain='example.com')
         self.assertTrue(result)
+
+
+class TestNetDetectScan(TestCase):
+    @patch('psutil.net_if_addrs')
+    def test_netdetect_returns_cidr_for_non_loopback_interface(self, mock_addrs):
+        import psutil as _psutil
+        mock_addrs.return_value = {
+            'lo': [
+                _psutil._ntuples.snicaddr(
+                    family=2, address='127.0.0.1', netmask='255.0.0.0',
+                    broadcast=None, ptp=None,
+                ),
+            ],
+            'eth0': [
+                _psutil._ntuples.snicaddr(
+                    family=2, address='10.0.0.5', netmask='255.255.0.0',
+                    broadcast='10.0.255.255', ptp=None,
+                ),
+            ],
+        }
+        from reNgine.recon_tasks import netdetect_scan
+        result = netdetect_scan(_make_proxy(), scan_history_id=1, domain_id=1)
+        self.assertIsInstance(result, list)
+        self.assertIn('10.0.0.0/16', result)
+        self.assertNotIn('127.0.0.0/8', result)
+
+    @patch('psutil.net_if_addrs')
+    def test_netdetect_skips_loopback(self, mock_addrs):
+        import psutil as _psutil
+        mock_addrs.return_value = {
+            'lo': [
+                _psutil._ntuples.snicaddr(
+                    family=2, address='127.0.0.1', netmask='255.0.0.0',
+                    broadcast=None, ptp=None,
+                ),
+            ],
+        }
+        from reNgine.recon_tasks import netdetect_scan
+        result = netdetect_scan(_make_proxy(), scan_history_id=1, domain_id=1)
+        self.assertEqual(result, [])
+
+    @patch('psutil.net_if_addrs')
+    def test_netdetect_handles_bad_netmask_gracefully(self, mock_addrs):
+        import psutil as _psutil
+        mock_addrs.return_value = {
+            'eth0': [
+                _psutil._ntuples.snicaddr(
+                    family=2, address='10.0.0.5', netmask=None,
+                    broadcast=None, ptp=None,
+                ),
+            ],
+        }
+        from reNgine.recon_tasks import netdetect_scan
+        result = netdetect_scan(_make_proxy(), scan_history_id=1, domain_id=1)
+        self.assertEqual(result, [])

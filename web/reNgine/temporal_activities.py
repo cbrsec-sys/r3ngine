@@ -2728,6 +2728,16 @@ def run_getasn_activity(ctx: dict) -> bool:
     )
 
 
+@activity.defn(name="RunNetDetectActivity")
+def run_netdetect_activity(ctx: dict) -> list:
+    from reNgine.recon_tasks import netdetect_scan
+    activity.logger.info("[RunNetDetectActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        netdetect_scan, ctx, task_name='netdetect_scan',
+        description='Network CIDR Detection (netdetect)',
+    )
+
+
 @activity.defn(name="RunJsWhoisActivity")
 def run_jswhois_activity(ctx: dict) -> bool:
     from reNgine.recon_tasks import jswhois_scan

@@ -260,6 +260,43 @@ def getasn_scan(self, scan_history_id: int, domain_id: int, ips: List[str] = Non
     return True
 
 
+def netdetect_scan(self, scan_history_id: int, domain_id: int) -> List[str]:
+    """Detect local network CIDR ranges by enumerating network interfaces.
+
+    Uses psutil to find non-loopback IPv4 interfaces and computes each
+    interface's network CIDR. Returns a list of CIDR strings.
+    Used in: CIDRReconWorkflow (auto-discover when no explicit target given).
+    """
+    import ipaddress
+    import psutil
+
+    cidrs: List[str] = []
+    logger.log_line("[NETDETECT]", "START", "enumerating network interfaces")
+
+    for iface, addrs in psutil.net_if_addrs().items():
+        if iface == 'lo':
+            continue
+        for addr in addrs:
+            if addr.family != 2:  # AF_INET only
+                continue
+            if not addr.netmask:
+                continue
+            try:
+                net = ipaddress.IPv4Network(
+                    '%s/%s' % (addr.address, addr.netmask), strict=False
+                )
+                if net.is_loopback:
+                    continue
+                cidr_str = str(net)
+                cidrs.append(cidr_str)
+                logger.log_line("[NETDETECT]", "FOUND", "iface=%s cidr=%s" % (iface, cidr_str))
+            except ValueError:
+                logger.log_line("[NETDETECT]", "WARN", "invalid addr on %s" % iface)
+
+    logger.log_line("[NETDETECT]", "RESULT", "detected %d CIDR ranges" % len(cidrs))
+    return cidrs
+
+
 def mapcidr_expand(self, scan_history_id: int, cidr: str) -> List[str]:
     """Expand a CIDR range to individual IP addresses using mapcidr.
 
