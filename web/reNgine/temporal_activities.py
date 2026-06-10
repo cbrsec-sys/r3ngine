@@ -2772,3 +2772,23 @@ def run_param_discovery_activity(ctx: dict) -> dict:
         urls=ctx.get('urls', []),
         ctx=ctx,
     )
+
+
+@activity.defn(name="RunGrypeScanActivity")
+def run_grype_scan_activity(ctx: dict) -> bool:
+    from reNgine.vulnerability_tasks import grype_scan
+    activity.logger.info("[RunGrypeScanActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        grype_scan, ctx, task_name='grype_scan',
+        description='CVE Scan (grype)', code_path=ctx.get('starting_point_path'),
+    )
+
+
+@activity.defn(name="RunTrivySecretScanActivity")
+def run_trivy_secret_scan_activity(ctx: dict) -> bool:
+    from reNgine.vulnerability_tasks import trivy_secret_scan
+    activity.logger.info("[RunTrivySecretScanActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        trivy_secret_scan, ctx, task_name='trivy_secret_scan',
+        description='Secret Scan (trivy v0.69.3)', code_path=ctx.get('starting_point_path'),
+    )

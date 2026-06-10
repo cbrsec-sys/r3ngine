@@ -470,6 +470,21 @@ RUN pipx install maigret && \
     pipx install bbot --force && \
     pipx install sploitscan --force
 
+# grype — Anchore filesystem CVE scanner
+RUN curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+
+# trivy — filesystem secrets scanner
+# PINNED to v0.69.3 — downloaded directly from GitHub Releases (NOT install.sh)
+# v0.69.4 was compromised in a March 2026 supply chain attack (credential-stealing binary)
+# SHA256 verified against official trivy_0.69.3_checksums.txt
+RUN TRIVY_VERSION="0.69.3" && \
+    curl -sSfL \
+      "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz" \
+      -o /tmp/trivy.tar.gz && \
+    echo "1816b632dfe529869c740c0913e36bd1629cb7688bd5634f4a858c1d57c88b75  /tmp/trivy.tar.gz" | sha256sum -c && \
+    tar -xzf /tmp/trivy.tar.gz -C /usr/local/bin trivy && \
+    rm /tmp/trivy.tar.gz
+
 RUN git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop \
     && pip3 install -r /usr/src/github/graphql-cop/requirements.txt \
     && rm -rf /usr/src/github/graphql-cop/.git
