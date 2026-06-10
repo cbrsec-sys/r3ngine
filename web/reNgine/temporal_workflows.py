@@ -2292,6 +2292,20 @@ class DomainReconWorkflow:
                 task_queue="python-orchestrator-queue",
             ),
             workflow.execute_activity(
+                "RunJsWhoisActivity",
+                {**ctx, 'domain': ctx.get('domain')},
+                start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue",
+            ),
+            workflow.execute_activity(
+                "RunWhoisDomainActivity",
+                {**ctx, 'domain': ctx.get('domain')},
+                start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue",
+            ),
+            workflow.execute_activity(
                 "RunDNSXActivity",
                 {**ctx, 'subdomain': ctx.get('domain')},
                 start_to_close_timeout=timedelta(minutes=10),

@@ -496,3 +496,86 @@ def search_vulns_scan(self, scan_history_id: int, service: str,
         )
 
     return True
+
+
+def jswhois_scan(self, scan_history_id: int, domain_id: int, domain: str = None) -> bool:
+    """Fetch WHOIS data as JSON using the jswhois Go binary.
+
+    Stores raw JSON in DomainInfo.whois_raw for the target domain.
+    Used in: DomainReconWorkflow.
+    """
+    from targetApp.models import Domain
+
+    target = domain or ''
+    if not target:
+        logger.log_line("[JSWHOIS]", "SKIP", "no domain provided")
+        return True
+
+    cmd = ['jswhois', '-j', target]
+    logger.log_line("[JSWHOIS]", "START", "querying %s" % target)
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        raw = result.stdout.strip()
+        if not raw:
+            return True
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.log_line("[JSWHOIS]", "WARN", "non-JSON output for %s" % target)
+            return True
+
+        domain_obj = Domain.objects.filter(pk=domain_id).first()
+        if domain_obj and domain_obj.domain_info:
+            domain_obj.domain_info.whois_raw = data
+            domain_obj.domain_info.save(update_fields=['whois_raw'])
+            logger.log_line("[JSWHOIS]", "RESULT", "stored whois_raw for %s" % target)
+    except subprocess.TimeoutExpired:
+        logger.log_line("[JSWHOIS]", "WARN", "timeout for %s" % target)
+
+    return True
+
+
+def whoisdomain_scan(self, scan_history_id: int, domain_id: int, domain: str = None) -> bool:
+    """Fetch WHOIS data using the whoisdomain Python CLI.
+
+    Writes JSON output to a temp file, reads it, and stores in DomainInfo.whois_raw.
+    Used in: DomainReconWorkflow.
+    """
+    from targetApp.models import Domain
+
+    target = domain or ''
+    if not target:
+        logger.log_line("[WHOISDOMAIN]", "SKIP", "no domain provided")
+        return True
+
+    output_file = f'/tmp/whoisdomain_{scan_history_id}.json'
+    cmd = ['whoisdomain', '-d', target, '-o', output_file]
+    logger.log_line("[WHOISDOMAIN]", "START", "querying %s" % target)
+
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        if not os.path.exists(output_file):
+            return True
+        with open(output_file) as f:
+            raw = f.read().strip()
+        if not raw:
+            return True
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError:
+            logger.log_line("[WHOISDOMAIN]", "WARN", "non-JSON output for %s" % target)
+            return True
+
+        domain_obj = Domain.objects.filter(pk=domain_id).first()
+        if domain_obj and domain_obj.domain_info:
+            domain_obj.domain_info.whois_raw = data
+            domain_obj.domain_info.save(update_fields=['whois_raw'])
+            logger.log_line("[WHOISDOMAIN]", "RESULT", "stored whois_raw for %s" % target)
+    except subprocess.TimeoutExpired:
+        logger.log_line("[WHOISDOMAIN]", "WARN", "timeout for %s" % target)
+    finally:
+        if os.path.exists(output_file):
+            os.remove(output_file)
+
+    return True

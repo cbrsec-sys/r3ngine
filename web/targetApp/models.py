@@ -118,6 +118,7 @@ class DomainInfo(models.Model):
 	dns_records = models.ManyToManyField(DNSRecord, blank=True)
 	# whois server
 	whois_server = models.CharField(max_length=150, null=True, blank=True)
+	whois_raw = models.JSONField(null=True, blank=True)
 	# associated/similer domains
 	related_domains = models.ManyToManyField(RelatedDomain, blank=True, related_name='associated_domains')
 	related_tlds = models.ManyToManyField(RelatedDomain, blank=True, related_name='related_tlds')
