@@ -2379,6 +2379,7 @@ class SubdomainReconWorkflow:
         subdomain_config = yaml_config.get('subdomain_recon', {})
         passive_only = subdomain_config.get('passive', False)
         brute_dns = subdomain_config.get('brute_dns', False)
+        run_bbot = subdomain_config.get('bbot', False)
 
         discovery_tasks = [
             workflow.execute_activity(
@@ -2401,6 +2402,16 @@ class SubdomainReconWorkflow:
                 workflow.execute_activity(
                     "RunDNSXActivity",
                     {**ctx, 'wordlist': 'combined_subdomains'},
+                    start_to_close_timeout=timedelta(hours=2),
+                    retry_policy=_RETRY_LONG_SCAN,
+                    task_queue="python-orchestrator-queue",
+                )
+            )
+        if run_bbot:
+            discovery_tasks.append(
+                workflow.execute_activity(
+                    "RunBBotActivity",
+                    {**ctx, 'domain': ctx.get('domain')},
                     start_to_close_timeout=timedelta(hours=2),
                     retry_policy=_RETRY_LONG_SCAN,
                     task_queue="python-orchestrator-queue",

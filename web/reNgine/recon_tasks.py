@@ -498,6 +498,84 @@ def search_vulns_scan(self, scan_history_id: int, service: str,
     return True
 
 
+def bbot_scan(self, scan_history_id: int, domain_id: int, domain: Optional[str] = None) -> bool:
+    """Discover subdomains using BBOT passive OSINT modules.
+
+    Runs the bbot subdomain-enum preset and parses DNS_NAME events from NDJSON
+    output into Subdomain records. Gated by yaml_configuration.subdomain_recon.bbot.
+    Used in: SubdomainReconWorkflow.
+    """
+    import shutil
+    from startScan.models import Subdomain
+    from targetApp.models import Domain
+    from django.db import transaction
+
+    target = domain or ''
+    if not target:
+        logger.log_line("[BBOT]", "SKIP", "no domain provided")
+        return True
+
+    output_dir = f'/tmp/bbot_{scan_history_id}'
+    output_file = f'{output_dir}/output.ndjson'
+
+    try:
+        cmd = [
+            'bbot', '-t', target,
+            '-p', 'subdomain-enum',
+            '--silent', '--no-deps',
+            '-o', output_dir,
+            '-om', 'ndjson',
+        ]
+        logger.log_line("[BBOT]", "START", "scanning %s" % target)
+        subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+
+        if not os.path.exists(output_file):
+            logger.log_line("[BBOT]", "WARN", "no output produced for %s" % target)
+            return True
+
+        try:
+            domain_obj = Domain.objects.get(pk=domain_id)
+        except Domain.DoesNotExist:
+            domain_obj = None
+
+        new_names: List[str] = []
+        with open(output_file) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    event = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if event.get('type') == 'DNS_NAME':
+                    name = event.get('data', '').strip()
+                    if name and not Subdomain.objects.filter(
+                        scan_history_id=scan_history_id, name=name
+                    ).exists():
+                        new_names.append(name)
+
+        if new_names:
+            with transaction.atomic():
+                Subdomain.objects.bulk_create(
+                    [Subdomain(scan_history_id=scan_history_id,
+                               target_domain=domain_obj, name=n)
+                     for n in new_names],
+                    ignore_conflicts=True,
+                )
+            logger.log_line("[BBOT]", "RESULT", "saved %d new subdomains" % len(new_names))
+        else:
+            logger.log_line("[BBOT]", "RESULT", "no new subdomains found")
+
+    except subprocess.TimeoutExpired:
+        logger.log_line("[BBOT]", "WARN", "bbot timed out for %s" % target)
+    finally:
+        if os.path.exists(output_dir):
+            shutil.rmtree(output_dir, ignore_errors=True)
+
+    return True
+
+
 def jswhois_scan(self, scan_history_id: int, domain_id: int, domain: Optional[str] = None) -> bool:
     """Fetch WHOIS data as JSON using the jswhois Go binary.
 
