@@ -145,3 +145,149 @@ class TestTakeScreenshotAndSaveUrlOverride(TestCase):
         # Legacy path strips to base URL
         called_url = mock_capture.call_args[0][0]
         self.assertEqual(called_url, 'https://app.screenshot-test.example.com')
+
+
+class TestScreenshotEndpointQuery(TestCase):
+    """Tests for the screenshot() task — endpoint collection logic."""
+
+    def _make_mock_proxy(self, scan, yaml_config=None):
+        from unittest.mock import MagicMock
+        proxy = MagicMock()
+        proxy.scan = scan
+        proxy.scan_id = scan.id
+        proxy.results_dir = '/tmp/test_results'
+        proxy.activity_id = None
+        proxy.yaml_configuration = yaml_config or {}
+        proxy.notify = MagicMock()
+        return proxy
+
+    def setUp(self):
+        from django.utils import timezone
+        from scanEngine.models import EngineType
+        self.domain = Domain.objects.create(name='target.com')
+        self.engine = EngineType.objects.create(
+            engine_name='screenshot-endpoint-query-engine',
+            yaml_configuration='screenshot: {}',
+        )
+        self.scan = ScanHistory.objects.create(
+            scan_status=0,
+            domain=self.domain,
+            scan_type=self.engine,
+            start_scan_date=timezone.now(),
+        )
+
+    def _make_subdomain(self, name, http_status=200):
+        return Subdomain.objects.create(
+            name=name,
+            scan_history=self.scan,
+            target_domain=self.domain,
+            http_url=f'https://{name}',
+            http_status=http_status,
+        )
+
+    def _make_default_endpoint(self, subdomain, http_url=None, http_status=200):
+        url = http_url or f'https://{subdomain.name}'
+        return EndPoint.objects.create(
+            http_url=url,
+            http_status=http_status,
+            scan_history=self.scan,
+            target_domain=self.domain,
+            subdomain=subdomain,
+            is_default=True,
+        )
+
+    @patch('reNgine.screenshot.tasks.take_screenshot_and_save')
+    def test_screenshots_all_default_endpoints_normal_intensity(self, mock_save):
+        """Normal intensity: all is_default=True endpoints with http_status > 0 are screenshotted."""
+        mock_save.return_value = True
+
+        sub1 = self._make_subdomain('a.target.com', http_status=200)
+        sub2 = self._make_subdomain('b.target.com', http_status=403)
+        sub3 = self._make_subdomain('c.target.com', http_status=200)
+        self._make_default_endpoint(sub1, 'https://a.target.com', http_status=200)
+        self._make_default_endpoint(sub2, 'https://b.target.com', http_status=403)
+        self._make_default_endpoint(sub3, 'https://c.target.com', http_status=200)
+
+        proxy = self._make_mock_proxy(self.scan, {'intensity': 'normal'})
+
+        from reNgine.tasks import screenshot
+        screenshot(proxy)
+
+        # All 3 endpoints have http_status > 0, so all 3 pass
+        self.assertEqual(mock_save.call_count, 3)
+        called_urls = {c.kwargs['url_override'] for c in mock_save.call_args_list}
+        self.assertIn('https://a.target.com', called_urls)
+        self.assertIn('https://b.target.com', called_urls)
+        self.assertIn('https://c.target.com', called_urls)
+
+    @patch('reNgine.screenshot.tasks.take_screenshot_and_save')
+    def test_normal_intensity_excludes_zero_status_endpoints(self, mock_save):
+        """Normal intensity excludes default endpoints where http_status == 0 (unreachable)."""
+        mock_save.return_value = True
+
+        alive_sub = self._make_subdomain('alive.target.com', http_status=200)
+        dead_sub = self._make_subdomain('dead.target.com', http_status=0)
+        self._make_default_endpoint(alive_sub, 'https://alive.target.com', http_status=200)
+        self._make_default_endpoint(dead_sub, 'https://dead.target.com', http_status=0)
+
+        proxy = self._make_mock_proxy(self.scan, {'intensity': 'normal'})
+
+        from reNgine.tasks import screenshot
+        screenshot(proxy)
+
+        self.assertEqual(mock_save.call_count, 1)
+        called_url = mock_save.call_args.kwargs['url_override']
+        self.assertEqual(called_url, 'https://alive.target.com')
+
+    @patch('reNgine.screenshot.tasks.take_screenshot_and_save')
+    def test_non_default_endpoints_are_skipped(self, mock_save):
+        """Endpoints with is_default=False are never passed to screenshot capture."""
+        mock_save.return_value = True
+
+        sub = self._make_subdomain('sub.target.com', http_status=200)
+        self._make_default_endpoint(sub, 'https://sub.target.com/root', http_status=200)
+        # Non-default endpoint — should be ignored
+        EndPoint.objects.create(
+            http_url='https://sub.target.com/api/v1',
+            http_status=200,
+            scan_history=self.scan,
+            target_domain=self.domain,
+            subdomain=sub,
+            is_default=False,
+        )
+
+        proxy = self._make_mock_proxy(self.scan, {'intensity': 'normal'})
+
+        from reNgine.tasks import screenshot
+        screenshot(proxy)
+
+        self.assertEqual(mock_save.call_count, 1)
+        called_url = mock_save.call_args.kwargs['url_override']
+        self.assertEqual(called_url, 'https://sub.target.com/root')
+
+    @patch('reNgine.screenshot.tasks.take_screenshot_and_save')
+    def test_full_url_with_path_is_passed(self, mock_save):
+        """The full http_url including path is passed as url_override — not stripped to scheme://netloc."""
+        mock_save.return_value = True
+
+        sub = self._make_subdomain('panel.target.com', http_status=200)
+        self._make_default_endpoint(sub, 'https://panel.target.com/admin/login', http_status=200)
+
+        proxy = self._make_mock_proxy(self.scan, {'intensity': 'normal'})
+
+        from reNgine.tasks import screenshot
+        screenshot(proxy)
+
+        called_url = mock_save.call_args.kwargs['url_override']
+        self.assertEqual(called_url, 'https://panel.target.com/admin/login')
+        self.assertNotEqual(called_url, 'https://panel.target.com')
+
+    @patch('reNgine.screenshot.tasks.take_screenshot_and_save')
+    def test_no_endpoints_no_screenshots(self, mock_save):
+        """With no default endpoints, screenshot() completes without calling capture."""
+        proxy = self._make_mock_proxy(self.scan, {'intensity': 'normal'})
+
+        from reNgine.tasks import screenshot
+        screenshot(proxy)
+
+        mock_save.assert_not_called()
