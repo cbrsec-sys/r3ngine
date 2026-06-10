@@ -2265,6 +2265,20 @@ class CodeScanWorkflow:
                 retry_policy=_RETRY_LONG_SCAN,
                 task_queue="python-orchestrator-queue",
             ),
+            workflow.execute_activity(
+                "RunGrypeScanActivity",
+                ctx,
+                start_to_close_timeout=timedelta(hours=2),
+                retry_policy=_RETRY_LONG_SCAN,
+                task_queue="python-orchestrator-queue",
+            ),
+            workflow.execute_activity(
+                "RunTrivySecretScanActivity",
+                ctx,
+                start_to_close_timeout=timedelta(hours=2),
+                retry_policy=_RETRY_LONG_SCAN,
+                task_queue="python-orchestrator-queue",
+            ),
         )
         return True
 
