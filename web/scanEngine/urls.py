@@ -77,6 +77,18 @@ urlpatterns = [
         views.test_llm_connection,
         name='test_llm_connection'),
     path(
+        '<slug:slug>/ollama/service_status',
+        views.get_ollama_service_status,
+        name='get_ollama_service_status'),
+    path(
+        '<slug:slug>/ollama/service_start',
+        views.start_ollama_service,
+        name='start_ollama_service'),
+    path(
+        '<slug:slug>/ollama/service_stop',
+        views.stop_ollama_service,
+        name='stop_ollama_service'),
+    path(
         '<slug:slug>/rengine_settings',
         views.rengine_settings,
         name='rengine_settings'),

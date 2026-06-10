@@ -93,8 +93,13 @@ class TorManager:
         try:
             client.images.get(TOR_IMAGE_NAME)
         except docker.errors.ImageNotFound:
-            logger.info("[TorManager] Image '%s' not found — building from source.", TOR_IMAGE_NAME)
-            self._build_image(client)
+            logger.info(f"[TorManager] Image '{TOR_IMAGE_NAME}' not found locally. Attempting to pull...")
+            try:
+                client.images.pull(TOR_IMAGE_NAME)
+                logger.info(f"[TorManager] Image '{TOR_IMAGE_NAME}' pulled successfully.")
+            except docker.errors.APIError:
+                logger.info(f"[TorManager] Pull failed or image is local-only. Building from source...")
+                self._build_image(client)
 
         # Generate a fresh random control password for this session
         password = secrets.token_hex(32)
@@ -109,6 +114,10 @@ class TorManager:
                 name=TOR_CONTAINER_NAME,
                 environment={'TOR_CONTROL_PASSWORD': password},
                 network=network,
+                labels={
+                    'com.docker.compose.project': 'r3ngine',
+                    'com.docker.compose.service': 'tor'
+                },
                 restart_policy={'Name': 'no'},
                 mem_limit='256m',
             )

@@ -732,12 +732,32 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin, onInstallStart
 
             {isMarketplace ? (
               isInstalled ? (
-                <Chip
-                  icon={<InstalledIcon sx={{ fontSize: '14px !important' }} />}
-                  label="INSTALLED"
-                  size="small"
-                  sx={{ bgcolor: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0, 255, 170, 0.2)', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}
-                />
+                marketplacePlugin?.update_available ? (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={installMutation.isPending ? <CircularProgress size={12} color="inherit" /> : <InstallIcon />}
+                    onClick={handleInstall}
+                    disabled={installMutation.isPending}
+                    sx={{
+                      bgcolor: '#ffb74d',
+                      color: '#000',
+                      fontFamily: 'Orbitron',
+                      fontWeight: 900,
+                      fontSize: '10px',
+                      '&:hover': { bgcolor: '#ffcc80' }
+                    }}
+                  >
+                    UPDATE TO v{marketplacePlugin.version}
+                  </Button>
+                ) : (
+                  <Chip
+                    icon={<InstalledIcon sx={{ fontSize: '14px !important' }} />}
+                    label="INSTALLED"
+                    size="small"
+                    sx={{ bgcolor: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0, 255, 170, 0.2)', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}
+                  />
+                )
               ) : (
                 <Button
                   size="small"

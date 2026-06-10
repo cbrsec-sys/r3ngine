@@ -1095,7 +1095,7 @@ class TechnologySerializer(serializers.ModelSerializer):
 class ParameterSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = Parameter
-		fields = ['name', 'value', 'type']
+		fields = ['id', 'name', 'value', 'type', 'is_reflected', 'is_source', 'is_sink', 'confidence', 'sources', 'endpoint']
 
 
 class PortSerializer(serializers.ModelSerializer):

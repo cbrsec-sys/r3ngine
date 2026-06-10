@@ -18,6 +18,17 @@
   - **Automated AI Risk Assessment**: Integrated the native `LLMVulnerabilityReportGenerator` into the enrichment flow. The system automatically prompts the active LLM (OpenAI, Anthropic, Gemini, or Ollama) with CVSS metrics and public exploit counts to generate a structured, context-rich risk assessment and mitigation strategy.
   - **Persistent Intelligence Cache**: Expanded the `CveId` model (Migration 0042) to permanently store `ai_risk_assessment`, `mitigation_ideas`, `public_exploits`, `hackerone_data`, and `patching_priority`, drastically reducing API calls and LLM token usage on subsequent scans.
 
+- **Ollama Orchestration UI & Backend Integration**:
+  - Implemented dynamic Docker orchestration for the local Ollama LLM provider. The LLM Toolkit settings page now includes a built-in Docker container lifecycle manager, allowing users to start and stop the `ollama` container directly from the UI.
+  - Developed `OllamaManager` using `docker.from_env()` to automatically pull, start, and manage the `ollama/ollama:latest` image inside the dynamically discovered `r3ngine` Docker network.
+  - Added REST endpoints (`/ollama/service_status`, `/ollama/service_start`, `/ollama/service_stop`) and React Query hooks to seamlessly coordinate container state with the UI.
+  - Designed the UI to prevent interactions like "Test Connection" or model selection when the service is stopped.
+
+- **Metasploit Integration Terminal Stabilization (Plugin)**:
+  - Fixed interactive console text formatting and squishing issues by ensuring properly structured PTY WebSockets handling in the Django Channels consumer.
+  - Implemented a "Kill Instance" switch to quickly terminate and clean up hanging Metasploit container processes.
+  - Migrated `msf_console` to the Docker SDK, ensuring spawned containers are properly labeled (`com.docker.compose.project: 'r3ngine'`) and attached to the project's native network.
+
 ### [v3.5.0] - 2026-06-04
 
 - **Python 3.12 Runtime Upgrade**:
