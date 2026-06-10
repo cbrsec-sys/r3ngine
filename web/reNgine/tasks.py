@@ -2271,9 +2271,13 @@ def screenshot(self, ctx={}, description=None):
 	intensity = config.get(INTENSITY) or self.yaml_configuration.get(INTENSITY, DEFAULT_SCAN_INTENSITY)
 	strict = intensity == 'normal'
 
+	# is_default=True excludes both False and NULL; null=True on the field is intentional
+	# (NULL means "not yet determined", not "yes"). subdomain__isnull=False guards against
+	# orphaned endpoints that would cause take_screenshot_and_save to raise DoesNotExist.
 	endpoints = (
 		EndPoint.objects
 		.filter(scan_history=self.scan, is_default=True)
+		.filter(subdomain__isnull=False)
 		.exclude(http_url__isnull=True)
 		.exclude(http_url='')
 		.select_related('subdomain')
@@ -2282,10 +2286,11 @@ def screenshot(self, ctx={}, description=None):
 	if strict:
 		endpoints = endpoints.filter(http_status__gt=0)
 
-	logger.info(f"Starting Playwright screenshot capture for {endpoints.count()} default endpoints...")
+	endpoint_list = list(endpoints)
+	logger.info("Starting Playwright screenshot capture for %d default endpoints...", len(endpoint_list))
 
 	success_count = 0
-	for endpoint in endpoints:
+	for endpoint in endpoint_list:
 		if take_screenshot_and_save(
 			subdomain_id=endpoint.subdomain_id,
 			scan_id=self.scan_id,

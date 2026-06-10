@@ -291,3 +291,64 @@ class TestScreenshotEndpointQuery(TestCase):
         screenshot(proxy)
 
         mock_save.assert_not_called()
+
+    @patch('reNgine.screenshot.tasks.take_screenshot_and_save')
+    def test_endpoint_with_null_subdomain_is_skipped(self, mock_save):
+        """Endpoints with no subdomain FK are excluded — they would raise DoesNotExist."""
+        mock_save.return_value = True
+
+        # Endpoint with no subdomain — should be skipped
+        EndPoint.objects.create(
+            http_url='https://orphan.target.com',
+            http_status=200,
+            scan_history=self.scan,
+            target_domain=self.domain,
+            subdomain=None,
+            is_default=True,
+        )
+
+        proxy = self._make_mock_proxy(self.scan, {'intensity': 'normal'})
+
+        from reNgine.tasks import screenshot
+        screenshot(proxy)
+
+        mock_save.assert_not_called()
+
+    @patch('reNgine.screenshot.tasks.take_screenshot_and_save')
+    def test_endpoint_with_null_is_default_is_skipped(self, mock_save):
+        """Endpoints where is_default IS NULL are not treated as default — excluded from screenshotting."""
+        mock_save.return_value = True
+
+        sub = self._make_subdomain('null-default.target.com', http_status=200)
+        EndPoint.objects.create(
+            http_url='https://null-default.target.com',
+            http_status=200,
+            scan_history=self.scan,
+            target_domain=self.domain,
+            subdomain=sub,
+            is_default=None,
+        )
+
+        proxy = self._make_mock_proxy(self.scan, {'intensity': 'normal'})
+
+        from reNgine.tasks import screenshot
+        screenshot(proxy)
+
+        mock_save.assert_not_called()
+
+    @patch('reNgine.screenshot.tasks.take_screenshot_and_save')
+    def test_aggressive_intensity_includes_zero_status_endpoints(self, mock_save):
+        """Non-normal intensity: endpoints with http_status=0 are included (not filtered out)."""
+        mock_save.return_value = True
+
+        sub = self._make_subdomain('dead.target.com', http_status=0)
+        self._make_default_endpoint(sub, 'https://dead.target.com', http_status=0)
+
+        proxy = self._make_mock_proxy(self.scan, {'intensity': 'aggressive'})
+
+        from reNgine.tasks import screenshot
+        screenshot(proxy)
+
+        self.assertEqual(mock_save.call_count, 1)
+        called_url = mock_save.call_args.kwargs['url_override']
+        self.assertEqual(called_url, 'https://dead.target.com')
