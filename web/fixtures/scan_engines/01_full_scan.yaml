@@ -175,6 +175,7 @@
         run_crlfuzz: true
         run_acunetix: true
         run_wpscan: true
+        run_wptaint_scan: true
         run_s3scanner: true
         run_vigolium: true
         enable_http_crawl: true

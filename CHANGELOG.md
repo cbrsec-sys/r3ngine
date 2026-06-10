@@ -8,6 +8,11 @@
   - **Frontend Configuration**: Built a dedicated "Custom Parameters" panel in the Settings page for managing parameters.
   - **Scan Integration**: Scan results now include a "Parameters" tab detailing all discovered custom parameters, their occurrence counts, severity levels, and the specific endpoint URLs where they were found.
 
+- **WP Taint Scan Integration**:
+  - Integrated `wp-taint-scan` to automatically perform Static Application Security Testing (SAST) on discovered WordPress plugins.
+  - The tool downloads plugin source code from the WordPress repository and runs taint analysis, parsing the results directly into the `Vulnerability` database.
+  - Configured Temporal workflows to execute `wp-taint-scan` sequentially as the final tool against WordPress targets, ensuring maximum plugin discovery coverage.
+
 ### [v3.5.0] - 2026-06-04
 
 - **Python 3.12 Runtime Upgrade**:

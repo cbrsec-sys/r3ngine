@@ -206,10 +206,12 @@ DNS_AMPLIFICATION_THRESHOLD = 'amplification_threshold'
 
 
 RUN_WPSCAN = 'run_wpscan'
+RUN_WPTAINT_SCAN = 'run_wptaint_scan'
 WPSCAN_ENUMERATION = 'wpscan_enumeration'
 WPSCAN_DETECTION_MODE = 'wpscan_detection_mode'
 WPSCAN_SCAN_DEFAULT_CONFIG = {
     'run_wpscan': True,
+    'run_wptaint_scan': True,
     'wpscan_enumeration': 'vp,vt,u',
     'wpscan_detection_mode': 'mixed'
 }
