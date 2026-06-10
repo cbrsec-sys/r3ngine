@@ -312,7 +312,6 @@ def urlparser_scan(self, scan_history_id: int, domain_id: int,
     Falls back to loading EndPoint URLs from the scan when urls is not given.
     Used in: URLParamsFuzzWorkflow, URLCrawlWorkflow.
     """
-    import os
     from startScan.models import EndPoint, Parameter
     from django.db import transaction
 
@@ -333,14 +332,13 @@ def urlparser_scan(self, scan_history_id: int, domain_id: int,
         with open(input_file, 'w') as f:
             f.write('\n'.join(t for t in targets if t))
 
+        logger.log_line("[URLPARSER]", "START", "parsing %d URLs" % len(targets))
         with open(input_file, 'rb') as stdin_f:
             result = subprocess.run(
                 ['unfurl', '-u', 'keypairs'],
                 stdin=stdin_f,
                 capture_output=True, text=True, timeout=120,
             )
-
-        logger.log_line("[URLPARSER]", "START", "parsing %d URLs" % len(targets))
 
         # Build lookup: http_url → EndPoint for fast matching
         ep_map = {
@@ -365,11 +363,10 @@ def urlparser_scan(self, scan_history_id: int, domain_id: int,
                     dedup_key = (ep.id, key)
                     if dedup_key in seen:
                         continue
-                    if not Parameter.objects.filter(endpoint=ep, name=key).exists():
-                        params_to_create.append(
-                            Parameter(endpoint=ep, name=key, value=value, type='GET')
-                        )
-                        seen.add(dedup_key)
+                    params_to_create.append(
+                        Parameter(endpoint=ep, name=key, value=value, type='GET')
+                    )
+                    seen.add(dedup_key)
 
         if params_to_create:
             with transaction.atomic():
