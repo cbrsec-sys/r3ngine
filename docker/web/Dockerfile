@@ -85,7 +85,6 @@ COPY web/executor/ ./
 RUN CGO_ENABLED=0 GO111MODULE=on go build -ldflags="-s -w" -o /usr/local/bin/r3ngine-executor . && \
     rm -rf /root/.cache/go-build /go/pkg
 
-
 # ===========================================================================
 # Stage: Vigolium Builder
 #
@@ -468,7 +467,8 @@ RUN pipx install maigret && \
     pipx install "git+https://github.com/EnableSecurity/wafw00f.git" --force && \
     pipx install whoisdomain --force && \
     pipx install "bypass-url-parser" --force && \
-    pipx install bbot --force
+    pipx install bbot --force && \
+    pipx install sploitscan --force
 
 RUN git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop \
     && pip3 install -r /usr/src/github/graphql-cop/requirements.txt \

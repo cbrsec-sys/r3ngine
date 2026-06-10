@@ -13,6 +13,11 @@
   - The tool downloads plugin source code from the WordPress repository and runs taint analysis, parsing the results directly into the `Vulnerability` database.
   - Configured Temporal workflows to execute `wp-taint-scan` sequentially as the final tool against WordPress targets, ensuring maximum plugin discovery coverage.
 
+- **CVE Enrichment Expansion (SploitScan & LLM Integration)**:
+  - **SploitScan Integration**: Integrated the `sploitscan` CLI to pull real-world exploit evidence directly into the CVE pipeline. Automatically extracts ExploitDB, Metasploit, and GitHub Proof-of-Concept links, along with HackerOne Hacktivity statistics and overarching patching priority.
+  - **Automated AI Risk Assessment**: Integrated the native `LLMVulnerabilityReportGenerator` into the enrichment flow. The system automatically prompts the active LLM (OpenAI, Anthropic, Gemini, or Ollama) with CVSS metrics and public exploit counts to generate a structured, context-rich risk assessment and mitigation strategy.
+  - **Persistent Intelligence Cache**: Expanded the `CveId` model (Migration 0042) to permanently store `ai_risk_assessment`, `mitigation_ideas`, `public_exploits`, `hackerone_data`, and `patching_priority`, drastically reducing API calls and LLM token usage on subsequent scans.
+
 ### [v3.5.0] - 2026-06-04
 
 - **Python 3.12 Runtime Upgrade**:

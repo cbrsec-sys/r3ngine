@@ -87,7 +87,7 @@ const SeverityBadge: React.FC<{ severity: number | string; label?: string }> = (
 
 export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) => {
   const theme = useTheme();
-  const [viewMode, setViewMode] = useState<'cwe' | 'cve'>('cwe');
+  const [viewMode, setViewMode] = useState<'cve' | 'cwe'>('cve');
   
   // CWE dialog state
   const [cweDialogOpen, setCweDialogOpen] = useState(false);
@@ -330,27 +330,6 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                 <Box sx={{ display: 'flex', bgcolor: 'rgba(112, 0, 255, 0.08)', borderRadius: 1, p: 0.25, border: '1px solid rgba(112, 0, 255, 0.2)' }}>
                   <Button
                     size="small"
-                    onClick={() => setViewMode('cwe')}
-                    sx={{
-                      minWidth: 50,
-                      height: 22,
-                      fontSize: '0.65rem',
-                      fontWeight: 700,
-                      fontFamily: 'Orbitron',
-                      borderRadius: 0.5,
-                      color: viewMode === 'cwe' ? '#00f3ff' : 'rgba(255,255,255,0.4)',
-                      bgcolor: viewMode === 'cwe' ? 'rgba(0, 243, 255, 0.15)' : 'transparent',
-                      boxShadow: viewMode === 'cwe' ? '0 0 8px rgba(0, 243, 255, 0.2)' : 'none',
-                      p: 0,
-                      '&:hover': {
-                        bgcolor: viewMode === 'cwe' ? 'rgba(0, 243, 255, 0.25)' : 'rgba(255,255,255,0.05)',
-                      }
-                    }}
-                  >
-                    CWE
-                  </Button>
-                  <Button
-                    size="small"
                     onClick={() => setViewMode('cve')}
                     sx={{
                       minWidth: 50,
@@ -369,6 +348,27 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                     }}
                   >
                     CVE
+                  </Button>
+                  <Button
+                    size="small"
+                    onClick={() => setViewMode('cwe')}
+                    sx={{
+                      minWidth: 50,
+                      height: 22,
+                      fontSize: '0.65rem',
+                      fontWeight: 700,
+                      fontFamily: 'Orbitron',
+                      borderRadius: 0.5,
+                      color: viewMode === 'cwe' ? '#00f3ff' : 'rgba(255,255,255,0.4)',
+                      bgcolor: viewMode === 'cwe' ? 'rgba(0, 243, 255, 0.15)' : 'transparent',
+                      boxShadow: viewMode === 'cwe' ? '0 0 8px rgba(0, 243, 255, 0.2)' : 'none',
+                      p: 0,
+                      '&:hover': {
+                        bgcolor: viewMode === 'cwe' ? 'rgba(0, 243, 255, 0.25)' : 'rgba(255,255,255,0.05)',
+                      }
+                    }}
+                  >
+                    CWE
                   </Button>
                 </Box>
               </Box>
