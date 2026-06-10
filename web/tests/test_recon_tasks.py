@@ -348,3 +348,96 @@ class TestGetASNScan(TestCase):
         self.assertTrue(result)
         ip = IpAddress.objects.get(address='1.2.3.4')
         self.assertIsNone(ip.asn)
+
+
+class TestJsWhoisScan(TestCase):
+    @patch('subprocess.run')
+    def test_jswhois_stores_raw_json_in_domain_info(self, mock_run):
+        from targetApp.models import Domain as TargetDomain, DomainInfo
+        from startScan.models import ScanHistory
+        from scanEngine.models import EngineType
+        from reNgine.recon_tasks import jswhois_scan
+
+        engine = EngineType.objects.create(
+            engine_name='test-jswhois-engine',
+            yaml_configuration='subdomain_discovery:\n  - subfinder\n',
+        )
+        domain_info = DomainInfo.objects.create()
+        domain = TargetDomain.objects.create(
+            name='jswhois-test.example.com',
+            insert_date=timezone.now(), domain_info=domain_info,
+        )
+        scan = ScanHistory.objects.create(
+            scan_status=0, start_scan_date=timezone.now(), domain=domain,
+            scan_type=engine,
+        )
+        whois_json = '{"registrar": "ACME Registrar", "creation_date": "2000-01-01"}'
+        mock_run.return_value = MagicMock(returncode=0, stdout=whois_json, stderr='')
+
+        result = jswhois_scan(_make_proxy(), scan_history_id=scan.id, domain_id=domain.id,
+                              domain='jswhois-test.example.com')
+        self.assertTrue(result)
+        domain_info.refresh_from_db()
+        self.assertIsNotNone(domain_info.whois_raw)
+        self.assertIn('registrar', domain_info.whois_raw)
+
+    @patch('subprocess.run')
+    def test_jswhois_returns_true_with_no_domain(self, mock_run):
+        from reNgine.recon_tasks import jswhois_scan
+        result = jswhois_scan(_make_proxy(), scan_history_id=1, domain_id=1)
+        self.assertTrue(result)
+        mock_run.assert_not_called()
+
+    @patch('subprocess.run')
+    def test_jswhois_handles_non_json_output(self, mock_run):
+        from reNgine.recon_tasks import jswhois_scan
+        mock_run.return_value = MagicMock(returncode=0, stdout='not json output', stderr='')
+        result = jswhois_scan(_make_proxy(), scan_history_id=1, domain_id=1,
+                              domain='example.com')
+        self.assertTrue(result)
+
+
+class TestWhoisDomainScan(TestCase):
+    @patch('os.path.exists')
+    @patch('os.remove')
+    @patch('subprocess.run')
+    def test_whoisdomain_stores_raw_json(self, mock_run, mock_remove, mock_exists):
+        import json as _json
+        from unittest.mock import mock_open, patch as _patch
+        from targetApp.models import Domain as TargetDomain, DomainInfo
+        from startScan.models import ScanHistory
+        from scanEngine.models import EngineType
+        from reNgine.recon_tasks import whoisdomain_scan
+
+        engine = EngineType.objects.create(
+            engine_name='test-wd-engine',
+            yaml_configuration='subdomain_discovery:\n  - subfinder\n',
+        )
+        domain_info = DomainInfo.objects.create()
+        domain = TargetDomain.objects.create(
+            name='wd-test.example.com',
+            insert_date=timezone.now(), domain_info=domain_info,
+        )
+        scan = ScanHistory.objects.create(
+            scan_status=0, start_scan_date=timezone.now(), domain=domain,
+            scan_type=engine,
+        )
+        mock_run.return_value = MagicMock(returncode=0, stdout='', stderr='')
+        mock_exists.return_value = True
+        whois_data = _json.dumps({'registrar': 'Test Registrar', 'expiration_date': '2030-01-01'})
+
+        with _patch('builtins.open', mock_open(read_data=whois_data)):
+            result = whoisdomain_scan(_make_proxy(), scan_history_id=scan.id,
+                                      domain_id=domain.id, domain='wd-test.example.com')
+
+        self.assertTrue(result)
+        domain_info.refresh_from_db()
+        self.assertIsNotNone(domain_info.whois_raw)
+        self.assertIn('registrar', domain_info.whois_raw)
+
+    @patch('subprocess.run')
+    def test_whoisdomain_returns_true_with_no_domain(self, mock_run):
+        from reNgine.recon_tasks import whoisdomain_scan
+        result = whoisdomain_scan(_make_proxy(), scan_history_id=1, domain_id=1)
+        self.assertTrue(result)
+        mock_run.assert_not_called()

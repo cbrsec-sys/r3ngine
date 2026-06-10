@@ -2728,6 +2728,26 @@ def run_getasn_activity(ctx: dict) -> bool:
     )
 
 
+@activity.defn(name="RunJsWhoisActivity")
+def run_jswhois_activity(ctx: dict) -> bool:
+    from reNgine.recon_tasks import jswhois_scan
+    activity.logger.info("[RunJsWhoisActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        jswhois_scan, ctx, task_name='jswhois_scan',
+        description='WHOIS Lookup (jswhois)', domain=ctx.get('domain'),
+    )
+
+
+@activity.defn(name="RunWhoisDomainActivity")
+def run_whoisdomain_activity(ctx: dict) -> bool:
+    from reNgine.recon_tasks import whoisdomain_scan
+    activity.logger.info("[RunWhoisDomainActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        whoisdomain_scan, ctx, task_name='whoisdomain_scan',
+        description='WHOIS Lookup (whoisdomain)', domain=ctx.get('domain'),
+    )
+
+
 @activity.defn(name="RunParamDiscoveryActivity")
 def run_param_discovery_activity(ctx: dict) -> dict:
     """Run the Custom Parameter Discovery Engine (CPDE)."""
