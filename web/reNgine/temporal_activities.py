@@ -2732,10 +2732,10 @@ def run_getasn_activity(ctx: dict) -> bool:
 def run_netdetect_activity(ctx: dict) -> list:
     from reNgine.recon_tasks import netdetect_scan
     activity.logger.info("[RunNetDetectActivity] scan_id=%s", ctx.get('scan_history_id'))
-    return _run_task(
-        netdetect_scan, ctx, task_name='netdetect_scan',
-        description='Network CIDR Detection (netdetect)',
-    )
+    proxy = TemporalTaskProxy(ctx, task_name='netdetect_scan',
+                              description='Network CIDR Detection (netdetect)')
+    result = netdetect_scan(proxy, ctx.get('scan_history_id'), ctx.get('domain_id'))
+    return [c for c in result if c] if isinstance(result, list) else []
 
 
 @activity.defn(name="RunJsWhoisActivity")

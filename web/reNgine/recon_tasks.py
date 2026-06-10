@@ -14,6 +14,7 @@ Severity mapping (matches Vulnerability.severity IntegerField):
 import json
 import logging
 import os
+import socket
 import subprocess
 from typing import List, Optional
 
@@ -277,7 +278,7 @@ def netdetect_scan(self, scan_history_id: int, domain_id: int) -> List[str]:
         if iface == 'lo':
             continue
         for addr in addrs:
-            if addr.family != 2:  # AF_INET only
+            if addr.family != socket.AF_INET:
                 continue
             if not addr.netmask:
                 continue
