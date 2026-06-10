@@ -2148,6 +2148,17 @@ class HostReconWorkflow:
             ),
         )
 
+        # Enrich host IP with ASN data
+        host_ip = ctx.get('host') or ctx.get('domain_name') or ctx.get('domain')
+        if host_ip:
+            await workflow.execute_activity(
+                "RunGetASNActivity",
+                {**ctx, 'ips': [host_ip]},
+                start_to_close_timeout=timedelta(minutes=5),
+                retry_policy=_RETRY_NETWORK_SCAN,
+                task_queue="python-orchestrator-queue",
+            )
+
         if run_nuclei:
             await workflow.execute_activity(
                 "RunNucleiActivity",
@@ -2313,6 +2324,23 @@ class DomainReconWorkflow:
                     retry_policy=_RETRY_NETWORK_SCAN,
                     task_queue="python-orchestrator-queue",
                 ),
+            )
+
+        # Enrich discovered IPs with ASN data after initial discovery
+        discovered_ips = await workflow.execute_activity(
+            "GetDiscoveredIPsActivity",
+            ctx,
+            start_to_close_timeout=timedelta(minutes=2),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+        if discovered_ips:
+            await workflow.execute_activity(
+                "RunGetASNActivity",
+                {**ctx, 'ips': discovered_ips},
+                start_to_close_timeout=timedelta(minutes=10),
+                retry_policy=_RETRY_NETWORK_SCAN,
+                task_queue="python-orchestrator-queue",
             )
         return True
 

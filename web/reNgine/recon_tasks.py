@@ -209,6 +209,53 @@ def arpscan_scan(self, scan_history_id: int, cidr: str = None) -> List[str]:
     return alive
 
 
+def getasn_scan(self, scan_history_id: int, domain_id: int, ips: List[str] = None) -> bool:
+    """Enrich discovered IPs with ASN number, CIDR, and organization using getasn.
+
+    Calls `getasn -ip <addr>` per IP and stores the result on IpAddress records.
+    Used in: DomainReconWorkflow, HostReconWorkflow.
+    """
+    from startScan.models import IpAddress
+
+    targets = ips or []
+    if not targets:
+        logger.log_line("[GETASN]", "SKIP", "no IPs to enrich")
+        return True
+
+    logger.log_line("[GETASN]", "START", "enriching %d IPs" % len(targets))
+    enriched = 0
+
+    for ip_addr in targets:
+        try:
+            result = subprocess.run(
+                ['getasn', '-ip', ip_addr],
+                capture_output=True, text=True, timeout=30,
+            )
+            line = result.stdout.strip()
+            if not line:
+                continue
+            parts = line.split()
+            # Expected: <IP> <ASN> <CIDR> <Org...>
+            if len(parts) >= 3:
+                asn = parts[1]
+                asn_cidr = parts[2]
+                asn_org = ' '.join(parts[3:]) if len(parts) > 3 else ''
+                updated = IpAddress.objects.filter(address=ip_addr).update(
+                    asn=asn[:20],
+                    asn_cidr=asn_cidr[:50],
+                    asn_org=asn_org[:200],
+                )
+                if updated:
+                    enriched += 1
+        except subprocess.TimeoutExpired:
+            logger.log_line("[GETASN]", "WARN", "timeout for %s" % ip_addr)
+        except Exception as exc:
+            logger.log_line("[GETASN]", "ERROR", "failed for %s: %s" % (ip_addr, exc))
+
+    logger.log_line("[GETASN]", "RESULT", "enriched %d/%d IPs" % (enriched, len(targets)))
+    return True
+
+
 def mapcidr_expand(self, scan_history_id: int, cidr: str) -> List[str]:
     """Expand a CIDR range to individual IP addresses using mapcidr.
 
