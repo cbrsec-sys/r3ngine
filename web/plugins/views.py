@@ -22,7 +22,7 @@ class PluginViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         # Read-only actions (list, retrieve, registry, install-status) require only authentication.
         # All mutating or privileged actions require admin/staff.
-        read_only_actions = {'list', 'retrieve', 'registry', 'install_status'}
+        read_only_actions = {'list', 'retrieve', 'registry', 'install_status', 'get_icon', 'get_docs'}
         if self.action in read_only_actions:
             return [IsAuthenticated()]
         return [IsAdminUser()]
