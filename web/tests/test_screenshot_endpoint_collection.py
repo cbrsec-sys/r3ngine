@@ -107,6 +107,17 @@ class TestTakeScreenshotAndSaveUrlOverride(TestCase):
         self.assertEqual(saved.url, full_url)
 
     @patch('reNgine.screenshot.tasks.run_capture')
+    def test_url_override_rejects_invalid_scheme(self, mock_capture):
+        """url_override with non-http/https scheme is rejected before reaching Playwright."""
+        result = take_screenshot_and_save(
+            subdomain_id=self.subdomain.id,
+            scan_id=self.scan.id,
+            url_override='javascript:alert(1)',
+        )
+        self.assertFalse(result)
+        mock_capture.assert_not_called()
+
+    @patch('reNgine.screenshot.tasks.run_capture')
     def test_no_override_still_works_legacy_path(self, mock_capture):
         """Without url_override, existing endpoint-query behaviour is preserved."""
         mock_capture.return_value = {
