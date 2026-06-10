@@ -24,8 +24,9 @@ from temporalio import activity
 from django.utils import timezone
 
 from reNgine.scan_context import ScanContext
+from reNgine.utils.logger import get_module_logger, format_exception_for_log
 
-logger = logging.getLogger(__name__)
+logger = get_module_logger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -258,6 +259,10 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
 
     proxy = TemporalTaskProxy(ctx, db_task_name or task_name, description)
 
+    _scan_id = ctx.get('scan_history_id')
+    _domain = ctx.get('domain_name', '')
+    logger.log_line("[TEMPORAL]", "START", "task=%s scan_id=%s domain=%s" % (task_name, _scan_id, _domain))
+
     activity_running = True
     cancel_event = threading.Event()
     _task_cancel_local.cancel_event = cancel_event
@@ -316,8 +321,10 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
         raw_func = task_func.__func__ if hasattr(task_func, '__func__') else task_func
         raw_func(proxy, ctx=ctx, description=description, **kwargs)
         proxy.update_scan_activity(SUCCESS_TASK)
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=%s scan_id=%s" % (task_name, _scan_id))
         return True
     except Exception as exc:
+        logger.log_line("[TEMPORAL]", "ERROR", "task=%s scan_id=%s error=%s" % (task_name, _scan_id, format_exception_for_log(exc)), level="error")
         activity.logger.exception(f"[_run_task] Task {task_name} failed: {exc}")
         proxy.update_scan_activity(FAILED_TASK, error_message=repr(exc))
         raise
@@ -359,6 +366,8 @@ def initialize_scan_tasks_activity(ctx: dict) -> dict:
     tasks = ctx.get('tasks', [])
     yaml_configuration = ctx.get('yaml_configuration', {})
 
+    logger.log_line("[TEMPORAL]", "START", "task=initialize_scan_tasks scan_id=%s task_count=%d" % (scan_id, len(tasks)))
+
     try:
         scan = ScanHistory.objects.get(pk=scan_id)
     except ScanHistory.DoesNotExist:
@@ -395,10 +404,7 @@ def initialize_scan_tasks_activity(ctx: dict) -> dict:
         else:
             existing_count += 1
 
-    logger.info(
-        f"InitializeScanTasksActivity: scan={scan_id} "
-        f"created={created_count} existing={existing_count}"
-    )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=initialize_scan_tasks scan_id=%s created=%d existing=%d" % (scan_id, created_count, existing_count))
     return {'created': created_count, 'existing': existing_count}
 
 
@@ -424,6 +430,7 @@ def target_profiling_activity(ctx: dict) -> dict:
 
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[TargetProfilingActivity] Profiling scan_history_id={scan_id}")
+    logger.log_line("[TEMPORAL]", "START", "task=target_profiling scan_id=%s" % scan_id)
 
     proxy = TemporalTaskProxy(ctx, 'target_profiling', 'Target Profiling')
     try:
@@ -466,8 +473,10 @@ def target_profiling_activity(ctx: dict) -> dict:
             f"tasks={ctx.get('tasks')}"
         )
         proxy.update_scan_activity(SUCCESS_TASK)
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=target_profiling scan_id=%s domain=%s" % (scan_id, scan.domain.name))
         return ctx
     except Exception as exc:
+        logger.log_line("[TEMPORAL]", "ERROR", "task=target_profiling scan_id=%s error=%s" % (scan_id, format_exception_for_log(exc)), level="error")
         proxy.update_scan_activity(FAILED_TASK, error_message=repr(exc))
         raise
 
@@ -970,6 +979,8 @@ def gather_nuclei_tags_activity(ctx: dict) -> list:
     scan_id = ctx.get('scan_history_id')
     subdomain_id = ctx.get('subdomain_id')
 
+    logger.log_line("[TEMPORAL]", "START", "task=gather_nuclei_tags scan_id=%s subdomain_id=%s" % (scan_id, subdomain_id))
+
     yaml_config = ctx.get('yaml_configuration', {})
     nuclei_cfg = yaml_config.get('vulnerability_scan', {}).get('nuclei', {})
     user_tags = nuclei_cfg.get('tags', [])
@@ -991,6 +1002,7 @@ def gather_nuclei_tags_activity(ctx: dict) -> list:
         "[GatherNucleiTagsActivity] scan_id=%s subdomain_id=%s tags=%s",
         scan_id, subdomain_id, merged,
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=gather_nuclei_tags scan_id=%s tags=%d" % (scan_id, len(merged)))
     return merged
 
 
@@ -1423,6 +1435,7 @@ def send_scan_notification_activity(ctx: dict) -> bool:
     engine_id = ctx.get('engine_id')
     proxy = TemporalTaskProxy(ctx, 'scan_notification', 'Send Scan Notification')
 
+    logger.log_line("[TEMPORAL]", "START", "task=send_scan_notification scan_id=%s" % scan_id)
     activity.logger.warning("[SCAN_COMPLETE] SendScanNotificationActivity starting | scan_id=%s", scan_id)
 
     scan = ScanHistory.objects.filter(pk=scan_id).first()
@@ -1504,6 +1517,7 @@ def send_scan_notification_activity(ctx: dict) -> bool:
         logger.warning("[SCAN_COMPLETE] Could not send scan notification for scan_id=%s: %s", scan_id, e)
 
     activity.logger.warning("[SCAN_COMPLETE] SendScanNotificationActivity complete | scan_id=%s status=%s", scan_id, status_h)
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=send_scan_notification scan_id=%s status=%s" % (scan_id, status_h))
     return True
 
 
@@ -1569,6 +1583,8 @@ def finalize_subscan_activity(ctx: dict, success: bool, subscan_id: int = None) 
     scan_id = ctx.get('scan_history_id')
     engine_id = ctx.get('engine_id')
 
+    logger.log_line("[TEMPORAL]", "START", "task=finalize_subscan scan_id=%s subscan_id=%s" % (scan_id, subscan_id))
+
     subscan = SubScan.objects.filter(pk=subscan_id).first()
     if not subscan:
         activity.logger.error(f"[FinalizeSubScanActivity] SubScan {subscan_id} not found.")
@@ -1584,6 +1600,7 @@ def finalize_subscan_activity(ctx: dict, success: bool, subscan_id: int = None) 
     activity.logger.info(
         f"[FinalizeSubScanActivity] subscan_id={subscan_id} finished with status={status_h}"
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=finalize_subscan scan_id=%s subscan_id=%s status=%s" % (scan_id, subscan_id, status_h))
 
     # Send notification directly (no Celery)
     try:
@@ -1964,6 +1981,7 @@ def finalize_stress_test_activity(ctx: dict) -> bool:
     result_id = ctx.get("stress_result_id")
     aborted = ctx.get("aborted", False)
 
+    logger.log_line("[TEMPORAL]", "START", "task=finalize_stress_test scan_id=%s aborted=%s" % (scan_id, aborted))
     activity.logger.info(
         f"[FinalizeStressTestActivity] scan_id={scan_id} aborted={aborted}"
     )
@@ -2005,6 +2023,8 @@ def finalize_stress_test_activity(ctx: dict) -> bool:
             f"[FinalizeStressTestActivity] Notification failed (non-fatal): {e}"
         )
 
+    status_h = "ABORTED" if aborted else "SUCCESS"
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=finalize_stress_test scan_id=%s status=%s" % (scan_id, status_h))
     return True
 
 
@@ -2255,7 +2275,9 @@ def finalize_failed_scan_activity(ctx: dict, error_msg: str) -> None:
     scan_id = ctx.get('scan_history_id')
     if not scan_id:
         return
-        
+
+    logger.log_line("[TEMPORAL]", "ERROR", "task=finalize_failed_scan scan_id=%s error=%s" % (scan_id, error_msg[:200] if error_msg else "workflow crash"), level="error")
+
     try:
         from reNgine.definitions import ABORTED_TASK, RUNNING_TASK, INITIATED_TASK
         scan = ScanHistory.objects.get(pk=scan_id)
