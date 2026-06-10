@@ -498,7 +498,7 @@ def search_vulns_scan(self, scan_history_id: int, service: str,
     return True
 
 
-def jswhois_scan(self, scan_history_id: int, domain_id: int, domain: str = None) -> bool:
+def jswhois_scan(self, scan_history_id: int, domain_id: int, domain: Optional[str] = None) -> bool:
     """Fetch WHOIS data as JSON using the jswhois Go binary.
 
     Stores raw JSON in DomainInfo.whois_raw for the target domain.
@@ -536,7 +536,7 @@ def jswhois_scan(self, scan_history_id: int, domain_id: int, domain: str = None)
     return True
 
 
-def whoisdomain_scan(self, scan_history_id: int, domain_id: int, domain: str = None) -> bool:
+def whoisdomain_scan(self, scan_history_id: int, domain_id: int, domain: Optional[str] = None) -> bool:
     """Fetch WHOIS data using the whoisdomain Python CLI.
 
     Writes JSON output to a temp file, reads it, and stores in DomainInfo.whois_raw.
