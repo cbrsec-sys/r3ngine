@@ -471,7 +471,15 @@ RUN pipx install maigret && \
     pipx install sploitscan --force
 
 # grype — Anchore filesystem CVE scanner
-RUN curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+# PINNED to v0.114.0 — downloaded directly from GitHub Releases (NOT install.sh)
+# SHA256 verified against official grype_0.114.0_checksums.txt
+RUN GRYPE_VERSION="0.114.0" && \
+    curl -sSfL \
+      "https://github.com/anchore/grype/releases/download/v${GRYPE_VERSION}/grype_${GRYPE_VERSION}_linux_amd64.tar.gz" \
+      -o /tmp/grype.tar.gz && \
+    echo "edda0968d8827daab01d32b3cd7de192ae0915005e7bbfcfef9e68e79bc43343  /tmp/grype.tar.gz" | sha256sum -c && \
+    tar -xzf /tmp/grype.tar.gz -C /usr/local/bin grype && \
+    rm /tmp/grype.tar.gz
 
 # trivy — filesystem secrets scanner
 # PINNED to v0.69.3 — downloaded directly from GitHub Releases (NOT install.sh)
