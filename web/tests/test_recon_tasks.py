@@ -326,3 +326,25 @@ class TestGetASNScan(TestCase):
         mock_run.return_value = MagicMock(returncode=0, stdout='bad output\n', stderr='')
         result = getasn_scan(_make_proxy(), scan_history_id=1, domain_id=1, ips=['1.2.3.4'])
         self.assertTrue(result)
+
+    @patch('subprocess.run')
+    def test_getasn_handles_timeout(self, mock_run):
+        """getasn_scan returns True even when subprocess times out."""
+        from reNgine.recon_tasks import getasn_scan
+        mock_run.side_effect = __import__('subprocess').TimeoutExpired(cmd='getasn', timeout=30)
+        result = getasn_scan(_make_proxy(), scan_history_id=1, domain_id=1, ips=['1.2.3.4'])
+        self.assertTrue(result)
+
+    @patch('subprocess.run')
+    def test_getasn_skips_non_asn_token(self, mock_run):
+        """getasn_scan ignores lines where parts[1] does not start with AS."""
+        from startScan.models import IpAddress
+        from reNgine.recon_tasks import getasn_scan
+        IpAddress.objects.create(address='1.2.3.4')
+        mock_run.return_value = MagicMock(
+            returncode=0, stdout='1.2.3.4 Error: lookup failed\n', stderr=''
+        )
+        result = getasn_scan(_make_proxy(), scan_history_id=1, domain_id=1, ips=['1.2.3.4'])
+        self.assertTrue(result)
+        ip = IpAddress.objects.get(address='1.2.3.4')
+        self.assertIsNone(ip.asn)

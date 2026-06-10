@@ -2704,6 +2704,7 @@ def get_discovered_ips_activity(ctx: dict) -> list:
     """Return distinct IP address strings discovered for this scan."""
     from startScan.models import IpAddress
     scan_id = ctx.get('scan_history_id')
+    activity.logger.info("[GetDiscoveredIPsActivity] scan_id=%s", scan_id)
     if not scan_id:
         return []
     ips = (
@@ -2712,7 +2713,9 @@ def get_discovered_ips_activity(ctx: dict) -> list:
         .values_list('address', flat=True)
         .distinct()
     )
-    return list(ips)
+    result = list(ips)
+    activity.logger.info("[GetDiscoveredIPsActivity] found %d IPs for scan_id=%s", len(result), scan_id)
+    return result
 
 
 @activity.defn(name="RunGetASNActivity")

@@ -2148,12 +2148,18 @@ class HostReconWorkflow:
             ),
         )
 
-        # Enrich host IP with ASN data
-        host_ip = ctx.get('host') or ctx.get('domain_name') or ctx.get('domain')
-        if host_ip:
+        # Enrich discovered IPs with ASN data (uses DB-backed IPs, not hostname string)
+        host_ips = await workflow.execute_activity(
+            "GetDiscoveredIPsActivity",
+            ctx,
+            start_to_close_timeout=timedelta(minutes=2),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+        if host_ips:
             await workflow.execute_activity(
                 "RunGetASNActivity",
-                {**ctx, 'ips': [host_ip]},
+                {**ctx, 'ips': host_ips},
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=_RETRY_NETWORK_SCAN,
                 task_queue="python-orchestrator-queue",

@@ -238,6 +238,9 @@ def getasn_scan(self, scan_history_id: int, domain_id: int, ips: List[str] = Non
             # Expected: <IP> <ASN> <CIDR> <Org...>
             if len(parts) >= 3:
                 asn = parts[1]
+                if not asn.startswith('AS'):
+                    logger.log_line("[GETASN]", "WARN", "unexpected token '%s' for %s, skipping" % (asn, ip_addr))
+                    continue
                 asn_cidr = parts[2]
                 asn_org = ' '.join(parts[3:]) if len(parts) > 3 else ''
                 updated = IpAddress.objects.filter(address=ip_addr).update(
@@ -250,7 +253,8 @@ def getasn_scan(self, scan_history_id: int, domain_id: int, ips: List[str] = Non
         except subprocess.TimeoutExpired:
             logger.log_line("[GETASN]", "WARN", "timeout for %s" % ip_addr)
         except Exception as exc:
-            logger.log_line("[GETASN]", "ERROR", "failed for %s: %s" % (ip_addr, exc))
+            from reNgine.utils.logger import format_exception_for_log
+            logger.log_line("[GETASN]", "ERROR", "failed for %s: %s" % (ip_addr, format_exception_for_log(exc)), level="error")
 
     logger.log_line("[GETASN]", "RESULT", "enriched %d/%d IPs" % (enriched, len(targets)))
     return True
