@@ -205,3 +205,66 @@ class TestGFScan(TestCase):
             urls=['https://example.com/?q=test'],
         )
         self.assertEqual(result, [])
+
+
+class TestURLParserScan(TestCase):
+    @patch('subprocess.run')
+    def test_urlparser_saves_keypairs_as_parameters(self, mock_run):
+        from startScan.models import ScanHistory, EndPoint, Parameter
+        from targetApp.models import Domain as TargetDomain, Project
+        from scanEngine.models import EngineType
+        from django.utils import timezone
+        from reNgine.crawl_tasks import urlparser_scan
+
+        project = Project.objects.create(name='up-proj', insert_date=timezone.now())
+        domain = TargetDomain.objects.create(
+            name='up-test.example.com', project=project, insert_date=timezone.now(),
+        )
+        engine = EngineType.objects.create(engine_name='up-engine', yaml_configuration='{}')
+        scan = ScanHistory.objects.create(
+            scan_status=0, start_scan_date=timezone.now(), domain=domain, scan_type=engine,
+        )
+        ep = EndPoint.objects.create(
+            scan_history=scan,
+            http_url='https://up-test.example.com/page?foo=1&bar=2',
+        )
+
+        mock_run.return_value = MagicMock(returncode=0, stdout='foo=1\nbar=2\n', stderr='')
+
+        result = urlparser_scan(
+            _make_proxy(), scan_history_id=scan.id, domain_id=domain.id,
+            urls=['https://up-test.example.com/page?foo=1&bar=2'],
+        )
+        self.assertTrue(result)
+        param_names = list(
+            Parameter.objects.filter(endpoint=ep).values_list('name', flat=True)
+        )
+        self.assertIn('foo', param_names)
+        self.assertIn('bar', param_names)
+
+    @patch('subprocess.run')
+    def test_urlparser_returns_true_with_no_urls(self, mock_run):
+        from reNgine.crawl_tasks import urlparser_scan
+        result = urlparser_scan(_make_proxy(), scan_history_id=1, domain_id=1, urls=[])
+        self.assertTrue(result)
+        mock_run.assert_not_called()
+
+    @patch('subprocess.run')
+    def test_urlparser_handles_no_query_params(self, mock_run):
+        from reNgine.crawl_tasks import urlparser_scan
+        mock_run.return_value = MagicMock(returncode=0, stdout='', stderr='')
+        result = urlparser_scan(
+            _make_proxy(), scan_history_id=1, domain_id=1,
+            urls=['https://example.com/page'],
+        )
+        self.assertTrue(result)
+
+    @patch('subprocess.run')
+    def test_urlparser_handles_timeout(self, mock_run):
+        from reNgine.crawl_tasks import urlparser_scan
+        mock_run.side_effect = __import__('subprocess').TimeoutExpired(cmd='unfurl', timeout=120)
+        result = urlparser_scan(
+            _make_proxy(), scan_history_id=1, domain_id=1,
+            urls=['https://example.com/page?x=1'],
+        )
+        self.assertTrue(result)

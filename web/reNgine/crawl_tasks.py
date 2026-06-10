@@ -303,6 +303,91 @@ def feroxbuster_scan(self, scan_history_id: int, url: str = None,
     return True
 
 
+def urlparser_scan(self, scan_history_id: int, domain_id: int,
+                   urls: Optional[List[str]] = None) -> bool:
+    """Extract unique query-string parameters from URLs using unfurl.
+
+    Pipes URLs through `unfurl -u keypairs`, parses key=value output,
+    and stores each pair as a Parameter record on the matching EndPoint.
+    Falls back to loading EndPoint URLs from the scan when urls is not given.
+    Used in: URLParamsFuzzWorkflow, URLCrawlWorkflow.
+    """
+    import os
+    from startScan.models import EndPoint, Parameter
+    from django.db import transaction
+
+    targets = urls or []
+    if not targets and scan_history_id:
+        targets = list(
+            EndPoint.objects.filter(
+                scan_history_id=scan_history_id
+            ).values_list('http_url', flat=True)[:2000]
+        )
+
+    if not targets:
+        logger.log_line("[URLPARSER]", "SKIP", "no URLs to parse")
+        return True
+
+    input_file = '/tmp/urlparser_input_%s.txt' % scan_history_id
+    try:
+        with open(input_file, 'w') as f:
+            f.write('\n'.join(t for t in targets if t))
+
+        with open(input_file, 'rb') as stdin_f:
+            result = subprocess.run(
+                ['unfurl', '-u', 'keypairs'],
+                stdin=stdin_f,
+                capture_output=True, text=True, timeout=120,
+            )
+
+        logger.log_line("[URLPARSER]", "START", "parsing %d URLs" % len(targets))
+
+        # Build lookup: http_url → EndPoint for fast matching
+        ep_map = {
+            ep.http_url: ep
+            for ep in EndPoint.objects.filter(
+                scan_history_id=scan_history_id,
+                http_url__in=targets,
+            )
+        }
+
+        params_to_create: List[Parameter] = []
+        seen: set = set()
+        for line in result.stdout.splitlines():
+            line = line.strip()
+            if not line or '=' not in line:
+                continue
+            key, _, value = line.partition('=')
+            key = key.strip()
+            value = value.strip()
+            for url, ep in ep_map.items():
+                if ('?%s=' % key) in url or ('&%s=' % key) in url:
+                    dedup_key = (ep.id, key)
+                    if dedup_key in seen:
+                        continue
+                    if not Parameter.objects.filter(endpoint=ep, name=key).exists():
+                        params_to_create.append(
+                            Parameter(endpoint=ep, name=key, value=value, type='GET')
+                        )
+                        seen.add(dedup_key)
+
+        if params_to_create:
+            with transaction.atomic():
+                Parameter.objects.bulk_create(params_to_create, ignore_conflicts=True)
+            logger.log_line("[URLPARSER]", "RESULT",
+                            "saved %d parameters" % len(params_to_create))
+        else:
+            logger.log_line("[URLPARSER]", "RESULT", "no new parameters found")
+
+    except subprocess.TimeoutExpired:
+        logger.log_line("[URLPARSER]", "WARN", "unfurl timed out")
+    finally:
+        if os.path.exists(input_file):
+            os.remove(input_file)
+
+    return True
+
+
 def gf_scan(self, scan_history_id: int, pattern: str,
             urls: List[str] = None) -> List[str]:
     """Filter URLs by vulnerability pattern using gf (grep for URLs).

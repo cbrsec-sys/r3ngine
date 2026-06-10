@@ -196,6 +196,7 @@ from reNgine.temporal_activities import (
     run_gf_activity,
     run_grype_scan_activity,
     run_trivy_secret_scan_activity,
+    run_urlparser_activity,
 )
 
 
@@ -474,6 +475,7 @@ class Command(BaseCommand):
                 run_gf_activity,
                 run_grype_scan_activity,
                 run_trivy_secret_scan_activity,
+                run_urlparser_activity,
             ]
 
             # -------------------------------------------------------------------

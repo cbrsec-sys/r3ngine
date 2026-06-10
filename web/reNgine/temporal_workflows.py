@@ -2553,6 +2553,15 @@ class URLCrawlWorkflow:
                         task_queue="python-orchestrator-queue",
                     ),
                 )
+
+            # Extract URL parameters from all crawled endpoints
+            await workflow.execute_activity(
+                "RunURLParserActivity",
+                ctx,
+                start_to_close_timeout=timedelta(minutes=10),
+                retry_policy=_RETRY_INTERNAL,
+                task_queue="python-orchestrator-queue",
+            )
         return True
 
 
@@ -2674,6 +2683,15 @@ class URLParamsFuzzWorkflow:
             ctx,
             start_to_close_timeout=timedelta(minutes=15),
             retry_policy=_RETRY_NETWORK_SCAN,
+            task_queue="python-orchestrator-queue",
+        )
+
+        # Passive parameter harvest from already-crawled URLs
+        await workflow.execute_activity(
+            "RunURLParserActivity",
+            ctx,
+            start_to_close_timeout=timedelta(minutes=10),
+            retry_policy=_RETRY_INTERNAL,
             task_queue="python-orchestrator-queue",
         )
 

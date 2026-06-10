@@ -2802,3 +2802,14 @@ def run_trivy_secret_scan_activity(ctx: dict) -> bool:
         trivy_secret_scan, ctx, task_name='trivy_secret_scan',
         description='Secret Scan (trivy v0.69.3)', code_path=ctx.get('starting_point_path'),
     )
+
+
+@activity.defn(name="RunURLParserActivity")
+def run_urlparser_activity(ctx: dict) -> bool:
+    from reNgine.crawl_tasks import urlparser_scan
+    activity.logger.info("[RunURLParserActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        urlparser_scan, ctx, task_name='urlparser_scan',
+        description='URL Parameter Extraction (urlparser/unfurl)',
+        urls=ctx.get('urls'),
+    )
