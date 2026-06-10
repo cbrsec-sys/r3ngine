@@ -550,9 +550,7 @@ def bbot_scan(self, scan_history_id: int, domain_id: int, domain: Optional[str] 
                     continue
                 if event.get('type') == 'DNS_NAME':
                     name = event.get('data', '').strip()
-                    if name and not Subdomain.objects.filter(
-                        scan_history_id=scan_history_id, name=name
-                    ).exists():
+                    if name:
                         new_names.append(name)
 
         if new_names:
