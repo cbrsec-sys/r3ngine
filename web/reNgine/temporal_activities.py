@@ -2692,3 +2692,18 @@ def run_gf_activity(ctx: dict) -> list:
         pattern=ctx.get('pattern', 'xss'),
         urls=ctx.get('urls', []),
     )
+
+@activity.defn(name="RunParamDiscoveryActivity")
+def run_param_discovery_activity(ctx: dict) -> dict:
+    """Run the Custom Parameter Discovery Engine (CPDE)."""
+    from reNgine.cpde_tasks import param_discovery
+    activity.logger.info(
+        "[RunParamDiscoveryActivity] Starting CPDE for scan_id=%s",
+        ctx.get('scan_history_id'),
+    )
+    proxy = TemporalTaskProxy(ctx, task_name='param_discovery', description='Custom Parameter Discovery (CPDE)')
+    return param_discovery(
+        proxy,
+        urls=ctx.get('urls', []),
+        ctx=ctx,
+    )

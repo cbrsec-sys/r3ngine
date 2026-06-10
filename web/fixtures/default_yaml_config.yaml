@@ -182,6 +182,10 @@ web_api_discovery: {
   'timeout': 5,
   'kr_wordlist': 'routes-small.kr'
 }
+param_discovery: {
+  'enabled': true,
+  'min_confidence': 50
+}
 stress_test: {
   'uses_tools': ['k6', 'wrk', 'hping3', 'locust'],
   'concurrency': 100,

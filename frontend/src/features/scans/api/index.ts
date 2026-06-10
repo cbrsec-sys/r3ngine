@@ -610,3 +610,23 @@ export const usePromoteOsint = (id: number) => {
     },
   });
 };
+export const useParameters = (params: { scan_id?: string | number, target_id?: string | number, page?: number, search?: string }) => {
+  return useQuery<import('../types').ParameterResponse>({
+    queryKey: ['parameters', params],
+    queryFn: async () => {
+      const searchParams = new URLSearchParams();
+      if (params.scan_id) searchParams.append('scan_history', params.scan_id.toString());
+      if (params.target_id) searchParams.append('target_id', params.target_id.toString());
+      if (params.page) searchParams.append('page', params.page.toString());
+      if (params.search) searchParams.append('search', params.search);
+      
+      const response = await fetch('/api/listParameters/?' + searchParams.toString(), {
+        credentials: 'include'
+      });
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      return response.json();
+    },
+  });
+};

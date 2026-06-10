@@ -426,6 +426,19 @@ class MasterScanWorkflow:
                 await asyncio.gather(*tier3_futures)
 
             # ------------------------------------------------------------------
+            # TIER 3b: Custom Parameter Discovery Engine (CPDE)
+            # ------------------------------------------------------------------
+            if "param_discovery" in tasks:
+                await workflow.execute_activity(
+                    "RunParamDiscoveryActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(hours=2),
+                    heartbeat_timeout=timedelta(minutes=10),
+                    retry_policy=_RETRY_LONG_SCAN,
+                    task_queue="python-orchestrator-queue"
+                )
+
+            # ------------------------------------------------------------------
             # TIER 4: Directory & File Fuzzing (sequential — needs Tier 3 URLs)
             # ------------------------------------------------------------------
             if "dir_file_fuzz" in tasks:
@@ -645,7 +658,8 @@ class MasterScanWorkflow:
                         _graph_tasks = {
                             "subdomain_discovery", "amass_intel_discovery", "firewall_vpn_scan",
                             "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
-                            "fetch_url", "dir_file_fuzz", "web_api_discovery", "vulnerability_scan"
+                            "fetch_url", "dir_file_fuzz", "web_api_discovery", "vulnerability_scan",
+                            "param_discovery"
                         }
                         if any(t in _graph_tasks for t in tasks):
                             # Neo4j graph sync (must precede APME so graph nodes exist)
@@ -993,6 +1007,11 @@ _SUBSCAN_DISPATCH = {
             {"urls": [ctx.get("subdomain_http_url") or f"http://{ctx.get('subdomain_name', '')}/"]},
         ],
     },
+    "param_discovery": {
+        "activity": "RunParamDiscoveryActivity",
+        "timeout": timedelta(hours=2),
+        "args_builder": lambda ctx: [ctx],
+    },
     "waf_bypass": {
         "activity": "RunGenericTaskActivity",
         "timeout": timedelta(hours=1),
@@ -1272,6 +1291,8 @@ class SubScanWorkflow:
                 # TIER 3: URL Fetching + Screenshot — both depend only on Tier 2 http_crawl;
                 # screenshot does NOT depend on fetch_url output so they run concurrently.
                 [t for t in active_tasks if t in {"fetch_url", "screenshot"}],
+                # TIER 3b: Custom Parameter Discovery Engine (CPDE) — needs Tier 3 JS bundles.
+                [t for t in active_tasks if t == "param_discovery"],
                 # TIER 4: Directory & File Fuzzing — needs Tier 3 URLs.
                 [t for t in active_tasks if t == "dir_file_fuzz"],
                 # TIER 5: Analysis — API discovery, WAF detection, secret scanning.
@@ -1289,7 +1310,7 @@ class SubScanWorkflow:
                     "dns_security", "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
                     "fetch_url", "screenshot", "dir_file_fuzz", "web_api_discovery", "waf_detection",
                     "secret_scanning", "vulnerability_scan", "waf_bypass",
-                    "vigolium_discovery", "vigolium_analysis", "vigolium_scan"
+                    "vigolium_discovery", "vigolium_analysis", "vigolium_scan", "param_discovery"
                 }],
             ]
 

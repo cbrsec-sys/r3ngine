@@ -50,6 +50,7 @@ export const ReNgineSettingsPage: React.FC = () => {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [overwriteConfigs, setOverwriteConfigs] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isExportingScanResults, setIsExportingScanResults] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
 
   const handleCloseSnackbar = () => {
@@ -129,6 +130,27 @@ export const ReNgineSettingsPage: React.FC = () => {
       setSnackbar({ open: true, message: 'Failed to export configuration', severity: 'error' });
     } finally {
       setIsExporting(false);
+    }
+  };
+
+  const handleExportScanResults = async () => {
+    try {
+      setIsExportingScanResults(true);
+      const response = await axios.get('/api/settings/export/scan-results/', {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', 'scan_results_backup.zip');
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setSnackbar({ open: true, message: 'Scan results exported successfully', severity: 'success' });
+    } catch (err) {
+      setSnackbar({ open: true, message: 'Failed to export scan results', severity: 'error' });
+    } finally {
+      setIsExportingScanResults(false);
     }
   };
 
@@ -301,6 +323,39 @@ export const ReNgineSettingsPage: React.FC = () => {
                 }}
               >
                 {isExporting ? 'EXPORTING...' : 'DOWNLOAD BACKUP'}
+              </Button>
+            </Box>
+
+            <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Box>
+                <Typography sx={{ color: '#00f3ff', fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
+                  Export Scan Results
+                </Typography>
+                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                  Download a ZIP containing all scan results and reports from the container. This may take some time depending on size.
+                </Typography>
+              </Box>
+              <Button
+                variant="outlined"
+                color="info"
+                onClick={handleExportScanResults}
+                disabled={isExportingScanResults}
+                startIcon={isExportingScanResults ? <CircularProgress size={18} /> : <Download size={18} />}
+                sx={{
+                  borderColor: '#00f3ff',
+                  color: '#00f3ff',
+                  fontFamily: 'Orbitron',
+                  fontWeight: 900,
+                  px: 3,
+                  '&:hover': {
+                    bgcolor: 'rgba(0, 243, 255, 0.1)',
+                    borderColor: '#00f3ff'
+                  }
+                }}
+              >
+                {isExportingScanResults ? 'EXPORTING...' : 'DOWNLOAD SCANS'}
               </Button>
             </Box>
 

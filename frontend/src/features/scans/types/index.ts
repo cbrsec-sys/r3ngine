@@ -127,3 +127,26 @@ export interface OsintStaging {
   target_domain_name: string;
   scan_history_id: number;
 }
+
+export interface Parameter {
+  id: number;
+  name: string;
+  value: string;
+  method: string;
+  confidence: number;
+  sources: string;
+  is_reflected: boolean;
+  is_source: boolean;
+  is_sink: boolean;
+  endpoint: {
+    id: number;
+    http_url: string;
+  };
+}
+
+export interface ParameterResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Parameter[];
+}
