@@ -26,6 +26,8 @@ import { usePlugins } from '../../plugins/api/pluginsApi';
 import { useInitiateScan } from '../api';
 import { useNavigate } from '@tanstack/react-router';
 import { generateDorks } from '../utils/dorkUtils';
+import { ProfileSelector } from '../../profiles/components/ProfileSelector';
+import { WorkflowLauncher } from '../../workflows/components/WorkflowLauncher';
 
 interface StartScanModalProps {
   open: boolean;
@@ -50,9 +52,11 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
     spiderfoot_scan: false,
     importSubdomainTextArea: '',
     outOfScopeSubdomainTextarea: '',
+    profile_name: '',
   });
   const [selectedPlugins, setSelectedPlugins] = useState<string[]>([]);
   const [pluginSectionOpen, setPluginSectionOpen] = useState(false);
+  const [showWorkflows, setShowWorkflows] = useState(false);
 
   const { data: engines, isLoading: loadingEngines } = useEngines();
   const { data: hardwareProfiles } = useHardwareProfiles();
@@ -89,10 +93,12 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
       importSubdomainTextArea: formData.importSubdomainTextArea.split('\n').filter(s => s.trim()),
       outOfScopeSubdomainTextarea: formData.outOfScopeSubdomainTextarea.split('\n').filter(s => s.trim()),
       selected_plugins: selectedPlugins,
+      ...(formData.profile_name ? { profile_name: formData.profile_name } : {}),
     }, {
       onSuccess: () => {
         onClose();
         reset();
+        setFormData(prev => ({ ...prev, profile_name: '' }));
         navigate({ to: `/${projectSlug}/scans` });
       },
     });
@@ -103,6 +109,8 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
     reset();
     setSelectedPlugins([]);
     setPluginSectionOpen(false);
+    setShowWorkflows(false);
+    setFormData(prev => ({ ...prev, profile_name: '' }));
   };
 
   const targetLabel = domainNames.length > 1
@@ -230,6 +238,11 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
                     </MenuItem>
                   ))}
                 </TextField>
+
+                <ProfileSelector
+                  value={formData.profile_name || null}
+                  onChange={(name) => setFormData(prev => ({ ...prev, profile_name: name ?? '' }))}
+                />
 
                 <FormControlLabel
                   control={
@@ -429,6 +442,25 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
             </Box>
           )}
         </DialogContent>
+
+        <Box sx={{ px: 3, pb: 2 }}>
+          <Button
+            variant="text"
+            size="small"
+            onClick={() => setShowWorkflows(v => !v)}
+            sx={{ color: 'text.secondary', textTransform: 'none' }}
+          >
+            {showWorkflows ? '▲ Hide Quick Workflows' : '▼ Quick Workflow Launch'}
+          </Button>
+          <Collapse in={showWorkflows}>
+            <Box sx={{ mt: 1, p: 2, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+              <WorkflowLauncher
+                onSuccess={(_id, _slug) => { onClose(); }}
+                onError={(err) => console.error('Workflow error:', err)}
+              />
+            </Box>
+          </Collapse>
+        </Box>
 
         <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
           <Button
