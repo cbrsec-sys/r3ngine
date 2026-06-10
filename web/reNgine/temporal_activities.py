@@ -2748,6 +2748,16 @@ def run_whoisdomain_activity(ctx: dict) -> bool:
     )
 
 
+@activity.defn(name="RunBBotActivity")
+def run_bbot_activity(ctx: dict) -> bool:
+    from reNgine.recon_tasks import bbot_scan
+    activity.logger.info("[RunBBotActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        bbot_scan, ctx, task_name='bbot_scan',
+        description='OSINT Discovery (bbot)', domain=ctx.get('domain'),
+    )
+
+
 @activity.defn(name="RunParamDiscoveryActivity")
 def run_param_discovery_activity(ctx: dict) -> dict:
     """Run the Custom Parameter Discovery Engine (CPDE)."""

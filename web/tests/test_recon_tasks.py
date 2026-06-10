@@ -441,3 +441,62 @@ class TestWhoisDomainScan(TestCase):
         result = whoisdomain_scan(_make_proxy(), scan_history_id=1, domain_id=1)
         self.assertTrue(result)
         mock_run.assert_not_called()
+
+
+class TestBBotScan(TestCase):
+    @patch('subprocess.run')
+    @patch('os.path.exists')
+    @patch('shutil.rmtree')
+    def test_bbot_saves_dns_name_events_as_subdomains(self, mock_rmtree, mock_exists, mock_run):
+        import json as _json
+        from unittest.mock import mock_open, patch as _patch
+        from startScan.models import ScanHistory, Subdomain
+        from targetApp.models import Domain as TargetDomain, Project
+        from scanEngine.models import EngineType
+        from reNgine.recon_tasks import bbot_scan
+
+        project = Project.objects.create(name='test-bbot-proj', insert_date=timezone.now())
+        domain = TargetDomain.objects.create(
+            name='bbot-test.example.com', project=project, insert_date=timezone.now(),
+        )
+        engine = EngineType.objects.create(engine_name='bbot-test-engine', yaml_configuration='{}')
+        scan = ScanHistory.objects.create(
+            scan_status=0, start_scan_date=timezone.now(), domain=domain, scan_type=engine,
+        )
+        mock_run.return_value = MagicMock(returncode=0, stdout='', stderr='')
+        mock_exists.return_value = True
+
+        events = '\n'.join([
+            _json.dumps({'type': 'DNS_NAME', 'data': 'api.bbot-test.example.com'}),
+            _json.dumps({'type': 'DNS_NAME', 'data': 'mail.bbot-test.example.com'}),
+            _json.dumps({'type': 'OPEN_TCP_PORT', 'data': '1.2.3.4:80'}),
+        ])
+        with _patch('builtins.open', mock_open(read_data=events)):
+            result = bbot_scan(_make_proxy(), scan_history_id=scan.id, domain_id=domain.id,
+                               domain='bbot-test.example.com')
+
+        self.assertTrue(result)
+        names = list(Subdomain.objects.filter(
+            scan_history_id=scan.id
+        ).values_list('name', flat=True))
+        self.assertIn('api.bbot-test.example.com', names)
+        self.assertIn('mail.bbot-test.example.com', names)
+        # OPEN_TCP_PORT event must not be stored as a subdomain
+        self.assertNotIn('1.2.3.4:80', names)
+
+    @patch('subprocess.run')
+    def test_bbot_returns_true_with_no_domain(self, mock_run):
+        from reNgine.recon_tasks import bbot_scan
+        result = bbot_scan(_make_proxy(), scan_history_id=1, domain_id=1)
+        self.assertTrue(result)
+        mock_run.assert_not_called()
+
+    @patch('subprocess.run')
+    @patch('os.path.exists', return_value=False)
+    @patch('shutil.rmtree')
+    def test_bbot_returns_true_when_no_output_file(self, mock_rmtree, mock_exists, mock_run):
+        from reNgine.recon_tasks import bbot_scan
+        mock_run.return_value = MagicMock(returncode=0, stdout='', stderr='')
+        result = bbot_scan(_make_proxy(), scan_history_id=1, domain_id=1,
+                           domain='example.com')
+        self.assertTrue(result)
