@@ -3,9 +3,10 @@ import { Box, Typography, Tabs, Tab, Grid, Card, Button } from '@mui/material';
 import { EngineList } from './EngineList';
 import { WordlistList } from './WordlistList';
 import { useEngines, useWordlists } from '../api';
-import { Cpu, List, Plus, FileUp } from 'lucide-react';
+import { Cpu, List, Plus, FileUp, Sliders } from 'lucide-react';
 import { AddEngineModal } from './AddEngineModal';
 import { UploadWordlistModal } from './UploadWordlistModal';
+import { ProfileManager } from '../../profiles/components/ProfileManager';
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -82,7 +83,7 @@ export const EnginesPage: React.FC = () => {
           onChange={handleChange}
           sx={{
             '& .MuiTabs-indicator': {
-              bgcolor: value === 0 ? '#7000ff' : '#ff00ff',
+              bgcolor: value === 0 ? '#7000ff' : value === 1 ? '#ff00ff' : '#00ff62',
               height: 3,
               borderRadius: '3px 3px 0 0'
             },
@@ -93,17 +94,18 @@ export const EnginesPage: React.FC = () => {
               color: 'rgba(255,255,255,0.4)',
               minHeight: 48,
               '&.Mui-selected': {
-                color: value === 0 ? '#7000ff' : '#ff00ff',
+                color: value === 0 ? '#7000ff' : value === 1 ? '#ff00ff' : '#00ff62',
               }
             }
           }}
         >
           <Tab icon={<Cpu size={16} />} iconPosition="start" label="ENGINES" />
           <Tab icon={<List size={16} />} iconPosition="start" label="WORDLISTS" />
+          <Tab icon={<Sliders size={16} />} iconPosition="start" label="SCAN PROFILES" />
         </Tabs>
 
         <Box sx={{ display: 'flex', gap: 2, pr: 2 }}>
-          {value === 0 ? (
+          {value === 0 && (
             <Button
               variant="outlined"
               size="small"
@@ -123,7 +125,8 @@ export const EnginesPage: React.FC = () => {
             >
               ADD ENGINE
             </Button>
-          ) : (
+          )}
+          {value === 1 && (
             <Button
               variant="outlined"
               size="small"
@@ -152,6 +155,9 @@ export const EnginesPage: React.FC = () => {
       </TabPanel>
       <TabPanel value={value} index={1}>
         <WordlistList />
+      </TabPanel>
+      <TabPanel value={value} index={2}>
+        <ProfileManager />
       </TabPanel>
 
       <AddEngineModal 

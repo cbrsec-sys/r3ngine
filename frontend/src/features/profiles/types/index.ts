@@ -37,4 +37,5 @@ export interface CreateProfilePayload {
   active?: boolean;
   stealth?: boolean;
   hunt_secrets?: boolean;
+  tor?: boolean;
 }
