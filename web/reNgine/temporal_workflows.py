@@ -2200,6 +2200,7 @@ class CIDRReconWorkflow:
                 retry_policy=_RETRY_INTERNAL,
                 task_queue="python-orchestrator-queue",
             )
+            detected = [c for c in (detected or []) if c]
             if not detected:
                 return True
             cidr = detected[0]
