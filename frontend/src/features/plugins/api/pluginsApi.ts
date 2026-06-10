@@ -30,6 +30,8 @@ export interface MarketplacePlugin {
   author?: string;
   signed?: boolean;
   is_installed: boolean;
+  update_available?: boolean;
+  installed_version?: string;
 }
 
 // --- CORE FETCHERS ---

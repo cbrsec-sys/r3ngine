@@ -22,6 +22,7 @@ _TASK_TITLES = {
     # Tier 3
     'fetch_url':                  'URL Fetching',
     'screenshot':                 'Screenshot Capture',
+    'param_discovery':            'Parameter Discovery (CPDE)',
     # Tier 4
     'dir_file_fuzz':              'Directory & File Fuzzing',
     # Tier 5
@@ -65,6 +66,7 @@ _TASK_TIER = {
     'vigolium_discovery':    2,
     'fetch_url':             3,
     'screenshot':            3,
+    'param_discovery':       3,
     'dir_file_fuzz':         4,
     'web_api_discovery':     5,
     'waf_detection':         5,
@@ -97,7 +99,7 @@ _TIER1_TO_5 = [
     'subdomain_discovery', 'amass_intel_discovery', 'firewall_vpn_scan',
     'dns_security', 'osint', 'spiderfoot_scan', 'baddns',
     'http_crawl', 'port_scan',
-    'fetch_url', 'screenshot',
+    'fetch_url', 'screenshot', 'param_discovery',
     'dir_file_fuzz',
     'web_api_discovery', 'waf_detection', 'secret_scanning',
     'waf_bypass',
@@ -179,7 +181,8 @@ def build_scan_task_plan(tasks: list, yaml_configuration: dict) -> list:
     _graph_tasks = {
         'subdomain_discovery', 'amass_intel_discovery', 'firewall_vpn_scan',
         'osint', 'spiderfoot_scan', 'baddns', 'http_crawl', 'port_scan',
-        'fetch_url', 'dir_file_fuzz', 'web_api_discovery', 'vulnerability_scan'
+        'fetch_url', 'dir_file_fuzz', 'web_api_discovery', 'vulnerability_scan',
+        'param_discovery'
     }
     if any(t in _graph_tasks for t in tasks):
         add('sync_graph')

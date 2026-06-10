@@ -35,14 +35,33 @@ class MarketplaceManager:
                 return cached_data
 
         try:
+            import packaging.version
             response = requests.get(cls.MARKETPLACE_YAML_URL, timeout=10)
             if response.status_code == 200:
                 data = yaml.safe_load(response.text)
                 plugins = data.get('marketplace', [])
-                # Add installation status
-                installed_slugs = list(Plugin.objects.values_list('slug', flat=True))
+                
+                # Fetch all installed plugins to compare versions
+                installed_plugins = {p.slug: p for p in Plugin.objects.all()}
+                
                 for plugin in plugins:
-                    plugin['is_installed'] = plugin['slug'] in installed_slugs
+                    slug = plugin.get('slug')
+                    if slug in installed_plugins:
+                        plugin['is_installed'] = True
+                        installed_ver = installed_plugins[slug].version
+                        plugin['installed_version'] = installed_ver
+                        
+                        try:
+                            m_ver = packaging.version.parse(str(plugin.get('version', '0.0.0')))
+                            i_ver = packaging.version.parse(str(installed_ver))
+                            plugin['update_available'] = m_ver > i_ver
+                        except Exception as e:
+                            logger.error(f"Version parsing error for plugin {slug}: {e}")
+                            plugin['update_available'] = False
+                    else:
+                        plugin['is_installed'] = False
+                        plugin['installed_version'] = None
+                        plugin['update_available'] = False
                 
                 cache.set(cls.CACHE_KEY, plugins, cls.CACHE_TIMEOUT)
                 return plugins
@@ -451,88 +470,98 @@ class AtomicInstaller:
                         except Exception as e:
                             logger.error(f"CRITICAL: Failed to ingest engine fixture {file}: {str(e)}")
 
-                # 6. Parse tools.yaml
-                tools_path = os.path.join(final_dir, 'tools.yaml')
-                if os.path.exists(tools_path):
-                    try:
-                        with open(tools_path, 'r') as f:
-                            tools_config = yaml.safe_load(f)
-                            plugin.tools_config = tools_config
-                            plugin.save()
+            # --- End of transaction.atomic() block ---
+            # Steps 6 & 7 are performed OUTSIDE the long transaction so that fresh
+            # DB connections are used after the migration subprocesses complete.
+            # This prevents the 'server closed the connection unexpectedly' error
+            # caused by PostgreSQL dropping idle connections inside a long transaction.
 
-                        # Invalidate per-tool verification cache so the orchestrator
-                        # re-installs tools on its next startup rather than skipping them.
-                        for _tool in tools_config.get('tools', []):
-                            _tool_name = _tool.get('name')
-                            if _tool_name:
-                                cache.delete(f"plugin_{plugin_slug}_tool_{_tool_name}_verified")
+            # 6. Parse tools.yaml — save in its own short transaction with a fresh connection.
+            tools_path = os.path.join(final_dir, 'tools.yaml')
+            if os.path.exists(tools_path):
+                try:
+                    from django.db import connection as _db_conn
+                    _db_conn.ensure_connection()
+                    with open(tools_path, 'r') as f:
+                        tools_config = yaml.safe_load(f)
 
-                        # Trigger orchestrator restart via Redis so it picks up the new plugin
-                        # and installs any required tools in its own container on startup.
-                        def _restart_orchestrator():
-                            try:
-                                import redis as _redis
-                                from django.conf import settings as _settings
-                                rdb = _redis.StrictRedis(
-                                    host=_settings.REDIS_HOST,
-                                    port=_settings.REDIS_PORT,
-                                    db=0,
-                                )
-                                rdb.publish('orchestrator_control', 'restart')
-                                logger.info(f"[{plugin_slug}] Orchestrator restart triggered for tool installation.")
-                            except Exception as _e:
-                                logger.error(f"[{plugin_slug}] Failed to trigger orchestrator restart: {_e}")
+                    with transaction.atomic():
+                        # Re-fetch the plugin record to get a live ORM instance.
+                        _plugin = Plugin.objects.get(slug=plugin_slug)
+                        _plugin.tools_config = tools_config
+                        _plugin.save(update_fields=['tools_config'])
 
-                        transaction.on_commit(
-                            lambda: threading.Thread(target=_restart_orchestrator, daemon=True).start()
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
+                    # Invalidate per-tool verification cache so the orchestrator
+                    # re-installs tools on its next startup rather than skipping them.
+                    for _tool in tools_config.get('tools', []):
+                        _tool_name = _tool.get('name')
+                        if _tool_name:
+                            cache.delete(f"plugin_{plugin_slug}_tool_{_tool_name}_verified")
 
-                # Set needs_restart to True in cache
-                cache.set(f"plugin_{plugin_slug}_needs_restart", True, timeout=None)
+                    # Trigger orchestrator restart via Redis so it picks up the new plugin
+                    # and installs any required tools in its own container on startup.
+                    def _restart_orchestrator():
+                        try:
+                            import redis as _redis
+                            from django.conf import settings as _settings
+                            rdb = _redis.StrictRedis(
+                                host=_settings.REDIS_HOST,
+                                port=_settings.REDIS_PORT,
+                                db=0,
+                            )
+                            rdb.publish('orchestrator_control', 'restart')
+                            logger.info(f"[{plugin_slug}] Orchestrator restart triggered for tool installation.")
+                        except Exception as _e:
+                            logger.error(f"[{plugin_slug}] Failed to trigger orchestrator restart: {_e}")
 
-                # 7. Promote ui/dist/ contents into ui/ so PluginUIView can serve them.
-                # PluginUIView serves directly from plugins_data/{slug}/ui/, so built
-                # assets must live there (not in a dist/ subdirectory).
-                ui_dist_src = os.path.join(final_dir, 'ui', 'dist')
-                if os.path.exists(ui_dist_src):
-                    ui_dir = os.path.join(final_dir, 'ui')
-                    for item in os.listdir(ui_dist_src):
-                        src_item = os.path.join(ui_dist_src, item)
-                        dst_item = os.path.join(ui_dir, item)
-                        if os.path.exists(dst_item):
-                            if os.path.isdir(dst_item):
-                                shutil.rmtree(dst_item)
-                            else:
-                                os.remove(dst_item)
-                        shutil.move(src_item, dst_item)
-                    shutil.rmtree(ui_dist_src)
-                
-                cls._emit(install_id, 'assets', 'completed')
+                    threading.Thread(target=_restart_orchestrator, daemon=True).start()
+                except Exception as e:
+                    logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
 
-                # 8. Cleanup backups on success
-                if backup_fs_dir and os.path.exists(backup_fs_dir):
-                    shutil.rmtree(backup_fs_dir)
-                if backup_db_file and os.path.exists(backup_db_file):
-                    os.remove(backup_db_file)
-                if inner_zip_path and os.path.exists(inner_zip_path):
-                    os.remove(inner_zip_path)
+            # Set needs_restart to True in cache
+            cache.set(f"plugin_{plugin_slug}_needs_restart", True, timeout=None)
 
-                cls._emit(install_id, 'complete', 'completed')
-                if install_id:
-                    data = cache.get(f'plugin:install:{install_id}') or {}
-                    data['status'] = 'success'
-                    _warning_messages = {
-                        'unsigned': 'This plugin is unsigned. Install at your own risk.',
-                        'signed_unknown': 'This plugin is signed by an unrecognized publisher.',
-                        'legacy': 'This is a legacy .zip plugin with no integrity verification.',
-                    }
-                    if verification_result in _warning_messages:
-                        data['warning'] = _warning_messages[verification_result]
-                    cache.set(f'plugin:install:{install_id}', data, timeout=300)
+            # 7. Promote ui/dist/ contents into ui/ so PluginUIView can serve them.
+            # PluginUIView serves directly from plugins_data/{slug}/ui/, so built
+            # assets must live there (not in a dist/ subdirectory).
+            ui_dist_src = os.path.join(final_dir, 'ui', 'dist')
+            if os.path.exists(ui_dist_src):
+                ui_dir = os.path.join(final_dir, 'ui')
+                for item in os.listdir(ui_dist_src):
+                    src_item = os.path.join(ui_dist_src, item)
+                    dst_item = os.path.join(ui_dir, item)
+                    if os.path.exists(dst_item):
+                        if os.path.isdir(dst_item):
+                            shutil.rmtree(dst_item)
+                        else:
+                            os.remove(dst_item)
+                    shutil.move(src_item, dst_item)
+                shutil.rmtree(ui_dist_src)
 
-                return plugin
+            cls._emit(install_id, 'assets', 'completed')
+
+            # 8. Cleanup backups on success
+            if backup_fs_dir and os.path.exists(backup_fs_dir):
+                shutil.rmtree(backup_fs_dir)
+            if backup_db_file and os.path.exists(backup_db_file):
+                os.remove(backup_db_file)
+            if inner_zip_path and os.path.exists(inner_zip_path):
+                os.remove(inner_zip_path)
+
+            cls._emit(install_id, 'complete', 'completed')
+            if install_id:
+                data = cache.get(f'plugin:install:{install_id}') or {}
+                data['status'] = 'success'
+                _warning_messages = {
+                    'unsigned': 'This plugin is unsigned. Install at your own risk.',
+                    'signed_unknown': 'This plugin is signed by an unrecognized publisher.',
+                    'legacy': 'This is a legacy .zip plugin with no integrity verification.',
+                }
+                if verification_result in _warning_messages:
+                    data['warning'] = _warning_messages[verification_result]
+                cache.set(f'plugin:install:{install_id}', data, timeout=300)
+
+            return Plugin.objects.get(slug=plugin_slug)
                 
         except Exception as e:
             logger.error(f"Installation failed for {plugin_slug}: {str(e)}")

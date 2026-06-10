@@ -4211,6 +4211,54 @@ class EndPointViewSet(viewsets.ModelViewSet):
 					logger.exception("Unexpected error: %s", e)
 		return qs
 
+class ParameterViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
+	queryset = Parameter.objects.none()
+	serializer_class = ParameterSerializer
+
+	def get_queryset(self):
+		req = self.request
+		scan_id = req.query_params.get('scan_history')
+		target_id = req.query_params.get('target_id')
+		endpoint_id = req.query_params.get('endpoint_id')
+
+		if scan_id:
+			queryset = Parameter.objects.filter(endpoint__scan_history__id=scan_id)
+		elif target_id:
+			queryset = Parameter.objects.filter(endpoint__target_domain__id=target_id)
+		else:
+			queryset = Parameter.objects.all()
+
+		if endpoint_id:
+			queryset = queryset.filter(endpoint__id=endpoint_id)
+
+		return queryset.distinct()
+
+
+class ParameterSummaryView(APIView):
+	permission_classes = [IsPenetrationTester]
+
+	def get(self, request, *args, **kwargs):
+		req = self.request
+		scan_id = req.query_params.get('scan_history')
+		target_id = req.query_params.get('target_id')
+
+		if scan_id:
+			base_qs = Parameter.objects.filter(endpoint__scan_history__id=scan_id)
+		elif target_id:
+			base_qs = Parameter.objects.filter(endpoint__target_domain__id=target_id)
+		else:
+			return Response({"error": "scan_history or target_id is required"}, status=400)
+
+		summary = {
+			'total': base_qs.count(),
+			'high_confidence': base_qs.filter(confidence__gte=80).count(),
+			'reflected': base_qs.filter(is_reflected=True).count(),
+			'source': base_qs.filter(is_source=True).count(),
+			'sink': base_qs.filter(is_sink=True).count(),
+		}
+		return Response(summary)
+
 
 class SecretLeakViewSet(viewsets.ModelViewSet):
 	permission_classes = [IsPenetrationTester]

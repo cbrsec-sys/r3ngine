@@ -722,20 +722,133 @@ def save_endpoint(
 
     return endpoint, created
 
-def save_parameter(endpoint, name, param_type='unknown', impact='none', value=None):
-    """Save a discovered parameter to the database."""
-    param, created = Parameter.objects.get_or_create(
-        endpoint=endpoint,
-        name=name,
-        defaults={'type': param_type, 'impact': impact, 'value': value}
-    )
-    if not created:
-        if param_type != 'unknown':
-            param.type = param_type
-        if value:
-            param.value = value
-        param.save()
-    return param, created
+def save_parameter(
+	endpoint,
+	name,
+	param_type='unknown',
+	impact='none',
+	value=None,
+	# CPDE intelligence fields — all optional; backward-compatible
+	confidence=0,
+	sources=None,
+	param_location=None,
+	data_type=None,
+	is_auth_related=False,
+	observed_in_js=False,
+	observed_in_openapi=False,
+	observed_in_graphql=False,
+	scan_history_id=None,
+):
+	"""Save a discovered parameter to the database.
+
+	Creates the parameter if it does not exist (keyed on endpoint + name +
+	param_location). When the record already exists, CPDE intelligence fields
+	are merged rather than overwritten: sources lists are unioned, confidence
+	takes the maximum, and boolean flags are ORed — so multiple tools each
+	calling save_parameter() for the same parameter accumulate evidence rather
+	than replacing each other's data.
+
+	Args:
+		endpoint: EndPoint instance the parameter belongs to.
+		name (str): Parameter name.
+		param_type (str): Tool source label (e.g. 'Arjun', 'js_ast'). Defaults to 'unknown'.
+		impact (str): Impact category. Defaults to 'none'.
+		value (str): Observed parameter value, if any.
+		confidence (int): 0-100 confidence score from CPDE. Defaults to 0.
+		sources (list): Evidence source labels (e.g. ['arjun', 'js_ast']). Defaults to [].
+		param_location (str): json_body|query_string|header|graphql_var|form_data|path.
+		data_type (str): Inferred JS type (string, number, boolean, object, array).
+		is_auth_related (bool): True when name matches auth patterns.
+		observed_in_js (bool): True when observed via JS/AST analysis.
+		observed_in_openapi (bool): True when observed in an OpenAPI schema.
+		observed_in_graphql (bool): True when observed as a GraphQL variable.
+		scan_history_id (int): ScanHistory PK for the direct denormalized FK.
+
+	Returns:
+		tuple: (Parameter instance, created: bool)
+	"""
+	if sources is None:
+		sources = []
+
+	# Resolve the scan_history FK if not provided (derive from endpoint)
+	if not scan_history_id and endpoint and hasattr(endpoint, 'scan_history_id'):
+		scan_history_id = endpoint.scan_history_id
+
+	# Key on endpoint + name + param_location so the same parameter name
+	# can exist in multiple locations (e.g. both query_string and json_body).
+	lookup = {'endpoint': endpoint, 'name': name}
+	if param_location:
+		lookup['param_location'] = param_location
+
+	param, created = Parameter.objects.get_or_create(
+		**lookup,
+		defaults={
+			'type': param_type,
+			'impact': impact,
+			'value': value,
+			'confidence': confidence,
+			'sources': sources,
+			'param_location': param_location,
+			'data_type': data_type,
+			'is_auth_related': is_auth_related,
+			'observed_in_js': observed_in_js,
+			'observed_in_openapi': observed_in_openapi,
+			'observed_in_graphql': observed_in_graphql,
+			'scan_history_id': scan_history_id,
+		}
+	)
+
+	if not created:
+		# Merge CPDE intelligence fields — never overwrite with lower-quality data
+		update_fields = []
+
+		if param_type and param_type != 'unknown' and param.type != param_type:
+			param.type = param_type
+			update_fields.append('type')
+		if value and not param.value:
+			param.value = value
+			update_fields.append('value')
+
+		# Merge sources: union existing + new labels
+		if sources:
+			merged = list(set((param.sources or []) + sources))
+			if merged != param.sources:
+				param.sources = merged
+				update_fields.append('sources')
+
+		# Confidence: keep the maximum observed across all tools
+		if confidence > param.confidence:
+			param.confidence = confidence
+			update_fields.append('confidence')
+
+		# Boolean flags: once True, stay True regardless of caller order
+		if observed_in_js and not param.observed_in_js:
+			param.observed_in_js = True
+			update_fields.append('observed_in_js')
+		if observed_in_openapi and not param.observed_in_openapi:
+			param.observed_in_openapi = True
+			update_fields.append('observed_in_openapi')
+		if observed_in_graphql and not param.observed_in_graphql:
+			param.observed_in_graphql = True
+			update_fields.append('observed_in_graphql')
+		if is_auth_related and not param.is_auth_related:
+			param.is_auth_related = True
+			update_fields.append('is_auth_related')
+
+		if not param.param_location and param_location:
+			param.param_location = param_location
+			update_fields.append('param_location')
+		if not param.data_type and data_type:
+			param.data_type = data_type
+			update_fields.append('data_type')
+		if not param.scan_history_id and scan_history_id:
+			param.scan_history_id = scan_history_id
+			update_fields.append('scan_history_id')
+
+		if update_fields:
+			param.save(update_fields=update_fields)
+
+	return param, created
 
 def stream_command(
 		cmd, 

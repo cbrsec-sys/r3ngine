@@ -763,6 +763,36 @@ def get_ollama_pull_status(request, slug):
         'log': log
     })
 
+@has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def get_ollama_service_status(request, slug):
+    from reNgine.ollama_manager import OllamaManager, OllamaUnavailableError
+    manager = OllamaManager()
+    is_running = manager.is_running()
+    return http.JsonResponse({'status': 'success', 'running': is_running})
+
+@has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def start_ollama_service(request, slug):
+    if request.method != 'POST':
+        return http.JsonResponse({'status': 'error', 'message': 'POST required'}, status=400)
+    
+    from reNgine.ollama_manager import OllamaManager, OllamaStartError
+    manager = OllamaManager()
+    try:
+        manager.start()
+        return http.JsonResponse({'status': 'success', 'message': 'Ollama service started.'})
+    except OllamaStartError as e:
+        return http.JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def stop_ollama_service(request, slug):
+    if request.method != 'POST':
+        return http.JsonResponse({'status': 'error', 'message': 'POST required'}, status=400)
+    
+    from reNgine.ollama_manager import OllamaManager
+    manager = OllamaManager()
+    manager.stop()
+    return http.JsonResponse({'status': 'success', 'message': 'Ollama service stopped.'})
+
 
 def _test_llm_provider(provider: str, api_key: str, model: str) -> dict:
     """Send a minimal prompt to the given provider and return a result dict.
