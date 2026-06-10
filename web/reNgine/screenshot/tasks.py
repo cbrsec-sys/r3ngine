@@ -39,7 +39,14 @@ def take_screenshot_and_save(subdomain_id, scan_id, results_dir=None, activity_i
         subdomain = Subdomain.objects.get(id=subdomain_id)
         scan = ScanHistory.objects.get(id=scan_id)
 
-        if url_override:
+        if url_override is not None:
+            parsed_override = urlparse(url_override)
+            if parsed_override.scheme not in ('http', 'https'):
+                logger.error(
+                    "url_override rejected — invalid scheme: %s",
+                    parsed_override.scheme or '(empty)'
+                )
+                return False
             # Use the caller-provided URL directly — no path stripping.
             target_urls = [url_override]
         else:
