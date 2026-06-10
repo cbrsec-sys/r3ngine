@@ -104,6 +104,7 @@ vulnerability_scan: {
   'run_s3scanner': true,
   'run_acunetix': true,
   'run_wpscan': true,
+  'run_wptaint_scan': true,
   'wpscan_enumeration': 'vp,vt,u',
   'wpscan_detection_mode': 'mixed',
   'enable_http_crawl': true,

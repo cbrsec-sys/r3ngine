@@ -78,6 +78,9 @@
       vulnerability_scan:
         run_acunetix: true
         run_wpscan: true
+        run_wptaint_scan: true
+        wpscan_enumeration: vp,vt,u
+        wpscan_detection_mode: mixed
       attack_path_modeling:
         enabled: true
       spiderfoot_scan:

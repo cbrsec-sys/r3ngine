@@ -59,6 +59,7 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/Chocapikk/wpprobe@latest && \
     go install -ldflags="-s -w" -v github.com/hueristiq/xurlfind3r/cmd/xurlfind3r@latest && \
     go install -ldflags="-s -w" -v github.com/edoardottt/cariddi/cmd/cariddi@latest && \
+    go install -ldflags="-s -w" -v github.com/dimasma0305/wp-taint-scan/cmd/taint-scan@latest && \
     rm -rf /go/pkg /root/.cache/go-build
 
 # betterleaks has no published go install path — clone and build directly.

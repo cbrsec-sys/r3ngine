@@ -924,6 +924,15 @@ class NucleiPlannerWorkflow:
                 task_queue="python-orchestrator-queue"
             )
 
+        if vuln_config.get('run_wptaint_scan', True):
+            await workflow.execute_activity(
+                "RunWPTaintScanActivity", 
+                ctx, 
+                start_to_close_timeout=timedelta(hours=2), 
+                heartbeat_timeout=timedelta(minutes=5),
+                task_queue="python-orchestrator-queue"
+            )
+
         # Write a ScanActivity(name='vulnerability_scan', status=SUCCESS) so that
         # resume_scan_temporal can recognise this compound task as complete and
         # skip it on crash recovery, instead of restarting the whole vuln scan.
@@ -2069,6 +2078,15 @@ class WordPressWorkflow:
                 task_queue="python-orchestrator-queue",
             ),
         )
+
+        await workflow.execute_activity(
+            "RunWPTaintScanActivity", 
+            ctx, 
+            start_to_close_timeout=timedelta(hours=2), 
+            heartbeat_timeout=timedelta(minutes=5),
+            task_queue="python-orchestrator-queue"
+        )
+
         return True
 
 
