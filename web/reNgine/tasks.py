@@ -2256,37 +2256,46 @@ def _process_spiderfoot_batch(self, batch, ctx, host):
 
 def screenshot(self, ctx={}, description=None):
 	"""Embedded Playwright Screenshot task.
-	
+
+	Queries is_default=True endpoints directly — one per subdomain root — and
+	passes the full http_url (including path) to the capture engine.
+	Mirrors the rengine-ng approach; fixes the single-screenshot bug caused by
+	the Subdomain http_url/http_status strict filter.
+
 	Args:
 		description (str, optional): Task description shown in UI.
 	"""
 	from reNgine.screenshot.tasks import take_screenshot_and_save
 
-	# Config
 	config = self.yaml_configuration.get(SCREENSHOT) or {}
-	enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
 	intensity = config.get(INTENSITY) or self.yaml_configuration.get(INTENSITY, DEFAULT_SCAN_INTENSITY)
-	
-	# If intensity is normal, grab only the root endpoints of each subdomain
-	strict = True if intensity == 'normal' else False
+	strict = intensity == 'normal'
 
-	# Get subdomains to process
-	subdomains = Subdomain.objects.filter(scan_history=self.scan)
-	
-	# If strict/normal intensity, we only care about subdomains that are definitely alive
+	endpoints = (
+		EndPoint.objects
+		.filter(scan_history=self.scan, is_default=True)
+		.exclude(http_url__isnull=True)
+		.exclude(http_url='')
+		.select_related('subdomain')
+	)
+
 	if strict:
-		subdomains = subdomains.filter(http_status__gt=0).exclude(http_url__isnull=True)
-	
-	logger.info(f"Starting Playwright screenshot capture for {subdomains.count()} subdomains...")
-	
+		endpoints = endpoints.filter(http_status__gt=0)
+
+	logger.info(f"Starting Playwright screenshot capture for {endpoints.count()} default endpoints...")
+
 	success_count = 0
-	for subdomain in subdomains:
-		# The internal task handles browser lifecycle, metadata, and DB persistence
-		if take_screenshot_and_save(subdomain.id, self.scan_id, self.results_dir, activity_id=self.activity_id):
+	for endpoint in endpoints:
+		if take_screenshot_and_save(
+			subdomain_id=endpoint.subdomain_id,
+			scan_id=self.scan_id,
+			results_dir=self.results_dir,
+			activity_id=self.activity_id,
+			url_override=endpoint.http_url,
+		):
 			success_count += 1
-			
+
 	self.notify(fields={'Screenshots': f'Successfully captured {success_count} screenshots using Embedded Playwright.'})
-	
 	return True
 
 
