@@ -399,6 +399,12 @@ LOGGING = {
         'null': {
             'class': 'logging.NullHandler',
         },
+        'temporal_file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': '/usr/src/app/temporal.log',
+            'formatter': 'verbose',
+        },
     },
     'formatters': {
         'verbose': {
@@ -435,6 +441,12 @@ LOGGING = {
             'handlers': ['null'],
             'level': 'ERROR',
             'propagate': False,
+        },
+        # Temporal activities — write INFO+ to temporal.log; propagate to 'reNgine' for console
+        'reNgine.temporal_activities': {
+            'handlers': ['temporal_file'],
+            'level': 'INFO',
+            'propagate': True,
         },
         # Scan tasks — use the task formatter so output is easy to grep
         'reNgine.tasks': {
