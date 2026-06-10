@@ -277,3 +277,52 @@ class TestSearchVulnsScan(TestCase):
         # CVSS 9.8 → critical (4)
         if created:
             self.assertEqual(created[0].severity, 4)
+
+
+from django.utils import timezone
+
+
+class TestGetASNScan(TestCase):
+    @patch('subprocess.run')
+    def test_getasn_updates_ip_address_asn_fields(self, mock_run):
+        from startScan.models import IpAddress, ScanHistory, Domain
+        from scanEngine.models import EngineType
+        from reNgine.recon_tasks import getasn_scan
+
+        engine = EngineType.objects.create(
+            engine_name='test-asn-engine',
+            yaml_configuration='subdomain_discovery:\n  - subfinder\n',
+        )
+        domain = Domain.objects.create(name='asn-test.example.com')
+        scan = ScanHistory.objects.create(
+            scan_status=0, start_scan_date=timezone.now(), domain=domain,
+            scan_type=engine,
+        )
+        ip = IpAddress.objects.create(address='172.217.14.196')
+
+        mock_run.return_value = MagicMock(
+            returncode=0,
+            stdout='172.217.14.196 AS15169 172.217.0.0/16 GOOGLE - Google LLC US\n',
+            stderr='',
+        )
+        result = getasn_scan(_make_proxy(), scan_history_id=scan.id, domain_id=domain.id,
+                             ips=['172.217.14.196'])
+        self.assertTrue(result)
+        ip.refresh_from_db()
+        self.assertEqual(ip.asn, 'AS15169')
+        self.assertEqual(ip.asn_cidr, '172.217.0.0/16')
+        self.assertIn('GOOGLE', ip.asn_org)
+
+    @patch('subprocess.run')
+    def test_getasn_returns_true_with_no_ips(self, mock_run):
+        from reNgine.recon_tasks import getasn_scan
+        result = getasn_scan(_make_proxy(), scan_history_id=1, domain_id=1, ips=[])
+        self.assertTrue(result)
+        mock_run.assert_not_called()
+
+    @patch('subprocess.run')
+    def test_getasn_handles_malformed_output(self, mock_run):
+        from reNgine.recon_tasks import getasn_scan
+        mock_run.return_value = MagicMock(returncode=0, stdout='bad output\n', stderr='')
+        result = getasn_scan(_make_proxy(), scan_history_id=1, domain_id=1, ips=['1.2.3.4'])
+        self.assertTrue(result)

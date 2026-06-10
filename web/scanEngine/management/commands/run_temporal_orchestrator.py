@@ -172,6 +172,8 @@ from reNgine.temporal_activities import (
 
     # Phase 1 — rengine-ng workflow tool activities
     get_discovered_services_activity,
+    get_discovered_ips_activity,
+    run_getasn_activity,
     run_dnsx_activity,
     run_wafw00f_activity,
     run_fping_activity,
@@ -442,6 +444,8 @@ class Command(BaseCommand):
 
                 # Phase 1 — rengine-ng workflow tool activities
                 get_discovered_services_activity,
+                get_discovered_ips_activity,
+                run_getasn_activity,
                 run_dnsx_activity,
                 run_wafw00f_activity,
                 run_fping_activity,

@@ -878,6 +878,9 @@ class IpAddress(models.Model):
 	version = models.IntegerField(blank=True, null=True)
 	is_private = models.BooleanField(default=False)
 	reverse_pointer = models.CharField(max_length=100, blank=True, null=True)
+	asn = models.CharField(max_length=20, blank=True, null=True)
+	asn_cidr = models.CharField(max_length=50, blank=True, null=True)
+	asn_org = models.CharField(max_length=200, blank=True, null=True)
 	# this is used for querying which ip was discovered during subcan
 	ip_subscan_ids = models.ManyToManyField('SubScan', related_name='ip_subscan_ids')
 

@@ -2699,6 +2699,32 @@ def run_gf_activity(ctx: dict) -> list:
         urls=ctx.get('urls', []),
     )
 
+@activity.defn(name="GetDiscoveredIPsActivity")
+def get_discovered_ips_activity(ctx: dict) -> list:
+    """Return distinct IP address strings discovered for this scan."""
+    from startScan.models import IpAddress
+    scan_id = ctx.get('scan_history_id')
+    if not scan_id:
+        return []
+    ips = (
+        IpAddress.objects
+        .filter(ip_addresses__scan_history_id=scan_id)
+        .values_list('address', flat=True)
+        .distinct()
+    )
+    return list(ips)
+
+
+@activity.defn(name="RunGetASNActivity")
+def run_getasn_activity(ctx: dict) -> bool:
+    from reNgine.recon_tasks import getasn_scan
+    activity.logger.info("[RunGetASNActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        getasn_scan, ctx, task_name='getasn_scan',
+        description='ASN Enrichment (getasn)', ips=ctx.get('ips', []),
+    )
+
+
 @activity.defn(name="RunParamDiscoveryActivity")
 def run_param_discovery_activity(ctx: dict) -> dict:
     """Run the Custom Parameter Discovery Engine (CPDE)."""
