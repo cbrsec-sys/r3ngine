@@ -349,7 +349,27 @@ export const ScanHistoryPage: React.FC = () => {
                       />
                     </TableCell>
                     <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 800, color: '#fff', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>{scan.domain?.name}</Typography>
+                      <RouterLink
+                        to={`/${projectSlug}/scan/detail/${scan.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        style={{ textDecoration: 'none' }}
+                      >
+                        <Typography
+                          variant="body2"
+                          sx={{
+                            fontWeight: 800,
+                            color: '#fff',
+                            fontFamily: 'Orbitron',
+                            fontSize: '0.8rem',
+                            '&:hover': {
+                              color: '#00f3ff',
+                              textDecoration: 'underline'
+                            }
+                          }}
+                        >
+                          {scan.domain?.name}
+                        </Typography>
+                      </RouterLink>
                       {scan.cfg_starting_point_path && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
                           <Terminal size={10} style={{ color: 'rgba(255,255,255,0.3)' }} />
