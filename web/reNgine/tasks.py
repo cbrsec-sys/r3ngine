@@ -6895,6 +6895,7 @@ def acunetix_scan(
 			
 		# Fetch Vulnerabilities for the specific scan
 		vulns_url = None
+		session_id = None
 		# Fetch scan details to get the scan session/result ID (which differs across AWVS versions)
 		scan_detail_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify)
 		if scan_detail_resp.status_code == 200:
@@ -6933,7 +6934,20 @@ def acunetix_scan(
 			logger.info(f"Found {len(v_list)} vulnerabilities in Acunetix scan report.")
 			for vuln in v_list:
 				# Get full details for each vuln
-				vuln_detail_resp = requests.get(f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}", headers=headers, verify=_acunetix_verify)
+				vuln_detail_url = None
+				if scan_id and session_id:
+					vuln_detail_url = f"{base_url}/api/v1/scans/{scan_id}/results/{session_id}/vulnerabilities/{vuln['vuln_id']}"
+				
+				# Try session-scoped URL first, fallback to global URL if needed
+				if vuln_detail_url:
+					vuln_detail_resp = requests.get(vuln_detail_url, headers=headers, verify=_acunetix_verify)
+					if vuln_detail_resp.status_code == 404:
+						global_url = f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}"
+						vuln_detail_resp = requests.get(global_url, headers=headers, verify=_acunetix_verify)
+				else:
+					global_url = f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}"
+					vuln_detail_resp = requests.get(global_url, headers=headers, verify=_acunetix_verify)
+
 				if vuln_detail_resp.status_code == 200:
 					v_detail = vuln_detail_resp.json()
 					
