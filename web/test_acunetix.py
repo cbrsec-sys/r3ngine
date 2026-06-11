@@ -31,16 +31,28 @@ def test_acunetix(query_target_name=None):
     
     _acunetix_verify = os.environ.get('ACUNETIX_CA_BUNDLE', False)
     
-    print("\n[1] Fetching targets list from Acunetix...")
+    print("\n[1] Fetching targets list from Acunetix (paginated)...")
     try:
-        targets_resp = requests.get(f"{server_url}/api/v1/targets", headers=headers, verify=_acunetix_verify)
-        print(f"    Status: {targets_resp.status_code}")
-        if targets_resp.status_code != 200:
-            print(f"    Error: {targets_resp.text}")
-            return
-        
-        targets_data = targets_resp.json()
-        targets = targets_data.get('targets', [])
+        targets = []
+        c = 0
+        while True:
+            url = f"{server_url}/api/v1/targets"
+            if c:
+                url += f"?c={c}"
+            targets_resp = requests.get(url, headers=headers, verify=_acunetix_verify)
+            if targets_resp.status_code != 200:
+                print(f"    Error fetching page cursor {c}: {targets_resp.text}")
+                break
+            
+            targets_data = targets_resp.json()
+            page_targets = targets_data.get('targets', [])
+            targets.extend(page_targets)
+            
+            cursor = targets_data.get('pagination', {}).get('cursor')
+            if not cursor or not page_targets:
+                break
+            c = cursor
+            
         print(f"    Found {len(targets)} total targets in Acunetix.")
         
         matching_targets = []
@@ -55,6 +67,10 @@ def test_acunetix(query_target_name=None):
             
         if not matching_targets:
             print("    No matching targets found.")
+            if targets:
+                print("    Here are the first 10 targets in Acunetix for comparison:")
+                for t in targets[:10]:
+                    print(f"      - {t.get('address')} (ID: {t.get('target_id')}) (Desc: {t.get('description')})")
             return
             
         for t in matching_targets:
