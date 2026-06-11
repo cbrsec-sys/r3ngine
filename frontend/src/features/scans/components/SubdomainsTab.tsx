@@ -63,7 +63,8 @@ import {
   useDeleteSubdomain,
   useToggleSubdomainImportant,
   useInitiateSubscan,
-  useGPTAttackSurface
+  useGPTAttackSurface,
+  SubdomainFilters
 } from '../../subdomains/api';
 import { useEngines } from '../../engines/api';
 import { usePlugins } from '../../plugins/api/pluginsApi';
@@ -102,8 +103,13 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedAssets, setSelectedAssets] = useState<number[]>([]);
+  const [hasIpFilter, setHasIpFilter] = useState(false);
 
-  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, false, targetId);
+  const filters: SubdomainFilters = {
+    has_ip: hasIpFilter ? 'true' : undefined
+  };
+
+  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, false, targetId, filters);
   const [isReady, setIsReady] = useState(false);
   
   // Modals state
@@ -328,6 +334,21 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
     }
   };
 
+  const handleSendToAWVS = async () => {
+    if (selectedAssets.length === 0) return;
+    try {
+      await subscanMutation.mutateAsync({
+        engine_id: null,
+        tasks: ['run_acunetix'],
+        subdomain_ids: selectedAssets
+      });
+      showNotification('Acunetix scan initiated successfully');
+      setSelectedAssets([]);
+    } catch (error: any) {
+      showNotification(error.message || 'Failed to initiate Acunetix scan', 'error');
+    }
+  };
+
   const selectedEngine = enginesData?.find(e => e.id === selectedEngineId);
 
   const handleAddTodo = async () => {
@@ -435,6 +456,25 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         >
           SEARCH
         </Button>
+        <Button
+          onClick={() => {
+            setHasIpFilter(prev => !prev);
+            setPage(1);
+          }}
+          sx={{
+            bgcolor: hasIpFilter ? 'rgba(0, 243, 255, 0.2)' : 'transparent',
+            color: hasIpFilter ? '#00f3ff' : 'rgba(255, 255, 255, 0.6)',
+            px: 3,
+            borderRadius: 0,
+            fontWeight: 700,
+            fontSize: '11px',
+            letterSpacing: 1,
+            borderLeft: '1px solid rgba(0, 243, 255, 0.1)',
+            '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.15)' }
+          }}
+        >
+          {hasIpFilter ? 'HAS IP [ON]' : 'HAS IP'}
+        </Button>
       </Box>
 
       {/* Tactical Panel */}
@@ -478,6 +518,22 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   }}
                 >
                   SUBSCAN SELECTED ({selectedAssets.length})
+                </Button>
+                <Button 
+                  size="small" 
+                  variant="contained" 
+                  onClick={handleSendToAWVS}
+                  disabled={subscanMutation.isPending}
+                  sx={{ 
+                    bgcolor: 'rgba(255, 170, 0, 0.1)', 
+                    color: '#ffaa00', 
+                    fontSize: '10px', 
+                    fontWeight: 800, 
+                    border: '1px solid rgba(255, 170, 0, 0.2)',
+                    '&:hover': { bgcolor: 'rgba(255, 170, 0, 0.2)' } 
+                  }}
+                >
+                  {subscanMutation.isPending ? 'SENDING...' : `SEND TO AWVS (${selectedAssets.length})`}
                 </Button>
                 <Button 
                   size="small" 
