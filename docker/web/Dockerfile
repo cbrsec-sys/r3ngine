@@ -370,6 +370,7 @@ RUN git clone --depth 1 https://github.com/urbanadventurer/username-anarchy /usr
     ln -sf /usr/src/github/username-anarchy/username-anarchy /usr/local/bin/username-anarchy
 
 RUN git clone --depth 1 https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python && \
+    sed -i 's/Sent from Acunetix-Python/r3-external/g' /usr/src/github/acunetix-python/acunetix/core.py && \
     pip3 install --no-cache-dir /usr/src/github/acunetix-python && \
     rm -rf /usr/src/github/acunetix-python/.git
 
