@@ -34,26 +34,32 @@ def test_acunetix(query_target_name=None):
     print("\n[1] Fetching targets list from Acunetix (paginated)...")
     try:
         targets = []
-        c = 0
-        while True:
+        all_cursors = [None]
+        visited = set()
+        
+        while len(visited) < len(all_cursors):
+            c = next(cur for cur in all_cursors if cur not in visited)
+            visited.add(c)
+            
             url = f"{server_url}/api/v1/targets"
             if c:
                 url += f"?c={c}"
+            
             targets_resp = requests.get(url, headers=headers, verify=_acunetix_verify)
             if targets_resp.status_code != 200:
                 print(f"    Error fetching page cursor {c}: {targets_resp.text}")
                 break
-            
+                
             targets_data = targets_resp.json()
             page_targets = targets_data.get('targets', [])
             pagination = targets_data.get('pagination', {})
             print(f"    [Debug] Fetched page with cursor {c}: {len(page_targets)} targets. Pagination metadata: {pagination}")
             targets.extend(page_targets)
             
-            cursor = pagination.get('cursor')
-            if not cursor or not page_targets:
-                break
-            c = cursor
+            # Dynamically discover next cursors
+            for cur in pagination.get('cursors', []):
+                if cur not in all_cursors:
+                    all_cursors.append(cur)
             
         print(f"    Found {len(targets)} total targets in Acunetix.")
         
