@@ -1,0 +1,33 @@
+- model: scanEngine.enginetype
+  pk: 14
+  fields:
+    engine_name: Code Scan
+    default_engine: false
+    yaml_configuration: |
+      code_scan:
+        grype: true
+        trivy: true
+      secret_scanning:
+        gitleaks: true
+        trufflehog: true
+        leaklookup: false
+      vulnerability_scan:
+        run_nuclei: false
+        run_dalfox: false
+        run_crlfuzz: false
+        run_acunetix: false
+        run_wpscan: false
+        run_vigolium: false
+        enable_http_crawl: false
+        concurrency: 10
+        intensity: normal
+        rate_limit: 50
+        retries: 1
+        timeout: 60
+        fetch_gpt_report: false
+        nuclei:
+          use_nuclei_config: false
+          severities:
+            - medium
+            - high
+            - critical
