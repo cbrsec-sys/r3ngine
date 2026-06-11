@@ -6781,9 +6781,16 @@ def map_acunetix_severity(severity):
 	return mapping.get(severity, 0)
 
 
-def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=None):
+def acunetix_scan(
+		self,
+		domain_id,
+		scan_history_id=None,
+		ctx={},
+		description=None,
+		subdomain_name=None,
+		subdomain_http_url=None):
 	"""
-	Run Acunetix (AWVS) scan for the given domain.
+	Run Acunetix (AWVS) scan for the given domain or a subdomain target.
 	"""
 	if not Acunetix:
 		logger.error("Acunetix library not found. Skipping Acunetix scan.")
@@ -6791,6 +6798,8 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 	logger.info(f"Starting Acunetix scan for domain ID: {domain_id}")
 	scan_history = ScanHistory.objects.get(pk=scan_history_id) if scan_history_id else None
 	domain = Domain.objects.get(pk=domain_id)
+	target_name = subdomain_name or domain.name
+	target_url = subdomain_http_url or f"https://{target_name}"
 	
 	# Get credentials from vault
 	creds = AcunetixAPIKey.objects.first()
@@ -6801,13 +6810,11 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 	try:
 		acunetix = Acunetix(host=creds.server_url, api=creds.api_key)
 		logger.info(f"Acunetix instance created: {acunetix}")
-		
-		target_url = f"https://{domain.name}"
 		logger.info(f"Starting Acunetix scan for {target_url}")
 		
 		# Use the library's start_scan which typically adds target and starts scan
 		# Based on the user provided example
-		scan_info = acunetix.start_scan(domain.name)
+		scan_info = acunetix.start_scan(target_url)
 		target_id = scan_info.get('target_id')
 		
 		# Now we need to poll for status and fetch findings.
@@ -6822,12 +6829,15 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 		# If target_id wasn't in scan_info, try to find it
 		if not target_id:
 			targets_data = acunetix.targets()
-			target = next((t for t in targets_data.get('targets', []) if domain.name in t['address']), None)
+			target = next((
+				t for t in targets_data.get('targets', [])
+				if target_name in t['address'] or target_url in t['address']
+			), None)
 			if target:
 				target_id = target['target_id']
 
 		if not target_id:
-			logger.error(f"Target {domain.name} not found in Acunetix after start_scan.")
+			logger.error(f"Target {target_name} not found in Acunetix after start_scan.")
 			return False
 			
 		# Wait for scan to complete
@@ -6845,11 +6855,11 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 					current_status = latest_scan.get('current_session', {}).get('status')
 					
 					if current_status == 'completed':
-						logger.info(f"Acunetix scan for {domain.name} completed.")
+						logger.info(f"Acunetix scan for {target_name} completed.")
 						scan_id = latest_scan.get('scan_id')
 						break
 					elif current_status in ['failed', 'aborted']:
-						logger.error(f"Acunetix scan for {domain.name} {current_status}.")
+						logger.error(f"Acunetix scan for {target_name} {current_status}.")
 						return False
 			
 			time.sleep(10)
@@ -7835,4 +7845,3 @@ def recover_stuck_scans():
 			logger.error("[RECOVERY] Failed to auto-recover stuck running scan %d: %s", scan.id, e)
 
 	logger.info("[RECOVERY] recover_stuck_scans complete — active=%d recovered=%d", active, recovered)
-
