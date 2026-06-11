@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { useParams } from '@tanstack/react-router';
+import { useParams, Link as RouterLink } from '@tanstack/react-router';
 import { 
   Box, 
   Typography, 
@@ -338,6 +338,8 @@ export const SubScansPage: React.FC = () => {
                     <Button
                       variant="contained"
                       size="small"
+                      component={RouterLink}
+                      to={`/${projectSlug}/scan/detail/${scan.scan_history}`}
                       sx={{ 
                         fontSize: '10px', 
                         fontFamily: 'Orbitron',
