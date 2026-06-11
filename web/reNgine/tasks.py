@@ -6800,6 +6800,18 @@ def acunetix_scan(
 	domain = Domain.objects.get(pk=domain_id)
 	target_name = subdomain_name or domain.name
 	target_url = subdomain_http_url or f"https://{target_name}"
+
+	# Resolve subdomain and subscan objects for association
+	from startScan.models import SubScan
+	subdomain = None
+	if subdomain_name:
+		subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=scan_history).first()
+		if not subdomain and scan_history:
+			subdomain = Subdomain.objects.filter(name=subdomain_name, target_domain=domain).first()
+	if not subdomain:
+		subdomain = getattr(self, 'subdomain', None)
+
+	subscan = getattr(self, 'subscan', None)
 	
 	# Get credentials from vault
 	creds = AcunetixAPIKey.objects.first()
@@ -6920,7 +6932,12 @@ def acunetix_scan(
 					if v_detail.get('cwe_id'):
 						cwes.append(f"CWE-{v_detail['cwe_id']}")
 					save_v_data['cwe_ids'] = cwes
-					
+
+					if subdomain:
+						save_v_data['subdomain'] = subdomain
+					if subscan:
+						save_v_data['subscan'] = subscan
+
 					save_vulnerability(**save_v_data)
 					
 		return True
