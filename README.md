@@ -1,4 +1,8 @@
 <p align="center">
+  <h4 align="center"><strong>v3.6.0 is currently unstable. Please use v3.5.0 from the main branch or releases instead.</strong></h4>
+</p>
+
+<p align="center">
 <img src="frontend/public/img/banner.png" height="400px" width="520px" alt=""/>
 </p>
 
@@ -14,7 +18,7 @@
 
 <p align="center">
   <a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank">
-    <img src="https://img.shields.io/badge/version-v3.5.0-informational?&logo=none" alt="r3ngine Latest Version" />
+    <img src="https://img.shields.io/badge/version-v3.6.0-informational?&logo=none" alt="r3ngine Latest Version" />
   </a>
   &nbsp;
   <a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank">
@@ -24,11 +28,14 @@
   <a href="#" target="_blank">
     <img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" />
   </a>
+  <a href="https://github.com/Security-Tools-Alliance/rengine-ng" target="_blank">
+    <img src="https://img.shields.io/badge/inspired-by--rengine-ng--red.svg?&logo=none" alt="Inspired by rengine-ng" />
+  </a>
 </p>
 
-<h3 align="center">r3ngine 3.5.0: The Phoenix Rebirth</h3>
+<h3 align="center">r3ngine 3.6.0: The Phoenix Rebirth</h3>
 <p>
-  r3ngine v3.5.0 is the production-stabilized, enterprise-grade evolution of the platform. This release delivers a complete <b>CVE Enrichment System</b> (NVD, EPSS, CISA KEV), a <b>Burp Suite Professional Integration Plugin</b>, and deep <b>Neo4j graph sync</b> with CVE metadata. The infrastructure has been hardened with <b>Django 5.2.3 LTS</b>, <b>PostgreSQL 16</b>, and <b>Gunicorn + Uvicorn ASGI</b> production serving. Building on the v3.2.0 Celery → Temporal migration — which replaced the legacy at-most-once task broker with a durable workflow engine providing crash-safe execution, full replay history, and pause/resume signaling — v3.5.0 focuses on intelligence enrichment, operational security, and production reliability at scale.
+  r3ngine v3.6.0 is the production-stabilized, enterprise-grade evolution of the platform. Building off the original reNgine and further insired by rengine-ng (Check out <a href="https://github.com/Security-Tools-Alliance/rengine-ng" target="_blank">rengine-ng v3</a> if you haven't!) This release delivers deep <b>Neo4j graph sync</b> with CVE metadata. With a whole new metasploit plugin featuring an interactive terminal, as well as quick task delegation. Also added a new module that allows for quick enumeration and identification of vulnerable services running on discovered hosts. The infrastructure has been hardened with <b>Django 5.2.3 LTS</b>, <b>PostgreSQL 16</b>, and <b>Gunicorn + Uvicorn ASGI</b> production serving. Building on the v3.2.0 Celery → Temporal migration — which replaced the legacy at-most-once task broker with a durable workflow engine providing crash-safe execution, full replay history, and pause/resume signaling — v3.6.0 focuses on intelligence enrichment, operational security, and production reliability at scale.
 </p>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
