@@ -11,9 +11,20 @@ export interface SubdomainFilters {
   has_ip?: string;
 }
 
-export const useSubdomains = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, onlyDirectory = false, targetId?: number, filters?: SubdomainFilters, pageSize = 10) => {
+export const useSubdomains = (
+  projectSlug: string,
+  page = 1,
+  searchQuery = '',
+  scanId?: number,
+  onlyDirectory = false,
+  targetId?: number,
+  filters?: SubdomainFilters,
+  pageSize = 10,
+  sortCol?: string,
+  sortDir?: 'asc' | 'desc'
+) => {
   return useQuery<SubdomainResponse>({
-    queryKey: ['subdomains', projectSlug, page, searchQuery, scanId, onlyDirectory, targetId, filters, pageSize],
+    queryKey: ['subdomains', projectSlug, page, searchQuery, scanId, onlyDirectory, targetId, filters, pageSize, sortCol, sortDir],
     queryFn: async () => {
       const response = await axios.get('/api/listDatatableSubdomain/', {
         params: {
@@ -29,7 +40,9 @@ export const useSubdomains = (projectSlug: string, page = 1, searchQuery = '', s
           is_important: filters?.is_important,
           has_vulnerabilities: filters?.has_vulnerabilities,
           ports: filters?.ports,
-          has_ip: filters?.has_ip
+          has_ip: filters?.has_ip,
+          'order[0][column]': sortCol,
+          'order[0][dir]': sortDir
         }
       });
       return response.data;

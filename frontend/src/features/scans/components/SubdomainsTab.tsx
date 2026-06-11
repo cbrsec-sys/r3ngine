@@ -104,12 +104,24 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedAssets, setSelectedAssets] = useState<number[]>([]);
   const [hasIpFilter, setHasIpFilter] = useState(false);
+  const [sortCol, setSortCol] = useState<string | undefined>('1');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  const handleSort = (colNum: string) => {
+    if (sortCol === colNum) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(colNum);
+      setSortDir('asc');
+    }
+    setPage(1);
+  };
 
   const filters: SubdomainFilters = {
     has_ip: hasIpFilter ? 'true' : undefined
   };
 
-  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, false, targetId, filters);
+  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, false, targetId, filters, 10, sortCol, sortDir);
   const [isReady, setIsReady] = useState(false);
   
   // Modals state
@@ -581,12 +593,74 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                     style={{ width: '14px', height: '14px', accentColor: '#00f3ff', cursor: 'pointer', opacity: 0.6 }}
                   />
                 </th>
-                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SUBDOMAIN</th>
-                <Box component="th" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</Box>
+                <th
+                  onClick={() => handleSort('1')}
+                  style={{
+                    padding: '12px 16px',
+                    color: '#00f3ff',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    letterSpacing: 1.5,
+                    fontFamily: 'Orbitron',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  SUBDOMAIN {sortCol === '1' && (sortDir === 'asc' ? '▲' : '▼')}
+                </th>
+                <Box
+                  component="th"
+                  onClick={() => handleSort('4')}
+                  sx={{
+                    display: { xs: 'none', sm: 'table-cell' },
+                    padding: '12px 16px',
+                    color: '#00f3ff',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    letterSpacing: 1.5,
+                    fontFamily: 'Orbitron',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  STATUS {sortCol === '4' && (sortDir === 'asc' ? '▲' : '▼')}
+                </Box>
                 <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>IP</Box>
                 <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PORTS</Box>
-                <Box component="th" sx={{ display: { xs: 'none', xl: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>CONTENT</Box>
-                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>TIME</Box>
+                <Box
+                  component="th"
+                  onClick={() => handleSort('8')}
+                  sx={{
+                    display: { xs: 'none', xl: 'table-cell' },
+                    padding: '12px 16px',
+                    color: '#00f3ff',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    letterSpacing: 1.5,
+                    fontFamily: 'Orbitron',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  CONTENT {sortCol === '8' && (sortDir === 'asc' ? '▲' : '▼')}
+                </Box>
+                <Box
+                  component="th"
+                  onClick={() => handleSort('10')}
+                  sx={{
+                    display: { xs: 'none', lg: 'table-cell' },
+                    padding: '12px 16px',
+                    color: '#00f3ff',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    letterSpacing: 1.5,
+                    fontFamily: 'Orbitron',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  TIME {sortCol === '10' && (sortDir === 'asc' ? '▲' : '▼')}
+                </Box>
                 <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SCREENSHOT</Box>
                 <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron', textAlign: 'right' }}>ACTION</th>
               </tr>
