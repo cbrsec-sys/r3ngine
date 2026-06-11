@@ -2663,7 +2663,7 @@ def get_discovered_services_activity(ctx: dict) -> list:
 
     services = []
     ip_qs = IpAddress.objects.filter(
-        subdomain__scan_history_id=scan_history_id
+        ip_addresses__scan_history_id=scan_history_id
     ).prefetch_related('ports').distinct()
 
     for ip in ip_qs:
