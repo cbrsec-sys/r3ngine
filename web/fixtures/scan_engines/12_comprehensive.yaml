@@ -33,12 +33,12 @@
         enable_http_crawl: true
         timeout: 5
         ports:
-          - top-1000
+          - top-100
         rate_limit: 150
         threads: 20
         passive: false
         enable_nmap: true
-        nmap_cmd: nmap -vv -Pn -sV
+        nmap_cmd: nmap -vv -Pn -sV -sC 
         nmap_script: /usr/share/nmap/scripts/vulners.nse
         enable_network_enum: true
       osint:
