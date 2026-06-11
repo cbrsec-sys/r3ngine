@@ -271,11 +271,13 @@ export const WorkflowLauncher: React.FC<WorkflowLauncherProps> = ({
               sx={fieldStyles}
             />
 
+            {/*
             <ProfileSelector
               value={profileName}
               onChange={setProfileName}
               disabled={isPending}
             />
+            */}
 
             <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
               <Button
