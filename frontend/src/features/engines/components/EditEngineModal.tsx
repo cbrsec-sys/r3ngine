@@ -9,10 +9,12 @@ import {
   Box,
   Typography,
   IconButton,
-  CircularProgress
+  CircularProgress,
+  Tooltip,
 } from '@mui/material';
-import { X, Cpu, Save } from 'lucide-react';
+import { X, Cpu, Save, BookOpen } from 'lucide-react';
 import { fetchEngineDetails, useUpdateEngine } from '../api';
+import { EngineConfigReferenceModal } from './EngineConfigReferenceModal';
 
 interface EditEngineModalProps {
   open: boolean;
@@ -24,6 +26,7 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
   const [name, setName] = useState('');
   const [yaml, setYaml] = useState('');
   const [loading, setLoading] = useState(false);
+  const [refOpen, setRefOpen] = useState(false);
   const updateEngine = useUpdateEngine();
   const backgroundRef = React.useRef<HTMLPreElement>(null);
 
@@ -124,6 +127,24 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
               }}
             />
 
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography sx={{ color: 'rgba(0,243,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
+                YAML CONFIGURATION BLUEPRINT
+              </Typography>
+              <Tooltip title="View configuration reference">
+                <IconButton
+                  size="small"
+                  onClick={() => setRefOpen(true)}
+                  sx={{
+                    color: 'rgba(0,243,255,0.6)',
+                    p: 0.5,
+                    '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0,243,255,0.08)' },
+                  }}
+                >
+                  <BookOpen size={14} />
+                </IconButton>
+              </Tooltip>
+            </Box>
             <Box sx={{
               position: 'relative',
               width: '100%',
@@ -258,6 +279,7 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
           {updateEngine.isPending ? 'SYNCHRONIZING...' : 'COMMIT CHANGES'}
         </Button>
       </DialogActions>
+      <EngineConfigReferenceModal open={refOpen} onClose={() => setRefOpen(false)} />
     </Dialog>
   );
 };
