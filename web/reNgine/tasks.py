@@ -6878,25 +6878,40 @@ def acunetix_scan(
 			retries += 1
 			
 		# Fetch Vulnerabilities for the specific scan
-		if not scan_id:
-			# Fallback to target_id if scan_id not found
+		vulns_url = None
+		if scan_id:
+			# Fetch scan details to get the scan session/result ID (which differs across AWVS versions)
+			scan_detail_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify)
+			if scan_detail_resp.status_code == 200:
+				scan_detail = scan_detail_resp.json()
+				session = scan_detail.get('current_session', {})
+				session_id = session.get('scan_session_id') or session.get('result_id')
+				if session_id:
+					vulns_url = f"{base_url}/api/v1/scans/{scan_id}/results/{session_id}/vulnerabilities"
+		
+		if not vulns_url:
+			# Fallback to querying by target_id
 			vulns_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
-		else:
-			# Fetch vulnerabilities for the specific scan
-			# Note: The API for scan vulnerabilities might be different, 
-			# but q=scan_id:ID or the sub-resource works in many versions.
-			vulns_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
 
 		logger.info(f"Fetching Acunetix vulnerabilities from: {vulns_url}")
 		vulns_resp = requests.get(vulns_url, headers=headers, verify=_acunetix_verify)
 		logger.info(f"Acunetix vulnerabilities response code: {vulns_resp.status_code}")
 
-		# If scan_id was used but returned 404, fallback to query by scan_id
-		if scan_id and vulns_resp.status_code == 404:
-			vulns_url = f"{base_url}/api/v1/vulnerabilities?q=scan_id:{scan_id}"
-			logger.info(f"Retrying with fallback URL: {vulns_url}")
-			vulns_resp = requests.get(vulns_url, headers=headers, verify=_acunetix_verify)
-			logger.info(f"Fallback response code: {vulns_resp.status_code}")
+		# If the URL returned 400 or 404, try fallbacks
+		if vulns_resp.status_code in [400, 404]:
+			# Fallback 1: try /api/v1/scans/{scan_id}/vulnerabilities
+			if scan_id:
+				fallback_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
+				logger.info(f"Retrying with fallback 1 URL: {fallback_url}")
+				vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify)
+				logger.info(f"Fallback 1 response code: {vulns_resp.status_code}")
+			
+			# Fallback 2: try querying by target_id
+			if vulns_resp.status_code in [400, 404]:
+				fallback_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
+				logger.info(f"Retrying with fallback 2 URL: {fallback_url}")
+				vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify)
+				logger.info(f"Fallback 2 response code: {vulns_resp.status_code}")
 
 		if vulns_resp.status_code == 200:
 			vulns_data = vulns_resp.json()
