@@ -10,7 +10,9 @@ logger = logging.getLogger(__name__)
 
 from datetime import datetime
 from django import http
+from django.conf import settings
 from django.contrib import messages
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from django.contrib.auth.decorators import login_required
@@ -1291,15 +1293,14 @@ def get_full_yaml_config(request, slug):
 
 
 @login_required
-def yaml_config_reference(request, slug):
+def yaml_config_reference(request: HttpRequest, slug: str) -> http.JsonResponse:
     """Return the full YAML configuration reference (static file, all config keys documented)."""
-    from django.conf import settings
     ref_path = os.path.join(settings.BASE_DIR, 'scanEngine', 'reference', 'full_yaml_config.yaml')
     try:
         with open(ref_path, 'r') as f:
             content = f.read()
         return http.JsonResponse({'status': 'success', 'content': content})
-    except FileNotFoundError:
+    except OSError:
         return http.JsonResponse(
             {'status': 'error', 'content': '', 'message': 'Reference config not found'},
             status=404,
