@@ -46,9 +46,11 @@ def test_acunetix(query_target_name=None):
             
             targets_data = targets_resp.json()
             page_targets = targets_data.get('targets', [])
+            pagination = targets_data.get('pagination', {})
+            print(f"    [Debug] Fetched page with cursor {c}: {len(page_targets)} targets. Pagination metadata: {pagination}")
             targets.extend(page_targets)
             
-            cursor = targets_data.get('pagination', {}).get('cursor')
+            cursor = pagination.get('cursor')
             if not cursor or not page_targets:
                 break
             c = cursor
