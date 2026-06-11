@@ -3573,6 +3573,7 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 		is_important = req.query_params.get('is_important')
 		has_vulnerabilities = req.query_params.get('has_vulnerabilities')
 		ports = req.query_params.get('ports')
+		has_ip = req.query_params.get('has_ip')
 
 		subdomains = Subdomain.objects.filter(target_domain__project__slug=project)
 
@@ -3631,6 +3632,12 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 			port_list = [p.strip() for p in ports.split(',') if p.strip()]
 			if port_list:
 				self.queryset = self.queryset.filter(ip_addresses__ports__number__in=port_list).distinct()
+
+		if has_ip is not None:
+			if has_ip.lower() in ('true', '1', 't', 'y', 'yes'):
+				self.queryset = self.queryset.filter(ip_addresses__isnull=False).distinct()
+			elif has_ip.lower() in ('false', '0', 'f', 'n', 'no'):
+				self.queryset = self.queryset.filter(ip_addresses__isnull=True).distinct()
 
 		return self.queryset
 

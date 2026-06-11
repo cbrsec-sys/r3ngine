@@ -8,6 +8,7 @@ export interface SubdomainFilters {
   is_important?: string;
   has_vulnerabilities?: string;
   ports?: string;
+  has_ip?: string;
 }
 
 export const useSubdomains = (projectSlug: string, page = 1, searchQuery = '', scanId?: number, onlyDirectory = false, targetId?: number, filters?: SubdomainFilters, pageSize = 10) => {
@@ -27,7 +28,8 @@ export const useSubdomains = (projectSlug: string, page = 1, searchQuery = '', s
           http_status: filters?.http_status,
           is_important: filters?.is_important,
           has_vulnerabilities: filters?.has_vulnerabilities,
-          ports: filters?.ports
+          ports: filters?.ports,
+          has_ip: filters?.has_ip
         }
       });
       return response.data;
@@ -38,7 +40,7 @@ export const useSubdomains = (projectSlug: string, page = 1, searchQuery = '', s
 
 export const useInitiateSubscan = () => {
   return useMutation({
-    mutationFn: async (params: { engine_id: number; tasks: string[]; subdomain_ids: number[]; selected_plugins?: string[] }) => {
+    mutationFn: async (params: { engine_id: number | null; tasks: string[]; subdomain_ids: number[]; selected_plugins?: string[] }) => {
       const response = await axios.post('/api/action/initiate/subtask/', params, {
         headers: {
           'X-CSRFToken': getCsrfToken()
