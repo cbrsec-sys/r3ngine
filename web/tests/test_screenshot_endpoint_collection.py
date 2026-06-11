@@ -198,7 +198,7 @@ class TestScreenshotEndpointQuery(TestCase):
 
     @patch('reNgine.screenshot.tasks.take_screenshot_and_save')
     def test_screenshots_all_default_endpoints_normal_intensity(self, mock_save):
-        """Normal intensity: all is_default=True endpoints with http_status > 0 are screenshotted."""
+        """Normal intensity: all is_default=True endpoints are screenshotted regardless of http_status."""
         mock_save.return_value = True
 
         sub1 = self._make_subdomain('a.target.com', http_status=200)
@@ -213,7 +213,6 @@ class TestScreenshotEndpointQuery(TestCase):
         from reNgine.tasks import screenshot
         screenshot(proxy)
 
-        # All 3 endpoints have http_status > 0, so all 3 pass
         self.assertEqual(mock_save.call_count, 3)
         called_urls = {c.kwargs['url_override'] for c in mock_save.call_args_list}
         self.assertIn('https://a.target.com', called_urls)
@@ -221,23 +220,26 @@ class TestScreenshotEndpointQuery(TestCase):
         self.assertIn('https://c.target.com', called_urls)
 
     @patch('reNgine.screenshot.tasks.take_screenshot_and_save')
-    def test_normal_intensity_excludes_zero_status_endpoints(self, mock_save):
-        """Normal intensity excludes default endpoints where http_status == 0 (unreachable)."""
+    def test_normal_intensity_includes_zero_status_endpoints(self, mock_save):
+        """is_default=True endpoints with http_status=0 are included — http_crawl hasn't probed them yet.
+        Playwright handles connection failures gracefully, matching the rengine-ng approach."""
         mock_save.return_value = True
 
         alive_sub = self._make_subdomain('alive.target.com', http_status=200)
-        dead_sub = self._make_subdomain('dead.target.com', http_status=0)
+        unprobed_sub = self._make_subdomain('unprobed.target.com', http_status=0)
         self._make_default_endpoint(alive_sub, 'https://alive.target.com', http_status=200)
-        self._make_default_endpoint(dead_sub, 'https://dead.target.com', http_status=0)
+        self._make_default_endpoint(unprobed_sub, 'https://unprobed.target.com', http_status=0)
 
         proxy = self._make_mock_proxy(self.scan, {'intensity': 'normal'})
 
         from reNgine.tasks import screenshot
         screenshot(proxy)
 
-        self.assertEqual(mock_save.call_count, 1)
-        called_url = mock_save.call_args.kwargs['url_override']
-        self.assertEqual(called_url, 'https://alive.target.com')
+        # Both endpoints are attempted — Playwright decides what's reachable
+        self.assertEqual(mock_save.call_count, 2)
+        called_urls = {c.kwargs['url_override'] for c in mock_save.call_args_list}
+        self.assertIn('https://alive.target.com', called_urls)
+        self.assertIn('https://unprobed.target.com', called_urls)
 
     @patch('reNgine.screenshot.tasks.take_screenshot_and_save')
     def test_non_default_endpoints_are_skipped(self, mock_save):

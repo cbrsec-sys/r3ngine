@@ -2313,8 +2313,10 @@ def screenshot(self, ctx={}, description=None):
 		.select_related('subdomain')
 	)
 
-	if strict:
-		endpoints = endpoints.filter(http_status__gt=0)
+	# No http_status filter: is_default endpoints are created before http_crawl probes them,
+	# so they always have http_status=0. Playwright handles unreachable URLs gracefully.
+	# intensity=normal still limits scope via is_default=True (one endpoint per subdomain root).
+	_ = strict  # reserved for future per-intensity tuning
 
 	endpoint_list = list(endpoints)
 	logger.info("Starting Playwright screenshot capture for %d default endpoints...", len(endpoint_list))
