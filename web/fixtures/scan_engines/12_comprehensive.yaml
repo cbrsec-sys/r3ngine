@@ -38,7 +38,7 @@
         threads: 20
         passive: false
         enable_nmap: true
-        nmap_cmd: nmap -vv -Pn -sV -sC 
+        nmap_cmd: nmap -vv -Pn -sC 
         nmap_script: /usr/share/nmap/scripts/vulners.nse
         enable_network_enum: true
       osint:
