@@ -349,7 +349,7 @@ export const ScanHistoryPage: React.FC = () => {
                       />
                     </TableCell>
                     <TableCell
-                      sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}
+                      sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer' }}
                       onClick={(e) => {
                         e.stopPropagation();
                         navigate({ to: `/${projectSlug}/scan/detail/${scan.id}` as any });
