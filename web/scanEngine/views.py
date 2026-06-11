@@ -13,6 +13,7 @@ from django import http
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.contrib.auth.decorators import login_required
 from rolepermissions.decorators import has_permission_decorator
 
 from reNgine.common_func import *
@@ -1287,3 +1288,19 @@ def get_full_yaml_config(request, slug):
         return http.JsonResponse({'status': 'success', 'content': content})
     except Exception as e:
         return http.JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@login_required
+def yaml_config_reference(request, slug):
+    """Return the full YAML configuration reference (static file, all config keys documented)."""
+    from django.conf import settings
+    ref_path = os.path.join(settings.BASE_DIR, 'scanEngine', 'reference', 'full_yaml_config.yaml')
+    try:
+        with open(ref_path, 'r') as f:
+            content = f.read()
+        return http.JsonResponse({'status': 'success', 'content': content})
+    except FileNotFoundError:
+        return http.JsonResponse(
+            {'status': 'error', 'content': '', 'message': 'Reference config not found'},
+            status=404,
+        )
