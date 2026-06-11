@@ -460,6 +460,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           onClick={() => {
             setHasIpFilter(prev => !prev);
             setPage(1);
+            setSelectedAssets([]);
           }}
           sx={{
             bgcolor: hasIpFilter ? 'rgba(0, 243, 255, 0.2)' : 'transparent',

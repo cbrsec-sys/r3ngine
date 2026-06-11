@@ -1010,7 +1010,16 @@ def run_s3scanner_activity(ctx: dict) -> bool:
 def run_acunetix_activity(ctx: dict) -> bool:
     from reNgine.tasks import acunetix_scan
     activity.logger.info(f"[RunAcunetixActivity] scan_id={ctx.get('scan_history_id')}")
-    return _run_task(acunetix_scan, ctx, task_name='acunetix_scan', description='Acunetix Scan', domain_id=ctx.get('domain_id'), scan_history_id=ctx.get('scan_history_id'))
+    return _run_task(
+        acunetix_scan,
+        ctx,
+        task_name='acunetix_scan',
+        description='Acunetix Scan',
+        domain_id=ctx.get('domain_id'),
+        scan_history_id=ctx.get('scan_history_id'),
+        subdomain_name=ctx.get('subdomain_name'),
+        subdomain_http_url=ctx.get('subdomain_http_url'),
+    )
 
 @activity.defn(name="RunCpanelScanActivity")
 def run_cpanel_scan_activity(ctx: dict) -> bool:
