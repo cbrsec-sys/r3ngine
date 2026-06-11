@@ -239,10 +239,12 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
                   ))}
                 </TextField>
 
+                {/*
                 <ProfileSelector
                   value={formData.profile_name || null}
                   onChange={(name) => setFormData(prev => ({ ...prev, profile_name: name ?? '' }))}
                 />
+                */}
 
                 <FormControlLabel
                   control={
