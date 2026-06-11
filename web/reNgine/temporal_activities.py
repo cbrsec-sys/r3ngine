@@ -296,7 +296,9 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
     try:
         # task_func is the plain function (self/proxy is passed as first positional arg).
         raw_func = task_func.__func__ if hasattr(task_func, '__func__') else task_func
-        raw_func(proxy, ctx=ctx, description=description, **kwargs)
+        res = raw_func(proxy, ctx=ctx, description=description, **kwargs)
+        if res is False:
+            raise Exception(f"Task {task_name} execution returned False/failed.")
         proxy.update_scan_activity(SUCCESS_TASK)
         return True
     except Exception as exc:
