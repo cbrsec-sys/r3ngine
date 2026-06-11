@@ -350,7 +350,7 @@ export const ScanHistoryPage: React.FC = () => {
                     </TableCell>
                     <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       <RouterLink
-                        to={`/${projectSlug}/scan/detail/${scan.id}`}
+                        to={`/${projectSlug}/scan/detail/${scan.id}` as any}
                         onClick={(e) => e.stopPropagation()}
                         style={{ textDecoration: 'none' }}
                       >
