@@ -454,15 +454,18 @@ LOGGING = {
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
-        # All other reNgine modules (utils.graph, cve_enrichment, etc.)
+        # All reNgine modules — use the task formatter for consistent grep-friendly output.
+        # The task formatter produces: module.funcName | LEVEL | message
+        # Specific child loggers (e.g. reNgine.tasks, reNgine.temporal_activities) are
+        # listed above with propagate=False to override this catch-all where needed.
         'reNgine': {
-            'handlers': ['console', 'error_file'],
+            'handlers': ['task', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
         # Plugin code
         'plugins': {
-            'handlers': ['task', 'console', 'error_file'],
+            'handlers': ['task', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },

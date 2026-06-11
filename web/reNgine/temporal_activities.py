@@ -319,7 +319,16 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
     try:
         # task_func is the plain function (self/proxy is passed as first positional arg).
         raw_func = task_func.__func__ if hasattr(task_func, '__func__') else task_func
-        raw_func(proxy, ctx=ctx, description=description, **kwargs)
+        
+        import inspect
+        sig = inspect.signature(raw_func)
+        accepts_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
+        if 'ctx' in sig.parameters or accepts_kwargs:
+            kwargs['ctx'] = ctx
+        if 'description' in sig.parameters or accepts_kwargs:
+            kwargs['description'] = description
+            
+        raw_func(proxy, **kwargs)
         proxy.update_scan_activity(SUCCESS_TASK)
         logger.log_line("[TEMPORAL]", "COMPLETE", "task=%s scan_id=%s" % (task_name, _scan_id))
         return True
@@ -595,11 +604,13 @@ def parse_discovery_results_activity(ctx: dict) -> bool:
     """
     from startScan.models import ScanHistory, Subdomain
     scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=parse_discovery_results scan_id=%s" % scan_id)
     count = Subdomain.objects.filter(scan_history_id=scan_id).count()
     activity.logger.info(
         f"[ParseDiscoveryResultsActivity] scan_id={scan_id}: "
         f"{count} subdomains persisted."
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=parse_discovery_results scan_id=%s subdomains=%d" % (scan_id, count))
     return True
 
 
@@ -618,6 +629,7 @@ def seed_endpoints_for_crawl_activity(ctx: dict) -> dict:
 
     scan_id = ctx.get('scan_history_id')
     url_filter = ctx.get('starting_point_path', '')
+    logger.log_line("[TEMPORAL]", "START", "task=seed_endpoints_for_crawl scan_id=%s" % scan_id)
 
     subdomains = Subdomain.objects.filter(scan_history_id=scan_id)
     seed_urls = []
@@ -655,6 +667,7 @@ def seed_endpoints_for_crawl_activity(ctx: dict) -> dict:
         f"[SeedEndpointsForCrawlActivity] scan_id={scan_id}: "
         f"seeded {len(seed_urls)} endpoint(s) for http_crawl."
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=seed_endpoints_for_crawl scan_id=%s seeded=%d" % (scan_id, len(seed_urls)))
     return {**ctx, 'seed_urls': seed_urls}
 
 
@@ -698,6 +711,7 @@ def parse_http_crawl_results_activity(ctx: dict) -> bool:
     """
     from startScan.models import EndPoint
     scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=parse_http_crawl_results scan_id=%s" % scan_id)
     # is_alive is a @property (not a DB column): http_status > 0, < 500, != 404
     alive_count = EndPoint.objects.filter(
         scan_history_id=scan_id,
@@ -708,6 +722,7 @@ def parse_http_crawl_results_activity(ctx: dict) -> bool:
         f"[ParseHTTPCrawlResultsActivity] scan_id={scan_id}: "
         f"{alive_count} alive endpoints."
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=parse_http_crawl_results scan_id=%s alive=%d" % (scan_id, alive_count))
     return True
 
 
@@ -743,14 +758,18 @@ def run_port_scan_activity(ctx: dict) -> bool:
 @activity.defn(name="TorNewCircuitActivity")
 def run_tor_new_circuit_activity() -> None:
     from reNgine.common_func import get_random_proxy
+    logger.log_line("[TEMPORAL]", "START", "task=tor_new_circuit")
     if not get_random_proxy().startswith('socks'):
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=tor_new_circuit skipped=no_socks_proxy")
         return
     from reNgine.tor_manager import TorManager
     try:
         TorManager().new_circuit()
         activity.logger.info("[TorNewCircuitActivity] New TOR circuit requested successfully")
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=tor_new_circuit")
     except Exception as e:
         activity.logger.warning(f"[TorNewCircuitActivity] Circuit rotation failed (scan continues): {e}")
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=tor_new_circuit skipped=circuit_failed")
 
 
 @activity.defn(name="RunScreenshotActivity")
@@ -809,11 +828,13 @@ def parse_enumeration_results_activity(ctx: dict) -> bool:
     """
     from startScan.models import EndPoint, IpAddress
     scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=parse_enumeration_results scan_id=%s" % scan_id)
     endpoint_count = EndPoint.objects.filter(scan_history_id=scan_id).count()
     activity.logger.info(
         f"[ParseEnumerationResultsActivity] scan_id={scan_id}: "
         f"{endpoint_count} total endpoints."
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=parse_enumeration_results scan_id=%s endpoints=%d" % (scan_id, endpoint_count))
     return True
 
 
@@ -855,12 +876,14 @@ def parse_fuzz_results_activity(ctx: dict) -> bool:
     """
     from startScan.models import DirectoryFile
     scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=parse_fuzz_results scan_id=%s" % scan_id)
     fuzz_count = DirectoryFile.objects.filter(
         directory_files__directories__scan_history_id=scan_id
     ).distinct().count()
     activity.logger.info(
         f"[ParseFuzzResultsActivity] scan_id={scan_id}: {fuzz_count} fuzz entries."
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=parse_fuzz_results scan_id=%s entries=%d" % (scan_id, fuzz_count))
     return True
 
 
@@ -944,9 +967,10 @@ def parse_analysis_results_activity(ctx: dict) -> bool:
     Returns:
         bool: True on success.
     """
-    activity.logger.info(
-        f"[ParseAnalysisResultsActivity] scan_id={ctx.get('scan_history_id')}"
-    )
+    scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=parse_analysis_results scan_id=%s" % scan_id)
+    activity.logger.info(f"[ParseAnalysisResultsActivity] scan_id={scan_id}")
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=parse_analysis_results scan_id=%s" % scan_id)
     return True
 
 
@@ -1184,8 +1208,10 @@ def mark_vulnerability_scan_complete_activity(ctx: dict) -> None:
     from django.utils import timezone
 
     scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=mark_vulnerability_scan_complete scan_id=%s" % scan_id)
     scan = ScanHistory.objects.filter(pk=scan_id).first()
     if not scan:
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=mark_vulnerability_scan_complete scan_id=%s skipped=no_scan" % scan_id)
         return
     ScanActivity.objects.update_or_create(
         scan_of=scan,
@@ -1197,6 +1223,7 @@ def mark_vulnerability_scan_complete_activity(ctx: dict) -> None:
         }
     )
     activity.logger.info(f"[MarkVulnerabilityScanCompleteActivity] scan_id={scan_id} marked complete")
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=mark_vulnerability_scan_complete scan_id=%s" % scan_id)
 
 
 @activity.defn(name="RunWAFBypassActivity")
@@ -1234,11 +1261,13 @@ def parse_assessment_results_activity(ctx: dict) -> bool:
     """
     from startScan.models import Vulnerability
     scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=parse_assessment_results scan_id=%s" % scan_id)
     vuln_count = Vulnerability.objects.filter(scan_history_id=scan_id).count()
     activity.logger.info(
         f"[ParseAssessmentResultsActivity] scan_id={scan_id}: "
         f"{vuln_count} vulnerabilities found."
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=parse_assessment_results scan_id=%s vulns=%d" % (scan_id, vuln_count))
     return True
 
 
@@ -1296,6 +1325,7 @@ def enrich_scan_cves_activity(ctx: dict) -> bool:
     from reNgine.cve_enrichment import CVEEnrichmentService
 
     scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=enrich_scan_cves scan_id=%s" % scan_id)
     activity.logger.warning("[TIER7][CVE_ENRICH] Activity starting | scan_id=%s", scan_id)
 
     cve_names = list(
@@ -1307,6 +1337,7 @@ def enrich_scan_cves_activity(ctx: dict) -> bool:
 
     if not cve_names:
         activity.logger.warning("[TIER7][CVE_ENRICH] No CVEs found for this scan | scan_id=%s", scan_id)
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=enrich_scan_cves scan_id=%s enriched=0/0 skipped=no_cves" % scan_id)
         return True
 
     activity.logger.warning("[TIER7][CVE_ENRICH] Enriching %d CVE(s) | scan_id=%s", len(cve_names), scan_id)
@@ -1325,6 +1356,7 @@ def enrich_scan_cves_activity(ctx: dict) -> bool:
         "[TIER7][CVE_ENRICH] Complete | scan_id=%s enriched=%d/%d",
         scan_id, enriched, len(cve_names),
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=enrich_scan_cves scan_id=%s enriched=%d/%d" % (scan_id, enriched, len(cve_names)))
     return True
 
 
@@ -1402,6 +1434,7 @@ def sync_graph_activity(ctx: dict) -> bool:
 
     from reNgine.utils.graph import _graph_heartbeat
 
+    logger.log_line("[TEMPORAL]", "START", "task=sync_graph scan_id=%s" % scan_id)
     activity.logger.warning("[TIER7][GRAPH] SyncGraphActivity starting | scan_id=%s", scan_id)
     _graph_heartbeat("SyncGraphActivity starting neo4j sync for scan_id=%s" % scan_id)
 
@@ -1410,10 +1443,11 @@ def sync_graph_activity(ctx: dict) -> bool:
         nm.sync_scan_results(scan_id, heartbeat_callback=_graph_heartbeat)
         activity.logger.warning("[TIER7][GRAPH] Neo4j sync complete | scan_id=%s", scan_id)
         proxy.update_scan_activity(SUCCESS_TASK)
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=sync_graph scan_id=%s" % scan_id)
         return True
     except Exception as e:
         activity.logger.error("[TIER7][GRAPH] Neo4j sync failed | scan_id=%s: %s", scan_id, e)
-        logger.error("Neo4j sync failed for scan_id=%s: %s", scan_id, e)
+        logger.log_line("[TEMPORAL]", "ERROR", "task=sync_graph scan_id=%s error=%s" % (scan_id, format_exception_for_log(e)), level="error")
         proxy.update_scan_activity(FAILED_TASK, error_message=str(e))
         return False
     finally:
@@ -1649,6 +1683,7 @@ def init_stress_test_activity(ctx: dict) -> dict:
     target_domain = ctx["target_domain_name"]
     stress_config = ctx.get("stress_config", {})
 
+    logger.log_line("[TEMPORAL]", "START", "task=init_stress_test scan_id=%s" % scan_id)
     activity.logger.info(f"[InitStressTestActivity] scan_id={scan_id}")
 
     scan = ScanHistory.objects.get(id=scan_id)
@@ -1691,6 +1726,7 @@ def init_stress_test_activity(ctx: dict) -> dict:
         f"[InitStressTestActivity] scan_id={scan_id} "
         f"resolved {len(endpoints)} endpoint(s) for tools={tools}"
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=init_stress_test scan_id=%s endpoints=%d tools=%s" % (scan_id, len(endpoints), ','.join(tools)))
 
     return {
         **ctx,
@@ -1744,6 +1780,7 @@ def run_stress_tool_activity(ctx: dict) -> dict:
     concurrency = stress_config.get("concurrency", 50)
     duration = stress_config.get("duration", "30s") or "30s"
 
+    logger.log_line("[TEMPORAL]", "START", "task=run_stress_tool tool=%s endpoint=%s scan_id=%s" % (tool, endpoint_url, scan_id))
     activity.logger.info(
         f"[RunStressToolActivity] tool={tool} endpoint={endpoint_url} scan_id={scan_id}"
     )
@@ -1958,6 +1995,7 @@ def run_stress_tool_activity(ctx: dict) -> dict:
         f"[RunStressToolActivity] tool={tool} endpoint={endpoint_url} "
         f"done — {final_metrics.get('total_requests', 0)} requests"
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=run_stress_tool tool=%s scan_id=%s requests=%d" % (tool, scan_id, final_metrics.get('total_requests', 0)))
     return final_metrics
 
 
@@ -2044,6 +2082,7 @@ def run_startup_sync_activity(task_name: str) -> None:
       'sync_semgrep_rules'      — syncs Semgrep rule sets to local filesystem
       'sync_cve_data'           — full CVE enrichment (KEV catalog + unenriched CVEs)
     """
+    logger.log_line("[TEMPORAL]", "START", "task=run_startup_sync task_name=%s" % task_name)
     activity.logger.info(f"[RunStartupSyncActivity] Starting: {task_name}")
     if task_name == 'sync_all_scans_to_graph':
         from reNgine.tasks import sync_all_scans_to_graph
@@ -2068,6 +2107,7 @@ def run_startup_sync_activity(task_name: str) -> None:
     else:
         raise ValueError(f"[RunStartupSyncActivity] Unknown task: {task_name}")
     activity.logger.info(f"[RunStartupSyncActivity] Completed: {task_name}")
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=run_startup_sync task_name=%s" % task_name)
 
 
 @activity.defn(name="RunMonitoringCheckActivity")
@@ -2077,10 +2117,12 @@ def run_monitoring_check_activity(domain_id: int) -> None:
     Delegates to monitor_target_task which handles subdomain discovery, change
     detection, notifications, and conditional scan initiation.
     """
+    logger.log_line("[TEMPORAL]", "START", "task=run_monitoring_check domain_id=%s" % domain_id)
     activity.logger.info(f"[RunMonitoringCheckActivity] Checking domain_id={domain_id}")
     from reNgine.monitor_tasks import monitor_target_task
     monitor_target_task(domain_id)
     activity.logger.info(f"[RunMonitoringCheckActivity] Completed domain_id={domain_id}")
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=run_monitoring_check domain_id=%s" % domain_id)
 
 
 @activity.defn(name="SetupScheduledScanActivity")
@@ -2118,6 +2160,7 @@ def setup_scheduled_scan_activity(params: dict) -> dict:
     domain_id = params['domain_id']
     engine_id = params['engine_id']
     initiated_by_id = params.get('initiated_by_id')
+    logger.log_line("[TEMPORAL]", "START", "task=setup_scheduled_scan domain_id=%s engine_id=%s" % (domain_id, engine_id))
     imported_subdomains = params.get('imported_subdomains') or []
     out_of_scope_subdomains = params.get('out_of_scope_subdomains') or []
     starting_point_path = (params.get('starting_point_path') or '').rstrip('/')
@@ -2200,6 +2243,7 @@ def setup_scheduled_scan_activity(params: dict) -> dict:
     activity.logger.info(
         f"[SetupScheduledScanActivity] Created scan_id={scan.id} for domain={domain.name}"
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=setup_scheduled_scan scan_id=%s domain_id=%s" % (scan.id, domain_id))
     return {
         'scan_history_id': scan.id,
         'engine_id': engine_id,
@@ -2235,6 +2279,9 @@ def prepare_port_scan_activity(ctx: dict) -> dict:
     from startScan.models import Command
     from django.utils import timezone
 
+    scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=prepare_port_scan scan_id=%s" % scan_id)
+    activity.logger.info(f"[PreparePortScanActivity] scan_id={scan_id}")
     proxy = TemporalTaskProxy(ctx, 'port_scan', 'Port Scan', track=False)
     raw_func = port_scan.__func__ if hasattr(port_scan, '__func__') else port_scan
     res = raw_func(proxy, ctx=ctx, prepare_only=True)
@@ -2246,6 +2293,7 @@ def prepare_port_scan_activity(ctx: dict) -> dict:
         activity_id=proxy.activity_id
     )
     res['command_id'] = cmd_record.id
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=prepare_port_scan scan_id=%s" % scan_id)
     return res
 
 
@@ -2262,9 +2310,13 @@ def parse_port_scan_results_activity(ctx: dict, stdout: str) -> dict:
     """
     from reNgine.tasks import port_scan
 
+    scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=parse_port_scan_results scan_id=%s" % scan_id)
+    activity.logger.info(f"[ParsePortScanResultsActivity] scan_id={scan_id}")
     proxy = TemporalTaskProxy(ctx, 'port_scan', 'Port Scan')
     raw_func = port_scan.__func__ if hasattr(port_scan, '__func__') else port_scan
     res = raw_func(proxy, ctx=ctx, parse_only=stdout)
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=parse_port_scan_results scan_id=%s" % scan_id)
     return {"ports_data": res}
 
 
@@ -2282,6 +2334,7 @@ def finalize_failed_scan_activity(ctx: dict, error_msg: str) -> None:
     if not scan_id:
         return
 
+    logger.log_line("[TEMPORAL]", "START", "task=finalize_failed_scan scan_id=%s" % scan_id)
     logger.log_line("[TEMPORAL]", "ERROR", "task=finalize_failed_scan scan_id=%s error=%s" % (scan_id, error_msg[:200] if error_msg else "workflow crash"), level="error")
 
     try:
@@ -2309,6 +2362,7 @@ def finalize_failed_scan_activity(ctx: dict, error_msg: str) -> None:
         scan.scanactivity_set.filter(
             status__in=[RUNNING_TASK, INITIATED_TASK]
         ).update(status=FAILED_TASK, error_message=err)
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=finalize_failed_scan scan_id=%s" % scan_id)
     except Exception as e:
         logger.error(f"Failed to finalize crashed scan {scan_id}: {e}")
 
@@ -2317,7 +2371,9 @@ def finalize_failed_scan_activity(ctx: dict, error_msg: str) -> None:
 def run_llm_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
     from apme.apme_tasks import run_llm_apme
     from reNgine.job_tracker import update_job
-    
+
+    logger.log_line("[TEMPORAL]", "START", "task=run_llm_apme scan_id=%s" % scan_history_id)
+    activity.logger.info(f"[RunLlmApmeActivity] scan_id={scan_history_id}")
     update_job(job_id, "RUNNING", 10, "Initializing LLM Attack Path modeling...") if job_id else None
     try:
         result = run_llm_apme(None, scan_history_id)
@@ -2325,43 +2381,60 @@ def run_llm_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
             update_job(job_id, "SUCCESS", 100, "Attack Path Modeling completed.", result) if job_id else None
         else:
             update_job(job_id, "FAILED", 100, f"Failed: {result.get('error')}", result) if job_id else None
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=run_llm_apme scan_id=%s status=%s" % (scan_history_id, result.get('status', 'unknown')))
         return result
     except Exception as e:
         update_job(job_id, "FAILED", 100, f"Error: {str(e)}") if job_id else None
+        logger.log_line("[TEMPORAL]", "ERROR", "task=run_llm_apme scan_id=%s error=%s" % (scan_history_id, format_exception_for_log(e)), level="error")
         raise
 
 
 @activity.defn(name="EnrichIdentitiesActivity")
 def enrich_identities_activity(identity: str, identity_type: str, scan_history_id: int, ctx: dict) -> str:
     from reNgine.osint_tasks import enrich_identities_task
+    logger.log_line("[TEMPORAL]", "START", "task=enrich_identities type=%s scan_id=%s" % (identity_type, scan_history_id))
+    activity.logger.info(f"[EnrichIdentitiesActivity] identity_type={identity_type} scan_id={scan_history_id}")
     # Run synchronously inside the Django threadpool executor worker
-    return enrich_identities_task(identity, identity_type, scan_history_id, ctx)
+    result = enrich_identities_task(identity, identity_type, scan_history_id, ctx)
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=enrich_identities type=%s scan_id=%s" % (identity_type, scan_history_id))
+    return result
 
 
 @activity.defn(name="GeoLocalizeActivity")
 def geo_localize_activity(host: str, ip_id: int, scan_id: int = None, activity_id: int = None) -> None:
     from reNgine.tasks import geo_localize
+    logger.log_line("[TEMPORAL]", "START", "task=geo_localize host=%s ip_id=%s scan_id=%s" % (host, ip_id, scan_id))
+    activity.logger.info(f"[GeoLocalizeActivity] host={host} ip_id={ip_id} scan_id={scan_id}")
     geo_localize(host, ip_id=ip_id, scan_id=scan_id, activity_id=activity_id)
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=geo_localize host=%s ip_id=%s scan_id=%s" % (host, ip_id, scan_id))
 
 
 @activity.defn(name="ImportHackerOneProgramsActivity")
 def import_hackerone_programs_activity(handles: list, project_slug: str, is_sync: bool = False) -> None:
     from api.shared_api_tasks import import_hackerone_programs_task
+    logger.log_line("[TEMPORAL]", "START", "task=import_hackerone_programs project=%s count=%d" % (project_slug, len(handles)))
+    activity.logger.info(f"[ImportHackerOneProgramsActivity] project={project_slug} handles_count={len(handles)}")
     import_hackerone_programs_task(handles, project_slug, is_sync=is_sync)
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=import_hackerone_programs project=%s" % project_slug)
 
 
 @activity.defn(name="SyncBookmarkedProgramsActivity")
 def sync_bookmarked_programs_activity(project_slug: str) -> None:
     from api.shared_api_tasks import sync_bookmarked_programs_task
+    logger.log_line("[TEMPORAL]", "START", "task=sync_bookmarked_programs project=%s" % project_slug)
+    activity.logger.info(f"[SyncBookmarkedProgramsActivity] project={project_slug}")
     sync_bookmarked_programs_task(project_slug)
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=sync_bookmarked_programs project=%s" % project_slug)
 
 
 @activity.defn(name="FetchProxiesActivity")
 def fetch_proxies_activity(limit: int, job_id: str) -> None:
+    logger.log_line("[TEMPORAL]", "START", "task=fetch_proxies limit=%d" % limit)
     activity.logger.info("[FetchProxies] Starting proxy fetch (limit=%d, job_id=%s)", limit, job_id)
     from reNgine.tasks import fetch_proxies_task
     fetch_proxies_task(limit=limit, job_id=job_id)
     activity.logger.info("[FetchProxies] Proxy fetch activity complete")
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=fetch_proxies limit=%d" % limit)
 
 
 @activity.defn(name="CheckScanQueueStatusActivity")
@@ -2378,71 +2451,56 @@ def check_scan_queue_status_activity(scan_id: int, queue_type: str) -> bool:
     from dashboard.models import UserPreferences
     from startScan.models import ScanHistory, SubScan
     from reNgine.definitions import RUNNING_TASK
-    
+
+    logger.log_line("[TEMPORAL]", "START", "task=check_scan_queue_status scan_id=%s queue_type=%s" % (scan_id, queue_type))
+    activity.logger.info(f"[CheckScanQueueStatusActivity] scan_id={scan_id} queue_type={queue_type}")
     # Get the global queuing setting. If there are multiple preferences, just grab the first.
     prefs = UserPreferences.objects.first()
     if not prefs or not getattr(prefs, 'enable_scan_queueing', False):
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=check_scan_queue_status scan_id=%s result=allowed_queueing_off" % scan_id)
         return True
-        
+
+    result = True
     if queue_type == "main":
         # Check running main scans (ordered by start date)
         running_scans = list(ScanHistory.objects.filter(
             scan_status=RUNNING_TASK
         ).order_by('start_scan_date').values_list('id', flat=True))
-        
-        # If the scan is the first in the list, it's its turn
-        if running_scans and running_scans[0] == scan_id:
-            return True
-        elif not running_scans:
-            return True
-            
-        return False
-        
+        result = not running_scans or running_scans[0] == scan_id
+
     elif queue_type == "subscan":
         running_subscans = list(SubScan.objects.filter(
             status=RUNNING_TASK
         ).order_by('start_scan_date').values_list('id', flat=True))
-        
-        if running_subscans and running_subscans[0] == scan_id:
-            return True
-        elif not running_subscans:
-            return True
-            
-        return False
+        result = not running_subscans or running_subscans[0] == scan_id
 
-    return True
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=check_scan_queue_status scan_id=%s queue_type=%s allowed=%s" % (scan_id, queue_type, result))
+    return result
 
 
 @activity.defn(name="GetEnabledPluginsForTierActivity")
 def get_enabled_plugins_for_tier_activity(params: dict) -> list:
-    """Return metadata for enabled plugins anchored to the given tier.
-
-    Queries the Plugin model for plugins with anchor_step matching `tier`
-    and runtime_position='AFTER', ordered by order_weight. When
-    selected_plugin_slugs is a non-empty list, only those slugs are returned
-    (per-scan user selection). An empty list means run all enabled plugins.
-
-    Args:
-        params: dict with keys:
-            - tier (str): e.g. "tier_2", "tier_6"
-            - selected_plugin_slugs (list[str]): user-selected slugs, or []
-
-    Returns:
-        List of dicts: [{"slug": str, "workflow_name": str}]
-    """
+    """Return metadata for enabled plugins anchored to the given tier."""
     from plugins.models import Plugin
 
     tier = params.get("tier", "")
     selected_plugin_slugs = params.get("selected_plugin_slugs") or []
+
+    logger.log_line("[TEMPORAL]", "START", "task=get_enabled_plugins tier=%s selected=%s" % (tier, selected_plugin_slugs))
+
+    # No slugs selected for this scan — nothing to run.
+    # The workflow helper already gates on this but we guard here too.
+    if not selected_plugin_slugs:
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=get_enabled_plugins tier=%s found=0 skipped=no_selection" % tier)
+        return []
 
     results = []
     qs = Plugin.objects.filter(
         anchor_step=tier,
         runtime_position='AFTER',
         is_enabled=True,
+        slug__in=selected_plugin_slugs,
     )
-    if selected_plugin_slugs:
-        qs = qs.filter(slug__in=selected_plugin_slugs)
     plugins = qs.order_by('order_weight', 'id')
 
     for plugin in plugins:
@@ -2452,21 +2510,12 @@ def get_enabled_plugins_for_tier_activity(params: dict) -> list:
             continue
         workflow_path = workflows[0]
         if not isinstance(workflow_path, str) or not workflow_path.strip():
-            activity.logger.warning(
-                f"[GetEnabledPluginsForTierActivity] {plugin.slug}: invalid workflow path {workflow_path!r}"
-            )
+            logger.log_line("[TEMPORAL]", "WARN", "task=get_enabled_plugins invalid workflow path for plugin=%s" % plugin.slug)
             continue
-        # Temporal workflow name is the class name (last segment of dotted path)
         workflow_name = workflow_path.rsplit('.', 1)[-1]
-        results.append({
-            "slug": plugin.slug,
-            "workflow_name": workflow_name,
-        })
-        activity.logger.info(
-            f"[GetEnabledPluginsForTierActivity] tier={tier} plugin={plugin.slug} "
-            f"workflow={workflow_name}"
-        )
+        results.append({"slug": plugin.slug, "workflow_name": workflow_name})
 
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=get_enabled_plugins tier=%s found=%d" % (tier, len(results)))
     return results
 
 
@@ -2566,20 +2615,24 @@ def run_search_vulns_activity(ctx: dict) -> bool:
     MasterScanWorkflow Tier 2 after port scan returns.
     """
     from reNgine.recon_tasks import search_vulns_scan
+    scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=search_vulns_scan service=%s host=%s scan_id=%s" % (ctx.get('service', ''), ctx.get('host', ''), scan_id))
     activity.logger.info(
         "[RunSearchVulnsActivity] service=%s host=%s scan_id=%s",
-        ctx.get('service'), ctx.get('host'), ctx.get('scan_history_id'),
+        ctx.get('service'), ctx.get('host'), scan_id,
     )
     proxy = TemporalTaskProxy(ctx, task_name='search_vulns_scan',
                               description='Per-service CVE Lookup (vulners.com)')
-    return search_vulns_scan(
+    result = search_vulns_scan(
         proxy,
-        scan_history_id=ctx.get('scan_history_id'),
+        scan_history_id=scan_id,
         service=ctx.get('service', ''),
         version=ctx.get('version'),
         host=ctx.get('host', ''),
         port=ctx.get('port', 0),
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=search_vulns_scan service=%s scan_id=%s" % (ctx.get('service', ''), scan_id))
+    return result
 
 
 @activity.defn(name="RunXURLFind3rActivity")
@@ -2658,7 +2711,9 @@ def get_discovered_services_activity(ctx: dict) -> list:
     from startScan.models import IpAddress
 
     scan_history_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=get_discovered_services scan_id=%s" % scan_history_id)
     if not scan_history_id:
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=get_discovered_services scan_id=None services=0")
         return []
 
     services = []
@@ -2680,6 +2735,7 @@ def get_discovered_services_activity(ctx: dict) -> list:
         "[GetDiscoveredServicesActivity] scan_id=%s found %d services",
         scan_history_id, len(services),
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=get_discovered_services scan_id=%s services=%d" % (scan_history_id, len(services)))
     return services
 
 
@@ -2687,25 +2743,31 @@ def get_discovered_services_activity(ctx: dict) -> list:
 def run_gf_activity(ctx: dict) -> list:
     """Run gf URL pattern matching. Returns matched URL list directly (not bool)."""
     from reNgine.crawl_tasks import gf_scan
+    scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=gf_scan pattern=%s scan_id=%s" % (ctx.get('pattern', 'xss'), scan_id))
     activity.logger.info(
         "[RunGFActivity] pattern=%s scan_id=%s",
-        ctx.get('pattern'), ctx.get('scan_history_id'),
+        ctx.get('pattern'), scan_id,
     )
     proxy = TemporalTaskProxy(ctx, task_name='gf_scan', description='URL Pattern Match (gf)')
-    return gf_scan(
+    result = gf_scan(
         proxy,
-        scan_history_id=ctx.get('scan_history_id'),
+        scan_history_id=scan_id,
         pattern=ctx.get('pattern', 'xss'),
         urls=ctx.get('urls', []),
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=gf_scan pattern=%s scan_id=%s matches=%d" % (ctx.get('pattern', 'xss'), scan_id, len(result) if isinstance(result, list) else 0))
+    return result
 
 @activity.defn(name="GetDiscoveredIPsActivity")
 def get_discovered_ips_activity(ctx: dict) -> list:
     """Return distinct IP address strings discovered for this scan."""
     from startScan.models import IpAddress
     scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=get_discovered_ips scan_id=%s" % scan_id)
     activity.logger.info("[GetDiscoveredIPsActivity] scan_id=%s", scan_id)
     if not scan_id:
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=get_discovered_ips scan_id=%s ips=0" % scan_id)
         return []
     ips = (
         IpAddress.objects
@@ -2715,6 +2777,7 @@ def get_discovered_ips_activity(ctx: dict) -> list:
     )
     result = list(ips)
     activity.logger.info("[GetDiscoveredIPsActivity] found %d IPs for scan_id=%s", len(result), scan_id)
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=get_discovered_ips scan_id=%s ips=%d" % (scan_id, len(result)))
     return result
 
 
@@ -2731,11 +2794,15 @@ def run_getasn_activity(ctx: dict) -> bool:
 @activity.defn(name="RunNetDetectActivity")
 def run_netdetect_activity(ctx: dict) -> list:
     from reNgine.recon_tasks import netdetect_scan
-    activity.logger.info("[RunNetDetectActivity] scan_id=%s", ctx.get('scan_history_id'))
+    scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=netdetect_scan scan_id=%s" % scan_id)
+    activity.logger.info("[RunNetDetectActivity] scan_id=%s", scan_id)
     proxy = TemporalTaskProxy(ctx, task_name='netdetect_scan',
                               description='Network CIDR Detection (netdetect)')
-    result = netdetect_scan(proxy, ctx.get('scan_history_id'), ctx.get('domain_id'))
-    return [c for c in result if c] if isinstance(result, list) else []
+    result = netdetect_scan(proxy, scan_id, ctx.get('domain_id'))
+    cidrs = [c for c in result if c] if isinstance(result, list) else []
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=netdetect_scan scan_id=%s cidrs=%d" % (scan_id, len(cidrs)))
+    return cidrs
 
 
 @activity.defn(name="RunJsWhoisActivity")
@@ -2772,16 +2839,20 @@ def run_bbot_activity(ctx: dict) -> bool:
 def run_param_discovery_activity(ctx: dict) -> dict:
     """Run the Custom Parameter Discovery Engine (CPDE)."""
     from reNgine.cpde_tasks import param_discovery
+    scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", "task=param_discovery scan_id=%s" % scan_id)
     activity.logger.info(
         "[RunParamDiscoveryActivity] Starting CPDE for scan_id=%s",
-        ctx.get('scan_history_id'),
+        scan_id,
     )
     proxy = TemporalTaskProxy(ctx, task_name='param_discovery', description='Custom Parameter Discovery (CPDE)')
-    return param_discovery(
+    result = param_discovery(
         proxy,
         urls=ctx.get('urls', []),
         ctx=ctx,
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=param_discovery scan_id=%s" % scan_id)
+    return result
 
 
 @activity.defn(name="RunGrypeScanActivity")

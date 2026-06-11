@@ -1221,6 +1221,18 @@ def osint(self, host=None, ctx={}, description=None):
 	Returns:
 		dict: Results from osint discovery and dorking.
 	"""
+	# Copy theHarvester api-keys.yaml to /root/.theHarvester/api-keys.yaml
+	source_api_keys = '/usr/src/github/theHarvester/api-keys.yaml'
+	target_dir = '/root/.theHarvester'
+	target_api_keys = f'{target_dir}/api-keys.yaml'
+	try:
+		if os.path.exists(source_api_keys):
+			os.makedirs(target_dir, exist_ok=True)
+			shutil.copyfile(source_api_keys, target_api_keys)
+			logger.info('Copied theHarvester api-keys.yaml to /root/.theHarvester/api-keys.yaml')
+	except Exception as e:
+		logger.error(f'Failed to copy theHarvester api-keys.yaml: {e}')
+
 	config = self.yaml_configuration.get(OSINT) or OSINT_DEFAULT_CONFIG
 	results = {}
 
@@ -1256,6 +1268,19 @@ def osint(self, host=None, ctx={}, description=None):
 	# Deep Pursuit OSINT Pipeline (holehe, maigret, LinkedInt)
 	logger.info('Starting Deep Pursuit OSINT Pipeline...')
 	osint_orchestrator(scan_history_id=self.scan.id)
+
+	# Run h8mail after all OSINT tasks are finished
+	osint_lookup = config.get(OSINT_DISCOVER, [])
+	if 'emails' in osint_lookup:
+		h8mail(
+			self,
+			config=config,
+			host=self.scan.domain.name,
+			scan_history_id=self.scan.id,
+			activity_id=self.activity_id,
+			results_dir=self.results_dir,
+			ctx=ctx
+		)
 
 	logger.info('OSINT Tasks finished...')
 	return True
@@ -1311,17 +1336,6 @@ def osint_discovery(self, config, host, scan_history_id, activity_id, results_di
 		# 			'documents_limit': documents_limit
 		# 		})
 		# 		meta_info.append(save_metadata_info(meta_dict))
-
-	if 'emails' in osint_lookup:
-		h8mail(
-			self,
-			config=config,
-			host=host,
-			scan_history_id=scan_history_id,
-			activity_id=activity_id,
-			results_dir=results_dir,
-			ctx=ctx
-		)
 
 	if 'employees' in osint_lookup:
 		ctx['track'] = False
@@ -1815,6 +1829,22 @@ def h8mail(self, config, host, scan_history_id, activity_id, results_dir, ctx={}
 	scan_history = ScanHistory.objects.get(pk=scan_history_id)
 	input_path = f'{results_dir}/emails.txt'
 	output_file = f'{results_dir}/h8mail.json'
+
+	# Retrieve all emails from DB and create emails.txt if not exists or update it
+	emails = scan_history.emails.all()
+	emails_list = [email.address for email in emails]
+	
+	target = ctx.get('target')
+	if target and target not in emails_list:
+		emails_list.append(target)
+		
+	if not emails_list:
+		logger.warning('No emails found to run h8mail against. Skipping.')
+		return []
+
+	with open(input_path, 'w') as f:
+		for email in set(emails_list):
+			f.write(f'{email}\n')
 
 	cmd = f'h8mail -t {input_path} --json {output_file}'
 	history_file = f'{results_dir}/commands.txt'

@@ -323,7 +323,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 20G
+          memory: 12G
         reservations:
           memory: 5G
     #memswap_limit: 9G

@@ -61,21 +61,24 @@ _RETRY_LLM = RetryPolicy(
 
 
 async def _dispatch_tier_plugins(ctx: dict, tier: str, wf_id_prefix: str) -> None:
-    """Dispatch all enabled plugins anchored to `tier` as child workflows.
+    """Dispatch selected plugins anchored to `tier` as child workflows.
 
-    Reusable helper called after any tier's asyncio.gather() completes.
-    Queries GetEnabledPluginsForTierActivity and fires each matching plugin
-    as an independent child workflow. Safe to call from any tier — returns
-    immediately if no plugins are registered for that tier.
+    Only runs if the scan explicitly selected at least one plugin slug.
+    An empty or absent `selected_plugin_slugs` in ctx means no plugins were
+    chosen for this scan — the activity is skipped entirely in that case.
 
     Args:
         ctx: Scan context dict passed through to each plugin workflow.
         tier: Anchor tier string, e.g. "tier_2", "vulnerability_scan".
         wf_id_prefix: Unique prefix for child workflow IDs (scan or subscan ID).
     """
+    selected_slugs = ctx.get("selected_plugin_slugs") or []
+    if not selected_slugs:
+        return
+
     plugin_list = await workflow.execute_activity(
         "GetEnabledPluginsForTierActivity",
-        {"tier": tier, "selected_plugin_slugs": ctx.get("selected_plugin_slugs") or []},
+        {"tier": tier, "selected_plugin_slugs": selected_slugs},
         start_to_close_timeout=timedelta(seconds=15),
         heartbeat_timeout=timedelta(seconds=15),
         retry_policy=_RETRY_INTERNAL,

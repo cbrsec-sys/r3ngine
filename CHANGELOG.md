@@ -18,6 +18,9 @@
   - **Automated AI Risk Assessment**: Integrated the native `LLMVulnerabilityReportGenerator` into the enrichment flow. The system automatically prompts the active LLM (OpenAI, Anthropic, Gemini, or Ollama) with CVSS metrics and public exploit counts to generate a structured, context-rich risk assessment and mitigation strategy.
   - **Persistent Intelligence Cache**: Expanded the `CveId` model (Migration 0042) to permanently store `ai_risk_assessment`, `mitigation_ideas`, `public_exploits`, `hackerone_data`, and `patching_priority`, drastically reducing API calls and LLM token usage on subsequent scans.
 
+- **Temporal Activity Stabilizations**:
+  - Fixed a `TypeError` signature mismatch in `_run_task` that crashed reconnaissance activities (such as `searchsploit_scan` and `wafw00f_scan`). The workflow engine now uses `inspect.signature` to intelligently inject Context (`ctx`) and descriptions only when supported by the underlying scanner function.
+
 - **Ollama Orchestration UI & Backend Integration**:
   - Implemented dynamic Docker orchestration for the local Ollama LLM provider. The LLM Toolkit settings page now includes a built-in Docker container lifecycle manager, allowing users to start and stop the `ollama` container directly from the UI.
   - Developed `OllamaManager` using `docker.from_env()` to automatically pull, start, and manage the `ollama/ollama:latest` image inside the dynamically discovered `r3ngine` Docker network.

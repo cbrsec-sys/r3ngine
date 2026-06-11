@@ -95,13 +95,13 @@
           - yml
           - pdf
         follow_redirect: true
-        max_time: 750
+        max_time: 300
         match_http_status:
           - 200
           - 204
         recursive_level: 2
         stop_on_error: false
-        timeout: 600
+        timeout: 30
         threads: 20
         wordlist_name: dicc
         use_api_wordlist: false
@@ -142,6 +142,7 @@
         threads: 20
       web_api_discovery:
         uses_tools:
+          - kiterunner
           - arjun
           - linkfinder
           - paramspider
@@ -156,7 +157,7 @@
       vulnerability_scan:
         run_nuclei: true
         run_dalfox: true
-        run_crlfuzz: true
+        run_crlfuzz: false
         run_acunetix: false
         run_wpscan: true
         run_wptaint_scan: true
