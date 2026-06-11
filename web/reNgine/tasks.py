@@ -6887,10 +6887,22 @@ def acunetix_scan(
 			# but q=scan_id:ID or the sub-resource works in many versions.
 			vulns_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
 
+		logger.info(f"Fetching Acunetix vulnerabilities from: {vulns_url}")
 		vulns_resp = requests.get(vulns_url, headers=headers, verify=_acunetix_verify)
+		logger.info(f"Acunetix vulnerabilities response code: {vulns_resp.status_code}")
+
+		# If scan_id was used but returned 404, fallback to query by scan_id
+		if scan_id and vulns_resp.status_code == 404:
+			vulns_url = f"{base_url}/api/v1/vulnerabilities?q=scan_id:{scan_id}"
+			logger.info(f"Retrying with fallback URL: {vulns_url}")
+			vulns_resp = requests.get(vulns_url, headers=headers, verify=_acunetix_verify)
+			logger.info(f"Fallback response code: {vulns_resp.status_code}")
+
 		if vulns_resp.status_code == 200:
 			vulns_data = vulns_resp.json()
-			for vuln in vulns_data.get('vulnerabilities', []):
+			v_list = vulns_data.get('vulnerabilities', [])
+			logger.info(f"Found {len(v_list)} vulnerabilities in Acunetix scan report.")
+			for vuln in v_list:
 				# Get full details for each vuln
 				vuln_detail_resp = requests.get(f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}", headers=headers, verify=_acunetix_verify)
 				if vuln_detail_resp.status_code == 200:
