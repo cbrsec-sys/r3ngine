@@ -31,3 +31,10 @@ class TestYamlConfigReference(TestCase):
         response = anon_client.get('/scanEngine/default/yaml_config_reference/')
         # login_required redirects unauthenticated requests
         self.assertIn(response.status_code, [302, 403])
+
+    @patch('scanEngine.views.open', side_effect=FileNotFoundError)
+    def test_file_not_found_returns_404(self, _):
+        response = self.client.get('/scanEngine/default/yaml_config_reference/')
+        self.assertEqual(response.status_code, 404)
+        data = response.json()
+        self.assertEqual(data['status'], 'error')
