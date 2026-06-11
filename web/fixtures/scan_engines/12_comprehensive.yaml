@@ -17,6 +17,7 @@
         enable_http_crawl: true
         threads: 30
         timeout: 90
+        bbot: true
       firewall_vpn_scan:
         run_ike_scan: true
         run_sslscan: true
@@ -218,3 +219,30 @@
         trufflehog: true
         gitleaks: true
         leaklookup: true
+      code_scan:
+        grype: true
+        trivy: true
+      cidr_recon:
+        use_arp: false
+      host_recon:
+        run_nuclei: true
+      url_fuzz:
+        fuzzers:
+          - ffuf
+          - feroxbuster
+        hunt_secrets: true
+      url_crawl:
+        passive: false
+        active: false
+        hunt_secrets: true
+      url_params_fuzz:
+        fuzz_values: true
+        hunt_secrets: true
+      url_vuln:
+        nuclei: true
+      subdomain_recon:
+        passive: false
+        brute_dns: true
+        bbot: true
+      domain_recon:
+        passive: false

@@ -13,6 +13,7 @@ subdomain_discovery: {
   'enable_http_crawl': true,
   'threads': 30,
   'timeout': 5,
+  'bbot': false,                  # bbot passive OSINT subdomain discovery (slow but thorough)
   # 'use_subfinder_config': false,
   # 'use_amass_config': false,
   # 'amass_wordlist': 'deepmagic.com-prefixes-top50000'
@@ -221,4 +222,71 @@ leaks_and_secrets: {
   'gitleaks': true,
   'trufflehog': true,
   'leaklookup': true
+}
+
+# ---------------------------------------------------------------------------
+# Standalone workflow configs (triggered via StartWorkflowView API)
+# ---------------------------------------------------------------------------
+
+subdomain_recon: {
+  'passive': false,               # Passive sources only (no DNS brute force)
+  'brute_dns': false,             # DNS brute force via dnsx wordlist
+  'bbot': false,                  # bbot OSINT framework (resource-intensive)
+}
+
+domain_recon: {
+  'passive': false,               # WHOIS + DNS only; skip HTTP probe + testssl
+}
+
+host_recon: {
+  'run_nuclei': false,            # Run nuclei [network,ssl] tags after port scan
+}
+
+cidr_recon: {
+  'use_arp': false,               # Use ARP scan for host discovery (requires NET_RAW capability)
+  # When no cidr target is given, netdetect auto-discovers local network CIDR ranges
+}
+
+code_scan: {
+  'grype': true,                  # Anchore Grype CVE scanner (filesystem)
+  'trivy': true,                  # Trivy secrets scanner (pinned v0.69.3, pre-compromise)
+}
+
+url_crawl: {
+  'passive': false,               # Passive URL discovery only (xurlfind3r, urlfinder, gau)
+  'active': false,                # Active crawl only (katana, cariddi); skip passive
+  'hunt_secrets': false,          # Run trufflehog + maigret after active crawl
+}
+
+url_fuzz: {
+  'fuzzers': ['ffuf', 'feroxbuster'],   # Fuzzers to use (ffuf, feroxbuster)
+  'hunt_secrets': false,          # Run trufflehog secret scan after fuzzing
+}
+
+url_dirsearch: {
+  'hunt_secrets': false,          # Run trufflehog secret scan after dir discovery
+}
+
+url_params_fuzz: {
+  'fuzz_values': false,           # Fuzz param values with ffuf after arjun discovery
+  'hunt_secrets': false,          # Run trufflehog after parameter fuzzing
+}
+
+url_vuln: {
+  'nuclei': false,                # Run nuclei HTTP scan alongside gf + dalfox
+}
+
+wordpress: {
+  # WordPress workflow always runs httpx + wpscan + wpprobe + nuclei[wordpress]
+  # No additional config keys at this time
+}
+
+user_hunt: {
+  # user_hunt workflow dispatches maigret (username) or h8mail (email)
+  # No additional config keys at this time
+}
+
+url_bypass: {
+  # url_bypass workflow uses bup (bypass-url-parser) on 4xx URLs
+  # No additional config keys at this time
 }

@@ -17,6 +17,7 @@
         enable_http_crawl: true
         threads: 30
         timeout: 5
+        bbot: false
       dns_security:
         enable_axfr: true
         enable_dnssec_check: true
@@ -267,3 +268,22 @@
         trufflehog: true
         gitleaks: true
         leaklookup: true
+      code_scan:
+        grype: true
+        trivy: true
+      cidr_recon:
+        use_arp: false
+      host_recon:
+        run_nuclei: false
+      url_fuzz:
+        fuzzers:
+          - ffuf
+          - feroxbuster
+        hunt_secrets: false
+      url_crawl:
+        passive: false
+        active: false
+        hunt_secrets: false
+      url_params_fuzz:
+        fuzz_values: false
+        hunt_secrets: false

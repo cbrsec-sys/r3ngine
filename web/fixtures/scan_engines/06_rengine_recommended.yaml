@@ -112,3 +112,18 @@
         trufflehog: true
         gitleaks: true
         leaklookup: true
+      code_scan:
+        grype: true
+        trivy: true
+      url_fuzz:
+        fuzzers:
+          - ffuf
+          - feroxbuster
+        hunt_secrets: false
+      url_crawl:
+        passive: false
+        active: false
+        hunt_secrets: false
+      url_params_fuzz:
+        fuzz_values: false
+        hunt_secrets: false
