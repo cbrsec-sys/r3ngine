@@ -64,8 +64,8 @@ import {
   useToggleSubdomainImportant,
   useInitiateSubscan,
   useGPTAttackSurface,
-  SubdomainFilters
 } from '../../subdomains/api';
+import type { SubdomainFilters } from '../../subdomains/api';
 import { useEngines } from '../../engines/api';
 import { usePlugins } from '../../plugins/api/pluginsApi';
 import { useCreateTodo } from '../../todos/api';
