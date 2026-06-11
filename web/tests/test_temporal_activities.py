@@ -53,13 +53,13 @@ class TestRunGenericTaskAllowlist(TestCase):
         from unittest.mock import patch, MagicMock
         from reNgine.temporal_activities import run_generic_task_activity
         fake_ctx = {"scan_history_id": 1, "domain_id": 1, "engine_id": 1}
-        with patch("importlib.import_module") as mock_import:
-            with patch("temporalio.activity.logger"):
+        with patch("temporalio.activity.logger"):
+            with patch("importlib.import_module") as mock_import:
                 try:
                     run_generic_task_activity(fake_ctx, "not_in_allowlist")
                 except ValueError:
                     pass
-        mock_import.assert_not_called()
+            mock_import.assert_not_called()
 
 
 class TestScanContext(TestCase):
