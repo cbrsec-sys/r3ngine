@@ -225,3 +225,18 @@ export const useFullYamlConfig = () => {
     },
   });
 };
+
+export function useYamlConfigReference() {
+  return useQuery<string>({
+    queryKey: ['yaml_config_reference'],
+    queryFn: async () => {
+      const response = await fetch('/scanEngine/default/yaml_config_reference/', {
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to fetch YAML config reference');
+      const json = await response.json();
+      return json.content as string;
+    },
+    staleTime: Infinity,
+  });
+}
