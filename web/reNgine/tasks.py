@@ -6827,6 +6827,7 @@ def acunetix_scan(
 		# Use the library's start_scan which typically adds target and starts scan
 		# Based on the user provided example
 		scan_info = acunetix.start_scan(target_url)
+		scan_id = scan_info.get('scan_id')
 		target_id = scan_info.get('target_id')
 		
 		# Now we need to poll for status and fetch findings.
@@ -6852,42 +6853,56 @@ def acunetix_scan(
 			logger.error(f"Target {target_name} not found in Acunetix after start_scan.")
 			return False
 			
-		# Wait for scan to complete
-		# We'll poll /api/v1/scans
-		scan_id = None
-		max_retries = 360 # 1 hour
-		retries = 0
-		while retries < max_retries:
+		# If scan_id wasn't in scan_info, try to find it from scans query by target_id
+		if not scan_id:
 			scans_resp = requests.get(f"{base_url}/api/v1/scans?q=target_id:{target_id}", headers=headers, verify=_acunetix_verify)
 			if scans_resp.status_code == 200:
 				scans_data = scans_resp.json()
 				scans_list = scans_data.get('scans', [])
 				if scans_list:
-					latest_scan = scans_list[0]
-					current_status = latest_scan.get('current_session', {}).get('status')
-					
-					if current_status == 'completed':
-						logger.info(f"Acunetix scan for {target_name} completed.")
-						scan_id = latest_scan.get('scan_id')
-						break
-					elif current_status in ['failed', 'aborted']:
-						logger.error(f"Acunetix scan for {target_name} {current_status}.")
-						return False
+					scan_id = scans_list[0].get('scan_id')
+
+		if not scan_id:
+			logger.error(f"Could not determine scan_id for Acunetix scan on target {target_name}")
+			return False
+
+		# Wait for scan to complete
+		# We'll poll /api/v1/scans/{scan_id} directly
+		max_retries = 720  # 12 hours
+		retries = 0
+		while retries < max_retries:
+			scan_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify)
+			if scan_resp.status_code == 200:
+				scan_data = scan_resp.json()
+				current_session = scan_data.get('current_session', {})
+				current_status = current_session.get('status')
+				logger.info(f"Acunetix scan {scan_id} status: {current_status} (retry {retries}/{max_retries})")
+				
+				if current_status == 'completed':
+					logger.info(f"Acunetix scan for {target_name} completed.")
+					break
+				elif current_status in ['failed', 'aborted']:
+					logger.error(f"Acunetix scan for {target_name} ended with status: {current_status}.")
+					return False
+			else:
+				logger.warning(f"Failed to fetch scan status for {scan_id}, status code: {scan_resp.status_code}")
 			
-			time.sleep(10)
+			time.sleep(60)
 			retries += 1
+		else:
+			logger.error(f"Acunetix scan for {target_name} timed out after {max_retries} retries.")
+			return False
 			
 		# Fetch Vulnerabilities for the specific scan
 		vulns_url = None
-		if scan_id:
-			# Fetch scan details to get the scan session/result ID (which differs across AWVS versions)
-			scan_detail_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify)
-			if scan_detail_resp.status_code == 200:
-				scan_detail = scan_detail_resp.json()
-				session = scan_detail.get('current_session', {})
-				session_id = session.get('scan_session_id') or session.get('result_id')
-				if session_id:
-					vulns_url = f"{base_url}/api/v1/scans/{scan_id}/results/{session_id}/vulnerabilities"
+		# Fetch scan details to get the scan session/result ID (which differs across AWVS versions)
+		scan_detail_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify)
+		if scan_detail_resp.status_code == 200:
+			scan_detail = scan_detail_resp.json()
+			session = scan_detail.get('current_session', {})
+			session_id = session.get('scan_session_id') or session.get('result_id')
+			if session_id:
+				vulns_url = f"{base_url}/api/v1/scans/{scan_id}/results/{session_id}/vulnerabilities"
 		
 		if not vulns_url:
 			# Fallback to querying by target_id
@@ -6900,11 +6915,10 @@ def acunetix_scan(
 		# If the URL returned 400 or 404, try fallbacks
 		if vulns_resp.status_code in [400, 404]:
 			# Fallback 1: try /api/v1/scans/{scan_id}/vulnerabilities
-			if scan_id:
-				fallback_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
-				logger.info(f"Retrying with fallback 1 URL: {fallback_url}")
-				vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify)
-				logger.info(f"Fallback 1 response code: {vulns_resp.status_code}")
+			fallback_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
+			logger.info(f"Retrying with fallback 1 URL: {fallback_url}")
+			vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify)
+			logger.info(f"Fallback 1 response code: {vulns_resp.status_code}")
 			
 			# Fallback 2: try querying by target_id
 			if vulns_resp.status_code in [400, 404]:
