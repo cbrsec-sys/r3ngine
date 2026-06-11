@@ -145,7 +145,7 @@ def get_subdomains(write_filepath=None, exclude_subdomains=False, ctx={}):
 		if subdomain.name
 	]
 	if not subdomains:
-		logger.error('No subdomains were found in query !')
+		logger.error('No subdomains were found in query')
 
 	if url_filter:
 		subdomains = [f'{subdomain}/{url_filter}' for subdomain in subdomains]
@@ -357,7 +357,7 @@ def get_http_urls(
 		endpoints = [e for e in endpoints if not urlparse(e).path.endswith(extensions)]
 
 	if not endpoints:
-		logger.error(f'No endpoints were found in query !')
+		logger.error('No endpoints were found in query')
 
 	if write_filepath:
 		with open(write_filepath, 'w') as f:
@@ -723,7 +723,7 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 				is_suppressed = True
 				break
 	except Exception as e:
-		logger.error(f"Error checking FP rules: {e}")
+		logger.error("Error checking FP rules: %s", e)
 
 	if is_suppressed:
 		vuln_data['is_suppressed'] = True
@@ -772,7 +772,7 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 						tech_hint=name
 					)
 			except Exception as e:
-				logger.error(f"Error registering AuthCandidate from vulnerability {name}: {e}")
+				logger.error("Error registering AuthCandidate from vulnerability %s: %s", name, e)
 	elif exploit_url and not vuln.exploit_url:
 		vuln.exploit_url = exploit_url
 		vuln.save()
@@ -976,7 +976,7 @@ def get_random_user_agent():
 		if opsec and opsec.enable_random_ua:
 			return random.choice(_USER_AGENT_POOL)
 	except Exception as e:
-		logger.warning(f'get_random_user_agent: could not read OpSec settings: {e}')
+		logger.warning('get_random_user_agent: could not read OpSec settings: %s', e)
 	return _DEFAULT_USER_AGENT
 
 
@@ -1088,7 +1088,7 @@ def get_cms_details(url):
 		try:
 			shutil.rmtree(cms_dir_path)
 		except Exception as e:
-			logger.error(e)
+			logger.error("Failed to remove CMS scan directory %s: %s", cms_dir_path, e)
 
 	return response
 
@@ -1320,9 +1320,9 @@ def send_discord_message(
 				fields_append)
 	elif response.status_code != 200:
 		logger.error(
-			f'Error while sending webhook data to Discord.'
-			f'\n\tHTTP code: {response.status_code}.'
-			f'\n\tDetails: {response.content}')
+			'Error while sending webhook data to Discord. HTTP code: %s. Details: %s',
+			response.status_code,
+			response.content)
 
 
 def enrich_notification(message, scan_history_id, subscan_id):
@@ -1493,7 +1493,7 @@ def get_nmap_cmd(
 
 	is_nmap_valid = is_valid_nmap_command(cmd)
 	if not is_nmap_valid:
-		logger.error(f'Invalid nmap command or potentially dangerous: {cmd}')
+		logger.error('Invalid nmap command or potentially dangerous: %s', cmd)
 		return None
 
 	if not input_file:
@@ -1517,7 +1517,7 @@ def reverse_whois(lookup_keyword):
 		Input: lookup keyword like email or registrar name
 		Returns a list of domains as string.
 	'''
-	logger.info(f'Querying reverse whois for {lookup_keyword}')
+	logger.info('Querying reverse whois for %s', lookup_keyword)
 	url = f"https://viewdns.info:443/reversewhois/?q={lookup_keyword}"
 	headers = {
 		"Sec-Ch-Ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"104\"",
@@ -1545,7 +1545,7 @@ def reverse_whois(lookup_keyword):
 				continue
 			domains.append(dom)
 	except Exception as e:
-		logger.error(f'Error while fetching reverse whois info: {e}')
+		logger.error('Error while fetching reverse whois info: %s', e)
 	return domains
 
 
@@ -1555,7 +1555,7 @@ def get_domain_historical_ip_address(domain):
 		This function will use viewdns to fetch historical IP address
 		for a domain
 	'''
-	logger.info(f'Fetching historical IP address for domain {domain}')
+	logger.info('Fetching historical IP address for domain %s', domain)
 	url = f"https://viewdns.info/iphistory/?domain={domain}"
 	headers = {
 		"Sec-Ch-Ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"104\"",
@@ -1691,7 +1691,7 @@ def get_port_service_description(port):
 		Returns:
 			dict: A dictionary containing the service name and description for the port number.
 	"""
-	logger.info('Fetching Port Service Name and Description')
+	logger.info('Fetching port service name and description for port %s', port)
 	try:
 		port = int(port)
 		whatportis_result = whatportis.get_ports(str(port))
@@ -1769,7 +1769,7 @@ def exclude_urls_by_patterns(exclude_paths, urls):
 		Returns:
 			list of str: A new list containing URLs that don't match any exclusion pattern.
 	"""
-	logger.info('exclude_urls_by_patterns')
+	logger.info('Filtering %d URLs by %d exclusion patterns', len(urls), len(exclude_paths))
 	if not exclude_paths:
 		# if no exclude paths are passed and is empty list return all urls as it is
 		return urls
@@ -1895,7 +1895,7 @@ def extract_domain_info(domain):
 
 		domain_info['target'] = domain_name
 	except Exception as e:
-		logger.error(f'Error while extracting domain info: {e}')
+		logger.error('Error while extracting domain info: %s', e)
 		domain_info = DottedDict()
 
 	return domain_info
@@ -2300,7 +2300,7 @@ def get_ips_from_cidr_range(target):
 	try:
 		return [str(ip) for ip in ipaddress.IPv4Network(target, False)]
 	except Exception as e:
-		logger.error(f'{target} is not a valid CIDR range. Skipping.')
+		logger.error('%s is not a valid CIDR range. Skipping.', target)
 
 
 def is_valid_nmap_command(cmd):
@@ -2316,7 +2316,7 @@ def is_valid_nmap_command(cmd):
 	try:
 		parts = shlex.split(cmd)
 	except ValueError as e:
-		logger.error(f'Nmap command shlex split failed: {e}')
+		logger.error('Nmap command shlex split failed: %s', e)
 		return False
 
 	if not parts:
@@ -2324,26 +2324,26 @@ def is_valid_nmap_command(cmd):
 		return False
 
 	if not (parts[0] == 'nmap' or parts[0].endswith('/nmap') or parts[0].endswith('\\nmap') or parts[0].endswith('\\nmap.exe')):
-		logger.error(f'Nmap command does not start with nmap: {parts[0]}')
+		logger.error('Nmap command does not start with nmap: %s', parts[0])
 		return False
-	
+
 	# Block dangerous shell characters (potentially used with shell=True)
 	dangerous_chars = {';', '&', '|', '>', '<', '`', '$', '(', ')'}
 	if any(char in cmd for char in dangerous_chars):
-		logger.error(f'Nmap command contains dangerous characters: {cmd}')
+		logger.error('Nmap command contains dangerous characters: %s', cmd)
 		return False
-		
+
 	for part in parts[1:]: # ignoring nmap the first part of command
 		if part.startswith('-') or part.startswith('--'):
 			continue
-		
+
 		# check for valid characters, . - etc are allowed in valid nmap command
 		# adding : and = to support script args, port specifications and Windows paths
 		# adding [] for IPv6, @ for script-args, +!*# for general nmap flexibility
 		# adding space to support quoted arguments from shlex.split
 		if all(c.isalnum() or c in '.,/-_:=\\ []@+!*#' for c in part):
 			continue
-		logger.error(f'Nmap command part rejected by whitelist: {part}')
+		logger.error('Nmap command part rejected by whitelist: %s', part)
 		return False
 		
 	return True
@@ -2476,5 +2476,5 @@ def extract_params_from_url(url):
 					'type': 'URL Query'
 				})
 	except Exception as e:
-		logger.error(f"Error extracting parameters from URL {url}: {e}")
+		logger.error("Error extracting parameters from URL %s: %s", url, e)
 	return params
