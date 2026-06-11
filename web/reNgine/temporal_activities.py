@@ -323,10 +323,23 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
         import inspect
         sig = inspect.signature(raw_func)
         accepts_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
-        if 'ctx' in sig.parameters or accepts_kwargs:
-            kwargs['ctx'] = ctx
-        if 'description' in sig.parameters or accepts_kwargs:
-            kwargs['description'] = description
+        
+        for param_name in sig.parameters:
+            if param_name in ('self', 'proxy'):
+                continue
+            if param_name not in kwargs:
+                if param_name == 'ctx':
+                    kwargs['ctx'] = ctx
+                elif param_name == 'description':
+                    kwargs['description'] = description
+                elif param_name in ctx:
+                    kwargs[param_name] = ctx[param_name]
+
+        if accepts_kwargs:
+            if 'ctx' not in kwargs:
+                kwargs['ctx'] = ctx
+            if 'description' not in kwargs:
+                kwargs['description'] = description
             
         raw_func(proxy, **kwargs)
         proxy.update_scan_activity(SUCCESS_TASK)
