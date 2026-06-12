@@ -51,5 +51,6 @@ application = ProtocolTypeRouter({
             )
         )
     ),
+    "lifespan": "auto",
 })
 
