@@ -8,12 +8,12 @@ class TestLinkedInCredentialsModel(TestCase):
         session = LinkedInCredentials.objects.create(
             username='operator@example.com',
             cookies_json='[]',
-            state_file_path='/tmp/state.json',
+            state_file_path='/var/scan_results/context/linkedin/storage_state.json',
             is_valid=False,
         )
         self.assertEqual(session.username, 'operator@example.com')
         self.assertEqual(session.cookies_json, '[]')
-        self.assertEqual(session.state_file_path, '/tmp/state.json')
+        self.assertEqual(session.state_file_path, '/var/scan_results/context/linkedin/storage_state.json')
         self.assertFalse(session.is_valid)
         self.assertIsNone(session.last_validated_at)
 
