@@ -63,8 +63,9 @@ import {
   useDeleteSubdomain,
   useToggleSubdomainImportant,
   useInitiateSubscan,
-  useGPTAttackSurface
+  useGPTAttackSurface,
 } from '../../subdomains/api';
+import type { SubdomainFilters } from '../../subdomains/api';
 import { useEngines } from '../../engines/api';
 import { usePlugins } from '../../plugins/api/pluginsApi';
 import { useCreateTodo } from '../../todos/api';
@@ -102,8 +103,25 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedAssets, setSelectedAssets] = useState<number[]>([]);
+  const [hasIpFilter, setHasIpFilter] = useState(false);
+  const [sortCol, setSortCol] = useState<string | undefined>('1');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
-  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, false, targetId);
+  const handleSort = (colNum: string) => {
+    if (sortCol === colNum) {
+      setSortDir(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(colNum);
+      setSortDir('asc');
+    }
+    setPage(1);
+  };
+
+  const filters: SubdomainFilters = {
+    has_ip: hasIpFilter ? 'true' : undefined
+  };
+
+  const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, scanId, false, targetId, filters, 10, sortCol, sortDir);
   const [isReady, setIsReady] = useState(false);
   
   // Modals state
@@ -328,6 +346,21 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
     }
   };
 
+  const handleSendToAWVS = async () => {
+    if (selectedAssets.length === 0) return;
+    try {
+      await subscanMutation.mutateAsync({
+        engine_id: null,
+        tasks: ['run_acunetix'],
+        subdomain_ids: selectedAssets
+      });
+      showNotification('Acunetix scan initiated successfully');
+      setSelectedAssets([]);
+    } catch (error: any) {
+      showNotification(error.message || 'Failed to initiate Acunetix scan', 'error');
+    }
+  };
+
   const selectedEngine = enginesData?.find(e => e.id === selectedEngineId);
 
   const handleAddTodo = async () => {
@@ -435,6 +468,28 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         >
           SEARCH
         </Button>
+        <Button
+          onClick={() => {
+            setHasIpFilter(prev => !prev);
+            setPage(1);
+            setSelectedAssets([]);
+          }}
+          disabled={isLoading}
+          sx={{
+            bgcolor: hasIpFilter ? 'rgba(0, 243, 255, 0.2)' : 'transparent',
+            color: hasIpFilter ? '#00f3ff' : 'rgba(255, 255, 255, 0.6)',
+            opacity: isLoading ? 0.6 : 1,
+            px: 3,
+            borderRadius: 0,
+            fontWeight: 700,
+            fontSize: '11px',
+            letterSpacing: 1,
+            borderLeft: '1px solid rgba(0, 243, 255, 0.1)',
+            '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.15)' }
+          }}
+        >
+          {isLoading ? 'LOADING...' : hasIpFilter ? 'HAS IP [ON]' : 'HAS IP'}
+        </Button>
       </Box>
 
       {/* Tactical Panel */}
@@ -482,6 +537,22 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 <Button 
                   size="small" 
                   variant="contained" 
+                  onClick={handleSendToAWVS}
+                  disabled={subscanMutation.isPending}
+                  sx={{ 
+                    bgcolor: 'rgba(255, 170, 0, 0.1)', 
+                    color: '#ffaa00', 
+                    fontSize: '10px', 
+                    fontWeight: 800, 
+                    border: '1px solid rgba(255, 170, 0, 0.2)',
+                    '&:hover': { bgcolor: 'rgba(255, 170, 0, 0.2)' } 
+                  }}
+                >
+                  {subscanMutation.isPending ? 'SENDING...' : `SEND TO AWVS (${selectedAssets.length})`}
+                </Button>
+                <Button 
+                  size="small" 
+                  variant="contained" 
                   onClick={handleBulkDelete}
                   sx={{ 
                     bgcolor: 'rgba(255, 0, 60, 0.1)', 
@@ -524,12 +595,110 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                     style={{ width: '14px', height: '14px', accentColor: '#00f3ff', cursor: 'pointer', opacity: 0.6 }}
                   />
                 </th>
-                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SUBDOMAIN</th>
-                <Box component="th" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</Box>
+                <th
+                  onClick={() => handleSort('1')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSort('1');
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Sort by subdomain${sortCol === '1' ? (sortDir === 'asc' ? ', ascending' : ', descending') : ''}`}
+                  style={{
+                    padding: '12px 16px',
+                    color: '#00f3ff',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    letterSpacing: 1.5,
+                    fontFamily: 'Orbitron',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  SUBDOMAIN {sortCol === '1' && (sortDir === 'asc' ? '▲' : '▼')}
+                </th>
+                <Box
+                  component="th"
+                  onClick={() => handleSort('4')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSort('4');
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Sort by status${sortCol === '4' ? (sortDir === 'asc' ? ', ascending' : ', descending') : ''}`}
+                  sx={{
+                    display: { xs: 'none', sm: 'table-cell' },
+                    padding: '12px 16px',
+                    color: '#00f3ff',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    letterSpacing: 1.5,
+                    fontFamily: 'Orbitron',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  STATUS {sortCol === '4' && (sortDir === 'asc' ? '▲' : '▼')}
+                </Box>
                 <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>IP</Box>
                 <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PORTS</Box>
-                <Box component="th" sx={{ display: { xs: 'none', xl: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>CONTENT</Box>
-                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>TIME</Box>
+                <Box
+                  component="th"
+                  onClick={() => handleSort('8')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSort('8');
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Sort by content${sortCol === '8' ? (sortDir === 'asc' ? ', ascending' : ', descending') : ''}`}
+                  sx={{
+                    display: { xs: 'none', xl: 'table-cell' },
+                    padding: '12px 16px',
+                    color: '#00f3ff',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    letterSpacing: 1.5,
+                    fontFamily: 'Orbitron',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  CONTENT {sortCol === '8' && (sortDir === 'asc' ? '▲' : '▼')}
+                </Box>
+                <Box
+                  component="th"
+                  onClick={() => handleSort('10')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSort('10');
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Sort by time${sortCol === '10' ? (sortDir === 'asc' ? ', ascending' : ', descending') : ''}`}
+                  sx={{
+                    display: { xs: 'none', lg: 'table-cell' },
+                    padding: '12px 16px',
+                    color: '#00f3ff',
+                    fontSize: '10px',
+                    fontWeight: 900,
+                    letterSpacing: 1.5,
+                    fontFamily: 'Orbitron',
+                    cursor: 'pointer',
+                    userSelect: 'none'
+                  }}
+                >
+                  TIME {sortCol === '10' && (sortDir === 'asc' ? '▲' : '▼')}
+                </Box>
                 <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SCREENSHOT</Box>
                 <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron', textAlign: 'right' }}>ACTION</th>
               </tr>

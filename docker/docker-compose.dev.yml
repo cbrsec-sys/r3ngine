@@ -146,6 +146,9 @@ services:
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
       - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_server_memory_heap_initial__size=512M
+      - NEO4J_server_memory_heap_max__size=1G
+      - NEO4J_server_memory_pagecache_size=512M
     volumes:
       - neo4j_data:/data
     networks:
@@ -344,8 +347,8 @@ volumes:
 
 secrets:
   proxy.ca:
-    file: ../secrets/certs/rengine_chain.pem
+    file: ../secrets/certs/r3ngine_chain.pem
   proxy.key:
-    file: ../secrets/certs/rengine_rsa.key
+    file: ../secrets/certs/r3ngine_rsa.key
   proxy.cert:
-    file: ../secrets/certs/rengine.pem
+    file: ../secrets/certs/r3ngine.pem

@@ -153,7 +153,26 @@ export const ScanList: React.FC = () => {
               {scans?.map((scan) => (
                 <TableRow key={scan.id!} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }, transition: 'all 0.2s' }}>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                    <Typography variant="body2" sx={{ fontWeight: 700, color: '#fff' }}>{scan.domain?.name || 'N/A'}</Typography>
+                    <a
+                      href={`/scan/detail/${scan.id!}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ textDecoration: 'none' }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 700,
+                          color: '#fff',
+                          '&:hover': {
+                            color: '#00f3ff',
+                            textDecoration: 'underline'
+                          }
+                        }}
+                      >
+                        {scan.domain?.name || 'N/A'}
+                      </Typography>
+                    </a>
                     <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontWeight: 600 }}>{scan.scan_type?.engine_name || 'Standard'}</Typography>
                   </TableCell>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', minWidth: 150 }}>
