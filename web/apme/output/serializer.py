@@ -11,7 +11,7 @@ from typing import Any, Dict, List
 from apme.models.path import AttackPath
 
 
-def serialize_path(path: AttackPath) -> Dict[str, Any]:
+def serialize_path(path: AttackPath, node_index: Dict[str, Any] = None) -> Dict[str, Any]:
     """
     Serialize a single AttackPath to the canonical output format.
 
@@ -22,7 +22,7 @@ def serialize_path(path: AttackPath) -> Dict[str, Any]:
     """
     steps = []
     for step in path.steps:
-        steps.append({
+        step_dict = {
             "from": step.from_id,
             "to": step.to_id,
             "action": step.action,
@@ -31,7 +31,31 @@ def serialize_path(path: AttackPath) -> Dict[str, Any]:
             # Clearly distinguish validated (ERL-confirmed) vs inferred steps
             "validated": step.validated,
             "status": "validated" if step.validated else "inferred",
-        })
+        }
+        if node_index:
+            from_node = node_index.get(step.from_id)
+            to_node = node_index.get(step.to_id)
+            if from_node:
+                step_dict["from_node"] = {
+                    "id": from_node.id,
+                    "type": from_node.type,
+                    "subtype": from_node.subtype,
+                    "name": from_node.properties.get("name", ""),
+                    "severity": from_node.properties.get("severity"),
+                    "cvss_score": from_node.properties.get("cvss_score"),
+                    "vuln_id": from_node.properties.get("vuln_id"),
+                }
+            if to_node:
+                step_dict["to_node"] = {
+                    "id": to_node.id,
+                    "type": to_node.type,
+                    "subtype": to_node.subtype,
+                    "name": to_node.properties.get("name", ""),
+                    "severity": to_node.properties.get("severity"),
+                    "cvss_score": to_node.properties.get("cvss_score"),
+                    "vuln_id": to_node.properties.get("vuln_id"),
+                }
+        steps.append(step_dict)
 
     validated_count = sum(1 for s in path.steps if s.validated)
     inferred_count = len(path.steps) - validated_count
@@ -50,7 +74,7 @@ def serialize_path(path: AttackPath) -> Dict[str, Any]:
     }
 
 
-def serialize_paths(paths: List[AttackPath], top_n: int = 5) -> Dict[str, Any]:
+def serialize_paths(paths: List[AttackPath], node_index: Dict[str, Any] = None, top_n: int = 5) -> Dict[str, Any]:
     """
     Serialize the top N attack paths into the canonical output envelope.
     """
@@ -58,7 +82,7 @@ def serialize_paths(paths: List[AttackPath], top_n: int = 5) -> Dict[str, Any]:
     return {
         "total_paths": len(paths),
         "returned_paths": len(top),
-        "paths": [serialize_path(p) for p in top],
+        "paths": [serialize_path(p, node_index) for p in top],
     }
 
 

@@ -2897,3 +2897,37 @@ def run_urlparser_activity(ctx: dict) -> bool:
         description='URL Parameter Extraction (urlparser/unfurl)',
         urls=ctx.get('urls'),
     )
+
+
+@activity.defn(name="RecalculateApmeActivity")
+def recalculate_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
+    from apme.orchestrator import APMEOrchestrator
+    from startScan.models import ScanHistory
+    import yaml
+    from reNgine.definitions import ATTACK_PATH_MODELING
+    from reNgine.job_tracker import update_job
+
+    logger.log_line("[TEMPORAL]", "START", "task=recalculate_apme scan_id=%s" % scan_history_id)
+    activity.logger.info(f"[RecalculateApmeActivity] scan_id={scan_history_id}")
+    update_job(job_id, "RUNNING", 10, "Recalculating attack paths...") if job_id else None
+    
+    try:
+        scan = ScanHistory.objects.get(id=scan_history_id)
+        config = yaml.safe_load(scan.scan_type.yaml_configuration) or {}
+        apme_config = config.get(ATTACK_PATH_MODELING, {})
+        top_n = apme_config.get('top_n', 5)
+
+        orchestrator = APMEOrchestrator(top_n=top_n)
+        result = orchestrator.run(scan_history_id)
+
+        if "error" in result:
+            update_job(job_id, "FAILED", 100, f"Failed: {result.get('error')}", result) if job_id else None
+            logger.log_line("[TEMPORAL]", "ERROR", "task=recalculate_apme scan_id=%s error=%s" % (scan_history_id, result.get('error')), level="error")
+        else:
+            update_job(job_id, "SUCCESS", 100, "Attack path recalculation completed.", result) if job_id else None
+            logger.log_line("[TEMPORAL]", "COMPLETE", "task=recalculate_apme scan_id=%s status=success" % scan_history_id)
+        return result
+    except Exception as e:
+        update_job(job_id, "FAILED", 100, f"Error: {str(e)}") if job_id else None
+        logger.log_line("[TEMPORAL]", "ERROR", "task=recalculate_apme scan_id=%s error=%s" % (scan_history_id, format_exception_for_log(e)), level="error")
+        raise

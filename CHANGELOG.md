@@ -2,6 +2,15 @@
 
 ### [v3.6.0] - Unreleased
 
+- **Attack Path Modeling Engine (APME) UI & Rules Enhancement**:
+  - **Rules Engine Gaps**: Fixed a mismatch in the APME rules engine where `pivot_to_internal_discovery` targeted a capability subtype `"internal_discovery"` that was not declared in `NODE_TYPES["Capability"]` in `schema.py`. Added `"internal_discovery"` to the capability schema.
+  - **Attack Rules Expansion**: Added rules for SSRF (`ssrf_to_cloud_access`, `ssrf_to_pivot`), LFI (`lfi_to_rce`, `lfi_to_data_exfil`), XXE (`xxe_to_data_exfil`, `xxe_to_ssrf`), XSS (`xss_to_auth_access`), and Open Redirect (`redirect_to_auth_access`).
+  - **Enriched Step Nodes API**: Updated the backend path serialization (`serializer.py`) and orchestrator persistence flow (`orchestrator.py`) to resolve and serialize full node properties (type, subtype, name, cvss_score, severity, vuln_id) as `from_node` and `to_node` objects instead of only transmitting raw string IDs.
+  - **Interactive Visual Timeline UI**: Replaced the simple vertical text row list of raw IDs with a visually stunning, responsive compromise chain timeline in `AttackPathsTab.tsx`. It features tailored colors and icons matching node types (Asset, Vulnerability, Capability, Privilege, Credential), CVSS scores, step-by-step actions, and direct links to verify details.
+  - **Description Truncation Fix**: Replaced the severe truncation (`noWrap`) on the finding descriptions with a clamped two-line preview in the collapsed card header and a full, multi-paragraph Executive Narrative display inside the expanded drill-down details view.
+  - **On-Demand Recalculation**: Added a "RE-CALCULATE PATHS" button in the Attack Paths tab header. It invokes the newly registered `RecalculateApmeWorkflow` Temporal workflow to rebuild the attack path modeling graph asynchronously and update local database entries.
+
+
 - **Custom Parameter Discovery Engine (CPDE)**:
   - Added the Custom Parameter Discovery Engine (CPDE) to allow users to define custom regular expressions and keyword matchers to extract sensitive or high-value parameters across scan results.
   - **Backend**: Added the `Parameter` model with `type` (`regex`/`string`), `severity`, and `description` fields. Implemented REST API endpoints (`/api/settings/parameters/`) for full CRUD management.

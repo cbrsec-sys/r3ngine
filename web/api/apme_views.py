@@ -130,3 +130,57 @@ class TriggerLLMAPMEAPIView(APIView):
             'task_id': job_id,
             'message': 'AI Attack Path Modeling task has been initiated.'
         }, status=status.HTTP_202_ACCEPTED)
+
+
+class RecalculateAttackPathsAPIView(APIView):
+    """
+    POST /api/apme/recalculate/
+    Body: { "scan_id": <id> }
+
+    Triggers an on-demand algorithmic attack path modeling recalculation task (via Temporal).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        scan_id = request.data.get('scan_id')
+        if not scan_id:
+            return Response(
+                {'error': 'scan_id is required in request body'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from startScan.models import ScanHistory
+            scan = ScanHistory.objects.get(id=scan_id)
+        except ScanHistory.DoesNotExist:
+            return Response({'error': 'Scan not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        from reNgine.job_tracker import create_job
+        from reNgine.temporal_client import TemporalClientProvider
+        import asyncio
+
+        job_id = create_job()
+
+        async def _start():
+            client = await TemporalClientProvider.get_client()
+            await client.start_workflow(
+                "RecalculateApmeWorkflow",
+                args=[scan_id, job_id],
+                id=f"apme-recalculate-{scan_id}-{job_id}",
+                task_queue="python-orchestrator-queue"
+            )
+
+        loop = asyncio.new_event_loop()
+        try:
+            loop.run_until_complete(_start())
+        except Exception as e:
+            from reNgine.job_tracker import update_job
+            update_job(job_id, "FAILED", 100, f"Failed to start workflow: {e}")
+        finally:
+            loop.close()
+
+        return Response({
+            'status': 'triggered',
+            'task_id': job_id,
+            'message': 'Algorithmic Attack Path Recalculation has been initiated.'
+        }, status=status.HTTP_202_ACCEPTED)
