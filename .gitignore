@@ -67,25 +67,13 @@ get-docker.sh
 .env
 spiderfoot_results/
 
-OFFSEC_ROADMAP.md
-BACKEND_ARCHITECTURAL_REWRITE.md
-CLAUDE.md
-AGENTS.md
-.cursorrules
-GEMINI.md
-documents/PROJECT_SCHEMA.md
-ngrok_tunneling.md
-PHASE1_IMPLEMENTATION_COMPLETE.md
-README_IMPLEMENTATION.md
-STRESS_TESTING_COMPREHENSIVE_PLAN.md
-TEMPORAL_AUDIT.md
-TEMPORAL_FIXES.md
-TEMPORAL_IMPLEMENTATION_PLAN.md
-temporal_migration_plan.md
-TEMPORAL_MIGRATION_STATUS.md
-temporal_migration.md
-.claude/settings.local.json
-CELERY_REMOVAL_PLAN.md
-PHASE3_MIGRATION_PLAN.md
-temporal_audit_report.md
-TEMPORAL_MIGRATION_COMPLETE.md
+web/templates/report/stress_test_report/content.md
+stress_test_report.pdf
+scripts/generate_stress_report.py
+# Plugin files
+UPGRADES.md
+web/ca.crt
+backups/
+.remember
+release_notes.md
+web/killer

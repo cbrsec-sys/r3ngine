@@ -29,6 +29,18 @@ Building on the v3.2.0 Celery → Temporal migration — which replaced the lega
   🚀 [v3.6.0] Unreleased 🚀
 </h2>
 
+## ✏️ Target Editing
+
+v3.6.0 introduces full post-creation editing of targets directly from the Targets page, eliminating the need to delete and recreate an entry to change its configuration.
+
+* **Inline Edit Button**: Each row in the Targets table now exposes a dedicated amber pencil icon button alongside the existing Initiate Scan and context-menu controls. The same action is mirrored as the first item in the row's three-dot context menu for keyboard-accessible workflows.
+* **Comprehensive Edit Modal**: The modal is organized into focused sections — Identity (target name shown read-only, target type selector), Metadata (description, organization reassignment, HackerOne team handle), Scope Configuration (in-scope IPs/CIDRs and secondary domains), Advanced Scan Configuration (starting point path, excluded paths), and Continuous Monitoring (frequency, scan scope, monitoring engine).
+* **Live Monitoring Schedule Sync**: Any change to monitoring settings (`is_monitored`, `monitor_frequency`, `monitor_engine`, `monitor_scan_scope`) automatically calls `manage_monitoring_task()` on the backend, upsert-ing or deleting the target's Temporal schedule in real time — the same path used at target creation.
+* **Organization Reassignment**: The edit modal allows moving a target between organizations (or removing it from all organizations) via the Organization drop-down, handled transparently through the `Organization.domains` M2M relationship.
+* **REST API Endpoint**: `POST /api/update/target/` (`UpdateTarget` APIView, `PERM_MODIFY_TARGETS` required). Handles `excluded_paths` as either a JSON array or newline-delimited string for forward compatibility.
+
+---
+
 ## 🪟 Custom Parameter Discovery Engine (CPDE)
 
 v3.6.0 introduces the Custom Parameter Discovery Engine (CPDE), allowing users to define custom regular expressions and keyword matchers to extract sensitive or high-value parameters across scan results.

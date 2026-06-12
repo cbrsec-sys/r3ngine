@@ -5,3 +5,4 @@ plugins_data
 scan_results
 frontend
 tests/sample_data
+web/static/plugins

@@ -169,5 +169,7 @@ echo 'alias httpx="/usr/local/bin/httpx"' >> ~/.bashrc
 pip install requests==2.32.3 "urllib3>=1.26.0,<3.0.0" "charset-normalizer>=3.0.0,<4.0.0" "chardet>=5.0.0,<6.0.0"
 pip3 install tenacity==8.2.2
 
+vulnx update
+
 echo "Starting Temporal Python Orchestrator..."
 exec python3 /usr/src/app/manage.py run_temporal_orchestrator

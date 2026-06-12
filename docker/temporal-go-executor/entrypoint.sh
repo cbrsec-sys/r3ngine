@@ -144,5 +144,7 @@ if [ ! -d "~/nuclei-templates/kayala-custom" ]; then
     ~/nuclei-templates/kayala-custom
 fi
 
+vulnx update
+
 echo "Starting Temporal Go Executor..."
 exec /usr/local/bin/r3ngine-executor
