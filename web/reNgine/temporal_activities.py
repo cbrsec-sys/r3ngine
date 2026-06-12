@@ -2303,7 +2303,7 @@ def setup_scheduled_scan_activity(params: dict) -> dict:
     gf_patterns = config.get(GF_PATTERNS, [])
     api_discovery_config = config.get(WEB_API_DISCOVERY, {})
     api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
-    kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
+    kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
     if gf_patterns and 'fetch_url' in tasks:
         scan.used_gf_patterns = ','.join(gf_patterns)
