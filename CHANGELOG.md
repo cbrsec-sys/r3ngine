@@ -2,6 +2,12 @@
 
 ### [v3.6.0] - Unreleased
 
+- **API Security Hardening**:
+  - **Swagger/OpenAPI docs now require authentication**: Changed `permission_classes` from `AllowAny` to `IsAuthenticated` and set `public=False` on the schema view. Removed `/swagger/` and `/redoc/` from `LOGIN_REQUIRED_IGNORE_PATHS` — API docs are no longer publicly accessible to unauthenticated users.
+  - **JWT refresh token blacklisting**: Enabled `rest_framework_simplejwt.token_blacklist` app and set `BLACKLIST_AFTER_ROTATION=True`. Rotated refresh tokens are now immediately invalidated in the database, preventing replay attacks with leaked refresh tokens.
+  - **Swagger security scheme**: Added Bearer token security definition and session login/logout links to `SWAGGER_SETTINGS` so authenticated users can authorize and test API endpoints directly from the explorer.
+  - **Dead ignore-path cleanup**: Removed the never-registered `/redoc/` entry from `LOGIN_REQUIRED_IGNORE_PATHS`.
+
 - **SearchSploit & CVE LLM Target Attribution**: 
   - Added `host` and `port` assignment to `searchsploit_scan` to correctly attribute findings with an `http_url`. 
   - Integrated `LLMVulnerabilityReportGenerator` into `search_vulns_scan` and `searchsploit_scan`. Findings dynamically hit the LLM (if enabled) for risk assessments, map descriptions and mitigations, and cache results in the local `CveId` database.
@@ -34,6 +40,12 @@
   - **SploitScan Integration**: Integrated the `sploitscan` CLI to pull real-world exploit evidence directly into the CVE pipeline. Automatically extracts ExploitDB, Metasploit, and GitHub Proof-of-Concept links, along with HackerOne Hacktivity statistics and overarching patching priority.
   - **Automated AI Risk Assessment**: Integrated the native `LLMVulnerabilityReportGenerator` into the enrichment flow. The system automatically prompts the active LLM (OpenAI, Anthropic, Gemini, or Ollama) with CVSS metrics and public exploit counts to generate a structured, context-rich risk assessment and mitigation strategy.
   - **Persistent Intelligence Cache**: Expanded the `CveId` model (Migration 0042) to permanently store `ai_risk_assessment`, `mitigation_ideas`, `public_exploits`, `hackerone_data`, and `patching_priority`, drastically reducing API calls and LLM token usage on subsequent scans.
+
+- **LLM Vulnerability Analysis & Tier 7 Enrichment**:
+  - Fixed `parse_llm_vulnerability_report` to handle all LLM output styles (`Header:\ncontent`, `Header:\n\ncontent`, `Header: inline content`) — the previous `re.split(r':\n')` silently returned an empty dict on any response that did not place content on a new line immediately after the colon, causing an HTTP 500 "Failed to parse LLM response" error on the vulnerability analysis endpoint.
+  - Fixed `get_vulnerability_gpt_report` to always update the specific requested vulnerability by ID before running the name/path bulk-update query. The previous `http_url__icontains=path` filter silently skipped findings with a `NULL` http_url because Django's `icontains` lookup does not match NULL columns.
+  - Tier 7 Impact Assessment (`generate_impact_assessment`) now automatically calls `get_vulnerability_gpt_report` for every vulnerability that has not yet been LLM-enriched (`is_gpt_used=False`), populating `description`, `impact`, `remediation`, and `references` on the `Vulnerability` record during every full scan without manual intervention. The `LLMImpactGenerator` business-impact narrative is stored in `ImpactAssessment.potential_impact` only and no longer overwrites the richer structured GPT content on `Vulnerability.impact`.
+  - Fixed naive `datetime.now()` usage in `test_stress_phase2.py` (replaced with `timezone.now()`) that generated Django `RuntimeWarning` on `ScanHistory.start_scan_date`, `StressTestResult.start_time`/`end_time`, and `StressTelemetryPoint.timestamp` fields when `USE_TZ=True` is active.
 
 - **Temporal Activity Stabilizations**:
   - Fixed a `TypeError` signature mismatch in `_run_task` that crashed reconnaissance activities (such as `searchsploit_scan` and `wafw00f_scan`). The workflow engine now uses `inspect.signature` to intelligently inject Context (`ctx`) and descriptions only when supported by the underlying scanner function.
