@@ -416,7 +416,8 @@ def _enrich_finding_with_llm(name: str, cvss_score: float = None) -> tuple:
 
 
 def searchsploit_scan(self, scan_history_id: int, service: str,
-                      version: Optional[str] = None, host: str = '', port: int = 0) -> bool:
+                      version: Optional[str] = None, host: str = '', port: int = 0,
+                      subdomain_id: Optional[int] = None, domain_id: Optional[int] = None) -> bool:
     """Search Exploit-DB for known exploits for a service/version combo.
 
     Saves matching exploits as Vulnerability records (severity=high/3).
@@ -462,6 +463,8 @@ def searchsploit_scan(self, scan_history_id: int, service: str,
             
             vulns.append(Vulnerability(
                 scan_history_id=scan_history_id,
+                subdomain_id=subdomain_id,
+                target_domain_id=domain_id,
                 name=name,
                 severity=3,  # high
                 description=base_desc,
@@ -520,7 +523,8 @@ def wpprobe_scan(self, scan_history_id: int, url: str) -> bool:
 
 
 def search_vulns_scan(self, scan_history_id: int, service: str,
-                      version: Optional[str], host: str, port: int) -> bool:
+                      version: Optional[str], host: str, port: int,
+                      subdomain_id: Optional[int] = None, domain_id: Optional[int] = None) -> bool:
     """Query vulners.com for CVEs/exploits for a discovered service+version.
 
     Called concurrently per service immediately after port scan completes.
@@ -593,6 +597,8 @@ def search_vulns_scan(self, scan_history_id: int, service: str,
 
         vulns.append(Vulnerability(
             scan_history_id=scan_history_id,
+            subdomain_id=subdomain_id,
+            target_domain_id=domain_id,
             name=item.get('id', 'Service Vulnerability'),
             severity=sev,
             description=base_desc,
