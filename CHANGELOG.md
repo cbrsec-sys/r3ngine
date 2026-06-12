@@ -2,6 +2,12 @@
 
 ### [v3.6.0] - Unreleased
 
+- **HTTP Crawl Bridge & Technology Mapping Propagation**:
+  - Added a second HTTP crawl task, `HTTP Crawl Bridge` (`http_crawl_bridge`), executed in between URL fetching and directory fuzzing.
+  - Dynamically checks any endpoints that are dead or not alive, as well as all new/uncrawled endpoints, updating their status and mapping their technologies.
+  - Removed the `endpoint.is_default` constraint when saving technology objects, enabling technologies discovered on *any* endpoint to propagate to `subdomain.technologies`.
+  - Integrated the bridge task in both `MasterScanWorkflow` and `SubScanWorkflow` (Tier 3a).
+
 - **Target Editing**:
   - Added a comprehensive **Edit Target** modal accessible directly from the Targets page, allowing full post-creation customization of every target parameter without deleting and recreating the entry.
   - **Edit button in each row**: A dedicated amber pencil (`✏`) icon button is now rendered inline per target row, alongside the existing Initiate Scan and 3-dot menu controls. "EDIT TARGET" also appears as the first item in the row's context menu.
