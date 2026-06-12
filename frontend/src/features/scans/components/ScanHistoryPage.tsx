@@ -348,8 +348,30 @@ export const ScanHistoryPage: React.FC = () => {
                         sx={{ color: 'rgba(255,255,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }}
                       />
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 800, color: '#fff', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>{scan.domain?.name}</Typography>
+                    <TableCell
+                      sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer' }}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigate({ to: `/${projectSlug}/scan/detail/${scan.id}` as any });
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: 800,
+                          color: '#fff',
+                          fontFamily: 'Orbitron',
+                          fontSize: '0.8rem',
+                          display: 'inline-block',
+                          cursor: 'pointer',
+                          '&:hover': {
+                            color: '#00f3ff',
+                            textDecoration: 'underline'
+                          }
+                        }}
+                      >
+                        {scan.domain?.name}
+                      </Typography>
                       {scan.cfg_starting_point_path && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
                           <Terminal size={10} style={{ color: 'rgba(255,255,255,0.3)' }} />
