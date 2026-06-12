@@ -143,8 +143,9 @@ class LinkedInScraper:
 
     def _save_state(self):
         try:
-            os.makedirs(os.path.dirname(self.session.state_file_path), exist_ok=True)
-            self._context.storage_state(path=self.session.state_file_path)
+            safe_path = _validate_state_path(self.session.state_file_path)
+            os.makedirs(os.path.dirname(safe_path), exist_ok=True)
+            self._context.storage_state(path=safe_path)
             self.session.is_valid = True
             self.session.last_validated_at = timezone.now()
             self.session.save(update_fields=["state_file_path", "is_valid", "last_validated_at"])
