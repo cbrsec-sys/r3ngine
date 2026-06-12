@@ -3,7 +3,11 @@ import os
 import tempfile
 from unittest.mock import MagicMock, patch
 from django.test import TestCase
-from dashboard.models import LinkedInCredentials
+from django.utils import timezone
+from dashboard.models import LinkedInCredentials, HunterIOAPIKey
+from targetApp.models import Domain
+from startScan.models import ScanHistory
+from scanEngine.models import EngineType
 
 
 class TestLinkedInCredentialsModel(TestCase):
@@ -133,3 +137,89 @@ class TestLinkedInScraperAuth(TestCase):
                 from reNgine.osint.linkedin_intelligence import LinkedInScraper
                 scraper = LinkedInScraper(session=self.session, hunter_key='key')
         self.assertEqual(scraper.format_email('Jane Smith', '{f}{last}', 'corp.com'), 'jsmith@corp.com')
+
+
+class TestRunLinkedint(TestCase):
+
+    def _make_scan(self):
+        domain = Domain.objects.create(name='target.example.com')
+        engine = EngineType.objects.create(engine_name='LinkedIn Test Engine')
+        return ScanHistory.objects.create(
+            domain=domain,
+            scan_status=1,  # 1 = RUNNING_TASK
+            start_scan_date=timezone.now(),
+            scan_type=engine,
+        )
+
+    def test_returns_empty_list_when_no_session_configured(self):
+        HunterIOAPIKey.objects.create(key='hunter-key')
+        scan = self._make_scan()
+        from reNgine.osint_tasks import run_linkedint
+        result = run_linkedint('TargetCorp', scan.id)
+        self.assertEqual(result, [])
+
+    def test_returns_empty_list_when_no_hunter_key(self):
+        LinkedInCredentials.objects.create(
+            id=1, username='u', cookies_json='[]', is_valid=False
+        )
+        scan = self._make_scan()
+        from reNgine.osint_tasks import run_linkedint
+        result = run_linkedint('TargetCorp', scan.id)
+        self.assertEqual(result, [])
+
+    @patch('reNgine.osint_tasks.LinkedInScraper')
+    def test_returns_result_string_on_success(self, mock_cls):
+        LinkedInCredentials.objects.create(
+            id=1, username='u', cookies_json='[]', is_valid=False
+        )
+        HunterIOAPIKey.objects.create(key='hunter-key')
+        scan = self._make_scan()
+
+        mock_scraper = MagicMock()
+        mock_scraper.__enter__ = MagicMock(return_value=mock_scraper)
+        mock_scraper.__exit__ = MagicMock(return_value=False)
+        mock_scraper.discover_employees.return_value = [
+            {'name': 'Alice Smith', 'designation': 'Engineer', 'email': 'a.smith@target.example.com'}
+        ]
+        mock_scraper.notes = []
+        mock_cls.return_value = mock_scraper
+
+        from reNgine.osint_tasks import run_linkedint
+        result = run_linkedint('TargetCorp', scan.id)
+        self.assertEqual(result, ['LinkedIn Intelligence processed 1 employees for TargetCorp'])
+
+    @patch('reNgine.osint_tasks.LinkedInScraper')
+    def test_notes_are_logged_on_auth_failure(self, mock_cls):
+        LinkedInCredentials.objects.create(
+            id=1, username='u', cookies_json='', is_valid=False
+        )
+        HunterIOAPIKey.objects.create(key='hunter-key')
+        scan = self._make_scan()
+
+        mock_scraper = MagicMock()
+        mock_scraper.__enter__ = MagicMock(return_value=mock_scraper)
+        mock_scraper.__exit__ = MagicMock(return_value=False)
+        mock_scraper.discover_employees.return_value = []
+        mock_scraper.notes = [
+            '[OSINT][LinkedIn] Session invalid and cookie injection failed — LinkedIn intelligence skipped.'
+        ]
+        mock_cls.return_value = mock_scraper
+
+        from reNgine.osint_tasks import run_linkedint
+        with self.assertLogs('reNgine.osint_tasks', level='WARNING') as cm:
+            result = run_linkedint('TargetCorp', scan.id)
+        self.assertIn('[OSINT][LinkedIn]', ' '.join(cm.output))
+        self.assertEqual(result, ['LinkedIn Intelligence processed 0 employees for TargetCorp'])
+
+    @patch('reNgine.osint_tasks.LinkedInScraper')
+    def test_never_raises_on_unexpected_exception(self, mock_cls):
+        LinkedInCredentials.objects.create(
+            id=1, username='u', cookies_json='[]', is_valid=False
+        )
+        HunterIOAPIKey.objects.create(key='hunter-key')
+        scan = self._make_scan()
+        mock_cls.side_effect = RuntimeError("Playwright crashed unexpectedly")
+
+        from reNgine.osint_tasks import run_linkedint
+        result = run_linkedint('TargetCorp', scan.id)
+        self.assertEqual(result, [])
