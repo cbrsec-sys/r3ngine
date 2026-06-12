@@ -90,6 +90,7 @@ def generate_report_task(report_id):
         params = report_obj.params
         is_ignore_info_vuln = params.get('ignore_info_vuln', False)
         include_attack_surface_map = params.get('include_attack_surface_map', False)
+        comments = params.get('comments', '')
 
         show_recon = True
         show_vuln = True
@@ -233,6 +234,7 @@ def generate_report_task(report_id):
             description = description.replace('{low_count}', str(vulns.filter(severity=1).count()))
             description = description.replace('{info_count}', str(vulns.filter(severity=0).count()))
             description = description.replace('{unknown_count}', str(vulns.filter(severity=-1).count()))
+            description = description.replace('{comments}', str(comments or ''))
             
             if report_type == 'stress_test' and stress_results.exists():
                 description += f"\n\n**Stress Test Performance Summary:**\n"
