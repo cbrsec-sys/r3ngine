@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { ThemeProvider, CssBaseline } from '@mui/material';
-import { hackerTheme, modernTheme, enterpriseTheme } from '../theme';
+import { hackerTheme, modernTheme, enterpriseTheme, v3LightTheme } from '../theme';
 import { alpha, type Theme } from '@mui/material/styles';
 
 import type { ThemeType } from '../theme/tokens';
@@ -20,7 +20,7 @@ const themes: Record<string, Theme> = {
   enterprise: enterpriseTheme,
   clean: modernTheme, // Legacy mapping
   script_kiddie: hackerTheme, // Legacy mapping
-  v3_light: enterpriseTheme, // Base light theme, but tokens will override background
+  v3_light: v3LightTheme, // Custom light cyber theme
 };
 
 export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
