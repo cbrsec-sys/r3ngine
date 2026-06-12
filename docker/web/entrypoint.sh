@@ -28,17 +28,13 @@ python3 manage.py migrate --noinput
 echo "Syncing roles..."
 python3 manage.py sync_roles
 
-# Load default fixtures (Scan Engines, Tools, Keywords)
+# Load default fixtures (Scan Engines, Tools, Keywords, Hardware Profiles) in a single fast command
 echo "Loading default fixtures..."
-python3 manage.py loaddata fixtures/external_tools.yaml
-python3 manage.py loaddata fixtures/default_keywords.yaml
-# Load default fixtures
-for f in fixtures/scan_engines/*.yaml; do
-  python3 manage.py loaddata "$f" --app scanEngine.EngineType
-done
-for f in fixtures/hardware_profiles/*.yaml; do
-  python3 manage.py loaddata "$f" --app scanEngine.HardwareProfile
-done
+python3 manage.py loaddata \
+    fixtures/external_tools.yaml \
+    fixtures/default_keywords.yaml \
+    fixtures/scan_engines/*.yaml \
+    fixtures/hardware_profiles/*.yaml
 
 # Start the server
 echo "Starting reNgine server..."

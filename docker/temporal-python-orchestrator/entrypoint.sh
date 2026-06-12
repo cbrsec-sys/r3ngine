@@ -5,8 +5,9 @@
 
 
 
-python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.InterestingLookupModel
-python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
+python3 manage.py loaddata \
+    fixtures/default_keywords.yaml \
+    fixtures/external_tools.yaml
 
 
 
