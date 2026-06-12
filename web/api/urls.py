@@ -341,6 +341,14 @@ urlpatterns = [
         ResumeScan.as_view(),
         name='resume_scan'),
     path(
+        'action/pause/scan/',
+        PauseScan.as_view(),
+        name='pause_scan'),
+    path(
+        'action/unpause/scan/',
+        UnpauseScan.as_view(),
+        name='unpause_scan'),
+    path(
         'fetch/results/subscan/',
         FetchSubscanResults.as_view(),
         name='fetch_subscan_results'),

@@ -1967,6 +1967,114 @@ class ResumeScan(APIView):
 		return Response(response)
 
 
+class PauseScan(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+	def post(self, request):
+		from reNgine.temporal_client import TemporalClientProvider
+		from reNgine.definitions import RUNNING_TASK, PAUSED_TASK
+		from startScan.models import ScanHistory, SubScan
+
+		data = request.data
+		scan_ids = data.get('scan_ids', [])
+		target_id = data.get('target_id')
+
+		if target_id:
+			scans = ScanHistory.objects.filter(domain_id=target_id, scan_status=RUNNING_TASK)
+		elif scan_ids:
+			scan_ids = [int(sid) for sid in scan_ids]
+			scans = ScanHistory.objects.filter(id__in=scan_ids)
+		else:
+			return Response({'status': False, 'message': 'scan_ids or target_id required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+		paused_count = 0
+		for scan in scans:
+			if scan.scan_status != RUNNING_TASK:
+				continue
+			try:
+				scan.scan_status = PAUSED_TASK
+				scan.save(update_fields=['scan_status'])
+
+				subscans = SubScan.objects.filter(scan_history=scan, status=RUNNING_TASK)
+				for subscan in subscans:
+					subscan.status = PAUSED_TASK
+					subscan.save(update_fields=['status'])
+					for wf_id in subscan.workflow_ids:
+						try:
+							TemporalClientProvider.pause_workflow(wf_id)
+						except Exception as e:
+							logger.error(f"Failed to pause subscan workflow {wf_id}: {e}")
+
+				for te in scan.temporal_executions.filter(status="RUNNING"):
+					try:
+						TemporalClientProvider.pause_workflow(te.workflow_id)
+					except Exception as e:
+						logger.error(f"Failed to pause workflow {te.workflow_id} for scan {scan.id}: {e}")
+
+				from reNgine.tasks import create_scan_activity
+				create_scan_activity(scan.id, "Scan paused", PAUSED_TASK)
+				paused_count += 1
+			except Exception as e:
+				logger.error(f"Failed to pause scan {scan.id}: {e}")
+
+		return Response({'status': True, 'paused_count': paused_count, 'message': f'Paused {paused_count} scans.'})
+
+
+class UnpauseScan(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_INITATE_SCANS_SUBSCANS
+
+	def post(self, request):
+		from reNgine.temporal_client import TemporalClientProvider
+		from reNgine.definitions import RUNNING_TASK, PAUSED_TASK
+		from startScan.models import ScanHistory, SubScan
+
+		data = request.data
+		scan_ids = data.get('scan_ids', [])
+		target_id = data.get('target_id')
+
+		if target_id:
+			scans = ScanHistory.objects.filter(domain_id=target_id, scan_status=PAUSED_TASK)
+		elif scan_ids:
+			scan_ids = [int(sid) for sid in scan_ids]
+			scans = ScanHistory.objects.filter(id__in=scan_ids)
+		else:
+			return Response({'status': False, 'message': 'scan_ids or target_id required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+		resumed_count = 0
+		for scan in scans:
+			if scan.scan_status != PAUSED_TASK:
+				continue
+			try:
+				scan.scan_status = RUNNING_TASK
+				scan.save(update_fields=['scan_status'])
+
+				subscans = SubScan.objects.filter(scan_history=scan, status=PAUSED_TASK)
+				for subscan in subscans:
+					subscan.status = RUNNING_TASK
+					subscan.save(update_fields=['status'])
+					for wf_id in subscan.workflow_ids:
+						try:
+							TemporalClientProvider.resume_workflow(wf_id)
+						except Exception as e:
+							logger.error(f"Failed to resume subscan workflow {wf_id}: {e}")
+
+				for te in scan.temporal_executions.filter(status="RUNNING"):
+					try:
+						TemporalClientProvider.resume_workflow(te.workflow_id)
+					except Exception as e:
+						logger.error(f"Failed to resume workflow {te.workflow_id} for scan {scan.id}: {e}")
+
+				from reNgine.tasks import create_scan_activity
+				create_scan_activity(scan.id, "Scan resumed", RUNNING_TASK)
+				resumed_count += 1
+			except Exception as e:
+				logger.error(f"Failed to resume/unpause scan {scan.id}: {e}")
+
+		return Response({'status': True, 'resumed_count': resumed_count, 'message': f'Resumed {resumed_count} scans.'})
+
+
 class InitiateScan(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_INITATE_SCANS_SUBSCANS

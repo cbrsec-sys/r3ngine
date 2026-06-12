@@ -444,6 +444,19 @@ def initialize_scan_tasks_activity(ctx: dict) -> dict:
     return {'created': created_count, 'existing': existing_count}
 
 
+@activity.defn(name="UpdateScanStatusActivity")
+def update_scan_status_activity(scan_id: int, status: int) -> None:
+    """Update scan status in DB (used by pause/resume signals)."""
+    from startScan.models import ScanHistory
+    try:
+        scan = ScanHistory.objects.get(id=scan_id)
+        scan.scan_status = status
+        scan.save(update_fields=["scan_status"])
+        logger.log_line("[TEMPORAL]", "STATUS_UPDATE", "scan_id=%d status=%d" % (scan_id, status))
+    except ScanHistory.DoesNotExist:
+        logger.warning("UpdateScanStatusActivity: ScanHistory %d not found" % scan_id)
+
+
 @activity.defn(name="TargetProfilingActivity")
 def target_profiling_activity(ctx: dict) -> dict:
     """Validate the scan target and populate baseline scan context.

@@ -7,7 +7,8 @@ from reNgine.common_func import *
 from reNgine.definitions import (
 	ABORTED_TASK,
 	RUNNING_TASK,
-	SUCCESS_TASK
+	SUCCESS_TASK,
+	FAILED_TASK
 )
 from rest_framework import serializers
 from scanEngine.models import *
@@ -377,10 +378,12 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 	initiated_by = MinimalUserSerializer(read_only=True)
 	max_severity = serializers.SerializerMethodField('get_max_severity')
 	engine_name = serializers.SerializerMethodField('get_engine_name')
-	is_spiderfoot_running = serializers.SerializerMethodField()
 	successful_task_count = serializers.SerializerMethodField()
 	failed_task_count = serializers.SerializerMethodField()
 	total_task_count = serializers.SerializerMethodField()
+	current_tier = serializers.SerializerMethodField()
+	total_tiers = serializers.SerializerMethodField()
+	current_tier_progress = serializers.SerializerMethodField()
 
 	class Meta:
 		model = ScanHistory
@@ -411,6 +414,9 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 			'successful_task_count',
 			'failed_task_count',
 			'total_task_count',
+			'current_tier',
+			'total_tiers',
+			'current_tier_progress',
 		]
 		depth = 1
 
@@ -435,6 +441,72 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 
 	def get_total_task_count(self, obj):
 		return self._get_cached_task_counts(obj)[2]
+
+	def get_tier_info(self, obj):
+		cache_attr = f'_tier_info_{obj.pk}'
+		if hasattr(self, cache_attr):
+			return getattr(self, cache_attr)
+
+		activities = list(obj.scanactivity_set.all())
+		if not activities:
+			info = {'current_tier': 0, 'total_tiers': 0, 'current_tier_progress': 0}
+			setattr(self, cache_attr, info)
+			return info
+
+		tiered_activities = [a for a in activities if a.tier is not None and a.tier > 0]
+		if not tiered_activities:
+			info = {'current_tier': 0, 'total_tiers': 0, 'current_tier_progress': 0}
+			setattr(self, cache_attr, info)
+			return info
+
+		total_tiers = max(a.tier for a in tiered_activities)
+
+		started_tiers = set()
+		completed_tiers = set()
+
+		tier_activities = {}
+		for a in tiered_activities:
+			tier_activities.setdefault(a.tier, []).append(a)
+			if a.status in [RUNNING_TASK, SUCCESS_TASK, FAILED_TASK]:
+				started_tiers.add(a.tier)
+
+		for tier, acts in tier_activities.items():
+			if all(a.status in [SUCCESS_TASK, FAILED_TASK] for a in acts):
+				completed_tiers.add(tier)
+
+		active_tier = 1
+		uncompleted_started = [t for t in started_tiers if t not in completed_tiers]
+		if uncompleted_started:
+			active_tier = min(uncompleted_started)
+		elif completed_tiers:
+			active_tier = min(max(completed_tiers) + 1, total_tiers)
+		elif obj.scan_status == RUNNING_TASK:
+			active_tier = 1
+		else:
+			active_tier = 0
+
+		current_tier_progress = 0
+		if active_tier in tier_activities:
+			acts = tier_activities[active_tier]
+			completed_acts = sum(1 for a in acts if a.status in [SUCCESS_TASK, FAILED_TASK])
+			current_tier_progress = round((completed_acts / len(acts)) * 100, 2)
+
+		info = {
+			'current_tier': active_tier,
+			'total_tiers': total_tiers,
+			'current_tier_progress': current_tier_progress
+		}
+		setattr(self, cache_attr, info)
+		return info
+
+	def get_current_tier(self, obj):
+		return self.get_tier_info(obj)['current_tier']
+
+	def get_total_tiers(self, obj):
+		return self.get_tier_info(obj)['total_tiers']
+
+	def get_current_tier_progress(self, obj):
+		return self.get_tier_info(obj)['current_tier_progress']
 
 	def get_max_severity(self, scan_history):
 		from startScan.models import Vulnerability
