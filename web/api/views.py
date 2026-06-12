@@ -1,3 +1,4 @@
+import json
 import re
 import socket
 import logging
@@ -21,7 +22,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.renderers import JSONRenderer
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
 import mimetypes
 import os
 
@@ -5186,3 +5187,146 @@ class ScanProfileViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         return super().destroy(request, *args, **kwargs)
+
+
+# ---------------------------------------------------------------------------
+# LinkedIn session management endpoints
+# ---------------------------------------------------------------------------
+
+_LINKEDIN_CAPTURE_SCRIPT = '''\
+#!/usr/bin/env python3
+"""
+LinkedIn Session Capture Helper -- r3ngine
+==========================================
+Run this script on your LOCAL machine (not inside Docker) to capture a LinkedIn
+authenticated session state file for upload to r3ngine.
+
+Requirements (local machine):
+    pip install playwright playwright-stealth
+    playwright install chromium
+
+Usage:
+    python linkedin_capture.py
+    # A browser window opens. Log in to LinkedIn (including any MFA steps).
+    # The script saves storage_state.json once you reach the feed.
+    # Upload that file in r3ngine: Settings -> API Keys -> LinkedIn.
+"""
+from playwright.sync_api import sync_playwright
+
+OUTPUT_FILE = "storage_state.json"
+
+def main():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        context = browser.new_context()
+        page = context.new_page()
+        print("Opening LinkedIn login...")
+        page.goto("https://www.linkedin.com/login")
+        print("Complete login in the browser (including MFA if prompted).")
+        print("Waiting for feed page...")
+        page.wait_for_url("**/feed/**", timeout=0)
+        print("Login confirmed. Saving session...")
+        context.storage_state(path=OUTPUT_FILE)
+        browser.close()
+        print(f"Done. Upload \'{OUTPUT_FILE}\' to r3ngine via Settings -> API Keys -> LinkedIn.")
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+class LinkedInSessionUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from dashboard.models import LinkedInCredentials
+
+        cookies_json = request.data.get('cookies_json')
+        if cookies_json:
+            try:
+                json.loads(cookies_json)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                return Response({'error': 'Invalid cookies_json -- must be a valid JSON array.'}, status=400)
+            session, _ = LinkedInCredentials.objects.get_or_create(id=1)
+            session.cookies_json = cookies_json
+            session.is_valid = False
+            session.save(update_fields=['cookies_json', 'is_valid'])
+            return Response({'status': 'cookies saved'})
+
+        state_file = request.FILES.get('state_file')
+        if not state_file:
+            return Response({'error': 'Provide state_file (multipart) or cookies_json (JSON).'}, status=400)
+
+        try:
+            content = state_file.read()
+            json.loads(content)
+        except (json.JSONDecodeError, Exception):
+            return Response({'error': 'Uploaded file is not valid JSON.'}, status=400)
+
+        state_dir = os.path.join(settings.RENGINE_RESULTS, 'context', 'linkedin')
+        os.makedirs(state_dir, exist_ok=True)
+        state_path = os.path.join(state_dir, 'storage_state.json')
+        with open(state_path, 'wb') as fh:
+            fh.write(content)
+
+        session, _ = LinkedInCredentials.objects.get_or_create(id=1)
+        session.state_file_path = state_path
+        session.is_valid = False
+        session.save(update_fields=['state_file_path', 'is_valid'])
+        return Response({'status': 'state file saved'})
+
+
+class LinkedInSessionStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from dashboard.models import LinkedInCredentials
+        session = LinkedInCredentials.objects.first()
+        if not session:
+            return Response({
+                'is_valid': False,
+                'last_validated_at': None,
+                'username': '',
+                'has_state_file': False,
+                'has_cookies': False,
+            })
+        return Response({
+            'is_valid': session.is_valid,
+            'last_validated_at': session.last_validated_at,
+            'username': session.username,
+            'has_state_file': bool(
+                session.state_file_path and os.path.isfile(session.state_file_path)
+            ),
+            'has_cookies': bool(session.cookies_json),
+        })
+
+
+class LinkedInSessionDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        import logging as _logging
+        from dashboard.models import LinkedInCredentials
+        _logger = _logging.getLogger(__name__)
+        session = LinkedInCredentials.objects.first()
+        if session:
+            if session.state_file_path and os.path.isfile(session.state_file_path):
+                try:
+                    os.remove(session.state_file_path)
+                except OSError as exc:
+                    _logger.warning("Could not delete LinkedIn state file: %s", exc)
+            session.cookies_json = ''
+            session.state_file_path = ''
+            session.is_valid = False
+            session.last_validated_at = None
+            session.save()
+        return Response({'status': 'session cleared'})
+
+
+class LinkedInHelperScriptView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        response = HttpResponse(_LINKEDIN_CAPTURE_SCRIPT, content_type='text/x-python')
+        response['Content-Disposition'] = 'attachment; filename="linkedin_capture.py"'
+        return response

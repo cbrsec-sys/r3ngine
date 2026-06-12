@@ -527,6 +527,22 @@ urlpatterns = [
         StartWorkflowView.as_view(),
         name='start-workflow',
     ),
+    path(
+        'linkedin/session/upload/',
+        LinkedInSessionUploadView.as_view(),
+        name='linkedin-session-upload'),
+    path(
+        'linkedin/session/status/',
+        LinkedInSessionStatusView.as_view(),
+        name='linkedin-session-status'),
+    path(
+        'linkedin/session/',
+        LinkedInSessionDeleteView.as_view(),
+        name='linkedin-session-delete'),
+    path(
+        'linkedin/session/helper/',
+        LinkedInHelperScriptView.as_view(),
+        name='linkedin-session-helper'),
 ]
 
 
