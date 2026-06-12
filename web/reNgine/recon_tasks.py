@@ -371,8 +371,51 @@ def sshaudit_scan(self, scan_history_id: int, host: str, port: int = 22) -> bool
     return True
 
 
+def _enrich_finding_with_llm(name: str, cvss_score: float = None) -> tuple:
+    """Helper to query LLM for a vulnerability description and cache it in CveId."""
+    try:
+        from dashboard.models import LLMConfig
+        from startScan.models import CveId
+        from reNgine.llm import LLMVulnerabilityReportGenerator
+        
+        config = LLMConfig.objects.filter(is_active=True).first()
+        if not config:
+            return "", "", ""
+            
+        cve_obj, created = CveId.objects.get_or_create(name=name)
+        if created and cvss_score:
+            cve_obj.cvss_v31_base_score = cvss_score
+            cve_obj.save()
+            
+        if not cve_obj.ai_risk_assessment:
+            report_gen = LLMVulnerabilityReportGenerator(logger=logger)
+            prompt = f"Analyze the vulnerability or CVE {name}. "
+            if cve_obj.cvss_v31_base_score:
+                prompt += f"It has a CVSS base score of {cve_obj.cvss_v31_base_score}. "
+            prompt += "Provide a detailed risk assessment, potential impact, and mitigation ideas."
+            
+            response = report_gen.get_vulnerability_description(prompt)
+            if response and response.get('status'):
+                desc = response.get('description', '')
+                impact = response.get('impact', '')
+                remediation = response.get('remediation', '')
+                
+                assessment = f"**Description**:\n{desc}\n\n**Impact**:\n{impact}\n\n**Mitigation**:\n{remediation}"
+                cve_obj.ai_risk_assessment = assessment
+                cve_obj.mitigation_ideas = remediation
+                cve_obj.save()
+                return desc, impact, remediation
+            return "", "", ""
+            
+        # Already cached
+        return cve_obj.ai_risk_assessment, "", cve_obj.mitigation_ideas or ""
+    except Exception as e:
+        logger.log_line("[LLM_ENRICH]", "WARN", "LLM enrichment failed for %s: %s" % (name, str(e)))
+        return "", "", ""
+
+
 def searchsploit_scan(self, scan_history_id: int, service: str,
-                      version: Optional[str] = None) -> bool:
+                      version: Optional[str] = None, host: str = '', port: int = 0) -> bool:
     """Search Exploit-DB for known exploits for a service/version combo.
 
     Saves matching exploits as Vulnerability records (severity=high/3).
@@ -394,13 +437,25 @@ def searchsploit_scan(self, scan_history_id: int, service: str,
         exploits = data.get('RESULTS_EXPLOIT', [])
         vulns = []
         for exploit in exploits[:20]:
+            name = exploit.get('Title', 'Exploit Found')
+            desc_llm, impact_llm, remediation_llm = _enrich_finding_with_llm(name)
+            
+            base_desc = exploit.get('Description', '')
+            if desc_llm:
+                base_desc += '\n\n**AI Risk Assessment**:\n' + desc_llm
+
+            http_url = f"{host}:{port}" if host else None
+            
             vulns.append(Vulnerability(
                 scan_history_id=scan_history_id,
-                name=exploit.get('Title', 'Exploit Found'),
+                name=name,
                 severity=3,  # high
-                description=exploit.get('Description', ''),
+                description=base_desc,
+                impact=impact_llm if impact_llm else None,
+                remediation=remediation_llm if remediation_llm else None,
                 source='searchsploit',
                 exploit_url=exploit.get('Path', ''),
+                http_url=http_url,
             ))
         if vulns:
             with transaction.atomic():
@@ -510,17 +565,25 @@ def search_vulns_scan(self, scan_history_id: int, service: str,
         else:
             sev = 1  # low
 
+        desc_llm, impact_llm, remediation_llm = _enrich_finding_with_llm(item.get('id', 'Service Vulnerability'), cvss_score)
+        
+        base_desc = '%s\n\nService: %s %s\nHost: %s:%d\nCVSS: %.1f\n\n%s' % (
+            item.get('title', ''),
+            service, version or '',
+            host, port,
+            cvss_score,
+            item.get('description', ''),
+        )
+        if desc_llm:
+            base_desc += '\n\n**AI Risk Assessment**:\n' + desc_llm
+
         vulns.append(Vulnerability(
             scan_history_id=scan_history_id,
             name=item.get('id', 'Service Vulnerability'),
             severity=sev,
-            description='%s\n\nService: %s %s\nHost: %s:%d\nCVSS: %.1f\n\n%s' % (
-                item.get('title', ''),
-                service, version or '',
-                host, port,
-                cvss_score,
-                item.get('description', ''),
-            ),
+            description=base_desc,
+            impact=impact_llm if impact_llm else None,
+            remediation=remediation_llm if remediation_llm else None,
             source='search_vulns',
             http_url='%s:%d' % (host, port),
         ))

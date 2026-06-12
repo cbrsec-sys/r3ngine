@@ -8,10 +8,11 @@ The CVE enrichment system automatically fetches and updates vulnerability metada
 - **FIRST EPSS API**: Exploit prediction scores
 - **CISA KEV Catalog**: Known exploited vulnerabilities
 - **SploitScan**: Public exploit evidence (ExploitDB, Metasploit, GitHub PoCs), HackerOne stats, and Patching Priority
+- **SearchSploit**: ExploitDB searches now automatically attribute to their targets (`http_url`) and fetch LLM summaries.
 - **Internal LLM Engine**: Automated, context-aware risk assessments and mitigation strategies
 
 The enriched metadata is stored in the `CveId` model and is consumed by the
-`VulnerabilityCorrelationEngine` to produce more accurate correlation and risk scores.
+`VulnerabilityCorrelationEngine` to produce more accurate correlation and risk scores. For non-CVE searchsploit exploits, the exploit Title acts as the cached `CveId` key.
 
 ---
 
