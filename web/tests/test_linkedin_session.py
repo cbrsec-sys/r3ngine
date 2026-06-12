@@ -2,7 +2,8 @@ import json
 import os
 import tempfile
 from unittest.mock import MagicMock, patch
-from django.test import TestCase
+from django.contrib.auth.models import User
+from django.test import TestCase, Client
 from django.utils import timezone
 from dashboard.models import LinkedInCredentials, HunterIOAPIKey
 from targetApp.models import Domain
@@ -223,3 +224,106 @@ class TestRunLinkedint(TestCase):
         from reNgine.osint_tasks import run_linkedint
         result = run_linkedint('TargetCorp', scan.id)
         self.assertEqual(result, [])
+
+
+class TestLinkedInSessionAPI(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user('apitest', 'api@example.com', 'password123')
+        self.client = Client()
+        self.client.force_login(self.user)
+
+    def test_status_returns_empty_shape_when_no_session(self):
+        res = self.client.get('/api/linkedin/session/status/')
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertFalse(data['is_valid'])
+        self.assertFalse(data['has_state_file'])
+        self.assertFalse(data['has_cookies'])
+        self.assertIsNone(data['last_validated_at'])
+        self.assertEqual(data['username'], '')
+
+    def test_status_returns_correct_shape_with_session(self):
+        LinkedInCredentials.objects.create(
+            id=1, username='op@example.com',
+            cookies_json='[]', state_file_path='', is_valid=True
+        )
+        res = self.client.get('/api/linkedin/session/status/')
+        self.assertEqual(res.status_code, 200)
+        data = res.json()
+        self.assertTrue(data['is_valid'])
+        self.assertTrue(data['has_cookies'])
+        self.assertEqual(data['username'], 'op@example.com')
+
+    def test_upload_cookies_json_saves_to_db(self):
+        cookies = json.dumps([
+            {'name': 'li_at', 'value': 'token123',
+             'domain': '.linkedin.com', 'path': '/'}
+        ])
+        res = self.client.post(
+            '/api/linkedin/session/upload/',
+            data=json.dumps({'cookies_json': cookies}),
+            content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 200)
+        session = LinkedInCredentials.objects.first()
+        self.assertIsNotNone(session)
+        self.assertEqual(session.cookies_json, cookies)
+
+    def test_upload_invalid_cookies_json_returns_400(self):
+        res = self.client.post(
+            '/api/linkedin/session/upload/',
+            data=json.dumps({'cookies_json': 'not-valid-json'}),
+            content_type='application/json',
+        )
+        self.assertEqual(res.status_code, 400)
+
+    def test_upload_state_file_saves_to_disk(self):
+        valid_state = json.dumps({"cookies": [], "origins": []})
+        from io import BytesIO
+        file_data = BytesIO(valid_state.encode())
+        file_data.name = 'storage_state.json'
+        res = self.client.post(
+            '/api/linkedin/session/upload/',
+            data={'state_file': file_data},
+            format='multipart',
+        )
+        self.assertEqual(res.status_code, 200)
+        session = LinkedInCredentials.objects.first()
+        self.assertIsNotNone(session)
+        self.assertTrue(os.path.isfile(session.state_file_path))
+
+    def test_upload_invalid_json_file_returns_400(self):
+        from io import BytesIO
+        bad_file = BytesIO(b'not valid json at all')
+        bad_file.name = 'storage_state.json'
+        res = self.client.post(
+            '/api/linkedin/session/upload/',
+            data={'state_file': bad_file},
+            format='multipart',
+        )
+        self.assertEqual(res.status_code, 400)
+
+    def test_delete_clears_session_fields(self):
+        LinkedInCredentials.objects.create(
+            id=1, username='op@example.com',
+            cookies_json='[]', state_file_path='', is_valid=True,
+        )
+        res = self.client.delete('/api/linkedin/session/')
+        self.assertEqual(res.status_code, 200)
+        session = LinkedInCredentials.objects.get(id=1)
+        self.assertFalse(session.is_valid)
+        self.assertEqual(session.cookies_json, '')
+        self.assertEqual(session.state_file_path, '')
+
+    def test_unauthenticated_status_returns_401_or_403(self):
+        unauthenticated = Client()
+        res = unauthenticated.get('/api/linkedin/session/status/')
+        self.assertIn(res.status_code, [401, 403, 302])
+
+    def test_helper_script_download_returns_python_file(self):
+        res = self.client.get('/api/linkedin/session/helper/')
+        self.assertEqual(res.status_code, 200)
+        self.assertIn('text/x-python', res['Content-Type'])
+        self.assertIn('attachment', res['Content-Disposition'])
+        self.assertIn(b'sync_playwright', res.content)
