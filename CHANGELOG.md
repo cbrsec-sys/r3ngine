@@ -2,13 +2,21 @@
 
 ### [v3.6.0] - Unreleased
 
+- **SearchSploit & CVE LLM Target Attribution**: 
+  - Added `host` and `port` assignment to `searchsploit_scan` to correctly attribute findings with an `http_url`. 
+  - Integrated `LLMVulnerabilityReportGenerator` into `search_vulns_scan` and `searchsploit_scan`. Findings dynamically hit the LLM (if enabled) for risk assessments, map descriptions and mitigations, and cache results in the local `CveId` database.
+
 - **Attack Path Modeling Engine (APME) UI & Rules Enhancement**:
+  - **Tactical AI Path Explanations ("Explain This")**: Implemented an AI-powered tactical explainer that generates step-by-step intelligence breakdowns of attack vectors for both the React Web App and React Native Mobile App.
+  - **Two-Way PII Protection**: Masked all private data (IP addresses, emails, hostnames) via the backend `PIIGate` wrapper before invoking the active LLM, restoring original values prior to client delivery.
+  - **Caching & Persistence**: Stored the generated explanations directly inside the `potential_attack_chain` JSON database field under the `explanation` key to allow immediate retrieval on subsequent views without regeneration.
   - **Rules Engine Gaps**: Fixed a mismatch in the APME rules engine where `pivot_to_internal_discovery` targeted a capability subtype `"internal_discovery"` that was not declared in `NODE_TYPES["Capability"]` in `schema.py`. Added `"internal_discovery"` to the capability schema.
   - **Attack Rules Expansion**: Added rules for SSRF (`ssrf_to_cloud_access`, `ssrf_to_pivot`), LFI (`lfi_to_rce`, `lfi_to_data_exfil`), XXE (`xxe_to_data_exfil`, `xxe_to_ssrf`), XSS (`xss_to_auth_access`), and Open Redirect (`redirect_to_auth_access`).
   - **Enriched Step Nodes API**: Updated the backend path serialization (`serializer.py`) and orchestrator persistence flow (`orchestrator.py`) to resolve and serialize full node properties (type, subtype, name, cvss_score, severity, vuln_id) as `from_node` and `to_node` objects instead of only transmitting raw string IDs.
-  - **Interactive Visual Timeline UI**: Replaced the simple vertical text row list of raw IDs with a visually stunning, responsive compromise chain timeline in `AttackPathsTab.tsx`. It features tailored colors and icons matching node types (Asset, Vulnerability, Capability, Privilege, Credential), CVSS scores, step-by-step actions, and direct links to verify details.
+  - **Interactive Visual Timeline UI**: Replaced the simple vertical text row list of raw IDs with a visually stunning, responsive compromise chain timeline in `AttackPathsTab.tsx` and the React Native Mobile app. Features colors and icons matching node types (Asset, Vulnerability, Capability, Privilege, Credential), CVSS scores, step-by-step actions, and direct links to verify details.
   - **Description Truncation Fix**: Replaced the severe truncation (`noWrap`) on the finding descriptions with a clamped two-line preview in the collapsed card header and a full, multi-paragraph Executive Narrative display inside the expanded drill-down details view.
-  - **On-Demand Recalculation**: Added a "RE-CALCULATE PATHS" button in the Attack Paths tab header. It invokes the newly registered `RecalculateApmeWorkflow` Temporal workflow to rebuild the attack path modeling graph asynchronously and update local database entries.
+  - **On-Demand Recalculation**: Added a "RE-CALCULATE PATHS" button in the Web Attack Paths tab header and mobile Summary tab. It invokes the newly registered `RecalculateApmeWorkflow` Temporal workflow to rebuild the attack path modeling graph asynchronously and update local database entries.
+
 
 
 - **Custom Parameter Discovery Engine (CPDE)**:
