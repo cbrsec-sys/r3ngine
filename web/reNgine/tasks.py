@@ -4606,7 +4606,7 @@ def http_crawl(
 			except MultipleObjectsReturned:
 				tech = Technology.objects.filter(name=technology).first()
 			endpoint.techs.add(tech)
-			if endpoint.is_default and subdomain:
+			if subdomain:
 				subdomain.technologies.add(tech)
 				subdomain.save()
 			endpoint.save()

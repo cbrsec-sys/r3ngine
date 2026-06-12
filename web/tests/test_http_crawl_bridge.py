@@ -111,3 +111,62 @@ class TestSeedEndpointsForCrawlActivity(TestCase):
 
         mock_save_ep.assert_not_called()
         self.assertIn('http://already.example.com', result['seed_urls'])
+
+
+class TestRunHTTPCrawlBridgeActivity(TestCase):
+    """RunHTTPCrawlBridgeActivity fetches and crawls new/dead/not-alive endpoints."""
+
+    def _make_ctx(self):
+        return {
+            'scan_history_id': 10,
+            'domain_id': 5,
+            'results_dir': '/tmp/results',
+            'yaml_configuration': {},
+        }
+
+    @patch('reNgine.temporal_activities._run_task')
+    @patch('reNgine.temporal_activities.activity')
+    def test_bridge_activity_crawls_expected_endpoints(self, mock_activity, mock_run_task):
+        """Verify bridge activity retrieves dead/not-alive/new endpoints and calls _run_task."""
+        from reNgine.temporal_activities import run_http_crawl_bridge_activity
+
+        mock_ep = MagicMock()
+        mock_ep.http_url = 'http://dead.example.com'
+
+        mock_qs = MagicMock()
+        # Mock filter to return mock_qs
+        mock_qs.filter.return_value = mock_qs
+        # Mock values_list to return distinct values
+        mock_qs.order_by.return_value.values_list.return_value.distinct.return_value = ['http://dead.example.com']
+
+        with patch('startScan.models.EndPoint.objects') as MockEPObjects:
+            MockEPObjects.filter.return_value = mock_qs
+
+            result = run_http_crawl_bridge_activity(self._make_ctx())
+
+        # Assert that it called _run_task with the right arguments
+        mock_run_task.assert_called_once()
+        args, kwargs = mock_run_task.call_args
+        self.assertEqual(kwargs['task_name'], 'http_crawl_bridge')
+        self.assertEqual(kwargs['urls'], ['http://dead.example.com'])
+        self.assertFalse(kwargs['recrawl'])
+
+    @patch('reNgine.temporal_activities._run_task')
+    @patch('reNgine.temporal_activities.activity')
+    def test_bridge_activity_skips_when_no_endpoints(self, mock_activity, mock_run_task):
+        """Verify bridge activity skips calling _run_task when no target endpoints are found."""
+        from reNgine.temporal_activities import run_http_crawl_bridge_activity
+
+        mock_qs = MagicMock()
+        mock_qs.filter.return_value = mock_qs
+        mock_qs.order_by.return_value.values_list.return_value.distinct.return_value = []
+
+        with patch('startScan.models.EndPoint.objects') as MockEPObjects:
+            MockEPObjects.filter.return_value = mock_qs
+
+            result = run_http_crawl_bridge_activity(self._make_ctx())
+
+        # Assert that it did not call _run_task and returned True
+        mock_run_task.assert_not_called()
+        self.assertTrue(result)
+

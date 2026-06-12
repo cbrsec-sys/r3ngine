@@ -429,6 +429,21 @@ class MasterScanWorkflow:
                 await asyncio.gather(*tier3_futures)
 
             # ------------------------------------------------------------------
+            # TIER 3a: HTTP Crawl Bridge
+            # Runs only if fetch_url is in tasks. Probes newly discovered endpoints
+            # and dead/not-alive ones for HTTP/HTTPS responses and technologies.
+            # ------------------------------------------------------------------
+            if "fetch_url" in tasks:
+                await workflow.execute_activity(
+                    "RunHTTPCrawlBridgeActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(hours=3),
+                    heartbeat_timeout=timedelta(minutes=5),
+                    retry_policy=_RETRY_LONG_SCAN,
+                    task_queue="python-orchestrator-queue"
+                )
+
+            # ------------------------------------------------------------------
             # TIER 3b: Custom Parameter Discovery Engine (CPDE)
             # ------------------------------------------------------------------
             if "param_discovery" in tasks:
@@ -1011,6 +1026,11 @@ _SUBSCAN_DISPATCH = {
             {"urls": [ctx.get("subdomain_http_url") or f"http://{ctx.get('subdomain_name', '')}/"]},
         ],
     },
+    "http_crawl_bridge": {
+        "activity": "RunHTTPCrawlBridgeActivity",
+        "timeout": timedelta(hours=3),
+        "args_builder": lambda ctx: [ctx],
+    },
     "web_api_discovery": {
         "activity": "RunGenericTaskActivity",
         "timeout": timedelta(hours=2),
@@ -1141,6 +1161,10 @@ class SubScanWorkflow:
             for t in scan_type:
                 if t not in tasks:
                     tasks.append(t)
+
+        # Automatically inject http_crawl_bridge if fetch_url is in tasks
+        if "fetch_url" in tasks and "http_crawl_bridge" not in tasks:
+            tasks.append("http_crawl_bridge")
 
         workflow.logger.info(
             f"Starting SubScanWorkflow for subdomain_id={ctx.get('subdomain_id')} tasks={tasks}"
@@ -1303,6 +1327,8 @@ class SubScanWorkflow:
                 # TIER 3: URL Fetching + Screenshot — both depend only on Tier 2 http_crawl;
                 # screenshot does NOT depend on fetch_url output so they run concurrently.
                 [t for t in active_tasks if t in {"fetch_url", "screenshot"}],
+                # TIER 3a: HTTP Crawl Bridge — crawls new/dead endpoints from fetch_url
+                [t for t in active_tasks if t == "http_crawl_bridge"],
                 # TIER 3b: Custom Parameter Discovery Engine (CPDE) — needs Tier 3 JS bundles.
                 [t for t in active_tasks if t == "param_discovery"],
                 # TIER 4: Directory & File Fuzzing — needs Tier 3 URLs.
@@ -1322,7 +1348,8 @@ class SubScanWorkflow:
                     "dns_security", "osint", "spiderfoot_scan", "baddns", "http_crawl", "port_scan",
                     "fetch_url", "screenshot", "dir_file_fuzz", "web_api_discovery", "waf_detection",
                     "secret_scanning", "vulnerability_scan", "waf_bypass",
-                    "vigolium_discovery", "vigolium_analysis", "vigolium_scan", "param_discovery"
+                    "vigolium_discovery", "vigolium_analysis", "vigolium_scan", "param_discovery",
+                    "http_crawl_bridge"
                 }],
             ]
 

@@ -712,6 +712,62 @@ def run_http_crawl_activity(ctx: dict) -> bool:
     )
 
 
+@activity.defn(name="RunHTTPCrawlBridgeActivity")
+def run_http_crawl_bridge_activity(ctx: dict) -> bool:
+    """Run httpx HTTP crawl bridge across newly discovered endpoints and dead/not-alive endpoints.
+
+    Queries the DB to fetch all endpoints associated with this scan that are either
+    newly discovered (status is 0 or None) or dead/not alive (status is 404, or >= 500, or <= 0).
+    It then delegates to the `http_crawl` task to scan exactly those URLs.
+
+    Args:
+        ctx (dict): Temporal workflow context containing:
+            - scan_history_id (int): Django ScanHistory database ID.
+            - subdomain_id (int, optional): Optional subdomain ID to limit query.
+
+    Returns:
+        bool: True on success.
+    """
+    from reNgine.tasks import http_crawl
+    from startScan.models import EndPoint
+    from django.db.models import Q
+
+    scan_history_id = ctx.get('scan_history_id')
+    subdomain_id = ctx.get('subdomain_id')
+    activity.logger.info(f"[RunHTTPCrawlBridgeActivity] Querying endpoints for scan_history_id={scan_history_id}")
+
+    # Query all endpoints for this scan/subscan
+    query = EndPoint.objects.filter(scan_history_id=scan_history_id)
+    if subdomain_id:
+        query = query.filter(subdomain__id=subdomain_id)
+
+    # Filter endpoints that are not alive or new:
+    # Alive is defined as: (0 < status < 500) and status != 404
+    # Therefore, not alive/new is: status is None, or status <= 0, or status == 404, or status >= 500
+    query = query.filter(
+        Q(http_status__isnull=True) |
+        Q(http_status__lte=0) |
+        Q(http_status=404) |
+        Q(http_status__gte=500)
+    )
+
+    urls = list(query.order_by('http_url').values_list('http_url', flat=True).distinct())
+    activity.logger.info(f"[RunHTTPCrawlBridgeActivity] Found {len(urls)} new or dead/not-alive endpoints to crawl.")
+
+    if not urls:
+        activity.logger.info("[RunHTTPCrawlBridgeActivity] No new or dead/not-alive endpoints found. Skipping crawl.")
+        return True
+
+    return _run_task(
+        http_crawl,
+        ctx,
+        task_name='http_crawl_bridge',
+        description='HTTP Crawl Bridge',
+        urls=urls,
+        recrawl=False
+    )
+
+
 @activity.defn(name="ParseHTTPCrawlResultsActivity")
 def parse_http_crawl_results_activity(ctx: dict) -> bool:
     """Verify HTTP crawl results are persisted correctly after http_crawl runs.
