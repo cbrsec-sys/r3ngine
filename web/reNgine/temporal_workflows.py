@@ -1981,7 +1981,7 @@ async def _fan_out_search_vulns(ctx: dict, services: list) -> None:
     """Fan out concurrent per-service CVE + exploit lookups.
 
     Reads a list of {host, port, service, version} dicts and launches one
-    RunSearchVulnsActivity + one RunSearchsploitActivity per service,
+    RunSearchVulnsActivity per service,
     all gathered concurrently with return_exceptions=True so a single
     lookup failure never aborts the scan.
 
@@ -2006,15 +2006,6 @@ async def _fan_out_search_vulns(ctx: dict, services: list) -> None:
         lookup_tasks.append(
             workflow.execute_activity(
                 "RunSearchVulnsActivity",
-                svc_ctx,
-                start_to_close_timeout=timedelta(minutes=5),
-                retry_policy=_RETRY_INTERNAL,
-                task_queue="python-orchestrator-queue",
-            )
-        )
-        lookup_tasks.append(
-            workflow.execute_activity(
-                "RunSearchsploitActivity",
                 svc_ctx,
                 start_to_close_timeout=timedelta(minutes=5),
                 retry_policy=_RETRY_INTERNAL,
