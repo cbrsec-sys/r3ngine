@@ -1,4 +1,5 @@
 import React, { useRef } from 'react';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 import {
     Box,
     Card,
@@ -42,7 +43,7 @@ interface GeoJSONFeatureCollection {
 }
 
 export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = ({ data, disableCard = false }) => {
-    const theme = useTheme();
+    const { theme, isLight, tokens } = useThemeTokens();
     const mapRef = useRef<L.Map>(null);
     const geoJsonRef = useRef<GeoJSONFeatureCollection | null>(null);
 
@@ -70,14 +71,14 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
             pathLayer.setStyle({
                 fillColor: fillColor,
                 fillOpacity: 0.8,
-                color: 'rgba(0, 243, 255, 0.1)',
+                color: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0, 243, 255, 0.1)',
                 weight: 0.3
             });
         } else {
             pathLayer.setStyle({
                 fillColor: 'rgba(255, 255, 255, 0.02)',
                 fillOpacity: 0.8,
-                color: 'rgba(0, 243, 255, 0.1)',
+                color: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0, 243, 255, 0.1)',
                 weight: 0.3
             });
         }
@@ -143,14 +144,14 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
                     <IconButton
                         size="small"
                         onClick={handleZoomIn}
-                        sx={{ bgcolor: 'rgba(5, 5, 20, 0.8)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1, p: 0.5, '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                        sx={{ bgcolor: 'rgba(5, 5, 20, 0.8)', color: tokens.accent.primary, border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1, p: 0.5, '&:hover': { bgcolor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0, 243, 255, 0.1)' } }}
                     >
                         <Plus size={14} />
                     </IconButton>
                     <IconButton
                         size="small"
                         onClick={handleZoomOut}
-                        sx={{ bgcolor: 'rgba(5, 5, 20, 0.8)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1, p: 0.5, '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                        sx={{ bgcolor: 'rgba(5, 5, 20, 0.8)', color: tokens.accent.primary, border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1, p: 0.5, '&:hover': { bgcolor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0, 243, 255, 0.1)' } }}
                     >
                         <Box sx={{ width: 14, height: 2, bgcolor: 'currentColor' }} />
                     </IconButton>
@@ -201,10 +202,10 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
                                     className="tactical-tooltip"
                                 >
                                     <Box sx={{ p: 0.5, minWidth: 100 }}>
-                                        <Typography variant="caption" sx={{ fontWeight: 800, color: '#00f3ff', display: 'block', mb: 0.5, fontFamily: 'Orbitron', fontSize: '0.65rem' }}>
+                                        <Typography variant="caption" sx={{ fontWeight: 800, color: tokens.accent.primary, display: 'block', mb: 0.5, fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem' }}>
                                             {country.name}
                                         </Typography>
-                                        <Typography variant="body2" sx={{ fontWeight: 900, color: '#fff', fontSize: '0.75rem', fontFamily: 'Orbitron' }}>
+                                        <Typography variant="body2" sx={{ fontWeight: 900, color: theme.palette.text.primary, fontSize: '0.75rem', fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>
                                             {country.count} ASSETS
                                         </Typography>
                                     </Box>
@@ -217,14 +218,14 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
 
             {/* List Column */}
             <Box sx={{ width: { xs: '100%', md: '35%' }, borderLeft: { xs: 'none', md: '1px solid rgba(0, 243, 255, 0.1)' }, borderTop: { xs: '1px solid rgba(0, 243, 255, 0.1)', md: 'none' }, overflow: 'hidden' }}>
-                <TableContainer sx={{ flexGrow: 1, overflow: 'auto', width: '100%', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderRadius: 4 } }}>
+                <TableContainer sx={{ flexGrow: 1, overflow: 'auto', width: '100%', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.2)', borderRadius: 4 } }}>
                     <Table size="small" stickyHeader sx={{ width: '100%' }}>
                         <TableHead>
                             <TableRow>
-                                <TableCell sx={{ bgcolor: 'rgba(5,5,15,0.98)', borderBottom: '2px solid #7000ff', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'Orbitron', py: 1.5, width: '100%' }}>
+                                <TableCell sx={{ bgcolor: isLight ? tokens.bg.secondary : 'rgba(5,5,15,0.98)', borderBottom: `2px solid ${tokens.accent.secondary}`, color: tokens.accent.secondary, fontSize: '0.7rem', fontWeight: 800, fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', py: 1.5, width: '100%' }}>
                                     COUNTRY
                                 </TableCell>
-                                <TableCell align="right" sx={{ bgcolor: 'rgba(5,5,15,0.98)', borderBottom: '2px solid #7000ff', color: '#7000ff', fontSize: '0.7rem', fontWeight: 800, fontFamily: 'Orbitron', py: 1.5 }}>
+                                <TableCell align="right" sx={{ bgcolor: isLight ? tokens.bg.secondary : 'rgba(5,5,15,0.98)', borderBottom: `2px solid ${tokens.accent.secondary}`, color: tokens.accent.secondary, fontSize: '0.7rem', fontWeight: 800, fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', py: 1.5 }}>
                                     COUNT
                                 </TableCell>
                             </TableRow>
@@ -238,8 +239,8 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
                                 </TableRow>
                             ) : (
                                 data.sort((a, b) => b.count - a.count).map((country) => (
-                                    <TableRow key={country.iso} sx={{ '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)' } }}>
-                                        <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.03)', py: 2 }}>
+                                    <TableRow key={country.iso} sx={{ '&:hover': { bgcolor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0, 243, 255, 0.05)' } }}>
+                                        <TableCell sx={{ borderBottom: isLight ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.03)', py: 2 }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                                                 <Box
                                                     component="img"
@@ -258,8 +259,8 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
                                                 </Typography>
                                             </Box>
                                         </TableCell>
-                                        <TableCell align="right" sx={{ borderBottom: '1px solid rgba(255,255,255,0.03)', py: 2 }}>
-                                            <Typography variant="body2" sx={{ fontWeight: 900, fontSize: '0.85rem', color: '#b6b9baff', fontFamily: 'Orbitron' }}>
+                                        <TableCell align="right" sx={{ borderBottom: isLight ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.03)', py: 2 }}>
+                                            <Typography sx={{ fontWeight: 800, fontSize: '0.85rem', color: isLight ? theme.palette.text.primary : '#fff', fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>
                                                 {country.count}
                                             </Typography>
                                         </TableCell>
@@ -295,8 +296,8 @@ export const GeoMap: React.FC<{ data: CountryData[]; disableCard?: boolean }> = 
                         fontWeight: 800,
                         textTransform: 'uppercase',
                         letterSpacing: 2,
-                        fontFamily: 'Orbitron',
-                        color: '#fff'
+                        fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
+                        color: theme.palette.text.primary
                     }}>
                         Geographical Distribution of Assets
                     </Typography>

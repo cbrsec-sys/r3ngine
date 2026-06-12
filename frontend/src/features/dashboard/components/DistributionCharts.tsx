@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 import {
   Box,
   Card,
@@ -38,11 +39,13 @@ const CWE_COLORS = [
   '#c060ff', '#4400aa', '#d080ff', '#330088',
 ];
 
-const ChartCard: React.FC<{ title: React.ReactNode; children: React.ReactNode; height?: number | string }> = ({ title, children, height }) => (
+const ChartCard: React.FC<{ title: React.ReactNode; children: React.ReactNode; height?: number | string }> = ({ title, children, height }) => {
+  const { theme, isLight, tokens } = useThemeTokens();
+  return (
   <Card sx={{ height: height || '100%', minHeight: 320, bgcolor: 'rgba(5, 5, 15, 0.6)', backdropFilter: 'blur(10px)', border: '1px solid rgba(0, 243, 255, 0.1)' }}>
     <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {typeof title === 'string' ? (
-        <Typography variant="h6" sx={{ mb: 2, fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: 'primary.main', fontFamily: 'Orbitron' }}>
+        <Typography variant="h6" sx={{ mb: 2, fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: 'primary.main', fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>
           {title}
         </Typography>
       ) : (
@@ -53,16 +56,18 @@ const ChartCard: React.FC<{ title: React.ReactNode; children: React.ReactNode; h
       </Box>
     </CardContent>
   </Card>
-);
+  );
+};
 
 const SeverityBadge: React.FC<{ severity: number | string; label?: string }> = ({ severity, label }) => {
+  const { theme, isLight, tokens } = useThemeTokens();
   const getSeverityInfo = (sev: number | string) => {
     const sevNum = typeof sev === 'string' ? parseInt(sev) : sev;
     if (sev === 'critical' || sevNum === 4) return { label: label || 'CRITICAL', color: '#ff003c' };
     if (sev === 'high' || sevNum === 3) return { label: label || 'HIGH', color: '#ff9f00' };
     if (sev === 'medium' || sevNum === 2) return { label: label || 'MEDIUM', color: '#fffc00' };
     if (sev === 'low' || sevNum === 1) return { label: label || 'LOW', color: '#00ff62' };
-    if (sev === 'info' || sevNum === 0) return { label: label || 'INFO', color: '#00f3ff' };
+    if (sev === 'info' || sevNum === 0) return { label: label || 'INFO', color: tokens.accent.primary };
     return { label: label || 'UNKNOWN', color: '#7000ff' };
   };
 
@@ -86,7 +91,7 @@ const SeverityBadge: React.FC<{ severity: number | string; label?: string }> = (
 };
 
 export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) => {
-  const theme = useTheme();
+  const { theme, isLight, tokens } = useThemeTokens();
   const [viewMode, setViewMode] = useState<'cve' | 'cwe'>('cve');
   
   // CWE dialog state
@@ -170,10 +175,10 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         }
       }
     },
-    colors: ['#00f3ff', '#7000ff', '#ff00f7', '#ff003c', '#00ff62', '#fffc00', '#ff9f00']
+    colors: [tokens.accent.primary, '#7000ff', '#ff00f7', '#ff003c', '#00ff62', '#fffc00', '#ff9f00']
   };
 
-  const getBarOptions = (categories: string[], color = '#00f3ff') => ({
+  const getBarOptions = (categories: string[], color = tokens.accent.primary) => ({
     chart: { type: 'bar' as any, toolbar: { show: false }, background: 'transparent' },
     plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '60%' } },
     dataLabels: { enabled: false },
@@ -197,7 +202,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               options={{
                 ...donutOptions,
                 labels: ['Critical', 'High', 'Medium', 'Low', 'Info', 'Unknown'],
-                colors: ['#ff003c', '#ff9f00', '#fffc00', '#00ff62', '#00f3ff', '#7000ff']
+                colors: ['#ff003c', '#ff9f00', '#fffc00', '#00ff62', tokens.accent.primary, '#7000ff']
               }}
               series={[
                 data.kpis.critical_count,
@@ -224,7 +229,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                     <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: '#ff9f00', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase' }}>High</TableCell>
                     <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: '#fffc00', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase' }}>Med</TableCell>
                     <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: '#00ff62', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase' }}>Low</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: '#00f3ff', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase' }}>Total</TableCell>
+                    <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: tokens.accent.primary, fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase' }}>Total</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -246,8 +251,8 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                         <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.low_count > 0 ? '#00ff62' : 'rgba(255,255,255,0.1)' }}>{target.low_count}</Typography>
                       </TableCell>
                       <TableCell align="center" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <Box sx={{ px: 1, py: 0.25, borderRadius: 0.5, bgcolor: 'rgba(0, 243, 255, 0.1)', display: 'inline-block' }}>
-                          <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#00f3ff' }}>{target.vuln_count}</Typography>
+                        <Box sx={{ px: 1, py: 0.25, borderRadius: 0.5, bgcolor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0, 243, 255, 0.1)', display: 'inline-block' }}>
+                          <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 800, color: tokens.accent.primary }}>{target.vuln_count}</Typography>
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -287,7 +292,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                   {data.most_common_vulnerabilities.map((vuln, index) => (
                     <TableRow key={index} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
                       <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', py: 1 }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#fff' }}>{vuln.name}</Typography>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: theme.palette.text.primary }}>{vuln.name}</Typography>
                       </TableCell>
                       <TableCell align="center" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                         <SeverityBadge severity={vuln.severity} />
@@ -324,7 +329,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
           <ChartCard
             title={
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                <Typography variant="h6" sx={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: 'primary.main', fontFamily: 'Orbitron' }}>
+                <Typography variant="h6" sx={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: 'primary.main', fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>
                   {viewMode === 'cwe' ? 'Most Common CWE' : 'Most Common CVE'}
                 </Typography>
                 <Box sx={{ display: 'flex', bgcolor: 'rgba(112, 0, 255, 0.08)', borderRadius: 1, p: 0.25, border: '1px solid rgba(112, 0, 255, 0.2)' }}>
@@ -336,9 +341,9 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                       height: 22,
                       fontSize: '0.65rem',
                       fontWeight: 700,
-                      fontFamily: 'Orbitron',
+                      fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
                       borderRadius: 0.5,
-                      color: viewMode === 'cve' ? '#00f3ff' : 'rgba(255,255,255,0.4)',
+                      color: viewMode === 'cve' ? tokens.accent.primary : 'rgba(255,255,255,0.4)',
                       bgcolor: viewMode === 'cve' ? 'rgba(0, 243, 255, 0.15)' : 'transparent',
                       boxShadow: viewMode === 'cve' ? '0 0 8px rgba(0, 243, 255, 0.2)' : 'none',
                       p: 0,
@@ -357,9 +362,9 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                       height: 22,
                       fontSize: '0.65rem',
                       fontWeight: 700,
-                      fontFamily: 'Orbitron',
+                      fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
                       borderRadius: 0.5,
-                      color: viewMode === 'cwe' ? '#00f3ff' : 'rgba(255,255,255,0.4)',
+                      color: viewMode === 'cwe' ? tokens.accent.primary : 'rgba(255,255,255,0.4)',
                       bgcolor: viewMode === 'cwe' ? 'rgba(0, 243, 255, 0.15)' : 'transparent',
                       boxShadow: viewMode === 'cwe' ? '0 0 8px rgba(0, 243, 255, 0.2)' : 'none',
                       p: 0,
@@ -574,7 +579,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         }}
       >
         <DialogTitle sx={{ pb: 1 }}>
-          <Typography variant="h6" sx={{ fontFamily: 'Orbitron', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: '#7000ff' }}>
+          <Typography variant="h6" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: '#7000ff' }}>
             {selectedCwe}
           </Typography>
           {cweInfo && (
@@ -608,7 +613,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                 </Box>
               )}
 
-              <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#7000ff', mb: 0.5 }}>
+              <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#7000ff', mb: 0.5 }}>
                 Description
               </Typography>
               <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.6, mb: 2 }}>
@@ -617,7 +622,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
 
               <Divider sx={{ borderColor: 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
 
-              <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#ff9f00', mb: 0.5 }}>
+              <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#ff9f00', mb: 0.5 }}>
                 Impact
               </Typography>
               <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.6, mb: 2 }}>
@@ -626,7 +631,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
 
               <Divider sx={{ borderColor: 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
 
-              <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#00ff62', mb: 0.5 }}>
+              <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#00ff62', mb: 0.5 }}>
                 Remediation
               </Typography>
               <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.6, mb: 2 }}>
@@ -636,13 +641,13 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               {cweInfo.examples && cweInfo.examples.length > 0 && (
                 <>
                   <Divider sx={{ borderColor: 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
-                  <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#00f3ff', mb: 1 }}>
+                  <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: tokens.accent.primary, mb: 1 }}>
                     Examples
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                     {cweInfo.examples.map((ex, i) => (
                       <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                        <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: '#00f3ff', mt: 0.8, flexShrink: 0 }} />
+                        <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: tokens.accent.primary, mt: 0.8, flexShrink: 0 }} />
                         <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.78rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
                           {ex}
                         </Typography>
@@ -660,7 +665,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
             onClick={() => setCweDialogOpen(false)}
             size="small"
             sx={{
-              fontFamily: 'Orbitron',
+              fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
               fontSize: '0.65rem',
               fontWeight: 800,
               textTransform: 'uppercase',
@@ -694,7 +699,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         <DialogTitle sx={{ pb: 1 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Box>
-              <Typography variant="h6" sx={{ fontFamily: 'Orbitron', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: '#00f3ff' }}>
+              <Typography variant="h6" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: tokens.accent.primary }}>
                 {selectedCve}
               </Typography>
               {cveInfo && (
@@ -709,7 +714,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                   label={`CVSS ${cveInfo.cvss_v31_base_score}`}
                   size="small"
                   sx={{
-                    fontFamily: 'Orbitron',
+                    fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
                     fontSize: '0.7rem',
                     fontWeight: 900,
                     bgcolor: `${getCvssColor(cveInfo.cvss_v31_base_score)}20`,
@@ -726,7 +731,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         <DialogContent sx={{ pt: 0 }}>
           {cveLoading && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
-              <CircularProgress size={20} sx={{ color: '#00f3ff' }} />
+              <CircularProgress size={20} sx={{ color: tokens.accent.primary }} />
               <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter', fontSize: '0.8rem' }}>
                 Loading enriched CVE intelligence...
               </Typography>
@@ -764,40 +769,40 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               {cveInfo.epss_score !== null && (
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#00f3ff' }}>
+                    <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: tokens.accent.primary }}>
                       EPSS Exploit Probability
                     </Typography>
-                    <Typography variant="body2" sx={{ fontFamily: 'Orbitron', fontSize: '0.7rem', fontWeight: 800, color: '#00f3ff' }}>
+                    <Typography variant="body2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.7rem', fontWeight: 800, color: tokens.accent.primary }}>
                       {(cveInfo.epss_score * 100).toFixed(2)}% ({cveInfo.epss_percentile?.toFixed(1) || 0}th percentile)
                     </Typography>
                   </Box>
                   <Box sx={{ width: '100%', height: 6, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <Box sx={{ width: `${Math.min(cveInfo.epss_score * 100, 100).toFixed(1)}%`, height: '100%', bgcolor: '#00f3ff', boxShadow: '0 0 8px #00f3ff' }} />
+                    <Box sx={{ width: `${Math.min(cveInfo.epss_score * 100, 100).toFixed(1)}%`, height: '100%', bgcolor: tokens.accent.primary, boxShadow: '0 0 8px #00f3ff' }} />
                   </Box>
                 </Box>
               )}
 
               {/* Metrics Grid */}
-              <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#7000ff' }}>
+              <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#7000ff' }}>
                 CVSS v3.1 Metrics
               </Typography>
               <Grid container spacing={1}>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 1 }}>
                     <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>Attack Vector</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase' }}>{cveInfo.attack_vector || 'N/A'}</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: theme.palette.text.primary, textTransform: 'uppercase' }}>{cveInfo.attack_vector || 'N/A'}</Typography>
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 1 }}>
                     <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>Complexity</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase' }}>{cveInfo.attack_complexity || 'N/A'}</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: theme.palette.text.primary, textTransform: 'uppercase' }}>{cveInfo.attack_complexity || 'N/A'}</Typography>
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.05)', borderRadius: 1 }}>
                     <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>User Interaction</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff', textTransform: 'uppercase' }}>{cveInfo.user_interaction || 'N/A'}</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: theme.palette.text.primary, textTransform: 'uppercase' }}>{cveInfo.user_interaction || 'N/A'}</Typography>
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
@@ -822,7 +827,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
 
               {/* Description */}
               <Box>
-                <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#7000ff', mb: 0.5 }}>
+                <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#7000ff', mb: 0.5 }}>
                   Description
                 </Typography>
                 <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: 'rgba(255,255,255,0.8)', lineHeight: 1.6 }}>
@@ -833,8 +838,8 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               {/* References */}
               {cveInfo.references && cveInfo.references.length > 0 && (
                 <Box>
-                  <Divider sx={{ borderColor: 'rgba(0, 243, 255, 0.1)', mb: 1.5 }} />
-                  <Typography variant="subtitle2" sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#ff9f00', mb: 1 }}>
+                  <Divider sx={{ borderColor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0, 243, 255, 0.1)', mb: 1.5 }} />
+                  <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: '#ff9f00', mb: 1 }}>
                     References
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, maxHeight: 120, overflowY: 'auto', pr: 1 }}>
@@ -872,15 +877,15 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
             onClick={() => setCveDialogOpen(false)}
             size="small"
             sx={{
-              fontFamily: 'Orbitron',
+              fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
               fontSize: '0.65rem',
               fontWeight: 800,
               textTransform: 'uppercase',
               letterSpacing: 1,
-              color: '#00f3ff',
+              color: tokens.accent.primary,
               border: '1px solid rgba(0, 243, 255, 0.4)',
               px: 2,
-              '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' },
+              '&:hover': { bgcolor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0, 243, 255, 0.1)' },
             }}
           >
             Close
