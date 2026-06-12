@@ -83,7 +83,7 @@ class CVEEnrichmentService:
             if re.match(r'^\d{4}-\d+$', cve_name):
                 cve_name = 'CVE-' + cve_name
             else:
-                logger.warning("Invalid CVE format: %s", cve_name)
+                logger.debug("Skipping NVD enrichment for non-CVE format: %s", cve_name)
                 return None
         
         # Get or create CVE record

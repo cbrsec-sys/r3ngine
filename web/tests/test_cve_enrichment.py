@@ -92,7 +92,8 @@ class CVEEnrichmentServiceTestCase(TestCase):
         }
         mock_get.return_value = mock_response
         
-        cve = self.service.enrich_cve("CVE-2024-1234")
+        cve = CveId.objects.create(name="CVE-2024-1234")
+        self.service._enrich_from_nvd(cve)
         
         self.assertIsNotNone(cve)
         self.assertEqual(cve.name, "CVE-2024-1234")
