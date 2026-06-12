@@ -259,7 +259,7 @@ class LinkedInScraper:
 
         except Exception as exc:
             logger.error("Error during LinkedIn employee discovery: %s", exc)
-            self.notes.append(f"[OSINT][LinkedIn] Discovery error: {type(exc).__name__}")
+            self.notes.append("[OSINT][LinkedIn] Discovery error: %s" % type(exc).__name__)
 
         try:
             safe_name = re.sub(r"[^a-zA-Z0-9]", "_", company_name).lower()
@@ -268,8 +268,12 @@ class LinkedInScraper:
                 scan_history.results_dir, "osint",
                 f"linkedin_{safe_name}_{timestamp}.png",
             )
-            os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
-            self._page.screenshot(path=screenshot_path)
+            resolved = os.path.realpath(screenshot_path)
+            base = os.path.realpath(settings.RENGINE_RESULTS)
+            if not resolved.startswith(base + os.sep):
+                raise ValueError("Screenshot path is outside RENGINE_RESULTS")
+            os.makedirs(os.path.dirname(resolved), exist_ok=True)
+            self._page.screenshot(path=resolved)
         except Exception as exc:
             logger.warning("LinkedIn screenshot failed: %s", exc)
 
