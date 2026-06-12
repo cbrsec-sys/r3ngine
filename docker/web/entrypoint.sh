@@ -1,17 +1,17 @@
 #!/bin/bash
-# Ensure OpenSSL compatibility before running any management commands
-pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
-
-# Install/update frontend dependencies (ensures packages match package.json in both modes)
-echo "Installing frontend dependencies..."
-cd /usr/src/app/frontend && npm install
+# Install/update frontend dependencies only when package.json is updated or node_modules doesn't exist
+echo "Checking frontend dependencies..."
+cd /usr/src/app/frontend
+if [ ! -d "node_modules" ] || [ package.json -nt node_modules ]; then
+    echo "Installing/updating frontend dependencies (changes detected)..."
+    npm install
+else
+    echo "Frontend dependencies are up to date."
+fi
 
 if [ "$DEBUG" = "1" ]; then
     echo "Development mode: Starting Vite dev server..."
     npm run dev -- --host 0.0.0.0 &
-# else
-    # echo "Production mode: Building frontend..."
-    # npm run build
 fi
 
 cd /usr/src/app
