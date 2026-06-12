@@ -24,7 +24,7 @@ from .subscans import SubScanViewSet
 from .scan_history import ScanHistoryViewSet
 from .users import UserManageViewSet
 from .stress_testing_views import StressTestingAPIView, StressTestingHistoryAPIView
-from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView, RecalculateAttackPathsAPIView
+from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView, RecalculateAttackPathsAPIView, AttackPathExplanationAPIView
 from .scan_configuration import ScanConfigurationAPI
 from .config_migration_views import ExportConfig, ImportConfig, ExportScanResults
 
@@ -464,6 +464,11 @@ urlpatterns = [
         'apme/recalculate/',
         RecalculateAttackPathsAPIView.as_view(),
         name='apme_recalculate'
+    ),
+    path(
+        'apme/explain/',
+        AttackPathExplanationAPIView.as_view(),
+        name='apme_explain'
     ),
     path(
         'action/ad-assessment/from-subdomain/',

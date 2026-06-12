@@ -236,4 +236,32 @@ class LLMImpactGenerator(LLMBaseGenerator):
             LLM_IMPACT_ASSESSMENT_SYSTEM_PROMPT = "You are a senior security architect. Given the following attack path and findings, describe the potential business impact and suggest a remediation priority. Focus on real-world risk."
         
         return self._call_llm(LLM_IMPACT_ASSESSMENT_SYSTEM_PROMPT, vulnerability_context)
-		
+
+
+class LLMAttackPathExplainer(LLMBaseGenerator):
+    """Generates an in-depth tactical explanation for a specific attack path.
+
+    Inherits from LLMBaseGenerator to support configured LLM providers and
+    automatically apply PII masking/unmasking (IPs, emails, hostnames).
+    """
+
+    def explain_path(self, path_id, path_details_str):
+        """Request explanation from LLM using standard system prompt and formatted details.
+
+        Args:
+            path_id (str): The unique ID identifying the attack path.
+            path_details_str (str): A newline-separated string containing step details,
+                nodes, confidence levels, and potential impacts.
+
+        Returns:
+            str: The LLM-generated tactical explanation with original PII restored.
+        """
+        system_message = (
+            "You are an expert cybersecurity analyst. Provide an in-depth, tactical, "
+            "and clear explanation of the following attack path, detailing how each step is executed, "
+            "the risks associated with the transitions, and a mitigation recommendation. "
+            "Keep the tone professional and focus on real-world impact. Do not include system metadata "
+            "or raw JSON structures in your response."
+        )
+        user_message = f"Attack Path ID: {path_id}\n\nPath Details:\n{path_details_str}"
+        return self._call_llm(system_message, user_message)

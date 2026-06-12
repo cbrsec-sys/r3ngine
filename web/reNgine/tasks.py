@@ -3687,19 +3687,31 @@ def get_vulnerability_gpt_report(vuln, vulnerability_id=None):
 
 	# 4. Update all matching vulnerabilities that don't have GPT info yet, or at least the specific one
 	if response.get('status'):
-		# Update matching vulnerabilities
-		for v in Vulnerability.objects.filter(name=title, http_url__icontains=path):
+		def _apply_gpt_fields(v):
 			v.description = response.get('description', v.description)
 			v.impact = response.get('impact', v.impact)
 			v.remediation = response.get('remediation', v.remediation)
 			v.is_gpt_used = True
 			v.save()
-
 			for url in response.get('references', []):
-				ref, created = VulnerabilityReference.objects.get_or_create(url=url)
+				ref, _ = VulnerabilityReference.objects.get_or_create(url=url)
 				v.references.add(ref)
 			v.save()
-	
+
+		# Always update the specific requested vulnerability first (handles NULL http_url)
+		if vulnerability_id:
+			try:
+				_apply_gpt_fields(Vulnerability.objects.get(id=vulnerability_id))
+			except Vulnerability.DoesNotExist:
+				pass
+
+		# Also bulk-update any other findings with the same name/path that lack GPT data
+		qs = Vulnerability.objects.filter(name=title, http_url__icontains=path, is_gpt_used=False)
+		if vulnerability_id:
+			qs = qs.exclude(id=vulnerability_id)
+		for v in qs:
+			_apply_gpt_fields(v)
+
 	return response
 
 
@@ -7155,20 +7167,42 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 			continue
 
 		asset = vuln.subdomain.name if vuln.subdomain else (vuln.endpoint.http_url if vuln.endpoint else 'Unknown')
-		logger.warning(
-			"[TIER7][IMPACT] [%d/%d] Calling LLM | vuln_id=%s severity=%s asset=%s",
-			idx, total, vuln.id, vuln.severity, asset,
-		)
 
 		try:
+			# Step 1 — populate structured description/impact/remediation/references if not already done
+			if not vuln.is_gpt_used:
+				logger.warning(
+					"[TIER7][IMPACT] [%d/%d] Generating GPT vulnerability report | vuln_id=%s",
+					idx, total, vuln.id,
+				)
+				gpt_report = get_vulnerability_gpt_report(
+					(vuln.name, vuln.get_path()),
+					vulnerability_id=vuln.id,
+				)
+				if gpt_report.get('status'):
+					vuln.refresh_from_db()
+					logger.warning(
+						"[TIER7][IMPACT] [%d/%d] GPT report saved | vuln_id=%s",
+						idx, total, vuln.id,
+					)
+				else:
+					logger.warning(
+						"[TIER7][IMPACT] [%d/%d] GPT report failed | vuln_id=%s error=%s",
+						idx, total, vuln.id, gpt_report.get('error'),
+					)
+
+			# Step 2 — generate AI business-impact assessment (for ImpactAssessment record)
+			logger.warning(
+				"[TIER7][IMPACT] [%d/%d] Calling LLM impact generator | vuln_id=%s severity=%s asset=%s",
+				idx, total, vuln.id, vuln.severity, asset,
+			)
 			context = "Vulnerability: %s\n" % vuln.name
-			context += "Description: %s\n" % vuln.description
+			context += "Description: %s\n" % (vuln.description or '')
 			context += "Asset: %s\n" % asset
 			if vuln.subdomain:
 				context += "Technologies: %s\n" % ', '.join([t.name for t in vuln.subdomain.technologies.all()])
 
 			t_start = time.time()
-			# Call LLM (PII protection is handled inside generator)
 			final_impact = generator.generate_impact_assessment(context)
 			elapsed = time.time() - t_start
 
@@ -7177,7 +7211,7 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 				idx, total, elapsed, vuln.id, len(final_impact) if final_impact else 0,
 			)
 
-			# Persist to ImpactAssessment model
+			# Persist business-impact text to ImpactAssessment model
 			ImpactAssessment.objects.update_or_create(
 				vulnerability=vuln,
 				defaults={
@@ -7188,9 +7222,12 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 				}
 			)
 
-			# Also sync to Vulnerability model for reports
-			vuln.impact = final_impact
-			vuln.save()
+			# Only write back to Vulnerability.impact when the structured GPT report
+			# has not already set it (avoid overwriting the richer structured content).
+			if not vuln.is_gpt_used:
+				vuln.impact = final_impact
+				vuln.save()
+
 			assessed_count += 1
 			logger.warning("[TIER7][IMPACT] [%d/%d] Saved | vuln_id=%s", idx, total, vuln.id)
 
