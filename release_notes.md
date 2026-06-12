@@ -49,14 +49,25 @@ v3.6.0 integrates `wp-taint-scan` to perform automated Static Application Securi
 
 ---
 
-## 🧠 CVE Enrichment Expansion (SploitScan & AI Assessments)
+## 🧠 CVE Enrichment Expansion (SploitScan, SearchSploit & AI Assessments)
 
 v3.6.0 massively upgrades the CVE enrichment pipeline by integrating `sploitscan` and automated LLM-based risk assessments.
 
 * **Real-World Exploit Tracking**: Runs `sploitscan` on newly discovered CVEs to pull ExploitDB, Metasploit, and GitHub Proof-of-Concept links directly into the database.
 * **HackerOne Intelligence**: Captures HackerOne Hacktivity statistics and patching priority recommendations.
 * **Automated AI Assessments**: Leverages the system's active LLM configuration (OpenAI, Anthropic, Gemini, or local Ollama) to automatically generate context-rich risk assessments and mitigation strategies based on the CVE's CVSS score and exploitability metrics.
+* **SearchSploit Target Attribution & Cache**: `searchsploit` findings are now explicitly attributed to their targets via `http_url`. Their descriptions and AI assessments are cached in the local `CveId` vulnerability database using the Exploit Title, preventing repeated heavy API/LLM calls.
 * **Persistent Intelligence Cache**: All new intelligence points are permanently cached in the `CveId` database model, eliminating redundant API lookups and saving LLM tokens across future scans.
+
+---
+
+## 🤖 LLM Vulnerability Analysis & Tier 7 Auto-Enrichment
+
+v3.6.0 delivers end-to-end automated LLM enrichment of vulnerability findings — both on-demand and automatically during every full scan.
+
+* **Parser Robustness**: The LLM response parser now handles all real-world output styles produced by OpenAI, Anthropic, Gemini, and Ollama — including inline headers (`Description: text`), double-spaced headers, and the original newline-separated format. The previous implementation crashed silently on any variation, returning a generic HTTP 500 error.
+* **Reliable Per-Finding Updates**: The GPT report writer now guarantees the explicitly requested finding is updated by database ID first, before running any bulk name/path queries. Findings with no `http_url` (previously silently skipped by Django's `icontains` NULL behaviour) are now correctly enriched.
+* **Automatic Tier 7 Enrichment**: The Impact Assessment phase of every scan automatically invokes `get_vulnerability_gpt_report` for each finding not yet enriched, populating the `description`, `impact`, `remediation`, and `references` fields without requiring any manual action from the user. The dedicated `ImpactAssessment` record continues to receive the focused business-impact narrative from `LLMImpactGenerator`, keeping the two outputs distinct.
 
 ---
 
@@ -100,7 +111,14 @@ A dedicated, self-contained integration plugin (`burpsuite_integration`) enables
 
 ## ⚡ Infrastructure Modernization & Performance
 
-The core system runtime, frameworks, and database engines have been upgraded to the latest LTS releases.
+The core system runtime, frameworks, and database engines have been upgraded to the latest LTS.
+
+# Release Notes
+
+## Version 3.5.0
+
+### Security & Recon Improvements
+- **LLM Enrichment for SearchSploit & CVE Lookups**: Vulnerabilities dynamically pull AI-generated risk assessments and mitigation strategies, caching them efficiently using the `CveId` database. SearchSploit exploits are now properly attributed to the target `host` and `port`.
 
 * **Python 3.12 Runtime**: Upgraded the container execution runtime from Python 3.10 to Python 3.12, gaining ~25% execution speedup. Configured the deadsnakes PPA, ensurepip bootstrap, and alternatives to route all global commands safely.
 * **Django 5.2.3 LTS**: Upgraded from the expired Django 3.2 LTS to 5.2.3 LTS (supported until April 2028). Deprecated APIs have been fully migrated (`url()` -> `re_path()`, `USE_L10N` removed, and `unique_together` migrated to `UniqueConstraint`).
