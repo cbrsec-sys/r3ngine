@@ -170,6 +170,71 @@ export const enterpriseTheme: Theme = createTheme({
   },
 });
 
+// V3 Light Theme (Clean Cyber Light)
+export const v3LightTheme: Theme = createTheme({
+  palette: {
+    mode: 'light',
+    primary: { main: themeTokens.v3_light.neon.cyan },
+    secondary: { main: themeTokens.v3_light.neon.pink },
+    background: {
+      default: themeTokens.v3_light.bg.primary,
+      paper: themeTokens.v3_light.bg.secondary,
+    },
+    text: {
+      primary: themeTokens.v3_light.cyber.text,
+      secondary: alpha(themeTokens.v3_light.cyber.text, 0.7),
+    },
+    divider: themeTokens.v3_light.cyber.border,
+  },
+  typography: baseTypography,
+  shape: { borderRadius: 18 },
+  components: {
+    MuiCard: {
+      styleOverrides: {
+        root: {
+          background: `linear-gradient(135deg, ${alpha(themeTokens.v3_light.bg.secondary, 0.9)} 0%, ${alpha(themeTokens.v3_light.bg.primary, 0.95)} 100%)`,
+          backdropFilter: 'blur(20px)',
+          border: `1px solid ${themeTokens.v3_light.cyber.border}`,
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+          borderRadius: themeTokens.effects?.radius || 18,
+          transition: `all 0.4s ${themeTokens.effects.bezier}`,
+          '&:hover': {
+            transform: 'translateY(-4px)',
+            boxShadow: '0 8px 30px rgba(14, 165, 233, 0.12)',
+            borderColor: alpha(themeTokens.v3_light.neon.cyan, 0.4),
+          },
+        },
+      },
+    },
+    MuiButton: {
+      styleOverrides: {
+        root: {
+          textTransform: 'uppercase',
+          letterSpacing: '1px',
+          fontWeight: 700,
+          borderRadius: '8px',
+          transition: `all 0.3s ${themeTokens.effects.bezier}`,
+          '&:active': { transform: 'scale(0.98)' },
+        },
+        contained: {
+          boxShadow: `0 2px 8px ${alpha(themeTokens.v3_light.neon.cyan, 0.2)}`,
+          '&:hover': {
+            boxShadow: `0 4px 16px ${alpha(themeTokens.v3_light.neon.cyan, 0.4)}`,
+          },
+        },
+      },
+    },
+    MuiCssBaseline: {
+      styleOverrides: `
+        body {
+          background-color: ${themeTokens.v3_light.bg.primary};
+          color: ${themeTokens.v3_light.cyber.text};
+        }
+      `,
+    },
+  },
+});
+
 // Deprecated / Legacy fallbacks
 export const cleanTheme = modernTheme;
 export const scriptKiddieTheme = hackerTheme;

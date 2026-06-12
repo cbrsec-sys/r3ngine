@@ -104,30 +104,30 @@ export const themeTokens: Record<string, ThemeSemanticTokens | any> = {
   },
   v3_light: {
     bg: {
-      primary: '#4cbbd9',
-      secondary: '#3aaec9',
-      glass: 'rgba(255, 255, 255, 0.4)',
+      primary: '#f8fafc',
+      secondary: '#ffffff',
+      glass: 'rgba(255, 255, 255, 0.7)',
     },
     neon: {
-      cyan: '#4cbbd9',
-      pink: '#ff00ff',
-      purple: '#bc13fe',
+      cyan: '#0ea5e9',
+      pink: '#ec4899',
+      purple: '#8b5cf6',
     },
     cyber: {
       text: '#0f172a',
-      border: 'rgba(76, 187, 217, 0.2)',
+      border: 'rgba(15, 23, 42, 0.08)',
       glow: {
-        cyan: '0 0 15px rgba(76, 187, 217, 0.3)',
-        pink: '0 0 15px rgba(255, 0, 255, 0.3)',
+        cyan: '0 0 10px rgba(14, 165, 233, 0.15)',
+        pink: '0 0 10px rgba(236, 72, 153, 0.15)',
       },
     },
     accent: {
-      primary: '#4cbbd9',
-      secondary: '#7000ff',
-      success: '#059669',
-      warning: '#d97706',
-      error: '#dc2626',
-      info: '#0ea5e9'
+      primary: '#0ea5e9',
+      secondary: '#8b5cf6',
+      success: '#10b981',
+      warning: '#f59e0b',
+      error: '#ef4444',
+      info: '#3b82f6'
     }
   },
   effects: {
