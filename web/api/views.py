@@ -1532,6 +1532,102 @@ class AddTarget(APIView):
 		})
 
 
+class UpdateTarget(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		from targetApp.views import manage_monitoring_task
+
+		data = request.data
+		target_id = data.get('id')
+		if not target_id:
+			return Response({'status': False, 'message': 'Target ID is required'}, status=HTTP_400_BAD_REQUEST)
+
+		try:
+			domain = Domain.objects.get(id=target_id)
+		except Domain.DoesNotExist:
+			return Response({'status': False, 'message': 'Target not found'}, status=HTTP_400_BAD_REQUEST)
+
+		try:
+			# Scalar fields
+			if 'description' in data:
+				domain.description = data.get('description') or ''
+			if 'h1_team_handle' in data:
+				domain.h1_team_handle = data.get('h1_team_handle') or ''
+			if 'target_type' in data:
+				domain.target_type = data.get('target_type') or 'domain'
+			if 'starting_point_path' in data:
+				domain.starting_point_path = data.get('starting_point_path') or ''
+			if 'in_scope_ips' in data:
+				domain.in_scope_ips = data.get('in_scope_ips') or ''
+			if 'secondary_domains' in data:
+				domain.secondary_domains = data.get('secondary_domains') or ''
+
+			# excluded_paths is a JSONField — accept list or newline-separated string
+			if 'excluded_paths' in data:
+				excluded_paths = data.get('excluded_paths')
+				if isinstance(excluded_paths, list):
+					domain.excluded_paths = excluded_paths
+				elif isinstance(excluded_paths, str):
+					domain.excluded_paths = [p.strip() for p in excluded_paths.split('\n') if p.strip()]
+				else:
+					domain.excluded_paths = []
+
+			# Monitoring fields — track whether they changed so we can update the schedule
+			monitoring_changed = False
+			if 'is_monitored' in data:
+				new_val = bool(data.get('is_monitored'))
+				if domain.is_monitored != new_val:
+					monitoring_changed = True
+				domain.is_monitored = new_val
+			if 'monitor_frequency' in data:
+				new_val = data.get('monitor_frequency') or 'daily'
+				if domain.monitor_frequency != new_val:
+					monitoring_changed = True
+				domain.monitor_frequency = new_val
+			if 'monitor_scan_scope' in data:
+				new_val = data.get('monitor_scan_scope') or 'targeted'
+				if domain.monitor_scan_scope != new_val:
+					monitoring_changed = True
+				domain.monitor_scan_scope = new_val
+			if 'monitor_engine_id' in data:
+				engine_id = data.get('monitor_engine_id')
+				try:
+					from scanEngine.models import EngineType
+					new_engine = EngineType.objects.get(id=engine_id) if engine_id else None
+				except EngineType.DoesNotExist:
+					new_engine = None
+				if domain.monitor_engine_id != (engine_id if engine_id else None):
+					monitoring_changed = True
+				domain.monitor_engine = new_engine
+
+			if monitoring_changed or 'is_monitored' in data:
+				domain.save()
+				manage_monitoring_task(domain)
+			else:
+				domain.save()
+
+			# Organization reassignment via M2M (Organization.domains)
+			if 'organization' in data:
+				organization_name = data.get('organization')
+				# Remove domain from all current organizations in this project
+				for org in Organization.objects.filter(domains=domain, project=domain.project):
+					org.domains.remove(domain)
+				# Add to new organization if specified
+				if organization_name:
+					try:
+						org = Organization.objects.get(name=organization_name, project=domain.project)
+						org.domains.add(domain)
+					except Organization.DoesNotExist:
+						pass
+
+			return Response({'status': True, 'message': f'Target {domain.name} updated successfully'})
+		except Exception as e:
+			logger.error("UpdateTarget failed for id=%s: %s", target_id, e)
+			return Response({'status': False, 'message': 'An error occurred while updating the target'}, status=HTTP_400_BAD_REQUEST)
+
+
 class FetchSubscanResults(APIView):
 	permission_classes = [IsPenetrationTester]
 	def get(self, request):

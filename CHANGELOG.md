@@ -2,6 +2,13 @@
 
 ### [v3.6.0] - Unreleased
 
+- **Target Editing**:
+  - Added a comprehensive **Edit Target** modal accessible directly from the Targets page, allowing full post-creation customization of every target parameter without deleting and recreating the entry.
+  - **Edit button in each row**: A dedicated amber pencil (`✏`) icon button is now rendered inline per target row, alongside the existing Initiate Scan and 3-dot menu controls. "EDIT TARGET" also appears as the first item in the row's context menu.
+  - **Comprehensive modal form**: The `EditTargetModal` exposes all editable `Domain` fields organized into sections — Identity (target name shown read-only, target type selector), Metadata (description, organization reassignment, HackerOne team handle), Scope Configuration (in-scope IPs/CIDRs, secondary domains), Advanced Scan Configuration (starting point path, excluded paths), and Continuous Monitoring (frequency, scan scope, engine).
+  - **Backend REST endpoint**: New `POST /api/update/target/` endpoint (`UpdateTarget` APIView, `PERM_MODIFY_TARGETS` gated). Accepts all editable fields and correctly handles `excluded_paths` as either a JSON list or newline-delimited string. Organization reassignment is handled via the `Organization.domains` M2M relationship. Monitoring field changes automatically trigger `manage_monitoring_task()` to upsert or delete the corresponding Temporal schedule.
+  - **React Query integration**: Added `useUpdateTarget` mutation hook that posts to the new endpoint and invalidates the `['domains', projectSlug]` query key on success, keeping the targets list in sync without a page refresh.
+
 - **API Security Hardening**:
   - **Swagger/OpenAPI docs now require authentication**: Changed `permission_classes` from `AllowAny` to `IsAuthenticated` and set `public=False` on the schema view. Removed `/swagger/` and `/redoc/` from `LOGIN_REQUIRED_IGNORE_PATHS` — API docs are no longer publicly accessible to unauthenticated users.
   - **JWT refresh token blacklisting**: Enabled `rest_framework_simplejwt.token_blacklist` app and set `BLACKLIST_AFTER_ROTATION=True`. Rotated refresh tokens are now immediately invalidated in the database, preventing replay attacks with leaked refresh tokens.

@@ -25,25 +25,29 @@ import {
   FormControl,
   TablePagination
 } from '@mui/material';
-import { 
-  Search, 
-  MoreVertical, 
-  Activity, 
-  ShieldAlert, 
-  ExternalLink, 
-  Play, 
+import {
+  Search,
+  MoreVertical,
+  Activity,
+  ShieldAlert,
+  ExternalLink,
+  Play,
   Settings,
   Plus,
   Trash2,
   Filter,
   Eye,
   ChevronRight,
-  Target
+  Target,
+  Pencil,
 } from 'lucide-react';
 import { useDomains, useDeleteTargets } from '../api';
 import { useParams, Link } from '@tanstack/react-router';
 import { AddTargetModal } from './AddTargetModal';
+import { EditTargetModal } from './EditTargetModal';
 import { StartScanModal } from '../../scans/components/StartScanModal';
+import type { Domain } from '../types';
+import type { ExtendedDomain } from './EditTargetModal';
 
 export const TargetList: React.FC = () => {
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
@@ -51,6 +55,7 @@ export const TargetList: React.FC = () => {
   const { mutate: deleteTargets } = useDeleteTargets(projectSlug);
   
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
+  const [editTarget, setEditTarget] = React.useState<ExtendedDomain | null>(null);
   const [startScanTargets, setStartScanTargets] = React.useState<{ ids: number[]; names: string[] } | null>(null);
   const [selectedIds, setSelectedIds] = React.useState<number[]>([]);
   const [resultsPerPage, setResultsPerPage] = React.useState(20);
@@ -405,8 +410,20 @@ export const TargetList: React.FC = () => {
                       >
                         Initiate Scan
                       </Button>
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
+                        onClick={() => setEditTarget(domain as ExtendedDomain)}
+                        sx={{
+                          color: 'rgba(255, 165, 0, 0.6)',
+                          bgcolor: 'rgba(255, 165, 0, 0.05)',
+                          borderRadius: 1,
+                          '&:hover': { color: '#ffa500', bgcolor: 'rgba(255, 165, 0, 0.12)' },
+                        }}
+                      >
+                        <Pencil size={16} />
+                      </IconButton>
+                      <IconButton
+                        size="small"
                         onClick={(e) => handleMenuOpen(e, { id: domain.id!, name: domain.name })}
                         sx={{ color: 'rgba(0, 170, 255, 0.5)', bgcolor: 'rgba(0, 170, 255, 0.05)', borderRadius: 1 }}
                       >
@@ -467,6 +484,15 @@ export const TargetList: React.FC = () => {
       >
         <MenuItem onClick={() => {
           if (activeTarget) {
+            const domain = domains?.find(d => d.id === activeTarget.id);
+            if (domain) setEditTarget(domain as ExtendedDomain);
+          }
+          handleMenuClose();
+        }} sx={{ color: '#ffa500 !important', '& svg': { color: '#ffa500 !important' } }}>
+          <Pencil size={14} /> EDIT TARGET
+        </MenuItem>
+        <MenuItem onClick={() => {
+          if (activeTarget) {
             setStartScanTargets({ ids: [activeTarget.id], names: [activeTarget.name] });
           }
           handleMenuClose();
@@ -485,11 +511,20 @@ export const TargetList: React.FC = () => {
         </MenuItem>
       </Menu>
 
-      <AddTargetModal 
-        open={isAddModalOpen} 
-        onClose={() => setIsAddModalOpen(false)} 
-        projectSlug={projectSlug} 
+      <AddTargetModal
+        open={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        projectSlug={projectSlug}
       />
+
+      {editTarget && (
+        <EditTargetModal
+          open={!!editTarget}
+          onClose={() => setEditTarget(null)}
+          domain={editTarget}
+          projectSlug={projectSlug}
+        />
+      )}
 
       {startScanTargets && (
         <StartScanModal 
