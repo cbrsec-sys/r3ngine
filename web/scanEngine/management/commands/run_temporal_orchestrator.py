@@ -197,6 +197,8 @@ from reNgine.temporal_activities import (
     run_grype_scan_activity,
     run_trivy_secret_scan_activity,
     run_urlparser_activity,
+    run_wptaint_scan_activity,
+    run_param_discovery_activity,
 )
 
 
@@ -391,6 +393,7 @@ class Command(BaseCommand):
                 parse_enumeration_results_activity,
 
                 # Tier 3/4
+                run_param_discovery_activity,
                 run_dir_file_fuzz_activity,
                 parse_fuzz_results_activity,
 
@@ -411,6 +414,7 @@ class Command(BaseCommand):
                 run_react2shell_activity,
                 run_wpscan_activity,
                 run_semgrep_activity,
+                run_wptaint_scan_activity,
                 run_vigolium_scan_activity,
                 run_vigolium_discovery_activity,
                 run_vigolium_analysis_activity,
