@@ -146,5 +146,8 @@ fi
 
 vulnx update
 
+# Configure vigolium to scan all severity levels for known issues
+vigolium config set known_issue_scan.severities "critical,high,medium,low,info" || true
+
 echo "Starting Temporal Go Executor..."
 exec /usr/local/bin/r3ngine-executor
