@@ -179,26 +179,6 @@ class TestSSHAuditScan(TestCase):
         self.assertTrue(result)
 
 
-class TestSearchsploitScan(TestCase):
-    @patch('subprocess.run')
-    def test_searchsploit_returns_true_empty_service(self, mock_run):
-        from reNgine.recon_tasks import searchsploit_scan
-        result = searchsploit_scan(_make_proxy(), scan_history_id=1, service='')
-        self.assertTrue(result)
-        mock_run.assert_not_called()
-
-    @patch('subprocess.run')
-    def test_searchsploit_handles_no_results(self, mock_run):
-        mock_run.return_value = MagicMock(
-            returncode=0,
-            stdout=json.dumps({'RESULTS_EXPLOIT': []}),
-            stderr='',
-        )
-        from reNgine.recon_tasks import searchsploit_scan
-        result = searchsploit_scan(_make_proxy(), scan_history_id=1, service='custom-app')
-        self.assertTrue(result)
-
-
 class TestWPProbeScan(TestCase):
     @patch('subprocess.run')
     def test_wpprobe_returns_true_on_timeout(self, mock_run):

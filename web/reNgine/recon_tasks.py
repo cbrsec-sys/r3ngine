@@ -415,75 +415,6 @@ def _enrich_finding_with_llm(name: str, cvss_score: float = None) -> tuple:
         return "", "", ""
 
 
-def searchsploit_scan(self, scan_history_id: int, service: str,
-                      version: Optional[str] = None, host: str = '', port: int = 0,
-                      subdomain_id: Optional[int] = None, domain_id: Optional[int] = None) -> bool:
-    """Search Exploit-DB for known exploits for a service/version combo.
-
-    Saves matching exploits as Vulnerability records (severity=high/3).
-    Used in: HostReconWorkflow, _fan_out_search_vulns in MasterScanWorkflow.
-    """
-    from startScan.models import Vulnerability
-    from django.db import transaction
-
-    if not service:
-        return True
-
-    query = ('%s %s' % (service, version)).strip() if version else service.strip()
-    cmd = ['searchsploit', '--json', query]
-    logger.log_line("[SEARCHSPLOIT]", "START", "searching exploits for %s" % query)
-
-    try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-        data = json.loads(result.stdout)
-        exploits = data.get('RESULTS_EXPLOIT', [])
-        vulns = []
-        for exploit in exploits[:20]:
-            name = exploit.get('Title', 'Exploit Found')
-            
-            # Extract CVE to ensure accurate LLM caching and NVD lookup
-            cve_id = None
-            codes = exploit.get('Codes', '')
-            match = re.search(r'CVE-\d{4}-\d+', codes, re.IGNORECASE)
-            if match:
-                cve_id = match.group(0).upper()
-            else:
-                match = re.search(r'CVE-\d{4}-\d+', name, re.IGNORECASE)
-                if match:
-                    cve_id = match.group(0).upper()
-            
-            enrich_key = cve_id if cve_id else name
-            desc_llm, impact_llm, remediation_llm = _enrich_finding_with_llm(enrich_key)
-            
-            base_desc = exploit.get('Description', '')
-            if desc_llm:
-                base_desc += '\n\n**AI Risk Assessment**:\n' + desc_llm
-
-            http_url = f"{host}:{port}" if host else None
-            
-            vulns.append(Vulnerability(
-                scan_history_id=scan_history_id,
-                subdomain_id=subdomain_id,
-                target_domain_id=domain_id,
-                name=name,
-                severity=3,  # high
-                description=base_desc,
-                impact=impact_llm if impact_llm else None,
-                remediation=remediation_llm if remediation_llm else None,
-                source='searchsploit',
-                exploit_url=exploit.get('Path', ''),
-                http_url=http_url,
-            ))
-        if vulns:
-            with transaction.atomic():
-                Vulnerability.objects.bulk_create(vulns, ignore_conflicts=True)
-            logger.log_line("[SEARCHSPLOIT]", "RESULT", "saved %d exploits" % len(vulns))
-    except (subprocess.TimeoutExpired, json.JSONDecodeError, KeyError):
-        logger.log_line("[SEARCHSPLOIT]", "WARN", "searchsploit failed for %s" % query)
-
-    return True
-
-
 def wpprobe_scan(self, scan_history_id: int, url: str) -> bool:
     """Scan WordPress site for vulnerable plugins using wpprobe.
 
@@ -536,7 +467,7 @@ def search_vulns_scan(self, scan_history_id: int, service: str,
     from startScan.models import Vulnerability
     from django.db import transaction
 
-    if not service or not service.strip():
+    if not service or not service.strip() or not version:
         return True
 
     query = ('%s %s' % (service, version)).strip() if version else service.strip()

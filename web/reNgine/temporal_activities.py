@@ -2685,20 +2685,6 @@ def run_sshaudit_activity(ctx: dict) -> bool:
         host=ctx.get('host', ''), port=ctx.get('port', 22),
     )
 
-
-@activity.defn(name="RunSearchsploitActivity")
-def run_searchsploit_activity(ctx: dict) -> bool:
-    from reNgine.recon_tasks import searchsploit_scan
-    activity.logger.info("[RunSearchsploitActivity] scan_id=%s", ctx.get('scan_history_id'))
-    return _run_task(
-        searchsploit_scan, ctx, task_name='searchsploit_scan',
-        description='Exploit Search (searchsploit)',
-        service=ctx.get('service', ''), version=ctx.get('version'),
-        host=ctx.get('host', ''), port=ctx.get('port', 0),
-        subdomain_id=ctx.get('subdomain_id'), domain_id=ctx.get('domain_id'),
-    )
-
-
 @activity.defn(name="RunWPProbeActivity")
 def run_wpprobe_activity(ctx: dict) -> bool:
     from reNgine.recon_tasks import wpprobe_scan

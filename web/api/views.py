@@ -5330,3 +5330,30 @@ class LinkedInHelperScriptView(APIView):
         response = HttpResponse(_LINKEDIN_CAPTURE_SCRIPT, content_type='text/x-python')
         response['Content-Disposition'] = 'attachment; filename="linkedin_capture.py"'
         return response
+
+
+class RunSearchsploitAction(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        from startScan.models import Subdomain
+        import subprocess
+        import json
+        try:
+            subdomain = Subdomain.objects.get(id=pk)
+        except Subdomain.DoesNotExist:
+            return Response({'status': False, 'message': 'Subdomain not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        query = request.data.get('query')
+        if not query:
+            return Response({'status': False, 'message': 'query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        cmd = ['searchsploit', '--json', query]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            data = json.loads(result.stdout)
+            exploits = data.get('RESULTS_EXPLOIT', [])
+            return Response({'status': True, 'results': exploits})
+        except Exception as e:
+            return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

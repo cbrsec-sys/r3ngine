@@ -289,6 +289,10 @@ urlpatterns = [
         DeleteSubdomain.as_view(),
         name='delete_subdomain'),
     path(
+        'action/subdomain/<int:pk>/searchsploit/',
+        RunSearchsploitAction.as_view(),
+        name='run_searchsploit'),
+    path(
         'action/vulnerability/delete/',
         DeleteVulnerability.as_view(),
         name='delete_vulnerability'),
