@@ -1,207 +1,275 @@
+import json
+import logging
 import os
 import random
-import time
-import logging
 import re
+import time
 import urllib.parse
-from playwright.sync_api import sync_playwright
-from playwright_stealth import stealth_sync
+from typing import Optional
+
 from django.conf import settings
-from startScan.models import ScanHistory, Email, Employee
-from dashboard.models import LinkedInCredentials, HunterIOAPIKey
-import requests
+from django.utils import timezone
+from playwright.sync_api import BrowserContext, sync_playwright
+from playwright_stealth import stealth_sync
+
+import requests as req
 
 logger = logging.getLogger(__name__)
 
+LINKEDIN_FEED_URL = "https://www.linkedin.com/feed/"
+STATE_DIR = os.path.join(settings.RENGINE_RESULTS, "context", "linkedin")
+STATE_FILE_NAME = "storage_state.json"
+
+
+def _validate_state_path(path: str) -> str:
+    """Ensure the state file path is within STATE_DIR (Rule 1.1)."""
+    resolved = os.path.realpath(path)
+    base = os.path.realpath(STATE_DIR)
+    if not resolved.startswith(base + os.sep) and resolved != base:
+        raise ValueError("state_file_path is outside the allowed directory: %s" % path)
+    return resolved
+
+
 class LinkedInScraper:
-    def __init__(self, username, password, hunter_key, context_path=None):
-        self.username = username
-        self.password = password
+    def __init__(self, session, hunter_key: str):
+        self.session = session
         self.hunter_key = hunter_key
-        # Default path within the container volume
-        self.context_path = context_path or os.path.join(settings.RENGINE_RESULTS, "context/linkedin")
-        os.makedirs(self.context_path, exist_ok=True)
-        self.playwright = None
-        self.context = None
-        self.page = None
+        self.notes: list = []
+        self._playwright = None
+        self._browser = None
+        self._context: Optional[BrowserContext] = None
+        self._page = None
+        os.makedirs(STATE_DIR, exist_ok=True)
+        if not self.session.state_file_path:
+            self.session.state_file_path = os.path.join(STATE_DIR, STATE_FILE_NAME)
 
     def __enter__(self):
-        self.playwright = sync_playwright().start()
-        # Using persistent context for session survival
-        self.context = self.playwright.chromium.launch_persistent_context(
-            user_data_dir=self.context_path,
+        self._playwright = sync_playwright().start()
+        self._browser = self._playwright.chromium.launch(
             headless=True,
             args=[
                 "--disable-dev-shm-usage",
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
                 "--disable-gpu",
-            ]
+            ],
         )
-        self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
-        stealth_sync(self.page)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.context:
-            self.context.close()
-        if self.playwright:
-            self.playwright.stop()
+        for resource in (self._context, self._browser, self._playwright):
+            if resource:
+                try:
+                    resource.close() if hasattr(resource, "close") else resource.stop()
+                except Exception:
+                    pass
 
-    def random_sleep(self, min_s=2, max_s=5):
+    # ------------------------------------------------------------------
+    # Authentication
+    # ------------------------------------------------------------------
+
+    def authenticate(self) -> bool:
+        if self._try_storage_state():
+            return True
+        if self._try_cookie_injection():
+            return True
+        self.session.is_valid = False
+        self.session.save(update_fields=["is_valid"])
+        self.notes.append(
+            "[OSINT][LinkedIn] Session invalid and cookie injection failed — "
+            "LinkedIn intelligence skipped. Re-authenticate via Settings → API Keys."
+        )
+        return False
+
+    def _try_storage_state(self) -> bool:
+        state_path = self.session.state_file_path
+        if not state_path or not os.path.isfile(state_path):
+            return False
+        try:
+            safe_path = _validate_state_path(state_path)
+        except ValueError as exc:
+            logger.warning("LinkedIn state_file_path rejected: %s", exc)
+            return False
+        try:
+            self._context = self._browser.new_context(storage_state=safe_path)
+            self._page = self._context.new_page()
+            stealth_sync(self._page)
+            if self._validate_session():
+                self.session.is_valid = True
+                self.session.last_validated_at = timezone.now()
+                self.session.save(update_fields=["is_valid", "last_validated_at"])
+                return True
+            self._close_context()
+            return False
+        except Exception as exc:
+            logger.warning("LinkedIn storage_state load failed: %s", exc)
+            self._close_context()
+            return False
+
+    def _try_cookie_injection(self) -> bool:
+        if not self.session.cookies_json:
+            return False
+        try:
+            cookies = json.loads(self.session.cookies_json)
+        except (json.JSONDecodeError, TypeError) as exc:
+            logger.warning("LinkedIn cookies_json parse failed: %s", exc)
+            return False
+        try:
+            self._context = self._browser.new_context()
+            self._context.add_cookies(cookies)
+            self._page = self._context.new_page()
+            stealth_sync(self._page)
+            if self._validate_session():
+                self._save_state()
+                return True
+            self._close_context()
+            return False
+        except Exception as exc:
+            logger.warning("LinkedIn cookie injection failed: %s", exc)
+            self._close_context()
+            return False
+
+    def _validate_session(self) -> bool:
+        try:
+            self._page.goto(LINKEDIN_FEED_URL, wait_until="networkidle", timeout=30000)
+            if "login" in self._page.url:
+                return False
+            if self._page.query_selector('button:has-text("Sign in")'):
+                return False
+            return True
+        except Exception as exc:
+            logger.warning("LinkedIn session validation error: %s", exc)
+            return False
+
+    def _save_state(self):
+        try:
+            os.makedirs(os.path.dirname(self.session.state_file_path), exist_ok=True)
+            self._context.storage_state(path=self.session.state_file_path)
+            self.session.is_valid = True
+            self.session.last_validated_at = timezone.now()
+            self.session.save(update_fields=["state_file_path", "is_valid", "last_validated_at"])
+        except Exception as exc:
+            logger.warning("LinkedIn state save failed: %s", exc)
+
+    def _close_context(self):
+        if self._context:
+            try:
+                self._context.close()
+            except Exception:
+                pass
+            self._context = None
+        self._page = None
+
+    # ------------------------------------------------------------------
+    # Scraping helpers
+    # ------------------------------------------------------------------
+
+    def random_sleep(self, min_s: float = 2, max_s: float = 5):
         time.sleep(random.uniform(min_s, max_s))
 
     def human_scroll(self):
-        """Perform a human-like scroll down the page."""
         for _ in range(random.randint(3, 6)):
-            scroll_amount = random.randint(300, 700)
-            self.page.evaluate(f"window.scrollBy(0, {scroll_amount})")
+            self._page.evaluate(f"window.scrollBy(0, {random.randint(300, 700)})")
             self.random_sleep(1, 3)
 
-    def is_logged_in(self):
+    def get_hunter_pattern(self, domain: str) -> str:
         try:
-            self.page.goto("https://www.linkedin.com/feed/", wait_until="networkidle")
-            # If redirected to login or see login buttons, we are not logged in
-            if "login" in self.page.url or self.page.query_selector('button:has-text("Sign in")'):
-                return False
-            return True
-        except Exception as e:
-            logger.error(f"Error checking login status: {e}")
-            return False
-
-    def login(self):
-        if self.is_logged_in():
-            logger.info("Already logged in to LinkedIn via persistent context.")
-            return True
-
-        logger.info("Attempting fresh LinkedIn login...")
-        try:
-            self.page.goto("https://www.linkedin.com/login", wait_until="networkidle")
-            self.page.fill('input[name="session_key"]', self.username)
-            self.random_sleep(1, 2)
-            self.page.fill('input[name="session_password"]', self.password)
-            self.random_sleep(1, 2)
-            self.page.click('button[type="submit"]')
-            self.page.wait_for_load_state("networkidle")
-            
-            if self.is_logged_in():
-                logger.info("LinkedIn login successful.")
-                return True
-            else:
-                logger.error("LinkedIn login failed. Check credentials or 2FA.")
-                return False
-        except Exception as e:
-            logger.error(f"LinkedIn login exception: {e}")
-            return False
-
-    def get_hunter_pattern(self, domain):
-        try:
-            url = f"https://api.hunter.io/v2/domain-search?domain={domain}&api_key={self.hunter_key}"
-            res = requests.get(url, timeout=10)
+            url = (
+                f"https://api.hunter.io/v2/domain-search"
+                f"?domain={domain}&api_key={self.hunter_key}"
+            )
+            res = req.get(url, timeout=10)
             data = res.json()
-            if 'data' in data and 'pattern' in data['data']:
-                return data['data']['pattern']
-        except Exception as e:
-            logger.warning(f"Failed to fetch Hunter.io pattern: {e}")
+            if "data" in data and "pattern" in data["data"]:
+                return data["data"]["pattern"]
+        except Exception as exc:
+            logger.warning("Failed to fetch Hunter.io pattern: %s", exc)
         return "{first}.{last}"
 
-    def format_email(self, name, pattern, domain):
-        # Very basic pattern formatter
+    def format_email(self, name: str, pattern: str, domain: str) -> str:
         parts = name.split()
-        first = parts[0] if len(parts) > 0 else ""
+        first = parts[0] if parts else ""
         last = parts[-1] if len(parts) > 1 else ""
-        
-        email = pattern.replace('{first}', first.lower())
-        email = email.replace('{last}', last.lower())
-        email = email.replace('{f}', first[0].lower() if first else '')
-        email = email.replace('{l}', last[0].lower() if last else '')
-        
-        if '@' not in email:
+        email = pattern.replace("{first}", first.lower())
+        email = email.replace("{last}", last.lower())
+        email = email.replace("{f}", first[0].lower() if first else "")
+        email = email.replace("{l}", last[0].lower() if last else "")
+        if "@" not in email:
             email = f"{email}@{domain}"
         return email
 
-    def discover_employees(self, company_name, domain, scan_history):
-        if not self.login():
+    # ------------------------------------------------------------------
+    # Main entry point
+    # ------------------------------------------------------------------
+
+    def discover_employees(self, company_name: str, domain: str, scan_history) -> list:
+        if not self.authenticate():
             return []
 
         pattern = self.get_hunter_pattern(domain)
-        employees_data = []
+        employees_data: list = []
 
         try:
-            # 1. Try direct company people page
-            # This requires knowing the company ID or slug, so we search for it first
             search_query = urllib.parse.quote_plus(company_name)
-            self.page.goto(f"https://www.linkedin.com/search/results/all/?keywords={search_query}", wait_until="networkidle")
+            self._page.goto(
+                f"https://www.linkedin.com/search/results/all/?keywords={search_query}",
+                wait_until="networkidle",
+            )
             self.random_sleep()
 
-            # Find the first company result
-            company_link = self.page.query_selector('a[href*="/company/"]')
+            company_link = self._page.query_selector('a[href*="/company/"]')
             if company_link:
-                company_url = company_link.get_attribute("href")
-                # Strip query params
-                company_url = company_url.split('?')[0]
-                people_url = f"{company_url}people/"
-                logger.info(f"Navigating to company people page: {people_url}")
-                self.page.goto(people_url, wait_until="networkidle")
+                company_url = company_link.get_attribute("href").split("?")[0]
+                self._page.goto(f"{company_url}people/", wait_until="networkidle")
                 self.random_sleep()
                 self.human_scroll()
-                
-                # Extract cards
-                # Note: Selectors are approximations and may need updates
-                cards = self.page.query_selector_all('.org-people-profile-card__profile-info')
-                for card in cards:
-                    name_elem = card.query_selector('.lt-line-clamp--single-line')
-                    title_elem = card.query_selector('.lt-line-clamp--multi-line')
-                    
+                for card in self._page.query_selector_all(".org-people-profile-card__profile-info"):
+                    name_elem = card.query_selector(".lt-line-clamp--single-line")
+                    title_elem = card.query_selector(".lt-line-clamp--multi-line")
                     if name_elem:
                         name = name_elem.inner_text().strip()
                         title = title_elem.inner_text().strip() if title_elem else "Employee"
-                        email = self.format_email(name, pattern, domain)
                         employees_data.append({
-                            'name': name,
-                            'designation': title,
-                            'email': email
+                            "name": name,
+                            "designation": title,
+                            "email": self.format_email(name, pattern, domain),
                         })
 
-            # 2. Fallback to global people search if needed
             if not employees_data:
-                logger.info("Falling back to global people search.")
-                search_url = f"https://www.linkedin.com/search/results/people/?keywords={search_query}"
-                self.page.goto(search_url, wait_until="networkidle")
+                self._page.goto(
+                    f"https://www.linkedin.com/search/results/people/?keywords={search_query}",
+                    wait_until="networkidle",
+                )
                 self.random_sleep()
                 self.human_scroll()
-                
-                # Global search selectors
-                cards = self.page.query_selector_all('.entity-result__item')
-                for card in cards:
-                    name_elem = card.query_selector('.entity-result__title-text a span[aria-hidden="true"]')
-                    title_elem = card.query_selector('.entity-result__primary-subtitle')
-                    
+                for card in self._page.query_selector_all(".entity-result__item"):
+                    name_elem = card.query_selector(
+                        '.entity-result__title-text a span[aria-hidden="true"]'
+                    )
+                    title_elem = card.query_selector(".entity-result__primary-subtitle")
                     if name_elem:
                         name = name_elem.inner_text().strip()
                         title = title_elem.inner_text().strip() if title_elem else "Employee"
-                        email = self.format_email(name, pattern, domain)
                         employees_data.append({
-                            'name': name,
-                            'designation': title,
-                            'email': email
+                            "name": name,
+                            "designation": title,
+                            "email": self.format_email(name, pattern, domain),
                         })
 
-        except Exception as e:
-            logger.error(f"Error during employee discovery: {e}")
+        except Exception as exc:
+            logger.error("Error during LinkedIn employee discovery: %s", exc)
+            self.notes.append(f"[OSINT][LinkedIn] Discovery error: {type(exc).__name__}")
 
-        # Visual Verification with unique naming
         try:
-            from datetime import datetime
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            # Clean company name for filename
-            safe_name = re.sub(r'[^a-zA-Z0-9]', '_', company_name).lower()
-            screenshot_path = f"{scan_history.results_dir}/osint/linkedin_{safe_name}_{timestamp}.png"
-            
+            safe_name = re.sub(r"[^a-zA-Z0-9]", "_", company_name).lower()
+            timestamp = timezone.now().strftime("%Y%m%d_%H%M%S")
+            screenshot_path = os.path.join(
+                scan_history.results_dir, "osint",
+                f"linkedin_{safe_name}_{timestamp}.png",
+            )
             os.makedirs(os.path.dirname(screenshot_path), exist_ok=True)
-            self.page.screenshot(path=screenshot_path)
-            logger.info(f"LinkedIn discovery screenshot saved to: {screenshot_path}")
-        except Exception as e:
-            logger.warning(f"Failed to capture discovery screenshot: {e}")
+            self._page.screenshot(path=screenshot_path)
+        except Exception as exc:
+            logger.warning("LinkedIn screenshot failed: %s", exc)
 
         return employees_data
