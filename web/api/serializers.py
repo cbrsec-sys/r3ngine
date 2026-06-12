@@ -378,6 +378,7 @@ class ScanHistorySerializer(serializers.ModelSerializer):
 	initiated_by = MinimalUserSerializer(read_only=True)
 	max_severity = serializers.SerializerMethodField('get_max_severity')
 	engine_name = serializers.SerializerMethodField('get_engine_name')
+	is_spiderfoot_running = serializers.SerializerMethodField()
 	successful_task_count = serializers.SerializerMethodField()
 	failed_task_count = serializers.SerializerMethodField()
 	total_task_count = serializers.SerializerMethodField()
