@@ -60,9 +60,7 @@ class RengineTaskFormatter(logging.Formatter):
 def get_gpt_vuln_input_description(title, path):
 	vulnerability_description = ''
 	vulnerability_description += f'Vulnerability Title: {title}'
-	# gpt gives concise vulnerability description when a vulnerable URL is provided
-	vulnerability_description += f'\nVulnerable URL: {path}'
-
+	# Note: path is removed from the prompt to ensure the generated report is target-agnostic
 	return vulnerability_description
 
 
