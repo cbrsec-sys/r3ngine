@@ -1009,7 +1009,6 @@ def api_vault(request, slug):
         key_acunetix_key = _pick('key_acunetix_key', 'acunetix_key')
         key_hunterio = _pick('key_hunterio', 'hunterio_key')
         linkedin_username = _pick('linkedin_username', 'linkedin_username')
-        linkedin_password = _pick('linkedin_password', 'linkedin_password')
         key_wpscan = _pick('key_wpscan', 'wpscan_key')
         key_projectdiscovery = _pick('key_projectdiscovery', 'projectdiscovery_key')
 
@@ -1115,13 +1114,10 @@ def api_vault(request, slug):
                 defaults={'key': key_projectdiscovery or ""}
             )
 
-        if (linkedin_username is not None) or (linkedin_password is not None):
+        if linkedin_username is not None:
             LinkedInCredentials.objects.update_or_create(
                 id=1,
-                defaults={
-                    'username': linkedin_username or "",
-                    'password': linkedin_password or ""
-                }
+                defaults={'username': linkedin_username or ""}
             )
 
         delete_sf_key = request.POST.get('delete_sf_key')
@@ -1167,7 +1163,6 @@ def api_vault(request, slug):
             'acunetix_key': context['acunetix_key'].api_key if context['acunetix_key'] else "",
             'hunterio_key': HunterIOAPIKey.objects.first().key if HunterIOAPIKey.objects.exists() else "",
             'linkedin_username': LinkedInCredentials.objects.first().username if LinkedInCredentials.objects.exists() else "",
-            'linkedin_password': LinkedInCredentials.objects.first().password if LinkedInCredentials.objects.exists() else "",
             'wpscan_key': WpScanAPIKey.objects.first().key if WpScanAPIKey.objects.exists() else "",
             'projectdiscovery_key': ProjectDiscoveryAPIKey.objects.first().key if ProjectDiscoveryAPIKey.objects.exists() else "",
         })
