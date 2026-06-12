@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { useParams, Link as RouterLink } from '@tanstack/react-router';
 import {
   Box,
@@ -763,14 +764,15 @@ const TIER_LABELS: Record<number, string> = {
 };
 
 const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> = ({ activity, onClick }) => {
+  const { theme, isLight, tokens } = useThemeTokens();
   const statusConfig: Record<string, { color: string, label: string }> = {
-    'SUCCESS': { color: '#00ff62', label: 'Completed' },
-    'RUNNING': { color: '#00f3ff', label: 'In Progress' },
-    'FAILED': { color: '#ff003c', label: 'Failed' },
-    'ABORTED': { color: '#ff003c', label: 'Aborted' },
-    'PENDING': { color: '#ff9f00', label: 'Pending' }
+    'SUCCESS': { color: tokens.accent.success, label: 'Completed' },
+    'RUNNING': { color: tokens.accent.primary, label: 'In Progress' },
+    'FAILED': { color: tokens.accent.error, label: 'Failed' },
+    'ABORTED': { color: tokens.accent.error, label: 'Aborted' },
+    'PENDING': { color: tokens.accent.warning, label: 'Pending' }
   };
-  const config = statusConfig[activity.status] || { color: '#fff', label: activity.status };
+  const config = statusConfig[activity.status] || { color: theme.palette.text.primary, label: activity.status };
 
   return (
     <Box
@@ -782,7 +784,7 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
         '&:last-child': { pb: 0 },
         cursor: 'pointer',
         '&:hover': {
-          '& .timeline-content': { bgcolor: 'rgba(255,255,255,0.03)' }
+          '& .timeline-content': { bgcolor: isLight ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.03)' }
         }
       }}
     >
@@ -793,7 +795,7 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
         top: 10,
         bottom: -4,
         width: 2,
-        bgcolor: 'rgba(255,255,255,0.05)',
+        bgcolor: isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.05)',
         zIndex: 1
       }} />
 
@@ -826,7 +828,7 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
 
       <Stack spacing={0.5} className="timeline-content" sx={{ p: 1, borderRadius: 1, transition: 'background-color 0.2s' }}>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: '#fff' }}>
+          <Typography sx={{ fontSize: '0.85rem', fontWeight: 800, color: theme.palette.text.primary }}>
             {activity.title}
           </Typography>
           <Box sx={{
@@ -841,12 +843,12 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
           }}>
             {config.label}
           </Box>
-          <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+          <Typography sx={{ fontSize: '0.6rem', color: isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.3)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5 }}>
             • Click to view details <ChevronRight size={10} />
           </Typography>
         </Stack>
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-          <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
+          <Typography sx={{ fontSize: '0.7rem', color: isLight ? 'rgba(0,0,0,0.6)' : 'rgba(255,255,255,0.3)', fontWeight: 600 }}>
             {activity.status === 'PENDING'
               ? 'Queued'
               : activity.time_started
@@ -1306,6 +1308,7 @@ const DiscoveredTechWidget: React.FC<{ techs: any[], sx?: any }> = ({ techs = []
 );
 
 export const ScanDetailPage = () => {
+  const { theme, isLight, tokens } = useThemeTokens();
   const { projectSlug, scanId } = useParams({ from: '/$projectSlug/scan/detail/$scanId' });
   const { data, isLoading } = useScanSummary(projectSlug, parseInt(scanId));
   const fetchWhois = useFetchWhois(projectSlug, parseInt(scanId));
@@ -1417,7 +1420,7 @@ export const ScanDetailPage = () => {
             </Box>
 
             <Box>
-              <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', mb: 1.5, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Current Progress</Typography>
+              <Typography sx={{ fontSize: '0.7rem', color: isLight ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.4)', mb: 1.5, textTransform: 'uppercase', letterSpacing: 1.5, fontWeight: 700 }}>Current Progress</Typography>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <Box sx={{ flexGrow: 1, position: 'relative' }}>
                   <LinearProgress

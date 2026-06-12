@@ -34,11 +34,12 @@ export const HeaderThemeSwitcher: React.FC = () => {
     handleClose();
   };
 
-  const themes = [
+  const themes: { id: ThemeType; label: string; color: string }[] = [
     { id: 'hacker', label: 'V3 Hacker', color: themeTokens.hacker.neon.pink },
     { id: 'modern', label: 'V3 Hybrid', color: themeTokens.modern.neon.cyan },
     { id: 'enterprise', label: 'V3 Enterprise', color: themeTokens.enterprise.palette.primary },
-  ] as const;
+    { id: 'v3_light', label: 'V3 Light', color: themeTokens.v3_light.neon.cyan },
+  ];
 
 
   return (

@@ -20,13 +20,14 @@ const themes: Record<string, Theme> = {
   enterprise: enterpriseTheme,
   clean: modernTheme, // Legacy mapping
   script_kiddie: hackerTheme, // Legacy mapping
+  v3_light: enterpriseTheme, // Base light theme, but tokens will override background
 };
 
 export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [themeName, setThemeName] = useState<ThemeType>(() => {
     const saved = localStorage.getItem('rengine-v3-theme');
-    if (saved === 'hacker' || saved === 'modern' || saved === 'enterprise') {
-      return saved as ThemeType;
+    if (saved === 'hacker' || saved === 'modern' || saved === 'enterprise' || saved === 'v3_light' || saved === 'v3_awvs') {
+      return saved === 'v3_awvs' ? 'v3_light' : saved as ThemeType;
     }
     return 'hacker';
   });
@@ -42,7 +43,7 @@ export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ childre
 
     // Inject typography and motion variables
     const root = document.documentElement;
-    const isEnterprise = themeName === 'enterprise';
+    const isEnterprise = themeName === 'enterprise' || themeName === 'v3_light';
     const isCyber = themeName === 'hacker' || themeName === 'modern' || themeName === 'script_kiddie';
     
     root.style.setProperty('--r3-heading-font', isEnterprise ? '"Inter", sans-serif' : '"Orbitron", sans-serif');

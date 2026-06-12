@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Card, CardContent, Typography, useTheme } from '@mui/material';
 import clsx from 'clsx';
+import { useThemeTokens } from '../theme/useThemeTokens';
 
 interface TacticalPanelProps {
   title?: string;
@@ -21,19 +22,18 @@ export const TacticalPanel: React.FC<TacticalPanelProps> = ({
   sx = {},
   headerAction
 }) => {
-  const theme = useTheme();
-  const isLight = theme.palette.mode === 'light';
+  const { theme, isLight, tokens } = useThemeTokens();
 
   return (
     <Card 
       className={clsx("relative overflow-hidden group transition-all duration-500", className)}
       sx={{ 
         background: isLight 
-          ? theme.palette.background.paper 
+          ? tokens.bg.secondary
           : 'linear-gradient(135deg, rgba(20, 15, 30, 0.7) 0%, rgba(10, 10, 15, 0.9) 100%)',
         backdropFilter: 'blur(25px) saturate(180%)',
         border: isLight 
-          ? `1px solid ${theme.palette.divider}` 
+          ? `1px solid rgba(0,0,0,0.1)` 
           : '1px solid rgba(255, 255, 255, 0.06)',
         borderRadius: isLight ? '8px' : '18px',
         position: 'relative',
