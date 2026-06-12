@@ -6781,20 +6781,75 @@ def map_acunetix_severity(severity):
 	return mapping.get(severity, 0)
 
 
+def _validate_subdomain_name(subdomain_name: str) -> bool:
+	"""
+	Validate subdomain name format before using in API calls.
+
+	Args:
+		subdomain_name: The subdomain to validate
+
+	Returns:
+		bool: True if valid or empty/None (optional parameter)
+
+	Raises:
+		ValueError: If subdomain format is invalid
+	"""
+	if not subdomain_name:
+		return True
+
+	if not validators.domain(subdomain_name, skip_ipv4=False):
+		raise ValueError(f"Invalid subdomain format: {subdomain_name}")
+
+	return True
+
+
+def _build_vuln_detail_url(base_url: str, scan_id: str, session_id: str, vuln_id: str) -> str:
+	"""
+	Build the correct vulnerability detail URL based on available session info.
+
+	AWVS API uses different URL patterns across versions:
+	- With session_id: /scans/{scan_id}/results/{session_id}/vulnerabilities/{vuln_id}
+	- Fallback: /vulnerabilities/{vuln_id}
+
+	Args:
+		base_url: Base Acunetix API URL
+		scan_id: Scan ID
+		session_id: Session or result ID
+		vuln_id: Vulnerability ID
+
+	Returns:
+		str: The correct vulnerability detail endpoint URL
+	"""
+	if scan_id and session_id:
+		return f"{base_url}/api/v1/scans/{scan_id}/results/{session_id}/vulnerabilities/{vuln_id}"
+	return f"{base_url}/api/v1/vulnerabilities/{vuln_id}"
+
+
 def acunetix_scan(
 		self,
 		domain_id,
 		scan_history_id=None,
-		ctx={},
+		ctx=None,
 		description=None,
 		subdomain_name=None,
 		subdomain_http_url=None):
 	"""
 	Run Acunetix (AWVS) scan for the given domain or a subdomain target.
 	"""
+	if ctx is None:
+		ctx = {}
+
 	if not Acunetix:
 		logger.error("Acunetix library not found. Skipping Acunetix scan.")
 		return False
+
+	if subdomain_name:
+		try:
+			_validate_subdomain_name(subdomain_name)
+		except ValueError as e:
+			logger.error(f"Invalid subdomain provided to acunetix_scan: {e}")
+			return False
+
 	logger.info(f"Starting Acunetix scan for domain ID: {domain_id}")
 	scan_history = ScanHistory.objects.get(pk=scan_history_id) if scan_history_id else None
 	domain = Domain.objects.get(pk=domain_id)
@@ -6855,7 +6910,7 @@ def acunetix_scan(
 			
 		# If scan_id wasn't in scan_info, try to find it from scans query by target_id
 		if not scan_id:
-			scans_resp = requests.get(f"{base_url}/api/v1/scans?q=target_id:{target_id}", headers=headers, verify=_acunetix_verify)
+			scans_resp = requests.get(f"{base_url}/api/v1/scans?q=target_id:{target_id}", headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 			if scans_resp.status_code == 200:
 				scans_data = scans_resp.json()
 				scans_list = scans_data.get('scans', [])
@@ -6868,16 +6923,17 @@ def acunetix_scan(
 
 		# Wait for scan to complete
 		# We'll poll /api/v1/scans/{scan_id} directly
-		max_retries = 720  # 12 hours
+		max_retries = settings.ACUNETIX_MAX_RETRIES
+		poll_interval = settings.ACUNETIX_POLL_INTERVAL
 		retries = 0
 		while retries < max_retries:
-			scan_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify)
+			scan_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 			if scan_resp.status_code == 200:
 				scan_data = scan_resp.json()
 				current_session = scan_data.get('current_session', {})
 				current_status = current_session.get('status')
 				logger.info(f"Acunetix scan {scan_id} status: {current_status} (retry {retries}/{max_retries})")
-				
+
 				if current_status == 'completed':
 					logger.info(f"Acunetix scan for {target_name} completed.")
 					break
@@ -6886,8 +6942,8 @@ def acunetix_scan(
 					return False
 			else:
 				logger.warning(f"Failed to fetch scan status for {scan_id}, status code: {scan_resp.status_code}")
-			
-			time.sleep(60)
+
+			time.sleep(poll_interval)
 			retries += 1
 		else:
 			logger.error(f"Acunetix scan for {target_name} timed out after {max_retries} retries.")
@@ -6897,20 +6953,20 @@ def acunetix_scan(
 		vulns_url = None
 		session_id = None
 		# Fetch scan details to get the scan session/result ID (which differs across AWVS versions)
-		scan_detail_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify)
+		scan_detail_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 		if scan_detail_resp.status_code == 200:
 			scan_detail = scan_detail_resp.json()
 			session = scan_detail.get('current_session', {})
 			session_id = session.get('scan_session_id') or session.get('result_id')
 			if session_id:
 				vulns_url = f"{base_url}/api/v1/scans/{scan_id}/results/{session_id}/vulnerabilities"
-		
+
 		if not vulns_url:
 			# Fallback to querying by target_id
 			vulns_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
 
 		logger.info(f"Fetching Acunetix vulnerabilities from: {vulns_url}")
-		vulns_resp = requests.get(vulns_url, headers=headers, verify=_acunetix_verify)
+		vulns_resp = requests.get(vulns_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 		logger.info(f"Acunetix vulnerabilities response code: {vulns_resp.status_code}")
 
 		# If the URL returned 400 or 404, try fallbacks
@@ -6918,14 +6974,14 @@ def acunetix_scan(
 			# Fallback 1: try /api/v1/scans/{scan_id}/vulnerabilities
 			fallback_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
 			logger.info(f"Retrying with fallback 1 URL: {fallback_url}")
-			vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify)
+			vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 			logger.info(f"Fallback 1 response code: {vulns_resp.status_code}")
-			
+
 			# Fallback 2: try querying by target_id
 			if vulns_resp.status_code in [400, 404]:
 				fallback_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
 				logger.info(f"Retrying with fallback 2 URL: {fallback_url}")
-				vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify)
+				vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 				logger.info(f"Fallback 2 response code: {vulns_resp.status_code}")
 
 		if vulns_resp.status_code == 200:
@@ -6933,20 +6989,14 @@ def acunetix_scan(
 			v_list = vulns_data.get('vulnerabilities', [])
 			logger.info(f"Found {len(v_list)} vulnerabilities in Acunetix scan report.")
 			for vuln in v_list:
-				# Get full details for each vuln
-				vuln_detail_url = None
-				if scan_id and session_id:
-					vuln_detail_url = f"{base_url}/api/v1/scans/{scan_id}/results/{session_id}/vulnerabilities/{vuln['vuln_id']}"
-				
+				# Get full details for each vuln using helper function for URL building
+				vuln_detail_url = _build_vuln_detail_url(base_url, scan_id, session_id, vuln['vuln_id'])
+
 				# Try session-scoped URL first, fallback to global URL if needed
-				if vuln_detail_url:
-					vuln_detail_resp = requests.get(vuln_detail_url, headers=headers, verify=_acunetix_verify)
-					if vuln_detail_resp.status_code == 404:
-						global_url = f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}"
-						vuln_detail_resp = requests.get(global_url, headers=headers, verify=_acunetix_verify)
-				else:
+				vuln_detail_resp = requests.get(vuln_detail_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
+				if vuln_detail_resp.status_code == 404:
 					global_url = f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}"
-					vuln_detail_resp = requests.get(global_url, headers=headers, verify=_acunetix_verify)
+					vuln_detail_resp = requests.get(global_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 
 				if vuln_detail_resp.status_code == 200:
 					v_detail = vuln_detail_resp.json()

@@ -474,9 +474,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             setPage(1);
             setSelectedAssets([]);
           }}
+          disabled={isLoading}
           sx={{
             bgcolor: hasIpFilter ? 'rgba(0, 243, 255, 0.2)' : 'transparent',
             color: hasIpFilter ? '#00f3ff' : 'rgba(255, 255, 255, 0.6)',
+            opacity: isLoading ? 0.6 : 1,
             px: 3,
             borderRadius: 0,
             fontWeight: 700,
@@ -486,7 +488,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.15)' }
           }}
         >
-          {hasIpFilter ? 'HAS IP [ON]' : 'HAS IP'}
+          {isLoading ? 'LOADING...' : hasIpFilter ? 'HAS IP [ON]' : 'HAS IP'}
         </Button>
       </Box>
 
@@ -595,6 +597,15 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 </th>
                 <th
                   onClick={() => handleSort('1')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSort('1');
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Sort by subdomain${sortCol === '1' ? (sortDir === 'asc' ? ', ascending' : ', descending') : ''}`}
                   style={{
                     padding: '12px 16px',
                     color: '#00f3ff',
@@ -611,6 +622,15 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 <Box
                   component="th"
                   onClick={() => handleSort('4')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSort('4');
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Sort by status${sortCol === '4' ? (sortDir === 'asc' ? ', ascending' : ', descending') : ''}`}
                   sx={{
                     display: { xs: 'none', sm: 'table-cell' },
                     padding: '12px 16px',
@@ -630,6 +650,15 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 <Box
                   component="th"
                   onClick={() => handleSort('8')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSort('8');
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Sort by content${sortCol === '8' ? (sortDir === 'asc' ? ', ascending' : ', descending') : ''}`}
                   sx={{
                     display: { xs: 'none', xl: 'table-cell' },
                     padding: '12px 16px',
@@ -647,6 +676,15 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 <Box
                   component="th"
                   onClick={() => handleSort('10')}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleSort('10');
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Sort by time${sortCol === '10' ? (sortDir === 'asc' ? ', ascending' : ', descending') : ''}`}
                   sx={{
                     display: { xs: 'none', lg: 'table-cell' },
                     padding: '12px 16px',
