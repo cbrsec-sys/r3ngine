@@ -7621,6 +7621,8 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 		if os.path.exists(filepath):
 			return True, filepath # Already downloaded
 
+		logger.warning("[SEMGREP] Downloading file: %s", full_url)
+
 		# Try downloading the URL, with proxy cycling on failure (capped at max 5 to prevent stalls)
 		max_retries = min(5, len(available_proxies)) if use_proxy and available_proxies else 1
 		if max_retries < 1:
@@ -7652,6 +7654,7 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 					
 					with open(filepath, 'wb') as f:
 						f.write(content)
+					logger.warning("[SEMGREP] Download complete: %s", full_url)
 					return True, filepath
 				elif resp.status_code in [407, 502, 503, 504]:
 					# Proxy connection/auth issues, cycle and retry
