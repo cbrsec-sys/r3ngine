@@ -14,6 +14,7 @@ Severity mapping (matches Vulnerability.severity IntegerField):
 import json
 import logging
 import os
+import re
 import socket
 import subprocess
 from typing import List, Optional
@@ -438,7 +439,20 @@ def searchsploit_scan(self, scan_history_id: int, service: str,
         vulns = []
         for exploit in exploits[:20]:
             name = exploit.get('Title', 'Exploit Found')
-            desc_llm, impact_llm, remediation_llm = _enrich_finding_with_llm(name)
+            
+            # Extract CVE to ensure accurate LLM caching and NVD lookup
+            cve_id = None
+            codes = exploit.get('Codes', '')
+            match = re.search(r'CVE-\d{4}-\d+', codes, re.IGNORECASE)
+            if match:
+                cve_id = match.group(0).upper()
+            else:
+                match = re.search(r'CVE-\d{4}-\d+', name, re.IGNORECASE)
+                if match:
+                    cve_id = match.group(0).upper()
+            
+            enrich_key = cve_id if cve_id else name
+            desc_llm, impact_llm, remediation_llm = _enrich_finding_with_llm(enrich_key)
             
             base_desc = exploit.get('Description', '')
             if desc_llm:

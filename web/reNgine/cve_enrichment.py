@@ -83,8 +83,7 @@ class CVEEnrichmentService:
             if re.match(r'^\d{4}-\d+$', cve_name):
                 cve_name = 'CVE-' + cve_name
             else:
-                logger.warning("Invalid CVE format: %s", cve_name)
-                return None
+                logger.debug("Non-CVE format detected: %s, proceeding with lookups anyway", cve_name)
         
         # Get or create CVE record
         cve_obj, created = CveId.objects.get_or_create(name=cve_name)

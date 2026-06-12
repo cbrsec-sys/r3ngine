@@ -261,7 +261,11 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
 
     _scan_id = ctx.get('scan_history_id')
     _domain = ctx.get('domain_name', '')
-    logger.log_line("[TEMPORAL]", "START", "task=%s scan_id=%s domain=%s" % (task_name, _scan_id, _domain))
+    try:
+        _workflow_id = activity.info().workflow_id
+    except Exception:
+        _workflow_id = '?'
+    logger.log_line("[TEMPORAL]", "START", "task=%s scan_id=%s domain=%s workflow_id=%s" % (task_name, _scan_id, _domain, _workflow_id))
 
     activity_running = True
     cancel_event = threading.Event()
@@ -279,10 +283,12 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
             from temporalio.exceptions import CancelledError as TemporalCancelledError
             while activity_running:
                 try:
-                    activity.heartbeat(
-                        f"Activity {task_name} running for {proxy.task_name}"
+                    _hb_detail = f"Activity {task_name} running for {proxy.task_name}"
+                    activity.heartbeat(_hb_detail)
+                    logger.log_line(
+                        "[TEMPORAL]", "HEARTBEAT",
+                        "activity_type=%s workflow_id=%s scan_id=%s" % (task_name, _workflow_id, _scan_id),
                     )
-                    activity.logger.debug(f"[_run_task] Sent heartbeat for {task_name}")
                 except TemporalCancelledError:
                     # Temporal has cancelled this activity — propagate by marking
                     # the scan aborted so the stream_command kill switch fires.
@@ -305,7 +311,13 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
                     cancel_event.set()  # signal stream_command/run_command to abort
                     return  # stop heartbeating; kill switch will stop the subprocess
                 except Exception as hb_err:
-                    activity.logger.warning(f"[_run_task] Heartbeat failed: {hb_err}")
+                    logger.log_line(
+                        "[TEMPORAL]", "HEARTBEAT_FAIL",
+                        "activity_type=%s workflow_id=%s scan_id=%s error=%s" % (
+                            task_name, _workflow_id, _scan_id, hb_err,
+                        ),
+                        level="warning",
+                    )
 
                 for _ in range(6):  # 6 * 5s = 30s, checking flag each iteration
                     if not activity_running:
@@ -1996,7 +2008,17 @@ def run_stress_tool_activity(ctx: dict) -> dict:
                             )
                             _terminate_process()
                             break
-                        activity.logger.warning(f"[RunStressToolActivity] Heartbeat failed: {hb_err}")
+                        try:
+                            _info = activity.info()
+                            activity.logger.warning(
+                                "[RunStressToolActivity] Heartbeat failed — "
+                                "activity_type=%s workflow_id=%s attempt=%d tool=%s error=%s",
+                                _info.activity_type, _info.workflow_id, _info.attempt, tool, hb_err,
+                            )
+                        except Exception:
+                            activity.logger.warning(
+                                "[RunStressToolActivity] Heartbeat failed for %s: %s", tool, hb_err
+                            )
                 stop_heartbeat.wait(15)
         _activity_ctx.run(_do_heartbeat)
 
@@ -2314,7 +2336,7 @@ def setup_scheduled_scan_activity(params: dict) -> dict:
     gf_patterns = config.get(GF_PATTERNS, [])
     api_discovery_config = config.get(WEB_API_DISCOVERY, {})
     api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
-    kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
+    kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
     if gf_patterns and 'fetch_url' in tasks:
         scan.used_gf_patterns = ','.join(gf_patterns)

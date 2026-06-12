@@ -229,7 +229,7 @@ def initiate_scan_temporal(
 		gf_patterns = config.get(GF_PATTERNS, [])
 		api_discovery_config = config.get(WEB_API_DISCOVERY, {})
 		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
-		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
+		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
 		# ---- Get domain ----
 		domain = Domain.objects.get(pk=domain_id)
@@ -526,7 +526,7 @@ def initiate_subscan_temporal(
 		# ---- Get web_api_discovery config ----
 		api_discovery_config = config.get(WEB_API_DISCOVERY, {})
 		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
-		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
+		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
 		# ---- Create scan activity records of SubScan Model ----
 		subscans_info = []
@@ -3224,7 +3224,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	scan_id = ctx.get('scan_history_id')
 	config = self.yaml_configuration.get(WEB_API_DISCOVERY) or {}
 	uses_tools = ctx.get('api_discovery_tools') or config.get(USES_TOOLS, ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'semgrep'])
-	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
+	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
 	arjun_methods = config.get(ARJUN_METHODS, ARJUN_DEFAULT_METHODS)

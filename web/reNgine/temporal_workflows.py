@@ -432,8 +432,13 @@ class MasterScanWorkflow:
             # TIER 3a: HTTP Crawl Bridge
             # Runs only if fetch_url is in tasks. Probes newly discovered endpoints
             # and dead/not-alive ones for HTTP/HTTPS responses and technologies.
+            #
+            # workflow.patched() guards this block so that workflows started
+            # BEFORE this activity was introduced replay their recorded history
+            # (RunDirFileFuzzActivity directly after fetch_url) without hitting a
+            # nondeterminism error.  New workflows always execute the bridge.
             # ------------------------------------------------------------------
-            if "fetch_url" in tasks:
+            if "fetch_url" in tasks and workflow.patched("add-http-crawl-bridge"):
                 await workflow.execute_activity(
                     "RunHTTPCrawlBridgeActivity",
                     ctx,

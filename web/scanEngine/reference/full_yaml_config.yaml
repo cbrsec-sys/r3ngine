@@ -267,7 +267,7 @@ web_api_discovery:
   scan_only_active: true
   threads: 30
   timeout: 5
-  kiterunner_wordlist: routes-large.kite  # kiterunner routes wordlist
+  kr_wordlist: routes-small.kite  # kiterunner routes wordlist (routes-large.kite for full scans)
   arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
   use_api_wordlist: false     # Use API wordlist for dir_file_fuzz integration
 
