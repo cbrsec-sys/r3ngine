@@ -118,6 +118,7 @@ The plugin system supports dynamic installation, signed `.r3n` packages with Ed2
 
 * [About r3ngine](#about-r3ngine)
 * [Workflow](#workflow)
+* [Project Schema](#project-schema)
 * [Features](#features)
 * [Quick Installation](#quick-installation)
 * [Administration & Recovery](#-administration--recovery)
@@ -167,39 +168,48 @@ flowchart TD
     end
 
     LC --> F1(( ))
-    F1 --> SD & AI & FW & OS & SF
+    F1 --> SD & AI & FW & DNS & OS & SF & BD
 
     subgraph T1["🔍 Tier 1 — Discovery  ·  all parallel"]
         direction TB
         SD[RunSubdomainDiscoveryActivity]
         AI[RunAmassIntelDiscoveryActivity]
         FW[RunFirewallVPNScanActivity]
+        DNS[RunDNSSecurityActivity]
         OS["RunGenericTaskActivity · osint"]
-        SF["RunGenericTaskActivity · spiderfoot_scan\n─ requires yaml spiderfoot_scan block"]
+        SF["RunGenericTaskActivity · spiderfoot_scan
+─ requires yaml spiderfoot_scan block"]
+        BD["RunGenericTaskActivity · subdomain_discovery
+uses_tools: [baddns]"]
     end
 
-    SD & AI & FW & OS & SF --> J1(( ))
+    SD & AI & FW & DNS & OS & SF & BD --> J1(( ))
     J1 --> PDR[ParseDiscoveryResultsActivity]
     PDR --> CP1{{"⏸ Pause Checkpoint"}}
 
     CP1 --> F2(( ))
-    F2 --> HC & PS
+    F2 --> HC & PS & VD
 
-    subgraph T2["🌐 Tier 2 — HTTP Crawl · Port Scan ·  all parallel"]
+    subgraph T2["🌐 Tier 2 — Endpoint Discovery  ·  all parallel"]
         direction TB
-        HC["RunHTTPCrawlActivity\n─ global config · feeds Tiers 3 & 4"] --> PHC[ParseHTTPCrawlResultsActivity]
+        HC["RunHTTPCrawlActivity
+via SeedEndpointsForCrawlActivity"] --> PHC[ParseHTTPCrawlResultsActivity]
         PS[RunPortScanActivity]
+        VD["RunVigoliumDiscoveryActivity
+─ requires vigolium_discovery.run_vigolium_discovery"]
     end
 
-    PHC & PS --> J2(( ))
-    J2 --> FU
+    PHC & PS & VD --> PT2[Dispatch tier_2 plugins]
+    PT2 --> F3(( ))
+    F3 --> FU & SS
 
-    subgraph T3["🔗 Tier 3 — URL Fetching  ·  sequential"]
+    subgraph T3["🔗 Tier 3 — URL Fetching + Screenshot  ·  parallel"]
         direction TB
         FU[RunFetchURLActivity]
+        SS[RunScreenshotActivity]
     end
 
-    FU --> DFF
+    FU & SS --> DFF
 
     subgraph T4["📁 Tier 4 — Directory & File Fuzzing  ·  sequential"]
         direction TB
@@ -209,54 +219,68 @@ flowchart TD
     PFF --> PER[ParseEnumerationResultsActivity]
     PER --> CP2{{"⏸ Pause Checkpoint"}}
 
-    CP2 --> F3(( ))
-    F3 --> WAD & WD & SEC
+    CP2 --> F4(( ))
+    F4 --> WAD & WD & SEC & VA
 
     subgraph T5["🔬 Tier 5 — Analysis  ·  all parallel"]
         direction TB
         WAD[RunWebAPIDiscoveryActivity]
         WD[RunWAFDetectionActivity]
         SEC[RunSecretScanningActivity]
+        VA["RunVigoliumAnalysisActivity
+─ requires vigolium_analysis.run_vigolium_analysis"]
     end
 
-    WAD & WD & SEC --> J3(( ))
+    WAD & WD & SEC & VA --> J3(( ))
     J3 --> PAR[ParseAnalysisResultsActivity]
     PAR --> CP3{{"⏸ Pause Checkpoint"}}
 
-    CP3 --> F4(( ))
-    F4 --> NUC & WB & BF & SS
+    CP3 --> NUC
 
-    subgraph T6["🎯 Tier 6 — Assessment · BruteForcing · WAFBypass · Nuclei · Screenshot   ·  all parallel"]
+    subgraph T6["🎯 Tier 6 — Security Assessment"]
         direction TB
-        subgraph NP["NucleiPlannerWorkflow · child workflow"]
+        subgraph NP["NucleiPlannerWorkflow · child workflow · runs first"]
             direction TB
-            NUC[RunVulnerabilityScanActivity]
+            NUC[RunNucleiActivity / vuln stage chain]
         end
+        NUC --> G6(( ))
+        G6 --> WB & VS
         WB[RunWAFBypassActivity]
-        BF[RunBruteForceScanActivity]
-        SS[RunScreenshotActivity]
+        VS["RunVigoliumScanActivity
+─ requires vulnerability_scan.run_vigolium"]
     end
 
-    SS & NUC & WB & BF --> J4(( ))
-    J4 --> PASM[ParseAssessmentResultsActivity]
+    WB & VS --> PASM[ParseAssessmentResultsActivity]
     PASM --> CP4{{"⏸ Pause Checkpoint"}}
 
     CP4 --> CV
 
     subgraph T7["🧠 Tier 7 — Intelligence  ·  sequential"]
         direction TB
-        CV[CorrelateVulnerabilitiesActivity] --> CR[CalculateRiskScoresActivity]
-        CR --> GI["GenerateImpactAssessmentActivity\n─ requires enable_ai_impact_analysis: true"]
-        GI --> SG["SyncGraphActivity  ·  APME + Neo4j\n─ requires attack_path_modeling.enabled: true"]
+        CV[CorrelateVulnerabilitiesActivity]
+        EC[EnrichScanCVEsActivity]
+        CR[CalculateRiskScoresActivity]
+        GI[GenerateImpactAssessmentActivity]
+        SG[SyncGraphActivity]
+        APME["RunGenericTaskActivity · run_apme"]
+        CV --> EC --> CR --> GI --> SG --> APME
     end
 
-    SG --> SN[SendScanNotificationActivity]
+    APME --> SN[SendScanNotificationActivity]
     SN --> DONE([✓ Scan Complete])
 ```
 
 > `(( ))` = fork/join (parallel branch split/rejoin) &nbsp;·&nbsp; `{{"⏸"}}` = pause checkpoint (workflow waits for `resume` signal) &nbsp;·&nbsp; `─ requires` = only runs when the noted YAML flag is set
 >
 > Full tier reference and execution notes: [`.github/workflows/temporal-scan-flow.md`](.github/workflows/temporal-scan-flow.md)
+>
+> Project-wide code navigation map for contributors and AI agents: [`documents/PROJECT_SCHEMA.md`](documents/PROJECT_SCHEMA.md)
+
+## Project Schema
+
+`documents/PROJECT_SCHEMA.md` is a living architecture map that explains ownership boundaries, workflow inventory, request paths, and which folders usually matter for a given change.
+
+AI-specific onboarding entrypoints are also available in `AGENTS.md`, `CLAUDE.md`, and `.cursorrules` for low-token handoff into other assistants.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 

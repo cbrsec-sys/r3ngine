@@ -40,6 +40,11 @@ DEFAULT_HTTP_TIMEOUT = env.int('DEFAULT_HTTP_TIMEOUT', default=5) # seconds
 DEFAULT_RETRIES = env.int('DEFAULT_RETRIES', default=1)
 DEFAULT_THREADS = env.int('DEFAULT_THREADS', default=30)
 DEFAULT_GET_GPT_REPORT = env.bool('DEFAULT_GET_GPT_REPORT', default=True)
+
+# Acunetix (AWVS) Configuration
+ACUNETIX_POLL_INTERVAL = env.int('ACUNETIX_POLL_INTERVAL', default=30)  # seconds
+ACUNETIX_MAX_RETRIES = env.int('ACUNETIX_MAX_RETRIES', default=720)     # 12 hours
+ACUNETIX_REQUEST_TIMEOUT = env.int('ACUNETIX_REQUEST_TIMEOUT', default=30)  # seconds
 VITE_DEV_SERVER_URL = env('VITE_DEV_SERVER_URL', default='https://localhost:5173')
 VITE_ENABLED = env.bool('VITE_ENABLED', default=DEBUG)
 

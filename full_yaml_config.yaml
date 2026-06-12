@@ -306,7 +306,7 @@ vulnerability_scan:
   run_nuclei: true
   run_dalfox: true
   run_crlfuzz: true
-  run_acunetix: true
+  run_acunetix: true                 # Requires AcunetixAPIKey configured in Django admin
   run_wpscan: true
   run_wptaint_scan: true
   run_s3scanner: true
@@ -318,6 +318,26 @@ vulnerability_scan:
   retries: 1
   timeout: 5
   fetch_gpt_report: true
+
+  # Acunetix (AWVS) Configuration
+  # These settings control how vulnerability scans interact with Acunetix
+  acunetix:
+    # Maximum time to wait for a scan to complete (in seconds)
+    # Default: 43200 (12 hours)
+    # Env var: ACUNETIX_MAX_RETRIES (value is number of 30-second intervals)
+    max_retries: 720
+
+    # Interval between scan status polls (in seconds)
+    # Default: 30 seconds
+    # Increase this if your Acunetix instance is slow or has rate limits
+    # Env var: ACUNETIX_POLL_INTERVAL
+    poll_interval: 30
+
+    # Timeout for individual Acunetix API requests (in seconds)
+    # Default: 30 seconds
+    # Increase for slow networks or large scans
+    # Env var: ACUNETIX_REQUEST_TIMEOUT
+    request_timeout: 30
 
   nuclei:
     use_nuclei_config: false
