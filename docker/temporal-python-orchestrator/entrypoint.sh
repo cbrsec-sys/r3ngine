@@ -2,16 +2,13 @@
 # Entrypoint for the Temporal Python Orchestrator container.
 # Handles one-time setup (wordlists, templates, tools) then starts the Temporal worker.
 
-# Ensure OpenSSL compatibility
-pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
+
 
 
 python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.InterestingLookupModel
 python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
 
-# TEMPORARY FIX FOR langchain
-pip install requests==2.32.3 "urllib3>=1.26.0,<3.0.0" "charset-normalizer>=3.0.0,<4.0.0" "chardet>=5.0.0,<6.0.0"
-pip install tenacity==8.2.2
+
 
 # Temporary fix for whatportis bug
 sed -i 's/purge()/truncate()/g' "$(python3 -c "import whatportis.cli; print(whatportis.cli.__file__)")"
@@ -165,9 +162,7 @@ fi
 # httpx alias
 echo 'alias httpx="/usr/local/bin/httpx"' >> ~/.bashrc
 
-# TEMPORARY FIX FOR langchain
-pip install requests==2.32.3 "urllib3>=1.26.0,<3.0.0" "charset-normalizer>=3.0.0,<4.0.0" "chardet>=5.0.0,<6.0.0"
-pip3 install tenacity==8.2.2
+
 
 echo "Starting Temporal Python Orchestrator..."
 exec python3 /usr/src/app/manage.py run_temporal_orchestrator

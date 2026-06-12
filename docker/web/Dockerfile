@@ -5,7 +5,8 @@
 FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
 COPY frontend/ ./
 RUN npm run build
 
@@ -30,7 +31,9 @@ ENV GO111MODULE=on
 
 # All tools in one RUN: single cache-invalidation point, no intermediate layers
 # retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols. 
-RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && \
     go install -ldflags="-s -w" -v github.com/jaeles-project/gospider@latest && \
     go install -ldflags="-s -w" -v github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006 && \
     go install -ldflags="-s -w" -v github.com/tomnomnom/unfurl@latest && \
@@ -59,11 +62,12 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/Chocapikk/wpprobe@latest && \
     go install -ldflags="-s -w" -v github.com/hueristiq/xurlfind3r/cmd/xurlfind3r@latest && \
     go install -ldflags="-s -w" -v github.com/edoardottt/cariddi/cmd/cariddi@latest && \
-    go install -ldflags="-s -w" -v github.com/dimasma0305/wp-taint-scan/cmd/taint-scan@latest && \
-    rm -rf /go/pkg /root/.cache/go-build
+    go install -ldflags="-s -w" -v github.com/dimasma0305/wp-taint-scan/cmd/taint-scan@latest
 
 # betterleaks has no published go install path — clone and build directly.
-RUN git clone --depth 1 https://github.com/betterleaks/betterleaks /tmp/betterleaks && \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    git clone --depth 1 https://github.com/betterleaks/betterleaks /tmp/betterleaks && \
     cd /tmp/betterleaks && make build && \
     cp betterleaks /go/bin/betterleaks && \
     rm -rf /tmp/betterleaks
@@ -80,10 +84,12 @@ FROM golang:1.25-bookworm AS executor-builder
 WORKDIR /build
 # Copy executor source from the repo root context
 COPY web/executor/go.mod web/executor/go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 COPY web/executor/ ./
-RUN CGO_ENABLED=0 GO111MODULE=on go build -ldflags="-s -w" -o /usr/local/bin/r3ngine-executor . && \
-    rm -rf /root/.cache/go-build /go/pkg
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GO111MODULE=on go build -ldflags="-s -w" -o /usr/local/bin/r3ngine-executor .
 
 # ===========================================================================
 # Stage: Vigolium Builder
@@ -112,8 +118,10 @@ WORKDIR /build/vigolium
 RUN make ensure-audit && make ensure-jsscan
 
 # Compile vigolium binary
-RUN go build -ldflags="-s -w" -o /usr/local/bin/vigolium ./cmd/vigolium && \
-    rm -rf /root/.cache/go-build /root/.bun /go/pkg /build/vigolium
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -ldflags="-s -w" -o /usr/local/bin/vigolium ./cmd/vigolium && \
+    rm -rf /build/vigolium
 
 
 # ===========================================================================
@@ -137,7 +145,10 @@ RUN git clone --depth 1 https://github.com/hahwul/dalfox /tmp/dalfox
 
 WORKDIR /tmp/dalfox
 
-RUN cargo build --release && \
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/tmp/dalfox/target \
+    cargo build --release && \
     cp target/release/dalfox /usr/local/bin/dalfox
 
 
@@ -448,17 +459,20 @@ RUN git clone --depth 1 https://github.com/ticarpi/jwt_tool /usr/src/github/jwt_
 # all pipx shims are immediately available to subsequent RUN steps and at
 # container runtime without any additional PATH configuration.
 # ---------------------------------------------------------------------------
-RUN pip3 install --upgrade pip setuptools wheel pyOpenSSL h8mail && \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install --upgrade pip setuptools wheel pyOpenSSL h8mail && \
     pip3 install --upgrade fierce dirsearch meson ninja arjun inql netlas holehe
 
 # Ensure pipx is available and install baddns
-RUN python3 -m pip install pipx && \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python3 -m pip install pipx && \
     pipx install git+https://github.com/blacklanternsecurity/baddns
 
 # Install conflicting tools in isolated pipx environments.
 # Each venv gets setuptools installed via its own pip to guarantee pkg_resources
 # is available under Python 3.12 (pipx inject can be silently skipped by layer cache).
-RUN pipx install maigret && \
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pipx install maigret && \
     pipx inject maigret setuptools && \
     pipx install semgrep && \
     pipx inject semgrep setuptools && \
@@ -513,7 +527,8 @@ RUN git clone --depth 1 https://github.com/CiscoCXSecurity/rdp-sec-check /usr/sr
 # changes don't invalidate the tool-install cache layers above.
 # ---------------------------------------------------------------------------
 COPY web/requirements.txt /tmp/requirements.txt
-RUN pip3 install -r /tmp/requirements.txt --ignore-installed blinker
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install -r /tmp/requirements.txt --ignore-installed blinker
 
 # pip's httpx Python package installs a CLI wrapper at /usr/local/bin/httpx that
 # overwrites the ProjectDiscovery Go tool copied earlier. Restore the Go binary.

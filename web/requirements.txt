@@ -66,3 +66,4 @@ git+https://github.com/MatrixTM/PyRoxy.git
 icmplib==3.0.4
 impacket==0.13.1
 typing_extensions>=4.0.0
+tenacity==8.2.2
