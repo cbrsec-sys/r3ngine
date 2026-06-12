@@ -1425,13 +1425,8 @@ class AddTarget(APIView):
 		if not cleaned_targets:
 			return Response({'status': False, 'message': 'No valid targets provided'}, status=status.HTTP_400_BAD_REQUEST)
 
-		# The first entry becomes the main target name
-		primary_target = cleaned_targets[0]
-		secondary_domains_list = []
-		in_scope_ips_list = []
-
-		# Handle extended target types that bulk_import_targets cannot auto-detect
-		# (email, username, phone, cidr, crypto_address, code_path).
+		# Handle extended target types (email, username, phone, cidr, crypto_address, code_path)
+		# and regular targets by processing them individually to create separate primary targets.
 		from reNgine.target_router import infer_target_type
 		from reNgine.definitions import (
 			TARGET_TYPE_EMAIL, TARGET_TYPE_USERNAME, TARGET_TYPE_PHONE,
@@ -1439,97 +1434,71 @@ class AddTarget(APIView):
 		)
 		from targetApp.models import Domain as _Domain
 		from dashboard.models import Project as _Project
+		from django.utils import timezone as _tz
 
 		_EXTENDED_TYPES = {
 			TARGET_TYPE_EMAIL, TARGET_TYPE_USERNAME, TARGET_TYPE_PHONE,
 			TARGET_TYPE_CIDR, TARGET_TYPE_CRYPTO_ADDRESS, TARGET_TYPE_CODE_PATH,
 		}
-		effective_type = explicit_target_type or infer_target_type(primary_target)
 
-		if effective_type in _EXTENDED_TYPES:
-			try:
-				project = _Project.objects.get(slug=slug)
-			except _Project.DoesNotExist:
-				return Response({'status': False, 'message': 'Project not found'}, status=status.HTTP_400_BAD_REQUEST)
-			from django.utils import timezone as _tz
-			target_obj, _ = _Domain.objects.get_or_create(
-				name=primary_target,
-				defaults={
-					'description': description or '',
-					'project': project,
-					'insert_date': _tz.now(),
-					'target_type': effective_type,
-				}
-			)
-			if not _:
-				# Existed already — update target_type if changed
-				if target_obj.target_type != effective_type:
-					target_obj.target_type = effective_type
-					target_obj.save(update_fields=['target_type'])
-			return Response({
-				'status': True,
-				'message': f'Target {primary_target} ({effective_type}) created successfully.',
-			})
+		try:
+			project = _Project.objects.get(slug=slug)
+		except _Project.DoesNotExist:
+			return Response({'status': False, 'message': 'Project not found'}, status=status.HTTP_400_BAD_REQUEST)
 
-		# Loop through subsequent items and classify them as In-Scope IPs or Secondary Domains
-		# IP checks are done via simple validator logic or typical patterns (checking for digits, colons, CIDRs)
-		import ipaddress
-		for extra in cleaned_targets[1:]:
-			# Check if it's an IP, CIDR block, or IP range
-			is_ip_or_range = False
-			try:
-				# Check if CIDR or single IP
-				if '/' in extra:
-					ipaddress.ip_network(extra, strict=False)
-					is_ip_or_range = True
+		regular_targets = []
+		extended_targets_created = 0
+
+		for target_name in cleaned_targets:
+			effective_type = explicit_target_type or infer_target_type(target_name)
+			if effective_type in _EXTENDED_TYPES:
+				target_obj, created = _Domain.objects.get_or_create(
+					name=target_name,
+					defaults={
+						'description': description or '',
+						'project': project,
+						'insert_date': _tz.now(),
+						'target_type': effective_type,
+					}
+				)
+				if not created:
+					if target_obj.target_type != effective_type:
+						target_obj.target_type = effective_type
+						target_obj.save(update_fields=['target_type'])
 				else:
-					ipaddress.ip_address(extra)
-					is_ip_or_range = True
-			except ValueError:
-				# Fallback regex check for standard IP/CIDR/range representations if parsing fails
-				if re.match(r'^[\d\.\:\/\-]+$', extra):
-					is_ip_or_range = True
-
-			if is_ip_or_range:
-				in_scope_ips_list.append(extra)
+					extended_targets_created += 1
 			else:
-				secondary_domains_list.append(extra)
+				regular_targets.append({'name': target_name, 'description': description})
 
-		# Format manually parsed lists as newline-separated text strings
-		in_scope_ips_str = '\n'.join(in_scope_ips_list) if in_scope_ips_list else None
-		secondary_domains_str = '\n'.join(secondary_domains_list) if secondary_domains_list else None
+		status_import = False
+		if regular_targets:
+			status_import = bulk_import_targets(
+				targets=regular_targets,
+				organization_name=organization_name,
+				h1_team_handle=h1_team_handle,
+				project_slug=slug,
+				is_monitored=is_monitored,
+				monitor_frequency=monitor_frequency,
+				monitor_engine_id=monitor_engine_id,
+				monitor_scan_scope=monitor_scan_scope,
+				starting_point_path=starting_point_path,
+				excluded_paths=excluded_paths,
+				in_scope_ips=None,
+				secondary_domains=None
+			)
 
-		targets_to_import = [{'name': primary_target, 'description': description}]
-
-		status_import = bulk_import_targets(
-			targets=targets_to_import,
-			organization_name=organization_name,
-			h1_team_handle=h1_team_handle,
-			project_slug=slug,
-			is_monitored=is_monitored,
-			monitor_frequency=monitor_frequency,
-			monitor_engine_id=monitor_engine_id,
-			monitor_scan_scope=monitor_scan_scope,
-			starting_point_path=starting_point_path,
-			excluded_paths=excluded_paths,
-			in_scope_ips=in_scope_ips_str,
-			secondary_domains=secondary_domains_str
-		)
-
-		if status_import:
-			msg = f'Target {primary_target} successfully created as a single entry'
-			if secondary_domains_list or in_scope_ips_list:
-				msg += f' with {len(secondary_domains_list)} secondary domains and {len(in_scope_ips_list)} in-scope IPs.'
-			else:
-				msg += '.'
+		if status_import or extended_targets_created > 0:
+			msg = f'Successfully created {len(cleaned_targets)} target{"s" if len(cleaned_targets) > 1 else ""}.'
 			return Response({
 				'status': True,
 				'message': msg,
 			})
 		return Response({
 			'status': False,
-			'message': 'Failed to add target! It may already exist or is invalid.'
+			'message': 'Failed to add targets! They may already exist or are invalid.'
 		})
+
+
 
 
 class UpdateTarget(APIView):
