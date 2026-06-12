@@ -164,6 +164,7 @@ INSTALLED_APPS = [
     'apme.apps.ApmeConfig',
     'channels',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
 ]
 
@@ -264,6 +265,17 @@ REST_FRAMEWORK = {
 
 SWAGGER_SETTINGS = {
     'DEFAULT_INFO': 'reNgine.openapi_info.info',
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': 'JWT token — prefix with "Bearer ": `Bearer <token>`',
+        }
+    },
+    'USE_SESSION_AUTH': True,
+    'LOGIN_URL': '/login/',
+    'LOGOUT_URL': '/logout/',
 }
 WSGI_APPLICATION = 'reNgine.wsgi.application'
 ASGI_APPLICATION = 'reNgine.routing.application'
@@ -549,8 +561,6 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     r'^/mapi/auth/token/',
     r'^/mapi/auth/token/refresh/',
     r'^/mapi/.*$',
-    r'^/swagger/',
-    r'^/redoc/',
 ]
 
 from datetime import timedelta
@@ -558,7 +568,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': False,
+    'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),

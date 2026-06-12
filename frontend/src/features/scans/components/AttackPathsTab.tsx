@@ -33,12 +33,13 @@ import {
   useAttackPaths, 
   useTriggerAttackPathModeling,
   useRecalculateAttackPaths,
+  useExplainAttackPath,
   type AttackPath, 
   type AttackStep,
   type EnrichedNode
 } from '../api/useAttackPaths';
 import { TacticalPanel } from '../../../components/TacticalPanel';
-import { Bot } from 'lucide-react';
+import { Bot, Brain } from 'lucide-react';
 
 // ─── Risk → color mapping ────────────────────────────────────────────────────
 const RISK_COLOR: Record<string, string> = {
@@ -313,6 +314,19 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
   const riskColor = RISK_COLOR[path.risk] ?? RISK_COLOR.unknown;
   const validatedCount = path.steps.filter((s) => s.validated).length;
   const inferredCount = path.steps.length - validatedCount;
+  const { scanId: scanIdStr } = useParams({ strict: false });
+  const scanId = Number(scanIdStr);
+  const explainMutation = useExplainAttackPath();
+
+  const handleExplain = async () => {
+    if (!scanId || !path.path_id) return;
+    try {
+      await explainMutation.mutateAsync({ pathId: path.path_id, scanId });
+    } catch (err) {
+      console.error('Failed to generate path explanation', err);
+    }
+  };
+
 
   return (
     <Box
@@ -476,6 +490,78 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
               {path.potential_impact}
             </Typography>
           </Box>
+
+          {/* Explain Path Section */}
+          <Box
+            sx={{
+              mb: 3,
+              p: 2,
+              borderRadius: 1.5,
+              bgcolor: 'rgba(0, 243, 255, 0.02)',
+              border: '1px solid rgba(0, 243, 255, 0.08)',
+            }}
+          >
+            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography
+                sx={{
+                  fontSize: '0.62rem',
+                  color: '#00f3ff',
+                  fontWeight: 900,
+                  fontFamily: 'Orbitron',
+                  letterSpacing: 1,
+                }}
+              >
+                TACTICAL AI EXPLANATION
+              </Typography>
+              {!path.explanation && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={handleExplain}
+                  disabled={explainMutation.isPending}
+                  startIcon={explainMutation.isPending ? <CircularProgress size={10} color="inherit" /> : <Brain size={12} />}
+                  sx={{
+                    fontSize: '0.55rem',
+                    height: 20,
+                    borderColor: 'rgba(0,243,255,0.3)',
+                    color: '#00f3ff',
+                    fontFamily: 'Orbitron',
+                    '&:hover': {
+                      borderColor: '#00f3ff',
+                      bgcolor: 'rgba(0,243,255,0.05)',
+                    },
+                  }}
+                >
+                  {explainMutation.isPending ? 'GENERATING...' : 'EXPLAIN THIS'}
+                </Button>
+              )}
+            </Stack>
+            {path.explanation ? (
+              <Typography
+                sx={{
+                  fontSize: '0.74rem',
+                  color: 'rgba(255,255,255,0.8)',
+                  lineHeight: 1.6,
+                  whiteSpace: 'pre-line',
+                }}
+              >
+                {path.explanation}
+              </Typography>
+            ) : (
+              <Typography
+                sx={{
+                  fontSize: '0.7rem',
+                  color: 'rgba(255,255,255,0.4)',
+                  fontStyle: 'italic',
+                }}
+              >
+                {explainMutation.isPending
+                  ? 'Analyzing tactical vector patterns. This may take up to a minute...'
+                  : 'Click "EXPLAIN THIS" to generate an in-depth, step-by-step intelligence breakdown of this attack vector.'}
+              </Typography>
+            )}
+          </Box>
+
 
           <Typography
             sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 800, mb: 2, letterSpacing: 1 }}

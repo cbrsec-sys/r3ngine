@@ -61,6 +61,7 @@ export interface AttackPath {
   potential_impact: string;
   remediation_priority: number;
   vulnerability_id: number | null;
+  explanation?: string;
 }
 
 export interface AttackPathsResponse {
@@ -82,3 +83,18 @@ export const useAttackPaths = (scanId: number) =>
     staleTime: 5 * 60 * 1000, // 5 min — paths don't change post-scan
     enabled: !!scanId,
   });
+
+export const useExplainAttackPath = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ pathId, scanId }: { pathId: string; scanId: number }) => {
+      const { data } = await axios.post(`/api/apme/explain/`, { path_id: pathId });
+      return data;
+    },
+    onSuccess: (data, variables) => {
+      // Invalidate queries so the updated path (with explanation) is fetched from backend
+      queryClient.invalidateQueries({ queryKey: ['attack-paths', variables.scanId] });
+    },
+  });
+};
+

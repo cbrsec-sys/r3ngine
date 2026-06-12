@@ -1621,25 +1621,32 @@ def parse_llm_vulnerability_report(report):
 	report = report.replace('**', '')
 	data = {}
 	sections = re.split(r'\n(?=(?:Description|Impact|Remediation|References):)', report.strip())
-	
-	try:
-		for section in sections:
-			if not section.strip():
-				continue
-			
-			section_title, content = re.split(r':\n', section.strip(), maxsplit=1)
-			
-			if section_title == 'Description':
-				data['description'] = content.strip()
-			elif section_title == 'Impact':
-				data['impact'] = content.strip()
-			elif section_title == 'Remediation':
-				data['remediation'] = content.strip()
-			elif section_title == 'References':
-				data['references'] = [ref.strip() for ref in content.split('\n') if ref.strip()]
-	except Exception as e:
-		return data
-	
+
+	for section in sections:
+		if not section.strip():
+			continue
+
+		# Accept "Header:\ncontent", "Header:\n\ncontent", or "Header: content on same line"
+		match = re.match(
+			r'^(Description|Impact|Remediation|References):\s*(.*)',
+			section.strip(),
+			re.DOTALL,
+		)
+		if not match:
+			continue
+
+		section_title = match.group(1)
+		content = match.group(2).strip()
+
+		if section_title == 'Description':
+			data['description'] = content
+		elif section_title == 'Impact':
+			data['impact'] = content
+		elif section_title == 'Remediation':
+			data['remediation'] = content
+		elif section_title == 'References':
+			data['references'] = [ref.strip() for ref in content.split('\n') if ref.strip()]
+
 	return data
 
 
