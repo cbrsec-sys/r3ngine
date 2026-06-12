@@ -412,6 +412,7 @@ export const ReportSettingsPage: React.FC = () => {
                     { tag: '{low_count}', desc: 'Low Vulnerabilities' },
                     { tag: '{info_count}', desc: 'Info Vulnerabilities' },
                     { tag: '{unknown_count}', desc: 'Unknown Severity' },
+                    { tag: '{comments}', desc: 'Assessment comments provided during report generation' },
                   ].map((item) => (
                     <Box key={item.tag} sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
                       <Typography sx={{

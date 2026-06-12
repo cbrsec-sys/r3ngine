@@ -183,6 +183,67 @@ class ReportGenerationTest(TransactionTestCase):
         self.assertIn("45.0ms", rendered_html) # P99 for wrk
         self.assertIn("35.0ms", rendered_html) # P99 for k6
 
+    @patch('reNgine.report_tasks.HTML')
+    @patch('reNgine.charts.generate_subdomain_chart_by_http_status')
+    @patch('reNgine.charts.generate_stress_latency_chart')
+    @patch('reNgine.charts.generate_stress_success_rate_chart')
+    def test_report_generation_with_comments(self, mock_success_chart, mock_latency_chart, mock_subdomain_chart, mock_html):
+        """
+        Verify that `{comments}` is correctly replaced when comments are provided,
+        and replaced with an empty string when not provided.
+        """
+        mock_subdomain_chart.return_value = 'mocked_chart_base64'
+        mock_latency_chart.return_value = 'mocked_chart_base64'
+        mock_success_chart.return_value = 'mocked_chart_base64'
+
+        mock_html_instance = MagicMock()
+        mock_html_instance.write_pdf.return_value = b"%PDF-1.4 Mock Content"
+        mock_html.return_value = mock_html_instance
+
+        # 1. Update report settings to include {comments}
+        setting = VulnerabilityReportSetting.objects.first()
+        setting.executive_summary_description = "Assessment comments: {comments}"
+        setting.save()
+
+        # 2. Generate with comments
+        report_with = ScanReport.objects.create(
+            scan_history=self.scan,
+            report_type="vulnerability",
+            report_template="modern",
+            params={
+                'ignore_info_vuln': False,
+                'include_attack_surface_map': False,
+                'comments': 'These are custom comments.'
+            },
+            status=0
+        )
+        generate_report_task(report_with.id)
+        
+        # Verify rendered HTML contains custom comments
+        rendered_html_with = mock_html.call_args[1]['string']
+        self.assertIn("Assessment comments: These are custom comments.", rendered_html_with)
+
+        # Reset mock
+        mock_html.reset_mock()
+
+        # 3. Generate without comments
+        report_without = ScanReport.objects.create(
+            scan_history=self.scan,
+            report_type="vulnerability",
+            report_template="modern",
+            params={
+                'ignore_info_vuln': False,
+                'include_attack_surface_map': False
+            },
+            status=0
+        )
+        generate_report_task(report_without.id)
+        
+        # Verify rendered HTML replaces {comments} with empty string
+        rendered_html_without = mock_html.call_args[1]['string']
+        self.assertIn("Assessment comments: ", rendered_html_without)
+        self.assertNotIn("{comments}", rendered_html_without)
+
 
 class VulnersReportGroupingTest(TestCase):
     def setUp(self):
