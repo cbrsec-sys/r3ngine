@@ -52,10 +52,11 @@ class CVEEnrichmentServiceTestCase(TestCase):
         self.assertIsNotNone(cve)
         self.assertEqual(cve.name, "CVE-2026-6127")
 
-    def test_enrich_cve_invalid_format_returns_none(self):
-        """Verify that a value that is not a CVE ID and not YYYY-NNNNN returns None."""
+    def test_enrich_cve_invalid_format_proceeds(self):
+        """Verify that a value that is not a CVE ID and not YYYY-NNNNN still creates the object and proceeds."""
         result = self.service.enrich_cve("NOT-A-CVE")
-        self.assertIsNone(result)
+        self.assertIsNotNone(result)
+        self.assertEqual(result.name, "NOT-A-CVE")
 
     @patch('requests.get')
     def test_enrich_cve_from_nvd(self, mock_get):
