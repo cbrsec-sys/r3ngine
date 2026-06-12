@@ -4336,6 +4336,29 @@ class ParameterViewSet(viewsets.ModelViewSet):
 		if endpoint_id:
 			queryset = queryset.filter(endpoint__id=endpoint_id)
 
+		# CPDE intelligence filters
+		if req.query_params.get('param_location'):
+			queryset = queryset.filter(param_location=req.query_params['param_location'])
+		is_auth = req.query_params.get('is_auth_related', '').lower()
+		if is_auth == 'true':
+			queryset = queryset.filter(is_auth_related=True)
+		elif is_auth == 'false':
+			queryset = queryset.filter(is_auth_related=False)
+		if req.query_params.get('observed_in_js', '').lower() == 'true':
+			queryset = queryset.filter(observed_in_js=True)
+		if req.query_params.get('observed_in_openapi', '').lower() == 'true':
+			queryset = queryset.filter(observed_in_openapi=True)
+		if req.query_params.get('observed_in_graphql', '').lower() == 'true':
+			queryset = queryset.filter(observed_in_graphql=True)
+		confidence_min = req.query_params.get('confidence_min')
+		if confidence_min is not None:
+			try:
+				queryset = queryset.filter(confidence__gte=int(confidence_min))
+			except (ValueError, TypeError):
+				pass
+		if req.query_params.get('data_type'):
+			queryset = queryset.filter(data_type=req.query_params['data_type'])
+
 		return queryset.distinct()
 
 

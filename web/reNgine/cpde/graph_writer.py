@@ -52,7 +52,7 @@ def write_js_sources(
     MERGE (jf:JSFile {url: row.js_url, scan_id: row.scan_id})
     WITH jf, row
     MATCH (p:Parameter {name: row.param_name})
-          -[:HAS_PARAMETER]-(e:Endpoint {http_url: row.endpoint_url, scan_id: row.scan_id})
+          -[:HAS_PARAMETER]-(e:Endpoint {url: row.endpoint_url, scan_id: row.scan_id})
     MERGE (p)-[:OBSERVED_IN]->(jf)
     """
     rows = [
@@ -93,7 +93,7 @@ def write_openapi_sources(
 
     Example Cypher:
         MERGE (:OpenAPISpec {url: $spec_url, scan_id: $scan_id})
-        MATCH (:Endpoint {http_url: $endpoint_url})
+        MATCH (:Endpoint {url: $endpoint_url, scan_id: $scan_id})
         MERGE (:Endpoint)-[:DISCOVERED_FROM]->(:OpenAPISpec)
     """
     if not driver or not endpoint_spec_map:
@@ -104,7 +104,7 @@ def write_openapi_sources(
     MERGE (spec:OpenAPISpec {url: row.spec_url, scan_id: row.scan_id})
     ON CREATE SET spec.title = row.spec_title
     WITH spec, row
-    MATCH (e:Endpoint {http_url: row.endpoint_url, scan_id: row.scan_id})
+    MATCH (e:Endpoint {url: row.endpoint_url, scan_id: row.scan_id})
     MERGE (e)-[:DISCOVERED_FROM]->(spec)
     """
     rows = [
@@ -155,7 +155,7 @@ def enrich_parameter_nodes(
     query = """
     UNWIND $rows AS row
     MATCH (p:Parameter {name: row.name})
-          -[:HAS_PARAMETER]-(e:Endpoint {http_url: row.endpoint_url, scan_id: row.scan_id})
+          -[:HAS_PARAMETER]-(e:Endpoint {url: row.endpoint_url, scan_id: row.scan_id})
     SET p.confidence = row.confidence,
         p.param_location = row.param_location,
         p.is_auth_related = row.is_auth_related

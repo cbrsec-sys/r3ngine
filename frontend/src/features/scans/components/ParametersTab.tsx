@@ -32,13 +32,49 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterLocation, setFilterLocation] = useState<string>('');
+  const [filterAuthRelated, setFilterAuthRelated] = useState<'all' | 'true' | 'false'>('all');
+  const [filterJs, setFilterJs] = useState(false);
+  const [filterOpenApi, setFilterOpenApi] = useState(false);
+  const [filterGraphql, setFilterGraphql] = useState(false);
+  const [filterConfidenceMin, setFilterConfidenceMin] = useState<number>(0);
+  const [filterDataType, setFilterDataType] = useState<string>('');
 
   const { data, isLoading } = useParameters({
     scan_id: scanId,
     target_id: targetId,
     page,
     search: activeSearch,
+    param_location: filterLocation || undefined,
+    is_auth_related: filterAuthRelated !== 'all' ? filterAuthRelated === 'true' : undefined,
+    observed_in_js: filterJs || undefined,
+    observed_in_openapi: filterOpenApi || undefined,
+    observed_in_graphql: filterGraphql || undefined,
+    confidence_min: filterConfidenceMin > 0 ? filterConfidenceMin : undefined,
+    data_type: filterDataType || undefined,
   });
+
+  const activeFilterCount = [
+    filterLocation,
+    filterAuthRelated !== 'all' ? filterAuthRelated : '',
+    filterJs ? 'js' : '',
+    filterOpenApi ? 'openapi' : '',
+    filterGraphql ? 'graphql' : '',
+    filterConfidenceMin > 0 ? 'conf' : '',
+    filterDataType,
+  ].filter(Boolean).length;
+
+  const clearFilters = () => {
+    setFilterLocation('');
+    setFilterAuthRelated('all');
+    setFilterJs(false);
+    setFilterOpenApi(false);
+    setFilterGraphql(false);
+    setFilterConfidenceMin(0);
+    setFilterDataType('');
+    setPage(1);
+  };
 
   const handleSearch = () => {
     setPage(1);
@@ -99,6 +135,118 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
         </Box>
       </Box>
 
+      {/* Collapsible Filter Panel */}
+      {filterOpen && (
+        <Box sx={{
+          mb: 2, p: 2,
+          bgcolor: 'rgba(0,243,255,0.03)',
+          border: '1px solid rgba(0,243,255,0.15)',
+          borderRadius: 1,
+          display: 'flex', flexWrap: 'wrap', gap: 2, alignItems: 'flex-end'
+        }}>
+          {/* Location */}
+          <Box sx={{ minWidth: 160 }}>
+            <Typography sx={{ fontSize: '9px', fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, mb: 0.5, fontFamily: 'Orbitron' }}>LOCATION</Typography>
+            <select
+              value={filterLocation}
+              onChange={e => { setFilterLocation(e.target.value); setPage(1); }}
+              style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(0,243,255,0.2)', color: '#fff', borderRadius: 4, padding: '4px 8px', fontSize: '11px', width: '100%' }}
+            >
+              <option value="">All</option>
+              <option value="query_string">Query String</option>
+              <option value="json_body">JSON Body</option>
+              <option value="header">Header</option>
+              <option value="form_data">Form Data</option>
+              <option value="path">Path</option>
+              <option value="graphql_var">GraphQL Var</option>
+            </select>
+          </Box>
+
+          {/* Source type toggles */}
+          <Box>
+            <Typography sx={{ fontSize: '9px', fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, mb: 0.5, fontFamily: 'Orbitron' }}>SOURCE</Typography>
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              {([['JS', filterJs, setFilterJs], ['OPENAPI', filterOpenApi, setFilterOpenApi], ['GRAPHQL', filterGraphql, setFilterGraphql]] as const).map(([label, active, setter]) => (
+                <Chip
+                  key={label}
+                  label={label}
+                  size="small"
+                  onClick={() => { (setter as React.Dispatch<React.SetStateAction<boolean>>)((v: boolean) => !v); setPage(1); }}
+                  sx={{
+                    height: 22, fontSize: '9px', fontWeight: 900, cursor: 'pointer',
+                    bgcolor: active ? 'rgba(112,0,255,0.2)' : 'rgba(255,255,255,0.05)',
+                    color: active ? '#a855f7' : 'rgba(255,255,255,0.4)',
+                    border: `1px solid ${active ? 'rgba(112,0,255,0.4)' : 'rgba(255,255,255,0.1)'}`,
+                  }}
+                />
+              ))}
+            </Box>
+          </Box>
+
+          {/* Auth-related */}
+          <Box>
+            <Typography sx={{ fontSize: '9px', fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, mb: 0.5, fontFamily: 'Orbitron' }}>AUTH</Typography>
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              {(['all', 'true', 'false'] as const).map(v => (
+                <Chip
+                  key={v}
+                  label={v === 'all' ? 'ALL' : v === 'true' ? 'AUTH ONLY' : 'NON-AUTH'}
+                  size="small"
+                  onClick={() => { setFilterAuthRelated(v); setPage(1); }}
+                  sx={{
+                    height: 22, fontSize: '9px', fontWeight: 900, cursor: 'pointer',
+                    bgcolor: filterAuthRelated === v ? 'rgba(255,0,60,0.15)' : 'rgba(255,255,255,0.05)',
+                    color: filterAuthRelated === v ? '#ff003c' : 'rgba(255,255,255,0.4)',
+                    border: `1px solid ${filterAuthRelated === v ? 'rgba(255,0,60,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                  }}
+                />
+              ))}
+            </Box>
+          </Box>
+
+          {/* Min Confidence */}
+          <Box sx={{ minWidth: 120 }}>
+            <Typography sx={{ fontSize: '9px', fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, mb: 0.5, fontFamily: 'Orbitron' }}>
+              MIN CONFIDENCE: <Box component="span" sx={{ color: '#00f3ff' }}>{filterConfidenceMin}%</Box>
+            </Typography>
+            <input
+              type="range" min={0} max={100} step={5}
+              value={filterConfidenceMin}
+              onChange={e => { setFilterConfidenceMin(Number(e.target.value)); setPage(1); }}
+              style={{ width: '100%', accentColor: '#00f3ff' }}
+            />
+          </Box>
+
+          {/* Data Type */}
+          <Box sx={{ minWidth: 120 }}>
+            <Typography sx={{ fontSize: '9px', fontWeight: 900, color: 'rgba(255,255,255,0.4)', letterSpacing: 1, mb: 0.5, fontFamily: 'Orbitron' }}>DATA TYPE</Typography>
+            <select
+              value={filterDataType}
+              onChange={e => { setFilterDataType(e.target.value); setPage(1); }}
+              style={{ background: 'rgba(0,0,0,0.5)', border: '1px solid rgba(0,243,255,0.2)', color: '#fff', borderRadius: 4, padding: '4px 8px', fontSize: '11px', width: '100%' }}
+            >
+              <option value="">All</option>
+              <option value="string">string</option>
+              <option value="number">number</option>
+              <option value="boolean">boolean</option>
+              <option value="object">object</option>
+              <option value="array">array</option>
+            </select>
+          </Box>
+
+          {/* Clear */}
+          {activeFilterCount > 0 && (
+            <Button
+              onClick={clearFilters}
+              size="small"
+              sx={{ alignSelf: 'flex-end', color: '#ffae00', border: '1px solid rgba(255,174,0,0.3)', borderRadius: 1, fontSize: '9px', fontWeight: 900, fontFamily: 'Orbitron', px: 2, height: 28 }}
+            >
+              CLEAR FILTERS
+            </Button>
+          )}
+        </Box>
+      )}
+
       {/* Main Tactical Panel */}
       <TacticalPanel title={"DISCOVERED PARAMETERS"} icon={<LayoutGrid size={14} />}>
         {/* Table Controls */}
@@ -114,8 +262,29 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
             </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <Tooltip title="Refresh">
-              <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1 }}><Filter size={16} /></IconButton>
+            <Tooltip title="Toggle Filters">
+              <IconButton
+                size="small"
+                onClick={() => setFilterOpen(o => !o)}
+                sx={{
+                  color: filterOpen || activeFilterCount > 0 ? '#00f3ff' : 'rgba(255,255,255,0.5)',
+                  border: `1px solid ${filterOpen || activeFilterCount > 0 ? 'rgba(0,243,255,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                  borderRadius: 1,
+                  position: 'relative'
+                }}
+              >
+                <Filter size={16} />
+                {activeFilterCount > 0 && (
+                  <Box component="span" sx={{
+                    position: 'absolute', top: -4, right: -4,
+                    width: 14, height: 14, borderRadius: '50%',
+                    bgcolor: '#ff003c', fontSize: '8px', fontWeight: 900,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff'
+                  }}>
+                    {activeFilterCount}
+                  </Box>
+                )}
+              </IconButton>
             </Tooltip>
             <Tooltip title="Export Data">
               <IconButton size="small" sx={{ color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1 }}><Download size={16} /></IconButton>
@@ -162,22 +331,18 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
                           textDecoration: 'none',
                           wordBreak: 'break-all',
                           '&:hover': { color: '#00f3ff' }
-                        }} component="a" href={param.endpoint?.http_url} target="_blank">
+                        }} component="a" href={/^https?:\/\//i.test(param.endpoint?.http_url ?? '') ? param.endpoint!.http_url : '#'} target="_blank">
                           {param.endpoint?.http_url}
                         </Typography>
                         <IconButton
                           size="small"
-                          onClick={() => copyToClipboard(param.endpoint?.http_url)}
+                          onClick={() => { const url = param.endpoint?.http_url; if (url) copyToClipboard(url); }}
                           sx={{ color: 'rgba(255,255,255,0.2)', p: 0.5, '&:hover': { color: '#00f3ff' } }}
                         >
                           <Copy size={12} />
                         </IconButton>
                       </Box>
-                      <Box sx={{ display: 'inline-flex' }}>
-                         <Typography sx={{ fontSize: '10px', fontWeight: 900, color: '#ffae00', fontFamily: 'monospace' }}>
-                           {param.method}
-                         </Typography>
-                      </Box>
+
                     </Box>
                   </td>
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
@@ -186,6 +351,13 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
                         <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#00f3ff', fontFamily: 'monospace' }}>
                           {param.name}
                         </Typography>
+                        {param.data_type && (
+                          <Box sx={{ display: 'inline-flex', ml: 1 }}>
+                            <Typography sx={{ fontSize: '9px', color: 'rgba(255,255,255,0.35)', bgcolor: 'rgba(255,255,255,0.05)', px: 0.75, py: 0.25, borderRadius: 0.5, border: '1px solid rgba(255,255,255,0.08)', fontFamily: 'monospace' }}>
+                              {param.data_type}
+                            </Typography>
+                          </Box>
+                        )}
                       </Box>
                       {param.value && (
                         <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1, border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -198,19 +370,23 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
                   </td>
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                      {param.is_reflected && (
-                        <Chip label="REFLECTED" size="small" sx={{ height: 18, fontSize: '9px', fontWeight: 900, bgcolor: 'rgba(0, 255, 98, 0.1)', color: '#00ff62', border: '1px solid rgba(0, 255, 98, 0.2)' }} />
+                      {param.is_auth_related && (
+                        <Chip label="AUTH KEY" size="small" sx={{ height: 18, fontSize: '9px', fontWeight: 900, bgcolor: 'rgba(255,0,60,0.1)', color: '#ff003c', border: '1px solid rgba(255,0,60,0.2)' }} />
                       )}
-                      {param.is_source && (
-                        <Chip label="SOURCE" size="small" sx={{ height: 18, fontSize: '9px', fontWeight: 900, bgcolor: 'rgba(255, 174, 0, 0.1)', color: '#ffae00', border: '1px solid rgba(255, 174, 0, 0.2)' }} />
+                      {param.param_location && (
+                        <Chip label={param.param_location.replace('_', ' ').toUpperCase()} size="small" sx={{ height: 18, fontSize: '9px', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.05)', color: '#00f3ff', border: '1px solid rgba(0,243,255,0.2)' }} />
                       )}
-                      {param.is_sink && (
-                        <Chip label="SINK" size="small" sx={{ height: 18, fontSize: '9px', fontWeight: 900, bgcolor: 'rgba(255, 0, 60, 0.1)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)' }} />
+                      {param.observed_in_js && (
+                        <Chip label="JS" size="small" sx={{ height: 18, fontSize: '9px', fontWeight: 900, bgcolor: 'rgba(112,0,255,0.1)', color: '#a855f7', border: '1px solid rgba(112,0,255,0.2)' }} />
                       )}
-                      {(!param.is_reflected && !param.is_source && !param.is_sink) && (
-                        <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>
-                          Standard
-                        </Typography>
+                      {param.observed_in_openapi && (
+                        <Chip label="OPENAPI" size="small" sx={{ height: 18, fontSize: '9px', fontWeight: 900, bgcolor: 'rgba(59,130,246,0.1)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.2)' }} />
+                      )}
+                      {param.observed_in_graphql && (
+                        <Chip label="GRAPHQL" size="small" sx={{ height: 18, fontSize: '9px', fontWeight: 900, bgcolor: 'rgba(20,184,166,0.1)', color: '#14b8a6', border: '1px solid rgba(20,184,166,0.2)' }} />
+                      )}
+                      {(!param.is_auth_related && !param.param_location && !param.observed_in_js && !param.observed_in_openapi && !param.observed_in_graphql) && (
+                        <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Standard</Typography>
                       )}
                     </Box>
                   </td>
@@ -223,7 +399,7 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
                         </Typography>
                       </Box>
                       <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                        {param.sources && param.sources.split(',').map((source) => (
+                        {(param.sources || []).map((source) => (
                           <Chip
                             key={source}
                             label={source.trim().toUpperCase()}

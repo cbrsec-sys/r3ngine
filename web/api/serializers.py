@@ -1092,10 +1092,24 @@ class TechnologySerializer(serializers.ModelSerializer):
 		fields = '__all__'
 
 
+class ParameterEndpointSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = EndPoint
+		fields = ['id', 'http_url']
+
+
 class ParameterSerializer(serializers.ModelSerializer):
+	endpoint = ParameterEndpointSerializer(read_only=True)
+
 	class Meta:
 		model = Parameter
-		fields = ['id', 'name', 'value', 'type', 'is_reflected', 'is_source', 'is_sink', 'confidence', 'sources', 'endpoint']
+		fields = [
+			'id', 'name', 'value', 'type',
+			'confidence', 'sources', 'param_location',
+			'data_type', 'is_auth_related',
+			'observed_in_js', 'observed_in_openapi', 'observed_in_graphql',
+			'endpoint',
+		]
 
 
 class PortSerializer(serializers.ModelSerializer):

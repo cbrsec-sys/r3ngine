@@ -558,6 +558,38 @@
             </tbody>
         </table>
         {% endif %}
+        {% if show_recon and parameters %}
+        <div class="section">
+            <h2 class="section-title">Discovered Parameters</h2>
+            <p class="section-summary">{{ parameters_count }} parameter{{ parameters_count|pluralize }} discovered across all endpoints.</p>
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 8mm;">#</th>
+                        <th>Parameter</th>
+                        <th>Endpoint</th>
+                        <th style="width: 25mm;">Location</th>
+                        <th style="width: 18mm;">Type</th>
+                        <th style="width: 18mm; text-align: center;">Confidence</th>
+                        <th>Sources</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in parameters %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ p.name }}{% if p.is_auth_related %} <span class="severity-badge severity-high">[AUTH]</span>{% endif %}</td>
+                        <td style="word-break: break-all; font-size: 0.8em;">{{ p.endpoint.http_url|default:"-" }}</td>
+                        <td>{{ p.param_location|default:"-" }}</td>
+                        <td>{{ p.data_type|default:"-" }}</td>
+                        <td style="text-align: center;">{{ p.confidence }}%</td>
+                        <td style="font-size: 0.85em;">{{ p.sources|join:", " }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% endif %}
     </article>
     <!-- Reconnaissance Details -->
     {% if show_recon %}

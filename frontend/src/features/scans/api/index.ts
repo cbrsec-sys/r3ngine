@@ -610,7 +610,19 @@ export const usePromoteOsint = (id: number) => {
     },
   });
 };
-export const useParameters = (params: { scan_id?: string | number, target_id?: string | number, page?: number, search?: string }) => {
+export const useParameters = (params: {
+  scan_id?: string | number;
+  target_id?: string | number;
+  page?: number;
+  search?: string;
+  param_location?: string;
+  is_auth_related?: boolean;
+  observed_in_js?: boolean;
+  observed_in_openapi?: boolean;
+  observed_in_graphql?: boolean;
+  confidence_min?: number;
+  data_type?: string;
+}) => {
   return useQuery<import('../types').ParameterResponse>({
     queryKey: ['parameters', params],
     queryFn: async () => {
@@ -619,7 +631,14 @@ export const useParameters = (params: { scan_id?: string | number, target_id?: s
       if (params.target_id) searchParams.append('target_id', params.target_id.toString());
       if (params.page) searchParams.append('page', params.page.toString());
       if (params.search) searchParams.append('search', params.search);
-      
+      if (params.param_location) searchParams.append('param_location', params.param_location);
+      if (params.is_auth_related !== undefined) searchParams.append('is_auth_related', String(params.is_auth_related));
+      if (params.observed_in_js !== undefined) searchParams.append('observed_in_js', String(params.observed_in_js));
+      if (params.observed_in_openapi !== undefined) searchParams.append('observed_in_openapi', String(params.observed_in_openapi));
+      if (params.observed_in_graphql !== undefined) searchParams.append('observed_in_graphql', String(params.observed_in_graphql));
+      if (params.confidence_min !== undefined) searchParams.append('confidence_min', String(params.confidence_min));
+      if (params.data_type) searchParams.append('data_type', params.data_type);
+
       const response = await fetch('/api/listParameters/?' + searchParams.toString(), {
         credentials: 'include'
       });

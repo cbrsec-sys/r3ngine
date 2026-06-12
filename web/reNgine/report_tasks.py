@@ -20,7 +20,7 @@ from reNgine.charts import (
 from reNgine.utils.graph import Neo4jManager
 from reNgine.common_func import get_interesting_subdomains
 from reNgine.stress.report_builder import StressReportBuilder
-from startScan.models import ScanHistory, Subdomain, Vulnerability, IpAddress, ScanReport, StressTestResult
+from startScan.models import ScanHistory, Subdomain, Vulnerability, IpAddress, ScanReport, StressTestResult, Parameter
 from scanEngine.models import VulnerabilityReportSetting
 
 logger = logging.getLogger('reNgine.tasks')
@@ -165,6 +165,16 @@ def generate_report_task(report_id):
             .distinct()
         )
 
+        # CPDE parameters — omit for stress-test-only reports
+        parameters = Parameter.objects.none()
+        if report_type != 'stress_test':
+            parameters = (
+                Parameter.objects
+                .filter(scan_history=scan)
+                .select_related('endpoint')
+                .order_by('-confidence', 'name')
+            )
+
         attack_surface_map_image = None
         if report_template == 'enterprise' and include_attack_surface_map:
             try:
@@ -174,7 +184,7 @@ def generate_report_task(report_id):
                     attack_surface_map_image = generate_attack_surface_map(graph_data)
                 neo4j_manager.close()
             except Exception as e:
-                logger.error(f"Error generating Attack Surface Map for report: {e}")
+                logger.error("Error generating Attack Surface Map for report: %s", e)
 
         data = {
             'scan_object': scan,
@@ -189,6 +199,8 @@ def generate_report_task(report_id):
             'is_ignore_info_vuln': is_ignore_info_vuln,
             'attack_surface_map_image': attack_surface_map_image,
             'stress_results': stress_results,
+            'parameters': parameters,
+            'parameters_count': parameters.count(),
         }
 
         # Stress Test Aggregation for context
