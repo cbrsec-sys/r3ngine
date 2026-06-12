@@ -89,6 +89,7 @@ from reNgine.temporal_activities import (
     run_generic_task_activity,
     finalize_subscan_activity,
     finalize_failed_scan_activity,
+    update_scan_status_activity,
     # Step 0: Task initialization & Target Profiling
     initialize_scan_tasks_activity,
     load_checkpoint_activity,
@@ -366,6 +367,7 @@ class Command(BaseCommand):
                 run_generic_task_activity,
                 finalize_subscan_activity,
                 finalize_failed_scan_activity,
+                update_scan_status_activity,
 
                 # Step 0
                 initialize_scan_tasks_activity,

@@ -5,6 +5,9 @@ export type ScanHistory = components["schemas"]["ScanHistory"] & {
   successful_task_count?: number;
   failed_task_count?: number;
   total_task_count?: number;
+  current_tier?: number;
+  total_tiers?: number;
+  current_tier_progress?: number;
 };
 export type ScheduledScan = components["schemas"]["PeriodicTask"];
 export type SubScan = components["schemas"]["SubScan"];

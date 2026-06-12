@@ -4,7 +4,7 @@ from django.utils import timezone
 
 from startScan.models import ScanActivity, SubScan
 from reNgine.temporal_client import TemporalClientProvider
-from reNgine.definitions import ABORTED_TASK, RUNNING_TASK
+from reNgine.definitions import ABORTED_TASK, RUNNING_TASK, PAUSED_TASK
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def abort_scan_history(scan, aborted_by=None):
             except Exception as e:
                 logger.error(f"Failed to cancel workflow {te.workflow_id} for scan {scan.id}: {e}")
 
-        for subscan in SubScan.objects.filter(scan_history=scan, status=RUNNING_TASK):
+        for subscan in SubScan.objects.filter(scan_history=scan, status__in=[RUNNING_TASK, PAUSED_TASK]):
             abort_subscan(subscan)
 
         for task in ScanActivity.objects.filter(scan_of=scan, status=RUNNING_TASK).order_by('-pk'):

@@ -48,7 +48,9 @@ import {
   Layers,
   ChevronRight,
   Globe,
-  AlertCircle
+  AlertCircle,
+  Pause,
+  PauseCircle
 } from 'lucide-react';
 import {
   useScansHistory,
@@ -56,7 +58,9 @@ import {
   useResumeScan,
   useDeleteScan,
   useBulkScanAction,
-  useDomains
+  useDomains,
+  usePauseScan,
+  useUnpauseScan
 } from '../api';
 import { useParams, Link as RouterLink, useNavigate } from '@tanstack/react-router';
 import { ScanReportModal } from './ScanReportModal';
@@ -74,6 +78,8 @@ export const ScanHistoryPage: React.FC = () => {
   const resumeScanMutation = useResumeScan(projectSlug);
   const deleteScanMutation = useDeleteScan(projectSlug);
   const bulkActionMutation = useBulkScanAction(projectSlug);
+  const pauseScanMutation = usePauseScan(projectSlug);
+  const unpauseScanMutation = useUnpauseScan(projectSlug);
   const { data: domains } = useDomains(projectSlug);
 
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -203,6 +209,28 @@ export const ScanHistoryPage: React.FC = () => {
       }
       case 1: // Running
         return <Chip label="PENDING" size="small" sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<RefreshCw size={12} className="spin" />} />;
+      case 5: // Paused
+        return (
+          <Chip
+            label="PAUSED"
+            size="small"
+            sx={{
+              bgcolor: 'rgba(255, 171, 0, 0.1)',
+              color: '#ffab00',
+              border: '1px solid rgba(255, 171, 0, 0.2)',
+              fontSize: '0.65rem',
+              fontWeight: 900,
+              fontFamily: 'Orbitron',
+              animation: 'pulse-paused 2s infinite ease-in-out',
+              '@keyframes pulse-paused': {
+                '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ffab00)' },
+                '50%': { transform: 'scale(1.02)', filter: 'drop-shadow(0 0 4px #ffab00)' },
+                '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ffab00)' },
+              }
+            }}
+            icon={<PauseCircle size={12} color="#ffab00" />}
+          />
+        );
       case 3: // Aborted
         return <Chip label="ABORTED" size="small" sx={{ bgcolor: 'rgba(255, 0, 60, 0.1)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<AlertTriangle size={12} />} />;
       case 0: { // Failed
@@ -238,6 +266,30 @@ export const ScanHistoryPage: React.FC = () => {
         <Box sx={{ display: 'flex', gap: 2 }}>
           {selected.length > 0 && (
             <>
+              <Button
+                variant="outlined"
+                color="warning"
+                startIcon={<Pause size={18} />}
+                onClick={() => {
+                  pauseScanMutation.mutate({ scan_ids: selected });
+                  setSelected([]);
+                }}
+                sx={{ fontFamily: 'Orbitron', fontSize: '0.7rem', fontWeight: 800, borderColor: '#ffab00', color: '#ffab00' }}
+              >
+                PAUSE SELECTED
+              </Button>
+              <Button
+                variant="outlined"
+                color="success"
+                startIcon={<Play size={18} />}
+                onClick={() => {
+                  unpauseScanMutation.mutate({ scan_ids: selected });
+                  setSelected([]);
+                }}
+                sx={{ fontFamily: 'Orbitron', fontSize: '0.7rem', fontWeight: 800, borderColor: '#00ff62', color: '#00ff62' }}
+              >
+                UNPAUSE SELECTED
+              </Button>
               <Button
                 variant="outlined"
                 color="error"
@@ -411,19 +463,27 @@ export const ScanHistoryPage: React.FC = () => {
                     <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                       {getStatusChip(scan)}
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', minWidth: 120 }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', minWidth: 160 }}>
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <Typography variant="caption" sx={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontWeight: 700 }}>
+                            {scan.scan_status === 2 ? 'ALL TIERS COMPLETE' : `TIER ${scan.current_tier || 0}/${scan.total_tiers || 0}`}
+                          </Typography>
+                          <Typography variant="caption" sx={{ fontWeight: 900, color: '#fff', fontSize: '0.6rem', fontFamily: 'Orbitron' }}>
+                            {Math.round(Number(displayProgress))}%
+                          </Typography>
+                        </Box>
                         <LinearProgress
                           variant="determinate"
                           value={displayProgress}
                           sx={{
-                            flexGrow: 1,
+                            width: '100%',
                             height: 4,
                             borderRadius: 0,
                             bgcolor: 'rgba(255,255,255,0.05)',
                             '& .MuiLinearProgress-bar': {
-                              bgcolor: (scan.scan_status === 0 || scan.scan_status === 3) ? '#ff003c' : '#00f3ff',
-                              boxShadow: `0 0 10px ${(scan.scan_status === 0 || scan.scan_status === 3) ? 'rgba(255, 0, 60, 0.5)' : 'rgba(0, 243, 255, 0.5)'}`,
+                              bgcolor: (scan.scan_status === 0 || scan.scan_status === 3) ? '#ff003c' : scan.scan_status === 5 ? '#ffab00' : '#00f3ff',
+                              boxShadow: `0 0 10px ${(scan.scan_status === 0 || scan.scan_status === 3) ? 'rgba(255, 0, 60, 0.5)' : scan.scan_status === 5 ? 'rgba(255, 171, 0, 0.5)' : 'rgba(0, 243, 255, 0.5)'}`,
                               ...((scan.scan_status === 1 || scan.scan_status === -1) && {
                                 background: 'linear-gradient(90deg, #00f3ff 0%, #00a8ff 50%, #00f3ff 100%)',
                                 backgroundSize: '200% 100%',
@@ -432,9 +492,33 @@ export const ScanHistoryPage: React.FC = () => {
                             }
                           }}
                         />
-                        <Typography variant="caption" sx={{ fontWeight: 900, color: '#fff', fontSize: '0.65rem', fontFamily: 'Orbitron', minWidth: 30 }}>
-                          {Math.round(Number(displayProgress))}%
-                        </Typography>
+
+                        {(scan.scan_status === 1 || scan.scan_status === 5) && scan.current_tier && scan.current_tier > 0 ? (
+                          <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                              <Typography variant="caption" sx={{ fontSize: '0.5rem', color: 'rgba(0, 243, 255, 0.6)', fontFamily: 'Orbitron', fontWeight: 600 }}>
+                                TIER TASK PROGRESS
+                              </Typography>
+                              <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.8)', fontSize: '0.55rem', fontFamily: 'Orbitron', fontWeight: 800 }}>
+                                {Math.round(scan.current_tier_progress || 0)}%
+                              </Typography>
+                            </Box>
+                            <LinearProgress
+                              variant="determinate"
+                              value={scan.current_tier_progress || 0}
+                              sx={{
+                                width: '100%',
+                                height: 2,
+                                borderRadius: 0,
+                                bgcolor: 'rgba(255,255,255,0.02)',
+                                '& .MuiLinearProgress-bar': {
+                                  bgcolor: scan.scan_status === 5 ? 'rgba(255, 171, 0, 0.6)' : '#d500f9',
+                                  boxShadow: `0 0 5px ${scan.scan_status === 5 ? 'rgba(255, 171, 0, 0.3)' : 'rgba(213, 0, 249, 0.3)'}`,
+                                }
+                              }}
+                            />
+                          </Box>
+                        ) : null}
                       </Box>
                     </TableCell>
                     <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
@@ -580,6 +664,26 @@ export const ScanHistoryPage: React.FC = () => {
         }}>
           <RefreshCw size={14} /> RESCAN
         </MenuItem> */}
+        {activeScanId && scans?.find((s) => s.id === activeScanId)?.scan_status === 1 && (
+          <MenuItem onClick={() => {
+            if (activeScanId) {
+              pauseScanMutation.mutate({ scan_ids: [activeScanId] });
+              handleMenuClose();
+            }
+          }}>
+            <Pause size={14} /> PAUSE SCAN
+          </MenuItem>
+        )}
+        {activeScanId && scans?.find((s) => s.id === activeScanId)?.scan_status === 5 && (
+          <MenuItem onClick={() => {
+            if (activeScanId) {
+              unpauseScanMutation.mutate({ scan_ids: [activeScanId] });
+              handleMenuClose();
+            }
+          }}>
+            <Play size={14} /> UNPAUSE SCAN
+          </MenuItem>
+        )}
         <MenuItem onClick={() => {
           if (activeScanId) {
             stopScanMutation.mutate(activeScanId);
@@ -588,23 +692,16 @@ export const ScanHistoryPage: React.FC = () => {
         }}>
           <StopCircle size={14} /> STOP SCAN
         </MenuItem>
-        <MenuItem onClick={() => {
-          if (activeScanId) {
-            const scan = scans?.find((s) => s.id === activeScanId);
-            if (scan && (scan.scan_status === 0 || scan.scan_status === 3)) {
+        {activeScanId && (scans?.find((s) => s.id === activeScanId)?.scan_status === 0 || scans?.find((s) => s.id === activeScanId)?.scan_status === 3) && (
+          <MenuItem onClick={() => {
+            if (activeScanId) {
               resumeScanMutation.mutate(activeScanId);
-            } else {
-              setSnackbar({
-                open: true,
-                message: 'Only failed or aborted scans can be resumed.',
-                severity: 'info'
-              });
+              handleMenuClose();
             }
-            handleMenuClose();
-          }
-        }}>
-          <Play size={14} /> RESUME SCAN
-        </MenuItem>
+          }}>
+            <Play size={14} /> RESUME SCAN
+          </MenuItem>
+        )}
         <MenuItem onClick={() => {
           if (activeScanId) {
             setConfirmConfig({
