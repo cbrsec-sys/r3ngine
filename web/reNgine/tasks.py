@@ -3654,7 +3654,6 @@ def get_vulnerability_gpt_report(vuln, vulnerability_id=None):
 
 	# 2. Check if in global cache (GPTVulnerabilityReport) already exists
 	stored = GPTVulnerabilityReport.objects.filter(
-		url_path=path,
 		title=title
 	).first()
 
@@ -7328,15 +7327,29 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 				"[TIER7][IMPACT] [%d/%d] Calling LLM impact generator | vuln_id=%s severity=%s asset=%s",
 				idx, total, vuln.id, vuln.severity, asset,
 			)
-			context = "Vulnerability: %s\n" % vuln.name
-			context += "Description: %s\n" % (vuln.description or '')
-			context += "Asset: %s\n" % asset
-			if vuln.subdomain:
-				context += "Technologies: %s\n" % ', '.join([t.name for t in vuln.subdomain.technologies.all()])
 
-			t_start = time.time()
-			final_impact = generator.generate_impact_assessment(context)
-			elapsed = time.time() - t_start
+			existing_assessment = ImpactAssessment.objects.filter(
+				vulnerability__name=vuln.name,
+				is_ai_generated=True
+			).first()
+
+			if existing_assessment and existing_assessment.potential_impact:
+				logger.warning(
+					"[TIER7][IMPACT] [%d/%d] Reusing existing target-agnostic impact assessment for %s | vuln_id=%s",
+					idx, total, vuln.name, vuln.id,
+				)
+				final_impact = existing_assessment.potential_impact
+				elapsed = 0.0
+			else:
+				# Omit Asset to make context target-agnostic (PII masking is handled by generator)
+				context = "Vulnerability: %s\n" % vuln.name
+				context += "Description: %s\n" % (vuln.description or '')
+				if vuln.subdomain:
+					context += "Technologies: %s\n" % ', '.join([t.name for t in vuln.subdomain.technologies.all()])
+
+				t_start = time.time()
+				final_impact = generator.generate_impact_assessment(context)
+				elapsed = time.time() - t_start
 
 			logger.warning(
 				"[TIER7][IMPACT] [%d/%d] LLM returned in %.1fs | vuln_id=%s impact_len=%d",
