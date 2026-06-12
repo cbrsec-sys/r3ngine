@@ -29,7 +29,7 @@ from apme.ingestion.credentials import ingest_credentials
 from apme.ingestion.vulnerabilities import ingest_vulnerabilities
 from apme.models.node import Node
 from apme.models.path import AttackPath
-from apme.output.serializer import serialize_paths
+from apme.output.serializer import serialize_paths, serialize_path
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +134,7 @@ class APMEOrchestrator:
 
         builder.close()
 
-        result = serialize_paths(scored_paths, top_n=self.top_n)
+        result = serialize_paths(scored_paths, node_index=node_index, top_n=self.top_n)
         logger.info(
             f"APME [7/7] Complete. "
             f"total_paths={result['total_paths']}, "
@@ -261,7 +261,7 @@ class APMEOrchestrator:
                                 "apme_path_id": path.id,
                                 "risk": path.risk,
                                 "score": path.score,
-                                "steps": [s.to_dict() for s in path.steps],
+                                "steps": serialize_path(path, node_index)["steps"],
                                 "narrative": narrative,
                                 "metadata": self._build_path_metadata(path, node_index),
                             },
@@ -282,7 +282,7 @@ class APMEOrchestrator:
                                 "apme_path_id": path.id,
                                 "risk": path.risk,
                                 "score": path.score,
-                                "steps": [s.to_dict() for s in path.steps],
+                                "steps": serialize_path(path, node_index)["steps"],
                                 "narrative": narrative,
                                 "metadata": self._build_path_metadata(path, node_index),
                             },

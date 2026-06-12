@@ -2780,3 +2780,18 @@ class URLVulnWorkflow:
             )
         return True
 
+
+@workflow.defn(name="RecalculateApmeWorkflow")
+class RecalculateApmeWorkflow:
+    """Workflow to execute algorithmic Attack Path modeling (non-LLM) recalculation."""
+
+    @workflow.run
+    async def run(self, scan_history_id: int, job_id: str = None) -> dict:
+        return await workflow.execute_activity(
+            "RecalculateApmeActivity",
+            args=[scan_history_id, job_id],
+            start_to_close_timeout=timedelta(hours=1),
+            heartbeat_timeout=timedelta(minutes=5),
+            task_queue="python-orchestrator-queue",
+        )
+

@@ -17,6 +17,29 @@ export const useTriggerAttackPathModeling = () => {
   });
 };
 
+export const useRecalculateAttackPaths = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (scanId: number) => {
+      const { data } = await axios.post(`/api/apme/recalculate/`, { scan_id: scanId });
+      return data;
+    },
+    onSuccess: (_, scanId) => {
+      queryClient.invalidateQueries({ queryKey: ['attack-paths', scanId] });
+    },
+  });
+};
+
+export interface EnrichedNode {
+  id: string;
+  type: string;
+  subtype: string;
+  name?: string;
+  severity?: number;
+  cvss_score?: number;
+  vuln_id?: number | null;
+}
+
 export interface AttackStep {
   from: string;
   to: string;
@@ -25,6 +48,8 @@ export interface AttackStep {
   confidence: number;
   validated: boolean;
   status: 'validated' | 'inferred';
+  from_node?: EnrichedNode;
+  to_node?: EnrichedNode;
 }
 
 export interface AttackPath {
