@@ -73,6 +73,19 @@ v3.6.0 massively upgrades the CVE enrichment pipeline by integrating `sploitscan
 
 ---
 
+## 🔗 LinkedIn Intelligence — Session-Based Authentication
+
+v3.6.0 replaces the fragile password-based LinkedIn scraper with a durable, MFA-compatible session model that never stores a password.
+
+* **Dual-Layer Authentication**: On every OSINT scan, the scraper tries a persisted Playwright `storage_state.json` file first. If the file is missing or the session has expired, it falls back to injecting LinkedIn session cookies stored in the API vault into a fresh browser context. If both paths fail, a structured note is written to the scan log and LinkedIn OSINT is skipped — the scan never halts.
+* **No Stored Passwords**: The `password` field has been removed from `LinkedInCredentials`. Authentication is driven entirely by session state, eliminating credential exposure from the database.
+* **Interactive Capture Helper**: A downloadable `linkedin_capture.py` script launches a local headed Chromium browser, lets the user complete login (including MFA), and saves `storage_state.json` for upload. No credentials transit the server.
+* **Session Management API**: Four new endpoints under `/api/linkedin/session/` — upload state file or raw cookies, check session validity, revoke and clear all session data, download the capture helper script.
+* **Session Status Card**: A new `LinkedInSessionCard` component in the API vault settings page shows live session status (active / present-but-unvalidated / missing), supports file upload and revocation in-browser, and links to the helper script download.
+* **Path Traversal Hardened**: All reads and writes to the session state file are validated against `{RENGINE_RESULTS}/context/linkedin/` before any disk operation.
+
+---
+
 ## 🤖 LLM Vulnerability Analysis & Tier 7 Auto-Enrichment
 
 v3.6.0 delivers end-to-end automated LLM enrichment of vulnerability findings — both on-demand and automatically during every full scan.
