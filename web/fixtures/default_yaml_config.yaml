@@ -182,7 +182,7 @@ web_api_discovery: {
   'scan_only_active': true,
   'threads': 30,
   'timeout': 5,
-  'kr_wordlist': 'routes-small.kr'
+  'kr_wordlist': 'routes-small.kite'
 }
 param_discovery: {
   'enabled': true,
