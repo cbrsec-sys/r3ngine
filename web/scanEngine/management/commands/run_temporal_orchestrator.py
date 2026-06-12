@@ -201,6 +201,7 @@ from reNgine.temporal_activities import (
     run_urlparser_activity,
     run_wptaint_scan_activity,
     run_param_discovery_activity,
+    run_http_crawl_bridge_activity,
 )
 
 
@@ -388,6 +389,7 @@ class Command(BaseCommand):
 
                 # Tier 2
                 run_http_crawl_activity,
+                run_http_crawl_bridge_activity,
                 parse_http_crawl_results_activity,
                 run_port_scan_activity,
                 run_screenshot_activity,

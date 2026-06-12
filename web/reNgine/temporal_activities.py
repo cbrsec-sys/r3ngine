@@ -2694,6 +2694,8 @@ def run_searchsploit_activity(ctx: dict) -> bool:
         searchsploit_scan, ctx, task_name='searchsploit_scan',
         description='Exploit Search (searchsploit)',
         service=ctx.get('service', ''), version=ctx.get('version'),
+        host=ctx.get('host', ''), port=ctx.get('port', 0),
+        subdomain_id=ctx.get('subdomain_id'), domain_id=ctx.get('domain_id'),
     )
 
 
@@ -2732,6 +2734,8 @@ def run_search_vulns_activity(ctx: dict) -> bool:
         version=ctx.get('version'),
         host=ctx.get('host', ''),
         port=ctx.get('port', 0),
+        subdomain_id=ctx.get('subdomain_id'),
+        domain_id=ctx.get('domain_id'),
     )
     logger.log_line("[TEMPORAL]", "COMPLETE", "task=search_vulns_scan service=%s scan_id=%s" % (ctx.get('service', ''), scan_id))
     return result
