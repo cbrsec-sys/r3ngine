@@ -150,6 +150,8 @@ class DomainSerializer(serializers.ModelSerializer):
 	insert_date_humanized = serializers.SerializerMethodField()
 	start_scan_date = serializers.SerializerMethodField()
 	start_scan_date_humanized = serializers.SerializerMethodField()
+	most_recent_scan_status = serializers.SerializerMethodField()
+	most_recent_scan_progress = serializers.SerializerMethodField()
 
 	class Meta:
 		model = Domain
@@ -190,6 +192,23 @@ class DomainSerializer(serializers.ModelSerializer):
 	def get_start_scan_date_humanized(self, obj):
 		if obj.start_scan_date:
 			return naturaltime(obj.start_scan_date).title()
+
+	def get_most_recent_scan_status(self, obj):
+		from django.apps import apps
+		ScanHistory = apps.get_model('startScan.ScanHistory')
+		recent_scan = ScanHistory.objects.filter(domain__id=obj.id).order_by('-id').first()
+		if recent_scan:
+			from reNgine.definitions import CELERY_TASK_STATUS_MAP
+			return CELERY_TASK_STATUS_MAP.get(recent_scan.scan_status, 'UNKNOWN')
+		return 'NEW'
+
+	def get_most_recent_scan_progress(self, obj):
+		from django.apps import apps
+		ScanHistory = apps.get_model('startScan.ScanHistory')
+		recent_scan = ScanHistory.objects.filter(domain__id=obj.id).order_by('-id').first()
+		if recent_scan:
+			return recent_scan.get_progress() or 0
+		return 0
 
 
 class SubScanResultSerializer(serializers.ModelSerializer):
