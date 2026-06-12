@@ -171,5 +171,8 @@ pip3 install tenacity==8.2.2
 
 vulnx update
 
+# Configure vigolium to scan all severity levels for known issues
+vigolium config set known_issue_scan.severities "critical,high,medium,low,info" || true
+
 echo "Starting Temporal Python Orchestrator..."
 exec python3 /usr/src/app/manage.py run_temporal_orchestrator

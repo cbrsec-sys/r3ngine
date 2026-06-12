@@ -169,7 +169,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 LABEL \
     name="reNgine" \
     author="Reboot Dev: MistrHyd3 (https://github.com/whiterabb17) \
-    Original By: Yogesh Ojha <yogesh.ojha11@gmail.com>" \
+    Original By: Yogesh Ojha" \
     description="reNgine is an automated recon pipeline for web application penetration testing."
 
 # ---------------------------------------------------------------------------

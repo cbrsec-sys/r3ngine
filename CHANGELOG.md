@@ -2,6 +2,10 @@
 
 ### [v3.6.0] - Unreleased
 
+- **Vigolium Scanning Enhancement**:
+  - Removed incorrect inline parsing of the `--known-issue-scan-severities` argument inside `vigolium_tasks.py`.
+  - Configured vigolium globally at the container level (in both Python and Go temporal entrypoints) using `vigolium config set known_issue_scan.severities "critical,high,medium,low,info"` to ensure all severity levels are scanned by default.
+
 - **HTTP Crawl Bridge & Technology Mapping Propagation**:
   - Added a second HTTP crawl task, `HTTP Crawl Bridge` (`http_crawl_bridge`), executed in between URL fetching and directory fuzzing.
   - Dynamically checks any endpoints that are dead or not alive, as well as all new/uncrawled endpoints, updating their status and mapping their technologies.
