@@ -319,11 +319,11 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
     try:
         # task_func is the plain function (self/proxy is passed as first positional arg).
         raw_func = task_func.__func__ if hasattr(task_func, '__func__') else task_func
-        
+
         import inspect
         sig = inspect.signature(raw_func)
         accepts_kwargs = any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values())
-        
+
         for param_name in sig.parameters:
             if param_name in ('self', 'proxy'):
                 continue
@@ -340,8 +340,10 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
                 kwargs['ctx'] = ctx
             if 'description' not in kwargs:
                 kwargs['description'] = description
-            
-        raw_func(proxy, **kwargs)
+
+        res = raw_func(proxy, **kwargs)
+        if res is False:
+            raise Exception(f"Task {task_name} execution returned False/failed.")
         proxy.update_scan_activity(SUCCESS_TASK)
         logger.log_line("[TEMPORAL]", "COMPLETE", "task=%s scan_id=%s" % (task_name, _scan_id))
         return True
@@ -1192,7 +1194,16 @@ def run_s3scanner_activity(ctx: dict) -> bool:
 def run_acunetix_activity(ctx: dict) -> bool:
     from reNgine.tasks import acunetix_scan
     activity.logger.info(f"[RunAcunetixActivity] scan_id={ctx.get('scan_history_id')}")
-    return _run_task(acunetix_scan, ctx, task_name='acunetix_scan', description='Acunetix Scan', domain_id=ctx.get('domain_id'), scan_history_id=ctx.get('scan_history_id'))
+    return _run_task(
+        acunetix_scan,
+        ctx,
+        task_name='acunetix_scan',
+        description='Acunetix Scan',
+        domain_id=ctx.get('domain_id'),
+        scan_history_id=ctx.get('scan_history_id'),
+        subdomain_name=ctx.get('subdomain_name'),
+        subdomain_http_url=ctx.get('subdomain_http_url'),
+    )
 
 @activity.defn(name="RunCpanelScanActivity")
 def run_cpanel_scan_activity(ctx: dict) -> bool:

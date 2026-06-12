@@ -1084,6 +1084,11 @@ _SUBSCAN_DISPATCH = {
         "timeout": timedelta(hours=4),
         "args_builder": lambda ctx: [ctx],
     },
+    "run_acunetix": {
+        "activity": "RunAcunetixActivity",
+        "timeout": timedelta(hours=4),
+        "args_builder": lambda ctx: [ctx],
+    },
     # Special cases — handled with inline logic in SubScanWorkflow.run():
     "vulnerability_scan": None,  # Has Tier 7 post-steps (correlation, risk, APME)
     "baddns": None,              # Modifies ctx before dispatch
@@ -1339,7 +1344,7 @@ class SubScanWorkflow:
                 # TIER 6: Security Assessment — explicit inclusion, mirrors MasterScanWorkflow Tier 6.
                 # vigolium_scan runs alongside vulnerability_scan at Tier 6.
                 [t for t in active_tasks if t in {
-                    "vulnerability_scan", "waf_bypass", "vigolium_scan"
+                    "vulnerability_scan", "waf_bypass", "vigolium_scan", "run_acunetix"
                 }],
                 # TIER 6b: Fallback for any task not classified in Tiers 1-6.
                 # Handles future tasks added to _SUBSCAN_DISPATCH without breaking existing tiers.
@@ -1349,7 +1354,7 @@ class SubScanWorkflow:
                     "fetch_url", "screenshot", "dir_file_fuzz", "web_api_discovery", "waf_detection",
                     "secret_scanning", "vulnerability_scan", "waf_bypass",
                     "vigolium_discovery", "vigolium_analysis", "vigolium_scan", "param_discovery",
-                    "http_crawl_bridge"
+                    "http_crawl_bridge", "run_acunetix"
                 }],
             ]
 
