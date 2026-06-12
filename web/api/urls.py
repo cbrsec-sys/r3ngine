@@ -69,6 +69,10 @@ urlpatterns = [
         AddTarget.as_view(),
         name='addTarget'),
     path(
+        'update/target/',
+        UpdateTarget.as_view(),
+        name='updateTarget'),
+    path(
         'add/recon_note/',
         AddReconNote.as_view(),
         name='addReconNote'),
