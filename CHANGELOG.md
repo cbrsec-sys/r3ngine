@@ -74,6 +74,16 @@
   - Implemented a "Kill Instance" switch to quickly terminate and clean up hanging Metasploit container processes.
   - Migrated `msf_console` to the Docker SDK, ensuring spawned containers are properly labeled (`com.docker.compose.project: 'r3ngine'`) and attached to the project's native network.
 
+- **LinkedIn Intelligence — Session-Based Authentication**:
+  - Replaced the password-based `launch_persistent_context()` approach with a two-tier session model: Playwright `storage_state.json` tried first, LinkedIn session cookies injected from the API vault as fallback.
+  - No password is ever stored in the database. The `password` field has been removed from `LinkedInCredentials` via migration `0017`. The model gains `cookies_json`, `state_file_path`, `last_validated_at`, and `is_valid` fields.
+  - Authentication failures (expired state file, invalid cookies, LinkedIn bot challenges, MFA prompts) log a structured operator note and gracefully skip LinkedIn OSINT — the scan continues without interruption.
+  - Added four REST API endpoints under `/api/linkedin/session/`: `upload/` (accepts `storage_state.json` multipart or raw `cookies_json` payload), `status/` (reports `is_valid`, `last_validated_at`, `has_state_file`, `has_cookies`), root `DELETE` (clears state file from disk and resets all session fields), and `helper/` (serves a downloadable standalone Python capture script).
+  - The downloadable `linkedin_capture.py` helper script launches a headed Chromium browser on the user's local machine, waits for manual login (including MFA), and saves `storage_state.json` for upload. No credentials ever leave the user's machine.
+  - All file-system operations on `state_file_path` enforce path-traversal protection (`_validate_state_path`) — both reads and writes are bounded to `{RENGINE_RESULTS}/context/linkedin/`.
+  - Added `LinkedInSessionCard` React component: live status indicator (green/amber/red), file upload, session revocation, and helper script download — all via the API vault settings page.
+  - 24 tests covering model fields, scraper authentication paths (storage_state, cookie injection, graceful fallback), all four API endpoints, and `run_linkedint` caller resilience.
+
 ### [v3.5.0] - 2026-06-04
 
 - **Python 3.12 Runtime Upgrade**:

@@ -315,7 +315,7 @@ AI-specific onboarding entrypoints are also available in `AGENTS.md`, `CLAUDE.md
 
 ### 🕵️ Surgical Reconnaissance & OSINT
 *   **Advanced Web API Discovery**: Kiterunner, Arjun, ParamSpider, LinkFinder, and InQL pipeline.
-*   **Deep Pursuit OSINT Engine**: Email pivoting (**holehe**), cross-platform social profile mapping (**maigret**), social presence discovery (**gosearch**), tactical identity permutation (**username-anarchy**), and a **Playwright-driven Social Intelligence Engine**.
+*   **Deep Pursuit OSINT Engine**: Email pivoting (**holehe**), cross-platform social profile mapping (**maigret**), social presence discovery (**gosearch**), tactical identity permutation (**username-anarchy**), and a **Playwright-driven LinkedIn Intelligence Engine** with session-state + cookie-vault authentication — MFA-compatible, no stored passwords, graceful scan continuation on session expiry.
 *   **URL Deduplication**: Two-pass dedup after `fetch_url` — URL signature dedup (pre-save) collapses parametric variants, content-based dedup (post-save) removes duplicate HTTP responses — reducing Tier 4–6 load.
 *   **Vulnerability Scanning**: Nuclei (sequential severity, auto-template updates), Semgrep (parallel downloads, 500-file cap, 5 MB per-file limit), WPScan, Dalfox (deep scan, WAF bypass, remote payloads), CRLFuzzer, S3Scanner, Gitleaks, Retire.js.
 *   **Custom Parameter Discovery Engine (CPDE)**: Define custom regex and string matchers with severity levels to automatically flag undocumented or high-value parameters during crawling.
