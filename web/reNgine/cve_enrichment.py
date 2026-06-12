@@ -373,7 +373,11 @@ class CVEEnrichmentService:
             )
 
             if result.returncode != 0:
-                logger.warning("vulnx command failed with code %d: %s", result.returncode, result.stderr)
+                error_lines = [line.strip() for line in result.stderr.split('\n') if line.strip().startswith('[FTL]') or line.strip().startswith('[ERR]')]
+                if error_lines:
+                    logger.warning("%s", " | ".join(error_lines))
+                else:
+                    logger.warning("vulnx command failed with code %d", result.returncode)
                 return
 
             if not result.stdout.strip():
