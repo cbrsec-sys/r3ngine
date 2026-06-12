@@ -2938,9 +2938,34 @@ def run_param_discovery_activity(ctx: dict) -> dict:
         scan_id,
     )
     proxy = TemporalTaskProxy(ctx, task_name='param_discovery', description='Custom Parameter Discovery (CPDE)')
+    urls = ctx.get('urls') or []
+    if not urls:
+        # Prefer a real endpoint URL (preserves correct scheme) from a prior http_crawl
+        from startScan.models import EndPoint
+        first_url = (
+            EndPoint.objects
+            .filter(scan_history_id=scan_id)
+            .values_list('http_url', flat=True)
+            .first()
+        )
+        if first_url:
+            urls = [first_url]
+            logger.log_line("[CPDE]", "INFO", "Derived seed URL from endpoint records: %s" % first_url)
+        else:
+            # Fall back to constructing from domain name
+            from targetApp.models import Domain
+            domain = Domain.objects.filter(id=ctx.get('domain_id')).first()
+            if domain:
+                urls = [f"https://{domain.name}/"]
+                logger.log_line("[CPDE]", "INFO", "Derived seed URL from domain: %s" % urls[0])
+
+    if not urls:
+        logger.log_line("[CPDE]", "WARN", "No seed URLs available for scan_id=%s — skipping CPDE" % scan_id)
+        logger.log_line("[TEMPORAL]", "COMPLETE", "task=param_discovery scan_id=%s (skipped)" % scan_id)
+        return {}
     result = param_discovery(
         proxy,
-        urls=ctx.get('urls', []),
+        urls=urls,
         ctx=ctx,
     )
     logger.log_line("[TEMPORAL]", "COMPLETE", "task=param_discovery scan_id=%s" % scan_id)

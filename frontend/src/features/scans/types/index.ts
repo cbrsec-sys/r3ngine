@@ -131,17 +131,17 @@ export interface OsintStaging {
 export interface Parameter {
   id: number;
   name: string;
-  value: string;
-  method: string;
+  value: string | null;
+  type: string | null;
   confidence: number;
-  sources: string;
-  is_reflected: boolean;
-  is_source: boolean;
-  is_sink: boolean;
-  endpoint: {
-    id: number;
-    http_url: string;
-  };
+  sources: string[];
+  param_location: string | null;
+  data_type: string | null;
+  is_auth_related: boolean;
+  observed_in_js: boolean;
+  observed_in_openapi: boolean;
+  observed_in_graphql: boolean;
+  endpoint: { id: number; http_url: string } | null;
 }
 
 export interface ParameterResponse {

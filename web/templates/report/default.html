@@ -667,6 +667,39 @@
       </article>
     {% endif %}
 
+    {% if show_recon and parameters %}
+      <article style="page-break-before: always" class="summary">
+        <h3 class="page_title">Discovered Parameters ({{ parameters_count }})</h3>
+        <p>Listed below are the {{ parameters_count }} parameter{{ parameters_count|pluralize }} identified on <span class="primary-color">{{ scan_object.domain.name }}</span></p>
+        <div class="table">
+          <div class="row header bg-success">
+            <div class="cell grey-color" style="width: 4%">#</div>
+            <div class="cell grey-color" style="width: 18%">Parameter</div>
+            <div class="cell grey-color" style="width: 35%">Endpoint URL</div>
+            <div class="cell grey-color" style="width: 13%">Location</div>
+            <div class="cell grey-color" style="width: 12%">Type</div>
+            <div class="cell grey-color" style="width: 8%">Confidence</div>
+            <div class="cell grey-color" style="width: 10%">Sources</div>
+          </div>
+          {% for p in parameters %}
+            <div class="row">
+              <div class="cell" style="width: 4%">{{ forloop.counter }}</div>
+              <div class="cell" style="width: 18%">
+                {{ p.name }}{% if p.is_auth_related %} [AUTH]{% endif %}
+              </div>
+              <div class="cell" style="width: 35%; word-break: break-all; font-size: 0.85em;">
+                {{ p.endpoint.http_url|default:"-" }}
+              </div>
+              <div class="cell" style="width: 13%">{{ p.param_location|default:"-" }}</div>
+              <div class="cell" style="width: 12%">{{ p.data_type|default:"-" }}</div>
+              <div class="cell" style="width: 8%">{{ p.confidence }}%</div>
+              <div class="cell" style="width: 10%; font-size: 0.85em;">{{ p.sources|join:", " }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      </article>
+    {% endif %}
+
     {# vulnerability_summary only when vuln_report #}
     {% if show_vuln %}
       <article style="page-break-before: always" class="summary">

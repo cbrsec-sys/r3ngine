@@ -29,6 +29,9 @@ def param_discovery(self, urls=[], ctx={}, description=None):
     scan_id = ctx.get('scan_history_id')
     results_dir = ctx.get('results_dir')
     proxy = ctx.get('proxy')
+    if not proxy:
+        from reNgine.common_func import get_random_proxy
+        proxy = get_random_proxy() or None
     
     if not results_dir:
         logger.error('[CPDE] No results_dir found in context. Aborting.')

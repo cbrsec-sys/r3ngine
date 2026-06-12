@@ -1000,6 +1000,33 @@
             No interesting subdomains were identified on <span class="primary">{{ scan_object.domain.name }}</span>
         </p>
         {% endif %}
+            {% if show_recon and parameters %}
+            <div class="interesting-subdomain-table-container">
+                <h4 class="section-heading">Discovered Parameters ({{ parameters_count }})</h4>
+                <table class="interesting-subdomain-table">
+                    <tr>
+                        <th class="number-td">#</th>
+                        <th>Parameter</th>
+                        <th>Endpoint URL</th>
+                        <th>Location</th>
+                        <th>Type</th>
+                        <th>Confidence</th>
+                        <th>Sources</th>
+                    </tr>
+                    {% for p in parameters %}
+                    <tr class="{% if p.is_auth_related %}high-td{% endif %}">
+                        <td class="number-td">{{ forloop.counter }}</td>
+                        <td>{{ p.name }}{% if p.is_auth_related %} <span style="color: #e74c3c; font-size: 0.8em;">[AUTH]</span>{% endif %}</td>
+                        <td style="word-break: break-all; font-size: 0.85em;">{{ p.endpoint.http_url|default:"-" }}</td>
+                        <td>{{ p.param_location|default:"-" }}</td>
+                        <td>{{ p.data_type|default:"-" }}</td>
+                        <td>{{ p.confidence }}%</td>
+                        <td style="font-size: 0.85em;">{{ p.sources|join:", " }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+            {% endif %}
     </article>
     {% if show_vuln %}
     <h3 class="primary">Summary of Vulnerabilities Identified</h3>
