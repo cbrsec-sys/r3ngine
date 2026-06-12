@@ -99,7 +99,10 @@ class CVEEnrichmentService:
         try:
             self._enrich_from_nvd(cve_obj)
         except Exception as e:
-            logger.warning(f"NVD enrichment failed for {cve_name}: {e}")
+            if "404" in str(e):
+                logger.debug(f"NVD enrichment not found for {cve_name}")
+            else:
+                logger.warning(f"NVD enrichment failed for {cve_name}: {e}")
         
         try:
             self._enrich_from_epss(cve_obj)
@@ -377,7 +380,7 @@ class CVEEnrichmentService:
                 if error_lines:
                     logger.warning("%s", " | ".join(error_lines))
                 else:
-                    logger.warning("vulnx command failed with code %d", result.returncode)
+                    logger.debug("vulnx command failed with code %d", result.returncode)
                 return
 
             if not result.stdout.strip():
@@ -496,7 +499,7 @@ class CVEEnrichmentService:
                 
                 json_files = glob.glob(os.path.join(tmpdir, "*.json"))
                 if not json_files:
-                    logger.warning(f"SploitScan failed to produce JSON for {cve_obj.name}")
+                    logger.debug(f"SploitScan failed to produce JSON for {cve_obj.name}")
                     return
                 
                 with open(json_files[0], 'r') as f:
