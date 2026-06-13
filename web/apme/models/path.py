@@ -11,6 +11,8 @@ class PathStep:
     confidence: float = 0.0
     validated: bool = False
     edge_type: str = ""
+    mitre_technique: str = ""
+    mitre_tactic: str = ""
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -21,6 +23,8 @@ class PathStep:
             "validated": self.validated,
             "status": "validated" if self.validated else "inferred",
             "edge_type": self.edge_type,
+            "mitre_technique": self.mitre_technique,
+            "mitre_tactic": self.mitre_tactic,
         }
 
 
@@ -35,7 +39,7 @@ class AttackPath:
     end: str
     steps: List[PathStep] = field(default_factory=list)
     score: float = 0.0
-    risk: str = "low"    # critical | high | medium | low
+    risk: str = "low"    # critical | high | medium | low | speculative
     entry_type: str = "internet"  # internet | credential | user_defined
 
     def to_dict(self) -> Dict[str, Any]:
