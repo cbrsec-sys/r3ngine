@@ -52,7 +52,19 @@ _RELS_PROJECTION = (
     "requires_java: r.requires_java, "
     "requires_python: r.requires_python, "
     "requires_wordpress: r.requires_wordpress, "
-    "endpoint_requires_auth: r.endpoint_requires_auth"
+    "endpoint_requires_auth: r.endpoint_requires_auth, "
+    "requires_dotnet: r.requires_dotnet, "
+    "requires_kubernetes: r.requires_kubernetes, "
+    "requires_docker: r.requires_docker, "
+    "requires_ruby: r.requires_ruby, "
+    "requires_nodejs: r.requires_nodejs, "
+    "requires_active_directory: r.requires_active_directory, "
+    "requires_mssql: r.requires_mssql, "
+    "requires_oracle: r.requires_oracle, "
+    "requires_redis: r.requires_redis, "
+    "requires_drupal: r.requires_drupal, "
+    "requires_joomla: r.requires_joomla, "
+    "requires_magento: r.requires_magento"
     "}] AS rels"
 )
 
@@ -296,6 +308,19 @@ class Pathfinder:
             "requires_python":        bool(rel.get("requires_python", False)),
             "requires_wordpress":     bool(rel.get("requires_wordpress", False)),
             "endpoint_requires_auth": bool(rel.get("endpoint_requires_auth", False)),
+            # Phase 2 constraint flags
+            "requires_dotnet":           bool(rel.get("requires_dotnet", False)),
+            "requires_kubernetes":       bool(rel.get("requires_kubernetes", False)),
+            "requires_docker":           bool(rel.get("requires_docker", False)),
+            "requires_ruby":             bool(rel.get("requires_ruby", False)),
+            "requires_nodejs":           bool(rel.get("requires_nodejs", False)),
+            "requires_active_directory": bool(rel.get("requires_active_directory", False)),
+            "requires_mssql":            bool(rel.get("requires_mssql", False)),
+            "requires_oracle":           bool(rel.get("requires_oracle", False)),
+            "requires_redis":            bool(rel.get("requires_redis", False)),
+            "requires_drupal":           bool(rel.get("requires_drupal", False)),
+            "requires_joomla":           bool(rel.get("requires_joomla", False)),
+            "requires_magento":          bool(rel.get("requires_magento", False)),
         }
 
         if edge_type == "AUTHENTICATES":

@@ -14,6 +14,8 @@ Prevents fantasy exploit chains by enforcing:
 9. WordPress technology gate — Phase 1
 10. Authenticated endpoint boundary — Phase 1
 11. Minimum path confidence product — Phase 1
+12-23. Technology gates for .NET, Kubernetes, Docker, Ruby, Node.js,
+       Active Directory, MSSQL, Oracle, Redis, Drupal, Joomla, Magento — Phase 2
 """
 
 import logging
@@ -44,6 +46,18 @@ class PathContext:
         self.has_java_tech: bool = False
         self.has_python_tech: bool = False
         self.has_wordpress_tech: bool = False
+        self.has_dotnet_tech: bool = False
+        self.has_kubernetes_tech: bool = False
+        self.has_docker_tech: bool = False
+        self.has_ruby_tech: bool = False
+        self.has_nodejs_tech: bool = False
+        self.has_active_directory_tech: bool = False
+        self.has_mssql_tech: bool = False
+        self.has_oracle_tech: bool = False
+        self.has_redis_tech: bool = False
+        self.has_drupal_tech: bool = False
+        self.has_joomla_tech: bool = False
+        self.has_magento_tech: bool = False
         self.visited_node_ids: set = None
         self.path_confidence_product: float = 1.0
 
@@ -162,6 +176,66 @@ class ConstraintEngine:
             )
             return False
 
+        # 12. .NET gate
+        if step.get("requires_dotnet") and not context.has_dotnet_tech:
+            logger.debug("APME Constraint [dotnet]: .NET required but not detected. Blocked.")
+            return False
+
+        # 13. Kubernetes gate
+        if step.get("requires_kubernetes") and not context.has_kubernetes_tech:
+            logger.debug("APME Constraint [kubernetes]: Kubernetes required but not detected. Blocked.")
+            return False
+
+        # 14. Docker gate
+        if step.get("requires_docker") and not context.has_docker_tech:
+            logger.debug("APME Constraint [docker]: Docker required but not detected. Blocked.")
+            return False
+
+        # 15. Ruby gate
+        if step.get("requires_ruby") and not context.has_ruby_tech:
+            logger.debug("APME Constraint [ruby]: Ruby required but not detected. Blocked.")
+            return False
+
+        # 16. Node.js gate
+        if step.get("requires_nodejs") and not context.has_nodejs_tech:
+            logger.debug("APME Constraint [nodejs]: Node.js required but not detected. Blocked.")
+            return False
+
+        # 17. Active Directory gate
+        if step.get("requires_active_directory") and not context.has_active_directory_tech:
+            logger.debug("APME Constraint [active_directory]: Active Directory required but not detected. Blocked.")
+            return False
+
+        # 18. MSSQL gate
+        if step.get("requires_mssql") and not context.has_mssql_tech:
+            logger.debug("APME Constraint [mssql]: MSSQL required but not detected. Blocked.")
+            return False
+
+        # 19. Oracle gate
+        if step.get("requires_oracle") and not context.has_oracle_tech:
+            logger.debug("APME Constraint [oracle]: Oracle required but not detected. Blocked.")
+            return False
+
+        # 20. Redis gate
+        if step.get("requires_redis") and not context.has_redis_tech:
+            logger.debug("APME Constraint [redis]: Redis required but not detected. Blocked.")
+            return False
+
+        # 21. Drupal gate
+        if step.get("requires_drupal") and not context.has_drupal_tech:
+            logger.debug("APME Constraint [drupal]: Drupal required but not detected. Blocked.")
+            return False
+
+        # 22. Joomla gate
+        if step.get("requires_joomla") and not context.has_joomla_tech:
+            logger.debug("APME Constraint [joomla]: Joomla required but not detected. Blocked.")
+            return False
+
+        # 23. Magento gate
+        if step.get("requires_magento") and not context.has_magento_tech:
+            logger.debug("APME Constraint [magento]: Magento required but not detected. Blocked.")
+            return False
+
         return True
 
     def update_context(self, step: Dict[str, Any], context: PathContext) -> None:
@@ -184,6 +258,30 @@ class ConstraintEngine:
             context.has_python_tech = True
         elif to_subtype == "wordpress":
             context.has_wordpress_tech = True
+        elif to_subtype in ("dotnet", "csharp", "aspnet"):
+            context.has_dotnet_tech = True
+        elif to_subtype in ("kubernetes", "k8s"):
+            context.has_kubernetes_tech = True
+        elif to_subtype in ("docker", "container"):
+            context.has_docker_tech = True
+        elif to_subtype in ("ruby", "rails"):
+            context.has_ruby_tech = True
+        elif to_subtype in ("nodejs", "node", "express"):
+            context.has_nodejs_tech = True
+        elif to_subtype in ("active_directory", "ldap", "exchange"):
+            context.has_active_directory_tech = True
+        elif to_subtype in ("mssql", "sqlserver"):
+            context.has_mssql_tech = True
+        elif to_subtype == "oracle":
+            context.has_oracle_tech = True
+        elif to_subtype == "redis":
+            context.has_redis_tech = True
+        elif to_subtype == "drupal":
+            context.has_drupal_tech = True
+        elif to_subtype == "joomla":
+            context.has_joomla_tech = True
+        elif to_subtype == "magento":
+            context.has_magento_tech = True
         # Track visited nodes and update confidence product
         if to_id := step.get("to_id", ""):
             context.visit_node(to_id)
