@@ -100,3 +100,95 @@ rules:
         type: LEADS_TO
         target_subtype: data_exfil
         confidence: 0.75
+
+  - name: saml_signature_wrapping_to_auth_bypass
+    mitre_id: "T1606.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: saml_signature_wrapping
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.85
+
+  - name: saml_to_account_takeover
+    mitre_id: "T1606.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: saml_signature_wrapping
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.80
+
+  - name: oauth_token_theft_to_account_takeover
+    mitre_id: "T1528"
+    if:
+      node.type: Vulnerability
+      node.subtype: oauth_token_theft
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.80
+
+  - name: pkce_bypass_to_auth_access
+    mitre_id: "T1078.004"
+    if:
+      node.type: Vulnerability
+      node.subtype: pkce_bypass
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.75
+
+  - name: session_fixation_to_account_takeover
+    mitre_id: "T1563"
+    if:
+      node.type: Vulnerability
+      node.subtype: session_fixation
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.70
+        requires_victim: true
+
+  - name: account_enumeration_to_credential_harvesting
+    mitre_id: "T1589.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: account_enumeration
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: credential_harvesting
+        confidence: 0.55
+
+  - name: broken_object_level_to_data_exfil
+    mitre_id: "T1530"
+    if:
+      node.type: Vulnerability
+      node.subtype: idor
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.75
+
+  - name: parameter_tampering_to_privilege_escalation
+    mitre_id: "T1548"
+    if:
+      node.type: Vulnerability
+      node.subtype: parameter_tampering
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.65

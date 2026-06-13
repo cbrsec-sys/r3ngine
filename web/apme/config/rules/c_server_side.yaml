@@ -77,3 +77,60 @@ rules:
         type: LEADS_TO
         target_subtype: pivot
         confidence: 0.70
+
+  - name: blind_ssrf_to_metadata_access
+    mitre_id: "T1552.005"
+    if:
+      node.type: Vulnerability
+      node.subtype: blind_ssrf
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: metadata_access
+        confidence: 0.50
+
+  - name: blind_ssrf_verified_to_cloud_access
+    mitre_id: "T1552.005"
+    if:
+      node.type: Vulnerability
+      node.subtype: blind_ssrf
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: cloud_access
+        confidence: 0.80
+
+  - name: ssrf_to_redis_rce
+    mitre_id: "T1090"
+    if:
+      node.type: Vulnerability
+      node.subtype: ssrf
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.75
+        requires_redis: true
+
+  - name: http_request_smuggling_to_auth_bypass
+    mitre_id: "T1557"
+    if:
+      node.type: Vulnerability
+      node.subtype: http_request_smuggling
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.70
+
+  - name: http_request_smuggling_to_data_exfil
+    mitre_id: "T1557"
+    if:
+      node.type: Vulnerability
+      node.subtype: http_request_smuggling
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.65

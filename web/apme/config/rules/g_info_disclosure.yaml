@@ -70,3 +70,49 @@ rules:
         type: LEADS_TO
         target_subtype: authenticated_access
         confidence: 0.70
+
+  - name: nginx_alias_traversal_to_data_exfil
+    mitre_id: "T1083"
+    if:
+      node.type: Vulnerability
+      node.subtype: nginx_alias_traversal
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.75
+
+  - name: http_method_tampering_to_data_exfil
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: http_method_tampering
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.60
+
+  - name: reflected_file_download_to_credential_harvesting
+    mitre_id: "T1566.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: reflected_file_download
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: credential_harvesting
+        confidence: 0.65
+        requires_victim: true
+
+  - name: web_cache_deception_to_data_exfil
+    mitre_id: "T1557"
+    if:
+      node.type: Vulnerability
+      node.subtype: web_cache_deception
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.70
+        requires_victim: true

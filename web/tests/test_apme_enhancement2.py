@@ -594,3 +594,132 @@ class ConstraintContextUpdateTests(TestCase):
         ctx = PathContext()
         self.engine.update_context(self._step_with_subtype("wordpress"), ctx)
         self.assertTrue(ctx.has_wordpress_tech)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 3 — Existing Rules Addition Tests
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class ExistingRulesAdditionTests(TestCase):
+    """Verify the 29 new rules added to existing YAML rule files."""
+
+    def setUp(self) -> None:
+        from apme.engine.rules_engine import RulesEngine
+        self.engine = RulesEngine()
+        self.rule_names = {r["name"] for r in self.engine._rules}
+
+    # ── Aggregate count ───────────────────────────────────────────────
+
+    def test_total_rule_count_at_least_105(self) -> None:
+        self.assertGreaterEqual(
+            len(self.engine._rules), 105,
+            f"Expected >= 105 rules (76 existing + 29 new), got {len(self.engine._rules)}",
+        )
+
+    # ── a_injection rules (7) ─────────────────────────────────────────
+
+    def test_blind_sqli_to_db_access(self) -> None:
+        self.assertIn("blind_sqli_to_db_access", self.rule_names)
+
+    def test_blind_sqli_verified_to_db_access(self) -> None:
+        self.assertIn("blind_sqli_verified_to_db_access", self.rule_names)
+
+    def test_second_order_sqli_to_account_takeover(self) -> None:
+        self.assertIn("second_order_sqli_to_account_takeover", self.rule_names)
+
+    def test_nosql_injection_to_auth_bypass(self) -> None:
+        self.assertIn("nosql_injection_to_auth_bypass", self.rule_names)
+
+    def test_ognl_injection_to_rce(self) -> None:
+        self.assertIn("ognl_injection_to_rce", self.rule_names)
+
+    def test_blind_cmdi_to_rce(self) -> None:
+        self.assertIn("blind_cmdi_to_rce", self.rule_names)
+
+    def test_blind_cmdi_verified_to_rce(self) -> None:
+        self.assertIn("blind_cmdi_verified_to_rce", self.rule_names)
+
+    # ── c_server_side rules (5) ───────────────────────────────────────
+
+    def test_blind_ssrf_to_metadata_access(self) -> None:
+        self.assertIn("blind_ssrf_to_metadata_access", self.rule_names)
+
+    def test_blind_ssrf_verified_to_cloud_access(self) -> None:
+        self.assertIn("blind_ssrf_verified_to_cloud_access", self.rule_names)
+
+    def test_ssrf_to_redis_rce(self) -> None:
+        self.assertIn("ssrf_to_redis_rce", self.rule_names)
+
+    def test_http_request_smuggling_to_auth_bypass(self) -> None:
+        self.assertIn("http_request_smuggling_to_auth_bypass", self.rule_names)
+
+    def test_http_request_smuggling_to_data_exfil(self) -> None:
+        self.assertIn("http_request_smuggling_to_data_exfil", self.rule_names)
+
+    # ── e_auth_identity rules (8) ─────────────────────────────────────
+
+    def test_saml_signature_wrapping_to_auth_bypass(self) -> None:
+        self.assertIn("saml_signature_wrapping_to_auth_bypass", self.rule_names)
+
+    def test_saml_to_account_takeover(self) -> None:
+        self.assertIn("saml_to_account_takeover", self.rule_names)
+
+    def test_oauth_token_theft_to_account_takeover(self) -> None:
+        self.assertIn("oauth_token_theft_to_account_takeover", self.rule_names)
+
+    def test_pkce_bypass_to_auth_access(self) -> None:
+        self.assertIn("pkce_bypass_to_auth_access", self.rule_names)
+
+    def test_session_fixation_to_account_takeover(self) -> None:
+        self.assertIn("session_fixation_to_account_takeover", self.rule_names)
+
+    def test_account_enumeration_to_credential_harvesting(self) -> None:
+        self.assertIn("account_enumeration_to_credential_harvesting", self.rule_names)
+
+    def test_broken_object_level_to_data_exfil(self) -> None:
+        self.assertIn("broken_object_level_to_data_exfil", self.rule_names)
+
+    def test_parameter_tampering_to_privilege_escalation(self) -> None:
+        self.assertIn("parameter_tampering_to_privilege_escalation", self.rule_names)
+
+    # ── f_client_side rules (5) ───────────────────────────────────────
+
+    def test_blind_xss_to_credential_harvesting(self) -> None:
+        self.assertIn("blind_xss_to_credential_harvesting", self.rule_names)
+
+    def test_dom_xss_to_account_takeover(self) -> None:
+        self.assertIn("dom_xss_to_account_takeover", self.rule_names)
+
+    def test_websocket_hijacking_to_auth_access(self) -> None:
+        self.assertIn("websocket_hijacking_to_auth_access", self.rule_names)
+
+    def test_iframe_injection_to_phishing(self) -> None:
+        self.assertIn("iframe_injection_to_phishing", self.rule_names)
+
+    def test_postmessage_origin_bypass_to_data_exfil(self) -> None:
+        self.assertIn("postmessage_origin_bypass_to_data_exfil", self.rule_names)
+
+    # ── g_info_disclosure rules (4) ───────────────────────────────────
+
+    def test_nginx_alias_traversal_to_data_exfil(self) -> None:
+        self.assertIn("nginx_alias_traversal_to_data_exfil", self.rule_names)
+
+    def test_http_method_tampering_to_data_exfil(self) -> None:
+        self.assertIn("http_method_tampering_to_data_exfil", self.rule_names)
+
+    def test_reflected_file_download_to_credential_harvesting(self) -> None:
+        self.assertIn("reflected_file_download_to_credential_harvesting", self.rule_names)
+
+    def test_web_cache_deception_to_data_exfil(self) -> None:
+        self.assertIn("web_cache_deception_to_data_exfil", self.rule_names)
+
+    # ── Constraint flag spot-checks ───────────────────────────────────
+
+    def test_ognl_rule_has_requires_java(self) -> None:
+        rule = next(r for r in self.engine._rules if r["name"] == "ognl_injection_to_rce")
+        self.assertTrue(rule["then"]["create_edge"].get("requires_java"))
+
+    def test_ssrf_redis_rule_has_requires_redis(self) -> None:
+        rule = next(r for r in self.engine._rules if r["name"] == "ssrf_to_redis_rce")
+        self.assertTrue(rule["then"]["create_edge"].get("requires_redis"))
