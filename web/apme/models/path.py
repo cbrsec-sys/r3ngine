@@ -13,6 +13,7 @@ class PathStep:
     edge_type: str = ""
     mitre_technique: str = ""
     mitre_tactic: str = ""
+    requires_victim: bool = False
 
     def to_dict(self) -> Dict[str, Any]:
         return {
