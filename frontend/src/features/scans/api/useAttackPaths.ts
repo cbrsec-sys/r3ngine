@@ -38,6 +38,8 @@ export interface EnrichedNode {
   severity?: number;
   cvss_score?: number;
   vuln_id?: number | null;
+  cwe?: string;
+  technique?: string;
 }
 
 export interface AttackStep {
@@ -50,6 +52,11 @@ export interface AttackStep {
   status: 'validated' | 'inferred';
   from_node?: EnrichedNode;
   to_node?: EnrichedNode;
+  mitre_technique?: string;
+  mitre_technique_name?: string;
+  mitre_tactic?: string;
+  mitre_tactic_display?: string;
+  mitre_tactic_color?: string;
 }
 
 export interface AttackPath {
@@ -62,11 +69,14 @@ export interface AttackPath {
   remediation_priority: number;
   vulnerability_id: number | null;
   explanation?: string;
+  mitre_techniques?: string[];
+  mitre_tactics?: string[];
 }
 
 export interface AttackPathsResponse {
   total_paths: number;
   paths: AttackPath[];
+  speculative_paths?: AttackPath[];
 }
 
 const fetchAttackPaths = async (scanId: number): Promise<AttackPathsResponse> => {
