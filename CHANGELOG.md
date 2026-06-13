@@ -2,6 +2,22 @@
 
 ### [v3.6.0] - Unreleased
 
+- **Intelligent Tool Gating (Tier 5)**:
+  - **JWT tool gate**: `jwt_tool` now only runs when JWT tokens have been detected in the current scan. Detection checks `Parameter` records with `is_auth_related=True` whose name matches known JWT patterns (`jwt`, `bearer`, `authorization`, `access_token`, `refresh_token`, `id_token`, `auth_token`), and `SecretLeak` records whose `secret_type` indicates a JWT or Bearer token. Scans against non-authenticated endpoints no longer waste time running JWT algorithm-confusion attacks.
+  - **GraphQL tool gate**: Both `InQL` and `graphql-cop` now gate on confirmed GraphQL endpoint presence. The gate first checks existing `EndPoint` database records for URLs matching `/graphql` or `/graphiql` (zero network cost), then falls back to HEAD-probing 6 common GraphQL paths if the DB has no evidence. Tools are skipped with a clear log entry on non-GraphQL targets.
+  - **OpenAPI discovery gate**: The CPDE OpenAPI discoverer now gates on `has_openapi_spec()` before calling the full `discover()` pipeline. The gate uses lightweight HEAD requests against the same 14 probe paths used by the discoverer itself, avoiding up to 14 full GET requests per host on targets that serve no API documentation.
+  - Added `has_jwt_tokens()`, `has_graphql_endpoint()`, and `has_openapi_spec()` helper functions to `common_func.py` for reuse across the scan pipeline.
+
+- **CPDE (Custom Parameter Discovery Engine) — End-to-End Fixes**:
+  - **URL derivation fix**: The `RunParamDiscoveryActivity` no longer silently no-ops when `urls` is absent from the scan context. It now queries `EndPoint` records for the scan, falls back to domain name construction, and logs a warning with early return if still empty.
+  - **Missing dependency**: Added `esprima==4.0.1` to `requirements.txt`; the JS AST analyzer was silently skipping all JavaScript analysis due to the missing import.
+  - **Neo4j property mismatch**: Fixed 3 Cypher `MATCH` clauses in `graph_writer.py` that referenced `http_url` on `Endpoint` nodes — the graph stores `url`, causing all graph enrichment writes to silently match zero nodes.
+  - **`get_neo4j_driver()` helper**: Added to `reNgine/utils/graph.py` so `cpde_tasks.py` can obtain a driver without re-implementing manager instantiation.
+  - **Proxy sourcing**: Replaced direct `Proxy.objects.first()` access with `get_random_proxy()` from `common_func.py`, respecting TOR mode and the `use_proxy` scan flag.
+  - **ParameterSerializer**: Replaced broken serializer (referenced non-existent `is_reflected`/`is_source`/`is_sink` fields) with correct CPDE fields and a nested `ParameterEndpointSerializer` so `endpoint.http_url` is returned instead of a bare PK integer.
+  - **Parameters tab filtering**: Added 7 server-side filter parameters to `ParameterViewSet` (`param_location`, `is_auth_related`, `observed_in_js`, `observed_in_openapi`, `observed_in_graphql`, `confidence_min`, `data_type`) and a collapsible filter panel in the frontend `ParametersTab` component.
+  - **Report integration**: `generate_report_task` now queries and passes `Parameter` records to all four report templates (`modern`, `enterprise`, `cyber_pro`, `default`), each with a gated Discovered Parameters table.
+
 - **Vigolium Scanning Enhancement**:
   - Removed incorrect inline parsing of the `--known-issue-scan-severities` argument inside `vigolium_tasks.py`.
   - Configured vigolium globally at the container level (in both Python and Go temporal entrypoints) using `vigolium config set known_issue_scan.severities "critical,high,medium,low,info"` to ensure all severity levels are scanned by default.
