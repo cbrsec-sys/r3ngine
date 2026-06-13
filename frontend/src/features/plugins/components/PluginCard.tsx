@@ -50,6 +50,7 @@ import {
   useBurpHealth,
 } from '../api/pluginsApi';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface Props {
@@ -365,7 +366,7 @@ const PluginDocsModal: React.FC<DocsModalProps> = ({ open, onClose, plugin }) =>
                     File: {filename}
                   </Typography>
                 )}
-                <ReactMarkdown>{content}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
               </Box>
             ))}
           </Box>
