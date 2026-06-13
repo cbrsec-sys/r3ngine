@@ -389,92 +389,93 @@ class AtomicInstaller:
                     shutil.rmtree(final_dir)
                 shutil.move(temp_dir, final_dir)
                 
-                # 5. Ingest Engine Fixtures and Run Migrations
-                # Run dynamic migrations if the plugin has models
-                backend_dir = os.path.join(final_dir, 'backend')
-                if os.path.exists(os.path.join(backend_dir, 'models.py')):
-                    # Ensure package directories have __init__.py files present
-                    for d in [final_dir, backend_dir]:
-                        init_f = os.path.join(d, '__init__.py')
-                        if not os.path.exists(init_f):
-                            try:
-                                with open(init_f, 'w') as f:
-                                    pass
-                            except Exception:
-                                pass
-
-                    app_label = f"{plugin_slug}_backend"
-                    logger.info(f"Running migrations for plugin app: {app_label}")
-                    cls._emit(install_id, 'migrations', 'in_progress')
-                    try:
-                        import sys
-                        # Run makemigrations in a clean subprocess to auto-load the new app config
-                        makemigrate_res = subprocess.run(
-                            [sys.executable, "manage.py", "makemigrations", app_label],
-                            cwd=settings.BASE_DIR,
-                            capture_output=True,
-                            text=True,
-                            check=True
-                        )
-                        logger.info(f"Subprocess makemigrations stdout: {makemigrate_res.stdout}")
-                        
-                        # Run migrate in a clean subprocess
-                        migrate_res = subprocess.run(
-                            [sys.executable, "manage.py", "migrate", app_label],
-                            cwd=settings.BASE_DIR,
-                            capture_output=True,
-                            text=True,
-                            check=True
-                        )
-                        logger.info(f"Subprocess migrate stdout: {migrate_res.stdout}")
-                        logger.info(f"Successfully migrated plugin: {plugin_slug}")
-                        cls._emit(install_id, 'migrations', 'completed')
-                    except subprocess.CalledProcessError as e:
-                        logger.error(f"Failed to run migrations for {plugin_slug} (exit {e.returncode}):\nStdout: {e.stdout}\nStderr: {e.stderr}")
-                        raise Exception(f"Migration subprocess failed for {app_label}: {e.stderr or e.stdout}")
-                    except Exception as e:
-                        logger.error(f"Unexpected error running migrations for {plugin_slug}: {str(e)}")
-                        raise e
-                else:
-                    # Plugin has no models — migrations not needed
-                    cls._emit(install_id, 'migrations', 'skipped')
-
-                cls._emit(install_id, 'assets', 'in_progress')
-                from scanEngine.models import EngineType
-                for file in os.listdir(final_dir):
-                    if file.endswith('_engine.yaml'):
-                        fixture_path = os.path.join(final_dir, file)
-                        logger.info(f"Ingesting engine fixture: {fixture_path}")
-                        try:
-                            with open(fixture_path, 'r') as f:
-                                fixture_data = yaml.safe_load(f)
-                                if isinstance(fixture_data, list):
-                                    for item in fixture_data:
-                                        if item.get('model') == 'scanEngine.enginetype':
-                                            fields = item.get('fields', {})
-                                            name = fields.get('engine_name')
-                                            if name:
-                                                obj, created = EngineType.objects.update_or_create(
-                                                    engine_name=name,
-                                                    defaults=fields
-                                                )
-                                                logger.info(f"{'Created' if created else 'Updated'} engine: {name}")
-                                            else:
-                                                logger.warning(f"Engine fixture item missing engine_name: {item}")
-                                        else:
-                                            # Fallback for other models (e.g. Wordlist, etc.)
-                                            call_command('loaddata', fixture_path, format='yaml')
-                                            logger.info(f"Fallback loaddata used for: {file}")
-                                else:
-                                    logger.error(f"Invalid fixture format in {file}")
-                        except Exception as e:
-                            logger.error(f"CRITICAL: Failed to ingest engine fixture {file}: {str(e)}")
-
             # --- End of transaction.atomic() block ---
-            # Steps 6 & 7 are performed OUTSIDE the long transaction so that fresh
-            # DB connections are used after the migration subprocesses complete.
-            # This prevents the 'server closed the connection unexpectedly' error
-            # caused by PostgreSQL dropping idle connections inside a long transaction.
+            # Migration and fixture steps are performed OUTSIDE the long transaction so that
+            # we do not trigger 'server closed the connection unexpectedly' errors caused by
+            # PostgreSQL dropping idle connections inside a long transaction (idle-in-transaction timeout).
+            from django.db import connection as _db_conn
+            _db_conn.close()
+
+            # 5. Ingest Engine Fixtures and Run Migrations
+            # Run dynamic migrations if the plugin has models
+            backend_dir = os.path.join(final_dir, 'backend')
+            if os.path.exists(os.path.join(backend_dir, 'models.py')):
+                # Ensure package directories have __init__.py files present
+                for d in [final_dir, backend_dir]:
+                    init_f = os.path.join(d, '__init__.py')
+                    if not os.path.exists(init_f):
+                        try:
+                            with open(init_f, 'w') as f:
+                                pass
+                        except Exception:
+                            pass
+
+                app_label = f"{plugin_slug}_backend"
+                logger.info(f"Running migrations for plugin app: {app_label}")
+                cls._emit(install_id, 'migrations', 'in_progress')
+                try:
+                    import sys
+                    # Run makemigrations in a clean subprocess to auto-load the new app config
+                    makemigrate_res = subprocess.run(
+                        [sys.executable, "manage.py", "makemigrations", app_label],
+                        cwd=settings.BASE_DIR,
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    logger.info(f"Subprocess makemigrations stdout: {makemigrate_res.stdout}")
+                    
+                    # Run migrate in a clean subprocess
+                    migrate_res = subprocess.run(
+                        [sys.executable, "manage.py", "migrate", app_label],
+                        cwd=settings.BASE_DIR,
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    logger.info(f"Subprocess migrate stdout: {migrate_res.stdout}")
+                    logger.info(f"Successfully migrated plugin: {plugin_slug}")
+                    cls._emit(install_id, 'migrations', 'completed')
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"Failed to run migrations for {plugin_slug} (exit {e.returncode}):\nStdout: {e.stdout}\nStderr: {e.stderr}")
+                    raise Exception(f"Migration subprocess failed for {app_label}: {e.stderr or e.stdout}")
+                except Exception as e:
+                    logger.error(f"Unexpected error running migrations for {plugin_slug}: {str(e)}")
+                    raise e
+            else:
+                # Plugin has no models — migrations not needed
+                cls._emit(install_id, 'migrations', 'skipped')
+
+            cls._emit(install_id, 'assets', 'in_progress')
+            from scanEngine.models import EngineType
+            for file in os.listdir(final_dir):
+                if file.endswith('_engine.yaml'):
+                    fixture_path = os.path.join(final_dir, file)
+                    logger.info(f"Ingesting engine fixture: {fixture_path}")
+                    try:
+                        with open(fixture_path, 'r') as f:
+                            fixture_data = yaml.safe_load(f)
+                            if isinstance(fixture_data, list):
+                                for item in fixture_data:
+                                    if item.get('model') == 'scanEngine.enginetype':
+                                        fields = item.get('fields', {})
+                                        name = fields.get('engine_name')
+                                        if name:
+                                            obj, created = EngineType.objects.update_or_create(
+                                                engine_name=name,
+                                                defaults=fields
+                                            )
+                                            logger.info(f"{'Created' if created else 'Updated'} engine: {name}")
+                                        else:
+                                            logger.warning(f"Engine fixture item missing engine_name: {item}")
+                                    else:
+                                        # Fallback for other models (e.g. Wordlist, etc.)
+                                        call_command('loaddata', fixture_path, format='yaml')
+                                        logger.info(f"Fallback loaddata used for: {file}")
+                            else:
+                                logger.error(f"Invalid fixture format in {file}")
+                    except Exception as e:
+                        logger.error(f"CRITICAL: Failed to ingest engine fixture {file}: {str(e)}")
 
             # 6. Parse tools.yaml — save in its own short transaction with a fresh connection.
             tools_path = os.path.join(final_dir, 'tools.yaml')
