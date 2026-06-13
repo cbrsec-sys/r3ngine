@@ -961,7 +961,7 @@ from apme.models.node import Node
 
 logger = logging.getLogger(__name__)
 
-_RULES_FILE = os.path.join(os.path.dirname(__file__), "..", "config", "rules.yaml")
+_RULES_FILE = os.path.join(os.path.dirname(__file__), "..", "config", "rules")
 
 _OPS = {
     ">=": operator.ge,
@@ -988,11 +988,43 @@ class RulesEngine:
         self._load_rules(rules_file)
 
     def _load_rules(self, rules_file: str) -> None:
+        """Load rules from a directory of YAML files or a single YAML file.
+
+        Directory mode: loads all *.yaml files sorted alphabetically (category
+        prefix a_, b_, … ensures consistent load order) and merges their
+        `rules` lists. Single-file mode is kept for backward-compatibility and
+        tests that pass an explicit path.
+        """
+        all_rules: List[Dict[str, Any]] = []
         try:
-            with open(rules_file, "r") as f:
-                data = yaml.safe_load(f)
-                self._rules = data.get("rules", [])
-            logger.info("APME RulesEngine: Loaded %d rules from %s.", len(self._rules), rules_file)
+            if os.path.isdir(rules_file):
+                yaml_files = sorted(
+                    f for f in os.listdir(rules_file)
+                    if f.endswith(".yaml") or f.endswith(".yml")
+                )
+                for fname in yaml_files:
+                    fpath = os.path.join(rules_file, fname)
+                    try:
+                        with open(fpath, "r") as f:
+                            data = yaml.safe_load(f)
+                            file_rules = (data.get("rules", []) if data else [])
+                            all_rules.extend(file_rules)
+                            logger.info(
+                                "APME RulesEngine: Loaded %d rules from %s.",
+                                len(file_rules), fname,
+                            )
+                    except Exception as exc:
+                        logger.error("APME RulesEngine: Failed to load %s: %s", fpath, exc)
+            else:
+                with open(rules_file, "r") as f:
+                    data = yaml.safe_load(f)
+                    all_rules = data.get("rules", []) if data else []
+                logger.info(
+                    "APME RulesEngine: Loaded %d rules from %s.", len(all_rules), rules_file
+                )
+
+            self._rules = all_rules
+            logger.info("APME RulesEngine: Total rules loaded: %d.", len(self._rules))
         except Exception as exc:
             logger.error("APME RulesEngine: Failed to load rules from %s: %s", rules_file, exc)
 
