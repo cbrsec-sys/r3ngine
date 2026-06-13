@@ -122,3 +122,33 @@ class TaxonomyInferenceTests(TestCase):
     def test_subdomain_takeover(self):
         result = _infer_taxonomy("Subdomain takeover via dangling CNAME", "", 3)
         self.assertEqual(result["subtype"], "subdomain_takeover")
+
+
+from apme.ingestion.credentials import _infer_credential_subtype
+
+
+class CredentialSubtypeTests(TestCase):
+
+    def test_aws_key_to_cloud_api_key(self):
+        self.assertEqual(_infer_credential_subtype("AWS Access Key"), "cloud_api_key")
+
+    def test_akia_prefix_to_cloud_api_key(self):
+        self.assertEqual(_infer_credential_subtype("AKIA1234EXAMPLE"), "cloud_api_key")
+
+    def test_jwt_to_jwt_token(self):
+        self.assertEqual(_infer_credential_subtype("JWT Token"), "jwt_token")
+
+    def test_github_token(self):
+        self.assertEqual(_infer_credential_subtype("ghp_github_token"), "github_token")
+
+    def test_db_password(self):
+        self.assertEqual(_infer_credential_subtype("POSTGRES_PASSWORD"), "db_password")
+
+    def test_ssh_key(self):
+        self.assertEqual(_infer_credential_subtype("-----BEGIN RSA PRIVATE KEY-----"), "ssh_key")
+
+    def test_generic_fallback(self):
+        self.assertEqual(_infer_credential_subtype("some_unknown_secret_type"), "generic_secret")
+
+    def test_stripe_api_key(self):
+        self.assertEqual(_infer_credential_subtype("stripe_secret_key"), "api_key")
