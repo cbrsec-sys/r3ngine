@@ -83,6 +83,71 @@ const RiskBadge: React.FC<{ risk: string }> = ({ risk }) => {
   );
 };
 
+// ─── MITRE Tactic color palette ──────────────────────────────────────────────
+const TACTIC_COLORS: Record<string, string> = {
+  'initial-access':       '#ff4444',
+  'execution':            '#ff8800',
+  'persistence':          '#ffcc00',
+  'privilege-escalation': '#aa00ff',
+  'defense-evasion':      '#0088ff',
+  'credential-access':    '#00aaff',
+  'discovery':            '#00ff88',
+  'lateral-movement':     '#ff00aa',
+  'collection':           '#ff6600',
+  'command-and-control':  '#9944ff',
+  'exfiltration':         '#ff0066',
+  'impact':               '#ff0000',
+  'resource-development': '#888888',
+  'reconnaissance':       '#44aaff',
+};
+
+// ─── MITRE ATT&CK badge ───────────────────────────────────────────────────────
+interface MitreBadgeProps {
+  technique?: string;
+  techniqueName?: string;
+  tactic?: string;
+  tacticDisplay?: string;
+  tacticColor?: string;
+}
+
+const MitreBadge: React.FC<MitreBadgeProps> = ({
+  technique,
+  techniqueName,
+  tactic,
+  tacticDisplay,
+  tacticColor,
+}) => {
+  if (!technique) return null;
+  const color = tacticColor ?? TACTIC_COLORS[tactic ?? ''] ?? '#888888';
+  const tooltip = `${techniqueName ?? technique}${tacticDisplay ? ` · ${tacticDisplay}` : ''}`;
+  return (
+    <Tooltip title={tooltip} arrow placement="top">
+      <Box
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          px: 0.75,
+          py: 0.15,
+          borderRadius: 0.5,
+          borderLeft: `3px solid ${color}`,
+          bgcolor: `${color}12`,
+          color,
+          fontSize: '0.48rem',
+          fontWeight: 900,
+          fontFamily: 'monospace',
+          letterSpacing: 0.5,
+          cursor: 'default',
+          userSelect: 'none',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+        }}
+      >
+        ATT&amp;CK&nbsp;·&nbsp;{technique}
+      </Box>
+    </Tooltip>
+  );
+};
+
 // ─── Enriched Node Rendering ──────────────────────────────────────────────────
 const RenderNode: React.FC<{ node: EnrichedNode | undefined; rawId: string; projectSlug?: string }> = ({ node, rawId, projectSlug }) => {
   const theme = useTheme();
@@ -177,6 +242,24 @@ const RenderNode: React.FC<{ node: EnrichedNode | undefined; rawId: string; proj
               }}
             />
           )}
+          {type === 'Vulnerability' && node?.cwe && (
+            <Chip
+              label={node.cwe}
+              size="small"
+              sx={{
+                height: 14,
+                fontSize: '0.5rem',
+                fontFamily: 'monospace',
+                bgcolor: 'rgba(255,159,0,0.08)',
+                color: '#ff9f00',
+                border: '1px solid rgba(255,159,0,0.15)',
+                '& .MuiChip-label': { px: 0.5 }
+              }}
+            />
+          )}
+          {type === 'Vulnerability' && node?.technique && (
+            <MitreBadge technique={node.technique} />
+          )}
         </Stack>
         <Typography
           noWrap
@@ -264,6 +347,13 @@ const TimelineConnector: React.FC<{ step: AttackStep }> = ({ step }) => {
           <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>
             CONF: <Box component="span" sx={{ color: '#00f3ff' }}>{(step.confidence * 100).toFixed(0)}%</Box>
           </Typography>
+          <MitreBadge
+            technique={step.mitre_technique}
+            techniqueName={step.mitre_technique_name}
+            tactic={step.mitre_tactic}
+            tacticDisplay={step.mitre_tactic_display}
+            tacticColor={step.mitre_tactic_color}
+          />
           <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', ml: 'auto' }}>
             <Icon size={10} color={edgeColor} />
             <Typography sx={{ fontSize: '0.55rem', color: edgeColor, fontWeight: 900, fontFamily: 'Orbitron', letterSpacing: 0.5 }}>
@@ -452,6 +542,40 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
           />
         </Stack>
       </Box>
+
+      {/* MITRE tactic strip */}
+      {path.mitre_tactics && path.mitre_tactics.length > 0 && (
+        <Box sx={{ px: 2, pb: expanded ? 0 : 1.5, pt: 0.5 }}>
+          <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+            {path.mitre_tactics.map((tactic) => {
+              const color = TACTIC_COLORS[tactic] ?? '#888888';
+              const label = tactic.replace(/-/g, ' ').toUpperCase();
+              return (
+                <Box
+                  key={tactic}
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    px: 0.75,
+                    py: 0.2,
+                    borderRadius: 4,
+                    bgcolor: `${color}10`,
+                    border: `1px solid ${color}30`,
+                    color,
+                    fontSize: '0.45rem',
+                    fontWeight: 900,
+                    fontFamily: 'Orbitron',
+                    letterSpacing: 0.5,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {label}
+                </Box>
+              );
+            })}
+          </Stack>
+        </Box>
+      )}
 
       {/* Expanded steps */}
       <Collapse in={expanded}>
@@ -731,6 +855,19 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
             <AlertTriangle size={12} color="#ff003c" />
             <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>
               Paths sorted by risk score (highest first)
+            </Typography>
+          </Stack>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+            <Box sx={{
+              display: 'inline-flex', px: 0.5, py: 0.1, borderRadius: 0.5,
+              borderLeft: '3px solid #ff4444', bgcolor: 'rgba(255,68,68,0.08)',
+              color: '#ff4444', fontSize: '0.5rem', fontWeight: 900, fontFamily: 'monospace',
+            }}>
+              ATT&amp;CK · T1190
+            </Box>
+            <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>
+              <Box component="span" sx={{ color: '#ff4444', fontWeight: 800 }}>MITRE ATT&amp;CK</Box>
+              {' — technique badge, colored by tactic'}
             </Typography>
           </Stack>
         </Stack>
