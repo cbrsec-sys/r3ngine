@@ -108,7 +108,7 @@ class MasterScanWorkflow:
       - Tier 2: HTTP crawl, Port scan, Screenshot, URL fetch
       - Tier 3/4: Directory/file fuzzing
       - Tier 5: Web API discovery, WAF detection, Secret scanning
-      - Tier 6: Vulnerability scan (via NucleiPlannerWorkflow), WAF bypass, Brute force
+      - Tier 6: Vulnerability scan (via NucleiPlannerWorkflow), WAF bypass
       - Tier 7: Vulnerability correlation, risk scoring, AI impact, Neo4j APME sync
       - Scan completion notification
 

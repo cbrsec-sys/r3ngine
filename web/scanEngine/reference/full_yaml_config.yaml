@@ -378,26 +378,7 @@ waf_bypass:
   use_nuclei: true              # Use nuclei WAF bypass templates
   use_benchmarking: true        # Test HTTP header manipulation (X-Forwarded-For etc.)
 
-# ---------------------------------------------------------------------------
-# TIER 6 — Brute Force Scan
-# ---------------------------------------------------------------------------
-brute_force_scan:
-  users_wordlist:
-    - top_default_usernames.txt
-    - most_common_usernames.txt
-  pass_wordlist:
-    - top_default_passwords.txt
-    - most_common_passwords.txt
-  services:
-    - ssh
-    - ftp
-    - http
-    - smb
-    - rdp
-    - telnet
-  threads: 5
-  stop_on_success: true
-  max_retries: 3
+
 
 # ---------------------------------------------------------------------------
 # TIER 6 — Firewall & VPN Scan
