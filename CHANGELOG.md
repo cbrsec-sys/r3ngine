@@ -2,6 +2,15 @@
 
 ### [v3.6.0] - Unreleased
 
+- **WPScan Parser & WPTaint Integration (Security & LLM Enrichment)**:
+  - Refactored `parse_wpscan_results` to split the logic into 5 private helper functions: `_parse_interesting_findings`, `_parse_version`, `_parse_plugins`, `_parse_themes`, and `_parse_users`.
+  - Added a dynamic catchall block in `_parse_interesting_findings` that extracts all unrecognized finding fields and formats them into a clean markdown description.
+  - Rewrote `save_finding` to accept an explicit `severity` string argument and map it correctly to Django model `severity` integers via `NUCLEI_SEVERITY_MAP`.
+  - Fixed three invocations of `stream_command` in `wptaint_tasks.py` to correctly consume the generator iterator and pass correct arguments instead of `self`.
+  - Extended wp-taint plugin discovery to support three sources of WordPress plugin slugs (legacy `WordPress Plugin: {slug}`, `WordPress Plugin: {slug} - {vuln title}`, and `WordPress Plugin Detected: {slug}`) and HTTP URLs matching the pattern `/wp-content/plugins/([^/?#]+)/` from crawled or fuzz-discovered endpoints.
+  - Ensured that new findings from both WPScan and WPTaint are dynamically passed through the LLM description generator (`get_vulnerability_gpt_report`) with full PII anonymization layer. Added checks to verify if a description/GPT has already been generated (`is_gpt_used=False`) before triggering the LLM call.
+  - Added comprehensive tests in `test_wpscan.py` and `test_wptaint.py`.
+
 - **WPScan Execution Reliability**:
   - Automatically runs `wpscan --update --no-banner` (with rotation proxies if configured) before starting the scan loop to ensure up-to-date vulnerability definition databases.
   - Strips the trailing slash of each target URL to normalize inputs.

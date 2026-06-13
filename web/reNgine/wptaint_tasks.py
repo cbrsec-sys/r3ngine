@@ -45,13 +45,22 @@ def parse_wptaint_results(task_instance, output_file, subdomains, plugin_name):
             }
 
             for subdomain in subdomains:
-                save_vulnerability(
+                vuln, created = save_vulnerability(
                     target_domain=task_instance.domain,
                     http_url=f"http://{subdomain.name}",
                     scan_history=task_instance.scan,
                     subdomain=subdomain,
                     **vuln_data
                 )
+                if not vuln.is_gpt_used:
+                    try:
+                        from reNgine.tasks import get_vulnerability_gpt_report
+                        path = vuln.get_path() if hasattr(vuln, 'get_path') else '/'
+                        if not path:
+                            path = '/'
+                        get_vulnerability_gpt_report((vuln.name, path), vulnerability_id=vuln.id)
+                    except Exception as e:
+                        logger.error(f"Failed to generate LLM description for WPTaint finding {vuln.name}: {e}")
 
     except Exception as e:
         logger.error(f"Failed to parse WP Taint Scan results for plugin {plugin_name}: {str(e)}")
@@ -71,15 +80,53 @@ def wptaint_scan(self, urls=[], ctx={}, description=None):
         logger.info("WP Taint Scan is disabled in configuration. Skipping.")
         return
 
-    # Gather plugins discovered by WPScan/Nuclei
-    plugin_subdomains = {} # mapping of plugin_name -> set of Subdomain objects
-    
-    for vuln in Vulnerability.objects.filter(scan_history=self.scan, target_domain=self.domain, type='WordPress'):
-        if vuln.name.startswith('WordPress Plugin:'):
-            plugin_name = vuln.name.replace('WordPress Plugin:', '').strip()
-            if plugin_name not in plugin_subdomains:
-                plugin_subdomains[plugin_name] = set()
-            plugin_subdomains[plugin_name].add(vuln.subdomain)
+    # Gather plugins discovered by WPScan/Nuclei or extracted from endpoint URLs
+    import re
+    plugin_url_re = re.compile(r'/wp-content/plugins/([^/?#]+)/')
+
+    # Gather plugins from three sources:
+    # 1. Vulnerability names: "WordPress Plugin: {slug}" (old) and
+    #    "WordPress Plugin: {slug} - {vuln title}" (new)
+    # 2. Vulnerability names: "WordPress Plugin Detected: {slug}" (new parser)
+    # 3. EndPoint URLs: /wp-content/plugins/{slug}/
+    plugin_subdomains = {}  # slug -> set of Subdomain objects
+
+    from django.db.models import Q
+    for vuln in Vulnerability.objects.filter(
+        Q(name__startswith='WordPress Plugin:') | Q(name__startswith='WordPress Plugin Detected:'),
+        scan_history=self.scan,
+        target_domain=self.domain,
+        type='WordPress',
+    ):
+        if vuln.name.startswith('WordPress Plugin Detected: '):
+            slug = vuln.name[len('WordPress Plugin Detected: '):].strip()
+        else:
+            # Handle both "WordPress Plugin: slug" and "WordPress Plugin: slug - title"
+            remainder = vuln.name[len('WordPress Plugin: '):]
+            slug = remainder.split(' - ')[0].strip()
+
+        if not slug:
+            continue
+        if slug not in plugin_subdomains:
+            plugin_subdomains[slug] = set()
+        if vuln.subdomain:
+            plugin_subdomains[slug].add(vuln.subdomain)
+
+    for ep in EndPoint.objects.filter(
+        scan_history=self.scan,
+        target_domain=self.domain,
+        http_url__contains='/wp-content/plugins/',
+    ):
+        match = plugin_url_re.search(ep.http_url)
+        if not match:
+            continue
+        slug = match.group(1)
+        if not slug:
+            continue
+        if slug not in plugin_subdomains:
+            plugin_subdomains[slug] = set()
+        if ep.subdomain:
+            plugin_subdomains[slug].add(ep.subdomain)
 
     if not plugin_subdomains:
         logger.info("No WordPress plugins discovered by previous tasks. Skipping WP Taint Scan.")
@@ -100,22 +147,25 @@ def wptaint_scan(self, urls=[], ctx={}, description=None):
         try:
             # 1. Download plugin source
             download_cmd = f"wget -q -O {plugin_zip} https://downloads.wordpress.org/plugin/{plugin_name}.zip"
-            stdout, stderr, exit_code = stream_command(self, download_cmd, ctx)
+            for _ in stream_command(download_cmd, scan_id=self.scan_id, activity_id=self.activity_id):
+                pass
             
-            if exit_code != 0 or not os.path.exists(plugin_zip):
-                logger.info(f"Could not download source for plugin {plugin_name}. It may be a premium or unavailable plugin.")
+            if not os.path.exists(plugin_zip) or os.path.getsize(plugin_zip) == 0:
+                logger.info("Could not download source for plugin %s. It may be a premium or unavailable plugin.", plugin_name)
                 continue
                 
             # 2. Unzip
             os.makedirs(plugin_dir, exist_ok=True)
             unzip_cmd = f"unzip -q -o {plugin_zip} -d {plugin_dir}"
-            stream_command(self, unzip_cmd, ctx)
+            for _ in stream_command(unzip_cmd, scan_id=self.scan_id, activity_id=self.activity_id):
+                pass
             
             # 3. Run taint-scan
             os.makedirs(plugin_results_dir, exist_ok=True)
             taint_cmd = f"taint-scan -target {plugin_dir} -output-dir {plugin_results_dir}"
-            logger.info(f"Running WP Taint Scan on {plugin_name}")
-            stream_command(self, taint_cmd, ctx)
+            logger.info("Running WP Taint Scan on %s", plugin_name)
+            for _ in stream_command(taint_cmd, scan_id=self.scan_id, activity_id=self.activity_id):
+                pass
             
             # 4. Parse results
             results_file = os.path.join(plugin_results_dir, "taint-results.json")
