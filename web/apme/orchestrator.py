@@ -127,7 +127,7 @@ class APMEOrchestrator:
         node_index: Dict[str, Node] = {n.id: n for n in all_nodes}
 
         for path in paths:
-            metadata = self._build_path_metadata(path, node_index)
+            metadata = self._build_path_metadata(path, node_index, builder)
             self._scorer.score(path, metadata)
 
         scored_paths = self._scorer.sort_paths(paths)
@@ -155,7 +155,8 @@ class APMEOrchestrator:
     # ──────────────────────────────────────────────────────────────────────────
 
     def _build_path_metadata(
-        self, path: AttackPath, node_index: Dict[str, Node]
+        self, path: AttackPath, node_index: Dict[str, Node],
+        builder: Optional["GraphBuilder"] = None,
     ) -> Dict[str, Any]:
         """Extract scoring metadata from path nodes."""
         max_severity = -1
@@ -179,10 +180,14 @@ class APMEOrchestrator:
                 elif to_node.type == "Privilege":
                     privilege_gained = to_node.subtype
 
-        # EPSS and CISA KEV — read from vulnerability node properties
+        # EPSS, CISA KEV, and Phase 5 vulnerability properties
         epss_percentile = 0.0
         has_cisa_kev = False
         path_confidence_product = 1.0
+        has_poc = False
+        has_exploit_url = False
+        has_metasploit = False
+        cve_published_date = None
 
         for step in path.steps:
             path_confidence_product *= step.confidence
@@ -193,6 +198,15 @@ class APMEOrchestrator:
                     epss_percentile = float(epss_val)
                 if to_node.properties.get("is_cisa_kev"):
                     has_cisa_kev = True
+                if to_node.properties.get("is_poc"):
+                    has_poc = True
+                if to_node.properties.get("exploit_url"):
+                    has_exploit_url = True
+                if to_node.properties.get("has_metasploit"):
+                    has_metasploit = True
+                pub_date = to_node.properties.get("cve_published_date")
+                if pub_date is not None and cve_published_date is None:
+                    cve_published_date = pub_date
 
         # Target node sensitivity (final node in path)
         target_sensitivity = "low"
@@ -211,6 +225,11 @@ class APMEOrchestrator:
             elif cap == "internal_discovery":
                 blast_radius = 15
 
+        # Target node degree (connectivity) via Neo4j query
+        target_node_degree = 1
+        if builder and path.end:
+            target_node_degree = builder.query_node_degree(path.end)
+
         return {
             "severity": max_severity,
             "cvss_score": max_cvss,
@@ -221,6 +240,11 @@ class APMEOrchestrator:
             "epss_percentile":         epss_percentile,
             "has_cisa_kev":            has_cisa_kev,
             "path_confidence_product": min(max(path_confidence_product, 0.0), 1.0),
+            "has_poc":                 has_poc,
+            "has_exploit_url":         has_exploit_url,
+            "has_metasploit":          has_metasploit,
+            "cve_published_date":      cve_published_date,
+            "target_node_degree":      target_node_degree,
         }
 
     def _generate_virtual_goal_nodes(self, scan_history_id: int) -> List[Node]:

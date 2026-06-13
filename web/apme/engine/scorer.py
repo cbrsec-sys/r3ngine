@@ -2,26 +2,31 @@
 APME Scoring Engine
 
 Scores attack paths. Additive factors (sum = 1.0):
-- Vulnerability severity       (0.20 weight)
-- Exploitability / CVSS        (0.20 weight)
-- Path length — shorter=higher risk (0.15 weight)
-- Privilege gained             (0.15 weight)
-- Impact (blast radius + sensitivity) (0.15 weight)
-- EPSS score                   (0.15 weight)
+- Vulnerability severity            (0.15 weight)
+- Exploitability / CVSS             (0.15 weight)
+- Path length — shorter=higher risk (0.10 weight)
+- Privilege gained                  (0.15 weight)
+- Impact (blast radius + sensitivity) (0.12 weight)
+- EPSS score                        (0.13 weight)
+- PoC / exploit availability        (0.08 weight)
+- Recency (CVE age)                 (0.04 weight)
+- Connectivity (target node degree) (0.05 weight)
+- Stealthiness (boundary crossings) (0.03 weight)
 
 Post-sum modifiers (applied after additive sum):
-- Path confidence product multiplier  ×[0.5, 1.0]
-- CISA KEV flat boost                 +0.10
-- ERL validated step boost            +0.05 per step, max +0.15
+- Path confidence product multiplier  x[0.5, 1.0]
+- CISA KEV tiered boost               +0.15 (KEV+PoC) or +0.10 (KEV alone)
+- ERL validated step boost            +0.05 per step, max +0.15 (requires >= 2 steps)
 
 Risk classification:
   speculative : 0 validated steps AND score < 0.40
   low         : score <= 0.50
-  medium      : score <= 0.70
+  medium      : score <= 0.70 (or constraint 22: unvalidated + no signal + score >= 0.70)
   high        : score <= 0.85
   critical    : score  > 0.85
 """
 
+import datetime
 import logging
 from typing import Any, Dict, List
 
@@ -32,17 +37,24 @@ logger = logging.getLogger(__name__)
 SEVERITY_MAP = {-1: 0.0, 0: 0.05, 1: 0.25, 2: 0.50, 3: 0.75, 4: 1.0}
 PRIVILEGE_MAP = {"none": 0.0, "user": 0.25, "admin": 0.75, "domain_admin": 1.0, "root": 1.0}
 
+# Edge types that represent boundary crossings (noisy, reduce stealthiness)
+_BOUNDARY_EDGE_TYPES = {"CONNECTED_TO", "TRUSTS"}
+
 
 class Scorer:
     """Computes a risk score for a complete attack path."""
 
     WEIGHTS = {
-        "severity":        0.20,
-        "exploitability":  0.20,
-        "path_length":     0.15,
+        "severity":        0.15,
+        "exploitability":  0.15,
+        "path_length":     0.10,
         "privilege_gain":  0.15,
-        "impact":          0.15,
-        "epss":            0.15,
+        "impact":          0.12,
+        "epss":            0.13,
+        "poc":             0.08,
+        "recency":         0.04,
+        "connectivity":    0.05,
+        "stealthiness":    0.03,
     }
 
     def __init__(self):
@@ -82,14 +94,50 @@ class Scorer:
         epss_percentile = path_metadata.get("epss_percentile", 0.0)
         epss_score = min(epss_percentile / 100.0, 1.0) if epss_percentile else 0.0
 
+        # 7. PoC / exploit availability
+        has_metasploit = path_metadata.get("has_metasploit", False)
+        has_exploit_url = path_metadata.get("has_exploit_url", False)
+        has_poc = path_metadata.get("has_poc", False)
+        if has_metasploit:
+            poc_score = 1.0
+        elif has_exploit_url:
+            poc_score = 0.80
+        elif has_poc:
+            poc_score = 0.60
+        else:
+            poc_score = 0.0
+
+        # 8. Recency (CVE age)
+        cve_date = path_metadata.get("cve_published_date")
+        has_kev = path_metadata.get("has_cisa_kev", False)
+        recency_score = self._compute_recency(cve_date, has_kev)
+
+        # 9. Connectivity (target node degree)
+        target_degree = path_metadata.get("target_node_degree", 1)
+        connectivity_score = min(float(target_degree) / 20.0, 1.0)
+
+        # 10. Stealthiness (boundary crossings + victim-interaction steps)
+        boundary_crossings = sum(
+            1 for s in steps if s.edge_type in _BOUNDARY_EDGE_TYPES
+        )
+        victim_steps = sum(
+            1 for s in steps
+            if "victim" in s.action.lower() or s.edge_type == "REQUIRES_VICTIM"
+        )
+        stealthiness_score = max(0.0, 1.0 - boundary_crossings * 0.2 - victim_steps * 0.3)
+
         # Additive sum (weights sum to 1.0)
         score = (
-            severity_score    * self.WEIGHTS["severity"]
-            + exploitability  * self.WEIGHTS["exploitability"]
-            + length_score    * self.WEIGHTS["path_length"]
-            + privilege_score * self.WEIGHTS["privilege_gain"]
-            + impact_score    * self.WEIGHTS["impact"]
-            + epss_score      * self.WEIGHTS["epss"]
+            severity_score      * self.WEIGHTS["severity"]
+            + exploitability    * self.WEIGHTS["exploitability"]
+            + length_score      * self.WEIGHTS["path_length"]
+            + privilege_score   * self.WEIGHTS["privilege_gain"]
+            + impact_score      * self.WEIGHTS["impact"]
+            + epss_score        * self.WEIGHTS["epss"]
+            + poc_score         * self.WEIGHTS["poc"]
+            + recency_score     * self.WEIGHTS["recency"]
+            + connectivity_score * self.WEIGHTS["connectivity"]
+            + stealthiness_score * self.WEIGHTS["stealthiness"]
         )
 
         # Path confidence product multiplier [0.5, 1.0]
@@ -97,32 +145,71 @@ class Scorer:
         conf_multiplier = max(min(float(conf_product), 1.0), 0.5)
         score *= conf_multiplier
 
-        # CISA KEV flat boost
-        if path_metadata.get("has_cisa_kev"):
-            score = min(score + 0.10, 1.0)
+        # CISA KEV tiered boost
+        if has_kev:
+            if has_poc or has_exploit_url:
+                score = min(score + 0.15, 1.0)
+            else:
+                score = min(score + 0.10, 1.0)
 
         # ERL validated step boost (+0.05 per validated step, max +0.15)
+        # Requires at least 2 steps in path to apply
         validated = path_metadata.get("validated_steps", 0)
-        if validated > 0:
+        if validated > 0 and len(steps) >= 2:
             score = min(score + min(validated * 0.05, 0.15), 1.0)
 
         score = round(score, 4)
         path.score = score
-        path.risk = self._classify(score, path)
+        path.risk = self._classify(score, path, path_metadata)
 
         logger.debug(
             "APME Scorer: path=%s score=%.4f risk=%s "
-            "(sev=%.2f expl=%.2f len=%.2f impact=%.2f epss=%.2f conf_mult=%.2f)",
+            "(sev=%.2f expl=%.2f len=%.2f priv=%.2f impact=%.2f epss=%.2f "
+            "poc=%.2f recency=%.2f conn=%.2f stealth=%.2f conf_mult=%.2f)",
             path.id, score, path.risk, severity_score, exploitability,
-            length_score, impact_score, epss_score, conf_multiplier,
+            length_score, privilege_score, impact_score, epss_score,
+            poc_score, recency_score, connectivity_score, stealthiness_score,
+            conf_multiplier,
         )
         return score
 
     @staticmethod
-    def _classify(score: float, path: AttackPath) -> str:
+    def _compute_recency(cve_date, has_kev: bool) -> float:
+        """Compute recency score from CVE published date."""
+        if cve_date is None:
+            return 0.50 if has_kev else 0.15
+        today = datetime.date.today()
+        if isinstance(cve_date, datetime.datetime):
+            cve_date = cve_date.date()
+        age_days = (today - cve_date).days
+        if age_days < 30:
+            return 1.0
+        if age_days < 180:
+            return 0.70
+        if age_days < 730:
+            return 0.40
+        # Old CVE (>= 730 days)
+        return 0.80 if has_kev else 0.15
+
+    @staticmethod
+    def _classify(score: float, path: AttackPath, metadata: dict) -> str:
+        """Classify path risk with constraint 22 (unvalidated cap)."""
         validated_count = sum(1 for s in path.steps if s.validated)
         if validated_count == 0 and score < 0.40:
             return "speculative"
+
+        # Constraint 22: unvalidated paths with no external signal
+        # cannot reach high/critical — capped at medium
+        if validated_count == 0 and score >= 0.70:
+            has_signal = (
+                metadata.get("has_cisa_kev", False)
+                or metadata.get("has_poc", False)
+                or metadata.get("has_exploit_url", False)
+                or metadata.get("has_metasploit", False)
+            )
+            if not has_signal:
+                return "medium"
+
         if score > 0.85:
             return "critical"
         if score > 0.70:

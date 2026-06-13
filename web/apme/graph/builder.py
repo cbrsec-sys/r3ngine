@@ -47,6 +47,27 @@ class GraphBuilder:
         if self._driver:
             self._driver.close()
 
+    def query_node_degree(self, apme_id: str) -> int:
+        """Return the number of relationships attached to a node (its degree).
+
+        Returns 1 on failure or if the driver is unavailable.
+        """
+        if not self._driver:
+            return 1
+        try:
+            with self._driver.session() as session:
+                result = session.run(
+                    "MATCH (n:APMENode {apme_id: $id}) "
+                    "RETURN size((n)--()) AS degree",
+                    id=apme_id,
+                )
+                record = result.single()
+                if record and record["degree"] is not None:
+                    return int(record["degree"])
+        except Exception as exc:
+            logger.warning("APME: Failed to query node degree for %s: %s", apme_id, exc)
+        return 1
+
     # -------------------------------------------------------------------------
     # Public API
     # -------------------------------------------------------------------------
