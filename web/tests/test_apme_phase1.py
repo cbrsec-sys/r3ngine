@@ -74,3 +74,51 @@ class SchemaTests(TestCase):
         d = step.to_dict()
         self.assertIn("mitre_technique", d)
         self.assertIn("mitre_tactic", d)
+
+
+from apme.ingestion.vulnerabilities import _infer_taxonomy
+
+
+class TaxonomyInferenceTests(TestCase):
+
+    def test_sqli_by_name(self):
+        result = _infer_taxonomy("SQL Injection via login form", "", 3)
+        self.assertEqual(result["subtype"], "sqli")
+        self.assertEqual(result["cwe"], "CWE-89")
+        self.assertEqual(result["technique"], "T1190")
+
+    def test_xss_by_name(self):
+        result = _infer_taxonomy("Reflected XSS in search parameter", "", 2)
+        self.assertEqual(result["subtype"], "xss")
+
+    def test_log4j_maps_to_log_injection(self):
+        result = _infer_taxonomy("Log4j RCE via JNDI", "", 4)
+        self.assertEqual(result["subtype"], "log_injection")
+
+    def test_deserialization_keyword(self):
+        result = _infer_taxonomy("Java deserialization gadget chain", "", 4)
+        self.assertEqual(result["subtype"], "deserialization")
+
+    def test_severity_4_fallback_to_generic_critical(self):
+        result = _infer_taxonomy("Some unknown critical finding", "", 4)
+        self.assertEqual(result["subtype"], "generic_critical")
+
+    def test_severity_3_fallback_to_generic_high(self):
+        result = _infer_taxonomy("Unknown high severity issue", "", 3)
+        self.assertEqual(result["subtype"], "generic_high")
+
+    def test_severity_2_fallback_to_generic(self):
+        result = _infer_taxonomy("Unknown medium finding", "", 2)
+        self.assertEqual(result["subtype"], "generic")
+
+    def test_type_field_used_as_fallback(self):
+        result = _infer_taxonomy("Nuclei finding", "SSRF", 2)
+        self.assertEqual(result["subtype"], "ssrf")
+
+    def test_jwt_maps_to_jwt_abuse(self):
+        result = _infer_taxonomy("JWT secret exposed in response", "", 3)
+        self.assertEqual(result["subtype"], "jwt_abuse")
+
+    def test_subdomain_takeover(self):
+        result = _infer_taxonomy("Subdomain takeover via dangling CNAME", "", 3)
+        self.assertEqual(result["subtype"], "subdomain_takeover")
