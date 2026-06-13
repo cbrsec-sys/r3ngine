@@ -8,6 +8,8 @@ These are unit tests; they call the task function directly with a mock
 self-proxy and patch stream_command to prevent real subprocess execution.
 """
 
+import json
+import os
 from unittest.mock import MagicMock, patch
 from django.test import TestCase
 from django.utils import timezone
@@ -21,6 +23,7 @@ def _make_proxy(scan, subdomain=None, subscan=None, yaml_config=None):
     """Build a minimal task-proxy mock for wpscan_scan."""
     proxy = MagicMock()
     proxy.scan = scan
+    proxy.scan.results_dir = '/tmp/rengine_test_wpscan'
     proxy.scan_id = scan.id
     proxy.subdomain = subdomain
     proxy.subscan = subscan
@@ -112,9 +115,13 @@ class TestWpscanGating(TestCase):
         result = wpscan_scan(proxy, urls=[])
 
         self.assertIsNotNone(result)
-        mock_stream.assert_called_once()
-        cmd = mock_stream.call_args[0][0]
-        self.assertIn('blog.wpscan-gate.example.com', cmd)
+        # stream_command is called twice (1. update, 2. scan)
+        self.assertEqual(mock_stream.call_count, 2)
+        cmd_update = mock_stream.call_args_list[0][0][0]
+        cmd_scan = mock_stream.call_args_list[1][0][0]
+        self.assertIn('wpscan --update', cmd_update)
+        self.assertIn('https://blog.wpscan-gate.example.com', cmd_scan)
+        self.assertNotIn('https://blog.wpscan-gate.example.com/', cmd_scan)
 
     @patch('reNgine.wpscan_tasks.parse_wpscan_results')
     @patch('reNgine.tasks.stream_command', return_value=iter([]))
@@ -129,11 +136,13 @@ class TestWpscanGating(TestCase):
         from reNgine.wpscan_tasks import wpscan_scan
         wpscan_scan(proxy, urls=[])
 
-        # stream_command called only once (for the WP subdomain)
-        self.assertEqual(mock_stream.call_count, 1)
-        cmd = mock_stream.call_args[0][0]
-        self.assertIn('blog.wpscan-gate.example.com', cmd)
-        self.assertNotIn('api.wpscan-gate.example.com', cmd)
+        # stream_command called 2 times (1. update, 2. target)
+        self.assertEqual(mock_stream.call_count, 2)
+        cmd_update = mock_stream.call_args_list[0][0][0]
+        self.assertIn('wpscan --update', cmd_update)
+        cmd_scan = mock_stream.call_args_list[1][0][0]
+        self.assertIn('blog.wpscan-gate.example.com', cmd_scan)
+        self.assertNotIn('api.wpscan-gate.example.com', cmd_scan)
 
     # ------------------------------------------------------------------
     # Runs — WordPress detected via wp-like paths in EndPoint
@@ -151,7 +160,12 @@ class TestWpscanGating(TestCase):
         result = wpscan_scan(proxy, urls=[])
 
         self.assertIsNotNone(result)
-        mock_stream.assert_called_once()
+        # stream_command called 2 times (1. update, 2. target)
+        self.assertEqual(mock_stream.call_count, 2)
+        cmd_update = mock_stream.call_args_list[0][0][0]
+        self.assertIn('wpscan --update', cmd_update)
+        cmd_scan = mock_stream.call_args_list[1][0][0]
+        self.assertIn('site.wpscan-gate.example.com', cmd_scan)
 
     @patch('reNgine.wpscan_tasks.parse_wpscan_results')
     @patch('reNgine.tasks.stream_command', return_value=iter([]))
@@ -165,7 +179,9 @@ class TestWpscanGating(TestCase):
         result = wpscan_scan(proxy, urls=[])
 
         self.assertIsNotNone(result)
-        mock_stream.assert_called_once()
+        self.assertEqual(mock_stream.call_count, 2)
+        cmd_scan = mock_stream.call_args_list[1][0][0]
+        self.assertIn('site2.wpscan-gate.example.com', cmd_scan)
 
     @patch('reNgine.wpscan_tasks.parse_wpscan_results')
     @patch('reNgine.tasks.stream_command', return_value=iter([]))
@@ -179,7 +195,9 @@ class TestWpscanGating(TestCase):
         result = wpscan_scan(proxy, urls=[])
 
         self.assertIsNotNone(result)
-        mock_stream.assert_called_once()
+        self.assertEqual(mock_stream.call_count, 2)
+        cmd_scan = mock_stream.call_args_list[1][0][0]
+        self.assertIn('site3.wpscan-gate.example.com', cmd_scan)
 
     # ------------------------------------------------------------------
     # Subscan mode
@@ -211,7 +229,9 @@ class TestWpscanGating(TestCase):
         result = wpscan_scan(proxy, urls=[])
 
         self.assertIsNotNone(result)
-        mock_stream.assert_called_once()
+        self.assertEqual(mock_stream.call_count, 2)
+        cmd_scan = mock_stream.call_args_list[1][0][0]
+        self.assertIn('blog.wpscan-gate.example.com', cmd_scan)
 
     @patch('reNgine.wpscan_tasks.parse_wpscan_results')
     @patch('reNgine.tasks.stream_command', return_value=iter([]))
@@ -226,4 +246,105 @@ class TestWpscanGating(TestCase):
         result = wpscan_scan(proxy, urls=[])
 
         self.assertIsNotNone(result)
-        mock_stream.assert_called_once()
+        self.assertEqual(mock_stream.call_count, 2)
+        cmd_scan = mock_stream.call_args_list[1][0][0]
+        self.assertIn('site.wpscan-gate.example.com', cmd_scan)
+
+    # ------------------------------------------------------------------
+    # WPScan Update & Retry Logic Tests
+    # ------------------------------------------------------------------
+
+    @patch('reNgine.wpscan_tasks.parse_wpscan_results')
+    @patch('reNgine.tasks.stream_command')
+    def test_wpscan_ssl_error_retry_and_success(self, mock_stream, mock_parse):
+        """WPScan retries on SSL metadata fetch error and then succeeds."""
+        sub = self._make_subdomain('blog.wpscan-gate.example.com')
+        self._add_tech(sub, 'WordPress')
+        proxy = _make_proxy(self.scan)
+        
+        attempts = []
+        
+        def stream_command_side_effect(cmd, *args, **kwargs):
+            if '--update' in cmd:
+                return iter([])
+            
+            attempts.append(cmd)
+            output_file = '/tmp/rengine_test_wpscan/vulnerability/wpscan/blog.wpscan-gate.example.com_wpscan.json'
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            
+            if len(attempts) == 1:
+                # First attempt: SSL/metadata error JSON
+                error_data = {
+                    "db_update_started": True,
+                    "scan_aborted": "Unable to get https://data.wpscan.org/metadata.json.sha512 (SSL peer certificate or SSH remote key was not OK)",
+                    "target_url": "https://blog.wpscan-gate.example.com"
+                }
+                with open(output_file, 'w') as f:
+                    json.dump(error_data, f)
+            else:
+                # Second attempt: Successful dummy scan result
+                success_data = {
+                    "start_time": 12345,
+                    "interesting_findings": []
+                }
+                with open(output_file, 'w') as f:
+                    json.dump(success_data, f)
+            return iter([])
+
+        mock_stream.side_effect = stream_command_side_effect
+
+        from reNgine.wpscan_tasks import wpscan_scan
+        wpscan_scan(proxy, urls=[])
+
+        # Total calls to stream_command: 1 (update) + 2 (scans) = 3 calls
+        self.assertEqual(mock_stream.call_count, 3)
+        self.assertEqual(len(attempts), 2)
+        self.assertIn('https://blog.wpscan-gate.example.com', attempts[0])
+        self.assertNotIn('https://blog.wpscan-gate.example.com/', attempts[0])
+        self.assertIn('https://blog.wpscan-gate.example.com', attempts[1])
+
+    @patch('reNgine.wpscan_tasks.parse_wpscan_results')
+    @patch('reNgine.tasks.stream_command')
+    @patch('reNgine.wpscan_tasks.get_random_proxy', return_value='127.0.0.1:8080')
+    def test_wpscan_ssl_error_max_retries_fail(self, mock_get_proxy, mock_stream, mock_parse):
+        """WPScan retries up to max attempts, and final attempt runs without proxy."""
+        sub = self._make_subdomain('blog.wpscan-gate.example.com')
+        self._add_tech(sub, 'WordPress')
+        proxy = _make_proxy(self.scan)
+        
+        attempts = []
+        
+        def stream_command_side_effect(cmd, *args, **kwargs):
+            if '--update' in cmd:
+                return iter([])
+            
+            attempts.append(cmd)
+            output_file = '/tmp/rengine_test_wpscan/vulnerability/wpscan/blog.wpscan-gate.example.com_wpscan.json'
+            os.makedirs(os.path.dirname(output_file), exist_ok=True)
+            
+            # Always write SSL error JSON
+            error_data = {
+                "db_update_started": True,
+                "scan_aborted": "Unable to get https://data.wpscan.org/metadata.json.sha512 (SSL peer certificate or SSH remote key was not OK)",
+                "target_url": "https://blog.wpscan-gate.example.com"
+            }
+            with open(output_file, 'w') as f:
+                json.dump(error_data, f)
+            return iter([])
+
+        mock_stream.side_effect = stream_command_side_effect
+
+        from reNgine.wpscan_tasks import wpscan_scan
+        wpscan_scan(proxy, urls=[])
+
+        # Total calls to stream_command: 1 (update) + 4 (scans) = 5 calls
+        self.assertEqual(mock_stream.call_count, 5)
+        self.assertEqual(len(attempts), 4)
+        
+        # Verify first 3 scan attempts included proxy
+        for i in range(3):
+            self.assertIn('--proxy 127.0.0.1:8080', attempts[i])
+        
+        # Verify 4th (final) attempt did NOT include proxy
+        self.assertNotIn('--proxy', attempts[3])
+

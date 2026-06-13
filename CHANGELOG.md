@@ -2,6 +2,20 @@
 
 ### [v3.6.0] - Unreleased
 
+- **WPScan Execution Reliability**:
+  - Automatically runs `wpscan --update --no-banner` (with rotation proxies if configured) before starting the scan loop to ensure up-to-date vulnerability definition databases.
+  - Strips the trailing slash of each target URL to normalize inputs.
+  - Implements a retry mechanism (up to 3 retries, 4 total attempts) if WPScan aborts with an SSL certificate/metadata verification error (`SSL peer certificate or SSH remote key was not OK`).
+  - Automatically executes the final retry attempt without the `--proxy` option to bypass potential proxy-induced SSL negotiation issues.
+
+- **Offline Hash Cracking & Wordlist Customization (Credential Intelligence Plugin)**:
+  - **Offline Cracking Engine**: Implemented containerized Hashcat support inside `credential_intelligence` viewset utilizing host Docker socket (`/var/run/docker.sock`).
+  - **Dynamic Device Detection**: Container automatically requests NVIDIA GPU runtimes if present, and seamlessly falls back to CPU execution if no GPU drivers are detected.
+  - **Flexible Parameter Customization**: Allowed users to fully customize cracking tasks with support for arbitrary integer hash types (`-m`), attack modes (`-a`), custom rules (`-r`), brute-force/mask patterns, custom charsets (`-1`, `-2`, `-3`, `-4`), increment modes, optimized kernels, and force runtimes.
+  - **Database & Model Schema**: Refactored the plugin app config label to `credential_intelligence_backend` and updated meta labels to resolve dynamic migration issues. Added `HashCrackingTask` and `CrackedHash` (encrypted passphrases at rest) models.
+  - **UI Interface Dashboard**: Created a tabbed glassmorphism offline cracking dashboard in the plugin UI with a log terminal window showing live container stdout and a cracked plaintexts table.
+  - **Wordlist Management**: Developed a Custom Wordlists management tab to upload, list, and delete custom `.txt` wordlist files in the shared system volume.
+
 - **Nuclei Proxy Rotation Support**:
   - Implemented dynamic creation of a `proxies.txt` file (populated with valid system proxies, excluding Tor/SOCKS routing endpoints) via `CreateProxyListActivity`.
   - Configured `NucleiPlannerWorkflow` to use this proxy list via the `-proxy` flag in Nuclei command execution, allowing Nuclei to rotate through available HTTP/S proxies when conducting vulnerability templates.

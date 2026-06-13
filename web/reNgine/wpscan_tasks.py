@@ -103,9 +103,17 @@ def save_finding(task_instance, finding, subdomain, default_title):
     )
 
 def wpscan_scan(self, urls=[], ctx={}, description=None):
-    """
-    WPScan task for WordPress vulnerability scanning.
+    """WPScan task for WordPress vulnerability scanning.
     Runs against all discovered subdomains or specific URLs.
+
+    Args:
+        self: The Temporal task proxy with scan context.
+        urls (list, optional): List of specific target URLs to scan.
+        ctx (dict, optional): Scan context data.
+        description (str, optional): Descriptive text for this task.
+
+    Returns:
+        str: Status message on completion, or None if skipped.
     """
     logger.info("Starting WPScan Vulnerability Scan")
     
@@ -187,25 +195,104 @@ def wpscan_scan(self, urls=[], ctx={}, description=None):
 
     from reNgine.tasks import stream_command
 
+    # Attempt to update WPScan database first before running scans on targets
+    update_cmd = "wpscan --update --no-banner"
+    proxy = get_random_proxy()
+    if proxy:
+        update_cmd += f" --proxy {proxy}"
+    logger.info("Updating WPScan database...")
+    try:
+        for _ in stream_command(update_cmd, scan_id=self.scan_id, activity_id=self.activity_id):
+            pass
+    except Exception as e:
+        logger.error(f"Failed to run wpscan database update: {e}")
+
     for target_url, subdomain in targets:
         target_name = subdomain.name
+        
+        # Ensure trailing slash is stripped from target URL
+        target_url = target_url.rstrip('/')
         logger.info(f"WPScan target: {target_url}")
         
         output_file = f"{results_dir}/{target_name}_wpscan.json"
         
-        # Command construction
-        cmd = f"wpscan --url {target_url} --format json --random-user-agent --output {output_file} --enumerate {enumeration} --detection-mode {detection_mode} --no-banner --ignore-main-redirect"
-        proxy = get_random_proxy()
-        if proxy:
-            cmd += f" --proxy {proxy}"
-        if api_key:
-            cmd += f" --api-token {api_key}"
-        
-        logger.info(f"Running WPScan for {target_url}")
-        logger.warning(f"Full WPScan command: {cmd}")
-        # Execute tool — stream_command is a generator; must be consumed to run the subprocess.
-        for _ in stream_command(cmd, scan_id=self.scan_id, activity_id=self.activity_id):
-            pass
+        max_attempts = 4  # 1 initial attempt + 3 retries
+        for attempt in range(max_attempts):
+            # Command construction
+            cmd = f"wpscan --url {target_url} --format json --random-user-agent --output {output_file} --enumerate {enumeration} --detection-mode {detection_mode} --no-banner --ignore-main-redirect"
+            
+            # The final retry attempt must be executed without the proxy flag
+            proxy = None
+            if attempt < max_attempts - 1:
+                proxy = get_random_proxy()
+            
+            if proxy:
+                cmd += f" --proxy {proxy}"
+            if api_key:
+                cmd += f" --api-token {api_key}"
+            
+            logger.info(f"Running WPScan for {target_url} (Attempt {attempt + 1}/{max_attempts})")
+            logger.warning(f"Full WPScan command: {cmd}")
+            
+            # Remove output file if it exists to ensure we don't read stale results
+            if os.path.exists(output_file):
+                try:
+                    os.remove(output_file)
+                except Exception:
+                    pass
+
+            # Execute tool — stream_command is a generator; must be consumed to run the subprocess.
+            for _ in stream_command(cmd, scan_id=self.scan_id, activity_id=self.activity_id):
+                pass
+
+            # Check after the tool call at the output files for SSL peer certificate error
+            failed_with_ssl_error = False
+            if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
+                try:
+                    with open(output_file, 'r') as f:
+                        data = json.load(f)
+                        if isinstance(data, dict):
+                            db_update_started = data.get('db_update_started')
+                            scan_aborted = data.get('scan_aborted')
+                            target_url_in_json = data.get('target_url')
+                            
+                            target_url_normalized = target_url.rstrip('/')
+                            json_url_normalized = target_url_in_json.rstrip('/') if isinstance(target_url_in_json, str) else ''
+                            
+                            # Verify if update failed due to SSL peer certificate check
+                            if (
+                                db_update_started is True and
+                                isinstance(scan_aborted, str) and
+                                "SSL peer certificate or SSH remote key was not OK" in scan_aborted and
+                                target_url_normalized == json_url_normalized
+                            ):
+                                failed_with_ssl_error = True
+                except Exception as parse_err:
+                    logger.error(f"Failed to parse WPScan output JSON: {parse_err}")
+
+            if failed_with_ssl_error:
+                if attempt < max_attempts - 1:
+                    logger.warning(
+                        f"WPScan aborted due to SSL peer certificate error on {target_url}. "
+                        f"Retrying ({attempt + 1}/{max_attempts - 1})..."
+                    )
+                    time.sleep(2)
+                    continue
+                else:
+                    logger.error(
+                        f"WPScan failed on {target_url} with SSL certificate error after {max_attempts} attempts. "
+                        f"Skipping target."
+                    )
+                    # Clean up aborted output file to prevent parsing junk
+                    if os.path.exists(output_file):
+                        try:
+                            os.remove(output_file)
+                        except Exception:
+                            pass
+                    break
+            else:
+                # Execution succeeded or failed with different error
+                break
 
         # Parse and save
         parse_wpscan_results(self, output_file, subdomain)
