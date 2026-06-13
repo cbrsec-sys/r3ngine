@@ -3747,7 +3747,7 @@ def add_gpt_description_db(title, path, description, impact, remediation, refere
 			gpt_report.references.add(ref)
 		gpt_report.save()
 
-def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, parse_only=None, severity=None, tags_override=None):
+def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, parse_only=None, severity=None, tags_override=None, proxies_file_path=None):
 	"""HTTP vulnerability scan using Nuclei
 
 	Args:
@@ -3937,7 +3937,10 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	if formatted_headers:
 		cmd += f' {formatted_headers}'
 	cmd += f' '
-	if 'http' in proxy:
+	
+	if proxies_file_path and os.path.exists(proxies_file_path):
+		cmd += f' -proxy {proxies_file_path}'
+	elif 'http' in proxy:
 		cmd += f' -proxy {proxy}' 
 	cmd += f' -l {input_path}'
 	cmd += f' -c {str(concurrency)}' if concurrency > 0 else ''

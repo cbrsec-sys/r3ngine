@@ -1034,6 +1034,27 @@ def get_random_proxy():
 	logger.error('No valid proxies found in the list!')
 	return ''
 
+def get_proxy_list():
+	"""Get a list of all proxies input by the user in the UI.
+	Does not validate if they are alive.
+	
+	Returns:
+		list: List of proxy names or [] if no proxy defined or use_proxy is False,
+			  or if use_tor is True (since Tor uses proxychains).
+	"""
+	proxy = Proxy.objects.first()
+	if not proxy or not proxy.use_proxy or proxy.use_tor:
+		return []
+
+	proxies = [p.strip() for p in proxy.proxies.splitlines() if p.strip()]
+	cleaned_proxies = []
+	for p in proxies:
+		if not p.startswith('http') and not p.startswith('socks'):
+			p = f"http://{p}"
+		cleaned_proxies.append(p)
+
+	return cleaned_proxies
+
 def remove_ansi_escape_sequences(text):
 	# Regular expression to match ANSI escape sequences
 	ansi_escape_pattern = r'\x1b\[.*?m'
