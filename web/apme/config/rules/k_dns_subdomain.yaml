@@ -1,0 +1,46 @@
+# Category K — DNS & Subdomain (4 rules)
+rules:
+
+  - name: subdomain_takeover_to_authenticated_access
+    mitre_id: "T1584.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: subdomain_takeover
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.85
+
+  - name: subdomain_takeover_to_phishing
+    mitre_id: "T1566.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: subdomain_takeover
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: phishing_amplification
+        confidence: 0.80
+
+  - name: dns_rebinding_to_internal_access
+    mitre_id: "T1557"
+    if:
+      node.type: Vulnerability
+      node.subtype: dns_rebinding
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: pivot
+        confidence: 0.70
+
+  - name: dependency_confusion_to_supply_chain
+    mitre_id: "T1195"
+    if:
+      node.type: Vulnerability
+      node.subtype: dependency_confusion
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: supply_chain_compromise
+        confidence: 0.75
