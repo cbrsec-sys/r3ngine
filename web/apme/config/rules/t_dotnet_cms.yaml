@@ -1,0 +1,104 @@
+# Category T — .NET & CMS / Framework-Specific (8 rules)
+rules:
+
+  - name: aspnet_viewstate_to_rce
+    mitre_id: "T1059.005"
+    if:
+      node.type: Vulnerability
+      node.subtype: aspnet_viewstate
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.85
+        requires_dotnet: true
+
+  - name: machinekey_to_rce
+    mitre_id: "T1059.005"
+    if:
+      node.type: Vulnerability
+      node.subtype: machinekey_exploitation
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.90
+        requires_dotnet: true
+
+  - name: drupal_rce_to_execution
+    mitre_id: "T1505.003"
+    if:
+      node.type: Vulnerability
+      node.subtype: rce
+      node.property: "severity:>=4"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.85
+        requires_drupal: true
+
+  - name: drupal_sqli_to_db_access
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: sqli
+      node.property: "severity:>=3"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: db_access
+        confidence: 0.85
+        requires_drupal: true
+
+  - name: joomla_rce_to_execution
+    mitre_id: "T1505.003"
+    if:
+      node.type: Vulnerability
+      node.subtype: rce
+      node.property: "severity:>=4"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.80
+        requires_joomla: true
+
+  - name: magento_sqli_to_db_access
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: sqli
+      node.property: "severity:>=3"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: db_access
+        confidence: 0.85
+        requires_magento: true
+
+  - name: rails_mass_assign_to_privilege_escalation
+    mitre_id: "T1548"
+    if:
+      node.type: Vulnerability
+      node.subtype: mass_assignment
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.80
+        requires_ruby: true
+
+  - name: nodejs_prototype_pollution_to_rce
+    mitre_id: "T1059"
+    if:
+      node.type: Vulnerability
+      node.subtype: prototype_pollution
+      node.property: "severity:>=3"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.85
+        requires_nodejs: true

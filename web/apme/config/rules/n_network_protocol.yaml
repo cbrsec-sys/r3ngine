@@ -1,0 +1,94 @@
+# Category N — Network Protocol Attacks (8 rules)
+rules:
+
+  - name: tls_downgrade_to_data_exfil
+    mitre_id: "T1557.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: tls_downgrade
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.60
+
+  - name: dns_cache_poisoning_to_phishing
+    mitre_id: "T1584.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: dns_cache_poisoning
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: phishing_amplification
+        confidence: 0.70
+
+  - name: dns_cache_poisoning_to_pivot
+    mitre_id: "T1557"
+    if:
+      node.type: Vulnerability
+      node.subtype: dns_cache_poisoning
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: pivot
+        confidence: 0.65
+
+  - name: cache_poisoning_to_auth_bypass
+    mitre_id: "T1557"
+    if:
+      node.type: Vulnerability
+      node.subtype: cache_poisoning
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.75
+
+  - name: cache_poisoning_to_account_takeover
+    mitre_id: "T1557"
+    if:
+      node.type: Vulnerability
+      node.subtype: cache_poisoning
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.70
+
+  - name: http_desync_to_cache_poisoning
+    mitre_id: "T1557"
+    if:
+      node.type: Vulnerability
+      node.subtype: http_request_smuggling
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: cache_poisoning_execution
+        confidence: 0.80
+
+  - name: tcp_sequence_prediction_to_pivot
+    mitre_id: "T1557.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: misconfig
+      node.property: "severity:>=3"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: pivot
+        confidence: 0.35
+
+  - name: smtp_relay_to_email_spoofing
+    mitre_id: "T1566.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: misconfig
+      node.property: "severity:>=2"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: email_spoofing
+        confidence: 0.75
