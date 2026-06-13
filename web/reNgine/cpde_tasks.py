@@ -3,6 +3,7 @@ import os
 import requests
 
 from reNgine.utils.task import save_endpoint, save_parameter, activity_heartbeat_safe
+from reNgine.common_func import has_openapi_spec
 from startScan.models import Domain
 
 from reNgine.cpde import js_collector
@@ -55,10 +56,16 @@ def param_discovery(self, urls=[], ctx={}, description=None):
     activity_heartbeat_safe(f"Analyzing AST for {len(js_files)} JS files")
     ast_findings = ast_analyzer.extract_from_js_files(js_files)
     
-    # 4. Discover OpenAPI
-    # We need base URLs to probe for OpenAPI specs. We use the input URLs.
-    activity_heartbeat_safe("Discovering OpenAPI schemas")
-    openapi_findings = openapi_discoverer.discover(urls, proxy=proxy)
+    # 4. Discover OpenAPI — gate on spec presence to avoid GET-probing all paths
+    # on targets that serve no API documentation.
+    activity_heartbeat_safe("Checking for OpenAPI/Swagger schemas")
+    seed_url = urls[0] if urls else None
+    if seed_url and has_openapi_spec(seed_url, proxy=proxy):
+        activity_heartbeat_safe("Discovering OpenAPI schemas")
+        openapi_findings = openapi_discoverer.discover(urls, proxy=proxy)
+    else:
+        logger.info('[CPDE] No OpenAPI spec reachable at probe paths, skipping OpenAPI discovery')
+        openapi_findings = []
     
     # 5. Correlate Findings
     activity_heartbeat_safe("Correlating parameter evidence")
