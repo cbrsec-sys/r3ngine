@@ -228,3 +228,79 @@ class RulesEngineNumericTests(TestCase):
         self.assertEqual(len(edges), 1)
         self.assertTrue(edges[0].properties.get("requires_victim"))
         self.assertEqual(edges[0].properties.get("mitre_id"), "T1189")
+
+
+from apme.engine.constraints import ConstraintEngine, PathContext, MIN_STEP_CONFIDENCE
+
+
+class ConstraintEngineTests(TestCase):
+
+    def _make_step(self, **kwargs):
+        defaults = {"action": "test", "confidence": 0.8, "to_id": "node::unique"}
+        defaults.update(kwargs)
+        return defaults
+
+    def setUp(self):
+        self.engine = ConstraintEngine()
+        self.ctx = PathContext()
+
+    def test_low_confidence_step_blocked(self):
+        step = self._make_step(confidence=MIN_STEP_CONFIDENCE - 0.01, to_id="node::a")
+        self.assertFalse(self.engine.validate_step(step, self.ctx))
+
+    def test_adequate_confidence_passes(self):
+        step = self._make_step(confidence=0.80, to_id="node::a")
+        self.assertTrue(self.engine.validate_step(step, self.ctx))
+
+    def test_cycle_detection_blocks_revisit(self):
+        self.ctx.visit_node("vuln::99")
+        step = self._make_step(to_id="vuln::99")
+        self.assertFalse(self.engine.validate_step(step, self.ctx))
+
+    def test_cycle_detection_allows_new_node(self):
+        self.ctx.visit_node("vuln::99")
+        step = self._make_step(to_id="vuln::100")
+        self.assertTrue(self.engine.validate_step(step, self.ctx))
+
+    def test_victim_required_blocked_without_context(self):
+        step = self._make_step(requires_victim=True, to_id="node::b")
+        self.assertFalse(self.engine.validate_step(step, self.ctx))
+
+    def test_victim_required_passes_with_context(self):
+        self.ctx.has_victim_interaction = True
+        step = self._make_step(requires_victim=True, to_id="node::b")
+        self.assertTrue(self.engine.validate_step(step, self.ctx))
+
+    def test_php_gate_blocked_without_tech(self):
+        step = self._make_step(requires_php=True, to_id="node::c")
+        self.assertFalse(self.engine.validate_step(step, self.ctx))
+
+    def test_php_gate_passes_with_tech(self):
+        self.ctx.has_php_tech = True
+        step = self._make_step(requires_php=True, to_id="node::c")
+        self.assertTrue(self.engine.validate_step(step, self.ctx))
+
+    def test_path_confidence_product_drops_below_threshold(self):
+        self.ctx.path_confidence_product = 0.06
+        # 0.06 * 0.8 = 0.048 < 0.05
+        step = self._make_step(confidence=0.8, to_id="node::d")
+        self.assertFalse(self.engine.validate_step(step, self.ctx))
+
+    def test_wordpress_gate_blocked_without_tech(self):
+        step = self._make_step(requires_wordpress=True, to_id="node::e")
+        self.assertFalse(self.engine.validate_step(step, self.ctx))
+
+    def test_update_context_sets_visited(self):
+        step = self._make_step(to_id="cap::pivot")
+        self.engine.update_context(step, self.ctx)
+        self.assertIn("cap::pivot", self.ctx.visited_node_ids)
+
+    def test_update_context_propagates_php_tech(self):
+        step = self._make_step(to_subtype="php")
+        self.engine.update_context(step, self.ctx)
+        self.assertTrue(self.ctx.has_php_tech)
+
+    def test_update_context_propagates_java_tech_for_spring(self):
+        step = self._make_step(to_subtype="spring")
+        self.engine.update_context(step, self.ctx)
+        self.assertTrue(self.ctx.has_java_tech)
