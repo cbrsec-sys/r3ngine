@@ -3442,41 +3442,50 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			else:
 				logger.warning('[WEB_API] LinkFinder: output file missing for %s', subdomain_name)
 
-		# InQL - GraphQL Discovery
+		# InQL - GraphQL Discovery (only when a GraphQL endpoint is detected)
 		if 'inql' in uses_tools:
-			inql_output = f"{results_dir}/inql_{subdomain_name}"
-			cmd = f"inql -t {url} -o {inql_output}"
-			proxy = get_random_proxy()
-			if proxy:
-				cmd += f" -p {proxy}"
-			logger.warning('[WEB_API] InQL: running on %s | cmd: %s', subdomain_name, cmd)
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
-			if os.path.exists(inql_output):
-				try:
-					inql_findings = parse_inql_results(inql_output)
-					for finding in inql_findings:
-						save_endpoint(url, ctx=ctx, subdomain=subdomain, source='InQL (GraphQL Found)')
-					from reNgine.cpde.graphql_enricher import enrich_graphql_params
-					enrich_graphql_params(inql_output, url, subdomain, ctx)
-					logger.warning('[WEB_API] InQL: %s → %d GraphQL findings saved', subdomain_name, len(inql_findings))
-				except Exception as e:
-					logger.error('[WEB_API] InQL: error parsing results for %s: %s', subdomain_name, e)
+			if not has_graphql_endpoint(self.scan_id, url):
+				logger.warning('[WEB_API] InQL: no GraphQL endpoint detected, skipping %s', subdomain_name)
 			else:
-				logger.warning('[WEB_API] InQL: no output directory found for %s', subdomain_name)
+				inql_output = f"{results_dir}/inql_{subdomain_name}"
+				cmd = f"inql -t {url} -o {inql_output}"
+				proxy = get_random_proxy()
+				if proxy:
+					cmd += f" -p {proxy}"
+				logger.warning('[WEB_API] InQL: running on %s | cmd: %s', subdomain_name, cmd)
+				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+				if os.path.exists(inql_output):
+					try:
+						inql_findings = parse_inql_results(inql_output)
+						for finding in inql_findings:
+							save_endpoint(url, ctx=ctx, subdomain=subdomain, source='InQL (GraphQL Found)')
+						from reNgine.cpde.graphql_enricher import enrich_graphql_params
+						enrich_graphql_params(inql_output, url, subdomain, ctx)
+						logger.warning('[WEB_API] InQL: %s → %d GraphQL findings saved', subdomain_name, len(inql_findings))
+					except Exception as e:
+						logger.error('[WEB_API] InQL: error parsing results for %s: %s', subdomain_name, e)
+				else:
+					logger.warning('[WEB_API] InQL: no output directory found for %s', subdomain_name)
 
-		# jwt_tool - JWT security testing
+		# jwt_tool - JWT security testing (only when JWT tokens have been found)
 		if JWT_TOOL in uses_tools:
-			logger.warning('[WEB_API] jwt_tool: running on %s', subdomain_name)
-			from reNgine.api_tasks import run_jwt_scan
-			run_jwt_scan(self, ctx, url, subdomain, results_dir)
-			logger.warning('[WEB_API] jwt_tool: finished on %s', subdomain_name)
+			if has_jwt_tokens(self.scan_id, subdomain=subdomain):
+				logger.warning('[WEB_API] jwt_tool: JWT tokens found, running on %s', subdomain_name)
+				from reNgine.api_tasks import run_jwt_scan
+				run_jwt_scan(self, ctx, url, subdomain, results_dir)
+				logger.warning('[WEB_API] jwt_tool: finished on %s', subdomain_name)
+			else:
+				logger.warning('[WEB_API] jwt_tool: no JWT tokens detected, skipping %s', subdomain_name)
 
-		# graphql-cop - GraphQL security audit
+		# graphql-cop - GraphQL security audit (only when a GraphQL endpoint is detected)
 		if GRAPHQL_COP in uses_tools:
-			logger.warning('[WEB_API] graphql-cop: running on %s', subdomain_name)
-			from reNgine.api_tasks import run_graphql_cop
-			run_graphql_cop(self, ctx, url, subdomain)
-			logger.warning('[WEB_API] graphql-cop: finished on %s', subdomain_name)
+			if not has_graphql_endpoint(self.scan_id, url):
+				logger.warning('[WEB_API] graphql-cop: no GraphQL endpoint detected, skipping %s', subdomain_name)
+			else:
+				logger.warning('[WEB_API] graphql-cop: running on %s', subdomain_name)
+				from reNgine.api_tasks import run_graphql_cop
+				run_graphql_cop(self, ctx, url, subdomain)
+				logger.warning('[WEB_API] graphql-cop: finished on %s', subdomain_name)
 
 	# Semgrep - Post-discovery pattern matching
 	if 'semgrep' in uses_tools:

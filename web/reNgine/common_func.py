@@ -2485,3 +2485,160 @@ def extract_params_from_url(url):
 	except Exception as e:
 		logger.error("Error extracting parameters from URL %s: %s", url, e)
 	return params
+
+
+_JWT_PARAM_RE = re.compile(
+	r'\b(jwt|bearer|authorization|access_token|refresh_token|id_token|auth_token)\b',
+	re.IGNORECASE,
+)
+_JWT_SECRET_TYPE_RE = re.compile(
+	r'jwt|json[\s_-]?web[\s_-]?token|bearer[\s_-]?token',
+	re.IGNORECASE,
+)
+
+# Paths probed to detect a GraphQL endpoint before running InQL / graphql-cop.
+_GRAPHQL_PROBE_PATHS = [
+	'/graphql',
+	'/api/graphql',
+	'/__graphql',
+	'/graphiql',
+	'/api/graphiql',
+	'/v1/graphql',
+]
+
+# Paths probed to detect an OpenAPI spec — mirrors openapi_discoverer._SPEC_PROBE_PATHS
+# so has_openapi_spec() and discover() cover the same set of paths.
+_OPENAPI_PROBE_PATHS = [
+	'/openapi.json',
+	'/openapi.yaml',
+	'/swagger.json',
+	'/swagger.yaml',
+	'/api-docs',
+	'/api-docs.json',
+	'/api/docs',
+	'/api/openapi.json',
+	'/api/swagger.json',
+	'/v1/api-docs',
+	'/v2/api-docs',
+	'/v3/api-docs',
+	'/docs/openapi.json',
+	'/.well-known/openapi.json',
+]
+
+_PROBE_HEADERS = {'User-Agent': 'r3ngine-probe/1.0'}
+_PROBE_TIMEOUT = 5  # seconds per HEAD request
+
+
+def has_graphql_endpoint(scan_id, url, proxy=None):
+	"""Return True if a GraphQL endpoint has been detected for this scan.
+
+	Checks existing EndPoint records first (zero network cost). Falls back to
+	HEAD-probing common GraphQL paths if the DB has no evidence.
+	"""
+	if EndPoint.objects.filter(
+		scan_history_id=scan_id,
+		http_url__iregex=r'/graphi?ql',
+	).exists():
+		return True
+
+	from urllib.parse import urlparse as _urlparse
+	parsed = _urlparse(url)
+	base = '%s://%s' % (parsed.scheme, parsed.netloc)
+	proxies = {'http': proxy, 'https': proxy} if proxy else None
+
+	for path in _GRAPHQL_PROBE_PATHS:
+		probe_url = base + path
+		try:
+			resp = requests.head(
+				probe_url,
+				timeout=_PROBE_TIMEOUT,
+				proxies=proxies,
+				allow_redirects=True,
+				headers=_PROBE_HEADERS,
+			)
+			if resp.status_code not in (400, 404, 410):
+				logger.info('[GATE] GraphQL endpoint candidate at %s (HTTP %d)', probe_url, resp.status_code)
+				return True
+		except requests.RequestException:
+			continue
+
+	return False
+
+
+def has_openapi_spec(url, proxy=None):
+	"""Return True if an OpenAPI/Swagger spec is reachable at the given base URL.
+
+	Uses HEAD requests only (fast existence check). For 200 responses the
+	Content-Type header is inspected; if ambiguous a minimal GET confirms the
+	body contains OpenAPI/Swagger keys. Using HEAD avoids downloading full spec
+	bodies for probe paths that return 404 or connection-refused.
+	"""
+	from urllib.parse import urlparse as _urlparse
+	parsed = _urlparse(url)
+	base = '%s://%s' % (parsed.scheme, parsed.netloc)
+	proxies = {'http': proxy, 'https': proxy} if proxy else None
+
+	for path in _OPENAPI_PROBE_PATHS:
+		probe_url = base + path
+		try:
+			resp = requests.head(
+				probe_url,
+				timeout=_PROBE_TIMEOUT,
+				proxies=proxies,
+				allow_redirects=True,
+				headers=_PROBE_HEADERS,
+			)
+			if resp.status_code != 200:
+				continue
+			# HEAD returned 200 — accept json/yaml content types directly
+			ct = resp.headers.get('Content-Type', '')
+			if 'json' in ct or 'yaml' in ct:
+				logger.info('[GATE] OpenAPI spec found at %s (Content-Type: %s)', probe_url, ct)
+				return True
+			# For ambiguous content types confirm with a lightweight GET
+			get_resp = requests.get(
+				probe_url,
+				timeout=_PROBE_TIMEOUT * 2,
+				proxies=proxies,
+				allow_redirects=True,
+				headers=_PROBE_HEADERS,
+			)
+			if get_resp.status_code != 200:
+				continue
+			try:
+				data = get_resp.json()
+				if isinstance(data, dict) and ('paths' in data or 'openapi' in data or 'swagger' in data):
+					logger.info('[GATE] OpenAPI spec confirmed at %s', probe_url)
+					return True
+			except Exception:
+				continue
+		except requests.RequestException:
+			continue
+
+	return False
+
+
+def has_jwt_tokens(scan_id, subdomain=None):
+	"""Return True if JWT tokens have been detected in the given scan.
+
+	Checks Parameter records with is_auth_related=True whose name matches
+	JWT patterns, and SecretLeak records whose secret_type indicates a JWT
+	or Bearer token. When subdomain is provided the Parameter check is
+	scoped to that subdomain; SecretLeak always covers the full scan so
+	that scan-wide secret discoveries gate per-subdomain runs correctly.
+	"""
+	param_qs = Parameter.objects.filter(
+		endpoint__scan_history_id=scan_id,
+		is_auth_related=True,
+	)
+	if subdomain is not None:
+		param_qs = param_qs.filter(endpoint__subdomain=subdomain)
+	for name in param_qs.values_list('name', flat=True):
+		if _JWT_PARAM_RE.search(name):
+			return True
+
+	for secret_type in SecretLeak.objects.filter(scan_history_id=scan_id).values_list('secret_type', flat=True):
+		if _JWT_SECRET_TYPE_RE.search(secret_type):
+			return True
+
+	return False
