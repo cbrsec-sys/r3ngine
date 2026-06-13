@@ -12,6 +12,7 @@ CRITICAL RULES:
 - Confidence scores MUST be propagated to edges.
 """
 
+import json as _json
 import logging
 from typing import List
 
@@ -111,10 +112,12 @@ class GraphBuilder:
         )
 
     @staticmethod
-    def _merge_edge(tx, edge: Edge, scan_id: int) -> bool:
+    def _merge_edge(tx, edge: "Edge", scan_id: int) -> bool:
         """
-        Create a directed edge between two APMENodes, automatically generating
-        skeleton endpoints if one or both nodes are missing from the ingestion layer.
+        Create a directed APME_EDGE between two APMENodes.
+        Stores mitre_id and all constraint flags as explicit Neo4j properties
+        so Cypher path queries can read them directly in rels projections.
+        Auto-creates skeleton nodes for missing endpoints.
         """
         def infer_node_type(apme_id: str) -> tuple:
             if apme_id.startswith("domain::"):
@@ -127,6 +130,10 @@ class GraphBuilder:
                 return "Asset", "endpoint"
             elif apme_id.startswith("vuln::"):
                 return "Vulnerability", "generic"
+            elif apme_id.startswith("tech::"):
+                return "Technology", "generic"
+            elif apme_id.startswith("credential::"):
+                return "Credential", "generic_secret"
             elif apme_id.startswith("goal::capability::"):
                 return "Capability", apme_id.split("::")[-1]
             elif apme_id.startswith("goal::privilege::"):
@@ -136,25 +143,33 @@ class GraphBuilder:
         from_type, from_subtype = infer_node_type(edge.from_id)
         to_type, to_subtype = infer_node_type(edge.to_id)
 
+        props = edge.properties
         result = tx.run(
             """
             MERGE (a:APMENode {apme_id: $from_id, scan_id: $scan_id})
-            ON CREATE SET a.type = $from_type, 
-                          a.subtype = $from_subtype, 
-                          a.confidence = 0.5, 
+            ON CREATE SET a.type = $from_type,
+                          a.subtype = $from_subtype,
+                          a.confidence = 0.5,
                           a.source = "APME:skeleton",
                           a.properties = '{}'
-            
+
             MERGE (b:APMENode {apme_id: $to_id, scan_id: $scan_id})
-            ON CREATE SET b.type = $to_type, 
-                          b.subtype = $to_subtype, 
-                          b.confidence = 0.5, 
+            ON CREATE SET b.type = $to_type,
+                          b.subtype = $to_subtype,
+                          b.confidence = 0.5,
                           b.source = "APME:skeleton",
                           b.properties = '{}'
-            
-            MERGE (a)-[r:APME_EDGE {edge_type: $type}]->(b)
-            SET r.confidence  = $confidence,
-                r.properties  = $properties
+
+            MERGE (a)-[r:APME_EDGE {edge_type: $type, scan_id: $scan_id}]->(b)
+            SET r.confidence             = $confidence,
+                r.properties             = $properties_json,
+                r.mitre_id               = $mitre_id,
+                r.requires_victim        = $requires_victim,
+                r.requires_php           = $requires_php,
+                r.requires_java          = $requires_java,
+                r.requires_python        = $requires_python,
+                r.requires_wordpress     = $requires_wordpress,
+                r.endpoint_requires_auth = $endpoint_requires_auth
             RETURN r
             """,
             from_id=edge.from_id,
@@ -162,7 +177,14 @@ class GraphBuilder:
             scan_id=scan_id,
             type=edge.type,
             confidence=edge.confidence,
-            properties=str(edge.properties),
+            properties_json=_json.dumps(props),
+            mitre_id=props.get("mitre_id", "unknown"),
+            requires_victim=bool(props.get("requires_victim", False)),
+            requires_php=bool(props.get("requires_php", False)),
+            requires_java=bool(props.get("requires_java", False)),
+            requires_python=bool(props.get("requires_python", False)),
+            requires_wordpress=bool(props.get("requires_wordpress", False)),
+            endpoint_requires_auth=bool(props.get("endpoint_requires_auth", False)),
             from_type=from_type,
             from_subtype=from_subtype,
             to_type=to_type,
