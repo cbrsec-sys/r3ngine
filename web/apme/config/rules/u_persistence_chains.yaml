@@ -1,0 +1,91 @@
+# Category U — Persistence Chains (8 rules)
+rules:
+
+  - name: rce_execution_to_webshell_persistence
+    mitre_id: "T1505.003"
+    if:
+      node.type: Capability
+      node.subtype: rce_execution
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: webshell_persistence
+        confidence: 0.85
+
+  - name: rce_execution_to_scheduled_task
+    mitre_id: "T1053.005"
+    if:
+      node.type: Capability
+      node.subtype: rce_execution
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: scheduled_task_persistence
+        confidence: 0.75
+
+  - name: rce_execution_to_registry_persistence
+    mitre_id: "T1547.001"
+    if:
+      node.type: Capability
+      node.subtype: rce_execution
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: registry_persistence
+        confidence: 0.70
+        requires_dotnet: true
+
+  - name: file_upload_to_webshell
+    mitre_id: "T1505.003"
+    if:
+      node.type: Vulnerability
+      node.subtype: file_upload
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: webshell_persistence
+        confidence: 0.90
+
+  - name: admin_access_to_cron_persistence
+    mitre_id: "T1053.003"
+    if:
+      node.type: Privilege
+      node.subtype: admin
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: persistence
+        confidence: 0.75
+
+  - name: persistence_to_lateral_movement
+    mitre_id: "T1021"
+    if:
+      node.type: Capability
+      node.subtype: persistence
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: lateral_movement
+        confidence: 0.80
+
+  - name: persistence_to_credential_harvesting
+    mitre_id: "T1003"
+    if:
+      node.type: Capability
+      node.subtype: persistence
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: credential_harvesting
+        confidence: 0.75
+
+  - name: webshell_to_data_exfil
+    mitre_id: "T1041"
+    if:
+      node.type: Capability
+      node.subtype: webshell_persistence
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.85

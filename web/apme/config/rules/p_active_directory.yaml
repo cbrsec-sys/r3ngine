@@ -1,0 +1,178 @@
+# Category P — Active Directory (14 rules)
+rules:
+
+  - name: ntlm_relay_to_lateral_movement
+    mitre_id: "T1557.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: ntlm_relay
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: lateral_movement
+        confidence: 0.85
+        requires_active_directory: true
+
+  - name: ntlm_relay_to_domain_admin
+    mitre_id: "T1557.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: ntlm_relay
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: hvt_compromise
+        confidence: 0.80
+        requires_active_directory: true
+
+  - name: pass_the_hash_to_lateral_movement
+    mitre_id: "T1550.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: pass_the_hash
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: lateral_movement
+        confidence: 0.85
+        requires_active_directory: true
+
+  - name: pass_the_ticket_to_lateral_movement
+    mitre_id: "T1550.003"
+    if:
+      node.type: Vulnerability
+      node.subtype: pass_the_ticket
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: lateral_movement
+        confidence: 0.80
+        requires_active_directory: true
+
+  - name: kerberoasting_to_credential_harvesting
+    mitre_id: "T1558.003"
+    if:
+      node.type: Vulnerability
+      node.subtype: kerberoasting
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: credential_harvesting
+        confidence: 0.80
+        requires_active_directory: true
+
+  - name: kerberoasting_to_lateral_movement
+    mitre_id: "T1558.003"
+    if:
+      node.type: Vulnerability
+      node.subtype: kerberoasting
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: lateral_movement
+        confidence: 0.75
+        requires_active_directory: true
+
+  - name: asrep_roasting_to_credential_harvesting
+    mitre_id: "T1558.004"
+    if:
+      node.type: Vulnerability
+      node.subtype: asrep_roasting
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: credential_harvesting
+        confidence: 0.75
+        requires_active_directory: true
+
+  - name: dcsync_to_credential_harvesting
+    mitre_id: "T1003.006"
+    if:
+      node.type: Vulnerability
+      node.subtype: dcsync_privilege
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: credential_harvesting
+        confidence: 0.90
+        requires_active_directory: true
+
+  - name: dcsync_to_hvt_compromise
+    mitre_id: "T1003.006"
+    if:
+      node.type: Vulnerability
+      node.subtype: dcsync_privilege
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: hvt_compromise
+        confidence: 0.90
+        requires_active_directory: true
+
+  - name: gpo_abuse_to_lateral_movement
+    mitre_id: "T1484.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: gpo_abuse
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: lateral_movement
+        confidence: 0.80
+        requires_active_directory: true
+
+  - name: gpo_abuse_to_persistence
+    mitre_id: "T1484.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: gpo_abuse
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: persistence
+        confidence: 0.75
+        requires_active_directory: true
+
+  - name: shadow_credentials_to_account_takeover
+    mitre_id: "T1556"
+    if:
+      node.type: Vulnerability
+      node.subtype: misconfig
+      node.property:
+        - "severity:>=3"
+        - "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.85
+        requires_active_directory: true
+
+  - name: kerberos_ticket_forgery_to_hvt_compromise
+    mitre_id: "T1558.001"
+    if:
+      node.type: Capability
+      node.subtype: kerberos_ticket_forgery
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: hvt_compromise
+        confidence: 0.90
+        requires_active_directory: true
+
+  - name: credential_harvesting_to_domain_controller
+    mitre_id: "T1003"
+    if:
+      node.type: Capability
+      node.subtype: credential_harvesting
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: domain_controller_compromise
+        confidence: 0.80
+        requires_active_directory: true

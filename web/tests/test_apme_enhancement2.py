@@ -723,3 +723,259 @@ class ExistingRulesAdditionTests(TestCase):
     def test_ssrf_redis_rule_has_requires_redis(self) -> None:
         rule = next(r for r in self.engine._rules if r["name"] == "ssrf_to_redis_rce")
         self.assertTrue(rule["then"]["create_edge"].get("requires_redis"))
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 4 — New Rule Category Files (74 rules across 8 files)
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class NewRuleCategoryTests(TestCase):
+    """Verify 74 new rules from 8 new YAML rule category files (n_ through u_)."""
+
+    def setUp(self) -> None:
+        from apme.engine.rules_engine import RulesEngine
+        self.engine = RulesEngine()
+        self.rule_names = {r["name"] for r in self.engine._rules}
+
+    def _assert_rules(self, *names: str) -> None:
+        for name in names:
+            self.assertIn(name, self.rule_names, f"Missing rule: {name}")
+
+    def _rule(self, name: str) -> dict:
+        return next(r for r in self.engine._rules if r["name"] == name)
+
+    # ── Aggregate count ──────────────────────────────────────────────────
+
+    def test_total_rule_count_approximately_179(self) -> None:
+        count = len(self.engine._rules)
+        self.assertGreaterEqual(count, 174, f"Expected >= 174 rules, got {count}")
+        self.assertLessEqual(count, 184, f"Expected <= 184 rules, got {count}")
+
+    # ── n_network_protocol.yaml (8 rules) ────────────────────────────────
+
+    def test_network_protocol_rules_loaded(self) -> None:
+        self._assert_rules(
+            "tls_downgrade_to_data_exfil",
+            "dns_cache_poisoning_to_phishing",
+            "dns_cache_poisoning_to_pivot",
+            "cache_poisoning_to_auth_bypass",
+            "cache_poisoning_to_account_takeover",
+            "http_desync_to_cache_poisoning",
+            "tcp_sequence_prediction_to_pivot",
+            "smtp_relay_to_email_spoofing",
+        )
+
+    # ── o_container_infra.yaml (10 rules) ────────────────────────────────
+
+    def test_container_infra_rules_loaded(self) -> None:
+        self._assert_rules(
+            "docker_socket_exposed_to_container_escape",
+            "container_escape_to_pivot",
+            "container_escape_to_rce_execution",
+            "privileged_container_to_escape",
+            "k8s_rbac_misconfig_to_cluster_access",
+            "k8s_secret_exposure_to_credential_harvesting",
+            "k8s_cluster_access_to_lateral_movement",
+            "k8s_cluster_access_to_persistence",
+            "k8s_cluster_access_to_supply_chain",
+            "docker_registry_exposure_to_code_exfil",
+        )
+
+    def test_docker_rules_have_requires_docker(self) -> None:
+        docker_rules = [
+            "docker_socket_exposed_to_container_escape",
+            "container_escape_to_pivot",
+            "container_escape_to_rce_execution",
+            "privileged_container_to_escape",
+            "docker_registry_exposure_to_code_exfil",
+        ]
+        for name in docker_rules:
+            rule = self._rule(name)
+            self.assertTrue(
+                rule["then"]["create_edge"].get("requires_docker"),
+                f"Rule {name} missing requires_docker",
+            )
+
+    def test_k8s_rules_have_requires_kubernetes(self) -> None:
+        k8s_rules = [
+            "k8s_rbac_misconfig_to_cluster_access",
+            "k8s_secret_exposure_to_credential_harvesting",
+            "k8s_cluster_access_to_lateral_movement",
+            "k8s_cluster_access_to_persistence",
+            "k8s_cluster_access_to_supply_chain",
+        ]
+        for name in k8s_rules:
+            rule = self._rule(name)
+            self.assertTrue(
+                rule["then"]["create_edge"].get("requires_kubernetes"),
+                f"Rule {name} missing requires_kubernetes",
+            )
+
+    # ── p_active_directory.yaml (14 rules) ───────────────────────────────
+
+    def test_active_directory_rules_loaded(self) -> None:
+        self._assert_rules(
+            "ntlm_relay_to_lateral_movement",
+            "ntlm_relay_to_domain_admin",
+            "pass_the_hash_to_lateral_movement",
+            "pass_the_ticket_to_lateral_movement",
+            "kerberoasting_to_credential_harvesting",
+            "kerberoasting_to_lateral_movement",
+            "asrep_roasting_to_credential_harvesting",
+            "dcsync_to_credential_harvesting",
+            "dcsync_to_hvt_compromise",
+            "gpo_abuse_to_lateral_movement",
+            "gpo_abuse_to_persistence",
+            "shadow_credentials_to_account_takeover",
+            "kerberos_ticket_forgery_to_hvt_compromise",
+            "credential_harvesting_to_domain_controller",
+        )
+
+    def test_all_ad_rules_have_requires_active_directory(self) -> None:
+        ad_rules = [
+            "ntlm_relay_to_lateral_movement",
+            "ntlm_relay_to_domain_admin",
+            "pass_the_hash_to_lateral_movement",
+            "pass_the_ticket_to_lateral_movement",
+            "kerberoasting_to_credential_harvesting",
+            "kerberoasting_to_lateral_movement",
+            "asrep_roasting_to_credential_harvesting",
+            "dcsync_to_credential_harvesting",
+            "dcsync_to_hvt_compromise",
+            "gpo_abuse_to_lateral_movement",
+            "gpo_abuse_to_persistence",
+            "shadow_credentials_to_account_takeover",
+            "kerberos_ticket_forgery_to_hvt_compromise",
+            "credential_harvesting_to_domain_controller",
+        ]
+        for name in ad_rules:
+            rule = self._rule(name)
+            self.assertTrue(
+                rule["then"]["create_edge"].get("requires_active_directory"),
+                f"Rule {name} missing requires_active_directory",
+            )
+
+    # ── q_api_web_modern.yaml (10 rules) ─────────────────────────────────
+
+    def test_api_web_modern_rules_loaded(self) -> None:
+        self._assert_rules(
+            "mass_assignment_to_privilege_escalation",
+            "mass_assignment_verified_to_account_takeover",
+            "parameter_pollution_to_auth_bypass",
+            "graphql_mutation_to_account_takeover",
+            "graphql_mutation_to_data_exfil",
+            "api_versioning_bypass_to_auth_bypass",
+            "api_versioning_bypass_to_data_exfil",
+            "insecure_websocket_to_auth_bypass",
+            "race_condition_to_privilege_escalation",
+            "race_condition_to_account_takeover",
+        )
+
+    # ── r_email_security.yaml (8 rules) ──────────────────────────────────
+
+    def test_email_security_rules_loaded(self) -> None:
+        self._assert_rules(
+            "spf_dmarc_bypass_to_email_spoofing",
+            "spf_dmarc_bypass_to_phishing_amplification",
+            "email_header_injection_to_phishing",
+            "email_header_injection_to_account_takeover",
+            "email_account_compromise_to_lateral_movement",
+            "email_account_compromise_to_credential_harvesting",
+            "email_spoofing_to_hvt_compromise",
+            "mx_misconfig_to_email_spoofing",
+        )
+
+    # ── s_supply_chain.yaml (8 rules) ────────────────────────────────────
+
+    def test_supply_chain_rules_loaded(self) -> None:
+        self._assert_rules(
+            "github_actions_injection_to_ci_execution",
+            "ci_artifact_poisoning_to_supply_chain",
+            "typosquatting_to_supply_chain",
+            "compromised_registry_to_rce_execution",
+            "ci_execution_to_credential_harvesting",
+            "ci_execution_to_code_exfil",
+            "github_token_to_ci_execution",
+            "supply_chain_compromise_to_hvt_compromise",
+        )
+
+    # ── t_dotnet_cms.yaml (8 rules) ──────────────────────────────────────
+
+    def test_dotnet_cms_rules_loaded(self) -> None:
+        self._assert_rules(
+            "aspnet_viewstate_to_rce",
+            "machinekey_to_rce",
+            "drupal_rce_to_execution",
+            "drupal_sqli_to_db_access",
+            "joomla_rce_to_execution",
+            "magento_sqli_to_db_access",
+            "rails_mass_assign_to_privilege_escalation",
+            "nodejs_prototype_pollution_to_rce",
+        )
+
+    def test_dotnet_rules_have_requires_dotnet(self) -> None:
+        dotnet_rules = ["aspnet_viewstate_to_rce", "machinekey_to_rce"]
+        for name in dotnet_rules:
+            rule = self._rule(name)
+            self.assertTrue(
+                rule["then"]["create_edge"].get("requires_dotnet"),
+                f"Rule {name} missing requires_dotnet",
+            )
+
+    def test_drupal_rules_have_requires_drupal(self) -> None:
+        drupal_rules = ["drupal_rce_to_execution", "drupal_sqli_to_db_access"]
+        for name in drupal_rules:
+            rule = self._rule(name)
+            self.assertTrue(
+                rule["then"]["create_edge"].get("requires_drupal"),
+                f"Rule {name} missing requires_drupal",
+            )
+
+    def test_nodejs_rule_has_requires_nodejs(self) -> None:
+        rule = self._rule("nodejs_prototype_pollution_to_rce")
+        self.assertTrue(rule["then"]["create_edge"].get("requires_nodejs"))
+
+    def test_joomla_rule_has_requires_joomla(self) -> None:
+        rule = self._rule("joomla_rce_to_execution")
+        self.assertTrue(rule["then"]["create_edge"].get("requires_joomla"))
+
+    def test_magento_rule_has_requires_magento(self) -> None:
+        rule = self._rule("magento_sqli_to_db_access")
+        self.assertTrue(rule["then"]["create_edge"].get("requires_magento"))
+
+    def test_rails_rule_has_requires_ruby(self) -> None:
+        rule = self._rule("rails_mass_assign_to_privilege_escalation")
+        self.assertTrue(rule["then"]["create_edge"].get("requires_ruby"))
+
+    # ── u_persistence_chains.yaml (8 rules) ──────────────────────────────
+
+    def test_persistence_chains_rules_loaded(self) -> None:
+        self._assert_rules(
+            "rce_execution_to_webshell_persistence",
+            "rce_execution_to_scheduled_task",
+            "rce_execution_to_registry_persistence",
+            "file_upload_to_webshell",
+            "admin_access_to_cron_persistence",
+            "persistence_to_lateral_movement",
+            "persistence_to_credential_harvesting",
+            "webshell_to_data_exfil",
+        )
+
+    def test_registry_persistence_requires_dotnet(self) -> None:
+        rule = self._rule("rce_execution_to_registry_persistence")
+        self.assertTrue(rule["then"]["create_edge"].get("requires_dotnet"))
+
+    # ── Cross-file constraint spot-checks ────────────────────────────────
+
+    def test_insecure_websocket_requires_victim(self) -> None:
+        rule = self._rule("insecure_websocket_to_auth_bypass")
+        self.assertTrue(rule["then"]["create_edge"].get("requires_victim"))
+
+    def test_email_spoofing_to_hvt_requires_victim(self) -> None:
+        rule = self._rule("email_spoofing_to_hvt_compromise")
+        self.assertTrue(rule["then"]["create_edge"].get("requires_victim"))
+
+    def test_email_header_injection_to_account_takeover_requires_victim(self) -> None:
+        rule = self._rule("email_header_injection_to_account_takeover")
+        self.assertTrue(rule["then"]["create_edge"].get("requires_victim"))
