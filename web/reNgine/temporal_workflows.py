@@ -833,16 +833,59 @@ class NucleiPlannerWorkflow:
             nuclei_specific_config = vuln_config.get('nuclei', {})
             severities = nuclei_specific_config.get('severity') or NUCLEI_DEFAULT_SEVERITIES
 
-            proxies_file_path = None
-            try:
-                proxies_file_path = await workflow.execute_activity(
-                    "CreateProxyListActivity",
-                    args=[ctx],
-                    start_to_close_timeout=timedelta(minutes=5),
-                    retry_policy=_RETRY_INTERNAL,
-                    task_queue="python-orchestrator-queue",
-                )
+            if workflow.patched("nuclei-proxy-rotation"):
+                proxies_file_path = None
+                try:
+                    proxies_file_path = await workflow.execute_activity(
+                        "CreateProxyListActivity",
+                        args=[ctx],
+                        start_to_close_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_INTERNAL,
+                        task_queue="python-orchestrator-queue",
+                    )
 
+                    # Gather tags via activity (DB + tech_mapping work is not allowed in workflows).
+                    all_tags = await workflow.execute_activity(
+                        "GatherNucleiTagsActivity",
+                        args=[ctx],
+                        start_to_close_timeout=timedelta(minutes=5),
+                        retry_policy=_RETRY_INTERNAL,
+                        task_queue="python-orchestrator-queue",
+                    )
+
+                    # Group into batches of 3 so each Nuclei call is bounded and provides
+                    # granular Temporal history entries.  An empty list → single pass with
+                    # no tag filter (preserves current behaviour when no tech is detected).
+                    if all_tags:
+                        tag_batches = [all_tags[i:i + 3] for i in range(0, len(all_tags), 3)]
+                    else:
+                        tag_batches = [None]  # sentinel: no -tags flag
+
+                    for severity in severities:
+                        for batch in tag_batches:
+                            severity_ctx = {
+                                **ctx,
+                                "nuclei_severity_filter": severity,
+                                "nuclei_proxies_path": proxies_file_path
+                            }
+                            await workflow.execute_activity(
+                                "RunNucleiActivity",
+                                args=[severity_ctx, severity, batch],
+                                start_to_close_timeout=timedelta(hours=6),
+                                heartbeat_timeout=timedelta(minutes=5),
+                                task_queue="python-orchestrator-queue",
+                            )
+                finally:
+                    if proxies_file_path:
+                        # Clean up the proxies list to avoid leaving sensitive network details around
+                        await workflow.execute_activity(
+                            "CleanupProxyListActivity",
+                            args=[proxies_file_path],
+                            start_to_close_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_INTERNAL,
+                            task_queue="python-orchestrator-queue",
+                        )
+            else:
                 # Gather tags via activity (DB + tech_mapping work is not allowed in workflows).
                 all_tags = await workflow.execute_activity(
                     "GatherNucleiTagsActivity",
@@ -864,8 +907,7 @@ class NucleiPlannerWorkflow:
                     for batch in tag_batches:
                         severity_ctx = {
                             **ctx,
-                            "nuclei_severity_filter": severity,
-                            "nuclei_proxies_path": proxies_file_path
+                            "nuclei_severity_filter": severity
                         }
                         await workflow.execute_activity(
                             "RunNucleiActivity",
@@ -874,16 +916,6 @@ class NucleiPlannerWorkflow:
                             heartbeat_timeout=timedelta(minutes=5),
                             task_queue="python-orchestrator-queue",
                         )
-            finally:
-                if proxies_file_path:
-                    # Clean up the proxies list to avoid leaving sensitive network details around
-                    await workflow.execute_activity(
-                        "CleanupProxyListActivity",
-                        args=[proxies_file_path],
-                        start_to_close_timeout=timedelta(minutes=5),
-                        retry_policy=_RETRY_INTERNAL,
-                        task_queue="python-orchestrator-queue",
-                    )
         
         if vuln_config.get('run_crlfuzz', False):
             await workflow.execute_activity(
