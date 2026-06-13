@@ -407,3 +407,81 @@ class ScorerTests(TestCase):
     def test_weights_sum_to_one(self):
         total = sum(Scorer.WEIGHTS.values())
         self.assertAlmostEqual(total, 1.0, places=10)
+
+
+from apme.output.serializer import serialize_path, serialize_paths, _serialize_node
+from apme.models.path import AttackPath, PathStep
+from apme.models.node import Node as APMENode
+
+
+class SerializerTests(TestCase):
+
+    def _make_path_with_mitre(self):
+        step = PathStep(
+            from_id="vuln::1",
+            to_id="goal::capability::rce_execution",
+            action="Exploit RCE",
+            confidence=0.90,
+            validated=True,
+            edge_type="LEADS_TO",
+            mitre_technique="T1190",
+            mitre_tactic="initial-access",
+        )
+        p = AttackPath(
+            id="APT-TEST1",
+            start="vuln::1",
+            end="goal::capability::rce_execution",
+            steps=[step],
+            score=0.85,
+            risk="high",
+        )
+        return p
+
+    def test_serialize_path_includes_mitre_technique(self):
+        p = self._make_path_with_mitre()
+        result = serialize_path(p)
+        step_dict = result["steps"][0]
+        self.assertEqual(step_dict["mitre_technique"], "T1190")
+        self.assertEqual(step_dict["mitre_technique_name"], "Exploit Public-Facing Application")
+        self.assertEqual(step_dict["mitre_tactic_display"], "Initial Access")
+        self.assertEqual(step_dict["mitre_tactic_color"], "#ff4444")
+
+    def test_serialize_path_includes_techniques_summary(self):
+        p = self._make_path_with_mitre()
+        result = serialize_path(p)
+        self.assertIn("T1190", result["mitre_techniques"])
+        self.assertIn("initial-access", result["mitre_tactics"])
+
+    def test_serialize_paths_separates_speculative(self):
+        p1 = self._make_path_with_mitre()
+        p1.risk = "high"
+        p2 = AttackPath(
+            id="APT-TEST2", start="a", end="b",
+            steps=[PathStep("a", "b", "x", confidence=0.3)],
+            score=0.20, risk="speculative",
+        )
+        result = serialize_paths([p1, p2])
+        self.assertEqual(len(result["paths"]), 1)
+        self.assertEqual(len(result["speculative_paths"]), 1)
+        self.assertEqual(result["paths"][0]["path_id"], "APT-TEST1")
+
+    def test_node_dict_includes_cwe_and_technique(self):
+        node = APMENode(
+            id="vuln::1", type="Vulnerability", subtype="sqli",
+            confidence=0.9, source="test",
+            properties={"cwe": "CWE-89", "technique": "T1190",
+                        "name": "SQLi", "severity": 3, "cvss_score": 7.5, "vuln_id": 1},
+        )
+        d = _serialize_node(node)
+        self.assertEqual(d["cwe"], "CWE-89")
+        self.assertEqual(d["technique"], "T1190")
+
+    def test_empty_mitre_technique_handled_gracefully(self):
+        step = PathStep(from_id="a", to_id="b", action="test",
+                        mitre_technique="", mitre_tactic="")
+        p = AttackPath(id="APT-X", start="a", end="b", steps=[step])
+        result = serialize_path(p)
+        step_dict = result["steps"][0]
+        self.assertEqual(step_dict["mitre_technique"], "")
+        self.assertEqual(step_dict["mitre_technique_name"], "")
+        self.assertEqual(result["mitre_techniques"], [])
