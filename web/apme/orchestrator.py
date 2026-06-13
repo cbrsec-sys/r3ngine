@@ -68,6 +68,12 @@ class APMEOrchestrator:
         all_nodes.extend(asset_nodes + ep_nodes + vuln_nodes + cred_nodes)
         all_edges.extend(asset_edges + ep_edges + vuln_edges + cred_edges)
 
+        # Technology ingestion (Phase 1)
+        from apme.ingestion.assets import ingest_technologies
+        tech_nodes, tech_edges = ingest_technologies(target_id)
+        all_nodes.extend(tech_nodes)
+        all_edges.extend(tech_edges)
+
         # Inject virtual goal nodes (Objectives) to ensure rules have targets
         goal_nodes = self._generate_virtual_goal_nodes(scan_history_id)
         all_nodes.extend(goal_nodes)
@@ -125,6 +131,8 @@ class APMEOrchestrator:
             self._scorer.score(path, metadata)
 
         scored_paths = self._scorer.sort_paths(paths)
+        scored_paths = self._scorer.deduplicate(scored_paths)
+        scored_paths = self._scorer.sort_paths(scored_paths)
 
         # ── Step 7: Persist & Return ──────────────────────────────────────────
         logger.info(f"APME [6/7] Persisting top {self.top_n} paths...")
@@ -171,6 +179,21 @@ class APMEOrchestrator:
                 elif to_node.type == "Privilege":
                     privilege_gained = to_node.subtype
 
+        # EPSS and CISA KEV — read from vulnerability node properties
+        epss_percentile = 0.0
+        has_cisa_kev = False
+        path_confidence_product = 1.0
+
+        for step in path.steps:
+            path_confidence_product *= step.confidence
+            to_node = node_index.get(step.to_id)
+            if to_node and to_node.type == "Vulnerability":
+                epss_val = to_node.properties.get("epss_percentile") or 0.0
+                if float(epss_val) > epss_percentile:
+                    epss_percentile = float(epss_val)
+                if to_node.properties.get("is_cisa_kev"):
+                    has_cisa_kev = True
+
         # Target node sensitivity (final node in path)
         target_sensitivity = "low"
         last_step_node = node_index.get(path.end)
@@ -195,6 +218,9 @@ class APMEOrchestrator:
             "validated_steps": validated_steps,
             "target_sensitivity": target_sensitivity,
             "blast_radius": blast_radius,
+            "epss_percentile":         epss_percentile,
+            "has_cisa_kev":            has_cisa_kev,
+            "path_confidence_product": min(max(path_confidence_product, 0.0), 1.0),
         }
 
     def _generate_virtual_goal_nodes(self, scan_history_id: int) -> List[Node]:
