@@ -62,14 +62,24 @@ TACTIC_COLOR: dict[str, str] = {
 }
 
 
-def lookup(technique_id: str) -> dict:
+def lookup(technique_id: str) -> dict[str, str]:
     """Return full MITRE metadata for a technique ID.
 
     Returns a safe dict with all keys present even for unknown IDs,
     so callers never need to guard against KeyError.
+    Unknown IDs (including None, empty string, or unrecognized codes)
+    return a sentinel dict with tactic_slug='unknown'.
     """
+    if not technique_id:
+        return {
+            "technique_id":   "",
+            "technique_name": "Unknown",
+            "tactic_slug":    "unknown",
+            "tactic_display": "Unknown",
+            "tactic_color":   "#888888",
+        }
     entry = TECHNIQUE_CATALOG.get(technique_id)
-    if not entry:
+    if entry is None:
         return {
             "technique_id":   technique_id,
             "technique_name": technique_id,
