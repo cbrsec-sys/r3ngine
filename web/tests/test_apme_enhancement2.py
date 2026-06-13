@@ -1,8 +1,10 @@
-"""APME Enhancement 2 — Phase 1 tests: Schema & Ingestion Extensions."""
+"""APME Enhancement 2 — Phase 1 & Phase 2 tests."""
 from django.test import TestCase
 
 from apme.graph.schema import NODE_TYPES
 from apme.ingestion.vulnerabilities import TAXONOMY_MAP, _infer_taxonomy
+from apme.engine.constraints import ConstraintEngine, PathContext
+from apme.engine.rules_engine import _CONSTRAINT_FLAGS
 
 
 class SchemaExtensionTests(TestCase):
@@ -211,3 +213,384 @@ class TaxonomyMapTests(TestCase):
         """Plain 'sqli' keyword must still resolve correctly."""
         result = _infer_taxonomy("sqli found in parameter", "", 2)
         self.assertEqual(result["subtype"], "sqli")
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Phase 2 tests: Constraint Engine Expansion
+# ═══════════════════════════════════════════════════════════════════════
+
+
+class ConstraintFlagTests(TestCase):
+    """Verify all 18 flags are present in _CONSTRAINT_FLAGS."""
+
+    EXPECTED_FLAGS = [
+        "requires_victim",
+        "requires_php",
+        "requires_java",
+        "requires_python",
+        "requires_wordpress",
+        "endpoint_requires_auth",
+        "requires_dotnet",
+        "requires_kubernetes",
+        "requires_docker",
+        "requires_ruby",
+        "requires_nodejs",
+        "requires_active_directory",
+        "requires_mssql",
+        "requires_oracle",
+        "requires_redis",
+        "requires_drupal",
+        "requires_joomla",
+        "requires_magento",
+    ]
+
+    def test_all_18_flags_present(self) -> None:
+        for flag in self.EXPECTED_FLAGS:
+            self.assertIn(flag, _CONSTRAINT_FLAGS, f"Missing flag: {flag}")
+
+    def test_flag_count(self) -> None:
+        self.assertEqual(len(_CONSTRAINT_FLAGS), 18)
+
+    def test_original_six_flags_preserved(self) -> None:
+        original = [
+            "requires_victim", "requires_php", "requires_java",
+            "requires_python", "requires_wordpress", "endpoint_requires_auth",
+        ]
+        for flag in original:
+            self.assertIn(flag, _CONSTRAINT_FLAGS, f"Regression — missing: {flag}")
+
+
+class ConstraintGateTests(TestCase):
+    """Verify each new gate blocks without tech and passes with tech."""
+
+    def setUp(self) -> None:
+        self.engine = ConstraintEngine()
+
+    def _base_step(self, **overrides) -> dict:
+        step = {"action": "test_action", "confidence": 0.8}
+        step.update(overrides)
+        return step
+
+    # ── Active Directory ───────────────────────────────────────────────
+
+    def test_active_directory_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_active_directory=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_active_directory_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_active_directory_tech = True
+        step = self._base_step(requires_active_directory=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── Kubernetes ─────────────────────────────────────────────────────
+
+    def test_kubernetes_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_kubernetes=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_kubernetes_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_kubernetes_tech = True
+        step = self._base_step(requires_kubernetes=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── Docker ─────────────────────────────────────────────────────────
+
+    def test_docker_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_docker=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_docker_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_docker_tech = True
+        step = self._base_step(requires_docker=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── Redis ──────────────────────────────────────────────────────────
+
+    def test_redis_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_redis=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_redis_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_redis_tech = True
+        step = self._base_step(requires_redis=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── Drupal ─────────────────────────────────────────────────────────
+
+    def test_drupal_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_drupal=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_drupal_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_drupal_tech = True
+        step = self._base_step(requires_drupal=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── Joomla ─────────────────────────────────────────────────────────
+
+    def test_joomla_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_joomla=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_joomla_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_joomla_tech = True
+        step = self._base_step(requires_joomla=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── Magento ────────────────────────────────────────────────────────
+
+    def test_magento_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_magento=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_magento_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_magento_tech = True
+        step = self._base_step(requires_magento=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── Ruby ───────────────────────────────────────────────────────────
+
+    def test_ruby_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_ruby=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_ruby_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_ruby_tech = True
+        step = self._base_step(requires_ruby=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── Node.js ────────────────────────────────────────────────────────
+
+    def test_nodejs_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_nodejs=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_nodejs_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_nodejs_tech = True
+        step = self._base_step(requires_nodejs=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── .NET ───────────────────────────────────────────────────────────
+
+    def test_dotnet_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_dotnet=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_dotnet_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_dotnet_tech = True
+        step = self._base_step(requires_dotnet=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── MSSQL ──────────────────────────────────────────────────────────
+
+    def test_mssql_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_mssql=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_mssql_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_mssql_tech = True
+        step = self._base_step(requires_mssql=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── Oracle ─────────────────────────────────────────────────────────
+
+    def test_oracle_gate_blocks(self) -> None:
+        ctx = PathContext()
+        step = self._base_step(requires_oracle=True)
+        self.assertFalse(self.engine.validate_step(step, ctx))
+
+    def test_oracle_gate_passes(self) -> None:
+        ctx = PathContext()
+        ctx.has_oracle_tech = True
+        step = self._base_step(requires_oracle=True)
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+    # ── Unrestricted pass ──────────────────────────────────────────────
+
+    def test_no_flag_set_passes_unrestricted(self) -> None:
+        ctx = PathContext()
+        step = self._base_step()
+        self.assertTrue(self.engine.validate_step(step, ctx))
+
+
+class ConstraintContextUpdateTests(TestCase):
+    """Verify update_context tech propagation for new technologies."""
+
+    def setUp(self) -> None:
+        self.engine = ConstraintEngine()
+
+    def _step_with_subtype(self, subtype: str) -> dict:
+        return {"action": "test", "confidence": 0.8, "to_subtype": subtype, "to_id": f"node-{subtype}"}
+
+    # ── .NET / ASP.NET ─────────────────────────────────────────────────
+
+    def test_dotnet_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("dotnet"), ctx)
+        self.assertTrue(ctx.has_dotnet_tech)
+
+    def test_aspnet_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("aspnet"), ctx)
+        self.assertTrue(ctx.has_dotnet_tech)
+
+    def test_csharp_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("csharp"), ctx)
+        self.assertTrue(ctx.has_dotnet_tech)
+
+    # ── Kubernetes ─────────────────────────────────────────────────────
+
+    def test_kubernetes_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("kubernetes"), ctx)
+        self.assertTrue(ctx.has_kubernetes_tech)
+
+    def test_k8s_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("k8s"), ctx)
+        self.assertTrue(ctx.has_kubernetes_tech)
+
+    # ── Docker ─────────────────────────────────────────────────────────
+
+    def test_docker_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("docker"), ctx)
+        self.assertTrue(ctx.has_docker_tech)
+
+    def test_container_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("container"), ctx)
+        self.assertTrue(ctx.has_docker_tech)
+
+    # ── Ruby ───────────────────────────────────────────────────────────
+
+    def test_ruby_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("ruby"), ctx)
+        self.assertTrue(ctx.has_ruby_tech)
+
+    def test_rails_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("rails"), ctx)
+        self.assertTrue(ctx.has_ruby_tech)
+
+    # ── Node.js ────────────────────────────────────────────────────────
+
+    def test_nodejs_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("nodejs"), ctx)
+        self.assertTrue(ctx.has_nodejs_tech)
+
+    def test_node_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("node"), ctx)
+        self.assertTrue(ctx.has_nodejs_tech)
+
+    def test_express_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("express"), ctx)
+        self.assertTrue(ctx.has_nodejs_tech)
+
+    # ── Active Directory ───────────────────────────────────────────────
+
+    def test_active_directory_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("active_directory"), ctx)
+        self.assertTrue(ctx.has_active_directory_tech)
+
+    def test_ldap_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("ldap"), ctx)
+        self.assertTrue(ctx.has_active_directory_tech)
+
+    def test_exchange_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("exchange"), ctx)
+        self.assertTrue(ctx.has_active_directory_tech)
+
+    # ── Redis ──────────────────────────────────────────────────────────
+
+    def test_redis_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("redis"), ctx)
+        self.assertTrue(ctx.has_redis_tech)
+
+    # ── Drupal ─────────────────────────────────────────────────────────
+
+    def test_drupal_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("drupal"), ctx)
+        self.assertTrue(ctx.has_drupal_tech)
+
+    # ── Joomla ─────────────────────────────────────────────────────────
+
+    def test_joomla_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("joomla"), ctx)
+        self.assertTrue(ctx.has_joomla_tech)
+
+    # ── Magento ────────────────────────────────────────────────────────
+
+    def test_magento_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("magento"), ctx)
+        self.assertTrue(ctx.has_magento_tech)
+
+    # ── MSSQL ──────────────────────────────────────────────────────────
+
+    def test_mssql_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("mssql"), ctx)
+        self.assertTrue(ctx.has_mssql_tech)
+
+    def test_sqlserver_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("sqlserver"), ctx)
+        self.assertTrue(ctx.has_mssql_tech)
+
+    # ── Oracle ─────────────────────────────────────────────────────────
+
+    def test_oracle_propagation(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("oracle"), ctx)
+        self.assertTrue(ctx.has_oracle_tech)
+
+    # ── Existing propagation regression ────────────────────────────────
+
+    def test_php_propagation_still_works(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("php"), ctx)
+        self.assertTrue(ctx.has_php_tech)
+
+    def test_java_propagation_still_works(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("java"), ctx)
+        self.assertTrue(ctx.has_java_tech)
+
+    def test_wordpress_propagation_still_works(self) -> None:
+        ctx = PathContext()
+        self.engine.update_context(self._step_with_subtype("wordpress"), ctx)
+        self.assertTrue(ctx.has_wordpress_tech)

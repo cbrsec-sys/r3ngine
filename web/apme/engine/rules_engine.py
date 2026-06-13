@@ -43,6 +43,18 @@ _CONSTRAINT_FLAGS = (
     "requires_python",
     "requires_wordpress",
     "endpoint_requires_auth",
+    "requires_dotnet",
+    "requires_kubernetes",
+    "requires_docker",
+    "requires_ruby",
+    "requires_nodejs",
+    "requires_active_directory",
+    "requires_mssql",
+    "requires_oracle",
+    "requires_redis",
+    "requires_drupal",
+    "requires_joomla",
+    "requires_magento",
 )
 
 
