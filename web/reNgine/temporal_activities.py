@@ -1061,6 +1061,61 @@ def parse_analysis_results_activity(ctx: dict) -> bool:
 # Tier 6 — Assessment
 # ===========================================================================
 
+@activity.defn(name="CreateProxyListActivity")
+def create_proxy_list_activity(ctx: dict) -> str:
+    """Create a proxies.txt file if normal proxies are enabled.
+
+    Args:
+        ctx (dict): Temporal workflow context.
+
+    Returns:
+        str: Path to the created proxies.txt file, or None if no proxies are configured.
+    """
+    from reNgine.common_func import get_proxy_list
+    import os
+    import uuid
+
+    scan_id = ctx.get('scan_history_id')
+    logger.log_line("[TEMPORAL]", "START", f"task=create_proxy_list scan_id={scan_id}")
+
+    proxies = get_proxy_list()
+    if not proxies or any(p.startswith('socks') for p in proxies):
+        logger.log_line("[TEMPORAL]", "COMPLETE", f"task=create_proxy_list scan_id={scan_id} result=no_proxies_or_socks")
+        return None
+
+    results_dir = f"/usr/src/github/scan_results/{scan_id}"
+    os.makedirs(results_dir, exist_ok=True)
+    
+    file_path = os.path.join(results_dir, f"proxies_{uuid.uuid4().hex}.txt")
+    with open(file_path, 'w') as f:
+        f.write('\n'.join(proxies))
+
+    activity.logger.info(f"[CreateProxyListActivity] scan_id={scan_id} wrote {len(proxies)} proxies to {file_path}")
+    logger.log_line("[TEMPORAL]", "COMPLETE", f"task=create_proxy_list scan_id={scan_id} result=created")
+    return file_path
+
+@activity.defn(name="CleanupProxyListActivity")
+def cleanup_proxy_list_activity(file_path: str) -> bool:
+    """Clean up the proxies.txt file.
+
+    Args:
+        file_path (str): Path to the proxies.txt file.
+
+    Returns:
+        bool: True if cleanup was successful or file didn't exist.
+    """
+    import os
+    logger.log_line("[TEMPORAL]", "START", f"task=cleanup_proxy_list file_path={file_path}")
+    if file_path and os.path.exists(file_path):
+        try:
+            os.remove(file_path)
+            activity.logger.info(f"[CleanupProxyListActivity] removed {file_path}")
+        except Exception as e:
+            activity.logger.error(f"[CleanupProxyListActivity] failed to remove {file_path}: {e}")
+    
+    logger.log_line("[TEMPORAL]", "COMPLETE", f"task=cleanup_proxy_list file_path={file_path}")
+    return True
+
 @activity.defn(name="GatherNucleiTagsActivity")
 def gather_nuclei_tags_activity(ctx: dict) -> list:
     """Pre-compute Nuclei tags from YAML config + detected technologies.
@@ -1136,9 +1191,10 @@ def run_nuclei_activity(ctx: dict, severity: str = None, tag_batch: list = None)
 
     scan_id = ctx.get('scan_history_id')
     severity = severity or ctx.get('nuclei_severity_filter')
+    proxies_file_path = ctx.get('nuclei_proxies_path')
     activity.logger.info(
-        "[RunNucleiActivity] scan_id=%s severity=%s tags=%s",
-        scan_id, severity, tag_batch,
+        "[RunNucleiActivity] scan_id=%s severity=%s tags=%s proxies_file=%s",
+        scan_id, severity, tag_batch, proxies_file_path
     )
 
     # Pre-flight: count endpoints in DB for this scan
@@ -1182,6 +1238,7 @@ def run_nuclei_activity(ctx: dict, severity: str = None, tag_batch: list = None)
         urls=urls,
         severity=severity,
         tags_override=tag_batch if tag_batch else None,
+        proxies_file_path=proxies_file_path,
     )
 
 @activity.defn(name="RunCRLFuzzActivity")

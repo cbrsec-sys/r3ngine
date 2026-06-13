@@ -37,6 +37,14 @@ from reNgine.definitions import NUCLEI_DEFAULT_SEVERITIES
 # can dispatch by name without touching real infrastructure.
 # ---------------------------------------------------------------------------
 
+@activity.defn(name="CreateProxyListActivity")
+async def _mock_create_proxy_list(ctx: Dict[str, Any]) -> str:
+    return "/tmp/mock_proxies.txt"
+
+@activity.defn(name="CleanupProxyListActivity")
+async def _mock_cleanup_proxy_list(file_path: str) -> bool:
+    return True
+
 @activity.defn(name="GatherNucleiTagsActivity")
 async def _mock_gather_tags(ctx: Dict[str, Any]) -> List[str]:
     """Default mock: no tech detected → empty tag list (no -tags flag)."""
@@ -93,7 +101,14 @@ async def _mock_mark_complete(ctx: Dict[str, Any]) -> Dict:
     return {}
 
 
+@activity.defn(name="RunWPTaintScanActivity")
+async def _mock_wptaint_scan(ctx: Dict[str, Any]) -> Dict:
+    return {}
+
+
 _NOOP_SUPPORT_ACTIVITIES = [
+    _mock_create_proxy_list,
+    _mock_cleanup_proxy_list,
     _mock_gather_tags,
     _mock_crlfuzz,
     _mock_dalfox,
@@ -104,6 +119,7 @@ _NOOP_SUPPORT_ACTIVITIES = [
     _mock_react2shell,
     _mock_semgrep,
     _mock_vigolium,
+    _mock_wptaint_scan,
     _mock_mark_complete,
 ]
 
@@ -130,6 +146,7 @@ def _ctx(severities=None, run_nuclei: bool = True) -> Dict[str, Any]:
                 "run_acunetix": False,
                 "cpanel_scanner": {"run_cpanel2shell": False},
                 "run_wpscan": False,
+                "run_wptaint_scan": False,
                 "react_scanner": {"run_react2shell": False},
                 "run_vigolium": False,
             },
@@ -146,10 +163,10 @@ class TestNucleiPlannerWorkflowSequential(IsolatedAsyncioTestCase):
         support = list(_NOOP_SUPPORT_ACTIVITIES)
         # Replace _mock_gather_tags if caller provides a custom one via extra_activities
         if extra_activities:
-            support_names = {a.defn.name for a in support}
+            support_names = {a.__name__ for a in support}
             for ea in extra_activities:
-                if ea.defn.name in support_names:
-                    support = [a for a in support if a.defn.name != ea.defn.name]
+                if ea.__name__ in support_names:
+                    support = [a for a in support if a.__name__ != ea.__name__]
             support = extra_activities + support
 
         async with await WorkflowEnvironment.start_time_skipping() as env:
@@ -308,7 +325,7 @@ class TestNucleiPlannerTagBatching(IsolatedAsyncioTestCase):
             return {}
 
         support = [a for a in _NOOP_SUPPORT_ACTIVITIES
-                   if a.defn.name not in ("GatherNucleiTagsActivity",)]
+                   if a.__name__ not in ("_mock_gather_tags",)]
 
         async with await WorkflowEnvironment.start_time_skipping() as env:
             async with Worker(
@@ -393,7 +410,7 @@ class TestNucleiPlannerTagBatching(IsolatedAsyncioTestCase):
             return {}
 
         support = [a for a in _NOOP_SUPPORT_ACTIVITIES
-                   if a.defn.name not in ("GatherNucleiTagsActivity",)]
+                   if a.__name__ not in ("_mock_gather_tags",)]
 
         async with await WorkflowEnvironment.start_time_skipping() as env:
             async with Worker(

@@ -2,6 +2,11 @@
 
 ### [v3.6.0] - Unreleased
 
+- **Nuclei Proxy Rotation Support**:
+  - Implemented dynamic creation of a `proxies.txt` file (populated with valid system proxies, excluding Tor/SOCKS routing endpoints) via `CreateProxyListActivity`.
+  - Configured `NucleiPlannerWorkflow` to use this proxy list via the `-proxy` flag in Nuclei command execution, allowing Nuclei to rotate through available HTTP/S proxies when conducting vulnerability templates.
+  - Added safe cleanup of the temporary proxy list via a `finally` block executing `CleanupProxyListActivity` regardless of scan success or failure.
+
 - **Intelligent Tool Gating (Tier 5)**:
   - **JWT tool gate**: `jwt_tool` now only runs when JWT tokens have been detected in the current scan. Detection checks `Parameter` records with `is_auth_related=True` whose name matches known JWT patterns (`jwt`, `bearer`, `authorization`, `access_token`, `refresh_token`, `id_token`, `auth_token`), and `SecretLeak` records whose `secret_type` indicates a JWT or Bearer token. Scans against non-authenticated endpoints no longer waste time running JWT algorithm-confusion attacks.
   - **GraphQL tool gate**: Both `InQL` and `graphql-cop` now gate on confirmed GraphQL endpoint presence. The gate first checks existing `EndPoint` database records for URLs matching `/graphql` or `/graphiql` (zero network cost), then falls back to HEAD-probing 6 common GraphQL paths if the DB has no evidence. Tools are skipped with a clear log entry on non-GraphQL targets.
