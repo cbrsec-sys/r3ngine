@@ -54,26 +54,46 @@ def parse_wpscan_results(task_instance, output_file, subdomain):
     except Exception as e:
         logger.error(f"Failed to parse WPScan results for {subdomain.name}: {str(e)}")
 
-def save_finding(task_instance, finding, subdomain, default_title):
+_FINDING_TYPE_MAP = {
+    'xmlrpc':                     ('high',     'XML-RPC Enabled'),
+    'upload_directory_listing':   ('medium',   'WordPress Upload Directory Listing Enabled'),
+    'readme':                     ('info',     'WordPress Readme File Exposed'),
+    'wp_cron':                    ('info',     'External WP-Cron Enabled'),
+    'headers':                    ('info',     'WordPress HTTP Headers'),
+    'backup_db':                  ('critical', 'WordPress Database Backup Exposed'),
+    'debug_log':                  ('high',     'WordPress Debug Log Exposed'),
+    'registration_enabled':       ('medium',   'WordPress User Registration Open'),
+    'mu_plugins_listing':         ('medium',   'WordPress Must-Use Plugins Directory Listing'),
+    'config_backup':              ('high',     'WordPress Configuration Backup Exposed'),
+    'timthumb':                   ('high',     'TimThumb Script Detected'),
+    'emergency_pwd_reset_script': ('critical', 'Emergency Password Reset Script Detected'),
+    'full_path_disclosure':       ('medium',   'WordPress Full Path Disclosure'),
+    'license':                    ('info',     'WordPress License File Exposed'),
+}
+
+
+def save_finding(task_instance, finding, subdomain, name, severity='info', extra_description=''):
     """Saves a WPScan finding to the database.
 
     Args:
         task_instance: Temporal task proxy with scan context.
-        finding (dict): Finding payload from WPScan JSON.
-        subdomain (Subdomain): Associated Subdomain database object.
-        default_title (str): Fallback title to use if finding has no title.
+        finding (dict): WPScan finding dict (may be empty {} for synthetic entries).
+        subdomain (Subdomain): Associated Subdomain object.
+        name (str): Vulnerability name/title to store.
+        severity (str): One of 'info', 'low', 'medium', 'high', 'critical'.
+        extra_description (str): Additional text prepended to the finding description.
     """
-    title = finding.get('title', default_title)
-    description = finding.get('description', '')
-    
-    severity = 'info'
-    if 'vulnerabilities' in str(finding).lower():
-        severity = 'medium'
-    
+    description_parts = []
+    if extra_description:
+        description_parts.append(extra_description)
+    base_desc = finding.get('description', '')
+    if base_desc:
+        description_parts.append(base_desc)
+    description = '\n\n'.join(description_parts)
+
     references = finding.get('references', {})
     ref_urls = []
     cve_ids = []
-    
     if isinstance(references, dict):
         for ref_type, ref_list in references.items():
             if ref_type == 'cve':
@@ -83,23 +103,20 @@ def save_finding(task_instance, finding, subdomain, default_title):
             else:
                 ref_urls.append(str(ref_list))
 
-    severity_num = NUCLEI_SEVERITY_MAP.get(severity, 2)
-    vuln_data = {
-        'name': title,
-        'severity': severity_num,
-        'description': description,
-        'type': 'WordPress',
-        'references': ref_urls,
-        'cve_ids': cve_ids,
-        'source': 'WPScan'
-    }
+    severity_num = NUCLEI_SEVERITY_MAP.get(severity, 0)
 
     save_vulnerability(
         target_domain=task_instance.domain,
         http_url=f"http://{subdomain.name}",
         scan_history=task_instance.scan,
         subdomain=subdomain,
-        **vuln_data
+        name=name,
+        severity=severity_num,
+        description=description,
+        type='WordPress',
+        references=ref_urls,
+        cve_ids=cve_ids,
+        source='WPScan',
     )
 
 def wpscan_scan(self, urls=[], ctx={}, description=None):

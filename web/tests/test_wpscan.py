@@ -10,6 +10,7 @@ self-proxy and patch stream_command to prevent real subprocess execution.
 
 import json
 import os
+import tempfile
 from unittest.mock import MagicMock, patch
 from django.test import TestCase
 from django.utils import timezone
@@ -311,17 +312,17 @@ class TestWpscanGating(TestCase):
         sub = self._make_subdomain('blog.wpscan-gate.example.com')
         self._add_tech(sub, 'WordPress')
         proxy = _make_proxy(self.scan)
-        
+
         attempts = []
-        
+
         def stream_command_side_effect(cmd, *args, **kwargs):
             if '--update' in cmd:
                 return iter([])
-            
+
             attempts.append(cmd)
             output_file = '/tmp/rengine_test_wpscan/vulnerability/wpscan/blog.wpscan-gate.example.com_wpscan.json'
             os.makedirs(os.path.dirname(output_file), exist_ok=True)
-            
+
             # Always write SSL error JSON
             error_data = {
                 "db_update_started": True,
@@ -340,11 +341,110 @@ class TestWpscanGating(TestCase):
         # Total calls to stream_command: 1 (update) + 4 (scans) = 5 calls
         self.assertEqual(mock_stream.call_count, 5)
         self.assertEqual(len(attempts), 4)
-        
+
         # Verify first 3 scan attempts included proxy
         for i in range(3):
             self.assertIn('--proxy 127.0.0.1:8080', attempts[i])
-        
+
         # Verify 4th (final) attempt did NOT include proxy
         self.assertNotIn('--proxy', attempts[3])
+
+
+class TestWpscanParser(TestCase):
+    def setUp(self):
+        self.domain = Domain.objects.create(name='parser-test.example.com')
+        self.engine = EngineType.objects.create(engine_name='Parser Test Engine')
+        self.scan = ScanHistory.objects.create(
+            domain=self.domain,
+            scan_status=1,
+            start_scan_date=timezone.now(),
+            scan_type=self.engine,
+        )
+        self.subdomain = Subdomain.objects.create(
+            name='parser-test.example.com',
+            scan_history=self.scan,
+            target_domain=self.domain,
+        )
+        self.proxy = MagicMock()
+        self.proxy.scan = self.scan
+        self.proxy.domain = self.domain
+
+    def _write_json(self, data):
+        f = tempfile.NamedTemporaryFile(suffix='.json', delete=False, mode='w')
+        json.dump(data, f)
+        f.close()
+        return f.name
+
+    def test_xmlrpc_finding_maps_to_high_severity(self):
+        payload = {
+            'interesting_findings': [{
+                'type': 'xmlrpc',
+                'to_s': 'XML-RPC seems to be enabled: https://parser-test.example.com/xmlrpc.php',
+                'found_by': 'Direct Access',
+                'confidence': 100,
+                'confirmed_by': {},
+                'references': {'url': ['http://codex.wordpress.org/XML-RPC_Pingback_API']},
+                'interesting_entries': [],
+            }],
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        vuln = Vulnerability.objects.filter(scan_history=self.scan, name__icontains='XML-RPC').first()
+        self.assertIsNotNone(vuln, "Expected XML-RPC finding to be stored")
+        self.assertEqual(vuln.severity, 3, "XML-RPC should map to High (3)")
+        self.assertNotEqual(vuln.name, 'WPScan Finding', "Name must not be generic fallback")
+
+    def test_upload_directory_listing_maps_to_medium(self):
+        payload = {
+            'interesting_findings': [{
+                'type': 'upload_directory_listing',
+                'to_s': 'Upload directory has listing enabled: https://parser-test.example.com/wp-content/uploads/',
+                'found_by': 'Direct Access',
+                'confidence': 100,
+                'confirmed_by': {},
+                'references': {},
+                'interesting_entries': [],
+            }],
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        vuln = Vulnerability.objects.filter(scan_history=self.scan, name__icontains='Upload Directory').first()
+        self.assertIsNotNone(vuln)
+        self.assertEqual(vuln.severity, 2)
+
+    def test_readme_maps_to_info(self):
+        payload = {
+            'interesting_findings': [{
+                'type': 'readme',
+                'to_s': 'WordPress readme found: https://parser-test.example.com/readme.html',
+                'found_by': 'Direct Access',
+                'confidence': 100,
+                'confirmed_by': {},
+                'references': {},
+                'interesting_entries': [],
+            }],
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        vuln = Vulnerability.objects.filter(scan_history=self.scan, name__icontains='Readme').first()
+        self.assertIsNotNone(vuln)
+        self.assertEqual(vuln.severity, 0)
 
