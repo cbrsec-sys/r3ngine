@@ -36,12 +36,12 @@ uses_tools: [baddns]"]
     subgraph T2["🌐 Tier 2 — Endpoint Discovery  ·  all parallel"]
         direction TB
         HC["SeedEndpointsForCrawlActivity → RunHTTPCrawlActivity"] --> PHC[ParseHTTPCrawlResultsActivity]
-        PS[RunPortScanActivity]
+        PS[RunPortScanActivity] --> GDS["GetDiscoveredServicesActivity → _fan_out_search_vulns"]
         VD["RunVigoliumDiscoveryActivity
 ─ requires vigolium_discovery.run_vigolium_discovery"]
     end
 
-    PHC & PS & VD --> PT2[Dispatch tier_2 plugins]
+    PHC & GDS & VD --> PT2[Dispatch tier_2 plugins]
     PT2 --> F3(( ))
     F3 --> FU & SS
 
@@ -51,7 +51,23 @@ uses_tools: [baddns]"]
         SS[RunScreenshotActivity]
     end
 
-    FU & SS --> DFF
+    FU & SS --> HCB
+
+    subgraph T3A["🌉 Tier 3a — HTTP Crawl Bridge"]
+        direction TB
+        HCB["RunHTTPCrawlBridgeActivity
+─ runs if fetch_url is enabled"]
+    end
+
+    HCB --> PD
+
+    subgraph T3B["🔍 Tier 3b — Parameter Discovery"]
+        direction TB
+        PD["RunParamDiscoveryActivity
+─ requires param_discovery task"]
+    end
+
+    PD --> DFF
 
     subgraph T4["📁 Tier 4 — Directory & File Fuzzing  ·  sequential"]
         direction TB
@@ -77,22 +93,20 @@ uses_tools: [baddns]"]
     J3 --> PAR[ParseAnalysisResultsActivity]
     PAR --> CP3{{"⏸ Pause Checkpoint"}}
 
-    CP3 --> NUC
+    CP3 --> NP
 
     subgraph T6["🎯 Tier 6 — Security Assessment"]
         direction TB
         subgraph NP["NucleiPlannerWorkflow · child workflow · runs first"]
             direction TB
-            NUC[RunNucleiActivity / vuln stage chain]
+            NUC["RunNucleiActivity & other vuln scanners
+(CRLFuzz, Dalfox, S3Scanner, Acunetix, Cpanel, WPScan, React2Shell, Semgrep, VigoliumScan, WPTaint)"]
         end
-        NUC --> G6(( ))
-        G6 --> WB & VS
+        NP --> WB
         WB[RunWAFBypassActivity]
-        VS["RunVigoliumScanActivity
-─ requires vulnerability_scan.run_vigolium"]
     end
 
-    WB & VS --> PASM[ParseAssessmentResultsActivity]
+    WB --> PASM[ParseAssessmentResultsActivity]
     PASM --> CP4{{"⏸ Pause Checkpoint"}}
 
     CP4 --> CV
@@ -127,8 +141,10 @@ uses_tools: [baddns]"]
 |------|-------------|---------------------|
 | Step 0 | Sequential | `LoadCheckpointActivity` |
 | Tier 1 | All parallel (`asyncio.gather`) | `ParseDiscoveryResultsActivity` |
-| Tier 2 | All parallel (`asyncio.gather`) | `ParseHTTPCrawlResultsActivity` + `RunPortScanActivity` + optional `RunVigoliumDiscoveryActivity` + tier 2 plugin dispatch |
+| Tier 2 | All parallel (`asyncio.gather`) | `ParseHTTPCrawlResultsActivity` + `_fan_out_search_vulns` + optional `RunVigoliumDiscoveryActivity` + tier 2 plugin dispatch |
 | Tier 3 | Parallel | `RunFetchURLActivity` + `RunScreenshotActivity` |
+| Tier 3a | Sequential | `RunHTTPCrawlBridgeActivity` |
+| Tier 3b | Sequential | `RunParamDiscoveryActivity` |
 | Tier 4 | Sequential | `ParseFuzzResultsActivity` |
 | -> | | `ParseEnumerationResultsActivity` |
 | Tier 5 | All parallel (`asyncio.gather`) | `ParseAnalysisResultsActivity` |
@@ -140,6 +156,8 @@ uses_tools: [baddns]"]
 `http_crawl` runs in Tier 2 and populates the endpoint database via `httpx`. Its results directly feed:
 - Tier 3 `fetch_url`
 - Tier 3 `screenshot`
+- Tier 3a `http_crawl_bridge`
+- Tier 3b `param_discovery`
 - Tier 4 `dir_file_fuzz`
 
 This is why the pipeline waits for Tier 2 before continuing.
