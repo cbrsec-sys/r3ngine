@@ -1183,3 +1183,142 @@ class ScorerClassifyConstraint22Tests(TestCase):
         }
         scorer.score(path, meta)
         self.assertEqual(path.risk, "speculative")
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 6 — Pathfinder Improvements
+# ─────────────────────────────────────────────────────────────────────────────
+
+import unittest as _unittest
+
+
+class PathStepModelTests(_unittest.TestCase):
+    """PathStep.requires_victim field."""
+
+    def test_requires_victim_field_defaults_false(self):
+        from apme.models.path import PathStep
+        step = PathStep(from_id="a", to_id="b", action="test")
+        self.assertFalse(step.requires_victim)
+
+    def test_requires_victim_can_be_set_true(self):
+        from apme.models.path import PathStep
+        step = PathStep(from_id="a", to_id="b", action="test", requires_victim=True)
+        self.assertTrue(step.requires_victim)
+
+    def test_to_dict_still_works_with_requires_victim(self):
+        from apme.models.path import PathStep
+        step = PathStep(from_id="a", to_id="b", action="test", requires_victim=True)
+        d = step.to_dict()
+        self.assertIn("from", d)
+        self.assertIn("confidence", d)
+
+
+class SemanticFingerprintTests(_unittest.TestCase):
+    """Semantic fingerprint deduplicates same attack chain on different instances."""
+
+    def _semantic_key(self, path):
+        import re
+        def _strip_instance(nid: str) -> str:
+            return re.sub(r'::\d+$', '', nid)
+        return "->".join(
+            f"{s.edge_type}:{_strip_instance(s.from_id)}:{_strip_instance(s.to_id)}"
+            for s in path.steps
+        )
+
+    def test_same_chain_different_vuln_ids_deduped(self):
+        from apme.models.path import AttackPath, PathStep
+        path_a = AttackPath(id="A", start="x", end="y", steps=[
+            PathStep("vuln::1", "goal::capability::rce_execution", "exploit",
+                     edge_type="LEADS_TO"),
+            PathStep("goal::capability::rce_execution", "goal::capability::pivot", "pivot",
+                     edge_type="LEADS_TO"),
+        ])
+        path_b = AttackPath(id="B", start="x", end="y", steps=[
+            PathStep("vuln::99", "goal::capability::rce_execution", "exploit",
+                     edge_type="LEADS_TO"),
+            PathStep("goal::capability::rce_execution", "goal::capability::pivot", "pivot",
+                     edge_type="LEADS_TO"),
+        ])
+        self.assertEqual(self._semantic_key(path_a), self._semantic_key(path_b))
+
+    def test_different_edge_types_not_deduped(self):
+        from apme.models.path import AttackPath, PathStep
+        path_a = AttackPath(id="A", start="x", end="y", steps=[
+            PathStep("vuln::1", "goal::capability::rce_execution", "rce",
+                     edge_type="LEADS_TO"),
+        ])
+        path_b = AttackPath(id="B", start="x", end="y", steps=[
+            PathStep("vuln::1", "goal::capability::rce_execution", "auth",
+                     edge_type="AUTHENTICATES"),
+        ])
+        self.assertNotEqual(self._semantic_key(path_a), self._semantic_key(path_b))
+
+    def test_different_target_subtypes_not_deduped(self):
+        from apme.models.path import AttackPath, PathStep
+        path_a = AttackPath(id="A", start="x", end="y", steps=[
+            PathStep("vuln::1", "goal::capability::rce_execution", "x",
+                     edge_type="LEADS_TO"),
+        ])
+        path_b = AttackPath(id="B", start="x", end="y", steps=[
+            PathStep("vuln::1", "goal::capability::data_exfil", "y",
+                     edge_type="LEADS_TO"),
+        ])
+        self.assertNotEqual(self._semantic_key(path_a), self._semantic_key(path_b))
+
+
+class PathfinderConstantsTests(_unittest.TestCase):
+    """DFS_MAX_DEPTH reduced to 6."""
+
+    def test_max_depth_is_6(self):
+        from apme.engine import pathfinder
+        import inspect
+        src = inspect.getsource(pathfinder.Pathfinder._dfs_query)
+        self.assertIn("2..6", src,
+                      "DFS query must use minimum 2 hops and max depth 6")
+        self.assertNotIn("1..8", src,
+                         "Old DFS range 1..8 must be removed")
+
+
+class EnricherFanOutCapTests(_unittest.TestCase):
+    """GraphEnricher fan-out cap at MAX_EDGES_PER_NODE=12."""
+
+    def test_max_edges_constant_is_12(self):
+        from apme.graph.enricher import MAX_EDGES_PER_NODE
+        self.assertEqual(MAX_EDGES_PER_NODE, 12)
+
+    def test_fan_out_cap_applied_when_exceeded(self):
+        from apme.graph.enricher import GraphEnricher
+        from apme.models.node import Node
+        from apme.models.edge import Edge
+        from unittest.mock import MagicMock, patch
+
+        mock_builder = MagicMock()
+        enricher = GraphEnricher(mock_builder)
+
+        source = Node(id="vuln::1", type="Vulnerability", subtype="rce",
+                      confidence=0.9, source="test", properties={"validated": False})
+        target_nodes = [
+            Node(id=f"goal::capability::cap{i}", type="Capability",
+                 subtype=f"cap{i}", confidence=1.0, source="test", properties={})
+            for i in range(20)
+        ]
+        all_nodes = [source] + target_nodes
+
+        edges_20 = [
+            Edge(from_id="vuln::1", to_id=f"goal::capability::cap{i}",
+                 type="LEADS_TO", confidence=round(0.5 + i * 0.02, 2), properties={})
+            for i in range(20)
+        ]
+
+        def _selective_apply(node, existing_nodes=None):
+            if node.id == "vuln::1":
+                return list(edges_20)
+            return []
+
+        with patch.object(enricher._rules_engine, "apply", side_effect=_selective_apply):
+            result = enricher.enrich(all_nodes, scan_id=1)
+
+        calls = mock_builder.add_edges.call_args_list
+        total_edges_added = sum(len(call[0][0]) for call in calls)
+        self.assertLessEqual(total_edges_added, 12,
+                             f"Expected ≤12 edges after fan-out cap, got {total_edges_added}")

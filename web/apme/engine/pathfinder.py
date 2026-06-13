@@ -12,6 +12,7 @@ Phase 1 changes:
 """
 
 import logging
+import re
 import uuid
 from typing import Any, Dict, List, Optional
 
@@ -74,6 +75,7 @@ class Pathfinder:
 
     MAX_DEPTH = 8
     MAX_PATHS = 20
+    DFS_MAX_DEPTH = 6
 
     def __init__(self, min_edge_confidence: float = 0.20):
         self.min_edge_confidence = min_edge_confidence
@@ -127,16 +129,21 @@ class Pathfinder:
             all_paths.extend(self.find_paths_dfs(scan_id, entry_id, target_subtypes, top_n))
             all_paths.extend(self.find_paths_dijkstra(scan_id, entry_id, target_subtypes, top_n))
 
-        # Deduplicate by step fingerprint
+        # Deduplicate by semantic fingerprint — same attack chain type, different instances
         seen: set = set()
         unique: List[AttackPath] = []
         for p in all_paths:
-            key = "->".join(s.from_id + s.to_id for s in p.steps)
+            key = "->".join(
+                f"{s.edge_type}:{re.sub(r'::\\d+$', '', s.from_id)}:"
+                f"{re.sub(r'::\\d+$', '', s.to_id)}"
+                for s in p.steps
+            )
             if key not in seen:
                 seen.add(key)
                 unique.append(p)
 
-        return sorted(unique, key=lambda p: len(p.steps))[:top_n]
+        # Sort descending by step count — richer chains first; scorer picks the best ones
+        return sorted(unique, key=lambda p: len(p.steps), reverse=True)[:top_n]
 
     # -------------------------------------------------------------------------
     # Neo4j Queries
@@ -160,7 +167,7 @@ class Pathfinder:
         query = (
             f"MATCH path = "
             f"(start:APMENode {{apme_id: $start_id, scan_id: $scan_id}})"
-            f"-[:APME_EDGE*1..{self.MAX_DEPTH}]->"
+            f"-[:APME_EDGE*2..6]->"
             f"(target:APMENode)"
             f" WHERE target.subtype IN $target_subtypes"
             f"   AND target.scan_id = $scan_id"
@@ -183,8 +190,15 @@ class Pathfinder:
         try:
             return self._run_path_query(query, scan_id, start_id, target_subtypes)
         except Exception:
-            logger.warning("APME Pathfinder: APOC Dijkstra unavailable, falling back to BFS.")
-            return self._bfs_query(scan_id, start_id, target_subtypes)
+            logger.warning(
+                "APME Pathfinder: APOC Dijkstra unavailable, "
+                "using high-confidence DFS fallback."
+            )
+            saved_conf = self.min_edge_confidence
+            self.min_edge_confidence = min(saved_conf + 0.10, 0.80)
+            result = self._dfs_query(scan_id, start_id, target_subtypes)
+            self.min_edge_confidence = saved_conf
+            return result
 
     def _run_path_query(self, query, scan_id, start_id, target_subtypes):
         results = []
@@ -265,9 +279,12 @@ class Pathfinder:
                     edge_type=edge_type,
                     mitre_technique=mitre_id if mitre_id not in ("", "unknown") else "",
                     mitre_tactic=mitre_info.get("tactic_slug", ""),
+                    requires_victim=step_dict.get("requires_victim", False),
                 ))
 
             if valid and steps:
+                if len(steps) < 2:
+                    continue
                 path = AttackPath(
                     id=f"APT-{uuid.uuid4().hex[:6].upper()}",
                     start=nodes[0].get("id", ""),
