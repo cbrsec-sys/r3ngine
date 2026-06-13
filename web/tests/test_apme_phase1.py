@@ -304,3 +304,106 @@ class ConstraintEngineTests(TestCase):
         step = self._make_step(to_subtype="spring")
         self.engine.update_context(step, self.ctx)
         self.assertTrue(self.ctx.has_java_tech)
+
+
+from apme.engine.scorer import Scorer
+from apme.models.path import AttackPath, PathStep
+
+
+def _make_step(from_id="a", to_id="b", confidence=0.8, validated=False):
+    s = PathStep(from_id=from_id, to_id=to_id, action="exploit", confidence=confidence)
+    s.validated = validated
+    return s
+
+
+def _make_path(path_id="P1", steps=None):
+    steps = steps or []
+    return AttackPath(id=path_id, start="a", end="b", steps=steps)
+
+
+class ScorerTests(TestCase):
+
+    def setUp(self):
+        self.scorer = Scorer()
+
+    def _base_meta(self, **kwargs):
+        defaults = {
+            "severity": 3, "cvss_score": 7.5, "privilege_gained": "none",
+            "blast_radius": 5, "target_sensitivity": "medium",
+            "epss_percentile": 0, "path_confidence_product": 1.0,
+            "has_cisa_kev": False, "validated_steps": 0,
+        }
+        defaults.update(kwargs)
+        return defaults
+
+    def test_empty_path_scores_zero(self):
+        p = _make_path(steps=[])
+        self.scorer.score(p, self._base_meta())
+        self.assertEqual(p.score, 0.0)
+        self.assertEqual(p.risk, "low")
+
+    def test_epss_boost_increases_score(self):
+        p1 = _make_path("P1", [_make_step(to_id="b1")])
+        p2 = _make_path("P2", [_make_step(to_id="b2")])
+        self.scorer.score(p1, self._base_meta(epss_percentile=0))
+        self.scorer.score(p2, self._base_meta(epss_percentile=90))
+        self.assertGreater(p2.score, p1.score)
+
+    def test_cisa_kev_boost_increases_score_by_010(self):
+        p1 = _make_path("P1", [_make_step(to_id="b1")])
+        p2 = _make_path("P2", [_make_step(to_id="b2")])
+        self.scorer.score(p1, self._base_meta(has_cisa_kev=False))
+        self.scorer.score(p2, self._base_meta(has_cisa_kev=True))
+        self.assertAlmostEqual(p2.score, min(p1.score + 0.10, 1.0), places=3)
+
+    def test_low_confidence_product_reduces_score(self):
+        p1 = _make_path("P1", [_make_step(to_id="b1")])
+        p2 = _make_path("P2", [_make_step(to_id="b2")])
+        self.scorer.score(p1, self._base_meta(path_confidence_product=1.0))
+        self.scorer.score(p2, self._base_meta(path_confidence_product=0.5))
+        self.assertGreater(p1.score, p2.score)
+
+    def test_zero_validated_steps_low_score_is_speculative(self):
+        p = _make_path(steps=[_make_step(confidence=0.3)])
+        self.scorer.score(p, self._base_meta(
+            severity=1, cvss_score=2.0, epss_percentile=0,
+            path_confidence_product=0.3,
+        ))
+        self.assertEqual(p.risk, "speculative")
+
+    def test_validated_step_prevents_speculative(self):
+        step = _make_step(validated=True)
+        p = _make_path(steps=[step])
+        self.scorer.score(p, self._base_meta(
+            severity=1, cvss_score=2.0, validated_steps=1,
+        ))
+        self.assertNotEqual(p.risk, "speculative")
+
+    def test_deduplication_removes_dominated_path(self):
+        s1 = _make_step("a", "b")
+        s2 = _make_step("b", "c")
+        p1 = _make_path("P1", [s1, s2])
+        p1.score = 0.8
+        p2 = _make_path("P2", [s1, s2])
+        p2.score = 0.5
+        result = self.scorer.deduplicate([p1, p2])
+        self.assertEqual(len(result), 1)
+        self.assertEqual(result[0].id, "P1")
+
+    def test_deduplication_keeps_distinct_paths(self):
+        p1 = _make_path("P1", [_make_step("a", "b")])
+        p1.score = 0.8
+        p2 = _make_path("P2", [_make_step("x", "y")])
+        p2.score = 0.5
+        result = self.scorer.deduplicate([p1, p2])
+        self.assertEqual(len(result), 2)
+
+    def test_score_below_015_dropped_in_dedup(self):
+        p = _make_path("P1", [_make_step()])
+        p.score = 0.10
+        result = self.scorer.deduplicate([p])
+        self.assertEqual(len(result), 0)
+
+    def test_weights_sum_to_one(self):
+        total = sum(Scorer.WEIGHTS.values())
+        self.assertAlmostEqual(total, 1.0, places=10)
