@@ -90,6 +90,7 @@ def generate_report_task(report_id):
         params = report_obj.params
         is_ignore_info_vuln = params.get('ignore_info_vuln', False)
         include_attack_surface_map = params.get('include_attack_surface_map', False)
+        include_attack_paths = params.get('include_attack_paths', False)
         comments = params.get('comments', '')
 
         show_recon = True
@@ -186,6 +187,29 @@ def generate_report_task(report_id):
             except Exception as e:
                 logger.error("Error generating Attack Surface Map for report: %s", e)
 
+        attack_paths = []
+        if report_template in ['enterprise', 'cyber_pro'] and include_attack_paths:
+            from startScan.models import ImpactAssessment
+            assessments = (
+                ImpactAssessment.objects.filter(scan_history_id=scan.id)
+                .exclude(potential_attack_chain__isnull=True)
+                .exclude(potential_attack_chain={})
+                .order_by('-remediation_priority')
+            )
+            for a in assessments:
+                chain = a.potential_attack_chain or {}
+                if not chain.get('apme_path_id'):
+                    continue
+                attack_paths.append({
+                    'path_id': chain.get('apme_path_id'),
+                    'risk': chain.get('risk', 'unknown'),
+                    'score': chain.get('score', 0.0),
+                    'steps': chain.get('steps', []),
+                    'explanation': chain.get('explanation', ''),
+                    'potential_impact': a.potential_impact,
+                    'remediation_priority': a.remediation_priority,
+                })
+
         data = {
             'scan_object': scan,
             **vuln_ctx,
@@ -198,6 +222,7 @@ def generate_report_task(report_id):
             'report_name': report_name,
             'is_ignore_info_vuln': is_ignore_info_vuln,
             'attack_surface_map_image': attack_surface_map_image,
+            'attack_paths': attack_paths,
             'stress_results': stress_results,
             'parameters': parameters,
             'parameters_count': parameters.count(),

@@ -411,6 +411,12 @@
                 <a href="#attack-surface-map">Attack Surface Map</a>
                 <span class="toc-page" data-href="#attack-surface-map"></span>
             </div>
+            {% if attack_paths %}
+            <div class="toc-item">
+                <a href="#attack-paths">Attack Paths</a>
+                <span class="toc-page" data-href="#attack-paths"></span>
+            </div>
+            {% endif %}
             <div class="toc-item">
                 <a href="#conclusion">Conclusion & Next Steps</a>
                 <span class="toc-page" data-href="#conclusion"></span>
@@ -848,6 +854,59 @@
             <img class="chart-img" src="data:image/png;base64,{{ attack_surface_map_image }}" style="max-height: 180mm;" />
             <p style="font-size: 8pt; color: #94a3b8; margin-top: 5mm;">Fig 3: Visual representation of the infrastructure relationships</p>
         </div>
+    </article>
+    {% endif %}
+
+    <!-- Attack Paths -->
+    {% if attack_paths %}
+    <article class="page-break" id="attack-paths">
+        <h1>Attack Paths</h1>
+        <p>The following sequence of steps details the Attack Paths derived by the Attack Path Modeling Engine (APME).</p>
+        
+        {% for path in attack_paths %}
+        <div class="finding-card">
+            <div class="finding-header" style="background-color: #f8fafc;">
+                <h4 class="finding-title" style="color: #1e293b !important;">Path ID: {{ path.path_id }}</h4>
+                <span class="severity-badge" style="background-color: {% if path.risk == 'critical' %}#991b1b{% elif path.risk == 'high' %}#dc2626{% elif path.risk == 'medium' %}#f97316{% elif path.risk == 'low' %}#eab308{% else %}#3b82f6{% endif %}; color: white;">
+                    Risk: {{ path.risk|upper }}
+                </span>
+            </div>
+            <div class="finding-body" style="padding: 4mm;">
+                <div class="finding-meta" style="margin-bottom: 4mm;">
+                    <div class="meta-item"><b>Score:</b> {{ path.score }}</div>
+                    <div class="meta-item"><b>Steps:</b> {{ path.steps|length }}</div>
+                </div>
+                
+                <div class="finding-section">
+                    <span class="section-label">Impact Summary</span>
+                    <p>{{ path.potential_impact }}</p>
+                </div>
+
+                {% if path.explanation %}
+                <div class="finding-section" style="background-color: #f1f5f9; border-left: 4px solid #3b82f6; padding: 4mm; margin-top: 4mm;">
+                    <span class="section-label" style="color: #3b82f6;">Attack Strategy Explanation</span>
+                    <div class="attack-scenario-content">
+                        {{ path.explanation | safe }}
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="mt-4">
+                    <span class="section-label">Exploitation Steps</span>
+                    <ol style="margin: 0; padding-left: 5mm; font-size: 9pt;">
+                        {% for step in path.steps %}
+                        <li style="margin-bottom: 2mm;">
+                            From <b>{% if step.from_node %}{{ step.from_node.name }}{% else %}{{ step.from }}{% endif %}</b>
+                            &rarr; To <b>{% if step.to_node %}{{ step.to_node.name }}{% else %}{{ step.to }}{% endif %}</b>
+                            via <span style="color: #be123c;">{{ step.action|default:"Exploitation" }}</span>
+                            (Confidence: {{ step.confidence|default:"1.0" }})
+                        </li>
+                        {% endfor %}
+                    </ol>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
     </article>
     {% endif %}
     <!-- Final Conclusion -->

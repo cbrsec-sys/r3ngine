@@ -1099,6 +1099,7 @@ def create_report(request, id):
             - report_template (str): Style template (default, modern, enterprise, cyber_pro).
             - ignore_info_vuln (str): Whether to ignore informational vulnerabilities ('True'/'False').
             - include_attack_surface_map (str): Whether to include the attack surface map ('True'/'False').
+            - include_attack_paths (str): Whether to include the APME Attack Paths ('True'/'False').
             - comments (str): Optional assessment comments to insert in template.
         id (int): ScanHistory database ID.
     """
@@ -1106,6 +1107,7 @@ def create_report(request, id):
     report_template = request.GET.get('report_template', 'default')
     is_ignore_info_vuln = request.GET.get('ignore_info_vuln', 'False') == 'True'
     include_attack_surface_map = request.GET.get('include_attack_surface_map', 'False') == 'True'
+    include_attack_paths = request.GET.get('include_attack_paths', 'False') == 'True'
     comments = request.GET.get('comments', '')
 
     scan = get_object_or_404(ScanHistory, id=id)
@@ -1118,6 +1120,7 @@ def create_report(request, id):
         params={
             'ignore_info_vuln': is_ignore_info_vuln,
             'include_attack_surface_map': include_attack_surface_map,
+            'include_attack_paths': include_attack_paths,
             'comments': comments
         }
     )

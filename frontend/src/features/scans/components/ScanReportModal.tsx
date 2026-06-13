@@ -33,6 +33,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
   const [reportTemplate, setReportTemplate] = useState('modern');
   const [ignoreInfoVuln, setIgnoreInfoVuln] = useState(false);
   const [includeAttackSurface, setIncludeAttackSurface] = useState(false);
+  const [includeAttackPaths, setIncludeAttackPaths] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<string | null>(null);
   const [reportUrl, setReportUrl] = useState<string | null>(null);
@@ -90,6 +91,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
         report_template: reportTemplate,
         ignore_info_vuln: ignoreInfoVuln ? 'True' : 'False',
         include_attack_surface_map: includeAttackSurface ? 'True' : 'False',
+        include_attack_paths: includeAttackPaths ? 'True' : 'False',
         download: download ? 'True' : 'False',
         comments: comments
       });
@@ -245,7 +247,10 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                 <RadioGroup row value={reportTemplate} onChange={(e) => {
                   const val = e.target.value;
                   setReportTemplate(val);
-                  if (val !== 'enterprise' && val !== 'cyber_pro') setIncludeAttackSurface(false);
+                  if (val !== 'enterprise' && val !== 'cyber_pro') {
+                    setIncludeAttackSurface(false);
+                    setIncludeAttackPaths(false);
+                  }
                 }}>
                   <FormControlLabel
                     value="default"
@@ -304,6 +309,36 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                         transition: 'color 0.2s'
                       }}>
                         Include Attack Surface Map
+                      </Typography>
+                      {reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro' && (
+                        <Typography sx={{ color: 'rgba(0,243,255,0.3)', fontSize: '0.65rem' }}>Only available for Enterprise/Pro templates</Typography>
+                      )}
+                    </Box>
+                  }
+                />
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={includeAttackPaths}
+                      disabled={reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro'}
+                      onChange={(e) => setIncludeAttackPaths(e.target.checked)}
+                      sx={{ 
+                        color: 'rgba(0,243,255,0.1)', 
+                        '&.Mui-checked': { color: '#00f3ff' },
+                        '&.Mui-disabled': { color: 'rgba(255,255,255,0.05)' }
+                      }}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography sx={{ 
+                        color: (reportTemplate === 'enterprise' || reportTemplate === 'cyber_pro') ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)', 
+                        fontSize: '0.8rem', 
+                        fontWeight: 600,
+                        transition: 'color 0.2s'
+                      }}>
+                        Include Attack Paths
                       </Typography>
                       {reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro' && (
                         <Typography sx={{ color: 'rgba(0,243,255,0.3)', fontSize: '0.65rem' }}>Only available for Enterprise/Pro templates</Typography>
