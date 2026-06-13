@@ -16,43 +16,186 @@ from startScan.models import EndPoint, ScanHistory, Subdomain, Vulnerability
 logger = logging.getLogger(__name__)
 
 def parse_wpscan_results(task_instance, output_file, subdomain):
-    """
-    Parses WPScan JSON output and saves vulnerabilities to the database.
+    """Parses WPScan JSON output and saves vulnerabilities to the database.
+
+    Args:
+        task_instance: Temporal task proxy with scan context.
+        output_file (str): Path to the WPScan JSON output file.
+        subdomain (Subdomain): Associated Subdomain object.
     """
     try:
         if not os.path.exists(output_file) or os.path.getsize(output_file) == 0:
             return
-
         with open(output_file, 'r') as f:
             data = json.load(f)
-            
-            # WPScan JSON structure
-            # 1. Interesting findings
-            for finding in data.get('interesting_findings', []):
-                save_finding(task_instance, finding, subdomain, "WPScan Finding")
-
-            # 2. Version vulnerabilities
-            version = data.get('version')
-            if version and version.get('vulnerabilities'):
-                for vuln in version.get('vulnerabilities'):
-                    save_finding(task_instance, vuln, subdomain, f"WordPress Version {version.get('number', 'Unknown')}")
-
-            # 3. Plugins vulnerabilities
-            plugins = data.get('plugins', {})
-            for plugin_name, plugin_info in plugins.items():
-                if plugin_info.get('vulnerabilities'):
-                    for vuln in plugin_info.get('vulnerabilities'):
-                        save_finding(task_instance, vuln, subdomain, f"WordPress Plugin: {plugin_name}")
-
-            # 4. Themes vulnerabilities
-            themes = data.get('themes', {})
-            for theme_name, theme_info in themes.items():
-                if theme_info.get('vulnerabilities'):
-                    for vuln in theme_info.get('vulnerabilities'):
-                        save_finding(task_instance, vuln, subdomain, f"WordPress Theme: {theme_name}")
-
+        _parse_interesting_findings(task_instance, data, subdomain)
+        _parse_version(task_instance, data, subdomain)
+        _parse_plugins(task_instance, data, subdomain)
+        _parse_themes(task_instance, data, subdomain)
+        _parse_users(task_instance, data, subdomain)
     except Exception as e:
-        logger.error(f"Failed to parse WPScan results for {subdomain.name}: {str(e)}")
+        logger.error("Failed to parse WPScan results for %s: %s", subdomain.name, str(e))
+
+
+def _parse_interesting_findings(task_instance, data, subdomain):
+    """Parses interesting findings from WPScan output, maps type to severity/name,
+    and handles unknown types with a robust catchall that records additional metadata.
+
+    Args:
+        task_instance: Temporal task proxy with scan context.
+        data (dict): WPScan output dict.
+        subdomain (Subdomain): Subdomain object.
+    """
+    for finding in data.get('interesting_findings', []):
+        finding_type = finding.get('type', '')
+        severity, default_title = _FINDING_TYPE_MAP.get(finding_type, (None, None))
+        
+        # If type is not mapped, use a catchall that records additional metadata
+        if severity is None or default_title is None:
+            severity = 'info'
+            # Create a name from finding type if possible, or fallback
+            if finding_type:
+                formatted_type = finding_type.replace('_', ' ').title()
+                default_title = f"WPScan Finding: {formatted_type}"
+            else:
+                default_title = 'WPScan Finding'
+                
+            # Record all other key-value pairs of the finding in the description as metadata
+            metadata_lines = []
+            for k, v in finding.items():
+                if k not in ['type', 'to_s', 'description', 'references', 'interesting_entries']:
+                    metadata_lines.append(f"- **{k}**: {v}")
+            
+            metadata_desc = ""
+            if metadata_lines:
+                metadata_desc = "**Additional Metadata:**\n" + "\n".join(metadata_lines)
+        else:
+            metadata_desc = ""
+
+        name = finding.get('to_s', default_title)
+        if ': http' in name:
+            name = name.split(': http')[0].strip()
+        
+        entries = finding.get('interesting_entries', [])
+        extra_desc = ''
+        if entries:
+            extra_desc = '**Details:**\n' + '\n'.join(f'- {e}' for e in entries)
+            
+        if metadata_desc:
+            if extra_desc:
+                extra_desc = f"{extra_desc}\n\n{metadata_desc}"
+            else:
+                extra_desc = metadata_desc
+
+        save_finding(task_instance, finding, subdomain, name,
+                     severity=severity, extra_description=extra_desc)
+
+
+def _parse_version(task_instance, data, subdomain):
+    """Parses WordPress core version and version vulnerabilities from WPScan output.
+
+    Args:
+        task_instance: Temporal task proxy with scan context.
+        data (dict): WPScan output dict.
+        subdomain (Subdomain): Subdomain object.
+    """
+    version = data.get('version')
+    if not version:
+        return
+    version_num = version.get('number', 'Unknown')
+    status = version.get('status', '')
+    outdated = status not in ('latest', '')
+    severity = 'medium' if outdated else 'info'
+    extra_desc = f"WordPress core v{version_num} detected."
+    if outdated:
+        extra_desc += f" Version status: {status}."
+    save_finding(task_instance, {}, subdomain,
+                 f"WordPress Core Detected: v{version_num}",
+                 severity=severity, extra_description=extra_desc)
+    for vuln in version.get('vulnerabilities', []):
+        vuln_title = vuln.get('title', f"WordPress Core Vulnerability (v{version_num})")
+        save_finding(task_instance, vuln, subdomain, vuln_title)
+
+
+def _parse_plugins(task_instance, data, subdomain):
+    """Parses WordPress plugins, versions, and vulnerabilities from WPScan output.
+
+    Args:
+        task_instance: Temporal task proxy with scan context.
+        data (dict): WPScan output dict.
+        subdomain (Subdomain): Subdomain object.
+    """
+    plugins = data.get('plugins', {}) or {}
+    for slug, info in plugins.items():
+        version_obj = info.get('version') or {}
+        version_num = version_obj.get('number', 'Unknown') if version_obj else 'Unknown'
+        outdated = info.get('outdated', False)
+        latest = info.get('latest_version', 'unknown')
+        location = info.get('location', '')
+        severity = 'medium' if outdated else 'info'
+        desc_parts = [f"Plugin **{slug}** v{version_num} detected at `{location}`."]
+        if outdated:
+            desc_parts.append(f"Plugin is **outdated** (installed: {version_num}, latest: {latest}).")
+        save_finding(task_instance, {}, subdomain,
+                     f"WordPress Plugin Detected: {slug}",
+                     severity=severity, extra_description=' '.join(desc_parts))
+        for vuln in info.get('vulnerabilities', []):
+            vuln_title = vuln.get('title', f"WordPress Plugin Vulnerability: {slug}")
+            save_finding(task_instance, vuln, subdomain,
+                         f"WordPress Plugin: {slug} - {vuln_title}")
+
+
+def _parse_themes(task_instance, data, subdomain):
+    """Parses WordPress themes (main theme and additional themes) from WPScan output.
+
+    Args:
+        task_instance: Temporal task proxy with scan context.
+        data (dict): WPScan output dict.
+        subdomain (Subdomain): Subdomain object.
+    """
+    all_themes = {}
+    main_theme = data.get('main_theme')
+    if main_theme:
+        slug = main_theme.get('slug', 'unknown-theme')
+        all_themes[slug] = main_theme
+    all_themes.update(data.get('themes', {}) or {})
+    for slug, info in all_themes.items():
+        version_obj = info.get('version') or {}
+        version_num = version_obj.get('number', 'Unknown') if version_obj else 'Unknown'
+        outdated = info.get('outdated', False)
+        latest = info.get('latest_version', 'unknown')
+        location = info.get('location', '')
+        severity = 'medium' if outdated else 'info'
+        desc_parts = [f"Theme **{slug}** v{version_num} detected at `{location}`."]
+        if outdated:
+            desc_parts.append(f"Theme is **outdated** (installed: {version_num}, latest: {latest}).")
+        save_finding(task_instance, {}, subdomain,
+                     f"WordPress Theme Detected: {slug}",
+                     severity=severity, extra_description=' '.join(desc_parts))
+        for vuln in info.get('vulnerabilities', []):
+            vuln_title = vuln.get('title', f"WordPress Theme Vulnerability: {slug}")
+            save_finding(task_instance, vuln, subdomain,
+                         f"WordPress Theme: {slug} - {vuln_title}")
+
+
+def _parse_users(task_instance, data, subdomain):
+    """Parses enumerated WordPress users from WPScan output.
+
+    Args:
+        task_instance: Temporal task proxy with scan context.
+        data (dict): WPScan output dict.
+        subdomain (Subdomain): Subdomain object.
+    """
+    users = data.get('users', {}) or {}
+    for username, info in users.items():
+        found_by = info.get('found_by', 'Unknown method')
+        user_id = info.get('id')
+        desc = f"WordPress user **{username}** enumerated via {found_by}."
+        if user_id is not None:
+            desc += f" User ID: {user_id}."
+        save_finding(task_instance, {}, subdomain,
+                     f"WordPress User Enumerated: {username}",
+                     severity='medium', extra_description=desc)
 
 _FINDING_TYPE_MAP = {
     'xmlrpc':                     ('high',     'XML-RPC Enabled'),
@@ -105,7 +248,7 @@ def save_finding(task_instance, finding, subdomain, name, severity='info', extra
 
     severity_num = NUCLEI_SEVERITY_MAP.get(severity, 0)
 
-    save_vulnerability(
+    vuln, created = save_vulnerability(
         target_domain=task_instance.domain,
         http_url=f"http://{subdomain.name}",
         scan_history=task_instance.scan,
@@ -118,6 +261,16 @@ def save_finding(task_instance, finding, subdomain, name, severity='info', extra
         cve_ids=cve_ids,
         source='WPScan',
     )
+
+    if not vuln.is_gpt_used:
+        try:
+            from reNgine.tasks import get_vulnerability_gpt_report
+            path = vuln.get_path() if hasattr(vuln, 'get_path') else '/'
+            if not path:
+                path = '/'
+            get_vulnerability_gpt_report((vuln.name, path), vulnerability_id=vuln.id)
+        except Exception as e:
+            logger.error(f"Failed to generate LLM description for finding {vuln.name}: {e}")
 
 def wpscan_scan(self, urls=[], ctx={}, description=None):
     """WPScan task for WordPress vulnerability scanning.

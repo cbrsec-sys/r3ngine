@@ -448,3 +448,288 @@ class TestWpscanParser(TestCase):
         self.assertIsNotNone(vuln)
         self.assertEqual(vuln.severity, 0)
 
+    def test_wordpress_version_stored_as_info_when_latest(self):
+        payload = {
+            'version': {
+                'number': '7.0',
+                'status': 'latest',
+                'vulnerabilities': [],
+            },
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        vuln = Vulnerability.objects.filter(scan_history=self.scan, name__startswith='WordPress Core Detected').first()
+        self.assertIsNotNone(vuln)
+        self.assertEqual(vuln.severity, 0)
+
+    def test_outdated_wordpress_version_stored_as_medium(self):
+        payload = {
+            'version': {
+                'number': '5.9.0',
+                'status': 'outdated',
+                'vulnerabilities': [],
+            },
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        vuln = Vulnerability.objects.filter(scan_history=self.scan, name__startswith='WordPress Core Detected').first()
+        self.assertIsNotNone(vuln)
+        self.assertEqual(vuln.severity, 2)
+
+    def test_plugin_without_vuln_stored_as_detection_finding(self):
+        """Non-vulnerable plugin must be stored so wp-taint can find it."""
+        payload = {
+            'plugins': {
+                'woocommerce': {
+                    'location': 'https://parser-test.example.com/wp-content/plugins/woocommerce/',
+                    'outdated': False,
+                    'version': {'number': '8.0.0'},
+                    'latest_version': '8.0.0',
+                    'vulnerabilities': [],
+                },
+            },
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        vuln = Vulnerability.objects.filter(
+            scan_history=self.scan,
+            name='WordPress Plugin Detected: woocommerce',
+        ).first()
+        self.assertIsNotNone(vuln, "Non-vulnerable plugin must be stored for wp-taint discovery")
+        self.assertEqual(vuln.severity, 0)
+
+    def test_outdated_plugin_stored_as_medium(self):
+        payload = {
+            'plugins': {
+                'contact-form-7': {
+                    'location': 'https://parser-test.example.com/wp-content/plugins/contact-form-7/',
+                    'outdated': True,
+                    'version': {'number': '5.0.0'},
+                    'latest_version': '6.1.1',
+                    'vulnerabilities': [],
+                },
+            },
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        vuln = Vulnerability.objects.filter(
+            scan_history=self.scan,
+            name='WordPress Plugin Detected: contact-form-7',
+        ).first()
+        self.assertIsNotNone(vuln)
+        self.assertEqual(vuln.severity, 2)
+        self.assertIn('outdated', vuln.description)
+
+    def test_plugin_with_vuln_stores_detection_finding_and_vuln(self):
+        """A plugin with vulnerabilities must store BOTH a detection finding AND the CVE finding."""
+        payload = {
+            'plugins': {
+                'akismet': {
+                    'location': 'https://parser-test.example.com/wp-content/plugins/akismet/',
+                    'outdated': False,
+                    'version': {'number': '5.3.1'},
+                    'latest_version': '5.3.1',
+                    'vulnerabilities': [{
+                        'title': 'Akismet Reflected XSS',
+                        'references': {'cve': ['CVE-2024-12345'], 'url': ['https://example.com/advisory']},
+                    }],
+                },
+            },
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        detection = Vulnerability.objects.filter(
+            scan_history=self.scan,
+            name='WordPress Plugin Detected: akismet',
+        ).first()
+        self.assertIsNotNone(detection, "Detection finding must exist")
+
+        vuln_finding = Vulnerability.objects.filter(
+            scan_history=self.scan,
+            name__startswith='WordPress Plugin: akismet',
+        ).first()
+        self.assertIsNotNone(vuln_finding, "CVE finding must exist separately")
+        self.assertIn('Reflected XSS', vuln_finding.name)
+
+    def test_main_theme_outdated_stored_as_medium(self):
+        payload = {
+            'main_theme': {
+                'slug': 'twentytwentyfive',
+                'location': 'https://parser-test.example.com/wp-content/themes/twentytwentyfive/',
+                'outdated': True,
+                'version': {'number': '1.1'},
+                'latest_version': '1.5',
+                'vulnerabilities': [],
+            },
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        vuln = Vulnerability.objects.filter(
+            scan_history=self.scan,
+            name='WordPress Theme Detected: twentytwentyfive',
+        ).first()
+        self.assertIsNotNone(vuln)
+        self.assertEqual(vuln.severity, 2)
+        self.assertIn('outdated', vuln.description)
+
+    def test_users_stored_as_medium_enumeration_findings(self):
+        payload = {
+            'users': {
+                'WebDeveloper': {
+                    'id': None,
+                    'found_by': 'Rss Generator (Passive Detection)',
+                    'confidence': 100,
+                },
+                'webdeveloper': {
+                    'id': 1,
+                    'found_by': 'Author Id Brute Forcing',
+                    'confidence': 100,
+                },
+            },
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        vulns = Vulnerability.objects.filter(
+            scan_history=self.scan,
+            name__startswith='WordPress User Enumerated:',
+        )
+        self.assertEqual(vulns.count(), 2, "Both users must be stored")
+        for v in vulns:
+            self.assertEqual(v.severity, 2, "User enumeration must be Medium")
+
+    def test_unrecognized_finding_type_records_metadata_in_description(self):
+        payload = {
+            'interesting_findings': [{
+                'type': 'some_exotic_new_finding',
+                'to_s': 'Some Exotic New Finding: https://parser-test.example.com/',
+                'found_by': 'Fuzzy Magic',
+                'confidence': 90,
+                'confirmed_by': {},
+                'references': {},
+                'interesting_entries': ['Secret header found'],
+                'custom_field_one': 'some_val',
+                'custom_field_two': 12345,
+            }],
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        vuln = Vulnerability.objects.filter(scan_history=self.scan, name__icontains='Exotic').first()
+        self.assertIsNotNone(vuln)
+        self.assertEqual(vuln.severity, 0, "Unrecognized finding should default to info (0)")
+        self.assertIn('Secret header found', vuln.description)
+        self.assertIn('**custom_field_one**: some_val', vuln.description)
+        self.assertIn('**custom_field_two**: 12345', vuln.description)
+        self.assertIn('**confidence**: 90', vuln.description)
+
+    def test_full_wpscan_json_produces_expected_findings(self):
+        """Integration test: the sample JSON from a real WPScan run produces all expected findings."""
+        payload = {
+            'interesting_findings': [
+                {'type': 'headers', 'to_s': 'Headers', 'found_by': 'Headers',
+                 'confidence': 100, 'confirmed_by': {}, 'references': {},
+                 'interesting_entries': ['Server: Apache']},
+                {'type': 'xmlrpc', 'to_s': 'XML-RPC seems to be enabled: https://parser-test.example.com/xmlrpc.php',
+                 'found_by': 'Direct Access', 'confidence': 100,
+                 'confirmed_by': {}, 'references': {}, 'interesting_entries': []},
+                {'type': 'readme', 'to_s': 'WordPress readme found: https://parser-test.example.com/readme.html',
+                 'found_by': 'Direct Access', 'confidence': 100,
+                 'confirmed_by': {}, 'references': {}, 'interesting_entries': []},
+                {'type': 'upload_directory_listing',
+                 'to_s': 'Upload directory has listing enabled: https://parser-test.example.com/wp-content/uploads/',
+                 'found_by': 'Direct Access', 'confidence': 100,
+                 'confirmed_by': {}, 'references': {}, 'interesting_entries': []},
+                {'type': 'wp_cron',
+                 'to_s': 'The external WP-Cron seems to be enabled: https://parser-test.example.com/wp-cron.php',
+                 'found_by': 'Direct Access', 'confidence': 60,
+                 'confirmed_by': {}, 'references': {}, 'interesting_entries': []},
+            ],
+            'version': {'number': '7.0', 'status': 'latest', 'vulnerabilities': []},
+            'main_theme': {
+                'slug': 'twentytwentyfive',
+                'location': 'https://parser-test.example.com/wp-content/themes/twentytwentyfive/',
+                'outdated': True,
+                'version': {'number': '1.1'},
+                'latest_version': '1.5',
+                'vulnerabilities': [],
+            },
+            'plugins': {},
+            'themes': {},
+            'users': {
+                'WebDeveloper': {'id': None, 'found_by': 'Rss Generator', 'confidence': 100},
+                'webdeveloper': {'id': 1, 'found_by': 'Author Id Brute Forcing', 'confidence': 100},
+            },
+        }
+        path = self._write_json(payload)
+        try:
+            from reNgine.wpscan_tasks import parse_wpscan_results
+            parse_wpscan_results(self.proxy, path, self.subdomain)
+        finally:
+            os.unlink(path)
+
+        from startScan.models import Vulnerability
+        vulns = Vulnerability.objects.filter(scan_history=self.scan)
+        names = list(vulns.values_list('name', flat=True))
+
+        # Check each expected finding exists
+        self.assertTrue(any('xml-rpc' in n.lower() for n in names), f"Missing XML-RPC finding in: {names}")
+        self.assertTrue(any('upload directory' in n.lower() for n in names), f"Missing upload listing in: {names}")
+        self.assertTrue(any('readme' in n.lower() for n in names), f"Missing readme finding in: {names}")
+        self.assertTrue(any('wp-cron' in n.lower() for n in names), f"Missing wp-cron finding in: {names}")
+        self.assertTrue(any('wordpress core detected' in n.lower() for n in names), f"Missing version finding in: {names}")
+        self.assertTrue(any('twentytwentyfive' in n.lower() for n in names), f"Missing theme finding in: {names}")
+        self.assertEqual(vulns.filter(name__startswith='WordPress User Enumerated:').count(), 2)
+
+        # Severity spot-checks
+        xmlrpc = vulns.get(name='XML-RPC seems to be enabled')
+        self.assertEqual(xmlrpc.severity, 3)
+        theme = vulns.get(name='WordPress Theme Detected: twentytwentyfive')
+        self.assertEqual(theme.severity, 2)
+
