@@ -1,0 +1,49 @@
+# Category D — Deserialization (4 rules)
+rules:
+
+  - name: deserialization_to_rce
+    mitre_id: "T1059"
+    if:
+      node.type: Vulnerability
+      node.subtype: deserialization
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.85
+
+  - name: java_deserialization_to_rce
+    mitre_id: "T1059.007"
+    if:
+      node.type: Vulnerability
+      node.subtype: deserialization
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.85
+        requires_java: true
+
+  - name: php_deserialization_to_rce
+    mitre_id: "T1059.004"
+    if:
+      node.type: Vulnerability
+      node.subtype: deserialization
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.80
+        requires_php: true
+
+  - name: python_pickle_to_rce
+    mitre_id: "T1059.006"
+    if:
+      node.type: Vulnerability
+      node.subtype: deserialization
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.80
+        requires_python: true

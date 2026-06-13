@@ -1,0 +1,102 @@
+# Category E — Authentication & Identity (9 rules)
+rules:
+
+  - name: bypass_to_auth_access
+    mitre_id: "T1548"
+    if:
+      node.type: Vulnerability
+      node.subtype: misconfig
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.75
+
+  - name: creds_to_auth_access
+    mitre_id: "T1078"
+    if:
+      node.type: Credential
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.95
+
+  - name: jwt_abuse_to_auth_bypass
+    mitre_id: "T1078.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: jwt_abuse
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.90
+
+  - name: jwt_abuse_to_account_takeover
+    mitre_id: "T1078.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: jwt_abuse
+      node.confidence: ">=0.70"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.85
+
+  - name: oauth_misconfig_to_auth
+    mitre_id: "T1078.004"
+    if:
+      node.type: Vulnerability
+      node.subtype: oauth_misconfig
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.80
+
+  - name: default_creds_to_admin_access
+    mitre_id: "T1078.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: misconfig
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.85
+
+  - name: crlf_to_session_fixation
+    mitre_id: "T1563"
+    if:
+      node.type: Vulnerability
+      node.subtype: crlf_injection
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: session_hijacking
+        confidence: 0.70
+
+  - name: host_header_to_password_reset_poison
+    mitre_id: "T1586.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: host_header
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.75
+
+  - name: idor_to_data_exfil
+    mitre_id: "T1530"
+    if:
+      node.type: Vulnerability
+      node.subtype: idor
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.75

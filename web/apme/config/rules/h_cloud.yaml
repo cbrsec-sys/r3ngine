@@ -1,0 +1,69 @@
+# Category H — Cloud & Infrastructure (6 rules)
+rules:
+
+  - name: cloud_api_key_to_cloud_access
+    mitre_id: "T1552.005"
+    if:
+      node.type: Credential
+      node.subtype: cloud_api_key
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: cloud_access
+        confidence: 0.90
+
+  - name: s3_misconfig_to_data_exfil
+    mitre_id: "T1530"
+    if:
+      node.type: Vulnerability
+      node.subtype: s3_misconfig
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.85
+
+  - name: metadata_access_to_credential_harvest
+    mitre_id: "T1552.005"
+    if:
+      node.type: Capability
+      node.subtype: metadata_access
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: credential_harvesting
+        confidence: 0.85
+
+  - name: cloud_access_to_data_exfil
+    mitre_id: "T1530"
+    if:
+      node.type: Capability
+      node.subtype: cloud_access
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.85
+
+  - name: prototype_pollution_to_rce
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: prototype_pollution
+      node.property: "severity:>=3"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.75
+
+  - name: graphql_injection_to_rce
+    mitre_id: "T1059"
+    if:
+      node.type: Vulnerability
+      node.subtype: graphql_injection
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.80
