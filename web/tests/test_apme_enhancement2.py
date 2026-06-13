@@ -979,3 +979,207 @@ class NewRuleCategoryTests(TestCase):
     def test_email_header_injection_to_account_takeover_requires_victim(self) -> None:
         rule = self._rule("email_header_injection_to_account_takeover")
         self.assertTrue(rule["then"]["create_edge"].get("requires_victim"))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Phase 5 — Scoring Overhaul
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ScorerWeightTests(TestCase):
+    """WEIGHTS dict validation."""
+
+    def test_ten_factors_in_weights(self):
+        from apme.engine.scorer import Scorer
+        self.assertEqual(len(Scorer.WEIGHTS), 10)
+
+    def test_weights_sum_to_one(self):
+        from apme.engine.scorer import Scorer
+        self.assertAlmostEqual(sum(Scorer.WEIGHTS.values()), 1.0, places=4)
+
+    def test_all_new_factor_keys_present(self):
+        from apme.engine.scorer import Scorer
+        for key in ("poc", "recency", "connectivity", "stealthiness"):
+            self.assertIn(key, Scorer.WEIGHTS,
+                          f"Missing scoring factor: {key}")
+
+
+class ScorerNewFactorTests(TestCase):
+    """New factor computations and modified modifiers."""
+
+    def _make_path(self, validated=False, n_steps=2):
+        from apme.models.path import AttackPath, PathStep
+        steps = [
+            PathStep(from_id=f"n{i}", to_id=f"n{i+1}", action="a",
+                     confidence=0.8, validated=validated, edge_type="LEADS_TO")
+            for i in range(n_steps)
+        ]
+        return AttackPath(id="T-1", start="n0", end=f"n{n_steps}", steps=steps)
+
+    def _base_meta(self, **overrides):
+        meta = {
+            "severity": 3, "cvss_score": 7.0, "privilege_gained": "user",
+            "validated_steps": 0, "target_sensitivity": "medium",
+            "blast_radius": 10, "epss_percentile": 50.0,
+            "has_cisa_kev": False, "path_confidence_product": 0.8,
+            "has_poc": False, "has_exploit_url": False, "has_metasploit": False,
+            "cve_published_date": None, "target_node_degree": 5,
+        }
+        meta.update(overrides)
+        return meta
+
+    def test_metasploit_boosts_score(self):
+        from apme.engine.scorer import Scorer
+        scorer = Scorer()
+        path_a = self._make_path()
+        score_a = scorer.score(path_a, self._base_meta(has_metasploit=True))
+        path_b = self._make_path()
+        score_b = scorer.score(path_b, self._base_meta(has_metasploit=False))
+        self.assertGreater(score_a, score_b)
+
+    def test_exploit_url_boosts_more_than_poc_only(self):
+        from apme.engine.scorer import Scorer
+        scorer = Scorer()
+        path_a = self._make_path()
+        score_exploit = scorer.score(path_a, self._base_meta(has_exploit_url=True))
+        path_b = self._make_path()
+        score_poc = scorer.score(path_b, self._base_meta(has_poc=True))
+        self.assertGreater(score_exploit, score_poc)
+
+    def test_recent_cve_boosts_score(self):
+        import datetime
+        from apme.engine.scorer import Scorer
+        scorer = Scorer()
+        recent = datetime.date.today() - datetime.timedelta(days=10)
+        old = datetime.date.today() - datetime.timedelta(days=1000)
+        path_a = self._make_path()
+        score_recent = scorer.score(path_a, self._base_meta(cve_published_date=recent))
+        path_b = self._make_path()
+        score_old = scorer.score(path_b, self._base_meta(cve_published_date=old))
+        self.assertGreater(score_recent, score_old)
+
+    def test_high_connectivity_boosts_score(self):
+        from apme.engine.scorer import Scorer
+        scorer = Scorer()
+        path_a = self._make_path()
+        score_high = scorer.score(path_a, self._base_meta(target_node_degree=20))
+        path_b = self._make_path()
+        score_low = scorer.score(path_b, self._base_meta(target_node_degree=1))
+        self.assertGreater(score_high, score_low)
+
+    def test_boundary_crossings_reduce_stealthiness(self):
+        from apme.engine.scorer import Scorer
+        from apme.models.path import AttackPath, PathStep
+        scorer = Scorer()
+        steps_noisy = [
+            PathStep(from_id="a", to_id="b", action="x", confidence=0.8,
+                     edge_type="CONNECTED_TO"),
+            PathStep(from_id="b", to_id="c", action="y", confidence=0.8,
+                     edge_type="CONNECTED_TO"),
+        ]
+        path_noisy = AttackPath(id="N-1", start="a", end="c", steps=steps_noisy)
+        score_noisy = scorer.score(path_noisy, self._base_meta())
+        steps_quiet = [
+            PathStep(from_id="a", to_id="b", action="x", confidence=0.8,
+                     edge_type="LEADS_TO"),
+            PathStep(from_id="b", to_id="c", action="y", confidence=0.8,
+                     edge_type="LEADS_TO"),
+        ]
+        path_quiet = AttackPath(id="Q-1", start="a", end="c", steps=steps_quiet)
+        score_quiet = scorer.score(path_quiet, self._base_meta())
+        self.assertGreater(score_quiet, score_noisy)
+
+    def test_kev_plus_poc_boosts_more_than_kev_alone(self):
+        from apme.engine.scorer import Scorer
+        scorer = Scorer()
+        path_a = self._make_path()
+        score_kev_poc = scorer.score(
+            path_a, self._base_meta(has_cisa_kev=True, has_poc=True))
+        path_b = self._make_path()
+        score_kev_only = scorer.score(
+            path_b, self._base_meta(has_cisa_kev=True))
+        self.assertGreater(score_kev_poc, score_kev_only)
+
+    def test_erl_boost_not_applied_on_single_step_path(self):
+        from apme.engine.scorer import Scorer
+        from apme.models.path import AttackPath, PathStep
+        scorer = Scorer()
+        single = AttackPath(
+            id="S-1", start="a", end="b",
+            steps=[PathStep(from_id="a", to_id="b", action="x",
+                            confidence=0.9, validated=True)]
+        )
+        meta = self._base_meta(validated_steps=1)
+        scorer.score(single, meta)
+        self.assertNotEqual(single.risk, "critical")
+
+    def test_erl_boost_applied_on_two_step_validated_path(self):
+        from apme.engine.scorer import Scorer
+        scorer = Scorer()
+        path = self._make_path(validated=True, n_steps=2)
+        meta = self._base_meta(
+            validated_steps=2, severity=4, cvss_score=9.0,
+            privilege_gained="admin", epss_percentile=90.0,
+            target_sensitivity="high", blast_radius=30,
+            has_cisa_kev=True, path_confidence_product=0.9,
+        )
+        scorer.score(path, meta)
+        self.assertIn(path.risk, ("high", "critical"))
+
+
+class ScorerClassifyConstraint22Tests(TestCase):
+    """Constraint 22: unvalidated high-score paths capped at medium."""
+
+    def _make_path(self, n_steps=2):
+        from apme.models.path import AttackPath, PathStep
+        return AttackPath(
+            id="C22-1", start="a", end="z",
+            steps=[
+                PathStep(from_id=f"n{i}", to_id=f"n{i+1}", action="a",
+                         confidence=0.9, validated=False, edge_type="LEADS_TO")
+                for i in range(n_steps)
+            ]
+        )
+
+    def test_unvalidated_no_signal_high_score_capped_at_medium(self):
+        from apme.engine.scorer import Scorer
+        scorer = Scorer()
+        path = self._make_path()
+        meta = {
+            "severity": 4, "cvss_score": 9.8, "privilege_gained": "root",
+            "validated_steps": 0, "target_sensitivity": "high", "blast_radius": 50,
+            "epss_percentile": 95.0, "has_cisa_kev": False, "path_confidence_product": 0.95,
+            "has_poc": False, "has_exploit_url": False, "has_metasploit": False,
+            "cve_published_date": None, "target_node_degree": 20,
+        }
+        scorer.score(path, meta)
+        self.assertNotIn(path.risk, ("high", "critical"),
+                         "Unvalidated paths with no signal must not reach high/critical")
+
+    def test_unvalidated_with_kev_signal_can_reach_high(self):
+        from apme.engine.scorer import Scorer
+        scorer = Scorer()
+        path = self._make_path()
+        meta = {
+            "severity": 4, "cvss_score": 9.8, "privilege_gained": "root",
+            "validated_steps": 0, "target_sensitivity": "high", "blast_radius": 50,
+            "epss_percentile": 95.0, "has_cisa_kev": True,
+            "path_confidence_product": 0.95,
+            "has_poc": True, "has_exploit_url": True, "has_metasploit": True,
+            "cve_published_date": None, "target_node_degree": 20,
+        }
+        scorer.score(path, meta)
+        self.assertIn(path.risk, ("high", "critical"))
+
+    def test_low_score_unvalidated_stays_speculative(self):
+        from apme.engine.scorer import Scorer
+        scorer = Scorer()
+        path = self._make_path()
+        meta = {
+            "severity": 0, "cvss_score": 0.0, "privilege_gained": "none",
+            "validated_steps": 0, "target_sensitivity": "low", "blast_radius": 1,
+            "epss_percentile": 0.0, "has_cisa_kev": False, "path_confidence_product": 0.3,
+            "has_poc": False, "has_exploit_url": False, "has_metasploit": False,
+            "cve_published_date": None, "target_node_degree": 1,
+        }
+        scorer.score(path, meta)
+        self.assertEqual(path.risk, "speculative")
