@@ -3413,9 +3413,12 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		# LinkFinder - per URL (fast; fetches and extracts JS links)
 		if 'linkfinder' in uses_tools:
 			lf_output = f"{results_dir}/lf_{subdomain_name}.txt"
-			cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -d -i {url} -o cli | tee {lf_output}"
-			logger.warning('[WEB_API] LinkFinder: running on %s | cmd: %s', subdomain_name, cmd)
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			if os.path.exists(lf_output) and os.path.getsize(lf_output) > 0:
+				logger.warning('[WEB_API] LinkFinder: cache hit for %s — loading existing results', subdomain_name)
+			else:
+				cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -d -i {url} -o cli | tee {lf_output}"
+				logger.warning('[WEB_API] LinkFinder: running on %s | cmd: %s', subdomain_name, cmd)
+				run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(lf_output):
 				try:
 					lf_endpoints = 0
