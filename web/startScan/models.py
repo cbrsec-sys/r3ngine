@@ -577,6 +577,19 @@ class CveId(models.Model):
 		return f"{self.name} (CVSS: {self.cvss_v31_base_score})"
 
 
+class EpssFeedData(models.Model):
+	"""
+	Stores the daily bulk EPSS data feed locally to prevent hitting API rate limits.
+	"""
+	cve_id = models.CharField(max_length=50, primary_key=True)
+	epss_score = models.FloatField()
+	epss_percentile = models.FloatField()
+	date_fetched = models.DateTimeField(auto_now=True)
+
+	def __str__(self):
+		return f"{self.cve_id} (EPSS: {self.epss_score})"
+
+
 class CweId(models.Model):
 	id = models.AutoField(primary_key=True)
 	name = models.CharField(max_length=100)

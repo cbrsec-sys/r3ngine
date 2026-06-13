@@ -70,6 +70,7 @@ v3.6.0 massively upgrades the CVE enrichment pipeline by integrating `sploitscan
 * **Automated AI Assessments**: Leverages the system's active LLM configuration (OpenAI, Anthropic, Gemini, or local Ollama) to automatically generate context-rich risk assessments and mitigation strategies based on the CVE's CVSS score and exploitability metrics.
 * **SearchSploit Target Attribution & Cache**: `searchsploit` findings are now explicitly attributed to their targets via `http_url`. Their descriptions and AI assessments are cached in the local `CveId` vulnerability database using the Exploit Title, preventing repeated heavy API/LLM calls.
 * **Persistent Intelligence Cache**: All new intelligence points are permanently cached in the `CveId` database model, eliminating redundant API lookups and saving LLM tokens across future scans.
+* **Daily EPSS Feed Synchronization**: Replaced live EPSS API queries with a localized database cache (`EpssFeedData`) synced daily via an 8:00 AM Temporal orchestrator cron task. This provides near-instant exploitation probability lookups and entirely eliminates rate-limit failures.
 
 ---
 

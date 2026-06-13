@@ -40,13 +40,14 @@ class CVEEnrichmentService:
     NVD_API_BASE = "https://services.nvd.nist.gov/rest/json/cves/2.0"
     EPSS_API_BASE = "https://api.first.org/data/v1/epss"
     CISA_KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+    EPSS_FEED_URL = "https://epss.cyentia.com/epss_scores-current.csv.gz"
     
     # Cache TTLs (seconds)
     CACHE_TTL_CVE = 86400 * 7  # 7 days for individual CVEs
     CACHE_TTL_KEV = 3600  # 1 hour for KEV catalog
     
     # Request settings
-    REQUEST_TIMEOUT = 15
+    REQUEST_TIMEOUT = 10
     MAX_RETRIES = 2
     
     def __init__(self):
@@ -78,15 +79,27 @@ class CVEEnrichmentService:
         """
         # Normalize CVE name
         cve_name = cve_name.upper().strip()
-        if not cve_name.startswith('CVE-'):
+        is_valid_cve = False
+        
+        if cve_name.startswith('CVE-'):
+            if re.match(r'^CVE-\d{4}-\d+$', cve_name):
+                is_valid_cve = True
+            else:
+                logger.debug("Non-CVE format detected: %s, skipping external database lookups", cve_name)
+        else:
             # Accept bare YYYY-NNNNN format and prepend the required prefix
             if re.match(r'^\d{4}-\d+$', cve_name):
                 cve_name = 'CVE-' + cve_name
+                is_valid_cve = True
             else:
-                logger.debug("Non-CVE format detected: %s, proceeding with lookups anyway", cve_name)
+                logger.debug("Non-CVE format detected: %s, skipping external database lookups", cve_name)
         
         # Get or create CVE record
         cve_obj, created = CveId.objects.get_or_create(name=cve_name)
+        
+        if not is_valid_cve:
+            # We don't perform external enrichment for non-CVE strings, just return
+            return cve_obj
         
         # Skip re-enrichment if recently updated (within 7 days)
         if not created and cve_obj.last_modified_date:
@@ -218,6 +231,79 @@ class CVEEnrichmentService:
                 'total': 0,
                 'errors': 1
             }
+
+    def sync_epss_catalog(self) -> Dict[str, int]:
+        """
+        Synchronize local EpssFeedData records with the official EPSS data feed.
+        Downloads the gzipped CSV from FIRST/Cyentia, drops the old table, and inserts
+        the fresh batch.
+        """
+        logger.info("Synchronizing EPSS catalog...")
+        from startScan.models import EpssFeedData
+        import gzip
+        import csv
+        import io
+
+        try:
+            response = requests.get(self.EPSS_FEED_URL, timeout=30)
+            response.raise_for_status()
+
+            # Read and decompress
+            with gzip.GzipFile(fileobj=io.BytesIO(response.content)) as gz:
+                content = gz.read().decode('utf-8')
+
+            # The EPSS CSV has a few metadata lines starting with '#', so filter them out
+            lines = content.splitlines()
+            data_lines = [line for line in lines if not line.startswith('#')]
+
+            if not data_lines:
+                logger.error("EPSS CSV feed is empty or invalid.")
+                return {'inserted': 0, 'errors': 1}
+
+            # Typically the first non-comment line is the header: cve,epss,percentile
+            # Ensure we are skipping the header by checking the first line
+            if "cve" in data_lines[0].lower():
+                data_lines.pop(0)
+
+            # Parse rows
+            reader = csv.reader(data_lines)
+            batch = []
+            batch_size = 10000
+
+            # Truncate old data
+            EpssFeedData.objects.all().delete()
+            
+            inserted_count = 0
+
+            for row in reader:
+                if len(row) >= 3:
+                    cve_id = row[0].strip()
+                    try:
+                        epss_score = float(row[1])
+                        epss_percentile = float(row[2]) * 100.0  # Convert to percentage format like API
+                        batch.append(EpssFeedData(
+                            cve_id=cve_id,
+                            epss_score=epss_score,
+                            epss_percentile=epss_percentile
+                        ))
+                    except ValueError:
+                        continue
+
+                if len(batch) >= batch_size:
+                    EpssFeedData.objects.bulk_create(batch, ignore_conflicts=True)
+                    inserted_count += len(batch)
+                    batch = []
+
+            if batch:
+                EpssFeedData.objects.bulk_create(batch, ignore_conflicts=True)
+                inserted_count += len(batch)
+
+            logger.info(f"EPSS catalog sync complete: {inserted_count} records inserted.")
+            return {'inserted': inserted_count, 'errors': 0}
+
+        except Exception as e:
+            logger.error(f"Failed to synchronize EPSS catalog: {e}")
+            return {'inserted': 0, 'errors': 1}
     
     # ==================== Private Methods ====================
     
@@ -232,6 +318,11 @@ class CVEEnrichmentService:
             requests.RequestException: If API call fails
             ValueError: If response format is unexpected
         """
+        # Circuit breaker to prevent 429s from flooding
+        if cache.get('nvd_api_unavailable'):
+            logger.debug(f"NVD API paused, skipping enrichment for {cve_obj.name}")
+            return
+
         # Build request with API key if available
         headers = {}
         if self.nvd_api_key:
@@ -247,6 +338,11 @@ class CVEEnrichmentService:
             headers=headers,
             timeout=self.REQUEST_TIMEOUT
         )
+        
+        if response.status_code in [429, 502, 503, 504]:
+            logger.warning(f"NVD API unavailable ({response.status_code}), pausing requests for 15 minutes")
+            cache.set('nvd_api_unavailable', True, 900)
+            
         response.raise_for_status()
         
         data = response.json()
@@ -288,45 +384,24 @@ class CVEEnrichmentService:
     
     def _enrich_from_epss(self, cve_obj: CveId) -> None:
         """
-        Fetch EPSS (Exploit Prediction Scoring System) data from FIRST API.
+        Fetch EPSS (Exploit Prediction Scoring System) data from local EpssFeedData.
         
         EPSS provides a probability score of a vulnerability being exploited
         in the wild (0-1 scale, higher = more likely to be exploited).
         
         Args:
             cve_obj (CveId): CVE object to enrich in-place
-        
-        Raises:
-            requests.RequestException: If API call fails
         """
-        params = {'cve': cve_obj.name}
-        
-        logger.debug(f"Fetching EPSS data for {cve_obj.name}...")
-        
-        response = requests.get(
-            self.EPSS_API_BASE,
-            params=params,
-            timeout=self.REQUEST_TIMEOUT
-        )
-        response.raise_for_status()
-        
-        data = response.json()
-        epss_list = data.get("data", [])
-        
-        if not epss_list:
-            logger.debug(f"No EPSS data found for {cve_obj.name}")
+        from startScan.models import EpssFeedData
+
+        feed_data = EpssFeedData.objects.filter(cve_id=cve_obj.name).first()
+        if not feed_data:
+            logger.debug(f"No local EPSS data found for {cve_obj.name}")
             return
-        
-        epss_data = epss_list[0]
-        
-        # EPSS score is 0-1, percentile is already percentage
-        if epss_data.get("epss"):
-            cve_obj.epss_score = float(epss_data["epss"])
-        
-        if epss_data.get("percentile"):
-            # FIRST API returns percentile as 0-1, convert to 0-100
-            cve_obj.epss_percentile = float(epss_data["percentile"]) * 100.0
-        
+
+        cve_obj.epss_score = feed_data.epss_score
+        cve_obj.epss_percentile = feed_data.epss_percentile
+
         logger.debug(
             f"EPSS enrichment successful: {cve_obj.name} "
             f"EPSS={cve_obj.epss_score} percentile={cve_obj.epss_percentile}"

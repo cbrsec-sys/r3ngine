@@ -287,7 +287,7 @@ AI-specific onboarding entrypoints are also available in `AGENTS.md`, `CLAUDE.md
 ## Features
 
 ### 🔬 CVE Intelligence & Enrichment (v3.5.0)
-*   **CVE Enrichment Service**: Fetches CVSS v3.1 metrics from **NVD API v2.0**, exploitation probability scores from **FIRST EPSS**, and syncs the **CISA KEV** (Known Exploited Vulnerabilities) catalog. Enriched data is cached (7-day TTL for CVEs, 1-hour for KEV) and gracefully degrades when external APIs are unavailable.
+*   **CVE Enrichment Service**: Fetches CVSS v3.1 metrics from **NVD API v2.0**, exploitation probability scores from **FIRST EPSS** (synced daily via local feed), and syncs the **CISA KEV** (Known Exploited Vulnerabilities) catalog. Enriched data is cached (7-day TTL for CVEs, 1-hour for KEV) and gracefully degrades when external APIs are unavailable.
 *   **Vulnerability History Tracking**: `VulnerabilityHistory` model traces vulnerabilities across historical scans, automatically classifying findings as new, persistent, or remediated.
 *   **Multi-Criteria Correlation Scoring**: Composite scores using configurable tool weights, asset criticality, CISA KEV/EPSS exploitability factors, and temporal modifiers. In-scan duplicate suppression groups findings under a `group_key` before writing.
 *   **Neo4j ID-Based Graph Sync**: CVE nodes in Neo4j are linked by precise CVE ID with CVSS base score and EPSS score ingested as node properties for attack path enrichment.

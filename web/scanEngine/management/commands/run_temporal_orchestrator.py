@@ -215,6 +215,7 @@ _STARTUP_SYNC_TASKS = [
     ("sync_semgrep_rules", 30, False),
     ("recover_stuck_scans", 30, True),
     ("sync_cve_data", 300, False),
+    ("sync_epss_data", 10, False),
 ]
 
 
@@ -267,6 +268,42 @@ async def _register_startup_schedule(
         ),
     )
     logger.info(f"[Startup] Registered one-shot schedule '{schedule_id}' → workflow '{workflow_id}' (fires in ~{interval_seconds}s)")
+
+
+async def _register_daily_cron_schedule(
+    client: Client, task_name: str, hour: int = 8, minute: int = 0
+) -> None:
+    """Create a daily cron schedule for a startup sync task."""
+    from temporalio.client import ScheduleCalendarSpec, ScheduleRange
+    schedule_id = f"daily-cron-{task_name.replace('_', '-')}"
+    
+    # Try to delete if exists to allow recreating/updating
+    try:
+        handle = client.get_schedule_handle(schedule_id)
+        await handle.delete()
+    except Exception:
+        pass
+
+    await client.create_schedule(
+        schedule_id,
+        Schedule(
+            action=ScheduleActionStartWorkflow(
+                StartupSyncWorkflow.run,
+                args=[task_name],
+                id=f"{schedule_id}-workflow",
+                task_queue="python-orchestrator-queue",
+            ),
+            spec=ScheduleSpec(
+                calendars=[ScheduleCalendarSpec(
+                    hour=[ScheduleRange(hour)],
+                    minute=[ScheduleRange(minute)],
+                )],
+            ),
+            policy=SchedulePolicy(overlap=ScheduleOverlapPolicy.SKIP),
+            state=ScheduleState(note=f"Daily cron sync: {task_name}"),
+        ),
+    )
+    logger.info(f"[Startup] Registered daily cron schedule '{schedule_id}' for {hour:02d}:{minute:02d}")
 
 
 class Command(BaseCommand):
@@ -357,6 +394,11 @@ class Command(BaseCommand):
                 except Exception as sched_err:
                     # Non-fatal: log and continue — don't block worker startup
                     logger.error(f"[Startup] Failed to register schedule for '{task_name}': {sched_err}")
+                    
+            try:
+                await _register_daily_cron_schedule(client, "sync_epss_data", hour=8, minute=0)
+            except Exception as sched_err:
+                logger.error(f"[Startup] Failed to register daily cron schedule for 'sync_epss_data': {sched_err}")
 
             # -------------------------------------------------------------------
             # Collect all registered activities

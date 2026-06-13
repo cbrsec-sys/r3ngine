@@ -2206,6 +2206,10 @@ def run_startup_sync_activity(task_name: str) -> None:
         enricher = CVEBatchEnricher()
         service.sync_cisa_kev_catalog()
         enricher.enrich_unenriched_cves()
+    elif task_name == 'sync_epss_data':
+        from reNgine.cve_enrichment import CVEEnrichmentService
+        service = CVEEnrichmentService()
+        service.sync_epss_catalog()
     else:
         raise ValueError(f"[RunStartupSyncActivity] Unknown task: {task_name}")
     activity.logger.info(f"[RunStartupSyncActivity] Completed: {task_name}")
