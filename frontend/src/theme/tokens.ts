@@ -41,18 +41,41 @@ export const themeTokens = {
   },
   enterprise: { // Professional Theme
     bg: {
-      primary: '#f8fafc', // Slate 50 (Light mode feel but keeping dark if needed, let's use dark slate for consistency with app logic)
+      primary: '#f8fafc', // Slate 50
       secondary: '#ffffff',
     },
-    // We'll use a deep professional blue palette
     palette: {
-      primary: '#0284c7', // Sky 600
+      primary: '#0284c7',   // Sky 600
       secondary: '#475569', // Slate 600
       background: '#f8fafc',
       paper: '#ffffff',
       text: '#0f172a',
       border: '#e2e8f0',
-    }
+    },
+    // Enterprise-appropriate KPI accent colors (muted vs neon)
+    kpi: {
+      targets:    '#0284c7', // sky blue
+      subdomains: '#7c3aed', // violet
+      endpoints:  '#db2777', // fuchsia
+      vulns:      '#dc2626', // red
+      leaks:      '#b45309', // amber
+    },
+    // Semantic severity colors — readable on light backgrounds, no neon
+    severity: {
+      critical: '#dc2626',
+      high:     '#d97706',
+      medium:   '#ca8a04',
+      low:      '#16a34a',
+      info:     '#0284c7',
+      unknown:  '#7c3aed',
+    },
+    // Chart palettes for ApexCharts light mode
+    charts: {
+      donut:    ['#dc2626', '#d97706', '#ca8a04', '#16a34a', '#0284c7', '#7c3aed'],
+      bar:      '#0284c7',
+      area:     ['#0284c7', '#dc2626', '#7c3aed'],
+      treemap:  ['#0284c7', '#0369a1', '#075985', '#0ea5e9', '#38bdf8', '#7dd3fc', '#93c5fd', '#60a5fa'],
+    },
   },
   effects: {
     blur: 'blur(14px)',
