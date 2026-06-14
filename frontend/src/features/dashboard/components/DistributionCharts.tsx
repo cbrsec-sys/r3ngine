@@ -115,7 +115,6 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
   const theme = useTheme();
   const isLight = theme.palette.mode === 'light';
   const ec = themeTokens.enterprise.charts;
-  const donutColors = isLight ? ec.donut : ['#ff003c', '#ff9f00', '#fffc00', '#00ff62', '#00f3ff', '#7000ff'];
   const donutChartColors = isLight ? ec.donut : ['#00f3ff', '#7000ff', '#ff00f7', '#ff003c', '#00ff62', '#fffc00', '#ff9f00'];
   const treemapColors = isLight ? ec.treemap : CWE_COLORS;
   const chartMode = isLight ? 'light' : 'dark';
@@ -471,7 +470,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                       data: data.most_common_cwe.slice(0, 8).map((c, i) => ({
                         x: c.name,
                         y: c.count,
-                        fillColor: CWE_COLORS[i % CWE_COLORS.length],
+                        fillColor: treemapColors[i % treemapColors.length],
                       })),
                     }]}
                     type="treemap"
@@ -479,32 +478,35 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                   />
                   {/* Clickable legend */}
                   <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {data.most_common_cwe.slice(0, 8).map((c, i) => (
-                      <Chip
-                        key={c.name}
-                        label={`${c.name} (${c.count})`}
-                        size="small"
-                        onClick={() => handleCweClick(c.name)}
-                        sx={{
-                          height: 20,
-                          fontSize: '0.6rem',
-                          fontWeight: 700,
-                          fontFamily: 'Inter',
-                          cursor: 'pointer',
-                          bgcolor: `${CWE_COLORS[i % CWE_COLORS.length]}18`,
-                          color: CWE_COLORS[i % CWE_COLORS.length],
-                          border: `1px solid ${CWE_COLORS[i % CWE_COLORS.length]}44`,
-                          '&:hover': {
-                            bgcolor: `${CWE_COLORS[i % CWE_COLORS.length]}35`,
-                          },
-                        }}
-                      />
-                    ))}
+                    {data.most_common_cwe.slice(0, 8).map((c, i) => {
+                      const chipColor = treemapColors[i % treemapColors.length];
+                      return (
+                        <Chip
+                          key={c.name}
+                          label={`${c.name} (${c.count})`}
+                          size="small"
+                          onClick={() => handleCweClick(c.name)}
+                          sx={{
+                            height: 20,
+                            fontSize: '0.6rem',
+                            fontWeight: 700,
+                            fontFamily: 'Inter',
+                            cursor: 'pointer',
+                            bgcolor: `${chipColor}18`,
+                            color: chipColor,
+                            border: `1px solid ${chipColor}44`,
+                            '&:hover': {
+                              bgcolor: `${chipColor}35`,
+                            },
+                          }}
+                        />
+                      );
+                    })}
                   </Box>
                 </>
               ) : (
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 210 }}>
-                  <Typography sx={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
+                  <Typography sx={{ color: isLight ? theme.palette.text.disabled : 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
                     No CWE Data Available
                   </Typography>
                 </Box>
@@ -555,7 +557,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                       data: data.most_common_cve.slice(0, 8).map((c, i) => ({
                         x: c.name,
                         y: c.count,
-                        fillColor: CWE_COLORS[i % CWE_COLORS.length],
+                        fillColor: treemapColors[i % treemapColors.length],
                       })),
                     }]}
                     type="treemap"
@@ -563,32 +565,35 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                   />
                   {/* Clickable legend */}
                   <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                    {data.most_common_cve.slice(0, 8).map((c, i) => (
-                      <Chip
-                        key={c.name}
-                        label={`${c.name} (${c.count})`}
-                        size="small"
-                        onClick={() => handleCveClick(c.name)}
-                        sx={{
-                          height: 20,
-                          fontSize: '0.6rem',
-                          fontWeight: 700,
-                          fontFamily: 'Inter',
-                          cursor: 'pointer',
-                          bgcolor: `${CWE_COLORS[i % CWE_COLORS.length]}18`,
-                          color: CWE_COLORS[i % CWE_COLORS.length],
-                          border: `1px solid ${CWE_COLORS[i % CWE_COLORS.length]}44`,
-                          '&:hover': {
-                            bgcolor: `${CWE_COLORS[i % CWE_COLORS.length]}35`,
-                          },
-                        }}
-                      />
-                    ))}
+                    {data.most_common_cve.slice(0, 8).map((c, i) => {
+                      const chipColor = treemapColors[i % treemapColors.length];
+                      return (
+                        <Chip
+                          key={c.name}
+                          label={`${c.name} (${c.count})`}
+                          size="small"
+                          onClick={() => handleCveClick(c.name)}
+                          sx={{
+                            height: 20,
+                            fontSize: '0.6rem',
+                            fontWeight: 700,
+                            fontFamily: 'Inter',
+                            cursor: 'pointer',
+                            bgcolor: `${chipColor}18`,
+                            color: chipColor,
+                            border: `1px solid ${chipColor}44`,
+                            '&:hover': {
+                              bgcolor: `${chipColor}35`,
+                            },
+                          }}
+                        />
+                      );
+                    })}
                   </Box>
                 </>
               ) : (
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 210 }}>
-                  <Typography sx={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
+                  <Typography sx={{ color: isLight ? theme.palette.text.disabled : 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
                     No CVE Data Available
                   </Typography>
                 </Box>
@@ -854,19 +859,19 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255, 255, 255, 0.02)', border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, borderRadius: 1 }}>
                     <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>Confidentiality</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.confidentiality_impact === 'HIGH' ? '#ff003c' : cveInfo.confidentiality_impact === 'LOW' ? '#ff9f00' : '#00ff62', textTransform: 'uppercase' }}>{cveInfo.confidentiality_impact || 'N/A'}</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.confidentiality_impact === 'HIGH' ? (isLight ? themeTokens.enterprise.severity.critical : '#ff003c') : cveInfo.confidentiality_impact === 'LOW' ? (isLight ? themeTokens.enterprise.severity.high : '#ff9f00') : (isLight ? themeTokens.enterprise.severity.low : '#00ff62'), textTransform: 'uppercase' }}>{cveInfo.confidentiality_impact || 'N/A'}</Typography>
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255, 255, 255, 0.02)', border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, borderRadius: 1 }}>
                     <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>Integrity</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.integrity_impact === 'HIGH' ? '#ff003c' : cveInfo.integrity_impact === 'LOW' ? '#ff9f00' : '#00ff62', textTransform: 'uppercase' }}>{cveInfo.integrity_impact || 'N/A'}</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.integrity_impact === 'HIGH' ? (isLight ? themeTokens.enterprise.severity.critical : '#ff003c') : cveInfo.integrity_impact === 'LOW' ? (isLight ? themeTokens.enterprise.severity.high : '#ff9f00') : (isLight ? themeTokens.enterprise.severity.low : '#00ff62'), textTransform: 'uppercase' }}>{cveInfo.integrity_impact || 'N/A'}</Typography>
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255, 255, 255, 0.02)', border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, borderRadius: 1 }}>
                     <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>Availability</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.availability_impact === 'HIGH' ? '#ff003c' : cveInfo.availability_impact === 'LOW' ? '#ff9f00' : '#00ff62', textTransform: 'uppercase' }}>{cveInfo.availability_impact || 'N/A'}</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.availability_impact === 'HIGH' ? (isLight ? themeTokens.enterprise.severity.critical : '#ff003c') : cveInfo.availability_impact === 'LOW' ? (isLight ? themeTokens.enterprise.severity.high : '#ff9f00') : (isLight ? themeTokens.enterprise.severity.low : '#00ff62'), textTransform: 'uppercase' }}>{cveInfo.availability_impact || 'N/A'}</Typography>
                   </Box>
                 </Grid>
               </Grid>
