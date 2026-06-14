@@ -5,9 +5,9 @@ import {
   Layers,
   Target,
   AlertTriangle,
-  ShieldAlert,
   Key
 } from 'lucide-react';
+import { themeTokens } from '../../../theme/tokens';
 import type { DashboardData } from '../api';
 
 interface KpiCardProps {
@@ -110,6 +110,14 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color, subtitle }
 };
 
 export const KpiGrid: React.FC<{ data: DashboardData['kpis'] }> = ({ data }) => {
+  const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
+  const kpi = themeTokens.enterprise.kpi;
+
+  const colors = isLight
+    ? [kpi.targets, kpi.subdomains, kpi.endpoints, kpi.vulns, kpi.leaks]
+    : ['#00f3ff',   '#7000ff',      '#ff00f7',      '#ff003c', '#fffc00'];
+
   return (
     <Grid container spacing={3}>
       <Grid size={{ xs: 12, sm: 6, lg: 2.4 }}>
@@ -117,7 +125,7 @@ export const KpiGrid: React.FC<{ data: DashboardData['kpis'] }> = ({ data }) => 
           title="TARGETS"
           value={data.domain_count}
           icon={<Globe />}
-          color="#00f3ff"
+          color={colors[0]}
           subtitle="Registered Domains"
         />
       </Grid>
@@ -126,7 +134,7 @@ export const KpiGrid: React.FC<{ data: DashboardData['kpis'] }> = ({ data }) => 
           title="SUBDOMAINS"
           value={data.subdomain_count}
           icon={<Layers />}
-          color="#7000ff"
+          color={colors[1]}
           subtitle={`${data.alive_count} Active Assets`}
         />
       </Grid>
@@ -135,7 +143,7 @@ export const KpiGrid: React.FC<{ data: DashboardData['kpis'] }> = ({ data }) => 
           title="ENDPOINTS"
           value={data.endpoint_count}
           icon={<Target />}
-          color="#ff00f7"
+          color={colors[2]}
           subtitle={`${data.endpoint_alive_count} Total Alive`}
         />
       </Grid>
@@ -144,7 +152,7 @@ export const KpiGrid: React.FC<{ data: DashboardData['kpis'] }> = ({ data }) => 
           title="VULNS"
           value={data.vulnerability_count}
           icon={<AlertTriangle />}
-          color="#ff003c"
+          color={colors[3]}
           subtitle={`${data.critical_count} Critical Risks`}
         />
       </Grid>
@@ -153,7 +161,7 @@ export const KpiGrid: React.FC<{ data: DashboardData['kpis'] }> = ({ data }) => 
           title="LEAKS"
           value={data.secret_leak_count}
           icon={<Key />}
-          color="#fffc00"
+          color={colors[4]}
           subtitle="Sensitive Data Found"
         />
       </Grid>
