@@ -259,11 +259,11 @@ export const BountyHubPage: React.FC = () => {
             <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end" }}>
               <FormControlLabel
                 control={<Checkbox checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />}
-                label={<Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Show Closed</Typography>}
+                label={<Typography variant="body2" sx={{ color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.6)' }}>Show Closed</Typography>}
               />
               <FormControlLabel
                 control={<Checkbox checked={showBookmarked} onChange={(e) => setShowBookmarked(e.target.checked)} />}
-                label={<Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Bookmarked</Typography>}
+                label={<Typography variant="body2" sx={{ color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.6)' }}>Bookmarked</Typography>}
               />
             </Stack>
           </Grid>
