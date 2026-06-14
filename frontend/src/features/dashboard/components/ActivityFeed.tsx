@@ -5,41 +5,11 @@ import {
   CardContent,
   Typography,
   List,
-  Chip,
   useTheme,
   alpha
 } from '@mui/material';
 import { Activity } from 'lucide-react';
 import type { DashboardData } from '../api';
-
-const SeverityChip: React.FC<{ severity: number }> = ({ severity }) => {
-  const theme = useTheme();
-  const isLight = theme.palette.mode === 'light';
-  const configs: Record<number, { label: string; color: string }> = {
-    4:  { label: 'CRITICAL', color: '#ff003c' },
-    3:  { label: 'HIGH',     color: '#ff9f00' },
-    2:  { label: 'MEDIUM',   color: '#fffc00' },
-    1:  { label: 'LOW',      color: '#00ff62' },
-    0:  { label: 'INFO',     color: '#00f3ff' },
-    [-1]: { label: 'UNKNOWN', color: '#7000ff' }
-  };
-  const config = configs[severity] || configs[-1];
-  return (
-    <Chip
-      label={config.label}
-      size="small"
-      sx={{
-        fontSize: '0.6rem',
-        fontWeight: 800,
-        borderRadius: 1,
-        bgcolor: 'transparent',
-        border: `1px solid ${config.color}`,
-        color: config.color,
-        boxShadow: isLight ? 'none' : `0 0 8px ${config.color}88`,
-      }}
-    />
-  );
-};
 
 const FeedCard: React.FC<{ title: string; icon: React.ReactNode; iconColor: string; children: React.ReactNode }> = ({ title, icon, iconColor, children }) => {
   const theme = useTheme();
@@ -83,7 +53,7 @@ const FeedCard: React.FC<{ title: string; icon: React.ReactNode; iconColor: stri
           pr: 1,
           '&::-webkit-scrollbar': { width: 4 },
           '&::-webkit-scrollbar-thumb': {
-            bgcolor: isLight ? alpha(theme.palette.divider, 0.5) : 'rgba(0, 243, 255, 0.2)',
+            bgcolor: isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.2)',
             borderRadius: 2
           }
         }}>
