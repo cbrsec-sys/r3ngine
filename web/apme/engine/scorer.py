@@ -175,20 +175,55 @@ class Scorer:
 
     @staticmethod
     def _compute_recency(cve_date, has_kev: bool) -> float:
-        """Compute recency score from CVE published date."""
-        if cve_date is None:
+        """Compute recency score from CVE published date.
+
+        Args:
+            cve_date (Any): The CVE published date, which can be None, a string, 
+                             a datetime.date, or a datetime.datetime object.
+            has_kev (bool): Whether the vulnerability is in the CISA KEV list.
+
+        Returns:
+            float: The computed recency score (ranging from 0.15 to 1.0).
+        """
+        if not cve_date:
             return 0.50 if has_kev else 0.15
-        today = datetime.date.today()
+
+        # If cve_date is a string, attempt robust parsing to a datetime.date object
+        if isinstance(cve_date, str):
+            cve_date = cve_date.strip()
+            if not cve_date or cve_date.lower() == "none":
+                return 0.50 if has_kev else 0.15
+            try:
+                # Attempt standard ISO format (YYYY-MM-DD)
+                cve_date = datetime.date.fromisoformat(cve_date)
+            except ValueError:
+                try:
+                    # Attempt standard datetime string format with space
+                    cve_date = datetime.datetime.strptime(cve_date, "%Y-%m-%d %H:%M:%S").date()
+                except ValueError:
+                    try:
+                        # Attempt standard ISO format with 'T' separator
+                        cve_date = datetime.datetime.fromisoformat(cve_date).date()
+                    except ValueError:
+                        # Default fallback if parsing fails completely
+                        return 0.50 if has_kev else 0.15
+
+        # Normalize datetime to date if necessary
         if isinstance(cve_date, datetime.datetime):
             cve_date = cve_date.date()
-        age_days = (today - cve_date).days
-        if age_days < 30:
-            return 1.0
-        if age_days < 180:
-            return 0.70
-        if age_days < 730:
-            return 0.40
-        # Old CVE (>= 730 days)
+
+        # Compute age in days and return the corresponding recency score
+        if isinstance(cve_date, datetime.date):
+            today = datetime.date.today()
+            age_days = (today - cve_date).days
+            if age_days < 30:
+                return 1.0
+            if age_days < 180:
+                return 0.70
+            if age_days < 730:
+                return 0.40
+
+        # Old CVE (>= 730 days) or fallback
         return 0.80 if has_kev else 0.15
 
     @staticmethod

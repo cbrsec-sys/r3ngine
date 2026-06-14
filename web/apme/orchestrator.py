@@ -127,7 +127,7 @@ class APMEOrchestrator:
         node_index: Dict[str, Node] = {n.id: n for n in all_nodes}
 
         for path in paths:
-            metadata = self._build_path_metadata(path, node_index, builder)
+            metadata = self._build_path_metadata(path, node_index, builder, scan_history_id)
             self._scorer.score(path, metadata)
 
         scored_paths = self._scorer.sort_paths(paths)
@@ -157,8 +157,19 @@ class APMEOrchestrator:
     def _build_path_metadata(
         self, path: AttackPath, node_index: Dict[str, Node],
         builder: Optional["GraphBuilder"] = None,
+        scan_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Extract scoring metadata from path nodes."""
+        """Extract scoring metadata from path nodes.
+
+        Args:
+            path (AttackPath): The attack path object.
+            node_index (Dict[str, Node]): Map of node ID to Node object.
+            builder (GraphBuilder, optional): The active GraphBuilder instance.
+            scan_id (int, optional): The unique ID of the scan.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing scoring metadata.
+        """
         max_severity = -1
         max_cvss = 0.0
         privilege_gained = "none"
@@ -228,7 +239,7 @@ class APMEOrchestrator:
         # Target node degree (connectivity) via Neo4j query
         target_node_degree = 1
         if builder and path.end:
-            target_node_degree = builder.query_node_degree(path.end)
+            target_node_degree = builder.query_node_degree(path.end, scan_id)
 
         return {
             "severity": max_severity,
@@ -313,7 +324,7 @@ class APMEOrchestrator:
                                 "score": path.score,
                                 "steps": serialize_path(path, node_index)["steps"],
                                 "narrative": narrative,
-                                "metadata": self._build_path_metadata(path, node_index),
+                                "metadata": self._build_path_metadata(path, node_index, scan_id=scan_history_id),
                             },
                             "potential_impact": narrative,
                             "remediation_priority": self._risk_to_priority(path.risk),
@@ -334,7 +345,7 @@ class APMEOrchestrator:
                                 "score": path.score,
                                 "steps": serialize_path(path, node_index)["steps"],
                                 "narrative": narrative,
-                                "metadata": self._build_path_metadata(path, node_index),
+                                "metadata": self._build_path_metadata(path, node_index, scan_id=scan_history_id),
                             },
                             "potential_impact": narrative,
                             "remediation_priority": self._risk_to_priority(path.risk),
