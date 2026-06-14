@@ -76,6 +76,8 @@ class Pathfinder:
     MAX_DEPTH = 8
     MAX_PATHS = 20
     DFS_MAX_DEPTH = 6
+    MAX_ENTRY_POINTS = 50
+    QUERY_TIMEOUT_MS = 30_000
 
     def __init__(self, min_edge_confidence: float = 0.20):
         self.min_edge_confidence = min_edge_confidence
@@ -122,6 +124,13 @@ class Pathfinder:
     ) -> List[AttackPath]:
         """Run BFS + DFS + Dijkstra across all entry points, deduplicate, return top N."""
         entries = start_node_ids or self._get_internet_entry_points(scan_id)
+        if len(entries) > self.MAX_ENTRY_POINTS:
+            logger.warning(
+                "APME Pathfinder: %d entry points exceed cap of %d, truncating",
+                len(entries), self.MAX_ENTRY_POINTS,
+            )
+            entries = entries[:self.MAX_ENTRY_POINTS]
+        logger.info("APME Pathfinder: querying %d entry points", len(entries))
         all_paths: List[AttackPath] = []
 
         for entry_id in entries:
@@ -231,6 +240,7 @@ class Pathfinder:
                     target_subtypes=target_subtypes,
                     min_conf=self.min_edge_confidence,
                     limit=self.MAX_PATHS,
+                    timeout=self.QUERY_TIMEOUT_MS,
                 )
                 # Eagerly consume the Bolt stream to avoid BufferError (object cannot be re-sized)
                 # when reading large records from the network stream dynamically.

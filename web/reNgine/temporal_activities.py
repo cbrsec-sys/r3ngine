@@ -3083,7 +3083,7 @@ def recalculate_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
         top_n = apme_config.get('top_n', 5)
 
         orchestrator = APMEOrchestrator(top_n=top_n)
-        result = orchestrator.run(scan_history_id)
+        result = orchestrator.run(scan_history_id, heartbeat_fn=activity.heartbeat)
 
         if "error" in result:
             update_job(job_id, "FAILED", 100, f"Failed: {result.get('error')}", result) if job_id else None

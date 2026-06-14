@@ -71,13 +71,20 @@ class LLMPathOrchestrator:
         domain_id = scan.domain_id
         
         # Fetch Subdomains
-        subdomains = Subdomain.objects.filter(target_domain_id=domain_id)
+        subdomains = Subdomain.objects.filter(
+            target_domain_id=domain_id
+        ).prefetch_related("ip_addresses", "ip_addresses__ports", "technologies")
         sub_list = []
         for s in subdomains:
+            ips = s.ip_addresses.all()
+            ports = []
+            for ip in ips:
+                for port in ip.ports.all():
+                    ports.append(f"{port.number}/{port.service_name}")
             sub_list.append({
                 "name": s.name,
-                "ip": s.ip_address,
-                "ports": s.open_ports or "",
+                "ip": ", ".join(ip.address for ip in ips),
+                "ports": ", ".join(ports),
                 "technologies": [t.name for t in s.technologies.all()]
             })
 
