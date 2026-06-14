@@ -69,7 +69,7 @@ export const DashboardPage: React.FC = () => {
           display: 'flex',
           alignItems: 'center',
           gap: 1,
-          fontWeight: 600,
+          fontWeight: 700,
           letterSpacing: 1
         }}>
           <Box component="span" sx={{
