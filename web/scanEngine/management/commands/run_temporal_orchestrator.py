@@ -603,7 +603,12 @@ class Command(BaseCommand):
             def listen():
                 while True:
                     try:
-                        rdb = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
+                        rdb = redis.StrictRedis(
+                            host=settings.REDIS_HOST,
+                            port=settings.REDIS_PORT,
+                            password=settings.REDIS_PASSWORD,
+                            db=0
+                        )
                         pubsub = rdb.pubsub()
                         pubsub.subscribe('orchestrator_control')
                         logger.info("[Control] Subscribed to orchestrator_control Redis channel.")

@@ -2,6 +2,14 @@
 # Entrypoint for the Temporal Go Executor container.
 # Handles one-time setup and tool updates then starts the Go executor worker.
 
+# ---------------------------------------------------------------------------
+# Start deferred tool installer in the background so normal setup tasks
+# run in parallel. We wait for it to finish just before the executor starts.
+# ---------------------------------------------------------------------------
+#echo "[entrypoint] Starting deferred tool installer in background..."
+#/usr/src/app/internal_tools.sh &
+#INTERNAL_TOOLS_PID=$!
+
 # vulscan (nmap script)
 if [ ! -d "/usr/src/github/scipag_vulscan" ]; then
   echo "Cloning Nmap Vulscan script..."
@@ -149,5 +157,8 @@ vulnx update
 # Configure vigolium to scan all severity levels for known issues
 vigolium config set known_issue_scan.severities "critical,high,medium,low,info" || true
 
-echo "Starting Temporal Go Executor..."
+# Wait for the background tool installer to finish before starting the executor.
+echo "[entrypoint] Waiting for deferred tool installer to complete..."
+wait $INTERNAL_TOOLS_PID
+echo "[entrypoint] Deferred tool installer complete. Starting Temporal Go Executor..."
 exec /usr/local/bin/r3ngine-executor

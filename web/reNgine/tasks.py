@@ -2149,7 +2149,13 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	logger.warning(f"[SPIDERFOOT] Executing command: {cmd}")
 	
 	# Initialize stateful parser with Redis dedup
-	redis_client = Redis(host="redis", port=6379, decode_responses=True)
+	from django.conf import settings
+	redis_client = Redis(
+		host=settings.REDIS_HOST,
+		port=settings.REDIS_PORT,
+		password=settings.REDIS_PASSWORD,
+		decode_responses=True
+	)
 	parser = SpiderFootBatchParser(dedup_backend=redis_client, scan_id=self.scan_id, target_domain=self.domain.name)
 	
 	batch = []

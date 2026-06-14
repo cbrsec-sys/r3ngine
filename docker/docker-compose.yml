@@ -40,6 +40,7 @@ services:
     build:
       context: ./redis
     image: "redis:alpine"
+    command: redis-server --requirepass "${REDIS_PASSWORD}"
     hostname: redis
     networks:
       - r3ngine_network
@@ -61,7 +62,7 @@ services:
     environment:
       - DEBUG=${DEBUG:-0}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -235,7 +236,7 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_SSLMODE=${POSTGRES_SSLMODE}
       - DOMAIN_NAME=${DOMAIN_NAME}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - NEO4J_URI=${NEO4J_URI}
       - NEO4J_USER=${NEO4J_USER}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}
@@ -280,7 +281,7 @@ services:
     environment:
       - TEMPORAL_HOST=temporal:7233
       - TEMPORAL_NAMESPACE=default
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
