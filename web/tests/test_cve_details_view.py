@@ -31,6 +31,7 @@ class CVEDetailsNormalizationTestCase(TestCase):
             is_staff=True, is_superuser=True,
         )
         self.client.force_authenticate(user=self.user)
+        self.client.force_login(self.user)
         assign_role(self.user, 'penetration_tester')
 
         self.cve = CveId.objects.create(

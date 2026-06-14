@@ -1234,57 +1234,79 @@ class CVEDetails(APIView):
 		Args:
 			request: DRF request object containing query parameters.
 				- query_params.cve_id (str): The CVE identifier, e.g., 'CVE-2024-1234'
+				  Also accepts bare YYYY-NNNNN format (e.g., '2024-1234').
 
 		Returns:
 			Response: A DRF Response object with either the CVE details or an error message.
 		"""
+		import re as _re
+
 		req = self.request
 		cve_id = req.query_params.get('cve_id')
 
 		if not cve_id:
 			return Response({
-				'status': False, 
+				'status': False,
 				'message': 'CVE ID not provided'
 			})
 
 		from reNgine.cve_enrichment import CVEEnrichmentService
 		from startScan.models import CveId
-		
+
+		# Normalize: bare YYYY-NNNNN → CVE-YYYY-NNNNN so DB lookups and
+		# external API calls always use the canonical format.
 		formatted_cve_id = cve_id.upper().strip()
-		
+		if _re.match(r'^\d{4}-\d+$', formatted_cve_id):
+			formatted_cve_id = 'CVE-' + formatted_cve_id
+
 		# 1. Check if the CVE exists in the local database
 		try:
 			cve_obj = CveId.objects.get(name__iexact=formatted_cve_id)
-			logger.info(f"Found {formatted_cve_id} in local database")
+			logger.info("Found %s in local database", formatted_cve_id)
+
+			# Lazy re-enrichment: if the record exists but CVSS data is missing,
+			# attempt to fill it in now (e.g. first created during scanning before
+			# NVD data was available).
+			if cve_obj.cvss_v31_base_score is None:
+				logger.info("CVE %s has no CVSS data, attempting re-enrichment", formatted_cve_id)
+				try:
+					service = CVEEnrichmentService()
+					refreshed = service.enrich_cve(formatted_cve_id)
+					if refreshed:
+						cve_obj = refreshed
+				except Exception as e:
+					logger.warning("Re-enrichment failed for %s: %s", formatted_cve_id, e)
+
 		except CveId.DoesNotExist:
 			# 2. Attempt live enrichment from NVD and EPSS APIs
-			logger.info(f"CVE {formatted_cve_id} not in database, attempting enrichment...")
+			logger.info("CVE %s not in database, attempting enrichment...", formatted_cve_id)
 			try:
 				service = CVEEnrichmentService()
 				cve_obj = service.enrich_cve(formatted_cve_id)
-				
+
 				if not cve_obj:
 					return Response({
-						'status': False, 
+						'status': False,
 						'message': f'CVE {formatted_cve_id} not found in official sources'
 					})
-				
-				logger.info(f"Successfully enriched {formatted_cve_id}")
+
+				logger.info("Successfully enriched %s", formatted_cve_id)
 			except Exception as e:
-				logger.error(f"Enrichment failed for {formatted_cve_id}: {e}")
+				logger.error("Enrichment failed for %s: %s", formatted_cve_id, e)
 				return Response({
-					'status': False, 
+					'status': False,
 					'message': f'Failed to enrich CVE data: {str(e)}'
 				})
 
 		# 3. Fetch additional context and references from CIRCL.LU API
+		# Always use the normalized CVE-YYYY-NNNNN format.
 		circl_data = {}
 		try:
 			response = requests.get(f'https://cve.circl.lu/api/cve/{formatted_cve_id}', timeout=10)
 			if response.status_code == 200:
 				circl_data = response.json() or {}
 		except Exception as e:
-			logger.warning(f"CIRCL.LU lookup failed for {formatted_cve_id}: {e}")
+			logger.warning("CIRCL.LU lookup failed for %s: %s", formatted_cve_id, e)
 
 		# 4. Compile the full enriched data dictionary
 		result = {
