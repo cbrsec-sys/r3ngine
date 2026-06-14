@@ -211,7 +211,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
           </List>
         ) : (
           <Box>
-            <Box sx={{ p: 1, borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ p: 1, borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center' }}>
               <Button 
                 size="small" 
                 onClick={() => setActiveFacetId(null)}
