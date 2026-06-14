@@ -8,6 +8,8 @@ import {
   Typography,
   Stack,
   IconButton,
+  useTheme,
+  alpha,
 } from '@mui/material';
 import { X, AlertTriangle, ShieldAlert } from 'lucide-react';
 
@@ -37,6 +39,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   type,
 }) => {
   const isActuallyDestructive = isDestructive || type === 'danger' || type === 'warning';
+  const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
+  const accentColor = isActuallyDestructive ? '#ff003c' : theme.palette.primary.main;
   return (
     <Dialog
       open={open}
@@ -46,12 +51,18 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       slotProps={{
         paper: {
           sx: {
-            bgcolor: '#0d0c14',
-            backgroundImage: 'linear-gradient(rgba(255, 0, 60, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 0, 60, 0.02) 1px, transparent 1px)',
+            bgcolor: isLight ? theme.palette.background.paper : '#0d0c14',
+            backgroundImage: isLight
+              ? 'none'
+              : 'linear-gradient(rgba(255, 0, 60, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 0, 60, 0.02) 1px, transparent 1px)',
             backgroundSize: '20px 20px',
-            border: `1px solid ${isActuallyDestructive ? 'rgba(255, 0, 60, 0.3)' : 'rgba(0, 243, 255, 0.3)'}`,
-            borderRadius: 0,
-            boxShadow: `0 0 30px rgba(0, 0, 0, 0.5), 0 0 10px ${isActuallyDestructive ? 'rgba(255, 0, 60, 0.1)' : 'rgba(0, 243, 255, 0.1)'}`,
+            border: isLight
+              ? `1px solid ${alpha(accentColor, 0.3)}`
+              : `1px solid ${isActuallyDestructive ? 'rgba(255, 0, 60, 0.3)' : 'rgba(0, 243, 255, 0.3)'}`,
+            borderRadius: isLight ? 1 : 0,
+            boxShadow: isLight
+              ? `0 4px 20px ${alpha(accentColor, 0.15)}`
+              : `0 0 30px rgba(0, 0, 0, 0.5), 0 0 10px ${isActuallyDestructive ? 'rgba(255, 0, 60, 0.1)' : 'rgba(0, 243, 255, 0.1)'}`,
           }
         }
       }}
@@ -59,8 +70,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
       <DialogTitle sx={{
         m: 0,
         p: 2,
-        bgcolor: isActuallyDestructive ? 'rgba(255, 0, 60, 0.05)' : 'rgba(0, 243, 255, 0.05)',
-        borderBottom: `1px solid ${isActuallyDestructive ? 'rgba(255, 0, 60, 0.1)' : 'rgba(0, 243, 255, 0.1)'}`,
+        bgcolor: isLight ? alpha(accentColor, 0.05) : (isActuallyDestructive ? 'rgba(255, 0, 60, 0.05)' : 'rgba(0, 243, 255, 0.05)'),
+        borderBottom: `1px solid ${isLight ? alpha(accentColor, 0.15) : (isActuallyDestructive ? 'rgba(255, 0, 60, 0.1)' : 'rgba(0, 243, 255, 0.1)')}`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between'
@@ -68,9 +79,9 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
           {isActuallyDestructive ? <ShieldAlert size={20} color="#ff003c" /> : <AlertTriangle size={20} color="#00f3ff" />}
           <Typography sx={{
-            fontFamily: 'Orbitron',
+            fontFamily: 'var(--r3-heading-font)',
             fontWeight: 900,
-            color: '#fff',
+            color: isLight ? theme.palette.text.primary : '#fff',
             letterSpacing: '0.1rem',
             fontSize: '0.9rem'
           }}>
@@ -78,7 +89,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </Typography>
         </Stack>
         {!isLoading && (
-          <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#fff' } }}>
+          <IconButton onClick={onClose} size="small" sx={{ color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.3)', '&:hover': { color: isLight ? theme.palette.text.primary : '#fff' } }}>
             <X size={18} />
           </IconButton>
         )}
@@ -86,7 +97,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
 
       <DialogContent sx={{ px: 3, pb: 3, pt: '28px !important' }}>
         <Typography sx={{
-          color: 'rgba(255,255,255,0.7)',
+          color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.7)',
           fontSize: '0.85rem',
           lineHeight: 1.6,
           textAlign: 'center'
@@ -101,11 +112,14 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           disabled={isLoading}
           sx={{
             flex: 1,
-            color: 'rgba(255,255,255,0.5)',
-            fontFamily: 'Orbitron',
+            color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.5)',
+            fontFamily: 'var(--r3-heading-font)',
             fontWeight: 800,
             fontSize: '0.7rem',
-            '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' }
+            '&:hover': {
+              color: isLight ? theme.palette.text.primary : '#fff',
+              bgcolor: isLight ? alpha(theme.palette.divider, 0.5) : 'rgba(255,255,255,0.05)'
+            }
           }}
         >
           {cancelText}
@@ -116,12 +130,12 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           variant="contained"
           sx={{
             flex: 1,
-            bgcolor: isActuallyDestructive ? '#ff003c' : '#00f3ff',
-            color: '#000',
-            fontFamily: 'Orbitron',
+            bgcolor: accentColor,
+            color: '#fff',
+            fontFamily: 'var(--r3-heading-font)',
             fontWeight: 900,
             fontSize: '0.7rem',
-            '&:hover': { bgcolor: isActuallyDestructive ? '#e60036' : '#00d8e4' }
+            '&:hover': { bgcolor: isActuallyDestructive ? '#e60036' : theme.palette.primary.dark }
           }}
         >
           {confirmText}
