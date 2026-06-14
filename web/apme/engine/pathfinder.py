@@ -39,7 +39,7 @@ HIGH_VALUE_TARGET_SUBTYPES = {
 _NODES_PROJECTION = (
     "[n in nodes(path) | {"
     "id: n.apme_id, type: n.type, subtype: n.subtype, "
-    "confidence: n.confidence, properties: n.properties"
+    "confidence: n.confidence"
     "}] AS nodes"
 )
 
@@ -178,21 +178,39 @@ class Pathfinder:
         return self._run_path_query(query, scan_id, start_id, target_subtypes)
 
     def _dijkstra_query(self, scan_id, start_id, target_subtypes):
+        """Execute a Dijkstra-like shortest path query using native Cypher.
+        
+        Calculates path weight dynamically using REDUCE over (1.0 - confidence) 
+        of relationships to find the path that maximizes confidence (minimizes cost).
+        Falls back to DFS if any database errors occur.
+
+        Args:
+            scan_id (int): The ID of the scan to query within.
+            start_id (str): The APME ID of the starting node.
+            target_subtypes (list): List of high-value target subtypes to find paths to.
+        
+        Returns:
+            list: A list of dicts containing the matching path nodes and relationships.
+        """
         query = (
-            "MATCH (start:APMENode {apme_id: $start_id, scan_id: $scan_id}), "
-            "(target:APMENode {scan_id: $scan_id}) "
-            "WHERE target.subtype IN $target_subtypes "
-            "CALL apoc.algo.dijkstra(start, target, 'APME_EDGE', 'cost') YIELD path, weight "
-            "WHERE ALL(r IN relationships(path) WHERE r.confidence >= $min_conf) "
-            f"RETURN {_NODES_PROJECTION}, {_RELS_PROJECTION} "
-            "LIMIT $limit"
+            f"MATCH path = (start:APMENode {{apme_id: $start_id, scan_id: $scan_id}})"
+            f"-[:APME_EDGE*1..{self.MAX_DEPTH}]->"
+            f"(target:APMENode {{scan_id: $scan_id}})"
+            f" WHERE target.subtype IN $target_subtypes"
+            f"   AND ALL(r IN relationships(path) WHERE r.confidence >= $min_conf)"
+            f" RETURN {_NODES_PROJECTION}, {_RELS_PROJECTION},"
+            f" REDUCE(cost = 0.0, r IN relationships(path) | cost + (1.0 - r.confidence)) AS weight"
+            f" ORDER BY weight ASC"
+            f" LIMIT $limit"
         )
         try:
-            return self._run_path_query(query, scan_id, start_id, target_subtypes)
-        except Exception:
+            # Run the native Cypher query eagerly
+            return self._run_path_query(query, scan_id, start_id, target_subtypes, raise_errors=True)
+        except Exception as exc:
             logger.warning(
-                "APME Pathfinder: APOC Dijkstra unavailable, "
-                "using high-confidence DFS fallback."
+                "APME Pathfinder: Dijkstra query failed (%s), "
+                "using high-confidence DFS fallback.",
+                exc
             )
             saved_conf = self.min_edge_confidence
             self.min_edge_confidence = min(saved_conf + 0.10, 0.80)
@@ -200,13 +218,13 @@ class Pathfinder:
             self.min_edge_confidence = saved_conf
             return result
 
-    def _run_path_query(self, query, scan_id, start_id, target_subtypes):
+    def _run_path_query(self, query, scan_id, start_id, target_subtypes, raise_errors=False):
         results = []
         if not self._driver:
             return results
         try:
             with self._driver.session() as session:
-                records = session.run(
+                result = session.run(
                     query,
                     scan_id=scan_id,
                     start_id=start_id,
@@ -214,9 +232,14 @@ class Pathfinder:
                     min_conf=self.min_edge_confidence,
                     limit=self.MAX_PATHS,
                 )
+                # Eagerly consume the Bolt stream to avoid BufferError (object cannot be re-sized)
+                # when reading large records from the network stream dynamically.
+                records = list(result)
                 for record in records:
                     results.append({"nodes": record["nodes"], "rels": record["rels"]})
         except Exception as exc:
+            if raise_errors:
+                raise
             logger.error("APME Pathfinder: Query failed: %s", exc)
         return results
 
