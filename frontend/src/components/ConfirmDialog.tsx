@@ -131,7 +131,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           sx={{
             flex: 1,
             bgcolor: accentColor,
-            color: '#fff',
+            color: isLight ? (isActuallyDestructive ? '#fff' : '#000') : '#fff',
             fontFamily: 'var(--r3-heading-font)',
             fontWeight: 900,
             fontSize: '0.7rem',
