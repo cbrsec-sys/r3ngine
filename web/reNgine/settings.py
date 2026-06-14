@@ -378,6 +378,7 @@ REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
 _parsed_redis = urllib.parse.urlparse(REDIS_URL)
 REDIS_HOST = _parsed_redis.hostname or 'redis'
 REDIS_PORT = _parsed_redis.port or 6379
+REDIS_PASSWORD = _parsed_redis.password or None
 '''
 ROLES and PERMISSIONS
 '''

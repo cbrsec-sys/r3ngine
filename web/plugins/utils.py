@@ -508,6 +508,7 @@ class AtomicInstaller:
                             rdb = _redis.StrictRedis(
                                 host=_settings.REDIS_HOST,
                                 port=_settings.REDIS_PORT,
+                                password=_settings.REDIS_PASSWORD,
                                 db=0,
                             )
                             rdb.publish('orchestrator_control', 'restart')

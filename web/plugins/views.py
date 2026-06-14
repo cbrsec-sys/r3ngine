@@ -96,7 +96,12 @@ class PluginViewSet(viewsets.ModelViewSet):
         import redis
         from django.conf import settings
         try:
-            rdb = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
+            rdb = redis.StrictRedis(
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                password=settings.REDIS_PASSWORD,
+                db=0
+            )
             rdb.publish('orchestrator_control', 'restart')
             return Response({'success': True, 'message': 'Restart command sent to orchestrator.'})
         except Exception as e:

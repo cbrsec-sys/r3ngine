@@ -1939,7 +1939,10 @@ def run_stress_tool_activity(ctx: dict) -> dict:
     # Redis kill-switch check — secondary fallback alongside the Temporal signal
     try:
         rdb = redis_lib.StrictRedis(
-            host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0
+            host=settings.REDIS_HOST,
+            port=settings.REDIS_PORT,
+            password=settings.REDIS_PASSWORD,
+            db=0
         )
     except Exception:
         rdb = None

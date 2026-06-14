@@ -12,6 +12,7 @@ if [ "$DEBUG" = "1" ]; then
 # else
     # echo "Production mode: Building frontend..."
     # npm run build
+fi
 # Ensure searchsploit RC file is copied to root home directory if available
 if [ -f "/usr/src/exploitdb/.searchsploit_rc" ]; then
   cp /usr/src/exploitdb/.searchsploit_rc /root/.searchsploit_rc

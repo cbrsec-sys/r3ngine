@@ -12,8 +12,9 @@ class StressTelemetryPublisher:
         self.stream_key = f"stress:telemetry:{scan_id}"
         try:
             self.redis_client = redis.StrictRedis(
-                host=settings.REDIS_HOST, 
-                port=settings.REDIS_PORT, 
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                password=settings.REDIS_PASSWORD,
                 db=0
             )
         except Exception as e:

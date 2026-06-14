@@ -19,7 +19,10 @@ logger = logging.getLogger(__name__)
 # Redis for kill switch
 try:
     redis_client = redis.StrictRedis(
-        host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0
+        host=settings.REDIS_HOST,
+        port=settings.REDIS_PORT,
+        password=settings.REDIS_PASSWORD,
+        db=0
     )
 except:
     redis_client = None
