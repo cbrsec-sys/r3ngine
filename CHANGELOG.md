@@ -3,6 +3,7 @@
 ### [v3.6.0] - Unreleased
 
 - **APME Task Errors & Neo4j Compatibility Fixes**:
+  - Refactored `_dijkstra_query` in `pathfinder.py` to replace `apoc.algo.dijkstra` with a native Cypher variable-length path matching query. It dynamically filters relationships by confidence and calculates cost weights via `REDUCE`, avoiding procedure exceptions (like `NotFoundException` or `BufferError` resizing crashes) while properly supporting custom path weights.
   - Replaced the deprecated/illegal `size((n)--())` Cypher pattern function with modern `COUNT { (n)--() }` in `query_node_degree` to prevent syntax errors in Neo4j 5.x+.
   - Updated the relationship merging transaction helper to map and store all 18 constraint flags (e.g. `requires_docker`, `requires_drupal`) as relationship properties in Neo4j, eliminating DBMS `UnknownPropertyKeyWarning` messages during path queries.
   - Enhanced `Scorer._compute_recency` to robustly handle CVE published dates formatted as strings, datetimes, or dates (with safe fallbacks), preventing a Temporal recalculate_apme task crash (`TypeError: unsupported operand type(s) for -: 'datetime.date' and 'str'`).
