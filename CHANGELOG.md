@@ -2,6 +2,12 @@
 
 ### [v3.6.0] - Unreleased
 
+- **APME Task Errors & Neo4j Compatibility Fixes**:
+  - Replaced the deprecated/illegal `size((n)--())` Cypher pattern function with modern `COUNT { (n)--() }` in `query_node_degree` to prevent syntax errors in Neo4j 5.x+.
+  - Updated the relationship merging transaction helper to map and store all 18 constraint flags (e.g. `requires_docker`, `requires_drupal`) as relationship properties in Neo4j, eliminating DBMS `UnknownPropertyKeyWarning` messages during path queries.
+  - Enhanced `Scorer._compute_recency` to robustly handle CVE published dates formatted as strings, datetimes, or dates (with safe fallbacks), preventing a Temporal recalculate_apme task crash (`TypeError: unsupported operand type(s) for -: 'datetime.date' and 'str'`).
+  - Added comprehensive test coverage in `test_apme_enhancement2.py` validating string-formatted date scoring scenarios and fallbacks.
+
 - **WPScan Parser & WPTaint Integration (Security & LLM Enrichment)**:
   - Refactored `parse_wpscan_results` to split the logic into 5 private helper functions: `_parse_interesting_findings`, `_parse_version`, `_parse_plugins`, `_parse_themes`, and `_parse_users`.
   - Added a dynamic catchall block in `_parse_interesting_findings` that extracts all unrecognized finding fields and formats them into a clean markdown description.

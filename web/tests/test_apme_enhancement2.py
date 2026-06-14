@@ -1057,6 +1057,30 @@ class ScorerNewFactorTests(TestCase):
         score_old = scorer.score(path_b, self._base_meta(cve_published_date=old))
         self.assertGreater(score_recent, score_old)
 
+    def test_cve_published_date_string_formats(self):
+        import datetime
+        from apme.engine.scorer import Scorer
+        scorer = Scorer()
+        path = self._make_path()
+        
+        # Test ISO format string
+        recent_str = (datetime.date.today() - datetime.timedelta(days=10)).isoformat()
+        score_recent = scorer.score(path, self._base_meta(cve_published_date=recent_str))
+        
+        old_str = (datetime.date.today() - datetime.timedelta(days=1000)).isoformat()
+        score_old = scorer.score(path, self._base_meta(cve_published_date=old_str))
+        self.assertGreater(score_recent, score_old)
+
+        # Test datetime string format
+        dt_str = (datetime.date.today() - datetime.timedelta(days=10)).strftime("%Y-%m-%d 12:00:00")
+        score_dt = scorer.score(path, self._base_meta(cve_published_date=dt_str))
+        self.assertEqual(score_recent, score_dt)
+
+        # Test fallback format
+        score_invalid = scorer.score(path, self._base_meta(cve_published_date="invalid-date"))
+        self.assertEqual(score_invalid, score_old)
+
+
     def test_high_connectivity_boosts_score(self):
         from apme.engine.scorer import Scorer
         scorer = Scorer()
