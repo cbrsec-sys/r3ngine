@@ -262,12 +262,12 @@ class Scorer:
     def deduplicate(self, paths: List[AttackPath], overlap_threshold: float = 0.75) -> List[AttackPath]:
         """
         Remove paths sharing >overlap_threshold step-pairs with a higher-scored path.
-        Also drops paths scoring below 0.15.
+        Also drops paths scoring below 0.05.
         Input must be sorted descending by score before calling.
         """
         kept = []
         for path in paths:
-            if path.score < 0.15:
+            if path.score < 0.05:
                 continue
             step_pairs = {(s.from_id, s.to_id) for s in path.steps}
             dominated = False
