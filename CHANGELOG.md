@@ -2,6 +2,11 @@
 
 ### [v3.6.0] - Unreleased
 
+- **Docker Build Image Size Optimization**:
+  - Relocated the Exploit-DB/Searchsploit database (~359MB) from build-time to container runtime. It is now dynamically cloned at startup inside the `temporal-python-orchestrator` container and shared with other containers via a new named Docker volume `exploitdb`.
+  - Added dynamic check-and-copy of the `.searchsploit_rc` configuration file within `RunSearchsploitAction` as a runtime safeguard.
+  - Cleared intermediate build caches in the Dockerfile, including cleaning Python `uv` package cache (`uv cache clean`), cleaning Ruby gem cache (`rm -rf /var/lib/gems/*/cache/*.gem`), and cleaning the Playwright `apt` lists (`rm -rf /var/lib/apt/lists/*`), saving an additional ~1.34GB.
+
 - **APME Task Errors & Neo4j Compatibility Fixes**:
   - Refactored `_dijkstra_query` in `pathfinder.py` to replace `apoc.algo.dijkstra` with a native Cypher variable-length path matching query. It dynamically filters relationships by confidence and calculates cost weights via `REDUCE`, avoiding procedure exceptions (like `NotFoundException` or `BufferError` resizing crashes) while properly supporting custom path weights.
   - Replaced the deprecated/illegal `size((n)--())` Cypher pattern function with modern `COUNT { (n)--() }` in `query_node_degree` to prevent syntax errors in Neo4j 5.x+.
@@ -90,7 +95,19 @@
   - **Interactive Visual Timeline UI**: Replaced the simple vertical text row list of raw IDs with a visually stunning, responsive compromise chain timeline in `AttackPathsTab.tsx` and the React Native Mobile app. Features colors and icons matching node types (Asset, Vulnerability, Capability, Privilege, Credential), CVSS scores, step-by-step actions, and direct links to verify details.
   - **Description Truncation Fix**: Replaced the severe truncation (`noWrap`) on the finding descriptions with a clamped two-line preview in the collapsed card header and a full, multi-paragraph Executive Narrative display inside the expanded drill-down details view.
   - **On-Demand Recalculation**: Added a "RE-CALCULATE PATHS" button in the Web Attack Paths tab header and mobile Summary tab. It invokes the newly registered `RecalculateApmeWorkflow` Temporal workflow to rebuild the attack path modeling graph asynchronously and update local database entries.
+  - **Schema Expansion (Enhancement 2)**: Extended node taxonomy with 23 new technology subtypes, 48 new vulnerability subtypes, and 13 new capability subtypes. Added `Technology` nodes with `USES_TECH` relationship edges to model software stack composition within the attack graph. Extended `TAXONOMY_MAP` with 50 new keyword mappings and 4 new vulnerability node properties for richer semantic resolution.
+  - **Constraint Engine (11→22 gates)**: Doubled the constraint gate count from 11 to 22, adding 12 new technology-gate flags (`requires_docker`, `requires_drupal`, `requires_windows`, `requires_kubernetes`, `requires_active_directory`, etc.) that prevent infeasible attack steps from appearing in paths, reducing false-positive attack chains.
+  - **Rules Library (76→179 rules)**: Expanded from 76 to 179 rules. Added 29 new rules to 5 existing category files (injection, server-side, auth, client-side, info-disclosure) and 8 entirely new category files: `network.yaml` (pivoting/lateral movement), `container.yaml` (container escapes/supply-chain), `active_directory.yaml` (AD attacks), `api.yaml` (API exploit chains), `email.yaml` (email-based pivots), `supply_chain.yaml` (dependency compromise), `dotnet.yaml` (.NET deserialization), `persistence.yaml` (persistence mechanisms).
+  - **Scoring Overhaul (10-Factor Weights)**: Rebuilt the vulnerability scorer with 10 independently tunable factor weights (up from 6): EPSS probability weight (0.15), tiered KEV severity boost (1.2×/1.5×/2.0× by severity), confidence product multiplier, speculative path tier adjustment, ERL validation step guard, and constraint-22 cap enforcement.
+  - **Pathfinder Improvements**: Implemented semantic path deduplication to eliminate structurally equivalent paths with different node orderings. Reduced DFS maximum depth from 8 to 6 hops. Added 2-step minimum hop filter to remove trivially short chains. Enforced fan-out cap at 12 successor nodes per step. Added DFS fallback when Dijkstra returns zero results on sparse graphs.
 
+- **APME Resilience & Temporal Stability**:
+  - **Pathfinder Entry Point Cap**: Capped pathfinder entry-point selection at 50 nodes per graph to prevent Cypher query explosion on large Neo4j installations.
+  - **Neo4j Per-Query Timeout**: Added a 30-second timeout to all Neo4j path queries to prevent hung Temporal activity threads.
+  - **Temporal Heartbeats in APME Pipeline**: Wired Temporal activity heartbeats through all 7 APME orchestrator pipeline steps, enabling heartbeat-based timeout detection and proper Temporal failure reporting.
+  - **RecalculateApmeWorkflow Resilience**: Set 30-minute execution timeout and maximum 3 retries on `RecalculateApmeWorkflow` to prevent infinite retry loops on persistently failing graphs.
+  - **Neo4j Heap Configuration**: Tuned Neo4j JVM heap to 768 MB initial / 1536 MB maximum (`NEO4J_server_memory_heap_initial__size=768m`, `NEO4J_server_memory_heap_max__size=1536m`) to fit safely within the 3 GB container memory limit.
+  - **LLM Orchestrator M2M Fix**: Fixed `AttributeError: 'Subdomain' object has no attribute 'ip_address'` in `llm_orchestrator.py` — updated to use the M2M `ip_addresses` relationship with `prefetch_related` to correctly gather open ports for LLM context enrichment.
 
 
 - **Custom Parameter Discovery Engine (CPDE)**:

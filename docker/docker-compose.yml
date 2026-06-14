@@ -92,6 +92,7 @@ services:
       - ../secrets/certs/ca.crt:/usr/src/app/ca.crt:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - ./web/entrypoint.sh:/usr/src/app/entrypoint.sh:ro
+      - exploitdb:/usr/src/exploitdb
     ports:
       - "8000:8000"
       - "5173:5173"
@@ -255,6 +256,7 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       - ./temporal-python-orchestrator/entrypoint.sh:/usr/src/app/temporal-entrypoint.sh:ro
+      - exploitdb:/usr/src/exploitdb
     networks:
       - r3ngine_network
     healthcheck:
@@ -299,6 +301,7 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       - ./temporal-go-executor/entrypoint.sh:/usr/src/app/executor-entrypoint.sh:ro
+      - exploitdb:/usr/src/exploitdb
     networks:
       - r3ngine_network
     healthcheck:
@@ -341,6 +344,8 @@ volumes:
     name: r3ngine_neo4j_data
   plugins_data:
     name: r3ngine_plugins_data
+  exploitdb:
+    name: r3ngine_exploitdb
 
 secrets:
   proxy.ca:

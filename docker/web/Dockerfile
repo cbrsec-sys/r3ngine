@@ -352,12 +352,12 @@ RUN FEROX_VERSION=$(curl -s https://api.github.com/repos/epi052/feroxbuster/rele
     rm /tmp/feroxbuster.zip
 
 # Searchsploit — offline Exploit-DB CLI search
-RUN git clone --depth 1 https://gitlab.com/exploit-database/exploitdb /usr/src/exploitdb && \
-    ln -sf /usr/src/exploitdb/searchsploit /usr/local/bin/searchsploit && \
-    cp /usr/src/exploitdb/.searchsploit_rc /root/.searchsploit_rc
+RUN mkdir -p /usr/src/exploitdb && \
+    ln -sf /usr/src/exploitdb/searchsploit /usr/local/bin/searchsploit
 
 # WPScan — WordPress vulnerability scanner
-RUN gem install wpscan --no-document
+RUN gem install wpscan --no-document && \
+    rm -rf /var/lib/gems/*/cache/*.gem
 
 # GooFuzz — Google-dork based fuzzer (shell script, no compilation)
 RUN mkdir -p /usr/src/github && \
@@ -408,7 +408,8 @@ RUN git clone --depth 1 https://github.com/aboul3la/Sublist3r /usr/src/github/Su
 
 RUN git clone --depth 1 https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
     cd /usr/src/github/theHarvester && uv sync && \
-    rm -rf /usr/src/github/theHarvester/.git
+    rm -rf /usr/src/github/theHarvester/.git && \
+    uv cache clean
 
 RUN git clone --depth 1 https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider && \
     cd /usr/src/github/ParamSpider && pip3 install . && \
@@ -524,7 +525,8 @@ COPY --from=go-tools-builder /go/bin/httpx /usr/local/bin/httpx
 # ---------------------------------------------------------------------------
 RUN playwright install-deps chromium && \
     playwright install chromium && \
-    ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome /usr/bin/chromium
+    ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome /usr/bin/chromium && \
+    rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
 # Copy application source (placed last — changes most frequently, so layers
