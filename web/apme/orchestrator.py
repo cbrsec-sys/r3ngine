@@ -44,12 +44,24 @@ class APMEOrchestrator:
         self.top_n = top_n
         self._scorer = Scorer()
 
-    def run(self, scan_history_id: int) -> Dict[str, Any]:
+    def run(self, scan_history_id: int, heartbeat_fn=None) -> Dict[str, Any]:
         """
         Execute the full APME pipeline for a scan.
 
+        Args:
+            scan_history_id: The scan to model.
+            heartbeat_fn: Optional callable invoked between pipeline steps
+                          to report progress (e.g. Temporal activity.heartbeat).
+
         Returns a dict with path results suitable for persistence and API output.
         """
+        def _heartbeat(detail: str):
+            if heartbeat_fn:
+                try:
+                    heartbeat_fn(detail)
+                except Exception:
+                    pass
+
         logger.info(f"APME Orchestrator: Starting for scan_history_id={scan_history_id}")
 
         # Resolve Target Domain from ScanHistory to ensure we ingest ALL historical and current scan data
@@ -86,6 +98,8 @@ class APMEOrchestrator:
             logger.warning("APME: No data to model. Graph is empty. Aborting.")
             return {"total_paths": 0, "returned_paths": 0, "paths": []}
 
+        _heartbeat("step 1/7 ingestion complete")
+
         # ── Step 2: Build Graph ───────────────────────────────────────────────
         logger.info("APME [2/7] Building Neo4j graph...")
         builder = GraphBuilder()
@@ -98,11 +112,15 @@ class APMEOrchestrator:
             builder.close()
             return {"total_paths": 0, "returned_paths": 0, "paths": [], "error": str(exc)}
 
+        _heartbeat("step 2/7 graph built")
+
         # ── Step 3: Enrich Graph ──────────────────────────────────────────────
         logger.info("APME [3/7] Enriching graph via rules engine...")
         enricher = GraphEnricher(builder)
         derived_edges = enricher.enrich(all_nodes, scan_history_id)
         logger.info(f"APME [3/7] Derived {len(derived_edges)} new edges from rules.")
+
+        _heartbeat("step 3/7 enrichment complete")
 
         # ── Step 4 & 5: Pathfinding ───────────────────────────────────────────
         logger.info("APME [4/7] Running pathfinding algorithms...")
@@ -116,6 +134,7 @@ class APMEOrchestrator:
             pathfinder.close()
 
         logger.info(f"APME [4/7] Found {len(paths)} candidate paths (pre-scoring).")
+        _heartbeat("step 4/7 pathfinding complete")
 
         if not paths:
             logger.info("APME: No attack paths found for this scan.")
@@ -133,6 +152,8 @@ class APMEOrchestrator:
         scored_paths = self._scorer.sort_paths(paths)
         scored_paths = self._scorer.deduplicate(scored_paths)
         scored_paths = self._scorer.sort_paths(scored_paths)
+
+        _heartbeat("step 5/7 scoring complete")
 
         # ── Step 7: Persist & Return ──────────────────────────────────────────
         logger.info(f"APME [6/7] Persisting top {self.top_n} paths...")

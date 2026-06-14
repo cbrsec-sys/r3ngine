@@ -41,6 +41,16 @@ v3.6.0 introduces full post-creation editing of targets directly from the Target
 
 ---
 
+## 🔄 Nuclei Proxy Rotation Support
+
+v3.6.0 adds native proxy rotation support for Nuclei vulnerability scans.
+
+* **Dynamic Proxy Lists**: The orchestrator dynamically gathers available HTTP/S proxies configured in the system (excluding Tor SOCKS routing) and compiles them into a runtime proxy list for each scan.
+* **Scan Distribution**: Nuclei uses the list via the `-proxy` flag, distributing vulnerability template requests across multiple proxies to evade rate limits and IP blocking.
+* **Safe Ephemeral Cleanup**: The generated proxy files are guaranteed to be cleaned up post-scan via a strict `finally` block in the Temporal workflow, preventing disk clutter.
+
+---
+
 ## 🪟 Custom Parameter Discovery Engine (CPDE)
 
 v3.6.0 introduces the Custom Parameter Discovery Engine (CPDE), allowing users to define custom regular expressions and keyword matchers to extract sensitive or high-value parameters across scan results.

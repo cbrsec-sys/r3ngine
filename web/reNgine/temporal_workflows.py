@@ -2874,8 +2874,9 @@ class RecalculateApmeWorkflow:
         return await workflow.execute_activity(
             "RecalculateApmeActivity",
             args=[scan_history_id, job_id],
-            start_to_close_timeout=timedelta(hours=1),
+            start_to_close_timeout=timedelta(minutes=30),
             heartbeat_timeout=timedelta(minutes=5),
+            retry_policy=RetryPolicy(maximum_attempts=3),
             task_queue="python-orchestrator-queue",
         )
 
