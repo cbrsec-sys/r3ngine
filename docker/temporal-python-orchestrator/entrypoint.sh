@@ -94,6 +94,18 @@ if [ ! -f '/usr/src/wordlist/cpanel_users.txt' ]; then
   sort -u /usr/src/wordlist/cpanel_users.txt -o /usr/src/wordlist/cpanel_users.txt
 fi
 
+# Clone Exploit-DB for Searchsploit if not already present
+if [ ! -d "/usr/src/exploitdb/.git" ]; then
+  echo "Cloning Exploit-DB for searchsploit..."
+  rm -rf /usr/src/exploitdb/* /usr/src/exploitdb/.* 2>/dev/null || true
+  git clone --depth 1 https://gitlab.com/exploit-database/exploitdb /usr/src/exploitdb
+fi
+
+# Ensure searchsploit RC file is copied to root home directory
+if [ -f "/usr/src/exploitdb/.searchsploit_rc" ]; then
+  cp /usr/src/exploitdb/.searchsploit_rc /root/.searchsploit_rc
+fi
+
 cd /usr/src/app
 
 # install gf patterns

@@ -1,8 +1,4 @@
 <p align="center">
-  <h4 align="center"><strong>v3.6.0 is currently unstable. Please use v3.5.0 from the main branch or releases instead.</strong></h4>
-</p>
-
-<p align="center">
 <img src="frontend/public/img/banner.png" height="400px" width="520px" alt=""/>
 </p>
 
@@ -35,7 +31,7 @@
 
 <h3 align="center">r3ngine 3.6.0: The Phoenix Rebirth</h3>
 <p>
-  r3ngine v3.6.0 is the production-stabilized, enterprise-grade evolution of the platform. Building off the original reNgine and further insired by rengine-ng (Check out <a href="https://github.com/Security-Tools-Alliance/rengine-ng" target="_blank">rengine-ng v3</a> if you haven't!) This release delivers deep <b>Neo4j graph sync</b> with CVE metadata. With a whole new metasploit plugin featuring an interactive terminal, as well as quick task delegation. Also added a new module that allows for quick enumeration and identification of vulnerable services running on discovered hosts. The infrastructure has been hardened with <b>Django 5.2.3 LTS</b>, <b>PostgreSQL 16</b>, and <b>Gunicorn + Uvicorn ASGI</b> production serving. Building on the v3.2.0 Celery → Temporal migration — which replaced the legacy at-most-once task broker with a durable workflow engine providing crash-safe execution, full replay history, and pause/resume signaling — v3.6.0 focuses on intelligence enrichment, operational security, and production reliability at scale.
+  r3ngine v3.6.0 is the production-stabilized, enterprise-grade evolution of the platform. Building off the original reNgine and further inspired by rengine-ng (Check out <a href="https://github.com/Security-Tools-Alliance/rengine-ng" target="_blank">rengine-ng v3</a> if you haven't!) This release delivers a massively expanded <b>Attack Path Modeling Engine</b> (179 rules, MITRE ATT&CK, 10-factor scoring), <b>WPScan/WPTaint SAST integration</b>, <b>Nuclei proxy rotation</b>, <b>session-based LinkedIn OSINT</b>, <b>Tier 7 LLM auto-enrichment</b>, <b>offline hash cracking</b>, <b>intelligent Tier 5 tool gating</b>, and a full <b>Target Editing</b> workflow. The infrastructure remains hardened with <b>Django 5.2.3 LTS</b>, <b>PostgreSQL 16</b>, and <b>Gunicorn + Uvicorn ASGI</b> production serving. Building on the v3.2.0 Celery → Temporal migration — which replaced the legacy at-most-once task broker with a durable workflow engine providing crash-safe execution, full replay history, and pause/resume signaling — v3.6.0 focuses on attack intelligence depth, operational security, and production reliability at scale.
 </p>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
@@ -304,7 +300,7 @@ AI-specific onboarding entrypoints are also available in `AGENTS.md`, `CLAUDE.md
 ### 🛠️ Advanced Scan & Execution Engines
 *   **Burp Suite Professional Integration** (v3.4.0 plugin): Two-phase Temporal sync (import → correlate), bidirectional scope push, filterable issues grid, and live connection health badge.
 *   **Active Directory Intelligence Plugin**: Full AD attack surface analysis — Cytoscape.js graph with 5 layout presets, real-time WebSocket streaming (150 ms batching), paginated findings API, 7-section PDF reports (`ad_modern`, `cyber_pro` templates), and RBAC evidence logs.
-*   **Attack Path Modeling Engine (APME)**: Neo4j-based graph discovery of feasible attack routes (e.g., SQLi → DB Access → Pivot) with 20+ security patterns and automated "Goal Injection".
+*   **Attack Path Modeling Engine (APME)**: Neo4j-based graph discovery of feasible attack routes (e.g., SQLi → DB Access → Pivot) with **179 attack rules** across 13 YAML category files, MITRE ATT&CK attribution, 10-factor confidence scoring, Dijkstra pathfinding with semantic deduplication, constraint-gated (22 gates) feasibility filtering, and automated "Goal Injection".
 *   **Adaptive Stress & Resilience Engine (ASRE)**: `k6`, `wrk`, `hping3`, and `Locust` orchestration with real-time ECharts telemetry via Redis Streams and WebSockets, safety kill-switches, and LLM-powered bottleneck PDF reports.
 *   **Exploit Readiness Layer (ERL)**: Containerized, non-destructive vulnerability validation with native proxy rotation and OpSec compliance built into the adapter layer.
 *   **Autonomous Recon Orchestration**: Temporal durable workflows with crash-safe execution, 10-attempt retry cap, full history replay at `localhost:8080`, and UI-based resume.

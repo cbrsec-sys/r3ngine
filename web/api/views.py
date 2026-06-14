@@ -5371,6 +5371,14 @@ class RunSearchsploitAction(APIView):
         if not query:
             return Response({'status': False, 'message': 'query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
 
+        import os
+        import shutil
+        if not os.path.exists('/root/.searchsploit_rc') and os.path.exists('/usr/src/exploitdb/.searchsploit_rc'):
+            try:
+                shutil.copy('/usr/src/exploitdb/.searchsploit_rc', '/root/.searchsploit_rc')
+            except Exception as e:
+                logger.error(f"Failed to copy searchsploit_rc dynamically: {e}")
+
         cmd = ['searchsploit', '--json', query]
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
