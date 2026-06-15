@@ -10,6 +10,7 @@ import {
   Typography,
   IconButton,
   Tooltip,
+  useTheme,
 } from '@mui/material';
 import { X, Cpu, BookOpen } from 'lucide-react';
 import { useCreateEngine, useFullYamlConfig } from '../api';
@@ -26,6 +27,8 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
   const [refOpen, setRefOpen] = useState(false);
   const createEngine = useCreateEngine();
   const { data: fullConfig } = useFullYamlConfig();
+  const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
 
   useEffect(() => {
     if (fullConfig) {
@@ -54,10 +57,10 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
       slotProps={{
         paper: {
           sx: {
-            bgcolor: '#0a0a0c',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
-            boxShadow: '0 0 30px rgba(0, 243, 255, 0.1)',
-            backgroundImage: 'linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px)',
+            bgcolor: isLight ? 'background.paper' : '#0a0a0c',
+            border: isLight ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(0, 243, 255, 0.2)',
+            boxShadow: isLight ? 'none' : '0 0 30px rgba(0, 243, 255, 0.1)',
+            backgroundImage: isLight ? 'none' : 'linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px)',
             backgroundSize: '20px 20px',
           }
         }
@@ -67,16 +70,17 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid rgba(0, 243, 255, 0.1)',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
         pb: 2
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Cpu size={20} style={{ color: '#00f3ff' }} />
-          <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: '#fff', letterSpacing: 1 }}>
+          <Cpu size={20} style={{ color: isLight ? theme.palette.primary.main : '#00f3ff' }} />
+          <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: 'text.primary', letterSpacing: 1 }}>
             PROVISION NEW ENGINE
           </Typography>
         </Box>
-        <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+        <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
           <X size={20} />
         </IconButton>
       </DialogTitle>
@@ -92,19 +96,19 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
             variant="filled"
             sx={{
               '& .MuiFilledInput-root': {
-                bgcolor: 'rgba(255,255,255,0.03)',
+                bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
                 '&:before, &:after': { display: 'none' },
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#fff',
+                border: isLight ? '1px solid rgba(0,0,0,0.15)' : '1px solid rgba(255,255,255,0.1)',
+                color: 'text.primary',
                 fontFamily: 'monospace'
               },
-              '& .MuiInputLabel-root': { color: 'rgba(0, 243, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }
+              '& .MuiInputLabel-root': { color: isLight ? 'text.secondary' : 'rgba(0, 243, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }
             }}
           />
 
           <Box>
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography sx={{ color: 'rgba(0,243,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
+              <Typography sx={{ color: isLight ? 'text.secondary' : 'rgba(0,243,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
                 YAML CONFIGURATION BLUEPRINT
               </Typography>
               <Tooltip title="View configuration reference">
@@ -112,9 +116,9 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
                   size="small"
                   onClick={() => setRefOpen(true)}
                   sx={{
-                    color: 'rgba(0,243,255,0.6)',
+                    color: isLight ? 'text.secondary' : 'rgba(0,243,255,0.6)',
                     p: 0.5,
-                    '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0,243,255,0.08)' },
+                    '&:hover': { color: isLight ? 'primary.main' : '#00f3ff', bgcolor: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(0,243,255,0.08)' },
                   }}
                 >
                   <BookOpen size={14} />
@@ -131,10 +135,10 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
               variant="filled"
               sx={{
                 '& .MuiFilledInput-root': {
-                  bgcolor: 'rgba(255,255,255,0.03)',
+                  bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
                   '&:before, &:after': { display: 'none' },
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#00f3ff',
+                  border: isLight ? '1px solid rgba(0,0,0,0.15)' : '1px solid rgba(255,255,255,0.1)',
+                  color: isLight ? 'text.primary' : '#00f3ff',
                   fontFamily: 'monospace',
                   fontSize: '0.85rem',
                 },
@@ -144,10 +148,10 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+      <DialogActions sx={{ p: 3, borderTop: '1px solid', borderColor: 'divider' }}>
         <Button
           onClick={onClose}
-          sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}
+          sx={{ color: 'text.secondary', fontFamily: 'Orbitron', fontSize: '0.7rem' }}
         >
           CANCEL
         </Button>
@@ -156,14 +160,14 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
           disabled={!name || !yaml || createEngine.isPending}
           variant="contained"
           sx={{
-            bgcolor: '#00f3ff',
-            color: '#000',
+            bgcolor: isLight ? 'primary.main' : '#00f3ff',
+            color: isLight ? '#fff' : '#000',
             fontFamily: 'Orbitron',
             fontWeight: 900,
             fontSize: '0.75rem',
             px: 4,
-            '&:hover': { bgcolor: '#00d8e6' },
-            '&.Mui-disabled': { bgcolor: 'rgba(0,243,255,0.1)', color: 'rgba(255,255,255,0.2)' }
+            '&:hover': { bgcolor: isLight ? 'primary.dark' : '#00d8e6' },
+            '&.Mui-disabled': { bgcolor: isLight ? 'action.disabledBackground' : 'rgba(0,243,255,0.1)', color: 'action.disabled' }
           }}
         >
           {createEngine.isPending ? 'PROVISIONING...' : 'INITIALIZE ENGINE'}
