@@ -4581,6 +4581,19 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		normalized_value = aliases.get(raw_value, raw_value)
 		return NUCLEI_SEVERITY_MAP.get(normalized_value)
 
+	@classmethod
+	def _normalize_severity_filters(cls, severity_value):
+		if severity_value is None:
+			return []
+
+		raw_values = str(severity_value).split(',')
+		normalized_values = []
+		for raw_value in raw_values:
+			normalized_value = cls._normalize_severity_filter(raw_value)
+			if normalized_value is not None and normalized_value not in normalized_values:
+				normalized_values.append(normalized_value)
+		return normalized_values
+
 	def get_queryset(self):
 		req = self.request
 		project = req.query_params.get('project')
@@ -4628,9 +4641,9 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		if vulnerability_name:
 			qs = qs.filter(Q(name=vulnerability_name)).distinct()
 		if severity:
-			severity_num = self._normalize_severity_filter(severity)
-			if severity_num is not None:
-				qs = qs.filter(severity=severity_num)
+			severity_values = self._normalize_severity_filters(severity)
+			if severity_values:
+				qs = qs.filter(severity__in=severity_values)
 		if validation_status:
 			qs = qs.filter(validation_status__iexact=validation_status)
 		if open_status is not None:
