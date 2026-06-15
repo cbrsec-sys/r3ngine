@@ -14,6 +14,12 @@ python3 manage.py loaddata \
 # Temporary fix for whatportis bug
 sed -i 's/purge()/truncate()/g' "$(python3 -c "import whatportis.cli; print(whatportis.cli.__file__)")"
 
+# Temporary fix for Sublist3r get_csrftoken bug
+if [ -f "/usr/src/github/Sublist3r/sublist3r.py" ]; then
+  sed -i "s/token = csrf_regex.findall(resp)\[0\]/token = csrf_regex.findall(resp)[0] if csrf_regex.findall(resp) else ''/g" /usr/src/github/Sublist3r/sublist3r.py
+fi
+
+
 # update whatportis
 yes | whatportis --update
 

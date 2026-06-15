@@ -415,6 +415,7 @@ RUN git clone --depth 1 https://github.com/shmilylty/OneForAll /usr/src/github/O
 
 RUN git clone --depth 1 https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r && \
     pip3 install -r /usr/src/github/Sublist3r/requirements.txt && \
+    sed -i "s/token = csrf_regex.findall(resp)\[0\]/token = csrf_regex.findall(resp)[0] if csrf_regex.findall(resp) else ''/g" /usr/src/github/Sublist3r/sublist3r.py && \
     rm -rf /usr/src/github/Sublist3r/.git
 
 RUN git clone --depth 1 https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
