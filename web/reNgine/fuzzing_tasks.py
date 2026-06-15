@@ -260,7 +260,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		ffuf_base_cmd += f' -w {wordlist_path}'
 		ffuf_base_cmd += f' -e {extensions_str}' if extensions else ''
 		ffuf_base_cmd += f' -maxtime {max_time}' if max_time > 0 else ''
-		ffuf_base_cmd += f' -p {delay}' if delay > 0 else ''
+		ffuf_base_cmd += f' -rate {rate_limit}' if rate_limit > 0 else ''
 		if recursive_level > 0:
 			ffuf_base_cmd += f' -recursion -recursion-depth {recursive_level}'
 		ffuf_base_cmd += f' -maxtime-job {max_time}' if max_time > 0 else ''

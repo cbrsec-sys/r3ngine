@@ -154,8 +154,8 @@ class OpSecManager:
         flags = []
         if self.settings.enable_random_ua:
             flags.append(f"-H 'User-Agent: {self.get_random_ua(proxy_ip)}'")
-        if self.settings.enable_rate_limit:
-            flags.append(f"-p {1.0 / self.settings.max_rps}")
+        if self.settings.enable_rate_limit and '-rate' not in cmd:
+            flags.append(f"-rate {self.settings.max_rps}")
         return f"{cmd} {' '.join(flags)}"
 
     def _apply_httpx(self, cmd, proxy_ip=None):
