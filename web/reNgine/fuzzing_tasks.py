@@ -274,10 +274,10 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 
 		has_ua = any('user-agent' in h.lower() for h in custom_headers_list)
 		if not has_ua:
-			ffuf_base_cmd += ' -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"'
+			ffuf_base_cmd += " -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'"
 
 		for header in custom_headers_list:
-			ffuf_base_cmd += f' -H "{header}"'
+			ffuf_base_cmd += f" -H '{header}'"
 			if 'cookie' in header.lower() or 'authorization' in header.lower():
 				logger.warning(f'Authenticated FFUF fuzzing enabled via header: {header}')
 
@@ -384,7 +384,8 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 
 				def _run_ffuf():
 					try:
-						fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json'
+						_fuzz_url = target_url if target_url.endswith('/') else target_url + '/'
+						fcmd = ffuf_base_cmd + f' -u {_fuzz_url}FUZZ -json'
 						fcmd += f' -x {proxy}' if proxy else ''
 						fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=proxy)
 

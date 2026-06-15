@@ -181,3 +181,100 @@ class TestFfufDefaultMatchStatus(TestCase):
             len(set(FFUF_DEFAULT_MATCH_HTTP_STATUS)),
             "FFUF_DEFAULT_MATCH_HTTP_STATUS must not contain duplicates"
         )
+
+
+class TestFfufUrlAndHeaderConstruction(TestCase):
+    """Bug #5: FUZZ must always follow a /. Bug #6: header values must be single-quoted."""
+
+    BASE_CONFIG = {
+        'dir_file_fuzz': {
+            'auto_calibration': False,
+            'rate_limit': 0,
+            'threads': 10,
+            'wordlist_name': 'dicc',
+            'extensions': [],
+            'match_http_status': [200],
+            'recursive_level': 0,
+            'max_time': 0,
+            'stop_on_error': False,
+            'follow_redirect': False,
+            'timeout': 10,
+            'custom_header': [],
+        }
+    }
+
+    # --- Bug #5: URL path separator ---
+
+    def test_fuzz_keyword_has_leading_slash_when_url_has_no_trailing_slash(self):
+        """URLs without trailing slash must get / inserted before FUZZ."""
+        captured_cmds = []
+
+        def fake_stream(cmd, **kwargs):
+            captured_cmds.append(cmd)
+            return iter([])
+
+        config = {'dir_file_fuzz': {**self.BASE_CONFIG['dir_file_fuzz']}}
+        proxy = _make_proxy(config)
+        ctx = {"urls_override": ["http://example.com/api"]}  # no trailing slash
+
+        def _fake_ensure(task_proxy, func, ctx, description=None):
+            return func(ctx=ctx, description=description)
+
+        with patch('reNgine.fuzzing_tasks.ensure_endpoints_crawled_and_execute',
+                   side_effect=_fake_ensure), \
+             patch('os.path.exists', return_value=False), \
+             patch('reNgine.api_tasks.resolve_wordlist_path',
+                   side_effect=lambda cfg, path: path), \
+             patch('reNgine.fuzzing_tasks.stream_command', side_effect=fake_stream), \
+             patch('reNgine.fuzzing_tasks.run_command', return_value=None), \
+             patch('reNgine.fuzzing_tasks.DirectoryScan') as mock_ds, \
+             patch('reNgine.fuzzing_tasks.Subdomain'), \
+             patch('reNgine.fuzzing_tasks.ScanHistory'), \
+             patch('reNgine.fuzzing_tasks.Redis'), \
+             patch('reNgine.fuzzing_tasks.OpSecManager') as mock_opsec, \
+             patch('reNgine.fuzzing_tasks.get_random_proxy', return_value=None), \
+             patch('reNgine.fuzzing_tasks._fuzz_target_marker', return_value='/tmp/no_marker'), \
+             patch('reNgine.tasks.http_crawl', return_value=None), \
+             patch('builtins.open', MagicMock()):
+            mock_ds.objects.create.return_value = MagicMock()
+            mock_opsec.return_value.apply_stealth = MagicMock(side_effect=lambda t, c, proxy=None: c)
+            dir_file_fuzz(proxy, ctx=ctx)
+
+        self.assertTrue(len(captured_cmds) > 0, "stream_command should have been called")
+        for cmd in captured_cmds:
+            self.assertIn('/FUZZ', cmd,
+                          f"FUZZ must be preceded by /. Got: {cmd}")
+            self.assertNotIn('apiFUZZ', cmd,
+                             f"FUZZ must not be appended directly to path segment. Got: {cmd}")
+
+    # --- Bug #6: Custom header quoting ---
+
+    def test_custom_header_uses_single_quotes(self):
+        """Custom headers must be wrapped in single quotes to avoid shell breakage."""
+        config = {
+            'dir_file_fuzz': {
+                **self.BASE_CONFIG['dir_file_fuzz'],
+                'custom_header': ['Authorization: Bearer mytoken'],
+            }
+        }
+        result = _prepare(config)
+        self.assertIsNotNone(result, "_prepare() must return a dict, not None")
+        self.assertIn('ffuf_base_cmd', result, "prepare_only=True must return ffuf_base_cmd key")
+        cmd = result['ffuf_base_cmd']
+        self.assertIn("-H 'Authorization: Bearer mytoken'", cmd,
+                      f"Header must use single quotes. Got: {cmd}")
+
+    def test_custom_header_double_quote_in_value_is_safe(self):
+        """A header value containing a double-quote must be safely wrapped in single quotes."""
+        config = {
+            'dir_file_fuzz': {
+                **self.BASE_CONFIG['dir_file_fuzz'],
+                'custom_header': ['X-Test: val"ue'],
+            }
+        }
+        result = _prepare(config)
+        self.assertIsNotNone(result, "_prepare() must return a dict, not None")
+        self.assertIn('ffuf_base_cmd', result, "prepare_only=True must return ffuf_base_cmd key")
+        cmd = result['ffuf_base_cmd']
+        self.assertIn("-H 'X-Test: val\"ue'", cmd,
+                      f"Double-quote inside value must remain inside single quotes. Got: {cmd}")
