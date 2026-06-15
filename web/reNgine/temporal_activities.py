@@ -2701,6 +2701,22 @@ def run_sshaudit_activity(ctx: dict) -> bool:
 
 @activity.defn(name="RunSearchsploitActivity")
 def run_searchsploit_activity(ctx: dict) -> bool:
+    import os
+    yaml_config = ctx.get('yaml_configuration') or {}
+    
+    # Check if disabled via environment variable or YAML configuration
+    disable_env = os.environ.get('DISABLE_SEARCHSPLOIT', '').lower() in ('true', '1', 'yes')
+    disable_yaml = (
+        yaml_config.get('vulnerability_scan', {}).get('run_searchsploit') is False or
+        yaml_config.get('port_scan', {}).get('run_searchsploit') is False or
+        yaml_config.get('run_searchsploit') is False or
+        yaml_config.get('searchsploit') is False
+    )
+    
+    if disable_env or disable_yaml:
+        activity.logger.info("[RunSearchsploitActivity] searchsploit is disabled by configuration, skipping.")
+        return True
+
     from reNgine.recon_tasks import searchsploit_scan
     activity.logger.info("[RunSearchsploitActivity] scan_id=%s", ctx.get('scan_history_id'))
     return _run_task(
@@ -2708,6 +2724,7 @@ def run_searchsploit_activity(ctx: dict) -> bool:
         description='Exploit Search (searchsploit)',
         service=ctx.get('service', ''), version=ctx.get('version'),
     )
+
 
 
 @activity.defn(name="RunWPProbeActivity")
