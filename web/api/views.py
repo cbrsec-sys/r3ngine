@@ -4595,6 +4595,18 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 				normalized_values.append(normalized_value)
 		return normalized_values
 
+	@staticmethod
+	def _normalize_csv_filters(raw_value):
+		if raw_value is None:
+			return []
+
+		normalized_values = []
+		for value in str(raw_value).split(','):
+			normalized_value = value.strip()
+			if normalized_value and normalized_value.lower() not in [item.lower() for item in normalized_values]:
+				normalized_values.append(normalized_value)
+		return normalized_values
+
 	def get_queryset(self):
 		req = self.request
 		project = req.query_params.get('project')
@@ -4653,7 +4665,12 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 			elif open_status.lower() in ('false', '0', 'f', 'n', 'no'):
 				qs = qs.filter(open_status=False)
 		if source:
-			qs = qs.filter(source__icontains=source)
+			source_values = self._normalize_csv_filters(source)
+			if source_values:
+				source_query = Q()
+				for source_value in source_values:
+					source_query |= Q(source__iexact=source_value)
+				qs = qs.filter(source_query)
 		if subdomain_id:
 			qs = qs.filter(subdomain__id=subdomain_id)
 		self.queryset = qs

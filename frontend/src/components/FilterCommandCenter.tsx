@@ -57,7 +57,19 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
   };
 
   const handleSelectFacetValue = (facetId: string, value: string) => {
-    onFilterChange({ ...filters, [facetId]: value });
+    const currentValues = filters[facetId]
+      ? filters[facetId].split(',').map((item) => item.trim()).filter(Boolean)
+      : [];
+    const nextValues = currentValues.includes(value)
+      ? currentValues.filter((item) => item !== value)
+      : [...currentValues, value];
+    const nextFilters = { ...filters };
+    if (nextValues.length > 0) {
+      nextFilters[facetId] = nextValues.join(',');
+    } else {
+      delete nextFilters[facetId];
+    }
+    onFilterChange(nextFilters);
     handleCloseFilters();
   };
 
