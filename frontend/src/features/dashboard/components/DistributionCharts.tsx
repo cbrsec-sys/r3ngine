@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { getSeverityColor, getChartSeriesColors, getSurfaceSx } from '../../../theme/semanticColors';
 import {
   Box,
   Card,
@@ -34,15 +35,10 @@ interface CWEInfo {
   severity: string;
 }
 
-const CWE_COLORS = [
-  '#7000ff', '#9020f0', '#b040ff', '#5500cc',
-  '#c060ff', '#4400aa', '#d080ff', '#330088',
-];
-
 const ChartCard: React.FC<{ title: React.ReactNode; children: React.ReactNode; height?: number | string }> = ({ title, children, height }) => {
-  const { theme, isLight, tokens } = useThemeTokens();
+  const { isLight, tokens } = useThemeTokens();
   return (
-  <Card sx={{ height: height || '100%', minHeight: 320, bgcolor: 'rgba(5, 5, 15, 0.6)', backdropFilter: 'blur(10px)', border: '1px solid rgba(0, 243, 255, 0.1)' }}>
+  <Card sx={{ height: height || '100%', minHeight: 320, ...getSurfaceSx(isLight, tokens) }}>
     <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
       {typeof title === 'string' ? (
         <Typography variant="h6" sx={{ mb: 2, fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: 'primary.main', fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>
@@ -60,15 +56,24 @@ const ChartCard: React.FC<{ title: React.ReactNode; children: React.ReactNode; h
 };
 
 const SeverityBadge: React.FC<{ severity: number | string; label?: string }> = ({ severity, label }) => {
-  const { theme, isLight, tokens } = useThemeTokens();
+  const { tokens } = useThemeTokens();
   const getSeverityInfo = (sev: number | string) => {
     const sevNum = typeof sev === 'string' ? parseInt(sev) : sev;
-    if (sev === 'critical' || sevNum === 4) return { label: label || 'CRITICAL', color: '#ff003c' };
-    if (sev === 'high' || sevNum === 3) return { label: label || 'HIGH', color: '#ff9f00' };
-    if (sev === 'medium' || sevNum === 2) return { label: label || 'MEDIUM', color: '#fffc00' };
-    if (sev === 'low' || sevNum === 1) return { label: label || 'LOW', color: '#00ff62' };
-    if (sev === 'info' || sevNum === 0) return { label: label || 'INFO', color: tokens.accent.primary };
-    return { label: label || 'UNKNOWN', color: '#7000ff' };
+    let level: 'critical' | 'high' | 'medium' | 'low' | 'info' | 'unknown' = 'unknown';
+    if (sev === 'critical' || sevNum === 4) level = 'critical';
+    else if (sev === 'high' || sevNum === 3) level = 'high';
+    else if (sev === 'medium' || sevNum === 2) level = 'medium';
+    else if (sev === 'low' || sevNum === 1) level = 'low';
+    else if (sev === 'info' || sevNum === 0) level = 'info';
+    const labels: Record<string, string> = {
+      critical: label || 'CRITICAL',
+      high: label || 'HIGH',
+      medium: label || 'MEDIUM',
+      low: label || 'LOW',
+      info: label || 'INFO',
+      unknown: label || 'UNKNOWN',
+    };
+    return { label: labels[level], color: getSeverityColor(level, tokens) };
   };
 
   const info = getSeverityInfo(severity);
@@ -92,12 +97,30 @@ const SeverityBadge: React.FC<{ severity: number | string; label?: string }> = (
 
 export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) => {
   const { theme, isLight, tokens } = useThemeTokens();
+  const CWE_COLORS = getChartSeriesColors(tokens);
+  const severityChartColors = [
+    tokens.severity.critical,
+    tokens.severity.high,
+    tokens.severity.medium,
+    tokens.severity.low,
+    tokens.severity.info,
+    tokens.severity.unknown,
+  ];
+  const tableHeaderSx = {
+    bgcolor: isLight ? theme.palette.background.paper : 'rgba(10, 10, 20, 0.95)',
+    fontSize: '0.65rem',
+    fontWeight: 800,
+    borderBottom: `1px solid ${tokens.border.subtle}`,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 1,
+  };
+  const emptyCountColor = isLight ? tokens.text.disabled : 'rgba(255,255,255,0.1)';
   const getCvssColor = (score: number) => {
-    if (score >= 9.0) return '#ff003c';
-    if (score >= 7.0) return '#ff9f00';
-    if (score >= 4.0) return '#fffc00';
-    if (score > 0.0) return '#00ff62';
-    return isLight ? theme.palette.primary.main : '#00f3ff';
+    if (score >= 9.0) return tokens.severity.critical;
+    if (score >= 7.0) return tokens.severity.high;
+    if (score >= 4.0) return tokens.severity.medium;
+    if (score > 0.0) return tokens.severity.low;
+    return tokens.accent.primary;
   };
   const [viewMode, setViewMode] = useState<'cve' | 'cwe'>('cve');
   
@@ -209,7 +232,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               options={{
                 ...donutOptions,
                 labels: ['Critical', 'High', 'Medium', 'Low', 'Info', 'Unknown'],
-                colors: ['#ff003c', '#ff9f00', '#fffc00', '#00ff62', tokens.accent.primary, '#7000ff']
+                colors: severityChartColors
               }}
               series={[
                 data.kpis.critical_count,
@@ -231,33 +254,33 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase', letterSpacing: 1 }}>Target Name</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: '#ff003c', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase' }}>Critical</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: '#ff9f00', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase' }}>High</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: '#fffc00', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase' }}>Med</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: '#00ff62', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase' }}>Low</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: tokens.accent.primary, fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase' }}>Total</TableCell>
+                    <TableCell sx={{ ...tableHeaderSx, color: theme.palette.text.secondary }}>Target Name</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: tokens.severity.critical }}>Critical</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: tokens.severity.high }}>High</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: tokens.severity.medium }}>Med</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: tokens.severity.low }}>Low</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: tokens.accent.primary }}>Total</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {data.most_vulnerable_targets.map((target, index) => (
-                    <TableRow key={index} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
-                      <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', py: 1 }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: '#c7c7c7ff' }}>{target.name}</Typography>
+                    <TableRow key={index} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                      <TableCell sx={{ borderBottom: `1px solid ${theme.palette.divider}`, py: 1 }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: theme.palette.text.primary }}>{target.name}</Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.critical_count > 0 ? '#ff003c' : 'rgba(255,255,255,0.1)' }}>{target.critical_count}</Typography>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.critical_count > 0 ? tokens.severity.critical : emptyCountColor }}>{target.critical_count}</Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.high_count > 0 ? '#ff9f00' : 'rgba(255,255,255,0.1)' }}>{target.high_count}</Typography>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.high_count > 0 ? tokens.severity.high : emptyCountColor }}>{target.high_count}</Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.medium_count > 0 ? '#fffc00' : 'rgba(255,255,255,0.1)' }}>{target.medium_count}</Typography>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.medium_count > 0 ? tokens.severity.medium : emptyCountColor }}>{target.medium_count}</Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.low_count > 0 ? '#00ff62' : 'rgba(255,255,255,0.1)' }}>{target.low_count}</Typography>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.low_count > 0 ? tokens.severity.low : emptyCountColor }}>{target.low_count}</Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
                         <Box sx={{ px: 1, py: 0.25, borderRadius: 0.5, bgcolor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0, 243, 255, 0.1)', display: 'inline-block' }}>
                           <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 800, color: tokens.accent.primary }}>{target.vuln_count}</Typography>
                         </Box>
@@ -290,9 +313,9 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase', letterSpacing: 1 }}>Vulnerability Name</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase', letterSpacing: 1 }}>Severity</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: 'rgba(10, 10, 20, 0.95)', color: 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 800, borderBottom: '1px solid rgba(0, 243, 255, 0.2)', textTransform: 'uppercase', letterSpacing: 1 }}>Count</TableCell>
+                    <TableCell sx={{ ...tableHeaderSx, color: theme.palette.text.secondary }}>Vulnerability Name</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: theme.palette.text.secondary }}>Severity</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: theme.palette.text.secondary }}>Count</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>

@@ -13,6 +13,7 @@ import 'cytoscape-context-menus/cytoscape-context-menus.css';
 import type { GraphData } from '../api/graphApi';
 import { useGraphStore } from '../../../store/useGraphStore';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { getChartSeriesColors } from '../../../theme/semanticColors';
 
 cytoscape.use(fcose);
 cytoscape.use(klay);
@@ -26,14 +27,9 @@ interface GraphCanvasProps {
   onInit?: (cy: cytoscape.Core) => void;
 }
 
-import { themeTokens } from '../../../theme/tokens';
-const SCAN_COLORS = [
-  themeTokens.hacker.accent.primary, '#7000ff', '#ff00f7', '#ff003c', '#ff9f00', 
-  '#fffc00', '#00ff62', '#2196f3', '#ec4899', '#8b5cf6'
-];
-
 export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, searchQuery, onInit }) => {
   const { tokens } = useThemeTokens();
+  const scanColors = getChartSeriesColors(tokens);
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   const { setSelectedNode } = useGraphStore();
@@ -66,7 +62,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
     
     const colorMap: Record<number, string> = {};
     Array.from(uniqueScans).forEach((id, index) => {
-        colorMap[id] = SCAN_COLORS[index % SCAN_COLORS.length];
+        colorMap[id] = scanColors[index % scanColors.length];
     });
 
     const cy = cytoscape({

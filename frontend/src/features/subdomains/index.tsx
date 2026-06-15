@@ -42,11 +42,14 @@ import {
 } from 'lucide-react';
 
 import { useThemeTokens } from '../../theme/useThemeTokens';
+import { getHttpStatusColor } from '../../theme/semanticColors';
 import { useSubdomains } from './api';
 import { TacticalPanel } from '../../components/TacticalPanel';
 
 export const SubdomainsPage: React.FC = () => {
   const { tokens } = useThemeTokens();
+
+  const getStatusColor = (status: number) => getHttpStatusColor(status, tokens);
   const { projectSlug } = useParams({ from: '/$projectSlug/subdomains' });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -96,14 +99,6 @@ export const SubdomainsPage: React.FC = () => {
   const handleActionClose = () => {
     setAnchorEl(null);
     setSelectedId(null);
-  };
-
-  const getStatusColor = (status: number) => {
-    if (status >= 200 && status < 300) return '#00ffaa';
-    if (status >= 300 && status < 400) return '#00f3ff';
-    if (status >= 400 && status < 500) return '#ffae00';
-    if (status >= 500) return '#ff003c';
-    return '#888';
   };
 
   return (
