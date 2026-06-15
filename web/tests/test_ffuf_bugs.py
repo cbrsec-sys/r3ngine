@@ -335,3 +335,122 @@ class TestFfufMaxtimeJob(TestCase):
         cmd = result['ffuf_base_cmd']
         self.assertNotIn('-maxtime-job', cmd,
                          "Non-recursive scan must not have -maxtime-job flag")
+
+
+class TestFfufStreamingHeartbeat(TestCase):
+    """Bug #7: ffuf must not be routed to Go executor (blocks heartbeats)."""
+
+    BASE_CONFIG = {
+        'dir_file_fuzz': {
+            'auto_calibration': False,
+            'rate_limit': 0,
+            'threads': 10,
+            'wordlist_name': 'dicc',
+            'extensions': [],
+            'match_http_status': [200],
+            'recursive_level': 0,
+            'max_time': 0,
+            'stop_on_error': False,
+            'follow_redirect': False,
+            'timeout': 10,
+        }
+    }
+
+    def _run_with_fake_stream(self, stream_side_effect):
+        """Helper: run dir_file_fuzz with a fake stream_command and return captured kwargs."""
+        captured_kwargs = {}
+
+        def fake_stream(cmd, **kwargs):
+            captured_kwargs.update(kwargs)
+            if callable(stream_side_effect):
+                return stream_side_effect()
+            return iter(stream_side_effect)
+
+        proxy = _make_proxy(self.BASE_CONFIG)
+        ctx = {"urls_override": ["http://example.com/"]}
+
+        def _fake_ensure(task_proxy, func, ctx, description=None):
+            return func(ctx=ctx, description=description)
+
+        # _fuzz_target_marker returns a path ending in .marker so the
+        # os.path.exists patch (which returns False for .marker paths) prevents
+        # the "already fuzzed" skip, while returning True for wordlist paths.
+        with patch('reNgine.fuzzing_tasks.ensure_endpoints_crawled_and_execute',
+                   side_effect=_fake_ensure), \
+             patch('os.path.exists', side_effect=lambda p: not p.endswith('.marker')), \
+             patch('reNgine.api_tasks.resolve_wordlist_path',
+                   side_effect=lambda cfg, path: path), \
+             patch('reNgine.fuzzing_tasks.stream_command', side_effect=fake_stream), \
+             patch('reNgine.fuzzing_tasks.DirectoryScan') as mock_ds, \
+             patch('reNgine.fuzzing_tasks.Subdomain'), \
+             patch('reNgine.fuzzing_tasks.ScanHistory'), \
+             patch('reNgine.fuzzing_tasks.Redis'), \
+             patch('reNgine.fuzzing_tasks.OpSecManager') as mock_opsec, \
+             patch('reNgine.fuzzing_tasks.get_random_proxy', return_value=None), \
+             patch('reNgine.fuzzing_tasks._fuzz_target_marker',
+                   return_value='/tmp/no_marker.marker'), \
+             patch('reNgine.fuzzing_tasks.run_command'), \
+             patch('reNgine.tasks.http_crawl'), \
+             patch('builtins.open', MagicMock()):
+            mock_ds.objects.create.return_value = MagicMock()
+            mock_opsec.return_value.apply_stealth = MagicMock(
+                side_effect=lambda t, c, proxy=None: c)
+            dir_file_fuzz(proxy, ctx=ctx)
+
+        return captured_kwargs
+
+    def test_stream_command_not_routed_to_executor(self):
+        """stream_command must be called with route_to_executor=False for ffuf."""
+        captured_kwargs = self._run_with_fake_stream([])
+
+        self.assertIn('route_to_executor', captured_kwargs,
+                      "stream_command must receive route_to_executor kwarg")
+        self.assertFalse(captured_kwargs['route_to_executor'],
+                         "ffuf stream_command must have route_to_executor=False")
+
+    def test_heartbeat_fires_after_batch_fills(self):
+        """activity_heartbeat_safe must be called after every 100 results."""
+        fake_result = {
+            'url': 'http://example.com/found',
+            'status': 200,
+            'length': 512,
+            'words': 20,
+            'lines': 10,
+            'content-type': 'text/html',
+            'duration': 1000000,
+        }
+        # 101 results so the first batch of 100 flushes and heartbeat fires
+        fake_results = [dict(fake_result, url=f'http://example.com/found{i}')
+                        for i in range(101)]
+
+        proxy = _make_proxy(self.BASE_CONFIG)
+        ctx = {"urls_override": ["http://example.com/"]}
+
+        def _fake_ensure(task_proxy, func, ctx, description=None):
+            return func(ctx=ctx, description=description)
+
+        with patch('reNgine.fuzzing_tasks.ensure_endpoints_crawled_and_execute',
+                   side_effect=_fake_ensure), \
+             patch('os.path.exists', side_effect=lambda p: not p.endswith('.marker')), \
+             patch('reNgine.api_tasks.resolve_wordlist_path',
+                   side_effect=lambda cfg, path: path), \
+             patch('reNgine.fuzzing_tasks.stream_command', return_value=iter(fake_results)), \
+             patch('reNgine.fuzzing_tasks.DirectoryScan') as mock_ds, \
+             patch('reNgine.fuzzing_tasks.Subdomain'), \
+             patch('reNgine.fuzzing_tasks.ScanHistory'), \
+             patch('reNgine.fuzzing_tasks.Redis'), \
+             patch('reNgine.fuzzing_tasks.OpSecManager') as mock_opsec, \
+             patch('reNgine.fuzzing_tasks.get_random_proxy', return_value=None), \
+             patch('reNgine.fuzzing_tasks._fuzz_target_marker',
+                   return_value='/tmp/no_marker.marker'), \
+             patch('reNgine.fuzzing_tasks.run_command'), \
+             patch('reNgine.tasks.http_crawl'), \
+             patch('builtins.open', MagicMock()), \
+             patch('reNgine.fuzzing_tasks._flush_ffuf_batch'), \
+             patch('reNgine.fuzzing_tasks.activity_heartbeat_safe') as mock_heartbeat:
+            mock_ds.objects.create.return_value = MagicMock()
+            mock_opsec.return_value.apply_stealth = MagicMock(
+                side_effect=lambda t, c, proxy=None: c)
+            dir_file_fuzz(proxy, ctx=ctx)
+
+        mock_heartbeat.assert_called()
