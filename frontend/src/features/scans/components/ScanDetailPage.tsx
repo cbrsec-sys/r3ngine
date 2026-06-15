@@ -104,6 +104,7 @@ import { ScanReportModal } from './ScanReportModal';
 import { StartScanModal } from './StartScanModal';
 import { OsintTab } from './OsintTab';
 import { AttackPathsTab } from './AttackPathsTab';
+import { AiExportModal } from './AiExportModal';
 import { usePlugins } from '../../plugins/api/pluginsApi';
 import PluginComponent from '../../plugins/components/PluginComponent';
 import PluginComponentLoader from '../../plugins/components/PluginComponentLoader';
@@ -1341,6 +1342,7 @@ export const ScanDetailPage = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
   const [reportModalOpen, setReportModalOpen] = useState(false);
+  const [aiExportModalOpen, setAiExportModalOpen] = useState(false);
   const [startScanTargets, setStartScanTargets] = useState<{ ids: number[]; names: string[] } | null>(null);
   const [taskOverlayOpen, setTaskOverlayOpen] = useState(false);
   const [selectedActivity, setSelectedActivity] = useState<{ id: number; title: string } | null>(null);
@@ -2050,6 +2052,23 @@ export const ScanDetailPage = () => {
               )}
               <Button
                 variant="contained"
+                startIcon={<Brain size={16} />}
+                onClick={() => setAiExportModalOpen(true)}
+                sx={{
+                  bgcolor: 'rgba(255, 193, 7, 0.08)',
+                  color: isLight ? '#9a6700' : '#fffc00',
+                  border: isLight ? '1px solid rgba(154, 103, 0, 0.25)' : '1px solid rgba(255, 252, 0, 0.28)',
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  px: 2,
+                  '&:hover': { bgcolor: isLight ? 'rgba(154, 103, 0, 0.12)' : 'rgba(255, 252, 0, 0.16)' }
+                }}
+              >
+                EXPORT FOR AI
+              </Button>
+              <Button
+                variant="contained"
                 startIcon={<FileText size={16} />}
                 onClick={() => setReportModalOpen(true)}
                 sx={{
@@ -2251,6 +2270,13 @@ export const ScanDetailPage = () => {
         open={reportModalOpen}
         onClose={() => setReportModalOpen(false)}
         scanId={parseInt(scanId)}
+      />
+      <AiExportModal
+        open={aiExportModalOpen}
+        onClose={() => setAiExportModalOpen(false)}
+        projectSlug={projectSlug}
+        scanId={parseInt(scanId)}
+        targetName={data.target_info.name}
       />
 
       <TaskOverlay

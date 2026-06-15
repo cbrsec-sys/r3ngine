@@ -531,9 +531,45 @@ def initiate_subscan_temporal(
 		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
 		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
+		# ---- Skip subscan types that are already active for this subdomain ----
+		active_statuses = [INITIATED_TASK, RUNNING_TASK, PAUSED_TASK]
+		existing_active_subscans = (
+			SubScan.objects
+			.filter(
+				scan_history=scan,
+				subdomain=subdomain,
+				type__in=scan_types,
+				status__in=active_statuses,
+			)
+			.order_by('-start_scan_date')
+		)
+		existing_active_by_type = {subscan.type: subscan for subscan in existing_active_subscans}
+		pending_scan_types = [stype for stype in scan_types if stype not in existing_active_by_type]
+
+		if not pending_scan_types:
+			existing_workflow_id = next(
+				(
+					workflow_id
+					for subscan in existing_active_subscans
+					for workflow_id in (subscan.workflow_ids or [])
+					if workflow_id
+				),
+				None,
+			)
+			logger.info(
+				f"Skipping duplicate subscan launch for subdomain_id={subdomain.id}. "
+				f"Active types already exist: {scan_types}. existing_workflow_id={existing_workflow_id}"
+			)
+			return {
+				'success': True,
+				'workflow_id': existing_workflow_id,
+				'skipped': True,
+				'skipped_scan_types': scan_types,
+			}
+
 		# ---- Create scan activity records of SubScan Model ----
 		subscans_info = []
-		for stype in scan_types:
+		for stype in pending_scan_types:
 			subscan = SubScan(
 				start_scan_date=timezone.now(),
 				workflow_ids=[],
@@ -557,7 +593,7 @@ def initiate_subscan_temporal(
 		os.makedirs(subscan_results_dir, exist_ok=True)
 
 		# ---- Update scan's tasks list ----
-		for stype in scan_types:
+		for stype in pending_scan_types:
 			if stype not in scan.tasks:
 				scan.tasks.append(stype)
 		scan.save()
@@ -671,7 +707,7 @@ def initiate_subscan_temporal(
 					)
 					handle = await client.start_workflow(
 						"SubScanWorkflow",
-						args=[temporal_ctx, scan_types],
+						args=[temporal_ctx, pending_scan_types],
 						id=workflow_id,
 						task_queue="python-orchestrator-queue",
 						execution_timeout=timedelta(days=7),
@@ -698,7 +734,7 @@ def initiate_subscan_temporal(
 
 		logger.info(
 			f"Started SubScanWorkflow id={started_workflow_id} "
-			f"for subscan_id={first_subscan_id} (types={scan_types})"
+			f"for subscan_id={first_subscan_id} (types={pending_scan_types})"
 		)
 
 		# Save workflow ID in all subscans' workflow_ids list
@@ -709,6 +745,7 @@ def initiate_subscan_temporal(
 		return {
 			'success': True,
 			'workflow_id': started_workflow_id,
+			'started_scan_types': pending_scan_types,
 		}
 
 	except Exception as e:
