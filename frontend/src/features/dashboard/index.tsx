@@ -11,8 +11,10 @@ import { useAppContext } from '../../context/AppContext';
 
 
 import { useParams } from '@tanstack/react-router';
+import { useThemeTokens } from '../../theme/useThemeTokens';
 
 export const DashboardPage: React.FC = () => {
+  const { tokens, isLight } = useThemeTokens();
   const { setVersion, setProjectName } = useAppContext();
   const { projectSlug = 'default' } = useParams({ strict: false });
   const { data, isLoading, error } = useDashboardData(projectSlug);
@@ -56,14 +58,14 @@ export const DashboardPage: React.FC = () => {
           fontFamily: 'Orbitron',
           mb: 1,
           letterSpacing: 3,
-          textShadow: '0 0 25px rgba(0, 243, 255, 0.6), 0 0 10px rgba(0, 243, 255, 0.4)',
-          color: '#fff',
+          textShadow: isLight ? 'none' : '0 0 25px rgba(0, 243, 255, 0.6), 0 0 10px rgba(0, 243, 255, 0.4)',
+          color: isLight ? 'text.primary' : '#fff',
           textTransform: 'uppercase'
         }}>
           {data.project_info.name.toUpperCase()} Dashboard
         </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(0, 243, 255, 0.6)', display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700, letterSpacing: 1 }}>
-          <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', boxShadow: '0 0 10px #00f3ff' }} />
+        <Typography variant="body2" sx={{ color: isLight ? 'text.secondary' : 'rgba(0, 243, 255, 0.6)', display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700, letterSpacing: 1 }}>
+          <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', boxShadow: isLight ? 'none' : '0 0 10px #00f3ff' }} />
           REAL-TIME TACTICAL INTELLIGENCE FEED
         </Typography>
       </Box>
