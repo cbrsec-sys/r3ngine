@@ -40,19 +40,135 @@ import {
   ChevronRight,
   Target,
   Pencil,
+  PauseCircle,
+  Pause,
 } from 'lucide-react';
 import { useDomains, useDeleteTargets } from '../api';
+import { usePauseScan, useUnpauseScan } from '../../scans/api';
 import { useParams, Link } from '@tanstack/react-router';
 import { AddTargetModal } from './AddTargetModal';
 import { EditTargetModal } from './EditTargetModal';
 import { StartScanModal } from '../../scans/components/StartScanModal';
 import type { Domain } from '../types';
 import type { ExtendedDomain } from './EditTargetModal';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { useTheme } from '@mui/material/styles';
+
+const ScanStatusCell: React.FC<{ status?: string, progress?: number }> = ({ status, progress = 0 }) => {
+  const { tokens } = useThemeTokens();
+  
+  if (!status || status === 'NEW') {
+    return (
+      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        new
+      </Typography>
+    );
+  }
+
+  if (status === 'RUNNING' || status === 'INITITATED') {
+    return (
+      <Box sx={{ minWidth: 100, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              color: tokens.accent.primary, 
+              fontWeight: 800, 
+              textTransform: 'uppercase', 
+              letterSpacing: 0.5, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 0.5 
+            }}
+          >
+            <Box 
+              sx={{ 
+                width: 6, 
+                height: 6, 
+                bgcolor: tokens.accent.primary, 
+                borderRadius: '50%', 
+                animation: 'pulse 1.5s infinite',
+                '@keyframes pulse': {
+                  '0%': { transform: 'scale(0.85)', opacity: 0.5 },
+                  '50%': { transform: 'scale(1.2)', opacity: 1 },
+                  '100%': { transform: 'scale(0.85)', opacity: 0.5 }
+                }
+              }} 
+            />
+            {status === 'INITITATED' ? 'starting' : 'running'}
+          </Typography>
+          <Typography variant="caption" sx={{ color: 'text.primary', fontWeight: 800 }}>{progress}%</Typography>
+        </Box>
+        <LinearProgress 
+          variant="determinate" 
+          value={progress} 
+          sx={{ 
+            height: 4, 
+            borderRadius: 2,
+            bgcolor: 'action.hover',
+            '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary }
+          }} 
+        />
+      </Box>
+    );
+  }
+
+  if (status === 'SUCCESS') {
+    return (
+      <Typography variant="caption" sx={{ color: tokens.accent.success, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        done
+      </Typography>
+    );
+  }
+
+  if (status === 'FAILED') {
+    return (
+      <Typography variant="caption" sx={{ color: tokens.accent.error, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        failed
+      </Typography>
+    );
+  }
+
+  if (status === 'ABORTED') {
+    return (
+      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        aborted
+      </Typography>
+    );
+  }
+
+  if (status === 'PAUSED') {
+    return (
+      <Typography variant="caption" sx={{ color: tokens.accent.warning, fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        paused
+      </Typography>
+    );
+  }
+
+  return (
+    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      {status.toLowerCase()}
+    </Typography>
+  );
+};
 
 export const TargetList: React.FC = () => {
+  const theme = useTheme();
+  const { tokens } = useThemeTokens();
+  const headerStyles = {
+    color: theme.palette.text.secondary,
+    fontWeight: 800,
+    fontFamily: 'var(--r3-heading-font)',
+    fontSize: '0.75rem',
+    letterSpacing: 1,
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    py: 1.5,
+  };
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: domains, isLoading, error } = useDomains(projectSlug);
   const { mutate: deleteTargets } = useDeleteTargets(projectSlug);
+  const pauseScanMutation = usePauseScan(projectSlug);
+  const unpauseScanMutation = useUnpauseScan(projectSlug);
   
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
   const [editTarget, setEditTarget] = React.useState<ExtendedDomain | null>(null);
@@ -119,11 +235,11 @@ export const TargetList: React.FC = () => {
     <Box sx={{ p: 3 }}>
       {/* Top Breadcrumb Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h5" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', letterSpacing: 1 }}>
+        <Typography variant="h5" sx={{ fontFamily: 'var(--r3-heading-font)', fontWeight: 900, color: 'text.primary', letterSpacing: 1 }}>
           TARGETS
         </Typography>
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'Orbitron' }}>
-          Targets {'>'} <span style={{ color: 'rgba(255,255,255,0.7)' }}>All Targets</span>
+        <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'var(--r3-heading-font)' }}>
+          Targets {'>'} <Box component="span" sx={{ color: 'text.secondary' }}>All Targets</Box>
         </Typography>
       </Box>
 
@@ -232,7 +348,7 @@ export const TargetList: React.FC = () => {
               width: 280,
               '& .MuiOutlinedInput-root': {
                 color: '#fff',
-                bgcolor: 'rgba(255,255,255,0.05)',
+                bgcolor: 'action.hover',
                 '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
               }
             }}
@@ -257,7 +373,7 @@ export const TargetList: React.FC = () => {
               size="small"
               sx={{ 
                 color: '#fff',
-                bgcolor: 'rgba(255,255,255,0.05)',
+                bgcolor: 'action.hover',
                 height: 32,
                 fontSize: '0.75rem',
                 fontFamily: 'Orbitron',
@@ -288,6 +404,7 @@ export const TargetList: React.FC = () => {
                 <TableCell sx={headerStyles}>DESCRIPTION</TableCell>
                 <TableCell sx={headerStyles}>ADDED ON</TableCell>
                 <TableCell sx={headerStyles}>LAST SCANNED</TableCell>
+                <TableCell sx={headerStyles}>SCAN STATUS</TableCell>
                 <TableCell sx={{ ...headerStyles, textAlign: 'center' }}>ACTION</TableCell>
               </TableRow>
             </TableHead>
@@ -312,7 +429,7 @@ export const TargetList: React.FC = () => {
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#fff' }}>{domain.name}</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.primary' }}>{domain.name}</Typography>
                       {domain.most_recent_scan ? (
                         <Typography 
                           variant="caption" 
@@ -373,6 +490,12 @@ export const TargetList: React.FC = () => {
                         height: 24,
                         border: '1px solid rgba(0, 170, 255, 0.2)'
                       }}
+                    />
+                  </TableCell>
+                  <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <ScanStatusCell 
+                      status={(domain as any).most_recent_scan_status} 
+                      progress={(domain as any).most_recent_scan_progress} 
                     />
                   </TableCell>
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>
@@ -501,6 +624,22 @@ export const TargetList: React.FC = () => {
         </MenuItem>
         <MenuItem onClick={() => {
           if (activeTarget) {
+            pauseScanMutation.mutate({ target_id: activeTarget.id });
+          }
+          handleMenuClose();
+        }} sx={{ color: '#ffab00 !important', '& svg': { color: '#ffab00 !important' } }}>
+          <PauseCircle size={14} /> PAUSE ALL SCANS
+        </MenuItem>
+        <MenuItem onClick={() => {
+          if (activeTarget) {
+            unpauseScanMutation.mutate({ target_id: activeTarget.id });
+          }
+          handleMenuClose();
+        }} sx={{ color: '#00ff62 !important', '& svg': { color: '#00ff62 !important' } }}>
+          <Play size={14} /> RESUME ALL SCANS
+        </MenuItem>
+        <MenuItem onClick={() => {
+          if (activeTarget) {
             if (window.confirm(`Are you sure you want to delete target ${activeTarget.name}?`)) {
               deleteTargets([activeTarget.id]);
             }
@@ -537,14 +676,4 @@ export const TargetList: React.FC = () => {
       )}
     </Box>
   );
-};
-
-const headerStyles = {
-  color: '#fff',
-  fontWeight: 800,
-  fontFamily: 'Orbitron',
-  fontSize: '0.75rem',
-  letterSpacing: 1,
-  borderBottom: '1px solid rgba(255,255,255,0.05)',
-  py: 1.5
 };

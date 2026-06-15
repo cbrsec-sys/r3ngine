@@ -25,8 +25,10 @@ import {
   Filter
 } from 'lucide-react';
 import { useSubScans, useBulkStopSubScans, useBulkDeleteSubScans } from '../api';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const SubScansPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data, isLoading, isError } = useSubScans(projectSlug);
   const stopMutation = useBulkStopSubScans(projectSlug);
@@ -111,7 +113,7 @@ export const SubScansPage: React.FC = () => {
         background: 'linear-gradient(90deg, rgba(188, 19, 254, 0.05) 0%, transparent 100%)',
         p: 2,
         borderRadius: 1,
-        borderLeft: '4px solid #bc13fe'
+        borderLeft: `4px solid ${tokens.accent.secondary}`
       }}>
         <Box>
           <Typography variant="h4" sx={{ 
@@ -122,12 +124,12 @@ export const SubScansPage: React.FC = () => {
             display: 'flex',
             alignItems: 'center',
             gap: 2,
-            color: '#bc13fe'
+            color: tokens.accent.secondary
           }}>
             <History size={32} />
             SUBSCAN HISTORY
           </Typography>
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 2 }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', letterSpacing: 2 }}>
             TACTICAL EXECUTION LOGS
           </Typography>
         </Box>
@@ -138,9 +140,9 @@ export const SubScansPage: React.FC = () => {
             startIcon={<Filter size={18} />}
             sx={{ 
               fontFamily: 'Orbitron',
-              color: '#00f3ff',
-              borderColor: '#00f3ff',
-              '&:hover': { borderColor: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)' }
+              color: tokens.accent.primary,
+              borderColor: tokens.accent.primary,
+              '&:hover': { borderColor: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D` }
             }}
           >
             FILTER
@@ -188,7 +190,7 @@ export const SubScansPage: React.FC = () => {
         p: 2, 
         bgcolor: 'rgba(0,0,0,0.3)', 
         borderRadius: 1, 
-        border: '1px solid rgba(255,255,255,0.05)'
+        border: 1, borderColor: 'divider'
       }}>
         <TextField
           placeholder="SEARCH TACTICAL OPERATIONS..."
@@ -199,7 +201,7 @@ export const SubScansPage: React.FC = () => {
             width: 400,
             '& .MuiInputBase-root': {
               fontFamily: 'monospace',
-              color: '#bc13fe',
+              color: tokens.accent.secondary,
               fontSize: '14px',
               '&:before, &:after': { borderBottomColor: 'rgba(188, 19, 254, 0.3)' }
             }
@@ -208,7 +210,7 @@ export const SubScansPage: React.FC = () => {
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search size={18} color="#bc13fe" />
+                  <Search size={18} color={tokens.accent.secondary} />
                 </InputAdornment>
               ),
             }
@@ -232,29 +234,29 @@ export const SubScansPage: React.FC = () => {
                   type="checkbox" 
                   checked={selectedIds.length === filteredData.length && filteredData.length > 0}
                   onChange={handleSelectAll}
-                  style={{ accentColor: '#bc13fe' }}
+                  style={{ accentColor: tokens.accent.secondary }}
                 />
               </th>
-              <th style={{ padding: '16px', color: '#bc13fe', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>SCANNED SUBDOMAIN</th>
-              <th style={{ padding: '16px', color: '#bc13fe', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>TASK</th>
-              <th style={{ padding: '16px', color: '#bc13fe', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>ENGINE</th>
-              <th style={{ padding: '16px', color: '#bc13fe', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>SCAN STARTED</th>
-              <th style={{ padding: '16px', color: '#bc13fe', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>STATUS</th>
-              <th style={{ padding: '16px', color: '#bc13fe', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ACTION</th>
+              <th style={{ padding: '16px', color: tokens.accent.secondary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>SCANNED SUBDOMAIN</th>
+              <th style={{ padding: '16px', color: tokens.accent.secondary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>TASK</th>
+              <th style={{ padding: '16px', color: tokens.accent.secondary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>ENGINE</th>
+              <th style={{ padding: '16px', color: tokens.accent.secondary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>SCAN STARTED</th>
+              <th style={{ padding: '16px', color: tokens.accent.secondary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>STATUS</th>
+              <th style={{ padding: '16px', color: tokens.accent.secondary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ACTION</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
                 <td colSpan={7} style={{ padding: '100px', textAlign: 'center' }}>
-                  <CircularProgress size={40} sx={{ color: '#bc13fe' }} />
-                  <Typography sx={{ mt: 2, fontFamily: 'monospace', color: '#bc13fe' }}>RETRIEVING SUBSCAN TELEMETRY...</Typography>
+                  <CircularProgress size={40} sx={{ color: tokens.accent.secondary }} />
+                  <Typography sx={{ mt: 2, fontFamily: 'monospace', color: tokens.accent.secondary }}>RETRIEVING SUBSCAN TELEMETRY...</Typography>
                 </td>
               </tr>
             ) : paginatedData.length === 0 ? (
               <tr>
                 <td colSpan={7} style={{ padding: '60px', textAlign: 'center' }}>
-                  <Typography sx={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>NO SUBSCAN DATA DETECTED</Typography>
+                  <Typography sx={{ fontFamily: 'monospace', color: 'text.disabled' }}>NO SUBSCAN DATA DETECTED</Typography>
                 </td>
               </tr>
             ) : (
@@ -262,7 +264,7 @@ export const SubScansPage: React.FC = () => {
                 <tr 
                   key={scan.id!} 
                   style={{ 
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    borderBottom: 1, borderColor: 'divider',
                     transition: 'background 0.2s',
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(188, 19, 254, 0.02)')}
@@ -273,14 +275,14 @@ export const SubScansPage: React.FC = () => {
                       type="checkbox" 
                       checked={selectedIds.includes(scan.id!)}
                       onChange={() => handleSelectOne(scan.id!)}
-                      style={{ accentColor: '#bc13fe' }}
+                      style={{ accentColor: tokens.accent.secondary }}
                     />
                   </td>
                   <td style={{ padding: '12px 16px' }}>
-                    <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '13px' }}>{scan.subdomain_name}</Typography>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px' }}>{scan.subdomain_name?.split('.').slice(-2).join('.') || ''}</Typography>
+                    <Typography sx={{ color: 'text.primary', fontWeight: 600, fontSize: '13px' }}>{scan.subdomain_name}</Typography>
+                    <Typography sx={{ color: 'text.secondary', fontSize: '11px' }}>{scan.subdomain_name?.split('.').slice(-2).join('.') || ''}</Typography>
                     <Box sx={{ mt: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                      <Typography sx={{ color: '#00f3ff', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}>
+                      <Typography sx={{ color: tokens.accent.primary, fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}>
                         Recent Scan <ExternalLink size={10} />
                       </Typography>
                     </Box>
@@ -291,7 +293,7 @@ export const SubScansPage: React.FC = () => {
                       size="small" 
                       sx={{ 
                         bgcolor: 'rgba(188, 19, 254, 0.1)', 
-                        color: '#bc13fe', 
+                        color: tokens.accent.secondary, 
                         border: '1px solid rgba(188, 19, 254, 0.3)',
                         fontSize: '10px',
                         fontFamily: 'monospace',
@@ -304,9 +306,9 @@ export const SubScansPage: React.FC = () => {
                       label={scan.engine} 
                       size="small" 
                       sx={{ 
-                        bgcolor: 'rgba(0, 243, 255, 0.1)', 
-                        color: '#00f3ff', 
-                        border: '1px solid rgba(0, 243, 255, 0.3)',
+                        bgcolor: `${tokens.accent.primary}15`, 
+                        color: tokens.accent.primary, 
+                        border: `1px solid ${tokens.accent.primary}4D`,
                         fontSize: '10px',
                         fontFamily: 'monospace',
                         fontWeight: 700
@@ -315,7 +317,7 @@ export const SubScansPage: React.FC = () => {
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <Typography sx={{ color: 'rgba(255,255,255,0.8)', fontSize: '12px' }}>{scan.completed_ago}</Typography>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontFamily: 'monospace' }}>
+                    <Typography sx={{ color: 'text.secondary', fontSize: '10px', fontFamily: 'monospace' }}>
                       ({new Date(scan.start_scan_date).toLocaleString()})
                     </Typography>
                   </td>
@@ -343,10 +345,10 @@ export const SubScansPage: React.FC = () => {
                       sx={{ 
                         fontSize: '10px', 
                         fontFamily: 'Orbitron',
-                        bgcolor: 'rgba(0, 243, 255, 0.1)',
-                        color: '#00f3ff',
-                        border: '1px solid #00f3ff',
-                        '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                        bgcolor: `${tokens.accent.primary}15`,
+                        color: tokens.accent.primary,
+                        border: `1px solid ${tokens.accent.primary}`,
+                        '&:hover': { bgcolor: `${tokens.accent.primary}33` }
                       }}
                     >
                       VIEW RESULTS
@@ -367,11 +369,11 @@ export const SubScansPage: React.FC = () => {
           rowsPerPage={rowsPerPage}
           onRowsPerPageChange={handleRowsPerPageChange}
           sx={{
-            color: '#bc13fe',
+            color: tokens.accent.secondary,
             fontFamily: 'monospace',
             borderTop: '1px solid rgba(188, 19, 254, 0.1)',
-            '& .MuiTablePagination-selectIcon': { color: '#bc13fe' },
-            '& .MuiTablePagination-actions': { color: '#bc13fe' },
+            '& .MuiTablePagination-selectIcon': { color: tokens.accent.secondary },
+            '& .MuiTablePagination-actions': { color: tokens.accent.secondary },
             '& .MuiTablePagination-select': { fontFamily: 'monospace' },
             '& .MuiTablePagination-displayedRows': { fontFamily: 'monospace' },
           }}
@@ -380,21 +382,21 @@ export const SubScansPage: React.FC = () => {
 
       {/* Footer Info */}
       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', px: 1 }}>
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+        <Typography variant="caption" sx={{ color: 'text.disabled', fontFamily: 'monospace' }}>
           TOTAL RECORDS: {filteredData.length}
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#00ff9d' }} />
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>SUCCESSFUL</Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>SUCCESSFUL</Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#ffb74d' }} />
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>RUNNING</Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>RUNNING</Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#ff003c' }} />
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>ABORTED</Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>ABORTED</Typography>
           </Box>
         </Box>
       </Box>

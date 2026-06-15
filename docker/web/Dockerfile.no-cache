@@ -38,7 +38,7 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest && \
-    go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8 && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.9.0 && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
     go install -ldflags="-s -w" -v github.com/hakluke/hakrawler@latest && \
     go install -ldflags="-s -w" -v github.com/lc/gau/v2/cmd/gau@latest && \
@@ -381,6 +381,7 @@ RUN git clone --depth 1 https://github.com/shmilylty/OneForAll /usr/src/github/O
 
 RUN git clone --depth 1 https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r && \
     pip3 install --no-cache-dir -r /usr/src/github/Sublist3r/requirements.txt && \
+    sed -i "s/token = csrf_regex.findall(resp)\[0\]/token = csrf_regex.findall(resp)[0] if csrf_regex.findall(resp) else ''/g" /usr/src/github/Sublist3r/sublist3r.py && \
     rm -rf /usr/src/github/Sublist3r/.git
 
 RUN git clone --depth 1 https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \

@@ -69,7 +69,7 @@ export const ProjectsPage: React.FC = () => {
           sx={{
             bgcolor: isLight ? theme.palette.primary.main : 'rgba(0, 243, 255, 0.1)',
             color: isLight ? '#fff' : '#00f3ff',
-            fontFamily: 'var(--r3-heading-font)',
+            fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
             fontWeight: 800,
             border: isLight
               ? `1px solid ${theme.palette.primary.main}`
@@ -114,10 +114,10 @@ export const ProjectsPage: React.FC = () => {
                 >
                   <TableCell sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, pl: 10 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                      <Typography variant="body1" sx={{ fontWeight: 800, color: isLight ? theme.palette.text.primary : '#fff' }}>
+                      <Typography variant="body1" sx={{ fontWeight: 800, color: 'text.primary' }}>
                         {project.name}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary, mt: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: 'text.secondary', mt: 0.5 }}>
                         Created {project.insert_date_humanized || project.insert_date}
                       </Typography>
                     </Box>
@@ -148,7 +148,7 @@ export const ProjectsPage: React.FC = () => {
                         sx={{
                           borderColor: isLight ? alpha(theme.palette.primary.main, 0.4) : 'rgba(0, 243, 255, 0.3)',
                           color: theme.palette.primary.main,
-                          fontFamily: 'var(--r3-heading-font)',
+                          fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
                           fontSize: '0.65rem',
                           fontWeight: 700,
                           '&:hover': {
@@ -187,4 +187,3 @@ export const ProjectsPage: React.FC = () => {
     </Box>
   );
 };
-

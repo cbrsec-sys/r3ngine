@@ -86,7 +86,10 @@ const groupByDirectory = (templates: string[]): Record<string, string[]> =>
     return acc;
   }, {} as Record<string, string[]>);
 
+import { useThemeTokens } from '../../../theme/useThemeTokens';
+
 export const ToolSettingsPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug } = useParams({ from: '/$projectSlug/settings/tool-settings' });
   const [tabValue, setTabValue] = useState(0);
   const [editingFile, setEditingFile] = useState<{ key: string; name: string } | null>(null);
@@ -186,7 +189,7 @@ export const ToolSettingsPage: React.FC = () => {
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
       </Box>
     );
   }
@@ -203,26 +206,26 @@ export const ToolSettingsPage: React.FC = () => {
   return (
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', mb: 1 }}>
+        <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: 'text.primary', mb: 1 }}>
           TOOL SETTINGS
         </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary' }}>
           Manage configuration files, GF patterns, and Nuclei templates.
         </Typography>
       </Box>
 
       <TacticalPanel title="CONFIGURATION PANEL" sx={{ width: '100%' }}>
-        <Box sx={{ borderBottom: 1, borderColor: 'rgba(255,255,255,0.1)' }}>
+        <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
           <Tabs
             value={tabValue}
             onChange={handleTabChange}
             sx={{
-              '& .MuiTabs-indicator': { bgcolor: '#00f3ff' },
+              '& .MuiTabs-indicator': { bgcolor: tokens.accent.primary },
               '& .MuiTab-root': {
-                color: 'rgba(255,255,255,0.5)',
+                color: 'text.secondary',
                 fontFamily: 'Orbitron',
                 fontSize: '12px',
-                '&.Mui-selected': { color: '#00f3ff' }
+                '&.Mui-selected': { color: tokens.accent.primary }
               }
             }}
           >
@@ -235,8 +238,8 @@ export const ToolSettingsPage: React.FC = () => {
         <TabPanel value={tabValue} index={0}>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 3 }} >
-              <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.1)', width: '100%' }}>
-                <Typography variant="h6" sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '14px', mb: 2 }}>
+              <Paper sx={{ bgcolor: 'background.paper', p: 2, border: 1, borderColor: 'divider', width: '100%' }}>
+                <Typography variant="h6" sx={{ color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '14px', mb: 2 }}>
                   UPLOAD GF PATTERNS
                 </Typography>
                 <input
@@ -254,28 +257,28 @@ export const ToolSettingsPage: React.FC = () => {
                     fullWidth
                     startIcon={<Upload size={18} />}
                     sx={{
-                      borderColor: '#00f3ff',
-                      color: '#00f3ff',
-                      '&:hover': { bgcolor: 'rgba(0,243,255,0.1)', borderColor: '#00f3ff' }
+                      borderColor: tokens.accent.primary,
+                      color: tokens.accent.primary,
+                      '&:hover': { bgcolor: `${tokens.accent.primary}1A`, borderColor: tokens.accent.primary }
                     }}
                   >
                     SELECT JSON FILES
                   </Button>
                 </label>
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mt: 1, display: 'block' }}>
+                <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1, display: 'block' }}>
                   Upload multiple .json patterns for GF
                 </Typography>
               </Paper>
 
               <Box sx={{ mt: 3 }}>
-                <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1 }}>
+                <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>
                   INSTALLED PATTERNS ({toolSettings?.gf_patterns.length})
                 </Typography>
                 <Paper sx={{
-                  bgcolor: 'rgba(0,0,0,0.2)',
+                  bgcolor: 'action.hover',
                   maxHeight: '400px',
                   overflow: 'auto',
-                  border: '1px solid rgba(255,255,255,0.05)',
+                  border: 1, borderColor: 'divider',
                   width: '100%'
                 }}>
                   <List dense>
@@ -284,19 +287,19 @@ export const ToolSettingsPage: React.FC = () => {
                         key={pattern}
                         disablePadding
                         sx={{
-                          borderBottom: '1px solid rgba(255,255,255,0.05)'
+                          borderBottom: 1, borderColor: 'divider'
                         }}
                       >
                         <ListItemButton
                           onClick={() => handleEditGF(pattern)}
                           sx={{
-                            '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' },
+                            '&:hover': { bgcolor: 'action.selected' },
                           }}
                         >
                           <ListItemText
                             primary={pattern}
                             slotProps={{
-                              primary: { sx: { color: 'rgba(255,255,255,0.8)', fontSize: '13px' } }
+                              primary: { sx: { color: 'text.primary', fontSize: '13px' } }
                             }}
                           />
                           <ChevronRight size={14} color="rgba(255,255,255,0.3)" />
@@ -310,9 +313,9 @@ export const ToolSettingsPage: React.FC = () => {
 
             <Grid size={{ xs: 12, md: 9 }} >
               {editingFile && editingFile.key === 'gf_pattern' ? (
-                <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.2)', width: '100%' }}>
+                <Paper sx={{ bgcolor: 'background.paper', p: 2, border: 1, borderColor: 'divider', width: '100%' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '14px' }}>
+                    <Typography sx={{ color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '14px' }}>
                       EDITING: {editingFile.name}
                     </Typography>
                     <Box>
@@ -322,13 +325,13 @@ export const ToolSettingsPage: React.FC = () => {
                         startIcon={<Save size={16} />}
                         onClick={handleSaveConfig}
                         disabled={updateConfig.isPending}
-                        sx={{ bgcolor: '#00f3ff', color: '#000', fontWeight: 'bold', '&:hover': { bgcolor: '#00d8e4' } }}
+                        sx={{ bgcolor: tokens.accent.primary, color: '#000', fontWeight: 'bold', '&:hover': { bgcolor: tokens.accent.primary, filter: 'brightness(1.1)' } }}
                       >
                         SAVE
                       </Button>
                       <Button
                         size="small"
-                        sx={{ color: 'rgba(255,255,255,0.5)', ml: 1 }}
+                        sx={{ color: 'text.secondary', ml: 1 }}
                         onClick={() => setEditingFile(null)}
                       >
                         CANCEL
@@ -351,7 +354,7 @@ export const ToolSettingsPage: React.FC = () => {
                           bgcolor: '#1e1e1e',
                           p: 2,
                           fontSize: '13px',
-                          border: '1px solid rgba(0,243,255,0.1)'
+                          border: 1, borderColor: 'divider'
                         }
                       }
                     }}
@@ -367,13 +370,13 @@ export const ToolSettingsPage: React.FC = () => {
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  bgcolor: 'rgba(0,0,0,0.1)',
+                  bgcolor: 'action.hover',
                   borderRadius: 1,
                   p: 5,
-                  border: '1px dashed rgba(255,255,255,0.1)'
+                  border: 1, borderStyle: 'dashed', borderColor: 'divider'
                 }}>
-                  <Code size={48} color="rgba(0,243,255,0.2)" />
-                  <Typography sx={{ color: 'rgba(255,255,255,0.3)', mt: 2, fontFamily: 'Orbitron', fontSize: '12px' }}>
+                  <Code size={48} color={`${tokens.accent.primary}33`} />
+                  <Typography sx={{ color: 'text.disabled', mt: 2, fontFamily: 'Orbitron', fontSize: '12px' }}>
                     SELECT A PATTERN TO VIEW OR EDIT
                   </Typography>
                 </Box>
@@ -385,8 +388,8 @@ export const ToolSettingsPage: React.FC = () => {
         <TabPanel value={tabValue} index={1}>
           <Box sx={{ display: 'flex', gap: 2, width: '100%', alignItems: 'flex-start' }}>
             <Box sx={{ width: '300px', flexShrink: 0 }}>
-              <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.1)', mb: 2 }}>
-                <Typography variant="h6" sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '14px', mb: 2 }}>
+              <Paper sx={{ bgcolor: 'background.paper', p: 2, border: 1, borderColor: 'divider', mb: 2 }}>
+                <Typography variant="h6" sx={{ color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '14px', mb: 2 }}>
                   UPLOAD NUCLEI TEMPLATES
                 </Typography>
                 <input
@@ -404,9 +407,9 @@ export const ToolSettingsPage: React.FC = () => {
                     fullWidth
                     startIcon={<Upload size={18} />}
                     sx={{
-                      borderColor: '#00f3ff',
-                      color: '#00f3ff',
-                      '&:hover': { bgcolor: 'rgba(0,243,255,0.1)', borderColor: '#00f3ff' }
+                      borderColor: tokens.accent.primary,
+                      color: tokens.accent.primary,
+                      '&:hover': { bgcolor: `${tokens.accent.primary}1A`, borderColor: tokens.accent.primary }
                     }}
                   >
                     SELECT YAML FILES
@@ -414,10 +417,10 @@ export const ToolSettingsPage: React.FC = () => {
                 </label>
               </Paper>
 
-              <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.7)', mb: 1, fontFamily: 'Orbitron', fontSize: '11px' }}>
+              <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1, fontFamily: 'Orbitron', fontSize: '11px' }}>
                 CUSTOM TEMPLATES ({toolSettings?.nuclei_templates?.length || 0})
               </Typography>
-              <Box sx={{ maxHeight: '500px', overflow: 'auto', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1 }}>
+              <Box sx={{ maxHeight: '500px', overflow: 'auto', border: 1, borderColor: 'divider', borderRadius: 1 }}>
                 {Object.entries(groupByDirectory(toolSettings?.nuclei_templates ?? [])).map(([group, templates]) => (
                   <Accordion
                     key={group}
@@ -425,28 +428,28 @@ export const ToolSettingsPage: React.FC = () => {
                     onChange={(_, isOpen) => setExpandedGroup(isOpen ? group : false)}
                     disableGutters
                     sx={{
-                      bgcolor: 'rgba(0,0,0,0.2)',
+                      bgcolor: 'action.hover',
                       backgroundImage: 'none',
                       boxShadow: 'none',
-                      borderBottom: '1px solid rgba(255,255,255,0.05)',
+                      borderBottom: 1, borderColor: 'divider',
                       '&:before': { display: 'none' },
                     }}
                   >
                     <AccordionSummary
-                      expandIcon={<ChevronDown size={14} color="#00f3ff" />}
+                      expandIcon={<ChevronDown size={14} color={tokens.accent.primary} />}
                       sx={{
                         minHeight: 36,
                         px: 1.5,
-                        bgcolor: expandedGroup === group ? 'rgba(0,243,255,0.06)' : 'transparent',
+                        bgcolor: expandedGroup === group ? 'action.selected' : 'transparent',
                         '& .MuiAccordionSummary-content': { alignItems: 'center', gap: 1, my: 0.5 },
                       }}
                     >
                       {expandedGroup === group
-                        ? <FolderOpen size={14} color="#00f3ff" />
+                        ? <FolderOpen size={14} color={tokens.accent.primary} />
                         : <Folder size={14} color="rgba(255,255,255,0.4)" />
                       }
                       <Typography sx={{
-                        color: expandedGroup === group ? '#00f3ff' : 'rgba(255,255,255,0.7)',
+                        color: expandedGroup === group ? tokens.accent.primary : 'text.secondary',
                         fontSize: '11px',
                         fontFamily: 'Orbitron',
                         fontWeight: 700,
@@ -461,9 +464,9 @@ export const ToolSettingsPage: React.FC = () => {
                         sx={{
                           height: 16,
                           fontSize: '10px',
-                          bgcolor: 'rgba(0,243,255,0.1)',
-                          color: '#00f3ff',
-                          border: '1px solid rgba(0,243,255,0.2)',
+                          bgcolor: `${tokens.accent.primary}1A`,
+                          color: tokens.accent.primary,
+                          border: 1, borderColor: `${tokens.accent.primary}33`,
                           borderRadius: 1,
                           '& .MuiChip-label': { px: 0.75 }
                         }}
@@ -475,20 +478,20 @@ export const ToolSettingsPage: React.FC = () => {
                           const filename = template.split('/').pop()!;
                           const isSelected = editingFile?.key === 'nuclei_template' && editingFile?.name === template;
                           return (
-                            <ListItem key={template} disablePadding sx={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
+                            <ListItem key={template} disablePadding sx={{ borderBottom: 1, borderColor: 'divider' }}>
                               <ListItemButton
                                 selected={isSelected}
                                 onClick={() => handleViewNucleiTemplate(template)}
                                 sx={{
                                   pl: 3.5,
-                                  '&.Mui-selected': { bgcolor: 'rgba(0,243,255,0.1)', borderLeft: '3px solid #00f3ff' },
-                                  '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' },
+                                  '&.Mui-selected': { bgcolor: `${tokens.accent.primary}1A`, borderLeft: `3px solid ${tokens.accent.primary}` },
+                                  '&:hover': { bgcolor: 'action.hover' },
                                 }}
                               >
                                 <ListItemText
                                   primary={filename}
                                   slotProps={{
-                                    primary: { sx: { color: isSelected ? '#00f3ff' : 'rgba(255,255,255,0.8)', fontSize: '12px' } }
+                                    primary: { sx: { color: isSelected ? tokens.accent.primary : 'text.primary', fontSize: '12px' } }
                                   }}
                                 />
                               </ListItemButton>
@@ -504,14 +507,14 @@ export const ToolSettingsPage: React.FC = () => {
 
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
               {editingFile && editingFile.key === 'nuclei_template' ? (
-                <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.2)', width: '100%' }}>
+                <Paper sx={{ bgcolor: 'background.paper', p: 2, border: 1, borderColor: 'divider', width: '100%' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '14px' }}>
+                    <Typography sx={{ color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '14px' }}>
                       {editingFile.name.split('/').pop()} (READ-ONLY)
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Shield size={16} color="#00f3ff" />
-                      <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '11px', fontFamily: 'Orbitron' }}>
+                      <Shield size={16} color={tokens.accent.primary} />
+                      <Typography sx={{ color: 'text.secondary', fontSize: '11px', fontFamily: 'Orbitron' }}>
                         TEMPLATES ARE VIEW-ONLY
                       </Typography>
                     </Box>
@@ -532,7 +535,7 @@ export const ToolSettingsPage: React.FC = () => {
                           bgcolor: '#1e1e1e',
                           p: 2,
                           fontSize: '13px',
-                          border: '1px solid rgba(0,243,255,0.1)'
+                          border: 1, borderColor: 'divider'
                         }
                       }
                     }}
@@ -545,13 +548,13 @@ export const ToolSettingsPage: React.FC = () => {
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  bgcolor: 'rgba(0,0,0,0.1)',
+                  bgcolor: 'action.hover',
                   borderRadius: 1,
                   p: 5,
-                  border: '1px dashed rgba(255,255,255,0.1)'
+                  border: 1, borderStyle: 'dashed', borderColor: 'divider'
                 }}>
-                  <Shield size={48} color="rgba(0,243,255,0.2)" />
-                  <Typography sx={{ color: 'rgba(255,255,255,0.3)', mt: 2, fontFamily: 'Orbitron', fontSize: '12px', textAlign: 'center' }}>
+                  <Shield size={48} color={`${tokens.accent.primary}33`} />
+                  <Typography sx={{ color: 'text.disabled', mt: 2, fontFamily: 'Orbitron', fontSize: '12px', textAlign: 'center' }}>
                     SELECT A NUCLEI TEMPLATE TO VIEW CONTENT<br />
                     UPLOAD NEW ONES USING THE PANEL ON THE LEFT
                   </Typography>
@@ -564,7 +567,7 @@ export const ToolSettingsPage: React.FC = () => {
         <TabPanel value={tabValue} index={2}>
           <Box sx={{ display: 'flex', gap: 2, width: '100%', alignItems: 'flex-start' }}>
             <Box sx={{ width: '250px', flexShrink: 0 }}>
-              <List sx={{ bgcolor: 'rgba(0,0,0,0.2)', borderRadius: 1 }}>
+              <List sx={{ bgcolor: 'action.hover', borderRadius: 1 }}>
                 {configFiles.map((file) => (
                   <ListItem
                     key={file.key}
@@ -575,13 +578,13 @@ export const ToolSettingsPage: React.FC = () => {
                       onClick={() => handleEditConfig(file.key, file.name)}
                       sx={{
                         '&.Mui-selected': {
-                          bgcolor: 'rgba(0,243,255,0.1)',
-                          borderLeft: '3px solid #00f3ff'
+                          bgcolor: `${tokens.accent.primary}1A`,
+                          borderLeft: `3px solid ${tokens.accent.primary}`
                         },
-                        '&:hover': { bgcolor: 'rgba(0,243,255,0.05)' }
+                        '&:hover': { bgcolor: 'action.selected' }
                       }}
                     >
-                      <Box sx={{ mr: 2, color: editingFile?.key === file.key ? '#00f3ff' : 'rgba(255,255,255,0.5)' }}>
+                      <Box sx={{ mr: 2, color: editingFile?.key === file.key ? tokens.accent.primary : 'text.disabled' }}>
                         {file.icon}
                       </Box>
                       <ListItemText
@@ -589,7 +592,7 @@ export const ToolSettingsPage: React.FC = () => {
                         slotProps={{
                           primary: {
                             sx: {
-                              color: editingFile?.key === file.key ? '#00f3ff' : 'rgba(255,255,255,0.7)',
+                              color: editingFile?.key === file.key ? tokens.accent.primary : 'text.secondary',
                               fontSize: '13px',
                               fontFamily: 'Orbitron'
                             }
@@ -604,9 +607,9 @@ export const ToolSettingsPage: React.FC = () => {
 
             <Box sx={{ flexGrow: 1, minWidth: 0 }}>
               {editingFile && editingFile.key !== 'gf_pattern' ? (
-                <Paper sx={{ bgcolor: 'rgba(0,0,0,0.3)', p: 2, border: '1px solid rgba(0,243,255,0.2)', width: '100%' }}>
+                <Paper sx={{ bgcolor: 'background.paper', p: 2, border: 1, borderColor: 'divider', width: '100%' }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                    <Typography sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '14px' }}>
+                    <Typography sx={{ color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '14px' }}>
                       {editingFile.name}
                     </Typography>
                     <Button
@@ -615,7 +618,7 @@ export const ToolSettingsPage: React.FC = () => {
                       startIcon={<Save size={16} />}
                       onClick={handleSaveConfig}
                       disabled={updateConfig.isPending}
-                      sx={{ bgcolor: '#00f3ff', color: '#000', fontWeight: 'bold', '&:hover': { bgcolor: '#00d8e4' } }}
+                      sx={{ bgcolor: tokens.accent.primary, color: '#000', fontWeight: 'bold', '&:hover': { bgcolor: tokens.accent.primary, filter: 'brightness(1.1)' } }}
                     >
                       UPDATE CONFIG
                     </Button>
@@ -636,7 +639,7 @@ export const ToolSettingsPage: React.FC = () => {
                           bgcolor: '#1e1e1e',
                           p: 2,
                           fontSize: '13px',
-                          border: '1px solid rgba(0,243,255,0.1)'
+                          border: 1, borderColor: 'divider'
                         }
                       }
                     }}
@@ -649,13 +652,13 @@ export const ToolSettingsPage: React.FC = () => {
                   flexDirection: 'column',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  bgcolor: 'rgba(0,0,0,0.1)',
+                  bgcolor: 'action.hover',
                   borderRadius: 1,
                   p: 5,
-                  border: '1px dashed rgba(255,255,255,0.1)'
+                  border: 1, borderStyle: 'dashed', borderColor: 'divider'
                 }}>
-                  <Settings size={48} color="rgba(0,243,255,0.2)" />
-                  <Typography sx={{ color: 'rgba(255,255,255,0.3)', mt: 2, fontFamily: 'Orbitron', fontSize: '12px' }}>
+                  <Settings size={48} color={`${tokens.accent.primary}33`} />
+                  <Typography sx={{ color: 'text.disabled', mt: 2, fontFamily: 'Orbitron', fontSize: '12px' }}>
                     SELECT A TOOL CONFIGURATION TO EDIT
                   </Typography>
                 </Box>

@@ -16,6 +16,7 @@ import {
 import { Bell, Check, Trash2, Info, AlertCircle, XCircle, BellOff } from 'lucide-react';
 // import { formatDistanceToNow } from 'date-fns';
 import { useNotifications, useUnreadCount, useMarkAllRead, useClearAll, useMarkRead } from '../api';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 interface NotificationsDropdownProps {
   anchorEl: HTMLElement | null;
@@ -28,6 +29,7 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
   onClose,
   projectSlug
 }) => {
+  const { tokens, theme } = useThemeTokens();
   const { data: notifications, isLoading } = useNotifications(projectSlug);
   const markAllRead = useMarkAllRead();
   const clearAll = useClearAll();
@@ -37,10 +39,10 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
 
   const getIcon = (type: string) => {
     switch (type) {
-      case 'info': return <Info size={16} color="#00f3ff" />;
-      case 'warning': return <AlertCircle size={16} color="#fffc00" />;
-      case 'error': return <XCircle size={16} color="#ff003c" />;
-      default: return <Bell size={16} color="rgba(255,255,255,0.5)" />;
+      case 'info': return <Info size={16} color={tokens.accent.primary} />;
+      case 'warning': return <AlertCircle size={16} color={tokens.accent.warning} />;
+      case 'error': return <XCircle size={16} color={tokens.accent.error} />;
+      default: return <Bell size={16} color={theme.palette.text.secondary} />;
     }
   };
 
@@ -55,9 +57,9 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
           sx: {
             width: 360,
             maxHeight: 500,
-            bgcolor: 'rgba(10, 10, 15, 0.95)',
+            bgcolor: 'background.default',
             backdropFilter: 'blur(20px)',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
+            border: 1, borderColor: 'divider',
             borderRadius: 2,
             backgroundImage: 'none',
             mt: 1.5,
@@ -66,23 +68,23 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
         }
       }}
     >
-      <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
         <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.75rem', letterSpacing: 1, color: '#00f3ff' }}>
+          <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.75rem', letterSpacing: 1, color: tokens.accent.primary }}>
             NOTIFICATIONS
           </Typography>
           <Stack direction="row" spacing={1}>
             <Button
               size="small"
               onClick={() => markAllRead.mutate(projectSlug)}
-              sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', '&:hover': { color: '#00f3ff' } }}
+              sx={{ fontSize: '0.65rem', color: 'text.secondary', '&:hover': { color: tokens.accent.primary } }}
             >
               Mark all read
             </Button>
             <Button
               size="small"
               onClick={() => clearAll.mutate(projectSlug)}
-              sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', '&:hover': { color: '#ff003c' } }}
+              sx={{ fontSize: '0.65rem', color: 'text.secondary', '&:hover': { color: tokens.accent.error } }}
             >
               Clear All
             </Button>
@@ -93,7 +95,7 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
       <List sx={{ maxHeight: 400, overflow: 'auto' }}>
         {isLoading ? (
           <Box sx={{ p: 4, textAlign: 'center' }}>
-            <CircularProgress size={20} sx={{ color: '#00f3ff' }} />
+            <CircularProgress size={20} sx={{ color: tokens.accent.primary }} />
           </Box>
         ) : (Array.isArray(notifications) && notifications.length > 0) ? (
           notifications.map((notif: any) => (
@@ -101,10 +103,10 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
               key={notif.id}
               onClick={() => markRead.mutate(notif.id)}
               sx={{
-                borderBottom: '1px solid rgba(255,255,255,0.03)',
+                borderBottom: 1, borderColor: 'divider',
                 cursor: 'pointer',
-                bgcolor: notif.is_read ? 'transparent' : 'rgba(0, 243, 255, 0.03)',
-                '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' },
+                bgcolor: notif.is_read ? 'transparent' : `${tokens.accent.primary}08`,
+                '&:hover': { bgcolor: 'action.hover' },
                 transition: 'all 0.2s'
               }}
             >
@@ -115,10 +117,10 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
                 primary={notif.title}
                 secondary={
                   <Stack spacing={0.5} sx={{ mt: 0.5 }}>
-                    <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.7)' }}>
+                    <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled' }}>
                       {notif.description}
                     </Typography>
-                    <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                    <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', fontFamily: 'monospace' }}>
                       {new Date(notif.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </Typography>
                   </Stack>
@@ -128,7 +130,7 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
                     sx: {
                       fontSize: '0.8rem',
                       fontWeight: notif.is_read ? 500 : 900,
-                      color: notif.is_read ? 'rgba(255,255,255,0.8)' : '#fff'
+                      color: notif.is_read ? 'text.secondary' : 'text.primary'
                     }
                   }
                 }}
@@ -137,8 +139,8 @@ export const NotificationsDropdown: React.FC<NotificationsDropdownProps> = ({
           ))
         ) : (
           <Box sx={{ p: 4, textAlign: 'center', opacity: 0.5 }}>
-            <BellOff size={32} style={{ marginBottom: 8, color: 'rgba(255,255,255,0.2)' }} />
-            <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
+            <BellOff size={32} style={{ marginBottom: 8, color: 'text.disabled' }} />
+            <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled' }}>
               Ping? Pong! No notifications, moving along
             </Typography>
           </Box>

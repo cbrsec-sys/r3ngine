@@ -112,11 +112,11 @@ const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon, color, subtitle }
 export const KpiGrid: React.FC<{ data: DashboardData['kpis'] }> = ({ data }) => {
   const theme = useTheme();
   const isLight = theme.palette.mode === 'light';
-  const kpi = themeTokens.enterprise.kpi;
+  const enterpriseSeries = themeTokens.enterprise.chart.series;
 
   const colors = isLight
-    ? [kpi.targets, kpi.subdomains, kpi.endpoints, kpi.vulns, kpi.leaks]
-    : ['#00f3ff',   '#7000ff',      '#ff00f7',      '#ff003c', '#fffc00'];
+    ? [enterpriseSeries[0], enterpriseSeries[1], enterpriseSeries[2], enterpriseSeries[3], enterpriseSeries[4]]
+    : ['#00f3ff',           '#7000ff',            '#ff00f7',            '#ff003c',           '#fffc00'];
 
   return (
     <Grid container spacing={3}>

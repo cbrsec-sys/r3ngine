@@ -53,8 +53,10 @@ import {
 import type { LLMConfig, LLMModel, TestLlmConnectionResult } from '../api';
 
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const LlmToolkitPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: toolkit, isLoading: isToolkitLoading } = useLlmToolkit(projectSlug);
   const updateSettings = useUpdateLlmSettings(projectSlug);
@@ -248,7 +250,7 @@ export const LlmToolkitPage: React.FC = () => {
   if (isToolkitLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
       </Box>
     );
   }
@@ -259,13 +261,13 @@ export const LlmToolkitPage: React.FC = () => {
         <Typography variant="h4" sx={{ 
           fontFamily: 'Orbitron', 
           fontWeight: 900, 
-          color: '#fff', 
-          textShadow: '0 0 20px rgba(0, 243, 255, 0.5)',
+          color: 'text.primary', 
+          textShadow: `0 0 20px ${tokens.accent.primary}80`,
           mb: 1 
         }}>
           AI_HUB
         </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary', letterSpacing: 1 }}>
           CENTRALIZED LLM ORCHESTRATION & CONFIGURATION
         </Typography>
       </Box>
@@ -288,26 +290,27 @@ export const LlmToolkitPage: React.FC = () => {
                     py: 1.5,
                     px: 2,
                     borderRadius: '12px',
-                    bgcolor: selectedProvider === p.id ? 'rgba(0, 243, 255, 0.15)' : 'transparent',
-                    color: selectedProvider === p.id ? '#00f3ff' : 'rgba(255,255,255,0.6)',
-                    border: selectedProvider === p.id ? '1px solid rgba(0, 243, 255, 0.3)' : '1px solid transparent',
+                    bgcolor: selectedProvider === p.id ? `${tokens.accent.primary}26` : 'transparent',
+                    color: selectedProvider === p.id ? tokens.accent.primary : 'text.secondary',
+                    border: 1,
+                    borderColor: selectedProvider === p.id ? `${tokens.accent.primary}4D` : 'transparent',
                     '&:hover': {
-                      bgcolor: 'rgba(0, 243, 255, 0.05)',
-                      color: '#00f3ff'
+                      bgcolor: 'action.hover',
+                      color: tokens.accent.primary
                     }
                   }}
                 >
                   {p.name}
                   {toolkit?.llm_configs.find(c => c.provider === p.id)?.is_active && (
                     <Box sx={{ ml: 'auto', display: 'flex' }}>
-                      <CheckCircle2 size={14} color="#00f3ff" />
+                      <CheckCircle2 size={14} color={tokens.accent.primary} />
                     </Box>
                   )}
                 </Button>
               ))}
             </Stack>
-            <Box sx={{ mt: 4, pt: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', lineHeight: 1.6, display: 'block' }}>
+            <Box sx={{ mt: 4, pt: 3, borderTop: 1, borderColor: 'divider' }}>
+              <Typography variant="caption" sx={{ color: 'text.secondary', lineHeight: 1.6, display: 'block' }}>
                 reNgine uses LLMs for intelligent reporting, vulnerability analysis, and attack path suggestions.
               </Typography>
             </Box>
@@ -324,13 +327,14 @@ export const LlmToolkitPage: React.FC = () => {
                 px: 1.5, 
                 py: 0.5, 
                 borderRadius: '20px', 
-                bgcolor: form.is_active ? 'rgba(0, 243, 255, 0.1)' : 'rgba(255,255,255,0.05)',
-                border: `1px solid ${form.is_active ? 'rgba(0, 243, 255, 0.3)' : 'rgba(255,255,255,0.1)'}`
+                bgcolor: form.is_active ? `${tokens.accent.primary}1A` : 'action.hover',
+                border: 1,
+                borderColor: form.is_active ? `${tokens.accent.primary}4D` : 'divider'
               }}>
                 <Typography sx={{ 
                   fontSize: '10px', 
                   fontFamily: 'Orbitron', 
-                  color: form.is_active ? '#00f3ff' : 'rgba(255,255,255,0.4)',
+                  color: form.is_active ? tokens.accent.primary : 'text.disabled',
                   fontWeight: 700
                 }}>
                   {form.is_active ? 'ACTIVE DEFAULT' : 'INACTIVE'}
@@ -344,8 +348,9 @@ export const LlmToolkitPage: React.FC = () => {
                 <Box sx={{ 
                   p: 2, 
                   borderRadius: '12px', 
-                  bgcolor: 'rgba(0,0,0,0.2)', 
-                  border: '1px solid rgba(255,255,255,0.05)',
+                  bgcolor: 'background.paper', 
+                  border: 1,
+                  borderColor: 'divider',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'space-between',
@@ -353,19 +358,19 @@ export const LlmToolkitPage: React.FC = () => {
                   gap: 2
                 }}>
                   <Box>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 0.5, fontFamily: 'Orbitron' }}>
+                    <Typography sx={{ color: 'text.secondary', fontSize: '0.75rem', mb: 0.5, fontFamily: 'Orbitron' }}>
                       OLLAMA SERVICE STATUS
                     </Typography>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                       {ollamaStatus?.running ? (
-                        <CheckCircle2 size={16} color="#00f3ff" />
+                        <CheckCircle2 size={16} color={tokens.accent.primary} />
                       ) : (
                         <AlertCircle size={16} color="#ff3131" />
                       )}
                       <Typography sx={{ 
                         fontSize: '0.85rem', 
                         fontWeight: 600,
-                        color: ollamaStatus?.running ? '#00f3ff' : '#ff3131' 
+                        color: ollamaStatus?.running ? tokens.accent.primary : '#ff3131' 
                       }}>
                         {ollamaStatus?.running ? 'RUNNING' : 'STOPPED'}
                       </Typography>
@@ -379,12 +384,12 @@ export const LlmToolkitPage: React.FC = () => {
                         disabled={startOllama.isPending}
                         startIcon={startOllama.isPending ? <CircularProgress size={14} color="inherit" /> : <Database size={16} />}
                         sx={{
-                          bgcolor: 'rgba(0, 243, 255, 0.1)',
-                          color: '#00f3ff',
-                          border: '1px solid rgba(0, 243, 255, 0.3)',
+                          bgcolor: `${tokens.accent.primary}1A`,
+                          color: tokens.accent.primary,
+                          border: `1px solid ${tokens.accent.primary}4D`,
                           fontFamily: 'Orbitron',
                           fontSize: '0.75rem',
-                          '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                          '&:hover': { bgcolor: `${tokens.accent.primary}33` }
                         }}
                       >
                         {startOllama.isPending ? 'STARTING...' : 'START LOCAL SERVICE'}
@@ -412,7 +417,7 @@ export const LlmToolkitPage: React.FC = () => {
 
               {/* API Key / Host URL */}
               <Box>
-                <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 1, fontFamily: 'Orbitron' }}>
+                <Typography sx={{ color: 'text.secondary', fontSize: '0.75rem', mb: 1, fontFamily: 'Orbitron' }}>
                   {selectedProvider === 'ollama' ? 'HOST_URL' : 'API_KEY'}
                 </Typography>
                 <TextField
@@ -425,14 +430,14 @@ export const LlmToolkitPage: React.FC = () => {
                     input: {
                       startAdornment: (
                         <InputAdornment position="start">
-                          <Box sx={{ color: 'rgba(0, 243, 255, 0.5)' }}>
+                          <Box sx={{ color: `${tokens.accent.primary}80` }}>
                             {selectedProvider === 'ollama' ? <Globe size={18} /> : <Eye size={18} />}
                           </Box>
                         </InputAdornment>
                       ),
                       endAdornment: (
                         <InputAdornment position="end">
-                          <IconButton onClick={() => setShowKey(!showKey)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                          <IconButton onClick={() => setShowKey(!showKey)} edge="end" sx={{ color: 'text.disabled' }}>
                             {showKey ? <EyeOff size={18} /> : <Eye size={18} />}
                           </IconButton>
                         </InputAdornment>
@@ -441,16 +446,16 @@ export const LlmToolkitPage: React.FC = () => {
                   }}
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      color: '#fff',
-                      bgcolor: 'rgba(255,255,255,0.02)',
+                      color: 'text.primary',
+                      bgcolor: 'action.hover',
                       fontFamily: 'monospace',
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                      '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
-                      '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+                      '& fieldset': { borderColor: 'divider' },
+                      '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                      '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
                     }
                   }}
                 />
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', mt: 1, display: 'block' }}>
+                <Typography variant="caption" sx={{ color: 'text.disabled', mt: 1, display: 'block' }}>
                   {selectedProvider === 'ollama' 
                     ? 'Internal URL for Ollama service. Default is http://ollama:11434' 
                     : `Enter your ${selectedProvider} API key to fetch available models.`}
@@ -459,7 +464,7 @@ export const LlmToolkitPage: React.FC = () => {
 
               {/* Model Selection */}
               <Box>
-                <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 1, fontFamily: 'Orbitron' }}>
+                <Typography sx={{ color: 'text.secondary', fontSize: '0.75rem', mb: 1, fontFamily: 'Orbitron' }}>
                   SELECT MODEL
                 </Typography>
                 <TextField
@@ -470,12 +475,12 @@ export const LlmToolkitPage: React.FC = () => {
                   disabled={isModelsLoading || (selectedProvider === 'ollama' && !ollamaStatus?.running)}
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      color: '#fff',
-                      bgcolor: 'rgba(255,255,255,0.02)',
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                      '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+                      color: 'text.primary',
+                      bgcolor: 'action.hover',
+                      '& fieldset': { borderColor: 'divider' },
+                      '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
                     },
-                    '& .MuiSelect-icon': { color: 'rgba(255,255,255,0.4)' }
+                    '& .MuiSelect-icon': { color: 'text.secondary' }
                   }}
                 >
                   {isModelsLoading ? (
@@ -486,10 +491,10 @@ export const LlmToolkitPage: React.FC = () => {
                     models.map((m) => (
                       <MenuItem key={m.name} value={m.name} sx={{ 
                         fontFamily: 'monospace',
-                        color: '#fff',
-                        bgcolor: '#0a0a0f',
-                        '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' },
-                        '&.Mui-selected': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                        color: 'text.primary',
+                        bgcolor: 'background.paper',
+                        '&:hover': { bgcolor: 'action.hover' },
+                        '&.Mui-selected': { bgcolor: `${tokens.accent.primary}33` }
                       }}>
                         {m.name} {m.is_local && '(Local)'}
                       </MenuItem>
@@ -509,13 +514,13 @@ export const LlmToolkitPage: React.FC = () => {
                     checked={form.is_active} 
                     onChange={(e) => setForm({ ...form, is_active: e.target.checked })}
                     sx={{
-                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
                     }}
                   />
                 }
                 label={
-                  <Typography sx={{ color: '#fff', fontSize: '0.85rem', fontFamily: 'Orbitron' }}>
+                  <Typography sx={{ color: 'text.primary', fontSize: '0.85rem', fontFamily: 'Orbitron' }}>
                     SET AS DEFAULT LLM
                   </Typography>
                 }
@@ -529,13 +534,13 @@ export const LlmToolkitPage: React.FC = () => {
                   onClick={() => handleSave('save')}
                   disabled={updateSettings.isPending}
                   sx={{
-                    bgcolor: 'rgba(0, 243, 255, 0.1)',
-                    color: '#00f3ff',
-                    border: '1px solid rgba(0, 243, 255, 0.3)',
+                    bgcolor: `${tokens.accent.primary}1A`,
+                    color: tokens.accent.primary,
+                    border: `1px solid ${tokens.accent.primary}4D`,
                     fontFamily: 'Orbitron',
                     fontWeight: 800,
                     px: 4,
-                    '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                    '&:hover': { bgcolor: `${tokens.accent.primary}33` }
                   }}
                 >
                   {updateSettings.isPending ? 'SAVING...' : 'SAVE CONFIG'}
@@ -585,20 +590,20 @@ export const LlmToolkitPage: React.FC = () => {
                   p: 2,
                   borderRadius: '12px',
                   bgcolor: testResult.status === 'success'
-                    ? 'rgba(0, 243, 255, 0.05)'
+                    ? `${tokens.accent.primary}0D`
                     : 'rgba(255, 49, 49, 0.05)',
-                  border: `1px solid ${testResult.status === 'success' ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255, 49, 49, 0.2)'}`,
+                  border: `1px solid ${testResult.status === 'success' ? `${tokens.accent.primary}33` : 'rgba(255, 49, 49, 0.2)'}`,
                 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: testResult.response ? 1.5 : 0 }}>
                     {testResult.status === 'success'
-                      ? <CheckCircle2 size={16} color="#00f3ff" />
+                      ? <CheckCircle2 size={16} color={tokens.accent.primary} />
                       : <XCircle size={16} color="#ff3131" />
                     }
                     <Typography sx={{
                       fontSize: '0.8rem',
                       fontFamily: 'Orbitron',
                       fontWeight: 700,
-                      color: testResult.status === 'success' ? '#00f3ff' : '#ff3131',
+                      color: testResult.status === 'success' ? tokens.accent.primary : '#ff3131',
                     }}>
                       {testResult.message}
                     </Typography>
@@ -608,13 +613,13 @@ export const LlmToolkitPage: React.FC = () => {
                       mt: 1,
                       p: 1.5,
                       borderRadius: '8px',
-                      bgcolor: 'rgba(0,0,0,0.3)',
+                      bgcolor: 'background.default',
                       fontFamily: 'monospace',
                       fontSize: '0.78rem',
-                      color: 'rgba(255,255,255,0.7)',
+                      color: 'text.secondary',
                       wordBreak: 'break-word',
                     }}>
-                      <Typography component="span" sx={{ color: 'rgba(0,243,255,0.5)', fontSize: '10px', fontFamily: 'Orbitron', mr: 1 }}>
+                      <Typography component="span" sx={{ color: `${tokens.accent.primary}80`, fontSize: '10px', fontFamily: 'Orbitron', mr: 1 }}>
                         RESPONSE:
                       </Typography>
                       {testResult.response}
@@ -627,29 +632,30 @@ export const LlmToolkitPage: React.FC = () => {
               {(pullingModel || pullStatus) && (
                 <Box sx={{ mt: 4 }}>
                   <Paper sx={{ 
-                    bgcolor: '#0a0a0a', 
+                    bgcolor: 'background.default', 
                     borderRadius: '12px', 
-                    border: '1px solid rgba(255,255,255,0.1)',
+                    border: 1,
+                    borderColor: 'divider',
                     overflow: 'hidden'
                   }}>
                     <Box sx={{ 
                       px: 2, 
                       py: 1, 
-                      bgcolor: '#1a1a1a', 
+                      bgcolor: 'background.paper', 
                       display: 'flex', 
                       justifyContent: 'space-between', 
                       alignItems: 'center' 
                     }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <TerminalIcon size={14} color="#00f3ff" />
-                        <Typography sx={{ color: '#fff', fontSize: '10px', fontFamily: 'monospace' }}>
+                        <TerminalIcon size={14} color={tokens.accent.primary} />
+                        <Typography sx={{ color: 'text.primary', fontSize: '10px', fontFamily: 'monospace' }}>
                           OLLAMA PULL: {pullingModel}
                         </Typography>
                       </Box>
                       <Typography sx={{ 
                         fontSize: '10px', 
                         fontFamily: 'Orbitron', 
-                        color: pullStatus?.status === 'success' ? '#00f3ff' : pullStatus?.status === 'failed' ? '#ff3131' : '#ffd600'
+                        color: pullStatus?.status === 'success' ? tokens.accent.primary : pullStatus?.status === 'failed' ? '#ff3131' : '#ffd600'
                       }}>
                         {pullStatus?.status.toUpperCase() || 'INITIATING'}
                       </Typography>
@@ -665,7 +671,7 @@ export const LlmToolkitPage: React.FC = () => {
                         color: '#10b981',
                         whiteSpace: 'pre-wrap',
                         '&::-webkit-scrollbar': { width: '4px' },
-                        '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                        '&::-webkit-scrollbar-thumb': { bgcolor: `${tokens.accent.primary}33` }
                       }}
                     >
                       {pullStatus?.log || 'Preparing environment...'}
@@ -684,29 +690,29 @@ export const LlmToolkitPage: React.FC = () => {
               {!currentModel ? (
                 <Box sx={{ textAlign: 'center', py: 4 }}>
                   <Ghost size={40} color="rgba(255,255,255,0.1)" />
-                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.3)', mt: 2 }}>
+                  <Typography variant="body2" sx={{ color: 'text.disabled', mt: 2 }}>
                     Select a model to view technical specifications.
                   </Typography>
                 </Box>
               ) : (
                 <Stack spacing={3}>
-                  <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', lineHeight: 1.6 }}>
+                  <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.8rem', lineHeight: 1.6 }}>
                     {currentModel.description || 'No detailed description available for this model variant.'}
                   </Typography>
                   
                   <Box>
-                    <Typography sx={{ color: 'rgba(0, 243, 255, 0.5)', fontSize: '10px', fontFamily: 'Orbitron', mb: 0.5 }}>EXPERTISE</Typography>
-                    <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600 }}>{currentModel.expertise || 'General Purpose'}</Typography>
+                    <Typography sx={{ color: `${tokens.accent.primary}80`, fontSize: '10px', fontFamily: 'Orbitron', mb: 0.5 }}>EXPERTISE</Typography>
+                    <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', fontWeight: 600 }}>{currentModel.expertise || 'General Purpose'}</Typography>
                   </Box>
 
                   <Box>
-                    <Typography sx={{ color: 'rgba(0, 243, 255, 0.5)', fontSize: '10px', fontFamily: 'Orbitron', mb: 0.5 }}>DISK FOOTPRINT</Typography>
-                    <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600 }}>{currentModel.size || 'N/A'}</Typography>
+                    <Typography sx={{ color: `${tokens.accent.primary}80`, fontSize: '10px', fontFamily: 'Orbitron', mb: 0.5 }}>DISK FOOTPRINT</Typography>
+                    <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', fontWeight: 600 }}>{currentModel.size || 'N/A'}</Typography>
                   </Box>
 
                   <Box>
-                    <Typography sx={{ color: 'rgba(0, 243, 255, 0.5)', fontSize: '10px', fontFamily: 'Orbitron', mb: 0.5 }}>SUGGESTED RAM</Typography>
-                    <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 600 }}>{currentModel.suggested_ram || 'N/A'}</Typography>
+                    <Typography sx={{ color: `${tokens.accent.primary}80`, fontSize: '10px', fontFamily: 'Orbitron', mb: 0.5 }}>SUGGESTED RAM</Typography>
+                    <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', fontWeight: 600 }}>{currentModel.suggested_ram || 'N/A'}</Typography>
                   </Box>
 
                   <Alert 
@@ -743,7 +749,7 @@ export const LlmToolkitPage: React.FC = () => {
             fontFamily: 'Orbitron', 
             fontSize: '0.8rem',
             fontWeight: 700,
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : snackbar.severity === 'info' ? 'rgba(0, 243, 255, 0.7)' : 'rgba(255, 0, 85, 0.9)',
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}E6` : snackbar.severity === 'info' ? `${tokens.accent.primary}B3` : 'rgba(255, 0, 85, 0.9)',
             color: '#000',
             '& .MuiAlert-icon': { color: '#000' }
           }}
