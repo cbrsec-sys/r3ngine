@@ -63,13 +63,19 @@ _RETRY_LLM = RetryPolicy(
 async def _dispatch_tier_plugins(ctx: dict, tier: str, wf_id_prefix: str) -> None:
     """Dispatch selected plugins anchored to `tier` as child workflows.
 
+    Called after every scan tier completes. Valid tier values:
+      tier_1 (subdomain discovery), tier_2 (port scan / HTTP crawl),
+      tier_3 (URL fetch / screenshot), tier_4 (dir/file fuzz),
+      tier_5 (API discovery / secrets / WAF), tier_6 (vulnerability scan),
+      tier_7 (correlation / risk / APME), standalone (not injected).
+
     Only runs if the scan explicitly selected at least one plugin slug.
     An empty or absent `selected_plugin_slugs` in ctx means no plugins were
     chosen for this scan — the activity is skipped entirely in that case.
 
     Args:
         ctx: Scan context dict passed through to each plugin workflow.
-        tier: Anchor tier string, e.g. "tier_2", "vulnerability_scan".
+        tier: Anchor tier string, e.g. "tier_2", "tier_7".
         wf_id_prefix: Unique prefix for child workflow IDs (scan or subscan ID).
     """
     selected_slugs = ctx.get("selected_plugin_slugs") or []
