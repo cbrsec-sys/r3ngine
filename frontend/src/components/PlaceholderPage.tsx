@@ -1,8 +1,10 @@
+import { useThemeTokens } from '../theme/useThemeTokens';
 import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
 import { Activity, ShieldAlert } from 'lucide-react';
 
 export const PlaceholderPage: React.FC<{ title: string; icon: React.ReactNode }> = ({ title, icon }) => {
+  const { tokens } = useThemeTokens();
   return (
     <Box
       sx={{
@@ -18,17 +20,17 @@ export const PlaceholderPage: React.FC<{ title: string; icon: React.ReactNode }>
         p: 4
       }}
     >
-      <Box sx={{ color: '#00f3ff', mb: 3 }}>
+      <Box sx={{ color: tokens.accent.primary, mb: 3 }}>
         {icon}
       </Box>
-      <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, mb: 2, color: '#fff' }}>
+      <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, mb: 2, color: 'text.primary' }}>
         {title.toUpperCase()}
       </Typography>
       <Typography variant="body1" sx={{ color: 'rgba(255, 255, 255, 0.5)', maxWidth: 500, mb: 4 }}>
         The {title} tactical module is currently being migrated to the new React interface. 
         Please check back shortly for full reconnaissance data.
       </Typography>
-      <Button variant="outlined" sx={{ borderColor: '#00f3ff', color: '#00f3ff' }}>
+      <Button variant="outlined" sx={{ borderColor: tokens.accent.primary, color: tokens.accent.primary }}>
         NOTIFY ON COMPLETION
       </Button>
     </Box>

@@ -69,8 +69,10 @@ import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 import { timeout } from 'd3';
 import type { ScanHistory } from '../types';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ScanHistoryPage: React.FC = () => {
+  const { tokens, isLight } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const navigate = useNavigate();
   const { data: scans, isLoading } = useScansHistory(projectSlug);
@@ -183,19 +185,19 @@ export const ScanHistoryPage: React.FC = () => {
             size="small"
             sx={{
               bgcolor: 'rgba(255, 0, 255, 0.1)',
-              color: '#ff00ff',
+              color: tokens.accent.secondary,
               border: '1px solid rgba(255, 0, 255, 0.4)',
               fontSize: '0.65rem',
               fontWeight: 900,
               fontFamily: 'Orbitron',
               animation: 'pulse-spider 2s infinite ease-in-out',
               '@keyframes pulse-spider': {
-                '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
-                '50%': { transform: 'scale(1.05)', filter: 'drop-shadow(0 0 8px #ff00ff)' },
-                '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+                '0%': { transform: 'scale(1)', filter: `drop-shadow(0 0 0px ${tokens.accent.secondary})` },
+                '50%': { transform: 'scale(1.05)', filter: `drop-shadow(0 0 8px ${tokens.accent.secondary})` },
+                '100%': { transform: 'scale(1)', filter: `drop-shadow(0 0 0px ${tokens.accent.secondary})` },
               }
             }}
-            icon={<Bug size={12} color="#ff00ff" />}
+            icon={<Bug size={12} color={tokens.accent.secondary} />}
           />
         </Tooltip>
       );
@@ -205,51 +207,61 @@ export const ScanHistoryPage: React.FC = () => {
         const total = scan.total_task_count ?? 0;
         const ok    = scan.successful_task_count ?? 0;
         const completeLabel = total > 0 ? `COMPLETE ${ok}/${total}` : 'COMPLETE';
-        return <Chip label={completeLabel} size="small" sx={{ bgcolor: 'rgba(0, 255, 98, 0.1)', color: '#00ff62', border: '1px solid rgba(0, 255, 98, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<CheckCircle2 size={12} />} />;
+        const color = isLight ? tokens.accent.success : '#00ff62';
+        return <Chip label={completeLabel} size="small" sx={{ bgcolor: isLight ? `${tokens.accent.success}1A` : 'rgba(0, 255, 98, 0.1)', color: color, border: `1px solid ${color}33`, fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<CheckCircle2 size={12} />} />;
       }
       case 1: // Running
-        return <Chip label="RUNNING" size="small" sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<RefreshCw size={12} className="spin" />} />;
-      case 5: // Paused
+        return <Chip label="RUNNING" size="small" sx={{ bgcolor: `${tokens.accent.primary}15`, color: tokens.accent.primary, border: `1px solid ${tokens.accent.primary}33`, fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<RefreshCw size={12} className="spin" />} />;
+      case 5: { // Paused
+        const color = isLight ? '#d97706' : '#ffab00';
         return (
           <Chip
             label="PAUSED"
             size="small"
             sx={{
-              bgcolor: 'rgba(255, 171, 0, 0.1)',
-              color: '#ffab00',
-              border: '1px solid rgba(255, 171, 0, 0.2)',
+              bgcolor: isLight ? '#d977061A' : 'rgba(255, 171, 0, 0.1)',
+              color: color,
+              border: `1px solid ${color}33`,
               fontSize: '0.65rem',
               fontWeight: 900,
               fontFamily: 'Orbitron',
               animation: 'pulse-paused 2s infinite ease-in-out',
               '@keyframes pulse-paused': {
-                '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ffab00)' },
-                '50%': { transform: 'scale(1.02)', filter: 'drop-shadow(0 0 4px #ffab00)' },
-                '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ffab00)' },
+                '0%': { transform: 'scale(1)', filter: `drop-shadow(0 0 0px ${color})` },
+                '50%': { transform: 'scale(1.02)', filter: `drop-shadow(0 0 4px ${color})` },
+                '100%': { transform: 'scale(1)', filter: `drop-shadow(0 0 0px ${color})` },
               }
             }}
-            icon={<PauseCircle size={12} color="#ffab00" />}
+            icon={<PauseCircle size={12} color={color} />}
           />
         );
-      case 3: // Aborted
-        return <Chip label="ABORTED" size="small" sx={{ bgcolor: 'rgba(255, 0, 60, 0.1)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<AlertTriangle size={12} />} />;
+      }
+      case 3: { // Aborted
+        const color = isLight ? tokens.accent.error : '#ff003c';
+        return <Chip label="ABORTED" size="small" sx={{ bgcolor: isLight ? `${tokens.accent.error}1A` : 'rgba(255, 0, 60, 0.1)', color: color, border: `1px solid ${color}33`, fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<AlertTriangle size={12} />} />;
+      }
       case 0: { // Failed
         const total = scan.total_task_count ?? 0;
         const ok    = scan.successful_task_count ?? 0;
         const failedLabel = total > 0 ? `FAILED ${ok}/${total}` : 'FAILED';
-        return <Chip label={failedLabel} size="small" sx={{ bgcolor: 'rgba(255, 0, 60, 0.1)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<XCircle size={12} />} />;
+        const color = isLight ? tokens.accent.error : '#ff003c';
+        return <Chip label={failedLabel} size="small" sx={{ bgcolor: isLight ? `${tokens.accent.error}1A` : 'rgba(255, 0, 60, 0.1)', color: color, border: `1px solid ${color}33`, fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<XCircle size={12} />} />;
       }
-      case 4: // Partially Complete
-        return <Chip label="PARTIALLY COMPLETE" size="small" sx={{ bgcolor: 'rgba(255, 252, 0, 0.1)', color: '#fffc00', border: '1px solid rgba(255, 252, 0, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<AlertTriangle size={12} />} />;
-      default:
-        return <Chip label="PENDING" size="small" sx={{ bgcolor: 'rgba(255, 171, 0, 0.1)', color: '#ffab00', border: '1px solid rgba(255, 171, 0, 0.2)', fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<Clock size={12} />} />;
+      case 4: { // Partially Complete
+        const warnColor = isLight ? '#d97706' : '#fffc00';
+        return <Chip label="PARTIALLY COMPLETE" size="small" sx={{ bgcolor: isLight ? '#d977061A' : 'rgba(255, 252, 0, 0.1)', color: warnColor, border: `1px solid ${warnColor}33`, fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<AlertTriangle size={12} />} />;
+      }
+      default: {
+        const color = isLight ? '#d97706' : '#ffab00';
+        return <Chip label="PENDING" size="small" sx={{ bgcolor: isLight ? '#d977061A' : 'rgba(255, 171, 0, 0.1)', color: color, border: `1px solid ${color}33`, fontSize: '0.65rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<Clock size={12} />} />;
+      }
     }
   };
 
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', mt: 10 }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
       </Box>
     );
   }
@@ -258,8 +270,8 @@ export const ScanHistoryPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN HISTORY</Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
+          <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: 'text.primary', letterSpacing: 2 }}>SCAN HISTORY</Typography>
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
             MANAGE AND AUDIT PAST SECURITY OPERATIONS
           </Typography>
         </Box>
@@ -324,8 +336,8 @@ export const ScanHistoryPage: React.FC = () => {
         </Box>
       </Box>
 
-      <Card sx={{ bgcolor: 'rgba(13, 12, 20, 0.95)', border: '1px solid rgba(0, 243, 255, 0.1)', borderRadius: '12px', position: 'relative', overflow: 'hidden' }}>
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>
+      <Card sx={{ bgcolor: 'rgba(13, 12, 20, 0.95)', border: `1px solid ${tokens.accent.primary}15`, borderRadius: '12px', position: 'relative', overflow: 'hidden' }}>
+        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: `1px solid ${tokens.accent.primary}15` }}>
           <TextField
             placeholder="FILTER SCAN RECORDS..."
             size="small"
@@ -334,20 +346,20 @@ export const ScanHistoryPage: React.FC = () => {
             sx={{
               width: 350,
               '& .MuiOutlinedInput-root': {
-                color: '#fff',
+                color: 'text.primary',
                 fontFamily: 'Orbitron',
                 fontSize: '0.75rem',
                 bgcolor: 'rgba(0, 243, 255, 0.03)',
-                '& fieldset': { borderColor: 'rgba(0, 243, 255, 0.2)' },
-                '&:hover fieldset': { borderColor: '#00f3ff' },
-                '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+                '& fieldset': { borderColor: `${tokens.accent.primary}33` },
+                '&:hover fieldset': { borderColor: tokens.accent.primary },
+                '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
               }
             }}
             slotProps={{
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search size={16} style={{ color: '#00f3ff' }} />
+                    <Search size={16} style={{ color: tokens.accent.primary }} />
                   </InputAdornment>
                 ),
               }
@@ -356,23 +368,23 @@ export const ScanHistoryPage: React.FC = () => {
         </Box>
         <TableContainer>
           <Table>
-            <TableHead sx={{ bgcolor: 'rgba(0, 243, 255, 0.05)' }}>
+            <TableHead sx={{ bgcolor: `${tokens.accent.primary}0D` }}>
               <TableRow>
-                <TableCell padding="checkbox" sx={{ borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>
+                <TableCell padding="checkbox" sx={{ borderBottom: `1px solid ${tokens.accent.primary}15` }}>
                   <Checkbox
                     indeterminate={selected.length > 0 && selected.length < (scans?.length || 0)}
                     checked={(scans?.length || 0) > 0 && selected.length === scans?.length}
                     onChange={handleSelectAllClick}
-                    sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
+                    sx={{ color: `${tokens.accent.primary}4D`, '&.Mui-checked': { color: tokens.accent.primary } }}
                   />
                 </TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>DOMAIN / TARGET</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>SUMMARY</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>ENGINE</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>STATUS</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>PROGRESS</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>TIMELINE</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)', textAlign: 'left', width: 140 }}>ACTION</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>DOMAIN / TARGET</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>SUMMARY</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>ENGINE</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>STATUS</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>PROGRESS</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>TIMELINE</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.7rem', borderBottom: `1px solid ${tokens.accent.primary}15`, textAlign: 'left', width: 140 }}>ACTION</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -389,19 +401,19 @@ export const ScanHistoryPage: React.FC = () => {
                     selected={isItemSelected}
                     sx={{
                       '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.02) !important' },
-                      '&.Mui-selected': { bgcolor: 'rgba(0, 243, 255, 0.05) !important' },
+                      '&.Mui-selected': { bgcolor: `${tokens.accent.primary}0D !important` },
                       transition: 'all 0.2s',
                       cursor: 'pointer'
                     }}
                   >
-                    <TableCell padding="checkbox" sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <TableCell padding="checkbox" sx={{ borderBottom: 1, borderColor: 'divider' }}>
                       <Checkbox
                         checked={isItemSelected}
-                        sx={{ color: 'rgba(255,255,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }}
+                        sx={{ color: 'rgba(255,255,255,0.2)', '&.Mui-checked': { color: tokens.accent.primary } }}
                       />
                     </TableCell>
                     <TableCell
-                      sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', cursor: 'pointer' }}
+                      sx={{ borderBottom: 1, borderColor: 'divider', cursor: 'pointer' }}
                       onClick={(e) => {
                         e.stopPropagation();
                         navigate({ to: `/${projectSlug}/scan/detail/${scan.id}` as any });
@@ -411,13 +423,13 @@ export const ScanHistoryPage: React.FC = () => {
                         variant="body2"
                         sx={{
                           fontWeight: 800,
-                          color: '#fff',
+                          color: 'text.primary',
                           fontFamily: 'Orbitron',
                           fontSize: '0.8rem',
                           display: 'inline-block',
                           cursor: 'pointer',
                           '&:hover': {
-                            color: '#00f3ff',
+                            color: tokens.accent.primary,
                             textDecoration: 'underline'
                           }
                         }}
@@ -426,15 +438,15 @@ export const ScanHistoryPage: React.FC = () => {
                       </Typography>
                       {scan.cfg_starting_point_path && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                          <Terminal size={10} style={{ color: 'rgba(255,255,255,0.3)' }} />
-                          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.6rem' }}>{scan.cfg_starting_point_path}</Typography>
+                          <Terminal size={10} style={{ color: 'text.disabled' }} />
+                          <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.6rem' }}>{scan.cfg_starting_point_path}</Typography>
                         </Box>
                       )}
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                       <Box sx={{ display: 'flex', gap: 1 }}>
                         <Tooltip title="Subdomains Found">
-                          <Box sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', px: 1, py: 0.5, borderRadius: '2px', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <Box sx={{ bgcolor: `${tokens.accent.primary}15`, color: tokens.accent.primary, px: 1, py: 0.5, borderRadius: '2px', display: 'flex', alignItems: 'center', gap: 0.5 }}>
                             <Globe size={12} />
                             <Typography variant="caption" sx={{ fontWeight: 900, fontFamily: 'Orbitron' }}>{scan.subdomain_count || 0}</Typography>
                           </Box>
@@ -453,23 +465,23 @@ export const ScanHistoryPage: React.FC = () => {
                         </Tooltip>
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                       <Chip
                         label={scan.engine_name || scan.scan_type?.engine_name || 'STANDARD'}
                         size="small"
-                        sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.6rem', fontWeight: 800, fontFamily: 'Orbitron' }}
+                        sx={{ bgcolor: 'action.hover', color: 'rgba(255,255,255,0.7)', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.6rem', fontWeight: 800, fontFamily: 'Orbitron' }}
                       />
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                       {getStatusChip(scan)}
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', minWidth: 160 }}>
+                    <TableCell sx={{ borderBottom: 1, borderColor: 'divider', minWidth: 160 }}>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                          <Typography variant="caption" sx={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontWeight: 700 }}>
+                          <Typography variant="caption" sx={{ fontSize: '0.55rem', color: 'text.secondary', fontFamily: 'Orbitron', fontWeight: 700 }}>
                             {scan.scan_status === 2 ? 'ALL TIERS COMPLETE' : `TIER ${scan.current_tier || 0}/${scan.total_tiers || 0}`}
                           </Typography>
-                          <Typography variant="caption" sx={{ fontWeight: 900, color: '#fff', fontSize: '0.6rem', fontFamily: 'Orbitron' }}>
+                          <Typography variant="caption" sx={{ fontWeight: 900, color: 'text.primary', fontSize: '0.6rem', fontFamily: 'Orbitron' }}>
                             {Math.round(Number(displayProgress))}%
                           </Typography>
                         </Box>
@@ -480,12 +492,12 @@ export const ScanHistoryPage: React.FC = () => {
                             width: '100%',
                             height: 4,
                             borderRadius: 0,
-                            bgcolor: 'rgba(255,255,255,0.05)',
+                            bgcolor: 'action.hover',
                             '& .MuiLinearProgress-bar': {
-                              bgcolor: (scan.scan_status === 0 || scan.scan_status === 3) ? '#ff003c' : scan.scan_status === 5 ? '#ffab00' : '#00f3ff',
-                              boxShadow: `0 0 10px ${(scan.scan_status === 0 || scan.scan_status === 3) ? 'rgba(255, 0, 60, 0.5)' : scan.scan_status === 5 ? 'rgba(255, 171, 0, 0.5)' : 'rgba(0, 243, 255, 0.5)'}`,
+                              bgcolor: (scan.scan_status === 0 || scan.scan_status === 3) ? '#ff003c' : scan.scan_status === 5 ? '#ffab00' : tokens.accent.primary,
+                              boxShadow: `0 0 10px ${(scan.scan_status === 0 || scan.scan_status === 3) ? 'rgba(255, 0, 60, 0.5)' : scan.scan_status === 5 ? 'rgba(255, 171, 0, 0.5)' : `${tokens.accent.primary}80`}`,
                               ...((scan.scan_status === 1 || scan.scan_status === -1) && {
-                                background: 'linear-gradient(90deg, #00f3ff 0%, #00a8ff 50%, #00f3ff 100%)',
+                                background: `linear-gradient(90deg, #00f3ff 0%, #00a8ff 50%, ${tokens.accent.primary} 100%)`,
                                 backgroundSize: '200% 100%',
                                 animation: 'progress-flow 2s linear infinite'
                               })
@@ -496,10 +508,10 @@ export const ScanHistoryPage: React.FC = () => {
                         {(scan.scan_status === 1 || scan.scan_status === 5) && scan.current_tier && scan.current_tier > 0 ? (
                           <Box sx={{ mt: 0.5, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <Typography variant="caption" sx={{ fontSize: '0.5rem', color: 'rgba(0, 243, 255, 0.6)', fontFamily: 'Orbitron', fontWeight: 600 }}>
+                              <Typography variant="caption" sx={{ fontSize: '0.5rem', color: `${tokens.accent.primary}99`, fontFamily: 'Orbitron', fontWeight: 600 }}>
                                 TIER TASK PROGRESS
                               </Typography>
-                              <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.8)', fontSize: '0.55rem', fontFamily: 'Orbitron', fontWeight: 800 }}>
+                              <Typography variant="caption" sx={{ color: `${tokens.accent.primary}CC`, fontSize: '0.55rem', fontFamily: 'Orbitron', fontWeight: 800 }}>
                                 {Math.round(scan.current_tier_progress || 0)}%
                               </Typography>
                             </Box>
@@ -510,7 +522,7 @@ export const ScanHistoryPage: React.FC = () => {
                                 width: '100%',
                                 height: 2,
                                 borderRadius: 0,
-                                bgcolor: 'rgba(255,255,255,0.02)',
+                                bgcolor: 'action.hover',
                                 '& .MuiLinearProgress-bar': {
                                   bgcolor: scan.scan_status === 5 ? 'rgba(255, 171, 0, 0.6)' : '#d500f9',
                                   boxShadow: `0 0 5px ${scan.scan_status === 5 ? 'rgba(255, 171, 0, 0.3)' : 'rgba(213, 0, 249, 0.3)'}`,
@@ -521,18 +533,18 @@ export const ScanHistoryPage: React.FC = () => {
                         ) : null}
                       </Box>
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                    <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Clock size={12} style={{ color: 'rgba(0, 243, 255, 0.5)' }} />
+                        <Clock size={12} style={{ color: `${tokens.accent.primary}80` }} />
                         <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)', fontWeight: 600, fontSize: '0.65rem' }}>
                           {scan.completed_ago || 'JUST NOW'}
                         </Typography>
                       </Box>
-                      <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.3)', fontSize: '0.55rem', mt: 0.5 }}>
+                      <Typography variant="caption" sx={{ display: 'block', color: 'text.disabled', fontSize: '0.55rem', mt: 0.5 }}>
                         ELAPSED: {scan.elapsed_time || '0s'}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'left' }}>
+                    <TableCell sx={{ borderBottom: 1, borderColor: 'divider', textAlign: 'left' }}>
                       <Box sx={{ display: 'flex', justifyContent: 'center', gap: 1 }}>
                         <Button
                           variant="contained"
@@ -540,13 +552,13 @@ export const ScanHistoryPage: React.FC = () => {
                           component={RouterLink}
                           to={`/${projectSlug}/scan/detail/${scan.id}`}
                           sx={{
-                            bgcolor: 'rgba(0, 243, 255, 0.1)',
-                            color: '#00f3ff',
-                            border: '1px solid rgba(0, 243, 255, 0.3)',
+                            bgcolor: `${tokens.accent.primary}15`,
+                            color: tokens.accent.primary,
+                            border: `1px solid ${tokens.accent.primary}4D`,
                             fontFamily: 'Orbitron',
                             fontSize: '0.6rem',
                             fontWeight: 900,
-                            '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                            '&:hover': { bgcolor: `${tokens.accent.primary}33` }
                           }}
                         >
                           RESULTS
@@ -561,7 +573,7 @@ export const ScanHistoryPage: React.FC = () => {
                               names: [match.name!],
                             });
                           }}
-                          sx={{ color: 'rgba(112, 206, 35, 0.63)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                          sx={{ color: 'rgba(112, 206, 35, 0.63)', '&:hover': { color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}15` } }}
                         >
                           <RefreshCw size={16} />
                         </IconButton>
@@ -571,7 +583,7 @@ export const ScanHistoryPage: React.FC = () => {
                             e.stopPropagation();
                             handleMenuOpen(e, scan.id!, scan.domain?.name || 'N/A');
                           }}
-                          sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                          sx={{ color: 'text.disabled', '&:hover': { color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}15` } }}
                         >
                           <MoreVertical size={16} />
                         </IconButton>
@@ -594,10 +606,10 @@ export const ScanHistoryPage: React.FC = () => {
             setPage(0);
           }}
           sx={{
-            color: 'rgba(255,255,255,0.5)',
-            borderTop: '1px solid rgba(0, 243, 255, 0.1)',
-            '& .MuiTablePagination-selectIcon': { color: 'rgba(255,255,255,0.5)' },
-            '& .MuiTablePagination-actions': { color: '#00f3ff' }
+            color: 'text.secondary',
+            borderTop: `1px solid ${tokens.accent.primary}15`,
+            '& .MuiTablePagination-selectIcon': { color: 'text.secondary' },
+            '& .MuiTablePagination-actions': { color: tokens.accent.primary }
           }}
         />
       </Card>
@@ -609,8 +621,8 @@ export const ScanHistoryPage: React.FC = () => {
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#0d0c14',
-              border: '1px solid rgba(0, 243, 255, 0.2)',
+              bgcolor: 'background.default',
+              border: `1px solid ${tokens.accent.primary}33`,
               borderRadius: 0,
               boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
               minWidth: 200,
@@ -621,8 +633,8 @@ export const ScanHistoryPage: React.FC = () => {
                 color: 'rgba(255,255,255,0.8)',
                 gap: 1.5,
                 py: 1.2,
-                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)', color: '#00f3ff' },
-                '& svg': { color: 'rgba(0, 243, 255, 0.5)' }
+                '&:hover': { bgcolor: `${tokens.accent.primary}0D`, color: tokens.accent.primary },
+                '& svg': { color: `${tokens.accent.primary}80` }
               }
             }
           }
@@ -777,8 +789,8 @@ export const ScanHistoryPage: React.FC = () => {
             fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' :
-              snackbar.severity === 'error' ? 'rgba(255, 0, 85, 0.9)' : 'rgba(0, 243, 255, 0.5)',
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}E6` :
+              snackbar.severity === 'error' ? 'rgba(255, 0, 85, 0.9)' : `${tokens.accent.primary}80`,
             color: '#000',
             border: '1px solid rgba(255,255,255,0.1)',
             '& .MuiAlert-icon': { color: '#000' }

@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 import React, { useState } from 'react';
 import {
   Box,
@@ -169,7 +170,7 @@ const PositionedPluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography
           noWrap
-          sx={{ fontFamily: 'Orbitron', fontWeight: 800, fontSize: '0.68rem', color: '#fff', letterSpacing: 0.5 }}
+          sx={{ fontFamily: 'Orbitron', fontWeight: 800, fontSize: '0.68rem', color: 'text.primary', letterSpacing: 0.5 }}
         >
           {plugin.name.toUpperCase()}
         </Typography>
@@ -211,7 +212,9 @@ const PositionedPluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
 
 // ── Standalone plugin card (right column, no pipeline position) ──────────────
 
-const StandalonePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => (
+const StandalonePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
+  const { tokens } = useThemeTokens();
+  return (
   <Box
     sx={{
       p: 1.5,
@@ -231,7 +234,7 @@ const StandalonePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => (
       <Box sx={{ flex: 1, minWidth: 0 }}>
         <Typography
           noWrap
-          sx={{ fontFamily: 'Orbitron', fontWeight: 800, fontSize: '0.7rem', color: '#fff', letterSpacing: 0.5 }}
+          sx={{ fontFamily: 'Orbitron', fontWeight: 800, fontSize: '0.7rem', color: 'text.primary', letterSpacing: 0.5 }}
         >
           {plugin.name.toUpperCase()}
         </Typography>
@@ -258,11 +261,13 @@ const StandalonePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => (
       />
     </Stack>
   </Box>
-);
+  );
+};
 
 // ── Configurable plugin card (right column, user-settable position) ──────────
 
 const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
+  const { tokens } = useThemeTokens();
   const updatePosition = useUpdatePluginPosition();
 
   const [selectedStage, setSelectedStage] = useState(plugin.anchor_step || '');
@@ -285,11 +290,11 @@ const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
       }}
     >
       <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', mb: 1 }}>
-        <Box sx={{ color: '#00f3ff', flexShrink: 0 }}>
+        <Box sx={{ color: tokens.accent.primary, flexShrink: 0 }}>
           <Settings2 size={14} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
-          <Typography noWrap sx={{ fontFamily: 'Orbitron', fontWeight: 800, fontSize: '0.7rem', color: '#fff', letterSpacing: 0.5 }}>
+          <Typography noWrap sx={{ fontFamily: 'Orbitron', fontWeight: 800, fontSize: '0.7rem', color: 'text.primary', letterSpacing: 0.5 }}>
             {plugin.name.toUpperCase()}
           </Typography>
           <Typography sx={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.35)' }}>
@@ -301,7 +306,7 @@ const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
           size="small"
           sx={{
             height: 16, fontSize: '0.48rem', fontFamily: 'Orbitron', fontWeight: 900, flexShrink: 0,
-            bgcolor: 'rgba(0,243,255,0.08)', color: '#00f3ff',
+            bgcolor: 'rgba(0,243,255,0.08)', color: tokens.accent.primary,
             border: '1px solid rgba(0,243,255,0.25)', '& .MuiChip-label': { px: 0.75 },
           }}
         />
@@ -323,7 +328,7 @@ const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
           mb: 1,
           fontSize: '0.65rem',
           fontFamily: 'Orbitron',
-          color: '#fff',
+          color: 'text.primary',
           bgcolor: 'rgba(255,255,255,0.03)',
           '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
           '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,243,255,0.3)' },
@@ -332,7 +337,7 @@ const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
         MenuProps={{
           slotProps: {
             paper: {
-              sx: { bgcolor: '#0a0a14', border: '1px solid rgba(0,243,255,0.15)', color: '#fff' },
+              sx: { bgcolor: '#0a0a14', border: '1px solid rgba(0,243,255,0.15)', color: 'text.primary' },
             },
           },
         }}
@@ -393,6 +398,7 @@ interface Props {
 }
 
 const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
+  const { tokens } = useThemeTokens();
   const updateWeightMutation = useUpdatePluginWeight();
 
   const sensors = useSensors(
@@ -423,9 +429,9 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
       <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
         {/* Header */}
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 4 }}>
-          <Cpu size={20} color="#00f3ff" />
+          <Cpu size={20} color={tokens.accent.primary} />
           <Box>
-            <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: 1, color: '#fff', fontSize: '1.1rem' }}>
+            <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: 1, color: 'text.primary', fontSize: '1.1rem' }}>
               EXECUTION PIPELINE
             </Typography>
             <Typography sx={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
@@ -479,8 +485,8 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
                   {/* Diamond node on line */}
                   <Box sx={{
                     width: 11, height: 11, borderRadius: 0,
-                    bgcolor: pluginsAfter.length > 0 || pluginsBefore.length > 0 ? '#00ffaa' : '#00f3ff',
-                    boxShadow: `0 0 8px ${pluginsAfter.length > 0 || pluginsBefore.length > 0 ? '#00ffaa' : '#00f3ff'}`,
+                    bgcolor: pluginsAfter.length > 0 || pluginsBefore.length > 0 ? '#00ffaa' : tokens.accent.primary,
+                    boxShadow: `0 0 8px ${pluginsAfter.length > 0 || pluginsBefore.length > 0 ? '#00ffaa' : tokens.accent.primary}`,
                     position: 'absolute', left: '-28px', zIndex: 2, transform: 'rotate(45deg)',
                   }} />
 
@@ -493,11 +499,11 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
                     position: 'relative', overflow: 'hidden',
                     '&::before': {
                       content: '""', position: 'absolute', top: 0, left: 0,
-                      width: '3px', height: '100%', bgcolor: '#00f3ff',
+                      width: '3px', height: '100%', bgcolor: tokens.accent.primary,
                     },
                   }}>
                     <Box>
-                      <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: 1, color: '#fff', fontSize: '0.85rem' }}>
+                      <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: 1, color: 'text.primary', fontSize: '0.85rem' }}>
                         {stage.label.toUpperCase()}
                       </Typography>
                       <Typography sx={{ fontSize: '0.6rem', color: 'rgba(0,243,255,0.45)', fontWeight: 700, letterSpacing: 0.4, mt: 0.25 }}>
@@ -549,7 +555,7 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
           {configurablePlugins.length > 0 && (
             <>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
-                <Settings2 size={14} color="#00f3ff" />
+                <Settings2 size={14} color={tokens.accent.primary} />
                 <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.62rem', letterSpacing: 1.5, color: 'rgba(0,243,255,0.7)' }}>
                   CONFIGURABLE INJECTION
                 </Typography>

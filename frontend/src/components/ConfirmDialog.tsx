@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../theme/useThemeTokens';
 import React from 'react';
 import {
   Dialog,
@@ -36,6 +37,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isLoading = false,
   type,
 }) => {
+  const { tokens } = useThemeTokens();
   const isActuallyDestructive = isDestructive || type === 'danger' || type === 'warning';
   return (
     <Dialog
@@ -66,11 +68,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         justifyContent: 'space-between'
       }}>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-          {isActuallyDestructive ? <ShieldAlert size={20} color="#ff003c" /> : <AlertTriangle size={20} color="#00f3ff" />}
+          {isActuallyDestructive ? <ShieldAlert size={20} color="#ff003c" /> : <AlertTriangle size={20} color={tokens.accent.primary} />}
           <Typography sx={{
             fontFamily: 'Orbitron',
             fontWeight: 900,
-            color: '#fff',
+            color: 'text.primary',
             letterSpacing: '0.1rem',
             fontSize: '0.9rem'
           }}>
@@ -78,7 +80,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </Typography>
         </Stack>
         {!isLoading && (
-          <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#fff' } }}>
+          <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: 'text.primary' } }}>
             <X size={18} />
           </IconButton>
         )}
@@ -105,7 +107,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             fontFamily: 'Orbitron',
             fontWeight: 800,
             fontSize: '0.7rem',
-            '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' }
+            '&:hover': { color: 'text.primary', bgcolor: 'rgba(255,255,255,0.05)' }
           }}
         >
           {cancelText}
@@ -116,7 +118,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           variant="contained"
           sx={{
             flex: 1,
-            bgcolor: isActuallyDestructive ? '#ff003c' : '#00f3ff',
+            bgcolor: isActuallyDestructive ? '#ff003c' : tokens.accent.primary,
             color: '#000',
             fontFamily: 'Orbitron',
             fontWeight: 900,

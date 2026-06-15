@@ -11,20 +11,24 @@ interface TodoItemProps {
   onClick: (note: TodoNote) => void;
 }
 
+import { useThemeTokens } from '../../../theme/useThemeTokens';
+
 export const TodoItem: React.FC<TodoItemProps> = ({ note, onToggleStatus, onToggleImportant, onDelete, onClick }) => {
+  const { tokens } = useThemeTokens();
   return (
     <Paper
       elevation={0}
       sx={{
         p: 2,
         mb: 2,
-        bgcolor: 'rgba(255, 255, 255, 0.02)',
-        border: '1px solid rgba(255, 255, 255, 0.05)',
+        bgcolor: 'action.hover',
+        border: 1,
+        borderColor: 'divider',
         borderRadius: '12px',
         transition: 'all 0.3s ease',
         '&:hover': {
-          bgcolor: 'rgba(255, 255, 255, 0.04)',
-          borderColor: note.is_important ? 'rgba(255, 0, 60, 0.3)' : 'rgba(0, 243, 255, 0.3)',
+          bgcolor: 'action.hover',
+          borderColor: note.is_important ? 'rgba(255, 0, 60, 0.3)' : tokens.accent.primary,
           transform: 'translateX(4px)'
         }
       }}
@@ -36,8 +40,8 @@ export const TodoItem: React.FC<TodoItemProps> = ({ note, onToggleStatus, onTogg
           sx={{ 
             p: 0,
             mt: 0.5,
-            color: 'rgba(255, 255, 255, 0.2)',
-            '&.Mui-checked': { color: '#00ff62' }
+            color: 'text.disabled',
+            '&.Mui-checked': { color: tokens.accent.primary }
           }}
         />
         
@@ -45,7 +49,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({ note, onToggleStatus, onTogg
           <Typography sx={{ 
             fontSize: '0.9rem', 
             fontWeight: 700, 
-            color: note.is_done ? 'rgba(255,255,255,0.3)' : '#fff',
+            color: note.is_done ? 'text.disabled' : 'text.primary',
             textDecoration: note.is_done ? 'line-through' : 'none',
             mb: 0.5
           }}>
@@ -55,7 +59,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({ note, onToggleStatus, onTogg
           {(note.domain_name || note.subdomain_name) && (
             <Typography sx={{ 
               fontSize: '0.65rem', 
-              color: '#00f3ff', 
+              color: tokens.accent.primary, 
               fontWeight: 800, 
               fontFamily: 'Orbitron',
               mb: 1
@@ -66,7 +70,7 @@ export const TodoItem: React.FC<TodoItemProps> = ({ note, onToggleStatus, onTogg
           
           <Typography sx={{ 
             fontSize: '0.75rem', 
-            color: note.is_done ? 'rgba(255,255,255,0.2)' : 'rgba(255,255,255,0.5)',
+            color: note.is_done ? 'text.disabled' : 'text.secondary',
             display: '-webkit-box',
             WebkitLineClamp: 2,
             WebkitBoxOrient: 'vertical',
@@ -85,11 +89,11 @@ export const TodoItem: React.FC<TodoItemProps> = ({ note, onToggleStatus, onTogg
             </Tooltip>
           )}
           
-          <IconButton size="small" onClick={() => onToggleImportant(note.id)} sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#ff003c' } }}>
+          <IconButton size="small" onClick={() => onToggleImportant(note.id)} sx={{ color: 'text.disabled', '&:hover': { color: '#ff003c' } }}>
             <AlertOctagon size={16} />
           </IconButton>
           
-          <IconButton size="small" onClick={() => onDelete(note.id)} sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#ff003c' } }}>
+          <IconButton size="small" onClick={() => onDelete(note.id)} sx={{ color: 'text.disabled', '&:hover': { color: '#ff003c' } }}>
             <Trash2 size={16} />
           </IconButton>
         </Stack>

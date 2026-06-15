@@ -6,6 +6,7 @@ import {
 } from '@mui/material';
 import { CheckCircle2, XCircle, X } from 'lucide-react';
 import { checkProxy } from '../api';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export interface ProxyValidationResult {
   proxy: string;
@@ -25,6 +26,7 @@ const BATCH_SIZE = 10;
 export const ProxyValidationModal: React.FC<ProxyValidationModalProps> = ({
   open, onClose, onSave, proxyList, projectSlug,
 }) => {
+  const { tokens } = useThemeTokens();
   const [results, setResults] = useState<ProxyValidationResult[]>([]);
   const [isRunning, setIsRunning] = useState(false);
   const [isDone, setIsDone] = useState(false);
@@ -111,7 +113,7 @@ export const ProxyValidationModal: React.FC<ProxyValidationModalProps> = ({
           </Typography>
         );
       case 'checking':
-        return <CircularProgress size={16} sx={{ color: '#00f3ff' }} />;
+        return <CircularProgress size={16} sx={{ color: tokens.accent.primary }} />;
       case 'valid':
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
@@ -142,24 +144,24 @@ export const ProxyValidationModal: React.FC<ProxyValidationModalProps> = ({
       slotProps={{
         paper: {
           sx: {
-            bgcolor: 'rgba(10, 14, 26, 0.98)',
-            border: '1px solid rgba(0, 243, 255, 0.3)',
+            bgcolor: 'background.paper',
+            border: `1px solid ${tokens.accent.primary}4D`,
             backdropFilter: 'blur(20px)',
-            boxShadow: '0 0 40px rgba(0, 243, 255, 0.1)',
+            boxShadow: `0 0 40px ${tokens.accent.primary}1A`,
           },
         },
       }}
     >
-      <DialogTitle sx={{ borderBottom: '1px solid rgba(0, 243, 255, 0.15)', pb: 2 }}>
+      <DialogTitle sx={{ borderBottom: 1, borderColor: 'divider', pb: 2 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
             <Typography sx={{
-              fontFamily: 'Orbitron', fontWeight: 900, color: '#00f3ff',
+              fontFamily: 'Orbitron', fontWeight: 900, color: tokens.accent.primary,
               letterSpacing: 2, fontSize: '1rem',
             }}>
               PROXY VALIDATION
             </Typography>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'Orbitron' }}>
+            <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'Orbitron' }}>
               {isDone
                 ? `COMPLETE — ${validCount} / ${totalCount} PROXIES VALID`
                 : isRunning
@@ -168,7 +170,7 @@ export const ProxyValidationModal: React.FC<ProxyValidationModalProps> = ({
             </Typography>
           </Box>
           {!isRunning && (
-            <IconButton onClick={handleClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+            <IconButton onClick={handleClose} size="small" sx={{ color: 'text.secondary' }}>
               <X size={16} />
             </IconButton>
           )}
@@ -179,11 +181,11 @@ export const ProxyValidationModal: React.FC<ProxyValidationModalProps> = ({
           value={progress}
           sx={{
             mt: 1.5, height: 4, borderRadius: 2,
-            bgcolor: 'rgba(255,255,255,0.05)',
+            bgcolor: 'action.hover',
             '& .MuiLinearProgress-bar': {
               bgcolor: isDone
                 ? (validCount > 0 ? '#00ff62' : '#ff0055')
-                : '#00f3ff',
+                : tokens.accent.primary,
               transition: 'background-color 0.3s ease',
             },
           }}
@@ -196,13 +198,13 @@ export const ProxyValidationModal: React.FC<ProxyValidationModalProps> = ({
           maxHeight: 420,
           overflowY: 'auto',
           '&::-webkit-scrollbar': { width: 4 },
-          '&::-webkit-scrollbar-track': { bgcolor: 'rgba(255,255,255,0.02)' },
-          '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,243,255,0.3)', borderRadius: 2 },
+          '&::-webkit-scrollbar-track': { bgcolor: 'action.hover' },
+          '&::-webkit-scrollbar-thumb': { bgcolor: `${tokens.accent.primary}4D`, borderRadius: 2 },
         }}
       >
         {results.length === 0 ? (
           <Box sx={{ p: 4, textAlign: 'center' }}>
-            <CircularProgress sx={{ color: '#00f3ff' }} />
+            <CircularProgress sx={{ color: tokens.accent.primary }} />
           </Box>
         ) : (
           <TableContainer>
@@ -210,18 +212,18 @@ export const ProxyValidationModal: React.FC<ProxyValidationModalProps> = ({
               <TableHead>
                 <TableRow>
                   <TableCell sx={{
-                    bgcolor: 'rgba(0,0,0,0.85)',
-                    borderBottom: '1px solid rgba(0,243,255,0.15)',
+                    bgcolor: 'background.paper',
+                    borderBottom: 1, borderColor: 'divider',
                     fontFamily: 'Orbitron', fontSize: '0.7rem',
-                    color: 'rgba(0,243,255,0.7)', fontWeight: 700, letterSpacing: 1,
+                    color: tokens.accent.primary, fontWeight: 700, letterSpacing: 1,
                   }}>
                     PROXY
                   </TableCell>
                   <TableCell sx={{
-                    bgcolor: 'rgba(0,0,0,0.85)',
-                    borderBottom: '1px solid rgba(0,243,255,0.15)',
+                    bgcolor: 'background.paper',
+                    borderBottom: 1, borderColor: 'divider',
                     fontFamily: 'Orbitron', fontSize: '0.7rem',
-                    color: 'rgba(0,243,255,0.7)', fontWeight: 700, letterSpacing: 1,
+                    color: tokens.accent.primary, fontWeight: 700, letterSpacing: 1,
                     width: 130,
                   }}>
                     STATUS
@@ -233,22 +235,22 @@ export const ProxyValidationModal: React.FC<ProxyValidationModalProps> = ({
                   <TableRow
                     key={idx}
                     sx={{
-                      bgcolor: entry.status === 'checking' ? 'rgba(0,243,255,0.03)' : 'transparent',
-                      '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+                      bgcolor: entry.status === 'checking' ? `${tokens.accent.primary}08` : 'transparent',
+                      '&:hover': { bgcolor: 'action.hover' },
                     }}
                   >
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.04)', py: 0.75 }}>
+                    <TableCell sx={{ borderBottom: 1, borderColor: 'divider', py: 0.75 }}>
                       <Typography sx={{
                         fontFamily: 'monospace', fontSize: '0.82rem',
                         color: entry.status === 'valid' ? 'rgba(0,255,98,0.9)'
                           : entry.status === 'invalid' ? 'rgba(255,0,85,0.6)'
-                          : entry.status === 'checking' ? '#fff'
-                          : 'rgba(255,255,255,0.4)',
+                          : entry.status === 'checking' ? 'text.primary'
+                          : 'text.disabled',
                       }}>
                         {entry.proxy}
                       </Typography>
                     </TableCell>
-                    <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.04)', py: 0.75 }}>
+                    <TableCell sx={{ borderBottom: 1, borderColor: 'divider', py: 0.75 }}>
                       {statusCell(entry.status)}
                     </TableCell>
                   </TableRow>
@@ -260,7 +262,7 @@ export const ProxyValidationModal: React.FC<ProxyValidationModalProps> = ({
       </DialogContent>
 
       <DialogActions sx={{
-        borderTop: '1px solid rgba(0,243,255,0.15)',
+        borderTop: 1, borderColor: 'divider',
         px: 3, py: 2,
         justifyContent: 'space-between',
       }}>
@@ -316,13 +318,13 @@ export const ProxyValidationModal: React.FC<ProxyValidationModalProps> = ({
             onClick={handleSave}
             disabled={validCount === 0}
             sx={{
-              bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff',
-              border: '1px solid rgba(0,243,255,0.4)',
+              bgcolor: `${tokens.accent.primary}1A`, color: tokens.accent.primary,
+              border: 1, borderColor: `${tokens.accent.primary}66`,
               fontFamily: 'Orbitron', fontSize: '0.75rem', fontWeight: 800,
-              '&:hover': { bgcolor: 'rgba(0,243,255,0.2)', boxShadow: '0 0 20px rgba(0,243,255,0.3)' },
+              '&:hover': { bgcolor: `${tokens.accent.primary}33`, boxShadow: `0 0 20px ${tokens.accent.primary}4D` },
               '&.Mui-disabled': {
-                color: 'rgba(255,255,255,0.2)',
-                borderColor: 'rgba(255,255,255,0.1)',
+                color: 'text.disabled',
+                borderColor: 'divider',
                 bgcolor: 'transparent',
               },
             }}

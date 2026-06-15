@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 import React from 'react';
 import { ResponsiveBar } from '@nivo/bar';
 import { useStressStore } from '../../../store/stressStore';
@@ -7,6 +8,7 @@ interface ErrorDistributionProps {
 }
 
 export const ErrorDistribution: React.FC<ErrorDistributionProps> = ({ data }) => {
+  const { tokens } = useThemeTokens();
   const { setSelectedEndpoint } = useStressStore();
 
   return (

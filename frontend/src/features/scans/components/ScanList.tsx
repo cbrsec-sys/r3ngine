@@ -38,8 +38,10 @@ import { useAppContext } from '../../../context/AppContext';
 import { useParams } from '@tanstack/react-router';
 import { StartScanModal } from './StartScanModal';
 import type { ScanHistory } from '../types';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ScanList: React.FC = () => {
+  const { tokens, isLight } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: scans, isLoading } = useScans(projectSlug);
   const [isStartScanModalOpen, setIsStartScanModalOpen] = React.useState(false);
@@ -64,24 +66,28 @@ export const ScanList: React.FC = () => {
         const total = scan.total_task_count ?? 0;
         const ok    = scan.successful_task_count ?? 0;
         const label = total > 0 ? `COMPLETE ${ok}/${total}` : 'COMPLETE';
-        return <Chip label={label} size="small" sx={{ bgcolor: 'rgba(0, 255, 98, 0.1)', color: '#00ff62', border: '1px solid rgba(0, 255, 98, 0.2)', fontSize: '0.6rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<CheckCircle2 size={12} />} />;
+        const color = isLight ? tokens.accent.success : '#00ff62';
+        return <Chip label={label} size="small" sx={{ bgcolor: isLight ? `${tokens.accent.success}1A` : 'rgba(0, 255, 98, 0.1)', color: color, border: `1px solid ${color}33`, fontSize: '0.6rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<CheckCircle2 size={12} />} />;
       }
       case 1: // Running
-        return <Chip label="RUNNING" size="small" sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', border: '1px solid rgba(0, 243, 255, 0.2)', fontSize: '0.6rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<RefreshCw size={12} className="spin" />} />;
+        return <Chip label="RUNNING" size="small" sx={{ bgcolor: `${tokens.accent.primary}15`, color: tokens.accent.primary, border: `1px solid ${tokens.accent.primary}33`, fontSize: '0.6rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<RefreshCw size={12} className="spin" />} />;
       case 0: { // Failed
         const total = scan.total_task_count ?? 0;
         const ok    = scan.successful_task_count ?? 0;
         const label = total > 0 ? `FAILED ${ok}/${total}` : 'FAILED';
-        return <Chip label={label} size="small" sx={{ bgcolor: 'rgba(255, 0, 60, 0.1)', color: '#ff003c', border: '1px solid rgba(255, 0, 60, 0.2)', fontSize: '0.6rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<XCircle size={12} />} />;
+        const color = isLight ? tokens.accent.error : '#ff003c';
+        return <Chip label={label} size="small" sx={{ bgcolor: isLight ? `${tokens.accent.error}1A` : 'rgba(255, 0, 60, 0.1)', color: color, border: `1px solid ${color}33`, fontSize: '0.6rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<XCircle size={12} />} />;
       }
-      case 4: // Partially Complete
-        return <Chip label="PARTIALLY COMPLETE" size="small" sx={{ bgcolor: 'rgba(255, 252, 0, 0.1)', color: '#fffc00', border: '1px solid rgba(255, 252, 0, 0.2)', fontSize: '0.6rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<AlertTriangle size={12} />} />;
+      case 4: { // Partially Complete
+        const warnColor = isLight ? '#d97706' : '#fffc00';
+        return <Chip label="PARTIALLY COMPLETE" size="small" sx={{ bgcolor: isLight ? '#d977061A' : 'rgba(255, 252, 0, 0.1)', color: warnColor, border: `1px solid ${warnColor}33`, fontSize: '0.6rem', fontWeight: 900, fontFamily: 'Orbitron' }} icon={<AlertTriangle size={12} />} />;
+      }
       default:
-        return <Chip label="PENDING" size="small" sx={{ bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.4)', border: '1px solid rgba(255,255,255,0.1)', fontSize: '0.6rem', fontWeight: 900, fontFamily: 'Orbitron' }} />;
+        return <Chip label="PENDING" size="small" sx={{ bgcolor: 'action.hover', color: 'text.secondary', border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.1)', fontSize: '0.6rem', fontWeight: 900, fontFamily: 'Orbitron' }} />;
     }
   };
 
-  if (isLoading) return <LinearProgress sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />;
+  if (isLoading) return <LinearProgress sx={{ bgcolor: `${tokens.accent.primary}15`, '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary } }} />;
 
   return (
     <Box>
@@ -91,13 +97,13 @@ export const ScanList: React.FC = () => {
             fontFamily: 'Orbitron', 
             fontWeight: 900, 
             letterSpacing: 2, 
-            color: '#fff',
-            textShadow: '0 0 20px rgba(0, 243, 255, 0.5)',
+            color: 'text.primary',
+            textShadow: `0 0 20px ${tokens.accent.primary}80`,
             mb: 1
           }}>
             SCAN OPERATIONS
           </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary', letterSpacing: 1 }}>
             HISTORICAL MISSION LOGS & ACTIVE DEPLOYMENTS
           </Typography>
         </Box>
@@ -106,11 +112,11 @@ export const ScanList: React.FC = () => {
       <Card sx={{ 
         bgcolor: 'rgba(10, 10, 20, 0.6)', 
         backdropFilter: 'blur(10px)', 
-        border: '1px solid rgba(0, 243, 255, 0.1)',
+        border: `1px solid ${tokens.accent.primary}15`,
         borderRadius: 4,
         overflow: 'hidden'
       }}>
-        <Box sx={{ p: 2, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', gap: 2 }}>
+        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider', display: 'flex', gap: 2 }}>
           <TextField 
             placeholder="Filter operations..."
             variant="outlined"
@@ -119,18 +125,18 @@ export const ScanList: React.FC = () => {
               maxWidth: 400,
               flex: 1,
               '& .MuiOutlinedInput-root': {
-                color: '#fff',
+                color: 'text.primary',
                 bgcolor: 'rgba(255,255,255,0.03)',
                 '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
-                '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+                '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
               }
             }}
             slotProps={{
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search size={16} style={{ color: 'rgba(255,255,255,0.3)' }} />
+                    <Search size={16} style={{ color: 'text.disabled' }} />
                   </InputAdornment>
                 ),
               }
@@ -141,18 +147,18 @@ export const ScanList: React.FC = () => {
           <Table>
             <TableHead sx={{ bgcolor: 'rgba(0, 243, 255, 0.03)' }}>
               <TableRow>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>TARGET / ENGINE</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>PROGRESS</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>RESULTS</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>STATUS</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>TIMELINE</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)', textAlign: 'right' }}>ACTIONS</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>TARGET / ENGINE</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>PROGRESS</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>RESULTS</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>STATUS</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>TIMELINE</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontWeight: 800, fontFamily: 'Orbitron', fontSize: '0.75rem', borderBottom: `1px solid ${tokens.accent.primary}15`, textAlign: 'right' }}>ACTIONS</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {scans?.map((scan) => (
-                <TableRow key={scan.id!} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }, transition: 'all 0.2s' }}>
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                <TableRow key={scan.id!} sx={{ '&:hover': { bgcolor: 'action.hover' }, transition: 'all 0.2s' }}>
+                  <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <a
                       href={`/scan/detail/${scan.id!}`}
                       target="_blank"
@@ -163,9 +169,9 @@ export const ScanList: React.FC = () => {
                         variant="body2"
                         sx={{
                           fontWeight: 700,
-                          color: '#fff',
+                          color: 'text.primary',
                           '&:hover': {
-                            color: '#00f3ff',
+                            color: tokens.accent.primary,
                             textDecoration: 'underline'
                           }
                         }}
@@ -173,9 +179,9 @@ export const ScanList: React.FC = () => {
                         {scan.domain?.name || 'N/A'}
                       </Typography>
                     </a>
-                    <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontWeight: 600 }}>{scan.scan_type?.engine_name || 'Standard'}</Typography>
+                    <Typography variant="caption" sx={{ color: `${tokens.accent.primary}99`, fontWeight: 600 }}>{scan.scan_type?.engine_name || 'Standard'}</Typography>
                   </TableCell>
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', minWidth: 150 }}>
+                  <TableCell sx={{ borderBottom: 1, borderColor: 'divider', minWidth: 150 }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                       <LinearProgress 
                         variant="determinate" 
@@ -184,29 +190,29 @@ export const ScanList: React.FC = () => {
                           flexGrow: 1, 
                           height: 4, 
                           borderRadius: 2,
-                          bgcolor: 'rgba(255,255,255,0.05)',
+                          bgcolor: 'action.hover',
                           '& .MuiLinearProgress-bar': {
-                            bgcolor: scan.scan_status === -1 ? '#ff003c' : '#00f3ff',
-                            boxShadow: `0 0 10px ${scan.scan_status === -1 ? 'rgba(255, 0, 60, 0.5)' : 'rgba(0, 243, 255, 0.5)'}`
+                            bgcolor: scan.scan_status === -1 ? '#ff003c' : tokens.accent.primary,
+                            boxShadow: `0 0 10px ${scan.scan_status === -1 ? 'rgba(255, 0, 60, 0.5)' : `${tokens.accent.primary}80`}`
                           }
                         }} 
                       />
-                      <Typography variant="caption" sx={{ fontWeight: 900, color: scan.scan_status === -1 ? '#ff003c' : '#00f3ff', width: 35 }}>
+                      <Typography variant="caption" sx={{ fontWeight: 900, color: scan.scan_status === -1 ? '#ff003c' : tokens.accent.primary, width: 35 }}>
                         {Math.round(Number(scan.current_progress || 0))}%
                       </Typography>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <Box sx={{ display: 'flex', gap: 1.5 }}>
                       <Tooltip title="Subdomains Found">
                         <Box sx={{ textAlign: 'center' }}>
-                          <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>SUB</Typography>
-                          <Typography variant="body2" sx={{ fontWeight: 900, color: '#fff' }}>{scan.subdomain_count || 0}</Typography>
+                          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>SUB</Typography>
+                          <Typography variant="body2" sx={{ fontWeight: 900, color: 'text.primary' }}>{scan.subdomain_count || 0}</Typography>
                         </Box>
                       </Tooltip>
                       <Tooltip title="Vulnerabilities Detected">
                         <Box sx={{ textAlign: 'center' }}>
-                          <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.4)', fontWeight: 800 }}>VUL</Typography>
+                          <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontWeight: 800 }}>VUL</Typography>
                           <Typography variant="body2" sx={{ fontWeight: 900, color: Number(scan.vulnerability_count || 0) > 0 ? '#ff003c' : '#fff' }}>
                             {scan.vulnerability_count || 0}
                           </Typography>
@@ -214,19 +220,19 @@ export const ScanList: React.FC = () => {
                       </Tooltip>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     {getStatusChip(scan)}
                   </TableCell>
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Clock size={12} style={{ color: 'rgba(255,255,255,0.4)' }} />
+                      <Clock size={12} style={{ color: 'text.secondary' }} />
                       <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>{scan.completed_ago || (scan.scan_status === 1 ? 'Active' : 'N/A')}</Typography>
                     </Box>
-                    <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.3)', fontSize: '0.65rem' }}>
+                    <Typography variant="caption" sx={{ display: 'block', color: 'text.disabled', fontSize: '0.65rem' }}>
                       Time: {scan.elapsed_time || '0s'}
                     </Typography>
                   </TableCell>
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>
+                  <TableCell sx={{ borderBottom: 1, borderColor: 'divider', textAlign: 'right' }}>
                     <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
                       <Tooltip title="View Detailed Report">
                         <IconButton 
@@ -234,7 +240,7 @@ export const ScanList: React.FC = () => {
                           component="a"
                           href={`/scan/detail/${scan.id!}`}
                           target="_blank"
-                          sx={{ color: '#00f3ff', '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                          sx={{ color: tokens.accent.primary, '&:hover': { bgcolor: `${tokens.accent.primary}15` } }}
                         >
                           <Eye size={16} />
                         </IconButton>
@@ -249,7 +255,7 @@ export const ScanList: React.FC = () => {
                       <IconButton 
                         size="small" 
                         onClick={(e) => handleMenuOpen(e, scan.id!)}
-                        sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                        sx={{ color: 'text.disabled', '&:hover': { color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}15` } }}
                       >
                         <MoreVertical size={16} />
                       </IconButton>
@@ -269,8 +275,8 @@ export const ScanList: React.FC = () => {
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#0d0c14',
-              border: '1px solid rgba(0, 243, 255, 0.2)',
+              bgcolor: 'background.default',
+              border: `1px solid ${tokens.accent.primary}33`,
               borderRadius: 0,
               boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
               minWidth: 200,
@@ -281,8 +287,8 @@ export const ScanList: React.FC = () => {
                 color: 'rgba(255,255,255,0.8)',
                 gap: 1.5,
                 py: 1.2,
-                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)', color: '#00f3ff' },
-                '& svg': { color: 'rgba(0, 243, 255, 0.5)' }
+                '&:hover': { bgcolor: `${tokens.accent.primary}0D`, color: tokens.accent.primary },
+                '& svg': { color: `${tokens.accent.primary}80` }
               }
             }
           }

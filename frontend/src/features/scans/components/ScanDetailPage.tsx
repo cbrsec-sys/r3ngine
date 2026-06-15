@@ -108,13 +108,14 @@ import PluginComponent from '../../plugins/components/PluginComponent';
 import PluginComponentLoader from '../../plugins/components/PluginComponentLoader';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
+  const { tokens, isLight } = useThemeTokens();
   const configs: any = {
-    4: { label: 'CRITICAL', color: '#ff003c' },
-    3: { label: 'HIGH', color: '#ff9f00' },
-    2: { label: 'MEDIUM', color: '#fffc00' },
-    1: { label: 'LOW', color: '#00ff62' },
-    0: { label: 'INFO', color: '#00f3ff' },
-    [-1]: { label: 'UNKNOWN', color: '#7000ff' }
+    4: { label: 'CRITICAL', color: isLight ? tokens.accent.error : '#ff003c' },
+    3: { label: 'HIGH', color: isLight ? '#d97706' : '#ff9f00' },
+    2: { label: 'MEDIUM', color: isLight ? '#b45309' : '#fffc00' },
+    1: { label: 'LOW', color: isLight ? tokens.accent.success : '#00ff62' },
+    0: { label: 'INFO', color: tokens.accent.primary },
+    [-1]: { label: 'UNKNOWN', color: isLight ? '#6d28d9' : '#7000ff' }
   };
   const config = configs[severity] || configs[-1];
   return (
@@ -139,6 +140,7 @@ const VulnerabilityInfoModal: React.FC<{
   onClose: () => void;
   vulnerability: any;
 }> = ({ open, onClose, vulnerability }) => {
+  const { tokens } = useThemeTokens();
   const gptMutation = useGptVulnerabilityDetails();
   const [localVuln, setLocalVuln] = useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -153,7 +155,7 @@ const VulnerabilityInfoModal: React.FC<{
   const severityColor = Number(localVuln.severity) === 4 ? '#ff003c' :
     Number(localVuln.severity) === 3 ? '#ff9f00' :
       Number(localVuln.severity) === 2 ? '#fffc00' :
-        Number(localVuln.severity) === 1 ? '#00ff62' : '#00f3ff';
+        Number(localVuln.severity) === 1 ? '#00ff62' : tokens.accent.primary;
 
   const handleFetchGpt = async () => {
     if (!localVuln) return;
@@ -196,17 +198,17 @@ const VulnerabilityInfoModal: React.FC<{
         }
       }}
     >
-      <DialogTitle sx={{ p: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <DialogTitle sx={{ p: 3, borderBottom: 1, borderColor: 'divider', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Stack direction="row" sx={{ spacing: '2', alignItems: "center" }}>
           <Bug size={24} color={severityColor} />
           <Box>
-            <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: '1.1rem', letterSpacing: 1, fontFamily: 'Orbitron' }}>
+            <Typography sx={{ color: 'text.primary', fontWeight: 900, fontSize: '1.1rem', letterSpacing: 1, fontFamily: 'Orbitron' }}>
               {localVuln.name}
             </Typography>
             <SeverityBadge severity={Number(localVuln.severity)} />
           </Box>
         </Stack>
-        <IconButton onClick={onClose} sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' } }}>
+        <IconButton onClick={onClose} sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary', bgcolor: 'action.hover' } }}>
           <X size={20} />
         </IconButton>
       </DialogTitle>
@@ -218,25 +220,25 @@ const VulnerabilityInfoModal: React.FC<{
             </Alert>
           )}
           {/* Classification Section */}
-          <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1 }}>
+          <Box sx={{ p: 2, bgcolor: 'action.hover', border: 1, borderColor: 'divider', borderRadius: 1 }}>
             <Typography sx={{ color: severityColor, fontSize: '0.7rem', fontWeight: 900, mb: 2, letterSpacing: 1, textTransform: 'uppercase' }}>
               Vulnerability Classification
             </Typography>
             <Grid container spacing={2}>
               <Grid size={{ xs: 6, md: 3 }}>
-                <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS SCORE</Typography>
-                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 900 }}>{localVuln.cvss_score || 'N/A'}</Typography>
+                <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS SCORE</Typography>
+                <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', fontWeight: 900 }}>{localVuln.cvss_score || 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
-                <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS METRICS</Typography>
-                <Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>{localVuln.cvss_metrics || 'N/A'}</Typography>
+                <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>CVSS METRICS</Typography>
+                <Typography sx={{ color: 'text.primary', fontSize: '0.8rem', fontWeight: 600, fontFamily: 'monospace' }}>{localVuln.cvss_metrics || 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
-                <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>SOURCE</Typography>
-                <Typography sx={{ color: '#fff', fontSize: '0.9rem', fontWeight: 700 }}>{localVuln.source || 'N/A'}</Typography>
+                <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>SOURCE</Typography>
+                <Typography sx={{ color: 'text.primary', fontSize: '0.9rem', fontWeight: 700 }}>{localVuln.source || 'N/A'}</Typography>
               </Grid>
               <Grid size={{ xs: 6, md: 3 }}>
-                <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>TAGS</Typography>
+                <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', fontWeight: 700, mb: 0.5 }}>TAGS</Typography>
                 <Stack direction="row" sx={{ spacing: 0.5, flexWrap: "wrap" }}>
                   {localVuln.tags?.map((tag: any, i: number) => (
                     <Chip
@@ -246,7 +248,7 @@ const VulnerabilityInfoModal: React.FC<{
                       sx={{
                         height: 16,
                         fontSize: '0.6rem',
-                        bgcolor: 'rgba(255,255,255,0.05)',
+                        bgcolor: 'action.hover',
                         color: 'rgba(255,255,255,0.6)',
                         border: '1px solid rgba(255,255,255,0.1)'
                       }}
@@ -294,7 +296,7 @@ const VulnerabilityInfoModal: React.FC<{
           {/* References Section */}
           {localVuln.references && (
             <Box>
-              <Typography sx={{ color: '#00f3ff', fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
+              <Typography sx={{ color: tokens.accent.primary, fontSize: '0.7rem', fontWeight: 900, mb: 1.5, letterSpacing: 1, textTransform: 'uppercase' }}>
                 References
               </Typography>
               <Stack spacing={1}>
@@ -310,7 +312,7 @@ const VulnerabilityInfoModal: React.FC<{
                       alignItems: 'center',
                       gap: 1,
                       textDecoration: 'none',
-                      '&:hover': { color: '#00f3ff', textDecoration: 'underline' }
+                      '&:hover': { color: tokens.accent.primary, textDecoration: 'underline' }
                     }}
                   >
                     <ExternalLink size={12} />
@@ -356,8 +358,8 @@ const VulnerabilityInfoModal: React.FC<{
         <Button
           onClick={onClose}
           sx={{
-            color: 'rgba(255,255,255,0.5)',
-            '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' },
+            color: 'text.secondary',
+            '&:hover': { color: 'text.primary', bgcolor: 'action.hover' },
             fontFamily: 'Orbitron',
             fontSize: '0.75rem',
             fontWeight: 900
@@ -402,6 +404,7 @@ const getFrontendEngineColor = (activityTitle: string) => {
 };
 
 const StatusBadge: React.FC<{ status: number, compact?: boolean, isSpiderFootRunning?: boolean }> = ({ status, compact = false, isSpiderFootRunning = false }) => {
+  const { tokens, isLight } = useThemeTokens();
   if (isSpiderFootRunning) {
     return (
       <MuiTooltip title="SpiderFoot OSINT Scan is running in the background">
@@ -413,7 +416,7 @@ const StatusBadge: React.FC<{ status: number, compact?: boolean, isSpiderFootRun
           py: compact ? 0.4 : 1,
           borderRadius: '20px',
           border: `1px solid #ff00ff40`,
-          color: '#ff00ff',
+          color: tokens.accent.secondary,
           fontSize: '0.9rem',
           fontWeight: 900,
           fontFamily: 'Orbitron',
@@ -421,9 +424,9 @@ const StatusBadge: React.FC<{ status: number, compact?: boolean, isSpiderFootRun
           textShadow: `0 0 10px #ff00ff40`,
           boxShadow: `inset 0 0 10px #ff00ff10`,
           '@keyframes pulse-spider': {
-            '0%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
-            '50%': { transform: 'scale(1.05)', filter: 'drop-shadow(0 0 8px #ff00ff)' },
-            '100%': { transform: 'scale(1)', filter: 'drop-shadow(0 0 0px #ff00ff)' },
+            '0%': { transform: 'scale(1)', filter: `drop-shadow(0 0 0px ${tokens.accent.secondary})` },
+            '50%': { transform: 'scale(1.05)', filter: `drop-shadow(0 0 8px ${tokens.accent.secondary})` },
+            '100%': { transform: 'scale(1)', filter: `drop-shadow(0 0 0px ${tokens.accent.secondary})` },
           }
         }}>
           <Bug size={compact ? 12 : 18} />
@@ -433,14 +436,14 @@ const StatusBadge: React.FC<{ status: number, compact?: boolean, isSpiderFootRun
     );
   }
   const configs: any = {
-    [-1]: { label: 'PENDING', color: '#ff9f00', icon: Clock },
-    [0]: { label: 'FAILED', color: '#ff003c', icon: AlertTriangle },
-    [1]: { label: 'PENDING', color: '#00f3ff', icon: Activity },
-    [2]: { label: 'SUCCESS', color: '#00ff62', icon: Shield },
-    [3]: { label: 'ABORTED', color: '#ff003c', icon: AlertTriangle },
-    [4]: { label: 'PARTIALLY COMPLETE', color: '#fffc00', icon: AlertTriangle },
+    [-1]: { label: 'PENDING', color: isLight ? tokens.accent.warning : '#ff9f00', icon: Clock },
+    [0]: { label: 'FAILED', color: isLight ? tokens.accent.error : '#ff003c', icon: AlertTriangle },
+    [1]: { label: 'PENDING', color: tokens.accent.primary, icon: Activity },
+    [2]: { label: 'SUCCESS', color: isLight ? tokens.accent.success : '#00ff62', icon: Shield },
+    [3]: { label: 'ABORTED', color: isLight ? tokens.accent.error : '#ff003c', icon: AlertTriangle },
+    [4]: { label: 'PARTIALLY COMPLETE', color: isLight ? tokens.accent.warning : '#fffc00', icon: AlertTriangle },
   };
-  const config = configs[status] || { label: 'UNKNOWN', color: '#fff', icon: Info };
+  const config = configs[status] || { label: 'UNKNOWN', color: 'text.primary', icon: Info };
   const Icon = config.icon;
 
   return (
@@ -492,14 +495,14 @@ const getCommandBinary = (cmd: string) => {
   return binary;
 };
 
-const getToolColor = (binary: string) => {
+const getToolColor = (binary: string, tokens: any) => {
   const b = binary.toLowerCase();
-  if (b.includes('httpx')) return '#00f3ff';
+  if (b.includes('httpx')) return tokens.accent.primary;
   if (b.includes('nuclei')) return '#ff003c';
   if (b.includes('semgrep')) return '#00ff62';
   if (b.includes('gau') || b.includes('hakrawler') || b.includes('katana') || b.includes('gospider') || b.includes('waybackurls')) return '#fffc00';
-  if (b.includes('cat') || b.includes('sort') || b.includes('grep') || b.includes('mv') || b.includes('rm')) return 'rgba(255,255,255,0.4)';
-  return '#ff00ff';
+  if (b.includes('cat') || b.includes('sort') || b.includes('grep') || b.includes('mv') || b.includes('rm')) return 'text.secondary';
+  return tokens.accent.secondary;
 };
 
 const TaskOverlay: React.FC<{
@@ -509,6 +512,7 @@ const TaskOverlay: React.FC<{
   scanId?: number | null;
   activityTitle: string;
 }> = ({ open, onClose, activityId, scanId, activityTitle }) => {
+  const { tokens } = useThemeTokens();
   const { data: logs, isLoading } = useScanLogs(activityId, scanId ?? null);
 
   const [selectedLog, setSelectedLog] = useState<Command | null>(null);
@@ -541,14 +545,14 @@ const TaskOverlay: React.FC<{
         }
       }}
     >
-      <DialogTitle sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <DialogTitle sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider' }}>
         <Stack direction="row" sx={{ alignItems: "center" }}>
-          <Terminal size={20} color="#00f3ff" />
-          <Typography sx={{ color: '#fff', fontWeight: 900, fontSize: '1rem', letterSpacing: 1, ml: 2 }}>
+          <Terminal size={20} color={tokens.accent.primary} />
+          <Typography sx={{ color: 'text.primary', fontWeight: 900, fontSize: '1rem', letterSpacing: 1, ml: 2 }}>
             {activityTitle} Execution Logs
           </Typography>
         </Stack>
-        <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.05)' } }}>
+        <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary', '&:hover': { color: 'text.primary', bgcolor: 'action.hover' } }}>
           <X size={20} />
         </IconButton>
       </DialogTitle>
@@ -558,14 +562,14 @@ const TaskOverlay: React.FC<{
           <Grid size={{ xs: 4 }} sx={{ borderRight: '1px solid rgba(255,255,255,0.05)', height: '100%', overflowY: 'auto' }}>
             {isLoading ? (
               <Box sx={{ p: 4, textAlign: 'center' }}>
-                <CircularProgress size={24} sx={{ color: '#00f3ff' }} />
+                <CircularProgress size={24} sx={{ color: tokens.accent.primary }} />
               </Box>
             ) : logs && logs.length > 0 ? (
               <List sx={{ p: 0 }}>
                 {logs.map((log: Command) => {
                   const cmdStr = log.command || '';
                   const binaryName = getCommandBinary(cmdStr);
-                  const toolColor = getToolColor(binaryName);
+                  const toolColor = getToolColor(binaryName, tokens);
                   const parts = cmdStr.trim().split(/\s+/);
                   const displayArgs = parts.length > 0 ? cmdStr.replace(parts[0], '').trim() : '';
 
@@ -579,9 +583,9 @@ const TaskOverlay: React.FC<{
                         borderBottom: '1px solid rgba(255,255,255,0.03)',
                         py: 1.5,
                         px: 2,
-                        bgcolor: selectedLog?.id === log.id ? 'rgba(0,243,255,0.05)' : 'transparent',
+                        bgcolor: selectedLog?.id === log.id ? `${tokens.accent.primary}0D` : 'transparent',
                         borderLeft: selectedLog?.id === log.id ? `3px solid ${toolColor}` : '3px solid transparent',
-                        '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' }
+                        '&:hover': { bgcolor: 'action.hover' }
                       }}
                     >
                       <ListItemText
@@ -619,10 +623,10 @@ const TaskOverlay: React.FC<{
                         }
                         secondary={
                           <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mt: 0.5 }}>
-                            <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+                            <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', fontFamily: 'monospace' }}>
                               ID: #{log.id}
                             </Typography>
-                            <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+                            <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', fontFamily: 'monospace' }}>
                               {new Date(log.time).toLocaleTimeString()}
                             </Typography>
                           </Stack>
@@ -634,7 +638,7 @@ const TaskOverlay: React.FC<{
               </List>
             ) : (
               <Box sx={{ p: 4, textAlign: 'center' }}>
-                <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.8rem' }}>
+                <Typography sx={{ color: 'text.disabled', fontSize: '0.8rem' }}>
                   No commands found.
                 </Typography>
               </Box>
@@ -649,7 +653,7 @@ const TaskOverlay: React.FC<{
                   p: 2,
                   mb: 3,
                   bgcolor: 'rgba(0,0,0,0.6)',
-                  border: '1px solid rgba(255,255,255,0.05)',
+                  border: 1, borderColor: 'divider',
                   borderRadius: 1,
                   boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
                 }}>
@@ -664,7 +668,7 @@ const TaskOverlay: React.FC<{
                       }} />
                       <Typography sx={{
                         fontSize: '0.65rem',
-                        color: 'rgba(255,255,255,0.5)',
+                        color: 'text.secondary',
                         fontWeight: 900,
                         letterSpacing: 1,
                         textTransform: 'uppercase'
@@ -690,16 +694,16 @@ const TaskOverlay: React.FC<{
                   {/* The Executed Command */}
                   <Box sx={{
                     p: 1.5,
-                    bgcolor: 'rgba(255,255,255,0.02)',
-                    borderLeft: `3px solid ${getToolColor(getCommandBinary(selectedLog.command || ''))}`,
+                    bgcolor: 'action.hover',
+                    borderLeft: `3px solid ${getToolColor(getCommandBinary(selectedLog.command || ''), tokens)}`,
                     fontFamily: 'monospace',
                     fontSize: '0.75rem',
-                    color: '#fff',
+                    color: 'text.primary',
                     whiteSpace: 'pre-wrap',
                     wordBreak: 'break-all',
                     position: 'relative'
                   }}>
-                    <Box component="span" sx={{ color: 'rgba(255,255,255,0.3)', mr: 1, userSelect: 'none' }}>$</Box>
+                    <Box component="span" sx={{ color: 'text.disabled', mr: 1, userSelect: 'none' }}>$</Box>
                     {selectedLog.command || ''}
                   </Box>
                 </Box>
@@ -719,7 +723,7 @@ const TaskOverlay: React.FC<{
                     size="small"
                     startIcon={<Copy size={12} />}
                     onClick={() => navigator.clipboard.writeText(selectedLog.output || '')}
-                    sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: '#fff', border: '1px solid #00f3ff' } }}
+                    sx={{ color: 'text.secondary', fontSize: '0.6rem', border: '1px solid rgba(255,255,255,0.1)', '&:hover': { color: 'text.primary', border: `1px solid ${tokens.accent.primary}` } }}
                   >
                     Copy Output
                   </Button>
@@ -727,7 +731,7 @@ const TaskOverlay: React.FC<{
                 <Box sx={{
                   p: 2,
                   bgcolor: 'rgba(0,0,0,0.5)',
-                  border: '1px solid rgba(255,255,255,0.05)',
+                  border: 1, borderColor: 'divider',
                   borderRadius: 1,
                   fontFamily: 'monospace',
                   fontSize: '0.75rem',
@@ -872,25 +876,26 @@ const TimelineItem: React.FC<{ activity: ScanActivity, onClick?: () => void }> =
 };
 
 const SubScanWidget: React.FC<{ subscans: SubScan[], targetName: string }> = ({ subscans, targetName }) => {
+  const { tokens } = useThemeTokens();
   return (
     <Stack spacing={1.5}>
       <Box sx={{ mb: 1 }}>
-        <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: '#ff00ff', mb: 1, textTransform: 'uppercase', letterSpacing: 1.5 }}>
+        <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: tokens.accent.secondary, mb: 1, textTransform: 'uppercase', letterSpacing: 1.5 }}>
           SUB SCAN HISTORY FOR
         </Typography>
-        <Box component="span" sx={{ display: 'inline-block', px: 2, py: 0.4, border: '1px solid #ff00ff', borderRadius: '20px', color: '#ff00ff', fontSize: '0.7rem', bgcolor: 'rgba(255,0,255,0.05)' }}>
+        <Box component="span" sx={{ display: 'inline-block', px: 2, py: 0.4, border: `1px solid ${tokens.accent.secondary}`, borderRadius: '20px', color: tokens.accent.secondary, fontSize: '0.7rem', bgcolor: 'rgba(255,0,255,0.05)' }}>
           {targetName}
         </Box>
       </Box>
       {subscans?.map((sub: SubScan) => (
-        <Box key={sub.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', position: 'relative', overflow: 'hidden' }}>
+        <Box key={sub.id} sx={{ p: 2, borderRadius: 2, bgcolor: 'action.hover', border: 1, borderColor: 'divider', position: 'relative', overflow: 'hidden' }}>
           <Box sx={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 4, bgcolor: sub.status === 2 ? '#00ff62' : '#ffc107', borderRadius: '4px 0 0 4px' }} />
           <Stack spacing={1.5}>
-            <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: '#00f3ff', textTransform: 'uppercase', letterSpacing: 1 }}>
+            <Typography sx={{ fontSize: '0.85rem', fontWeight: 900, color: tokens.accent.primary, textTransform: 'uppercase', letterSpacing: 1 }}>
               {sub.engine} ON {sub.subdomain_name}
             </Typography>
             <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', fontWeight: 600, maxWidth: '60%', lineHeight: 1.4 }}>
+              <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', fontWeight: 600, maxWidth: '60%', lineHeight: 1.4 }}>
                 {sub.completed_ago} Took {sub.time_taken}
               </Typography>
               <StatusBadge status={sub.status} compact />
@@ -940,11 +945,11 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
                       total: {
                         show: true,
                         label: 'Total',
-                        color: 'rgba(255,255,255,0.4)',
+                        color: 'text.secondary',
                         fontSize: '12px',
                         formatter: () => counts.total.toString()
                       },
-                      value: { color: '#fff', fontSize: '20px', fontWeight: 900 }
+                      value: { color: 'text.primary', fontSize: '20px', fontWeight: 900 }
                     }
                   }
                 }
@@ -961,12 +966,14 @@ const VulnerabilityBreakdown: React.FC<{ counts: Record<string, number>, exploit
   );
 };
 
-const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: any) => void }> = ({ highlights, onVulnClick }) => (
+const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: any) => void }> = ({ highlights, onVulnClick }) => {
+  const { tokens, isLight } = useThemeTokens();
+  return (
   <TacticalPanel title="Vulnerability Highlights" icon={<Bug size={14} color="#ef4a04ff" />} sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
     <TableContainer sx={{ flex: 1, overflow: 'auto', maxHeight: 380 }}>
       <Table size="small" stickyHeader>
         <TableHead>
-          <TableRow sx={{ '& th': { borderBottom: '2px solid #7000ff', bgcolor: '#12121c', color: '#00f3ff', fontSize: '0.7rem', fontWeight: 900, py: 1.5 } }}>
+          <TableRow sx={{ '& th': { borderBottom: `2px solid ${isLight ? tokens.accent.primary : '#7000ff'}`, bgcolor: isLight ? 'background.paper' : '#12121c', color: tokens.accent.primary, fontSize: '0.7rem', fontWeight: 900, py: 1.5 } }}>
             <TableCell>TYPE</TableCell>
             <TableCell>VULNERABILITY</TableCell>
             <TableCell>SEVERITY</TableCell>
@@ -979,12 +986,12 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: a
               key={idx}
               onClick={() => onVulnClick(v)}
               sx={{
-                '& td': { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 2 },
+                '& td': { borderBottom: 1, borderColor: 'divider', py: 2 },
                 cursor: 'pointer',
                 transition: 'background-color 0.2s',
                 '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.03)',
-                  '& td:nth-of-type(2) p:first-of-type': { color: '#00f3ff' }
+                  bgcolor: isLight ? 'action.hover' : 'rgba(255,255,255,0.03)',
+                  '& td:nth-of-type(2) p:first-of-type': { color: tokens.accent.primary }
                 }
               }}
             >
@@ -1004,8 +1011,8 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: a
                 </Box>
               </TableCell>
               <TableCell>
-                <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: '#fff', mb: 0.5 }}>{v.name}</Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>
+                <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: 'text.primary', mb: 0.5 }}>{v.name}</Typography>
+                <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>
                   Discovered: {formatTimeAgo(v.discovered_date || '')}
                 </Typography>
               </TableCell>
@@ -1015,7 +1022,7 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: a
               <TableCell>
                 <Typography sx={{
                   fontSize: '0.7rem',
-                  color: '#ff003c',
+                  color: isLight ? tokens.accent.error : '#ff003c',
                   fontWeight: 600,
                   wordBreak: 'break-all'
                 }}>
@@ -1026,7 +1033,7 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: a
           ))}
           {(!highlights || highlights.length === 0) && (
             <TableRow>
-              <TableCell colSpan={4} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)' }}>NO VULNERABILITY HIGHLIGHTS</TableCell>
+              <TableCell colSpan={4} align="center" sx={{ py: 4, color: isLight ? 'text.disabled' : 'rgba(255,255,255,0.2)' }}>NO VULNERABILITY HIGHLIGHTS</TableCell>
             </TableRow>
           )}
         </TableBody>
@@ -1034,6 +1041,7 @@ const VulnHighlights: React.FC<{ highlights: Vulnerability[], onVulnClick: (v: a
     </TableContainer>
   </TacticalPanel>
 );
+};
 
 interface SubdomainVulnCounts {
   host: string;
@@ -1045,6 +1053,7 @@ interface SubdomainVulnCounts {
 }
 
 const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?: any }> = ({ vulnerabilities = [], sx = {} }) => {
+  const { tokens, isLight } = useThemeTokens();
   const [ignoreInfo, setIgnoreInfo] = useState(false);
 
   const filteredVulns = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) > 0) : vulnerabilities;
@@ -1073,7 +1082,7 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?:
 
   const rows = Object.values(subdomainMap).sort((a, b) => b.total - a.total);
 
-  const cellStyle = { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 0.75 };
+  const cellStyle = { borderBottom: 1, borderColor: 'divider', py: 0.75 };
 
   return (
     <TacticalPanel
@@ -1082,7 +1091,7 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?:
       sx={{ height: '100%', ...sx }}
       headerAction={
         <FormControlLabel
-          control={<Checkbox size="small" checked={ignoreInfo} onChange={(e) => setIgnoreInfo(e.target.checked)} sx={{ color: 'rgba(255,255,255,0.4)', '&.Mui-checked': { color: '#00f3ff' } }} />}
+          control={<Checkbox size="small" checked={ignoreInfo} onChange={(e) => setIgnoreInfo(e.target.checked)} sx={{ color: 'text.secondary', '&.Mui-checked': { color: tokens.accent.primary } }} />}
           label={<Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 800 }}>Ignore Info</Typography>}
         />
       }
@@ -1092,35 +1101,35 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?:
           <Table size="small" stickyHeader>
             <TableHead>
               <TableRow>
-                <TableCell sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: 'rgba(255,255,255,0.5)', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase', letterSpacing: 1 }}>Subdomain</TableCell>
-                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#ff003c', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Crit</TableCell>
-                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#ff9f00', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>High</TableCell>
-                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#fffc00', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Med</TableCell>
-                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#00ff62', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Low</TableCell>
-                <TableCell align="center" sx={{ bgcolor: 'rgba(10,10,20,0.95)', color: '#00f3ff', fontSize: '0.6rem', fontWeight: 800, borderBottom: '1px solid rgba(0,243,255,0.2)', textTransform: 'uppercase' }}>Total</TableCell>
+                <TableCell sx={{ bgcolor: isLight ? 'action.hover' : 'rgba(10,10,20,0.95)', color: 'text.secondary', fontSize: '0.6rem', fontWeight: 800, borderBottom: isLight ? '1px solid rgba(0,0,0,0.08)' : `1px solid ${tokens.accent.primary}33`, textTransform: 'uppercase', letterSpacing: 1 }}>Subdomain</TableCell>
+                <TableCell align="center" sx={{ bgcolor: isLight ? 'action.hover' : 'rgba(10,10,20,0.95)', color: isLight ? tokens.accent.error : '#ff003c', fontSize: '0.6rem', fontWeight: 800, borderBottom: isLight ? '1px solid rgba(0,0,0,0.08)' : `1px solid ${tokens.accent.primary}33`, textTransform: 'uppercase' }}>Crit</TableCell>
+                <TableCell align="center" sx={{ bgcolor: isLight ? 'action.hover' : 'rgba(10,10,20,0.95)', color: isLight ? '#d97706' : '#ff9f00', fontSize: '0.6rem', fontWeight: 800, borderBottom: isLight ? '1px solid rgba(0,0,0,0.08)' : `1px solid ${tokens.accent.primary}33`, textTransform: 'uppercase' }}>High</TableCell>
+                <TableCell align="center" sx={{ bgcolor: isLight ? 'action.hover' : 'rgba(10,10,20,0.95)', color: isLight ? '#b45309' : '#fffc00', fontSize: '0.6rem', fontWeight: 800, borderBottom: isLight ? '1px solid rgba(0,0,0,0.08)' : `1px solid ${tokens.accent.primary}33`, textTransform: 'uppercase' }}>Med</TableCell>
+                <TableCell align="center" sx={{ bgcolor: isLight ? 'action.hover' : 'rgba(10,10,20,0.95)', color: isLight ? tokens.accent.success : '#00ff62', fontSize: '0.6rem', fontWeight: 800, borderBottom: isLight ? '1px solid rgba(0,0,0,0.08)' : `1px solid ${tokens.accent.primary}33`, textTransform: 'uppercase' }}>Low</TableCell>
+                <TableCell align="center" sx={{ bgcolor: isLight ? 'action.hover' : 'rgba(10,10,20,0.95)', color: tokens.accent.primary, fontSize: '0.6rem', fontWeight: 800, borderBottom: isLight ? '1px solid rgba(0,0,0,0.08)' : `1px solid ${tokens.accent.primary}33`, textTransform: 'uppercase' }}>Total</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {rows.map((row) => (
-                <TableRow key={row.host} sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' } }}>
+                <TableRow key={row.host} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
                   <TableCell sx={cellStyle}>
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: '#c7c7c7' }}>{row.host}</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 600, color: 'text.primary' }}>{row.host}</Typography>
                   </TableCell>
                   <TableCell align="center" sx={cellStyle}>
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.critical > 0 ? '#ff003c' : 'rgba(255,255,255,0.1)' }}>{row.critical}</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.critical > 0 ? (isLight ? tokens.accent.error : '#ff003c') : (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') }}>{row.critical}</Typography>
                   </TableCell>
                   <TableCell align="center" sx={cellStyle}>
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.high > 0 ? '#ff9f00' : 'rgba(255,255,255,0.1)' }}>{row.high}</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.high > 0 ? (isLight ? '#d97706' : '#ff9f00') : (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') }}>{row.high}</Typography>
                   </TableCell>
                   <TableCell align="center" sx={cellStyle}>
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.medium > 0 ? '#fffc00' : 'rgba(255,255,255,0.1)' }}>{row.medium}</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.medium > 0 ? (isLight ? '#b45309' : '#fffc00') : (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') }}>{row.medium}</Typography>
                   </TableCell>
                   <TableCell align="center" sx={cellStyle}>
-                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.low > 0 ? '#00ff62' : 'rgba(255,255,255,0.1)' }}>{row.low}</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, color: row.low > 0 ? (isLight ? tokens.accent.success : '#00ff62') : (isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.1)') }}>{row.low}</Typography>
                   </TableCell>
                   <TableCell align="center" sx={cellStyle}>
-                    <Box sx={{ px: 1, py: 0.25, borderRadius: 0.5, bgcolor: 'rgba(0,243,255,0.1)', display: 'inline-block' }}>
-                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#00f3ff' }}>{row.total}</Typography>
+                    <Box sx={{ px: 1, py: 0.25, borderRadius: 0.5, bgcolor: `${tokens.accent.primary}15`, display: 'inline-block' }}>
+                      <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: tokens.accent.primary }}>{row.total}</Typography>
                     </Box>
                   </TableCell>
                 </TableRow>
@@ -1141,6 +1150,7 @@ const MostVulnerableSubdomain: React.FC<{ vulnerabilities: Vulnerability[], sx?:
 };
 
 const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], onVulnClick: (v: any) => void, sx?: any }> = ({ vulnerabilities = [], onVulnClick, sx = {} }) => {
+  const { tokens, isLight } = useThemeTokens();
   const [ignoreInfo, setIgnoreInfo] = useState(false);
   const filtered = ignoreInfo ? vulnerabilities.filter(v => Number(v.severity) !== 0) : vulnerabilities;
 
@@ -1160,15 +1170,15 @@ const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], onVuln
       sx={{ height: '100%', ...sx }}
       headerAction={
         <FormControlLabel
-          control={<Checkbox size="small" checked={ignoreInfo} onChange={(e) => setIgnoreInfo(e.target.checked)} sx={{ color: 'rgba(255,255,255,0.4)', '&.Mui-checked': { color: '#00f3ff' } }} />}
-          label={<Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 800 }}>Ignore Info Vulnerabilities</Typography>}
+          control={<Checkbox size="small" checked={ignoreInfo} onChange={(e) => setIgnoreInfo(e.target.checked)} sx={{ color: 'text.secondary', '&.Mui-checked': { color: tokens.accent.primary } }} />}
+          label={<Typography sx={{ fontSize: '0.65rem', color: 'text.secondary', fontWeight: 800 }}>Ignore Info Vulnerabilities</Typography>}
         />
       }
     >
       <TableContainer sx={{ flex: 1, overflow: 'auto' }}>
         <Table size="small">
           <TableHead>
-            <TableRow sx={{ '& th': { borderBottom: '2px solid rgba(255,255,255,0.05)', color: '#00f3ff', fontSize: '0.65rem', fontWeight: 900 } }}>
+            <TableRow sx={{ '& th': { borderBottom: isLight ? '2px solid rgba(0,0,0,0.08)' : '2px solid rgba(255,255,255,0.05)', color: tokens.accent.primary, fontSize: '0.65rem', fontWeight: 900 } }}>
               <TableCell>VULNERABILITY NAME</TableCell>
               <TableCell align="center">COUNT</TableCell>
               <TableCell align="right">SEVERITY</TableCell>
@@ -1180,18 +1190,18 @@ const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], onVuln
                 key={i}
                 onClick={() => onVulnClick(v.vulnerability)}
                 sx={{
-                  '& td': { borderBottom: '1px solid rgba(255,255,255,0.03)', py: 1.5 },
+                  '& td': { borderBottom: isLight ? '1px solid rgba(0,0,0,0.05)' : '1px solid rgba(255,255,255,0.03)', py: 1.5 },
                   cursor: 'pointer',
                   transition: 'background-color 0.2s',
                   '&:hover': {
-                    bgcolor: 'rgba(255,255,255,0.03)',
-                    '& td:first-of-type': { color: '#00f3ff' }
+                    bgcolor: isLight ? 'action.hover' : 'rgba(255,255,255,0.03)',
+                    '& td:first-of-type': { color: tokens.accent.primary }
                   }
                 }}
               >
-                <TableCell sx={{ color: '#e7e7e7ff', fontSize: '0.75rem', fontWeight: 800, transition: 'color 0.2s' }}>{v.name}</TableCell>
+                <TableCell sx={{ color: isLight ? 'text.primary' : '#e7e7e7ff', fontSize: '0.75rem', fontWeight: 800, transition: 'color 0.2s' }}>{v.name}</TableCell>
                 <TableCell align="center">
-                  <Box sx={{ display: 'inline-block', px: 1.5, py: 0.5, border: '1px solid #ff003c', color: '#ff003c', borderRadius: 0.5, fontSize: '0.7rem', fontWeight: 900, bgcolor: 'rgba(255,0,60,0.05)' }}>
+                  <Box sx={{ display: 'inline-block', px: 1.5, py: 0.5, border: `1px solid ${isLight ? tokens.accent.error : '#ff003c'}`, color: isLight ? tokens.accent.error : '#ff003c', borderRadius: 0.5, fontSize: '0.7rem', fontWeight: 900, bgcolor: isLight ? `${tokens.accent.error}10` : 'rgba(255,0,60,0.05)' }}>
                     {v.count}
                   </Box>
                 </TableCell>
@@ -1202,7 +1212,7 @@ const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], onVuln
             ))}
             {data.length === 0 && (
               <TableRow>
-                <TableCell colSpan={3} align="center" sx={{ py: 4, color: 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>NO VULNERABILITIES FOUND</TableCell>
+                <TableCell colSpan={3} align="center" sx={{ py: 4, color: isLight ? 'text.disabled' : 'rgba(255,255,255,0.2)', fontSize: '0.7rem' }}>NO VULNERABILITIES FOUND</TableCell>
               </TableRow>
             )}
           </TableBody>
@@ -1212,58 +1222,65 @@ const MostCommonVulnsWidget: React.FC<{ vulnerabilities: Vulnerability[], onVuln
   );
 };
 
-const ImportantSubdomainsWidget: React.FC<{ subdomains: Subdomain[], sx?: any }> = ({ subdomains = [], sx = {} }) => (
-  <TacticalPanel title="IMPORTANT SUBDOMAINS" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#ff00ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{subdomains.length}</Box>} sx={{ height: '100%', ...sx }}>
+const ImportantSubdomainsWidget: React.FC<{ subdomains: Subdomain[], sx?: any }> = ({ subdomains = [], sx = {} }) => {
+  const { tokens } = useThemeTokens();
+  return (
+  <TacticalPanel title="IMPORTANT SUBDOMAINS" icon={<Box sx={{ width: 14, height: 14, bgcolor: tokens.accent.secondary, borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{subdomains.length}</Box>} sx={{ height: '100%', ...sx }}>
     <Box sx={{ p: 2 }}>
       {subdomains.length > 0 ? (
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
           {subdomains.map((s: Subdomain, i: number) => (
-            <Box key={i} sx={{ px: 1.5, py: 0.5, bgcolor: 'rgba(0,243,255,0.05)', border: '1px solid rgba(0,243,255,0.1)', borderRadius: 1, color: '#00f3ff', fontSize: '0.7rem', fontWeight: 700 }}>
+            <Box key={i} sx={{ px: 1.5, py: 0.5, bgcolor: `${tokens.accent.primary}0D`, border: `1px solid ${tokens.accent.primary}15`, borderRadius: 1, color: tokens.accent.primary, fontSize: '0.7rem', fontWeight: 700 }}>
               {s.name}
             </Box>
           ))}
         </Box>
       ) : (
-        <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>No subdomains marked as important!</Typography>
+        <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled', fontStyle: 'italic' }}>No subdomains marked as important!</Typography>
       )}
     </Box>
   </TacticalPanel>
 );
+};
 
-const ReconNotesWidget: React.FC<{ notes: any[], sx?: any }> = ({ notes = [], sx = {} }) => (
+const ReconNotesWidget: React.FC<{ notes: any[], sx?: any }> = ({ notes = [], sx = {} }) => {
+  const { tokens } = useThemeTokens();
+  return (
   <TacticalPanel
     title="RECON NOTE/TODO"
-    icon={<Box sx={{ width: 14, height: 14, bgcolor: '#2196f3', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notes.length}</Box>}
-    headerAction={<Plus size={14} color="#00f3ff" style={{ cursor: 'pointer' }} />}
+    icon={<Box sx={{ width: 14, height: 14, bgcolor: '#2196f3', borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{notes.length}</Box>}
+    headerAction={<Plus size={14} color={tokens.accent.primary} style={{ cursor: 'pointer' }} />}
     sx={{ height: '100%', ...sx }}
   >
     <Box sx={{ p: 2 }}>
       {notes.length > 0 ? (
         <Stack spacing={1}>
           {notes.map((n: TodoNote) => (
-            <Box key={n.id} sx={{ p: 1, bgcolor: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: 1, display: 'flex', gap: 1.5 }}>
+            <Box key={n.id} sx={{ p: 1, bgcolor: 'rgba(255,255,255,0.03)', border: 1, borderColor: 'divider', borderRadius: 1, display: 'flex', gap: 1.5 }}>
               <Checkbox size="small" checked={n.is_done} sx={{ color: 'rgba(255,255,255,0.2)', p: 0 }} />
               <Box>
                 <Typography sx={{ fontSize: '0.75rem', fontWeight: 800, color: n.is_done ? 'rgba(255,255,255,0.3)' : '#fff', textDecoration: n.is_done ? 'line-through' : 'none' }}>{n.title}</Typography>
-                <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>{n.description}</Typography>
+                <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary' }}>{n.description}</Typography>
               </Box>
             </Box>
           ))}
         </Stack>
       ) : (
         <Box>
-          <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)', fontWeight: 700 }}>No todos or notes...</Typography>
+          <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', fontWeight: 700 }}>No todos or notes...</Typography>
           <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.2)' }}>You can add todo for individual subdomains or you can also add using + symbol above.</Typography>
         </Box>
       )}
     </Box>
   </TacticalPanel>
 );
+};
 
 const IpAddressesWidget: React.FC<{ subdomains: Partial<Subdomain>[], sx?: any }> = ({ subdomains = [], sx = {} }) => {
+  const { tokens } = useThemeTokens();
   const ips = Array.from(new Set(subdomains.map(s => s.origin_ip).filter(ip => ip && ip !== '0.0.0.0')));
   return (
-    <TacticalPanel title="IP ADDRESSES" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ips.length}</Box>} sx={{ height: '100%', ...sx }}>
+    <TacticalPanel title="IP ADDRESSES" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ips.length}</Box>} sx={{ height: '100%', ...sx }}>
       <Box sx={{ p: 2 }}>
         <Typography sx={{ fontSize: '0.6rem', color: '#fffc00', textAlign: 'right', mb: 1, fontWeight: 700 }}>*IP Addresses highlighted with yellow are CDN IP</Typography>
         <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
@@ -1278,34 +1295,40 @@ const IpAddressesWidget: React.FC<{ subdomains: Partial<Subdomain>[], sx?: any }
   );
 };
 
-const DiscoveredPortsWidget: React.FC<{ ports: any[], sx?: any }> = ({ ports = [], sx = {} }) => (
-  <TacticalPanel title="DISCOVERED PORTS" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ports.length}</Box>} sx={{ height: '100%', ...sx }}>
-    <Box sx={{ p: 2 }}>
-      <Typography sx={{ fontSize: '0.6rem', color: '#fffc00', textAlign: 'right', mb: 1, fontWeight: 700 }}>*Ports highlighted with red are uncommon Ports</Typography>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-        {ports.map((p, i) => (
-          <Box key={i} sx={{ px: 1, py: 0.4, bgcolor: p.is_uncommon ? 'rgba(255,0,60,0.1)' : 'rgba(33,150,243,0.1)', border: `1px solid ${p.is_uncommon ? 'rgba(255,0,60,0.2)' : 'rgba(33,150,243,0.2)'}`, borderRadius: 0.5, color: p.is_uncommon ? '#ff003c' : '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
-            {p.number}/{p.service_name}
-          </Box>
-        ))}
+const DiscoveredPortsWidget: React.FC<{ ports: any[], sx?: any }> = ({ ports = [], sx = {} }) => {
+  const { tokens } = useThemeTokens();
+  return (
+    <TacticalPanel title="DISCOVERED PORTS" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{ports.length}</Box>} sx={{ height: '100%', ...sx }}>
+      <Box sx={{ p: 2 }}>
+        <Typography sx={{ fontSize: '0.6rem', color: '#fffc00', textAlign: 'right', mb: 1, fontWeight: 700 }}>*Ports highlighted with red are uncommon Ports</Typography>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {ports.map((p, i) => (
+            <Box key={i} sx={{ px: 1, py: 0.4, bgcolor: p.is_uncommon ? 'rgba(255,0,60,0.1)' : 'rgba(33,150,243,0.1)', border: `1px solid ${p.is_uncommon ? 'rgba(255,0,60,0.2)' : 'rgba(33,150,243,0.2)'}`, borderRadius: 0.5, color: p.is_uncommon ? '#ff003c' : '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
+              {p.number}/{p.service_name}
+            </Box>
+          ))}
+        </Box>
       </Box>
-    </Box>
-  </TacticalPanel>
-);
+    </TacticalPanel>
+  );
+};
 
-const DiscoveredTechWidget: React.FC<{ techs: any[], sx?: any }> = ({ techs = [], sx = {} }) => (
-  <TacticalPanel title="DISCOVERED TECHNOLOGIES" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: '#fff', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{techs.length}</Box>} sx={{ height: '100%', ...sx }}>
-    <Box sx={{ p: 2 }}>
-      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
-        {techs.map((t, i) => (
-          <Box key={i} sx={{ px: 1, py: 0.4, bgcolor: 'rgba(33,150,243,0.1)', border: '1px solid rgba(33,150,243,0.2)', borderRadius: 0.5, color: '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
-            {t.name}
-          </Box>
-        ))}
+const DiscoveredTechWidget: React.FC<{ techs: any[], sx?: any }> = ({ techs = [], sx = {} }) => {
+  const { tokens } = useThemeTokens();
+  return (
+    <TacticalPanel title="DISCOVERED TECHNOLOGIES" icon={<Box sx={{ width: 14, height: 14, bgcolor: '#7000ff', borderRadius: 0.5, color: 'text.primary', fontSize: '8px', fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{techs.length}</Box>} sx={{ height: '100%', ...sx }}>
+      <Box sx={{ p: 2 }}>
+        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+          {techs.map((t, i) => (
+            <Box key={i} sx={{ px: 1, py: 0.4, bgcolor: 'rgba(33,150,243,0.1)', border: '1px solid rgba(33,150,243,0.2)', borderRadius: 0.5, color: '#2196f3', fontSize: '0.65rem', fontWeight: 800 }}>
+              {t.name}
+            </Box>
+          ))}
+        </Box>
       </Box>
-    </Box>
-  </TacticalPanel>
-);
+    </TacticalPanel>
+  );
+};
 
 export const ScanDetailPage = () => {
   const { theme, isLight, tokens } = useThemeTokens();
@@ -1359,14 +1382,14 @@ export const ScanDetailPage = () => {
   if (isLoading || !data) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
       </Box>
     );
   }
 
   const scanStatus = data.scan_info.scan_status;
   const isTerminal = [0, 2, 3, 4].includes(scanStatus);
-  const progressColor = scanStatus === 2 ? '#00ff62' : (scanStatus === 3 || scanStatus === 0) ? '#ff003c' : scanStatus === 4 ? '#fffc00' : '#00f3ff';
+  const progressColor = scanStatus === 2 ? '#00ff62' : (scanStatus === 3 || scanStatus === 0) ? '#ff003c' : scanStatus === 4 ? '#fffc00' : tokens.accent.primary;
   const progressValue = isTerminal ? 100 : data.scan_info.progress;
 
   const baseTabs = [
@@ -1429,7 +1452,7 @@ export const ScanDetailPage = () => {
                     sx={{
                       height: 6,
                       borderRadius: 3,
-                      bgcolor: 'rgba(255,255,255,0.05)',
+                      bgcolor: 'action.hover',
                       '& .MuiLinearProgress-bar': {
                         bgcolor: progressColor,
                         boxShadow: `0 0 15px ${progressColor}80`
@@ -1443,21 +1466,21 @@ export const ScanDetailPage = () => {
               </Box>
             </Box>
 
-            <Box sx={{ height: '1px', bgcolor: 'rgba(255,255,255,0.05)', mx: -2 }} />
+            <Box sx={{ height: '1px', bgcolor: 'action.hover', mx: -2 }} />
 
             <Grid container spacing={3}>
               <Grid size={{ xs: 6 }}>
-                <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', mb: 1, fontWeight: 700 }}>ENGINE</Typography>
+                <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary', mb: 1, fontWeight: 700 }}>ENGINE</Typography>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                  <Cpu size={16} color="#00f3ff" />
-                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>{data.scan_info.engine_name}</Typography>
+                  <Cpu size={16} color={tokens.accent.primary} />
+                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: 'text.primary' }}>{data.scan_info.engine_name}</Typography>
                 </Stack>
               </Grid>
               <Grid size={{ xs: 6 }}>
-                <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', mb: 1, fontWeight: 700 }}>DURATION</Typography>
+                <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary', mb: 1, fontWeight: 700 }}>DURATION</Typography>
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                   <Timer size={16} color="#fffc00" />
-                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff' }}>{Math.floor(data.scan_info.duration / 60)}m {data.scan_info.duration % 60}s</Typography>
+                  <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: 'text.primary' }}>{Math.floor(data.scan_info.duration / 60)}m {data.scan_info.duration % 60}s</Typography>
                 </Stack>
               </Grid>
             </Grid>
@@ -1469,19 +1492,19 @@ export const ScanDetailPage = () => {
         <Box sx={{ p: 1 }}>
           <Stack spacing={1.5}>
             <Box>
-              <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mb: 0.5 }}>STARTING PATH</Typography>
-              <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, wordBreak: 'break-all', color: '#fff' }}>{data.scan_info.cfg_starting_point_path || '/'}</Typography>
+              <Typography sx={{ fontSize: '0.6rem', color: 'text.secondary', mb: 0.5 }}>STARTING PATH</Typography>
+              <Typography sx={{ fontSize: '0.7rem', fontWeight: 700, wordBreak: 'break-all', color: 'text.primary' }}>{data.scan_info.cfg_starting_point_path || '/'}</Typography>
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mb: 0.5 }}>IMPORTED SUBDOMAINS</Typography>
+              <Typography sx={{ fontSize: '0.6rem', color: 'text.secondary', mb: 0.5 }}>IMPORTED SUBDOMAINS</Typography>
               {data.scan_info.cfg_imported_subdomains?.length > 0 ? (
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
-                  {data.scan_info.cfg_imported_subdomains.map((s: string) => <Chip key={s} label={s} size="small" sx={{ height: 18, fontSize: '0.6rem', bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff', mb: 0.5 }} />)}
+                  {data.scan_info.cfg_imported_subdomains.map((s: string) => <Chip key={s} label={s} size="small" sx={{ height: 18, fontSize: '0.6rem', bgcolor: `${tokens.accent.primary}15`, color: tokens.accent.primary, mb: 0.5 }} />)}
                 </Stack>
               ) : <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.2)' }}>None</Typography>}
             </Box>
             <Box>
-              <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mb: 0.5 }}>OUT OF SCOPE</Typography>
+              <Typography sx={{ fontSize: '0.6rem', color: 'text.secondary', mb: 0.5 }}>OUT OF SCOPE</Typography>
               {data.scan_info.cfg_out_of_scope_subdomains?.length > 0 ? (
                 <Stack direction="row" spacing={1} sx={{ alignItems: 'center', flexWrap: 'wrap' }}>
                   {data.scan_info.cfg_out_of_scope_subdomains.map((s: string) => <Chip key={s} label={s} size="small" sx={{ height: 18, fontSize: '0.6rem', bgcolor: 'rgba(255,0,60,0.1)', color: '#ff003c', mb: 0.5 }} />)}
@@ -1570,18 +1593,18 @@ export const ScanDetailPage = () => {
                 sx={{
                   p: 1.5,
                   borderRadius: 1,
-                  bgcolor: scan.id === parseInt(scanId || '0') ? 'rgba(0, 243, 255, 0.05)' : 'transparent',
-                  border: `1px solid ${scan.id === parseInt(scanId || '0') ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255,255,255,0.05)'}`,
+                  bgcolor: scan.id === parseInt(scanId || '0') ? `${tokens.accent.primary}0D` : 'transparent',
+                  border: `1px solid ${scan.id === parseInt(scanId || '0') ? `${tokens.accent.primary}33` : 'rgba(255,255,255,0.05)'}`,
                   textDecoration: 'none',
                   transition: 'all 0.2s',
                   '&:hover': { bgcolor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.1)' }
                 }}
               >
                 <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center' }}>
-                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: '#fff' }}>{scan.engine_name}</Typography>
+                  <Typography sx={{ fontSize: '0.7rem', fontWeight: 800, color: 'text.primary' }}>{scan.engine_name}</Typography>
                   <SeverityBadge severity={scan.highest_severity === 'critical' ? 4 : scan.highest_severity === 'high' ? 3 : 0} />
                 </Stack>
-                <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>{scan.completed_ago}</Typography>
+                <Typography sx={{ fontSize: '0.6rem', color: 'text.secondary', mt: 0.5 }}>{scan.completed_ago}</Typography>
               </Box>
             ))}
           </Stack>
@@ -1603,9 +1626,9 @@ export const ScanDetailPage = () => {
         <Grid size={{ xs: 12, md: 6 }} sx={{ display: 'flex' }}>
           <TacticalPanel title="Target Information" icon={<Activity size={14} />} sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
             <Box sx={{ p: 2, flex: 1 }}>
-              <Tabs value={infoTab} onChange={(_, v) => setInfoTab(v)} sx={{ mb: 2, borderBottom: '1px solid rgba(255,255,255,0.05)', minHeight: 32 }}>
+              <Tabs value={infoTab} onChange={(_, v) => setInfoTab(v)} sx={{ mb: 2, borderBottom: 1, borderColor: 'divider', minHeight: 32 }}>
                 {['Domain Info', 'Whois', 'DNS Records', 'Nameservers', 'History'].map((l) => (
-                  <Tab key={l} label={l} sx={{ fontSize: '0.65rem', fontWeight: 900, minHeight: 32, p: 1, color: 'rgba(255,255,255,0.4)', '&.Mui-selected': { color: '#00f3ff' } }} />
+                  <Tab key={l} label={l} sx={{ fontSize: '0.65rem', fontWeight: 900, minHeight: 32, p: 1, color: 'text.secondary', '&.Mui-selected': { color: tokens.accent.primary } }} />
                 ))}
               </Tabs>
 
@@ -1615,19 +1638,19 @@ export const ScanDetailPage = () => {
                   <Grid size={{ xs: 6 }}>
                     <Stack spacing={2.5}>
                       <Box>
-                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Domain</Typography>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Domain</Typography>
                         <Typography sx={{ fontSize: '0.8rem', fontWeight: 800, color: '#ff003c', fontFamily: 'Orbitron', wordBreak: 'break-all' }}>{data.target_info?.name || 'N/A'}</Typography>
                       </Box>
                       <Box>
-                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Dnssec</Typography>
-                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>{data.domain_info?.dnssec || 'N/A'}</Typography>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Dnssec</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'text.primary' }}>{data.domain_info?.dnssec || 'N/A'}</Typography>
                       </Box>
                       <Box>
-                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Geolocation</Typography>
-                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#fff' }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Geolocation</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: 'text.primary' }}>{data.domain_info?.geolocation_iso || 'N/A'}</Typography>
                       </Box>
                       <Box>
-                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Created</Typography>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Created</Typography>
                         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.created?.split('T')[0] || 'N/A'}</Typography>
                       </Box>
                     </Stack>
@@ -1637,16 +1660,16 @@ export const ScanDetailPage = () => {
                   <Grid size={{ xs: 6 }}>
                     <Stack spacing={2.5}>
                       <Box>
-                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Updated</Typography>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Updated</Typography>
                         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.updated?.split('T')[0] || 'N/A'}</Typography>
                       </Box>
                       <Box>
-                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Expires</Typography>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Expires</Typography>
                         <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{data.domain_info?.expires?.split('T')[0] || 'N/A'}</Typography>
                       </Box>
                       <Box>
-                        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Registrar</Typography>
-                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: '#00f3ff' }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography>
+                        <Typography sx={{ fontSize: '0.65rem', color: 'text.disabled', mb: 0.2, textTransform: 'uppercase', letterSpacing: 1 }}>Registrar</Typography>
+                        <Typography sx={{ fontSize: '0.8rem', fontWeight: 700, color: tokens.accent.primary }}>{data.domain_info?.registrar?.name || 'N/A'}</Typography>
                       </Box>
                     </Stack>
                   </Grid>
@@ -1656,7 +1679,7 @@ export const ScanDetailPage = () => {
                 <Box sx={{ maxHeight: 300, overflow: 'auto' }}>
                   {!data.domain_info?.whois_data ? (
                     <Box sx={{ p: 4, textAlign: 'center' }}>
-                      <Typography sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.4)', mb: 2 }}>
+                      <Typography sx={{ fontSize: '0.8rem', color: 'text.secondary', mb: 2 }}>
                         No WHOIS data available for this target.
                       </Typography>
                       <Button
@@ -1666,13 +1689,13 @@ export const ScanDetailPage = () => {
                         disabled={fetchWhois.isPending}
                         onClick={() => fetchWhois.mutate(data.target_info.name)}
                         sx={{
-                          color: '#00f3ff',
-                          borderColor: 'rgba(0,243,255,0.3)',
+                          color: tokens.accent.primary,
+                          borderColor: `${tokens.accent.primary}4D`,
                           fontSize: '0.65rem',
                           fontWeight: 900,
                           '&:hover': {
-                            borderColor: '#00f3ff',
-                            bgcolor: 'rgba(0,243,255,0.05)'
+                            borderColor: tokens.accent.primary,
+                            bgcolor: `${tokens.accent.primary}0D`
                           }
                         }}
                       >
@@ -1687,7 +1710,7 @@ export const ScanDetailPage = () => {
                           startIcon={fetchWhois.isPending ? <CircularProgress size={10} /> : <RefreshCw size={10} />}
                           disabled={fetchWhois.isPending}
                           onClick={() => fetchWhois.mutate(data.target_info.name)}
-                          sx={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.6rem', '&:hover': { color: '#00f3ff' } }}
+                          sx={{ color: 'text.disabled', fontSize: '0.6rem', '&:hover': { color: tokens.accent.primary } }}
                         >
                           Refresh
                         </Button>
@@ -1703,7 +1726,7 @@ export const ScanDetailPage = () => {
                 <Stack spacing={1}>
                   {data.domain_info?.dns_records?.map((r: any, idx: number) => (
                     <Stack key={idx} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                      <Chip label={r.type?.toUpperCase() ?? 'DNS'} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff' }} />
+                      <Chip label={r.type?.toUpperCase() ?? 'DNS'} size="small" sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: `${tokens.accent.primary}15`, color: tokens.accent.primary }} />
                       <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.8)' }}>{r.name} {"->"} {r.value}</Typography>
                     </Stack>
                   ))}
@@ -1713,31 +1736,31 @@ export const ScanDetailPage = () => {
                 <Stack spacing={1}>
                   {data.domain_info?.nameservers?.map((ns: string, idx: number) => (
                     <Stack key={idx} direction="row" spacing={1} sx={{ alignItems: 'center' }}>
-                      <Globe size={14} color="#00f3ff" />
-                      <Typography sx={{ fontSize: '0.7rem', color: '#fff' }}>{ns}</Typography>
+                      <Globe size={14} color={tokens.accent.primary} />
+                      <Typography sx={{ fontSize: '0.7rem', color: 'text.primary' }}>{ns}</Typography>
                     </Stack>
                   ))}
                   {(!data.domain_info?.nameservers || data.domain_info.nameservers.length === 0) && (
-                    <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.3)', p: 1 }}>No nameservers identified</Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'text.disabled', p: 1 }}>No nameservers identified</Typography>
                   )}
                 </Stack>
               )}
               {infoTab === 4 && (
                 <TableContainer sx={{ maxHeight: 300 }}>
                   <Table size="small">
-                    <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
+                    <TableHead sx={{ bgcolor: 'action.hover' }}>
                       <TableRow>
-                        <TableCell sx={{ color: '#00f3ff', fontWeight: 900, fontSize: '0.65rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>IP ADDRESS</TableCell>
-                        <TableCell sx={{ color: '#00f3ff', fontWeight: 900, fontSize: '0.65rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>LOCATION</TableCell>
-                        <TableCell sx={{ color: '#00f3ff', fontWeight: 900, fontSize: '0.65rem', borderBottom: '1px solid rgba(0, 243, 255, 0.1)' }}>OWNER</TableCell>
+                        <TableCell sx={{ color: tokens.accent.primary, fontWeight: 900, fontSize: '0.65rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>IP ADDRESS</TableCell>
+                        <TableCell sx={{ color: tokens.accent.primary, fontWeight: 900, fontSize: '0.65rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>LOCATION</TableCell>
+                        <TableCell sx={{ color: tokens.accent.primary, fontWeight: 900, fontSize: '0.65rem', borderBottom: `1px solid ${tokens.accent.primary}15` }}>OWNER</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {data.domain_info?.historical_ips?.map((ip: any, idx: number) => (
                         <TableRow key={idx}>
-                          <TableCell sx={{ color: '#fff', fontSize: '0.7rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{ip.ip}</TableCell>
-                          <TableCell sx={{ color: '#fff', fontSize: '0.7rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{ip.location}</TableCell>
-                          <TableCell sx={{ color: '#fff', fontSize: '0.7rem', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>{ip.owner}</TableCell>
+                          <TableCell sx={{ color: 'text.primary', fontSize: '0.7rem', borderBottom: 1, borderColor: 'divider' }}>{ip.ip}</TableCell>
+                          <TableCell sx={{ color: 'text.primary', fontSize: '0.7rem', borderBottom: 1, borderColor: 'divider' }}>{ip.location}</TableCell>
+                          <TableCell sx={{ color: 'text.primary', fontSize: '0.7rem', borderBottom: 1, borderColor: 'divider' }}>{ip.owner}</TableCell>
                         </TableRow>
                       ))}
                       {(!data.domain_info?.historical_ips || data.domain_info.historical_ips.length === 0) && (
@@ -1760,7 +1783,7 @@ export const ScanDetailPage = () => {
                   chart: { type: 'donut', background: 'transparent' },
                   theme: { mode: 'dark' as any },
                   labels: (data?.http_status_breakdown || []).slice().sort((a: { http_status: number }, b: { http_status: number }) => a.http_status - b.http_status).map((s: { http_status: number }) => `HTTP ${s.http_status}`),
-                  colors: ['#00ff62', '#ff003c', '#00f3ff', '#7000ff', '#fffc00', '#ff8000', '#0080ff', '#8000ff'],
+                  colors: ['#00ff62', '#ff003c', tokens.accent.primary, '#7000ff', '#fffc00', '#ff8000', '#0080ff', '#8000ff'],
                   stroke: { show: false },
                   dataLabels: { enabled: false },
                   legend: {
@@ -1849,17 +1872,17 @@ export const ScanDetailPage = () => {
     <TacticalPanel title="S3 Buckets Discovered" icon={<Database size={14} />}>
       <TableContainer>
         <Table size="small">
-          <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
+          <TableHead sx={{ bgcolor: 'action.hover' }}>
             <TableRow>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>BUCKET NAME</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>PUBLIC READ</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 900 }}>PUBLIC WRITE</TableCell>
+              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 900 }}>BUCKET NAME</TableCell>
+              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 900 }}>PUBLIC READ</TableCell>
+              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 900 }}>PUBLIC WRITE</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {(data.buckets || []).map((b: any, idx: number) => (
               <TableRow key={idx}>
-                <TableCell sx={{ color: '#fff', fontWeight: 700 }}>{b.name}</TableCell>
+                <TableCell sx={{ color: 'text.primary', fontWeight: 700 }}>{b.name}</TableCell>
                 <TableCell>
                   <Chip label={b.public_read ? 'YES' : 'NO'} size="small" color={b.public_read ? 'error' : 'default'} />
                 </TableCell>
@@ -1900,7 +1923,7 @@ export const ScanDetailPage = () => {
     <TacticalPanel title="Potential Exploits & Payloads" icon={<Zap size={14} />}>
       <TableContainer>
         <Table size="small">
-          <TableHead sx={{ bgcolor: 'rgba(255,255,255,0.05)' }}>
+          <TableHead sx={{ bgcolor: 'action.hover' }}>
             <TableRow>
               <TableCell sx={{ color: '#fffc00', fontWeight: 900 }}>TARGET</TableCell>
               <TableCell sx={{ color: '#fffc00', fontWeight: 900 }}>EXPLOIT TYPE</TableCell>
@@ -1936,7 +1959,7 @@ export const ScanDetailPage = () => {
 
 
   const renderVulnerabilities = () => (
-    <TacticalPanel title="VULNERABILITY INTELLIGENCE" icon={<ShieldAlert size={18} color="#00f3ff" />}>
+    <TacticalPanel title="VULNERABILITY INTELLIGENCE" icon={<ShieldAlert size={18} color={tokens.accent.primary} />}>
       <PluginComponent
         name="VulnerabilityTable"
         default={VulnerabilityTable}
@@ -1959,8 +1982,8 @@ export const ScanDetailPage = () => {
           }}
         >
           <Box sx={{ mt: 0.5 }}>
-            <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>SCAN DETAIL</Typography>
-            <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600 }}>
+            <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: 'text.primary', letterSpacing: 2 }}>SCAN DETAIL</Typography>
+            <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', fontWeight: 600 }}>
               IDENTIFIER: <Box component="span" sx={{
                 color: '#c0521a'
                 // '@keyframes subtlePulse': {
@@ -1991,14 +2014,14 @@ export const ScanDetailPage = () => {
                 startIcon={<RefreshCw size={16} />}
                 onClick={() => setStartScanTargets({ ids: [data.target_info.id], names: [data.target_info.name] })}
                 sx={{
-                  bgcolor: 'rgba(0, 255, 98, 0.1)',
-                  color: '#00ff62',
-                  border: '1px solid rgba(0, 255, 98, 0.3)',
+                  bgcolor: isLight ? `${tokens.accent.success}1A` : 'rgba(0, 255, 98, 0.1)',
+                  color: isLight ? tokens.accent.success : '#00ff62',
+                  border: isLight ? `1px solid ${tokens.accent.success}4D` : '1px solid rgba(0, 255, 98, 0.3)',
                   fontFamily: 'Orbitron',
                   fontSize: '0.65rem',
                   fontWeight: 900,
                   px: 2,
-                  '&:hover': { bgcolor: 'rgba(0, 255, 98, 0.2)' }
+                  '&:hover': { bgcolor: isLight ? `${tokens.accent.success}33` : 'rgba(0, 255, 98, 0.2)' }
                 }}
               >
                 RESCAN
@@ -2008,14 +2031,14 @@ export const ScanDetailPage = () => {
                 startIcon={<FileText size={16} />}
                 onClick={() => setReportModalOpen(true)}
                 sx={{
-                  bgcolor: 'rgba(0, 243, 255, 0.1)',
-                  color: '#00f3ff',
-                  border: '1px solid rgba(0, 243, 255, 0.3)',
+                  bgcolor: `${tokens.accent.primary}15`,
+                  color: tokens.accent.primary,
+                  border: `1px solid ${tokens.accent.primary}4D`,
                   fontFamily: 'Orbitron',
                   fontSize: '0.65rem',
                   fontWeight: 900,
                   px: 2,
-                  '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                  '&:hover': { bgcolor: `${tokens.accent.primary}33` }
                 }}
               >
                 GENERATE REPORT
@@ -2027,7 +2050,7 @@ export const ScanDetailPage = () => {
                 startIcon={<Zap size={16} />}
                 sx={{
                   bgcolor: 'rgba(255, 0, 255, 0.1)',
-                  color: '#ff00ff',
+                  color: tokens.accent.secondary,
                   border: '1px solid rgba(255, 0, 255, 0.3)',
                   fontFamily: 'Orbitron',
                   fontSize: '0.65rem',
@@ -2039,8 +2062,8 @@ export const ScanDetailPage = () => {
                 STRESS TEST
               </Button>
             </Stack>
-            <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace', alignSelf: { xs: 'flex-start', sm: 'flex-end' } }}>
-              <span>SCANS</span> / <span>DETAIL</span> / <span style={{ color: '#00f3ff' }}>{data.target_info.name}</span>
+            <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: 'text.disabled', fontFamily: 'monospace', alignSelf: { xs: 'flex-start', sm: 'flex-end' } }}>
+              <span>SCANS</span> / <span>DETAIL</span> / <span style={{ color: tokens.accent.primary }}>{data.target_info.name}</span>
             </Stack>
           </Stack>
         </Stack>
@@ -2048,7 +2071,7 @@ export const ScanDetailPage = () => {
 
 
       {/* Tab Bar Integration - Now spanning full width at the top */}
-      <Box sx={{ mb: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', position: 'sticky', top: 0, bgcolor: 'rgba(10,10,15,0.9)', zIndex: 10, backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px' }}>
+      <Box sx={{ mb: 3, borderBottom: 1, borderColor: 'divider', position: 'sticky', top: 0, bgcolor: isLight ? 'rgba(248, 250, 252, 0.95)' : 'rgba(10,10,15,0.9)', zIndex: 10, backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px' }}>
         <Tabs
           value={activeTab}
           onChange={(_, v) => setActiveTab(v)}
@@ -2056,8 +2079,8 @@ export const ScanDetailPage = () => {
           scrollButtons="auto"
           sx={{
             minHeight: 50,
-            '& .MuiTabs-indicator': { bgcolor: '#00f3ff', height: 3, boxShadow: '0 0 15px #00f3ff' },
-            '& .MuiTabs-scrollButtons': { color: '#00f3ff' }
+            '& .MuiTabs-indicator': { bgcolor: tokens.accent.primary, height: 3, boxShadow: `0 0 15px ${tokens.accent.primary}` },
+            '& .MuiTabs-scrollButtons': { color: tokens.accent.primary }
           }}
         >
           {tabs.map((tab, idx) => (
@@ -2073,11 +2096,11 @@ export const ScanDetailPage = () => {
                 fontSize: '0.65rem',
                 fontWeight: 900,
                 minHeight: 50,
-                color: 'rgba(255,255,255,0.4)',
+                color: 'text.secondary',
                 letterSpacing: 1.5,
                 fontFamily: 'Orbitron',
                 px: 3,
-                '&.Mui-selected': { color: '#00f3ff' }
+                '&.Mui-selected': { color: tokens.accent.primary }
               }}
             />
           ))}
@@ -2193,7 +2216,7 @@ export const ScanDetailPage = () => {
 
                 {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'PARAMETERS', 'VULNERABILITIES', 'BUCKETS', 'SCREENSHOTS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION', 'ATTACK PATHS'].includes(tabs[activeTab]?.label) && !tabs[activeTab]?.isPlugin && (
                   <Box sx={{ p: 4, textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 2 }}>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE STAGING AREA: {tabs[activeTab]?.label}</Typography>
+                    <Typography sx={{ color: 'text.disabled', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE STAGING AREA: {tabs[activeTab]?.label}</Typography>
                     <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem', mt: 1 }}>SYNCHRONIZING DATA FROM LEGACY INTERFACE...</Typography>
                   </Box>
                 )}
