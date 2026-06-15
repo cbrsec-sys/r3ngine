@@ -41,7 +41,7 @@ RUN --mount=type=cache,target=/go/pkg/mod \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest && \
-    go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8 && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.9.0 && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
     go install -ldflags="-s -w" -v github.com/hakluke/hakrawler@latest && \
     go install -ldflags="-s -w" -v github.com/lc/gau/v2/cmd/gau@latest && \

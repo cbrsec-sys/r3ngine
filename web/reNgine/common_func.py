@@ -811,7 +811,7 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 	# Save vuln reference
 	for url in references or []:
 		ref, created = VulnerabilityReference.objects.get_or_create(url=url)
-		if created:
+		if ref:
 			vuln.references.add(ref)
 			vuln.save()
 
