@@ -28,7 +28,7 @@ import { EditEngineModal } from './EditEngineModal';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const EngineList: React.FC = () => {
-  const { tokens, isLight } = useThemeTokens();
+  const { tokens, isLight, theme } = useThemeTokens();
   const { data: engines, isLoading } = useEngines();
   const deleteEngine = useDeleteEngine();
   const [editModalOpen, setEditModalOpen] = React.useState(false);
@@ -39,7 +39,7 @@ export const EngineList: React.FC = () => {
     setEditModalOpen(true);
   };
 
-  if (isLoading) return <LinearProgress sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />;
+  if (isLoading) return <LinearProgress sx={{ bgcolor: isLight ? `${tokens.accent.primary}1A` : 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary } }} />;
 
   return (
     <Box>
@@ -84,7 +84,7 @@ export const EngineList: React.FC = () => {
                   borderRadius: 1,
                   border: engine.default_engine ? '1px solid rgba(112, 0, 255, 0.3)' : (isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.05)')
                 }}>
-                  <Shield size={16} style={{ color: engine.default_engine ? '#7000ff' : (isLight ? 'text.secondary' : 'rgba(255,255,255,0.3)') }} />
+                  <Shield size={16} style={{ color: engine.default_engine ? '#7000ff' : (isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.3)') }} />
                 </Paper>
                 <Box sx={{ overflow: 'hidden' }}>
                   <Typography variant="body2" sx={{ 

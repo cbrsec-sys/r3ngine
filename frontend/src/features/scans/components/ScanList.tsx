@@ -41,7 +41,7 @@ import type { ScanHistory } from '../types';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ScanList: React.FC = () => {
-  const { tokens, isLight } = useThemeTokens();
+  const { tokens, isLight, theme } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: scans, isLoading } = useScans(projectSlug);
   const [isStartScanModalOpen, setIsStartScanModalOpen] = React.useState(false);
@@ -136,7 +136,7 @@ export const ScanList: React.FC = () => {
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search size={16} style={{ color: 'text.disabled' }} />
+                    <Search size={16} style={{ color: theme.palette.text.disabled }} />
                   </InputAdornment>
                 ),
               }
@@ -225,8 +225,8 @@ export const ScanList: React.FC = () => {
                   </TableCell>
                   <TableCell sx={{ borderBottom: 1, borderColor: 'divider' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                      <Clock size={12} style={{ color: 'text.secondary' }} />
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>{scan.completed_ago || (scan.scan_status === 1 ? 'Active' : 'N/A')}</Typography>
+                      <Clock size={12} style={{ color: theme.palette.text.secondary }} />
+                      <Typography variant="caption" sx={{ color: 'text.secondary' }}>{scan.completed_ago || (scan.scan_status === 1 ? 'Active' : 'N/A')}</Typography>
                     </Box>
                     <Typography variant="caption" sx={{ display: 'block', color: 'text.disabled', fontSize: '0.65rem' }}>
                       Time: {scan.elapsed_time || '0s'}
