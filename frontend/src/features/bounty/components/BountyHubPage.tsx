@@ -78,7 +78,7 @@ const getProgramCardStyle = (tokens: any) => ({
 });
 
 export const BountyHubPage: React.FC = () => {
-  const { tokens } = useThemeTokens();
+  const { tokens, theme } = useThemeTokens();
   const { projectSlug } = useParams({ strict: false });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
@@ -226,7 +226,7 @@ export const BountyHubPage: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               slotProps={{
                 input: {
-                  startAdornment: <Search size={18} style={{ color: 'text.disabled', marginRight: 8 }} />
+                  startAdornment: <Search size={18} style={{ color: theme.palette.text.disabled, marginRight: 8 }} />
                 }
               }}
               sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'action.hover' } }}

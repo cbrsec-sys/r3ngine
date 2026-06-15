@@ -72,7 +72,7 @@ import type { ScanHistory } from '../types';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ScanHistoryPage: React.FC = () => {
-  const { tokens, isLight } = useThemeTokens();
+  const { tokens, isLight, theme } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const navigate = useNavigate();
   const { data: scans, isLoading } = useScansHistory(projectSlug);
@@ -438,7 +438,7 @@ export const ScanHistoryPage: React.FC = () => {
                       </Typography>
                       {scan.cfg_starting_point_path && (
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                          <Terminal size={10} style={{ color: 'text.disabled' }} />
+                          <Terminal size={10} style={{ color: theme.palette.text.disabled }} />
                           <Typography variant="caption" sx={{ color: 'text.secondary', fontSize: '0.6rem' }}>{scan.cfg_starting_point_path}</Typography>
                         </Box>
                       )}
