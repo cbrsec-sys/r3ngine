@@ -348,6 +348,54 @@ export const useScanSummary = (projectSlug: string, scanId: number) => {
   });
 };
 
+export const useDownloadAiExport = (projectSlug: string, scanId: number) => {
+  return useMutation({
+    mutationFn: async (options: {
+      preset: 'analyst_assist';
+      include_raw_outputs: boolean;
+      include_timeline: boolean;
+      include_sidecars: boolean;
+    }) => {
+      const response = await fetch(`/api/scan-summary/${projectSlug}/${scanId}/export-ai/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify(options),
+      });
+
+      if (!response.ok) {
+        let message = 'Failed to export AI bundle';
+        try {
+          const errorData = await response.json();
+          message = errorData.error || message;
+        } catch {
+          // ignore JSON parse failure
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match?.[1] || `ai_bundle_scan_${scanId}.zip`;
+
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+
+      return { filename };
+    },
+  });
+};
+
 export const useSecretLeaks = (projectSlug: string, scanId: number) => {
   return useQuery<SecretLeak[]>({
     queryKey: ['secret-leaks', projectSlug, scanId],

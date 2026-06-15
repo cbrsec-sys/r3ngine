@@ -2211,6 +2211,7 @@ class InitiateSubTask(APIView):
 			single = data.get('subdomain_id')
 			if single:
 				subdomain_ids = [single]
+		subdomain_ids = list(dict.fromkeys(int(subdomain_id) for subdomain_id in subdomain_ids))
 		for subdomain_id in subdomain_ids:
 			logger.info(f'Running subscans {scan_types} on subdomain "{subdomain_id}" ...')
 			ctx = {
