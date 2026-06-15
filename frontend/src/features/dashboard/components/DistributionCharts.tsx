@@ -92,6 +92,13 @@ const SeverityBadge: React.FC<{ severity: number | string; label?: string }> = (
 
 export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) => {
   const { theme, isLight, tokens } = useThemeTokens();
+  const getCvssColor = (score: number) => {
+    if (score >= 9.0) return '#ff003c';
+    if (score >= 7.0) return '#ff9f00';
+    if (score >= 4.0) return '#fffc00';
+    if (score > 0.0) return '#00ff62';
+    return isLight ? theme.palette.primary.main : '#00f3ff';
+  };
   const [viewMode, setViewMode] = useState<'cve' | 'cwe'>('cve');
   
   // CWE dialog state
@@ -896,10 +903,3 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
   );
 };
 
-const getCvssColor = (score: number) => {
-  if (score >= 9.0) return '#ff003c';
-  if (score >= 7.0) return '#ff9f00';
-  if (score >= 4.0) return '#fffc00';
-  if (score > 0.0) return '#00ff62';
-  return isLight ? theme.palette.primary.main : '#00f3ff';
-};
