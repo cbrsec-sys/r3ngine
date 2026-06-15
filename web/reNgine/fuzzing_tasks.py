@@ -424,7 +424,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 									history_file=self.history_file,
 									scan_id=self.scan_id,
 									activity_id=self.activity_id,
-									route_to_executor=True):
+									route_to_executor=False):
 								if not isinstance(line, dict):
 									continue
 								batch.append(line)
