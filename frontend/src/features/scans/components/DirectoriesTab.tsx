@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 import {
   Box,
   Typography,
@@ -45,6 +46,7 @@ interface DirectoriesTabProps {
 }
 
 export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, scanId, subdomainId, subdomainName, targetId }) => {
+  const { theme, isLight, tokens } = useThemeTokens();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
@@ -124,7 +126,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
 
   const getStatusColor = (status: number) => {
     if (status >= 200 && status < 300) return '#00ffaa';
-    if (status >= 300 && status < 400) return '#00f3ff';
+    if (status >= 300 && status < 400) return tokens.accent.primary;
     if (status >= 400 && status < 500) return '#ffae00';
     if (status >= 500) return '#ff003c';
     return '#888';
@@ -147,14 +149,14 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
         <Box>
           <Typography variant="h5" sx={{
             fontWeight: 900,
-            fontFamily: 'Orbitron',
+            fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
             letterSpacing: 3,
-            color: '#fff',
+            color: theme.palette.text.primary,
             textTransform: 'uppercase'
           }}>
             Directory Fuzzing Results
           </Typography>
-          <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
+          <Typography sx={{ fontSize: '12px', color: 'text.secondary', mt: 0.5, letterSpacing: 1 }}>
             V3.0 SCAN ASSETS DIRECTORY ENUM
           </Typography>
         </Box>
@@ -167,14 +169,14 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
         borderRadius: '4px',
         overflow: 'hidden',
         mb: 3,
-        border: '1px solid rgba(0, 243, 255, 0.1)',
+        border: `1px solid ${tokens.accent.primary}15`,
         '&:focus-within': {
-          borderColor: 'rgba(0, 243, 255, 0.4)',
-          boxShadow: '0 0 15px rgba(0, 243, 255, 0.1)'
+          borderColor: `${tokens.accent.primary}66`,
+          boxShadow: `0 0 15px ${tokens.accent.primary}15`
         },
         transition: 'all 0.2s'
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', pl: 2, color: 'rgba(255,255,255,0.3)' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', pl: 2, color: 'text.disabled' }}>
           <Search size={18} />
         </Box>
         <InputBase
@@ -187,22 +189,22 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
             px: 2,
             py: 1,
             fontSize: '0.9rem',
-            color: '#fff',
+            color: theme.palette.text.primary,
             '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 }
           }}
         />
         <Button
           onClick={handleSearch}
           sx={{
-            bgcolor: 'rgba(0, 243, 255, 0.1)',
-            color: '#00f3ff',
+            bgcolor: isLight ? 'rgba(0,0,0,0.05)' : `${tokens.accent.primary}15`,
+            color: tokens.accent.primary,
             px: 4,
             borderRadius: 0,
             fontWeight: 700,
             fontSize: '11px',
             letterSpacing: 1,
-            borderLeft: '1px solid rgba(0, 243, 255, 0.1)',
-            '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+            borderLeft: `1px solid ${tokens.accent.primary}15`,
+            '&:hover': { bgcolor: isLight ? theme.palette.divider : `${tokens.accent.primary}33` }
           }}
         >
           SEARCH
@@ -215,14 +217,14 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-          bgcolor: 'rgba(255,255,255,0.01)'
+          borderBottom: 1, borderColor: 'divider',
+          bgcolor: 'action.hover'
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Results :</Typography>
-              <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1 }}>
-                <Typography sx={{ fontSize: '11px', color: '#fff', fontWeight: 700 }}>{data?.count || 0}</Typography>
+              <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'text.secondary' }}>Results :</Typography>
+              <Box sx={{ px: 1, py: 0.5, bgcolor: 'action.hover', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1 }}>
+                <Typography sx={{ fontSize: '11px', color: theme.palette.text.primary, fontWeight: 700 }}>{data?.count || 0}</Typography>
               </Box>
             </Box>
             <Box sx={{ px: 3, py: 0.8, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 1, border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -232,7 +234,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
             </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
-            <IconButton size="small" sx={{ color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.1)', borderRadius: 1 }}>
+            <IconButton size="small" sx={{ color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D`, border: `1px solid ${tokens.accent.primary}15`, borderRadius: 1 }}>
               <Download size={14} />
             </IconButton>
           </Box>
@@ -247,11 +249,11 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                 backgroundColor: 'rgba(255,255,255,0.02)'
               }}>
                 <th style={{ width: '40px', padding: '12px 16px' }}></th>
-                <Box component="th" sx={{ display: { xs: 'none', sm: 'table-cell' }, width: '80px', padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>VISUAL</Box>
-                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SUBDOMAIN</th>
-                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</Box>
-                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PAGE TITLE</Box>
-                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>DIRECTORIES DISCOVERED</th>
+                <Box component="th" sx={{ display: { xs: 'none', sm: 'table-cell' }, width: '80px', padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>VISUAL</Box>
+                <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>SUBDOMAIN</th>
+                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>STATUS</Box>
+                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>PAGE TITLE</Box>
+                <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>DIRECTORIES DISCOVERED</th>
               </tr>
             </thead>
             <tbody>
@@ -259,8 +261,8 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                 <tr>
                   <td colSpan={6} style={{ padding: '80px', textAlign: 'center' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                      <CircularProgress size={32} sx={{ color: '#00f3ff', filter: 'drop-shadow(0 0 8px #00f3ff)' }} />
-                      <Typography sx={{ fontSize: '10px', fontWeight: 900, color: 'rgba(0, 243, 255, 0.5)', fontFamily: 'Orbitron', letterSpacing: 2 }}>
+                      <CircularProgress size={32} sx={{ color: tokens.accent.primary, filter: `drop-shadow(0 0 8px ${tokens.accent.primary})` }} />
+                      <Typography sx={{ fontSize: '10px', fontWeight: 900, color: `${tokens.accent.primary}80`, fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', letterSpacing: 2 }}>
                         FETCHING DIRECTORY DATA...
                       </Typography>
                     </Box>
@@ -270,51 +272,51 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                 (data?.results || []).map((sd: any) => (
                   <React.Fragment key={sd.id}>
                     <tr style={{
-                      borderBottom: '1px solid rgba(255,255,255,0.05)',
-                      backgroundColor: expandedSubdomains[sd.id] ? 'rgba(0, 243, 255, 0.05)' : 'transparent',
+                      borderBottom: 1, borderColor: 'divider',
+                      backgroundColor: expandedSubdomains[sd.id] ? `${tokens.accent.primary}0D` : 'transparent',
                       cursor: 'pointer',
                       transition: 'background 0.2s'
                     }} onClick={() => toggleSubdomain(sd.id)}>
                       <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                        <IconButton size="small" sx={{ color: '#00f3ff' }}>
+                        <IconButton size="small" sx={{ color: tokens.accent.primary }}>
                           {expandedSubdomains[sd.id] ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                         </IconButton>
                       </td>
                       <Box component="td" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '12px 16px', textAlign: 'center' }}>
-                        <Folder size={18} style={{ color: expandedSubdomains[sd.id] ? '#00f3ff' : 'rgba(0, 243, 255, 0.4)' }} />
+                        <Folder size={18} style={{ color: expandedSubdomains[sd.id] ? tokens.accent.primary : `${tokens.accent.primary}66` }} />
                       </Box>
                       <td style={{ padding: '12px 16px' }}>
-                        <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{sd.name}</Typography>
+                        <Typography sx={{ fontSize: '13px', fontWeight: 700, color: theme.palette.text.primary }}>{sd.name}</Typography>
                       </td>
                       <Box component="td" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px' }}>
-                        <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', fontWeight: 800 }}>RECON ACTIVE</Typography>
+                        <Typography sx={{ fontSize: '11px', color: 'text.secondary', fontWeight: 800 }}>RECON ACTIVE</Typography>
                       </Box>
                       <Box component="td" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px' }}>
-                        <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.4)' }}>Click to expand findings</Typography>
+                        <Typography sx={{ fontSize: '12px', color: 'text.secondary' }}>Click to expand findings</Typography>
                       </Box>
                       <td style={{ padding: '12px 16px' }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                           <Box sx={{ 
                             px: 1, 
                             py: 0.2, 
-                            bgcolor: 'rgba(0, 243, 255, 0.1)', 
+                            bgcolor: isLight ? 'rgba(0,0,0,0.05)' : `${tokens.accent.primary}15`, 
                             borderRadius: 0.5, 
-                            color: '#00f3ff', 
+                            color: tokens.accent.primary, 
                             fontSize: '11px', 
                             fontWeight: 900,
-                            fontFamily: 'Orbitron',
-                            border: '1px solid rgba(0, 243, 255, 0.2)'
+                            fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
+                            border: `1px solid ${tokens.accent.primary}33`
                           }}>
                             {sd.directory_count}
                           </Box>
-                          <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', textTransform: 'uppercase', letterSpacing: 1 }}>Paths</Typography>
+                          <Typography sx={{ fontSize: '10px', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>Paths</Typography>
                         </Box>
                       </td>
                     </tr>
                     <tr>
                       <td colSpan={6} style={{ padding: 0 }}>
                         <Collapse in={expandedSubdomains[sd.id]} timeout="auto" unmountOnExit>
-                          <Box sx={{ p: 3, bgcolor: 'rgba(0, 243, 255, 0.02)', borderLeft: '2px solid #00f3ff' }}>
+                          <Box sx={{ p: 3, bgcolor: 'rgba(0, 243, 255, 0.02)', borderLeft: `2px solid ${tokens.accent.primary}` }}>
                             <SubdomainFilesContent scanId={scanId!} subdomainId={sd.id} />
                           </Box>
                         </Collapse>
@@ -325,11 +327,11 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
               ) : (
                 groupedSubdomains.map((sub: any) => (
                   <tr key={sub.id} style={{
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    borderBottom: 1, borderColor: 'divider',
                     backgroundColor: 'transparent'
                   }}>
                     <td style={{ padding: '12px 16px', verticalAlign: 'top', textAlign: 'center' }}>
-                      <IconButton size="small" onClick={() => toggleSubdomain(sub.id)} sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                      <IconButton size="small" onClick={() => toggleSubdomain(sub.id)} sx={{ color: 'text.disabled' }}>
                         {expandedSubdomains[sub.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                       </IconButton>
                     </td>
@@ -339,10 +341,10 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                           size="small"
                           onClick={() => openLightbox(sub.screenshot_path!, sub.name)}
                           sx={{
-                            color: '#00f3ff',
-                            bgcolor: 'rgba(0, 243, 255, 0.05)',
-                            border: '1px solid rgba(0, 243, 255, 0.2)',
-                            '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)', borderColor: '#00f3ff' }
+                            color: tokens.accent.primary,
+                            bgcolor: `${tokens.accent.primary}0D`,
+                            border: `1px solid ${tokens.accent.primary}33`,
+                            '&:hover': { bgcolor: isLight ? 'rgba(0,0,0,0.05)' : `${tokens.accent.primary}15`, borderColor: tokens.accent.primary }
                           }}
                         >
                           <Eye size={14} />
@@ -354,13 +356,13 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                     <td style={{ padding: '12px 16px', verticalAlign: 'top' }}>
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#fff' }}>{sub.name}</Typography>
+                          <Typography sx={{ fontSize: '13px', fontWeight: 700, color: theme.palette.text.primary }}>{sub.name}</Typography>
                           {sub.http_url && (
-                            <IconButton size="small" component="a" href={sub.http_url} target="_blank" sx={{ p: 0.2, color: '#00f3ff' }}>
+                            <IconButton size="small" component="a" href={sub.http_url} target="_blank" sx={{ p: 0.2, color: tokens.accent.primary }}>
                               <ExternalLink size={12} />
                             </IconButton>
                           )}
-                          <IconButton size="small" sx={{ p: 0.2, color: 'rgba(255,255,255,0.3)' }}>
+                          <IconButton size="small" sx={{ p: 0.2, color: 'text.disabled' }}>
                             <Copy size={12} />
                           </IconButton>
                         </Box>
@@ -405,7 +407,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                       {sub.directories && sub.directories.length > 0 ? (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                           {sub.directories.length > 1 && (
-                            <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.5)', mb: 1 }}>
+                            <Typography sx={{ fontSize: '11px', color: 'text.secondary', mb: 1 }}>
                               Directory Scan performed {sub.directories.length} times.
                             </Typography>
                           )}
@@ -419,15 +421,15 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                                     alignItems: 'center',
                                     gap: 1,
                                     cursor: 'pointer',
-                                    '&:hover': { color: '#00f3ff' },
+                                    '&:hover': { color: tokens.accent.primary },
                                     color: 'rgba(255,255,255,0.8)',
                                     transition: 'color 0.2s'
                                   }}
                                 >
                                   {expandedScans[`${sub.id}-${scan.id}`] ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                                  <FolderPlus size={14} style={{ color: '#00f3ff' }} />
+                                  <FolderPlus size={14} style={{ color: tokens.accent.primary }} />
                                   <Typography sx={{ fontSize: '12px', fontWeight: 600 }}>
-                                    <Box component="span" sx={{ px: 1, py: 0.2, bgcolor: 'rgba(0, 243, 255, 0.1)', borderRadius: 0.5, mr: 1, color: '#00f3ff' }}>
+                                    <Box component="span" sx={{ px: 1, py: 0.2, bgcolor: isLight ? 'rgba(0,0,0,0.05)' : `${tokens.accent.primary}15`, borderRadius: 0.5, mr: 1, color: tokens.accent.primary }}>
                                       {scan.directory_files.length}
                                     </Box>
                                     Directories found on {scan.scanned_date}
@@ -445,7 +447,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                                             alignItems: 'center',
                                             justifyContent: 'space-between',
                                             p: 1,
-                                            bgcolor: 'rgba(255,255,255,0.02)',
+                                            bgcolor: 'action.hover',
                                             borderRadius: 0.5,
                                             '&:hover': { bgcolor: 'rgba(255,255,255,0.04)' }
                                           }}
@@ -454,9 +456,9 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                                             <Typography sx={{
                                               fontSize: '12px',
                                               fontWeight: 700,
-                                              color: '#fff',
+                                              color: theme.palette.text.primary,
                                               textDecoration: 'none',
-                                              '&:hover': { color: '#00f3ff' }
+                                              '&:hover': { color: tokens.accent.primary }
                                             }} component="a" href={file.url} target="_blank">
                                               {decodeBase64(file.name)}
                                             </Typography>
@@ -474,19 +476,19 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                                             <Chip
                                               label={file.content_type}
                                               size="small"
-                                              sx={{ height: 14, fontSize: '8px', bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', borderRadius: 0.5 }}
+                                              sx={{ height: 14, fontSize: '8px', bgcolor: 'action.hover', color: 'text.secondary', borderRadius: 0.5 }}
                                             />
                                           </Box>
                                           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                            <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                                            <Typography sx={{ fontSize: '10px', color: 'text.secondary', fontFamily: 'monospace' }}>
                                               {(file.length / 1024).toFixed(1)} KB
                                             </Typography>
                                             {file.lines && (
-                                              <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                                              <Typography sx={{ fontSize: '10px', color: 'text.secondary', fontFamily: 'monospace' }}>
                                                 {file.lines} L
                                               </Typography>
                                             )}
-                                            <IconButton size="small" component="a" href={file.url} target="_blank" sx={{ color: 'rgba(255,255,255,0.3)', p: 0.5 }}>
+                                            <IconButton size="small" component="a" href={file.url} target="_blank" sx={{ color: 'text.disabled', p: 0.5 }}>
                                               <ExternalLink size={12} />
                                             </IconButton>
                                           </Box>
@@ -521,14 +523,14 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
               size="small"
               sx={{
                 '& .MuiPaginationItem-root': {
-                  color: 'rgba(255,255,255,0.5)',
+                  color: 'text.secondary',
                   borderColor: 'rgba(255,255,255,0.1)',
-                  fontFamily: 'Orbitron',
+                  fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
                   fontSize: '10px',
                   '&.Mui-selected': {
-                    bgcolor: 'rgba(0, 243, 255, 0.1)',
-                    color: '#00f3ff',
-                    borderColor: '#00f3ff'
+                    bgcolor: isLight ? 'rgba(0,0,0,0.05)' : `${tokens.accent.primary}15`,
+                    color: tokens.accent.primary,
+                    borderColor: tokens.accent.primary
                   }
                 }
               }}
@@ -575,8 +577,8 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
               }}
             >
               <Typography sx={{
-                color: '#00f3ff',
-                fontFamily: 'Orbitron',
+                color: tokens.accent.primary,
+                fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
                 fontSize: '12px',
                 fontWeight: 700,
                 letterSpacing: 1,
@@ -597,9 +599,9 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                   size="small"
                   sx={{
                     color: 'rgba(255,255,255,0.6)',
-                    bgcolor: 'rgba(255,255,255,0.05)',
+                    bgcolor: 'action.hover',
                     border: '1px solid rgba(255,255,255,0.1)',
-                    '&:hover': { color: '#00f3ff', borderColor: 'rgba(0,243,255,0.4)' },
+                    '&:hover': { color: tokens.accent.primary, borderColor: `${tokens.accent.primary}66` },
                   }}
                 >
                   <ExternalLink size={14} />
@@ -609,7 +611,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                   size="small"
                   sx={{
                     color: 'rgba(255,255,255,0.6)',
-                    bgcolor: 'rgba(255,255,255,0.05)',
+                    bgcolor: 'action.hover',
                     border: '1px solid rgba(255,255,255,0.1)',
                     '&:hover': { color: '#ff003c', borderColor: 'rgba(255,0,60,0.4)' },
                   }}
@@ -624,10 +626,10 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
               sx={{
                 maxWidth: '90vw',
                 maxHeight: '80vh',
-                border: '1px solid rgba(0, 243, 255, 0.2)',
+                border: `1px solid ${tokens.accent.primary}33`,
                 borderRadius: 1,
                 overflow: 'hidden',
-                boxShadow: '0 0 60px rgba(0, 243, 255, 0.1)',
+                boxShadow: `0 0 60px ${tokens.accent.primary}15`,
               }}
             >
               {lightboxSrc && (
@@ -650,7 +652,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                 mt: 2,
                 fontSize: '10px',
                 color: 'rgba(255,255,255,0.2)',
-                fontFamily: 'Orbitron',
+                fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
                 letterSpacing: 1,
                 cursor: 'pointer',
                 userSelect: 'none',
@@ -666,11 +668,12 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
 };
 
 const SubdomainFilesContent: React.FC<{ scanId: number; subdomainId: number }> = ({ scanId, subdomainId }) => {
+  const { theme, isLight, tokens } = useThemeTokens();
   const { data, isLoading } = useDirectories({ scan_id: scanId, subdomain_id: subdomainId });
 
   const getStatusColor = (status: number) => {
     if (status >= 200 && status < 300) return '#00ffaa';
-    if (status >= 300 && status < 400) return '#00f3ff';
+    if (status >= 300 && status < 400) return tokens.accent.primary;
     if (status >= 400 && status < 500) return '#ffae00';
     if (status >= 500) return '#ff003c';
     return '#888';
@@ -687,8 +690,8 @@ const SubdomainFilesContent: React.FC<{ scanId: number; subdomainId: number }> =
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2 }}>
-        <CircularProgress size={16} sx={{ color: '#00f3ff' }} />
-        <Typography sx={{ fontSize: '10px', color: 'rgba(0, 243, 255, 0.6)', fontWeight: 800, fontFamily: 'Orbitron' }}>
+        <CircularProgress size={16} sx={{ color: tokens.accent.primary }} />
+        <Typography sx={{ fontSize: '10px', color: `${tokens.accent.primary}99`, fontWeight: 800, fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>
           DECRYPTING FILE SYSTEM...
         </Typography>
       </Box>
@@ -697,7 +700,7 @@ const SubdomainFilesContent: React.FC<{ scanId: number; subdomainId: number }> =
 
   if (!data?.results || data.results.length === 0) {
     return (
-      <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>
+      <Typography sx={{ fontSize: '11px', color: 'text.disabled', fontStyle: 'italic' }}>
         No directory findings associated with this subdomain.
       </Typography>
     );
@@ -715,11 +718,11 @@ const SubdomainFilesContent: React.FC<{ scanId: number; subdomainId: number }> =
             p: 1.5,
             bgcolor: 'rgba(255,255,255,0.03)',
             borderRadius: 1,
-            border: '1px solid rgba(255,255,255,0.05)',
+            border: 1, borderColor: 'divider',
             '&:hover': { 
-              bgcolor: 'rgba(255,255,255,0.05)',
-              borderColor: 'rgba(0, 243, 255, 0.2)',
-              boxShadow: '0 0 10px rgba(0, 243, 255, 0.05)'
+              bgcolor: 'action.hover',
+              borderColor: isLight ? theme.palette.divider : `${tokens.accent.primary}33`,
+              boxShadow: `0 0 10px ${tokens.accent.primary}0D`
             },
             transition: 'all 0.2s'
           }}
@@ -729,13 +732,13 @@ const SubdomainFilesContent: React.FC<{ scanId: number; subdomainId: number }> =
               <Typography sx={{
                 fontSize: '12px',
                 fontWeight: 700,
-                color: '#fff',
+                color: theme.palette.text.primary,
                 textDecoration: 'none',
-                '&:hover': { color: '#00f3ff' }
+                '&:hover': { color: tokens.accent.primary }
               }} component="a" href={file.url} target="_blank">
                 {decodeBase64(file.name)}
               </Typography>
-              <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+              <Typography sx={{ fontSize: '10px', color: 'text.disabled', fontFamily: 'monospace' }}>
                 {file.url}
               </Typography>
             </Box>
@@ -755,28 +758,28 @@ const SubdomainFilesContent: React.FC<{ scanId: number; subdomainId: number }> =
             <Chip
               label={file.content_type || 'unknown'}
               size="small"
-              sx={{ height: 16, fontSize: '9px', bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', borderRadius: 0.5 }}
+              sx={{ height: 16, fontSize: '9px', bgcolor: 'action.hover', color: 'text.secondary', borderRadius: 0.5 }}
             />
           </Box>
           
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
             <Stack direction="row" spacing={2}>
               <Box sx={{ textAlign: 'right' }}>
-                <Typography sx={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)', fontWeight: 800 }}>SIZE</Typography>
+                <Typography sx={{ fontSize: '9px', color: 'text.disabled', fontWeight: 800 }}>SIZE</Typography>
                 <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
                   {(file.length / 1024).toFixed(1)} KB
                 </Typography>
               </Box>
               {file.lines && (
                 <Box sx={{ textAlign: 'right' }}>
-                  <Typography sx={{ fontSize: '9px', color: 'rgba(255,255,255,0.3)', fontWeight: 800 }}>LINES</Typography>
+                  <Typography sx={{ fontSize: '9px', color: 'text.disabled', fontWeight: 800 }}>LINES</Typography>
                   <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
                     {file.lines}
                   </Typography>
                 </Box>
               )}
             </Stack>
-            <IconButton size="small" component="a" href={file.url} target="_blank" sx={{ color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)', p: 1 }}>
+            <IconButton size="small" component="a" href={file.url} target="_blank" sx={{ color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D`, p: 1 }}>
               <ExternalLink size={14} />
             </IconButton>
           </Box>

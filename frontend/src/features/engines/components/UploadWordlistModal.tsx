@@ -9,7 +9,8 @@ import {
   Box,
   Typography,
   IconButton,
-  Paper
+  Paper,
+  useTheme,
 } from '@mui/material';
 import { X, FileUp, Upload } from 'lucide-react';
 import { useUploadWordlist } from '../api';
@@ -24,6 +25,8 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
   const [shortName, setShortName] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const uploadWordlist = useUploadWordlist();
+  const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -59,10 +62,10 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
       slotProps={{
         paper: {
           sx: {
-            bgcolor: '#0a0a0c',
-            border: '1px solid rgba(255, 0, 255, 0.2)',
-            boxShadow: '0 0 30px rgba(255, 0, 255, 0.1)',
-            backgroundImage: 'linear-gradient(rgba(255, 0, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px)',
+            bgcolor: isLight ? 'background.paper' : '#0a0a0c',
+            border: isLight ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(255, 0, 255, 0.2)',
+            boxShadow: isLight ? 'none' : '0 0 30px rgba(255, 0, 255, 0.1)',
+            backgroundImage: isLight ? 'none' : 'linear-gradient(rgba(255, 0, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 0, 255, 0.05) 1px, transparent 1px)',
             backgroundSize: '20px 20px',
           }
         }
@@ -72,16 +75,17 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid rgba(255, 0, 255, 0.1)',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
         pb: 2
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <FileUp size={20} style={{ color: '#ff00ff' }} />
-          <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: '#fff', letterSpacing: 1 }}>
+          <FileUp size={20} style={{ color: isLight ? theme.palette.primary.main : '#ff00ff' }} />
+          <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: 'text.primary', letterSpacing: 1 }}>
             UPLOAD WORDLIST PAYLOAD
           </Typography>
         </Box>
-        <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+        <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
           <X size={20} />
         </IconButton>
       </DialogTitle>
@@ -97,13 +101,13 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
             variant="filled"
             sx={{
               '& .MuiFilledInput-root': {
-                bgcolor: 'rgba(255,255,255,0.03)',
+                bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
                 '&:before, &:after': { display: 'none' },
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#fff',
+                border: isLight ? '1px solid rgba(0,0,0,0.15)' : '1px solid rgba(255,255,255,0.1)',
+                color: 'text.primary',
                 fontFamily: 'monospace'
               },
-              '& .MuiInputLabel-root': { color: 'rgba(255, 0, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }
+              '& .MuiInputLabel-root': { color: isLight ? 'text.secondary' : 'rgba(255, 0, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }
             }}
           />
 
@@ -116,18 +120,18 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
             variant="filled"
             sx={{
               '& .MuiFilledInput-root': {
-                bgcolor: 'rgba(255,255,255,0.03)',
+                bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
                 '&:before, &:after': { display: 'none' },
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#fff',
+                border: isLight ? '1px solid rgba(0,0,0,0.15)' : '1px solid rgba(255,255,255,0.1)',
+                color: 'text.primary',
                 fontFamily: 'monospace'
               },
-              '& .MuiInputLabel-root': { color: 'rgba(255, 0, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }
+              '& .MuiInputLabel-root': { color: isLight ? 'text.secondary' : 'rgba(255, 0, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }
             }}
           />
 
           <Box>
-            <Typography variant="caption" sx={{ color: 'rgba(255, 0, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem', mb: 1, display: 'block' }}>
+            <Typography variant="caption" sx={{ color: isLight ? 'text.secondary' : 'rgba(255, 0, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem', mb: 1, display: 'block' }}>
               SELECT PAYLOAD FILE (.TXT)
             </Typography>
             <input
@@ -140,8 +144,8 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
             <label htmlFor="wordlist-file-input">
               <Paper sx={{
                 p: 3,
-                bgcolor: 'rgba(255,255,255,0.02)',
-                border: '1px dashed rgba(255,0,255,0.3)',
+                bgcolor: isLight ? 'rgba(0,0,0,0.01)' : 'rgba(255,255,255,0.02)',
+                border: isLight ? '1px dashed rgba(0,0,0,0.15)' : '1px dashed rgba(255,0,255,0.3)',
                 cursor: 'pointer',
                 display: 'flex',
                 flexDirection: 'column',
@@ -149,12 +153,12 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
                 gap: 1,
                 transition: 'all 0.2s',
                 '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.04)',
-                  borderColor: '#ff00ff'
+                  bgcolor: isLight ? 'action.hover' : 'rgba(255,255,255,0.04)',
+                  borderColor: isLight ? 'primary.main' : '#ff00ff'
                 }
               }}>
-                <Upload size={24} style={{ color: file ? '#ff00ff' : 'rgba(255,255,255,0.3)' }} />
-                <Typography sx={{ color: file ? '#fff' : 'rgba(255,255,255,0.5)', fontSize: '0.8rem', fontFamily: 'monospace' }}>
+                <Upload size={24} style={{ color: file ? (isLight ? theme.palette.primary.main : '#ff00ff') : 'rgba(128,128,128,0.5)' }} />
+                <Typography sx={{ color: file ? 'text.primary' : 'text.secondary', fontSize: '0.8rem', fontFamily: 'monospace' }}>
                   {file ? file.name : 'CLICK TO SCAN FILESYSTEM'}
                 </Typography>
               </Paper>
@@ -163,10 +167,10 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
         </Box>
       </DialogContent>
 
-      <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+      <DialogActions sx={{ p: 3, borderTop: '1px solid', borderColor: 'divider' }}>
         <Button
           onClick={onClose}
-          sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}
+          sx={{ color: 'text.secondary', fontFamily: 'Orbitron', fontSize: '0.7rem' }}
         >
           CANCEL
         </Button>
@@ -175,14 +179,14 @@ export const UploadWordlistModal: React.FC<UploadWordlistModalProps> = ({ open, 
           disabled={!name || !shortName || !file || uploadWordlist.isPending}
           variant="contained"
           sx={{
-            bgcolor: '#ff00ff',
+            bgcolor: isLight ? 'primary.main' : '#ff00ff',
             color: '#fff',
             fontFamily: 'Orbitron',
             fontWeight: 900,
             fontSize: '0.75rem',
             px: 4,
-            '&:hover': { bgcolor: '#e600e6' },
-            '&.Mui-disabled': { bgcolor: 'rgba(255,0,255,0.1)', color: 'rgba(255,255,255,0.2)' }
+            '&:hover': { bgcolor: isLight ? 'primary.dark' : '#e600e6' },
+            '&.Mui-disabled': { bgcolor: isLight ? 'action.disabledBackground' : 'rgba(255,0,255,0.1)', color: 'action.disabled' }
           }}
         >
           {uploadWordlist.isPending ? 'UPLOADING...' : 'COMMIT PAYLOAD'}

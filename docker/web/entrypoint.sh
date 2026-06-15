@@ -1,17 +1,17 @@
 #!/bin/bash
-# Ensure OpenSSL compatibility before running any management commands
-pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
-
-# Install/update frontend dependencies (ensures packages match package.json in both modes)
-echo "Installing frontend dependencies..."
-cd /usr/src/app/frontend && npm install
+# Install/update frontend dependencies only when package.json is updated or node_modules doesn't exist
+echo "Checking frontend dependencies..."
+cd /usr/src/app/frontend
+if [ ! -d "node_modules" ] || [ package.json -nt node_modules ]; then
+    echo "Installing/updating frontend dependencies (changes detected)..."
+    npm install
+else
+    echo "Frontend dependencies are up to date."
+fi
 
 if [ "$DEBUG" = "1" ]; then
     echo "Development mode: Starting Vite dev server..."
     npm run dev -- --host 0.0.0.0 &
-# else
-    # echo "Production mode: Building frontend..."
-    # npm run build
 fi
 # Ensure searchsploit RC file is copied to root home directory if available
 if [ -f "/usr/src/exploitdb/.searchsploit_rc" ]; then
@@ -38,11 +38,11 @@ if ! python3 manage.py shell -c "from scanEngine.models import EngineType; impor
     echo "Loading default fixtures..."
     python3 manage.py loaddata fixtures/external_tools.yaml
     python3 manage.py loaddata fixtures/default_keywords.yaml
-    
+
     for f in fixtures/scan_engines/*.yaml; do
         python3 manage.py loaddata "$f" --app scanEngine.EngineType
     done
-    
+
     for f in fixtures/hardware_profiles/*.yaml; do
         python3 manage.py loaddata "$f" --app scanEngine.HardwareProfile
     done

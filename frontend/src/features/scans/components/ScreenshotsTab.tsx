@@ -12,6 +12,7 @@ import {
 } from '@mui/material';
 import { X, ExternalLink, Camera } from 'lucide-react';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 interface ScreenshotEntry {
   id: number | string;
@@ -65,6 +66,7 @@ const useScreenshots = (scanId: number) => {
 };
 
 export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
+  const { tokens } = useThemeTokens();
   const { data: subdomainData, isLoading, isError } = useScreenshots(scanId);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [lightboxLabel, setLightboxLabel] = useState<string>('');
@@ -116,19 +118,19 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
       {/* Header */}
       <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1.5, mb: 4, mt: 2 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Camera size={20} color="#00f3ff" />
+          <Camera size={20} color={tokens.accent.primary} />
           <Box>
             <Typography variant="h5" sx={{
               fontWeight: 900,
               fontFamily: 'Orbitron',
               letterSpacing: { xs: 1, sm: 3 },
-              color: '#fff',
+              color: 'text.primary',
               textTransform: 'uppercase',
               fontSize: { xs: '1.2rem', sm: '1.5rem' }
             }}>
               Visual Intelligence
             </Typography>
-            <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
+            <Typography sx={{ fontSize: '12px', color: 'text.secondary', mt: 0.5, letterSpacing: 1 }}>
               EYEWITNESS CAPTURE RESULTS
             </Typography>
           </Box>
@@ -143,21 +145,21 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
           flexDirection: { xs: 'column', md: 'row' },
           alignItems: { xs: 'flex-start', md: 'center' },
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-          bgcolor: 'rgba(255,255,255,0.01)',
+          borderBottom: 1, borderColor: 'divider',
+          bgcolor: 'action.hover',
           gap: 2
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, flexWrap: 'wrap' }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-              <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>
+              <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'text.secondary' }}>
                 Captured:
               </Typography>
-              <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(0, 243, 255, 0.08)', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1 }}>
-                <Typography sx={{ fontSize: '11px', color: '#00f3ff', fontWeight: 700 }}>
+              <Box sx={{ px: 1, py: 0.5, bgcolor: `${tokens.accent.primary}14`, border: `1px solid ${tokens.accent.primary}33`, borderRadius: 1 }}>
+                <Typography sx={{ fontSize: '11px', color: tokens.accent.primary, fontWeight: 700 }}>
                   {isLoading ? '...' : (screenshots?.length ?? 0)} screenshots
                 </Typography>
               </Box>
-              <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.3)' }}>
+              <Typography sx={{ fontSize: '11px', color: 'text.disabled' }}>
                 ({subdomainData?.length ?? 0} targets)
               </Typography>
             </Box>
@@ -171,11 +173,11 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
         <Box sx={{ p: 3, minHeight: 300 }}>
           {isLoading && (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 8 }}>
-              <CircularProgress size={32} sx={{ color: '#00f3ff', filter: 'drop-shadow(0 0 8px #00f3ff)' }} />
+              <CircularProgress size={32} sx={{ color: tokens.accent.primary, filter: `drop-shadow(0 0 8px ${tokens.accent.primary})` }} />
               <Typography sx={{
                 fontSize: '10px',
                 fontWeight: 900,
-                color: 'rgba(0, 243, 255, 0.5)',
+                color: `${tokens.accent.primary}80`,
                 fontFamily: 'Orbitron',
                 letterSpacing: 2,
                 textTransform: 'uppercase',
@@ -196,7 +198,7 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
               <Typography sx={{ color: '#ff003c', fontFamily: 'Orbitron', fontSize: '0.75rem', fontWeight: 700 }}>
                 FETCH ERROR
               </Typography>
-              <Typography sx={{ color: 'rgba(255, 255, 255, 0.3)', fontSize: '0.65rem', mt: 1 }}>
+              <Typography sx={{ color: 'text.disabled', fontSize: '0.65rem', mt: 1 }}>
                 Could not load screenshots from server.
               </Typography>
             </Box>
@@ -238,8 +240,8 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                       bgcolor: 'rgba(0,0,0,0.4)',
                       transition: 'all 0.2s ease',
                       '&:hover': {
-                        border: '1px solid rgba(0, 243, 255, 0.4)',
-                        boxShadow: '0 0 20px rgba(0, 243, 255, 0.1)',
+                        border: `1px solid ${tokens.accent.primary}66`,
+                        boxShadow: `0 0 20px ${tokens.accent.primary}15`,
                         transform: 'translateY(-2px)',
                         '& .screenshot-overlay': { opacity: 1 },
                       },
@@ -269,7 +271,7 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                       sx={{
                         position: 'absolute',
                         inset: 0,
-                        bgcolor: 'rgba(0, 243, 255, 0.08)',
+                        bgcolor: `${tokens.accent.primary}14`,
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -278,12 +280,12 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                       }}
                     >
                       <Typography sx={{
-                        color: '#00f3ff',
+                        color: tokens.accent.primary,
                         fontSize: '10px',
                         fontWeight: 900,
                         fontFamily: 'Orbitron',
                         letterSpacing: 1,
-                        textShadow: '0 0 10px #00f3ff',
+                        textShadow: `0 0 10px ${tokens.accent.primary}`,
                       }}>
                         EXPAND
                       </Typography>
@@ -299,7 +301,7 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                       <Typography sx={{
                         fontSize: '11px',
                         fontWeight: 700,
-                        color: '#fff',
+                        color: 'text.primary',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
                         whiteSpace: 'nowrap',
@@ -378,12 +380,12 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
               }}
             >
               <Typography sx={{
-                color: '#00f3ff',
+                color: tokens.accent.primary,
                 fontFamily: 'Orbitron',
                 fontSize: '13px',
                 fontWeight: 700,
                 letterSpacing: 1.5,
-                textShadow: '0 0 10px rgba(0, 243, 255, 0.5)',
+                textShadow: `0 0 10px ${tokens.accent.primary}80`,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -403,7 +405,7 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                     color: 'rgba(255,255,255,0.8)',
                     bgcolor: 'rgba(255,255,255,0.1)',
                     border: '1px solid rgba(255,255,255,0.2)',
-                    '&:hover': { color: '#00f3ff', borderColor: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' },
+                    '&:hover': { color: tokens.accent.primary, borderColor: tokens.accent.primary, bgcolor: `${tokens.accent.primary}15` },
                   }}
                 >
                   <ExternalLink size={16} />
@@ -431,10 +433,10 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                 zIndex: 2,
                 maxWidth: '92vw',
                 maxHeight: '82vh',
-                border: '2px solid rgba(0, 243, 255, 0.4)',
+                border: `2px solid ${tokens.accent.primary}66`,
                 borderRadius: 1,
                 overflow: 'hidden',
-                boxShadow: '0 0 100px rgba(0, 243, 255, 0.3)',
+                boxShadow: `0 0 100px ${tokens.accent.primary}4D`,
                 bgcolor: '#000'
               }}
             >
@@ -460,12 +462,12 @@ export const ScreenshotsTab: React.FC<ScreenshotsTabProps> = ({ scanId }) => {
                 zIndex: 3,
                 mt: 3,
                 fontSize: '11px',
-                color: 'rgba(255,255,255,0.4)',
+                color: 'text.secondary',
                 fontFamily: 'Orbitron',
                 letterSpacing: 2,
                 cursor: 'pointer',
                 userSelect: 'none',
-                '&:hover': { color: '#00f3ff' }
+                '&:hover': { color: tokens.accent.primary }
               }}
             >
               CLICK ANYWHERE TO CLOSE

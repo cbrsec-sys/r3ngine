@@ -61,3 +61,27 @@ class TemporalClientProvider:
             await handle.cancel()
 
         run_and_close(loop, _cancel())
+
+    @classmethod
+    def pause_workflow(cls, workflow_id: str) -> None:
+        """Send a pause signal to a running Temporal workflow synchronously."""
+        loop = asyncio.new_event_loop()
+
+        async def _pause():
+            client = await cls.get_client()
+            handle = client.get_workflow_handle(workflow_id)
+            await handle.signal("pause")
+
+        run_and_close(loop, _pause())
+
+    @classmethod
+    def resume_workflow(cls, workflow_id: str) -> None:
+        """Send a resume signal to a running Temporal workflow synchronously."""
+        loop = asyncio.new_event_loop()
+
+        async def _resume():
+            client = await cls.get_client()
+            handle = client.get_workflow_handle(workflow_id)
+            await handle.signal("resume")
+
+        run_and_close(loop, _resume())

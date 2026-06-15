@@ -255,6 +255,9 @@ export const useStopScan = (projectSlug: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scans-history', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['domains', projectSlug] });
     },
   });
 };
@@ -342,6 +345,54 @@ export const useScanSummary = (projectSlug: string, scanId: number) => {
       if (data && data.scan_info && data.scan_info.scan_status === 2 && !data.scan_info.is_spiderfoot_running) return false;
       return 5000;
     }
+  });
+};
+
+export const useDownloadAiExport = (projectSlug: string, scanId: number) => {
+  return useMutation({
+    mutationFn: async (options: {
+      preset: 'analyst_assist';
+      include_raw_outputs: boolean;
+      include_timeline: boolean;
+      include_sidecars: boolean;
+    }) => {
+      const response = await fetch(`/api/scan-summary/${projectSlug}/${scanId}/export-ai/`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify(options),
+      });
+
+      if (!response.ok) {
+        let message = 'Failed to export AI bundle';
+        try {
+          const errorData = await response.json();
+          message = errorData.error || message;
+        } catch {
+          // ignore JSON parse failure
+        }
+        throw new Error(message);
+      }
+
+      const blob = await response.blob();
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const match = disposition.match(/filename="?([^"]+)"?/);
+      const filename = match?.[1] || `ai_bundle_scan_${scanId}.zip`;
+
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+
+      return { filename };
+    },
   });
 };
 
@@ -646,6 +697,60 @@ export const useParameters = (params: {
         throw new Error('Network response was not ok');
       }
       return response.json();
+    },
+  });
+};
+
+export const usePauseScan = (projectSlug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { scan_ids?: number[]; target_id?: number }) => {
+      const response = await fetch('/api/action/pause/scan/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to pause scan(s)');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scans-history', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['domains', projectSlug] });
+    },
+  });
+};
+
+export const useUnpauseScan = (projectSlug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { scan_ids?: number[]; target_id?: number }) => {
+      const response = await fetch('/api/action/unpause/scan/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to unpause scan(s)');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['scans-history', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['domains', projectSlug] });
     },
   });
 };

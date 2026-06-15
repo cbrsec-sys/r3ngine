@@ -11,6 +11,7 @@ import {
   IconButton,
   CircularProgress,
   Tooltip,
+  useTheme,
 } from '@mui/material';
 import { X, Cpu, Save, BookOpen } from 'lucide-react';
 import { fetchEngineDetails, useUpdateEngine } from '../api';
@@ -29,6 +30,8 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
   const [refOpen, setRefOpen] = useState(false);
   const updateEngine = useUpdateEngine();
   const backgroundRef = React.useRef<HTMLPreElement>(null);
+  const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
 
   const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
     if (backgroundRef.current) {
@@ -75,10 +78,10 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
       slotProps={{
         paper: {
           sx: {
-            bgcolor: '#0a0a0c',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
-            boxShadow: '0 0 30px rgba(0, 243, 255, 0.1)',
-            backgroundImage: 'linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px)',
+            bgcolor: isLight ? 'background.paper' : '#0a0a0c',
+            border: isLight ? '1px solid rgba(0, 0, 0, 0.1)' : '1px solid rgba(0, 243, 255, 0.2)',
+            boxShadow: isLight ? 'none' : '0 0 30px rgba(0, 243, 255, 0.1)',
+            backgroundImage: isLight ? 'none' : 'linear-gradient(rgba(0, 243, 255, 0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 243, 255, 0.05) 1px, transparent 1px)',
             backgroundSize: '20px 20px',
           }
         }
@@ -88,16 +91,17 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderBottom: '1px solid rgba(0, 243, 255, 0.1)',
+        borderBottom: '1px solid',
+        borderColor: 'divider',
         pb: 2
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Cpu size={20} style={{ color: '#00f3ff' }} />
-          <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: '#fff', letterSpacing: 1 }}>
+          <Cpu size={20} style={{ color: isLight ? theme.palette.primary.main : '#00f3ff' }} />
+          <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: 'text.primary', letterSpacing: 1 }}>
             MODIFY ENGINE CONFIG
           </Typography>
         </Box>
-        <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+        <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
           <X size={20} />
         </IconButton>
       </DialogTitle>
@@ -105,7 +109,7 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
       <DialogContent sx={{ mt: 2, minHeight: 400, display: 'flex', flexDirection: 'column' }}>
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', flexGrow: 1 }}>
-            <CircularProgress sx={{ color: '#00f3ff' }} />
+            <CircularProgress sx={{ color: isLight ? 'primary.main' : '#00f3ff' }} />
           </Box>
         ) : (
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -117,18 +121,18 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
               variant="filled"
               sx={{
                 '& .MuiFilledInput-root': {
-                  bgcolor: 'rgba(255,255,255,0.03)',
+                  bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
                   '&:before, &:after': { display: 'none' },
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  color: '#fff',
+                  border: isLight ? '1px solid rgba(0,0,0,0.15)' : '1px solid rgba(255,255,255,0.1)',
+                  color: 'text.primary',
                   fontFamily: 'monospace'
                 },
-                '& .MuiInputLabel-root': { color: 'rgba(0, 243, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }
+                '& .MuiInputLabel-root': { color: isLight ? 'text.secondary' : 'rgba(0, 243, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }
               }}
             />
 
             <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
-              <Typography sx={{ color: 'rgba(0,243,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
+              <Typography sx={{ color: isLight ? 'text.secondary' : 'rgba(0,243,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
                 YAML CONFIGURATION BLUEPRINT
               </Typography>
               <Tooltip title="View configuration reference">
@@ -136,9 +140,9 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
                   size="small"
                   onClick={() => setRefOpen(true)}
                   sx={{
-                    color: 'rgba(0,243,255,0.6)',
+                    color: isLight ? 'text.secondary' : 'rgba(0,243,255,0.6)',
                     p: 0.5,
-                    '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0,243,255,0.08)' },
+                    '&:hover': { color: isLight ? 'primary.main' : '#00f3ff', bgcolor: isLight ? 'rgba(0,0,0,0.04)' : 'rgba(0,243,255,0.08)' },
                   }}
                 >
                   <BookOpen size={14} />
@@ -149,8 +153,8 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
               position: 'relative',
               width: '100%',
               height: 500,
-              bgcolor: 'rgba(255,255,255,0.03)',
-              border: '1px solid rgba(255,255,255,0.1)',
+              bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.03)',
+              border: isLight ? '1px solid rgba(0,0,0,0.15)' : '1px solid rgba(255,255,255,0.1)',
               borderRadius: 1,
               overflow: 'hidden'
             }}>
@@ -182,7 +186,7 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
 
                   if (isComment) {
                     return (
-                      <span key={i} style={{ color: 'rgba(255,255,255,0.3)' }}>
+                      <span key={i} style={{ color: isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.3)' }}>
                         {cleanLine}{i === yaml.split('\n').length - 1 ? '' : '\n'}
                       </span>
                     );
@@ -196,19 +200,21 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
                       <span key={i}>
                         <span>{indent}</span>
                         <span style={{
-                          color: isTopLevel ? '#ff3333' : '#e5c07b',
+                          color: isTopLevel 
+                            ? (isLight ? '#c2410c' : '#ff3333') 
+                            : (isLight ? '#b45309' : '#e5c07b'),
                           fontWeight: isTopLevel ? 900 : 400
                         }}>
                           {key}
                         </span>
-                        <span style={{ color: '#fff' }}>{rest}</span>
+                        <span style={{ color: isLight ? '#0f172a' : '#fff' }}>{rest}</span>
                         {i === yaml.split('\n').length - 1 ? '' : '\n'}
                       </span>
                     );
                   }
 
                   return (
-                    <span key={i} style={{ color: '#fff' }}>
+                    <span key={i} style={{ color: isLight ? '#0f172a' : '#fff' }}>
                       {cleanLine}{i === yaml.split('\n').length - 1 ? '' : '\n'}
                     </span>
                   );
@@ -241,7 +247,7 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
                   fontSize: '14px',
                   lineHeight: '1.5',
                   color: 'transparent',
-                  caretColor: '#fff',
+                  caretColor: isLight ? theme.palette.primary.main : '#fff',
                   boxSizing: 'border-box',
                   whiteSpace: 'pre-wrap',
                   wordBreak: 'break-all',
@@ -253,10 +259,10 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
         )}
       </DialogContent>
 
-      <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+      <DialogActions sx={{ p: 3, borderTop: '1px solid', borderColor: 'divider' }}>
         <Button
           onClick={onClose}
-          sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}
+          sx={{ color: 'text.secondary', fontFamily: 'Orbitron', fontSize: '0.7rem' }}
         >
           CANCEL
         </Button>
@@ -266,14 +272,14 @@ export const EditEngineModal: React.FC<EditEngineModalProps> = ({ open, onClose,
           variant="contained"
           startIcon={<Save size={16} />}
           sx={{
-            bgcolor: '#00f3ff',
-            color: '#000',
+            bgcolor: isLight ? 'primary.main' : '#00f3ff',
+            color: isLight ? '#fff' : '#000',
             fontFamily: 'Orbitron',
             fontWeight: 900,
             fontSize: '0.75rem',
             px: 4,
-            '&:hover': { bgcolor: '#00d8e6' },
-            '&.Mui-disabled': { bgcolor: 'rgba(0,243,255,0.1)', color: 'rgba(255,255,255,0.2)' }
+            '&:hover': { bgcolor: isLight ? 'primary.dark' : '#00d8e6' },
+            '&.Mui-disabled': { bgcolor: isLight ? 'action.disabledBackground' : 'rgba(0,243,255,0.1)', color: 'action.disabled' }
           }}
         >
           {updateEngine.isPending ? 'SYNCHRONIZING...' : 'COMMIT CHANGES'}

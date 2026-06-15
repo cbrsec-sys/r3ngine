@@ -46,8 +46,10 @@ import {
 } from '../api';
 import type { ReportSettings } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ReportSettingsPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: settings, isLoading } = useReportSettings();
   const updateSettings = useUpdateReportSettings();
@@ -130,7 +132,7 @@ export const ReportSettingsPage: React.FC = () => {
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
       </Box>
     );
   }
@@ -141,13 +143,13 @@ export const ReportSettingsPage: React.FC = () => {
         <Typography variant="h4" sx={{
           fontFamily: 'Orbitron',
           fontWeight: 900,
-          color: '#fff',
-          textShadow: '0 0 20px rgba(0, 243, 255, 0.5)',
+          color: 'text.primary',
+          textShadow: `0 0 20px ${tokens.accent.primary}80`,
           mb: 1
         }}>
           REPORT CALIBRATION
         </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
+        <Typography variant="body2" sx={{ color: 'text.secondary', letterSpacing: 1 }}>
           CUSTOMIZE VULNERABILITY REPORT AESTHETICS & BRANDING
         </Typography>
       </Box>
@@ -157,13 +159,13 @@ export const ReportSettingsPage: React.FC = () => {
         <TacticalPanel title="BRANDING & VISUALS" icon={<Palette size={18} />} sx={{ width: '100%' }}>
           <Stack spacing={4}>
             <Box>
-              <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
+              <Typography sx={{ color: 'text.secondary', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
                 THEME COLORS
               </Typography>
               <Grid container spacing={3}>
                 <Grid size={{ xs: 12, sm: 6 }} >
-                  <Typography variant="caption" sx={{ color: '#00f3ff', mb: 1, display: 'block', fontWeight: 600 }}>PRIMARY COLOR</Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
+                  <Typography variant="caption" sx={{ color: tokens.accent.primary, mb: 1, display: 'block', fontWeight: 600 }}>PRIMARY COLOR</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.disabled', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for Main Title, Footer Background, and Page Counters.
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -179,9 +181,9 @@ export const ReportSettingsPage: React.FC = () => {
                       onChange={(e) => setForm({ ...form, primary_color: e.target.value })}
                       sx={{
                         '& .MuiOutlinedInput-root': {
-                          color: '#fff',
+                          color: 'text.primary',
                           fontFamily: 'monospace',
-                          bgcolor: 'rgba(255,255,255,0.02)',
+                          bgcolor: 'action.hover',
                           fontSize: '0.8rem'
                         }
                       }}
@@ -190,7 +192,7 @@ export const ReportSettingsPage: React.FC = () => {
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6 }} >
                   <Typography variant="caption" sx={{ color: '#ffd600', mb: 1, display: 'block', fontWeight: 600 }}>SECONDARY COLOR</Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
+                  <Typography variant="caption" sx={{ color: 'text.disabled', mb: 1.5, display: 'block', lineHeight: 1.4 }}>
                     Used for the report cover background.
                   </Typography>
                   <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
@@ -206,9 +208,9 @@ export const ReportSettingsPage: React.FC = () => {
                       onChange={(e) => setForm({ ...form, secondary_color: e.target.value })}
                       sx={{
                         '& .MuiOutlinedInput-root': {
-                          color: '#fff',
+                          color: 'text.primary',
                           fontFamily: 'monospace',
-                          bgcolor: 'rgba(255,255,255,0.02)',
+                          bgcolor: 'action.hover',
                           fontSize: '0.8rem'
                         }
                       }}
@@ -218,10 +220,10 @@ export const ReportSettingsPage: React.FC = () => {
               </Grid>
             </Box>
 
-            <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+            <Divider sx={{ borderColor: 'divider' }} />
 
             <Box sx={{ width: '100%' }}>
-              <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
+              <Typography sx={{ color: 'text.secondary', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
                 COMPANY IDENTITY
               </Typography>
               <Stack spacing={3} sx={{ width: '100%' }}>
@@ -236,13 +238,13 @@ export const ReportSettingsPage: React.FC = () => {
                         input: {
                           startAdornment: (
                             <InputAdornment position="start">
-                              <Building2 size={18} color="rgba(0, 243, 255, 0.5)" />
+                              <Building2 size={18} color={tokens.accent.primary} style={{ opacity: 0.5 }} />
                             </InputAdornment>
                           ),
                         }
                       }}
                       variant="outlined"
-                      sx={{ '& .MuiOutlinedInput-root': { color: '#fff' } }}
+                      sx={{ '& .MuiOutlinedInput-root': { color: 'text.primary' } }}
                     />
                   </Box>
                   <Box sx={{ flex: 1 }}>
@@ -255,13 +257,13 @@ export const ReportSettingsPage: React.FC = () => {
                         input: {
                           startAdornment: (
                             <InputAdornment position="start">
-                              <MapPin size={18} color="rgba(0, 243, 255, 0.5)" />
+                              <MapPin size={18} color={tokens.accent.primary} style={{ opacity: 0.5 }} />
                             </InputAdornment>
                           ),
                         }
                       }}
                       variant="outlined"
-                      sx={{ '& .MuiOutlinedInput-root': { color: '#fff' } }}
+                      sx={{ '& .MuiOutlinedInput-root': { color: 'text.primary' } }}
                     />
                   </Box>
                 </Stack>
@@ -278,13 +280,13 @@ export const ReportSettingsPage: React.FC = () => {
                         input: {
                           startAdornment: (
                             <InputAdornment position="start">
-                              <Globe size={18} color="rgba(0, 243, 255, 0.5)" />
+                              <Globe size={18} color={tokens.accent.primary} style={{ opacity: 0.5 }} />
                             </InputAdornment>
                           ),
                         }
                       }}
                       variant="outlined"
-                      sx={{ '& .MuiOutlinedInput-root': { color: '#fff' } }}
+                      sx={{ '& .MuiOutlinedInput-root': { color: 'text.primary' } }}
                     />
                   </Box>
                   <Box sx={{ flex: 1 }}>
@@ -298,13 +300,13 @@ export const ReportSettingsPage: React.FC = () => {
                         input: {
                           startAdornment: (
                             <InputAdornment position="start">
-                              <Mail size={18} color="rgba(0, 243, 255, 0.5)" />
+                              <Mail size={18} color={tokens.accent.primary} style={{ opacity: 0.5 }} />
                             </InputAdornment>
                           ),
                         }
                       }}
                       variant="outlined"
-                      sx={{ '& .MuiOutlinedInput-root': { color: '#fff' } }}
+                      sx={{ '& .MuiOutlinedInput-root': { color: 'text.primary' } }}
                     />
                   </Box>
                 </Stack>
@@ -317,7 +319,7 @@ export const ReportSettingsPage: React.FC = () => {
         <TacticalPanel title="REPORT COMPONENTS" icon={<Layout size={18} />} sx={{ width: '100%' }}>
           <Stack spacing={4}>
             <Box>
-              <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
+              <Typography sx={{ color: 'text.secondary', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
                 LAYOUT TOGGLES
               </Typography>
               <Stack
@@ -335,13 +337,13 @@ export const ReportSettingsPage: React.FC = () => {
                     <Switch
                       checked={form.show_rengine_banner}
                       onChange={(e) => setForm({ ...form, show_rengine_banner: e.target.checked })}
-                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' } }}
+                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary } }}
                     />
                   }
                   label={
                     <Box>
-                      <Typography sx={{ color: '#fff', fontSize: '0.85rem' }}>Show reNgine Banner</Typography>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
+                      <Typography sx={{ color: 'text.primary', fontSize: '0.85rem' }}>Show reNgine Banner</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block' }}>
                         Includes 'Generated by reNgine' in the footer.
                       </Typography>
                     </Box>
@@ -352,13 +354,13 @@ export const ReportSettingsPage: React.FC = () => {
                     <Switch
                       checked={form.show_executive_summary}
                       onChange={(e) => setForm({ ...form, show_executive_summary: e.target.checked })}
-                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' } }}
+                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary } }}
                     />
                   }
                   label={
                     <Box>
-                      <Typography sx={{ color: '#fff', fontSize: '0.85rem' }}>Show Executive Summary</Typography>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
+                      <Typography sx={{ color: 'text.primary', fontSize: '0.85rem' }}>Show Executive Summary</Typography>
+                      <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block' }}>
                         Appears before the quick summary section.
                       </Typography>
                     </Box>
@@ -369,16 +371,16 @@ export const ReportSettingsPage: React.FC = () => {
                     <Switch
                       checked={form.enable_llm_report_generation}
                       onChange={(e) => setForm({ ...form, enable_llm_report_generation: e.target.checked })}
-                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' } }}
+                      sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary } }}
                     />
                   }
                   label={
                     <Box>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography sx={{ color: '#fff', fontSize: '0.85rem' }}>AI Powered Report Generation</Typography>
+                        <Typography sx={{ color: 'text.primary', fontSize: '0.85rem' }}>AI Powered Report Generation</Typography>
                         <Sparkles size={14} color="#ffd600" />
                       </Box>
-                      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
+                      <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block' }}>
                         Automatically generates Overview, Brief, and Conclusion via LLM.
                       </Typography>
                     </Box>
@@ -387,15 +389,15 @@ export const ReportSettingsPage: React.FC = () => {
               </Stack>
             </Box>
 
-            <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+            <Divider sx={{ borderColor: 'divider' }} />
 
             <Box>
-              <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
+              <Typography sx={{ color: 'text.secondary', fontSize: '0.75rem', mb: 2, fontFamily: 'Orbitron' }}>
                 EXECUTIVE SUMMARY TEMPLATE
               </Typography>
 
-              <Box sx={{ mb: 2, p: 2, bgcolor: 'rgba(0,0,0,0.3)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                <Typography variant="caption" sx={{ color: '#00f3ff', fontWeight: 600, display: 'block', mb: 2, fontFamily: 'Orbitron' }}>
+              <Box sx={{ mb: 2, p: 2, bgcolor: 'background.default', borderRadius: '8px', border: 1, borderColor: 'divider' }}>
+                <Typography variant="caption" sx={{ color: tokens.accent.primary, fontWeight: 600, display: 'block', mb: 2, fontFamily: 'Orbitron' }}>
                   AVAILABLE SYNTAX (Curly braces are mandatory)
                 </Typography>
                 <Stack spacing={1}>
@@ -441,8 +443,9 @@ export const ReportSettingsPage: React.FC = () => {
                 gap: 0.5,
                 px: 1,
                 py: 0.5,
-                bgcolor: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.1)',
+                bgcolor: 'action.hover',
+                border: 1,
+                borderColor: 'divider',
                 borderBottom: 'none',
                 borderTopLeftRadius: '8px',
                 borderTopRightRadius: '8px'
@@ -463,7 +466,7 @@ export const ReportSettingsPage: React.FC = () => {
                   { icon: <HelpCircle size={16} />, label: 'Help', action: () => { } },
                 ].map((item, idx) => (
                   item.separator ? (
-                    <Box key={idx} sx={{ width: '1px', height: '16px', bgcolor: 'rgba(255,255,255,0.1)', mx: 0.5 }} />
+                    <Box key={idx} sx={{ width: '1px', height: '16px', bgcolor: 'divider', mx: 0.5 }} />
                   ) : (
                     <Button
                       key={idx}
@@ -473,8 +476,8 @@ export const ReportSettingsPage: React.FC = () => {
                         minWidth: '32px',
                         height: '32px',
                         p: 0,
-                        color: 'rgba(0, 243, 255, 0.7)',
-                        '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' }
+                        color: `${tokens.accent.primary}B3`,
+                        '&:hover': { color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}1A` }
                       }}
                       title={item.label}
                     >
@@ -521,13 +524,13 @@ export const ReportSettingsPage: React.FC = () => {
                   <Switch
                     checked={form.show_footer}
                     onChange={(e) => setForm({ ...form, show_footer: e.target.checked })}
-                    sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' } }}
+                    sx={{ '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary } }}
                   />
                 }
                 label={
                   <Box>
-                    <Typography sx={{ color: '#fff', fontSize: '0.85rem' }}>Show Footer Text</Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
+                    <Typography sx={{ color: 'text.primary', fontSize: '0.85rem' }}>Show Footer Text</Typography>
+                    <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block' }}>
                       Copyright or generation info, placed bottom-left.
                     </Typography>
                   </Box>
@@ -551,15 +554,15 @@ export const ReportSettingsPage: React.FC = () => {
         <Paper sx={{
           p: 2,
           width: '100%',
-          bgcolor: 'rgba(0, 243, 255, 0.05)',
-          border: '1px solid rgba(0, 243, 255, 0.2)',
+          bgcolor: `${tokens.accent.primary}0D`,
+          border: `1px solid ${tokens.accent.primary}33`,
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center'
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Info size={20} color="#00f3ff" />
-            <Typography sx={{ color: 'rgba(255,255,255,0.6)', fontSize: '0.8rem' }}>
+            <Info size={20} color={tokens.accent.primary} />
+            <Typography sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>
               These settings will be applied to all PDF reports generated across all projects.
             </Typography>
           </Box>
@@ -569,12 +572,12 @@ export const ReportSettingsPage: React.FC = () => {
             onClick={handleSave}
             disabled={updateSettings.isPending}
             sx={{
-              bgcolor: '#00f3ff',
+              bgcolor: tokens.accent.primary,
               color: '#000',
               fontFamily: 'Orbitron',
               fontWeight: 900,
               px: 6,
-              '&:hover': { bgcolor: '#00d8e4' }
+              '&:hover': { bgcolor: tokens.accent.primary, filter: 'brightness(1.1)' }
             }}
           >
             {updateSettings.isPending ? 'SYNCHRONIZING...' : 'UPDATE CONFIG'}
@@ -596,7 +599,7 @@ export const ReportSettingsPage: React.FC = () => {
             fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}E6` : 'rgba(255, 0, 85, 0.9)',
             color: '#000',
             '& .MuiAlert-icon': { color: '#000' }
           }}

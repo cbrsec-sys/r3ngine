@@ -4,8 +4,10 @@ import { Box, Typography, Button, Stack } from '@mui/material';
 import { ChevronLeft } from 'lucide-react';
 import { Link as RouterLink } from '@tanstack/react-router';
 import { AttackSurfaceTab } from './AttackSurfaceTab';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const AttackSurfacePage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug, scanId } = useParams({ strict: false }) as any;
 
   return (
@@ -18,19 +20,19 @@ export const AttackSurfacePage: React.FC = () => {
               to={`/${projectSlug}/scans`}
               startIcon={<ChevronLeft size={16} />}
               sx={{
-                color: 'rgba(255,255,255,0.5)',
+                color: 'text.secondary',
                 fontFamily: 'Orbitron',
                 fontSize: '0.7rem',
-                '&:hover': { color: '#00f3ff', bgcolor: 'transparent' }
+                '&:hover': { color: tokens.accent.primary, bgcolor: 'transparent' }
               }}
             >
               BACK TO SCANS
             </Button>
           </Stack>
-          {/* <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: '#fff', letterSpacing: 2 }}>
+          {/* <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'Orbitron', color: 'text.primary', letterSpacing: 2 }}>
             ATTACK SURFACE MAP
           </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
             VISUALIZING INFRASTRUCTURE NODES AND RELATIONSHIPS FOR SCAN #{scanId}
           </Typography> */}
         </Box>

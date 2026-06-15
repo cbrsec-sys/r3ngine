@@ -407,6 +407,8 @@ class MasterScanWorkflow:
             # Post-Tier-2: dispatch any enabled "run after tier_2" plugins
             await _dispatch_tier_plugins(ctx, "tier_2", str(ctx.get('scan_history_id', 'scan')))
 
+            await self._check_paused()
+
             # ------------------------------------------------------------------
             # TIER 3: URL Fetching + Screenshot (parallel — both depend only on
             # Tier 2 http_crawl; screenshot does NOT depend on fetch_url output)
@@ -436,6 +438,8 @@ class MasterScanWorkflow:
                 )
             if tier3_futures:
                 await asyncio.gather(*tier3_futures)
+
+            await self._check_paused()
 
             # ------------------------------------------------------------------
             # TIER 3a: HTTP Crawl Bridge
@@ -470,8 +474,12 @@ class MasterScanWorkflow:
                     task_queue="python-orchestrator-queue"
                 )
 
+            await self._check_paused()
+
             # Post-Tier-3: dispatch any enabled "run after tier_3" plugins
             await _dispatch_tier_plugins(ctx, "tier_3", str(ctx.get('scan_history_id', 'scan')))
+
+            await self._check_paused()
 
             # ------------------------------------------------------------------
             # TIER 4: Directory & File Fuzzing (sequential — needs Tier 3 URLs)
@@ -508,6 +516,8 @@ class MasterScanWorkflow:
 
             # Post-Tier-4: dispatch any enabled "run after tier_4" plugins
             await _dispatch_tier_plugins(ctx, "tier_4", str(ctx.get('scan_history_id', 'scan')))
+
+            await self._check_paused()
 
             # ------------------------------------------------------------------
             # TIER 5: Analysis (parallel — API discovery, WAF detection, secrets)
@@ -576,6 +586,7 @@ class MasterScanWorkflow:
             # Post-Tier-5: dispatch any enabled "run after tier_5" plugins
             await _dispatch_tier_plugins(ctx, "tier_5", str(ctx.get('scan_history_id', 'scan')))
 
+            await self._check_paused()
             # ------------------------------------------------------------------
             # TIER 6: Security Assessment
             # NucleiPlannerWorkflow runs sequentially FIRST to prevent orphaned
@@ -631,6 +642,7 @@ class MasterScanWorkflow:
             # Post-Tier-6: dispatch any enabled "run after tier_6" plugins
             await _dispatch_tier_plugins(ctx, "tier_6", str(ctx.get('scan_history_id', 'scan')))
 
+            await self._check_paused()
             # Tier 7, notification, and finalization have moved to the finally
             # block below — guarded by `if success:` to match SubScanWorkflow.
             success = True
