@@ -13,26 +13,50 @@ from apme.models.edge import Edge
 
 logger = logging.getLogger(__name__)
 
-SECRET_TYPE_TO_SUBTYPE = {
-    "api_key": "api_key",
-    "api key": "api_key",
-    "aws": "api_key",
-    "stripe": "api_key",
-    "password": "password",
-    "token": "token",
-    "jwt": "token",
-    "oauth": "token",
-    "ssh": "ssh_key",
-    "certificate": "certificate",
-}
+# Ordered patterns: first match wins. More specific entries MUST come first.
+_CREDENTIAL_PATTERNS = [
+    # Cloud API keys (check before generic "aws"/"api_key" patterns)
+    ("akia",           "cloud_api_key"),   # AWS access key ID prefix
+    ("aws",            "cloud_api_key"),
+    ("gcp",            "cloud_api_key"),
+    ("azure",          "cloud_api_key"),
+    ("google_api",     "cloud_api_key"),
+    # VCS tokens (check before generic "token")
+    ("ghp_",           "github_token"),
+    ("github",         "github_token"),
+    ("gitlab",         "generic_secret"),
+    # JWT (check before generic "token")
+    ("jwt",            "jwt_token"),
+    ("json web token", "jwt_token"),
+    ("bearer",         "jwt_token"),
+    # Database (check before generic "password")
+    ("db_pass",        "db_password"),
+    ("database_url",   "db_password"),
+    ("mysql",          "db_password"),
+    ("postgres",       "db_password"),
+    ("mongodb",        "db_password"),
+    # SSH
+    ("ssh",            "ssh_key"),
+    ("-----begin",     "ssh_key"),
+    ("private key",    "ssh_key"),
+    # Generic password/token/API (broad patterns — must come after specific ones)
+    ("password",       "password"),
+    ("api_key",        "api_key"),
+    ("api key",        "api_key"),
+    ("apikey",         "api_key"),
+    ("token",          "token"),
+    ("oauth",          "token"),
+    ("certificate",    "certificate"),
+    ("stripe",         "api_key"),
+]
 
 
 def _infer_credential_subtype(secret_type: str) -> str:
     lower = secret_type.lower()
-    for keyword, subtype in SECRET_TYPE_TO_SUBTYPE.items():
+    for keyword, subtype in _CREDENTIAL_PATTERNS:
         if keyword in lower:
             return subtype
-    return "token"
+    return "generic_secret"
 
 
 def _make_id(prefix: str, value: str) -> str:

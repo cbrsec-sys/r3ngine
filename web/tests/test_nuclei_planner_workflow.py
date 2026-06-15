@@ -1,23 +1,22 @@
 """
-Integration tests for NucleiPlannerWorkflow sequential severity scanning.
+Tests for NucleiPlannerWorkflow — sequential severity scanning and tag batching.
 
 Uses WorkflowEnvironment (time-skipping) from temporalio.testing to execute
 the workflow against mocked activities and verify:
 
-  1. Each configured severity triggers its own RunNucleiActivity call.
-  2. Severities execute in the configured order (sequential, not concurrent).
-  3. NUCLEI_DEFAULT_SEVERITIES applies when no severity list is configured.
-  4. run_nuclei=False suppresses all RunNucleiActivity calls.
-  5. MarkVulnerabilityScanCompleteActivity fires exactly once on every run.
-
-These tests validate the sequential fix introduced to prevent orphaned
-NucleiPlannerWorkflow child workflows in the Tier 6 gather (FIXES.md Fix 2).
+  1. GatherNucleiTagsActivity is called once before the severity loop.
+  2. Each severity × tag-batch combination triggers its own RunNucleiActivity call.
+  3. Calls are sequential and in the correct (severity, batch) order.
+  4. NUCLEI_DEFAULT_SEVERITIES applies when no severity list is configured.
+  5. No tags → single pass per severity with tag_batch=None (no -tags flag).
+  6. run_nuclei=False suppresses all RunNucleiActivity calls.
+  7. MarkVulnerabilityScanCompleteActivity fires exactly once on every run.
 """
 
 import asyncio
 import os
 import unittest
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from unittest import IsolatedAsyncioTestCase
 
 import django
@@ -37,6 +36,20 @@ from reNgine.definitions import NUCLEI_DEFAULT_SEVERITIES
 # Mock activities — registered under their production names so the workflow
 # can dispatch by name without touching real infrastructure.
 # ---------------------------------------------------------------------------
+
+@activity.defn(name="CreateProxyListActivity")
+async def _mock_create_proxy_list(ctx: Dict[str, Any]) -> str:
+    return "/tmp/mock_proxies.txt"
+
+@activity.defn(name="CleanupProxyListActivity")
+async def _mock_cleanup_proxy_list(file_path: str) -> bool:
+    return True
+
+@activity.defn(name="GatherNucleiTagsActivity")
+async def _mock_gather_tags(ctx: Dict[str, Any]) -> List[str]:
+    """Default mock: no tech detected → empty tag list (no -tags flag)."""
+    return []
+
 
 @activity.defn(name="RunCRLFuzzActivity")
 async def _mock_crlfuzz(ctx: Dict[str, Any]) -> Dict:
@@ -88,7 +101,15 @@ async def _mock_mark_complete(ctx: Dict[str, Any]) -> Dict:
     return {}
 
 
+@activity.defn(name="RunWPTaintScanActivity")
+async def _mock_wptaint_scan(ctx: Dict[str, Any]) -> Dict:
+    return {}
+
+
 _NOOP_SUPPORT_ACTIVITIES = [
+    _mock_create_proxy_list,
+    _mock_cleanup_proxy_list,
+    _mock_gather_tags,
     _mock_crlfuzz,
     _mock_dalfox,
     _mock_s3scanner,
@@ -98,6 +119,7 @@ _NOOP_SUPPORT_ACTIVITIES = [
     _mock_react2shell,
     _mock_semgrep,
     _mock_vigolium,
+    _mock_wptaint_scan,
     _mock_mark_complete,
 ]
 
@@ -106,7 +128,7 @@ def _ctx(severities=None, run_nuclei: bool = True) -> Dict[str, Any]:
     """Minimal scan context for NucleiPlannerWorkflow tests.
 
     All optional scanners (crlfuzz, dalfox, s3scanner, etc.) are disabled so
-    only RunNucleiActivity calls appear in the tracking log.
+    only RunNucleiActivity / GatherNucleiTagsActivity calls appear in logs.
     """
     nuclei_cfg: Dict[str, Any] = {}
     if severities is not None:
@@ -124,6 +146,7 @@ def _ctx(severities=None, run_nuclei: bool = True) -> Dict[str, Any]:
                 "run_acunetix": False,
                 "cpanel_scanner": {"run_cpanel2shell": False},
                 "run_wpscan": False,
+                "run_wptaint_scan": False,
                 "react_scanner": {"run_react2shell": False},
                 "run_vigolium": False,
             },
@@ -133,21 +156,25 @@ def _ctx(severities=None, run_nuclei: bool = True) -> Dict[str, Any]:
 
 
 class TestNucleiPlannerWorkflowSequential(IsolatedAsyncioTestCase):
-    """Verify per-severity sequential execution in NucleiPlannerWorkflow.
+    """Verify per-severity sequential execution in NucleiPlannerWorkflow."""
 
-    Uses WorkflowEnvironment with time-skipping so tests complete in
-    milliseconds regardless of configured scan durations.
-    """
+    async def _run_workflow(self, ctx, nuclei_activity, wf_id, extra_activities=None):
+        """Spin up a time-skipping WorkflowEnvironment and execute the workflow."""
+        support = list(_NOOP_SUPPORT_ACTIVITIES)
+        # Replace _mock_gather_tags if caller provides a custom one via extra_activities
+        if extra_activities:
+            support_names = {a.__name__ for a in support}
+            for ea in extra_activities:
+                if ea.__name__ in support_names:
+                    support = [a for a in support if a.__name__ != ea.__name__]
+            support = extra_activities + support
 
-    async def _run_workflow(self, ctx, nuclei_activity, wf_id):
-        """Helper: spin up a time-skipping WorkflowEnvironment, execute the
-        workflow, and return the result."""
         async with await WorkflowEnvironment.start_time_skipping() as env:
             async with Worker(
                 env.client,
                 task_queue="python-orchestrator-queue",
                 workflows=[NucleiPlannerWorkflow],
-                activities=[nuclei_activity, *_NOOP_SUPPORT_ACTIVITIES],
+                activities=[nuclei_activity, *support],
             ):
                 return await env.client.execute_workflow(
                     NucleiPlannerWorkflow.run,
@@ -157,11 +184,11 @@ class TestNucleiPlannerWorkflowSequential(IsolatedAsyncioTestCase):
                 )
 
     async def test_each_severity_gets_own_activity_call_in_order(self):
-        """RunNucleiActivity is called once per severity in the configured order."""
+        """With no tags, RunNucleiActivity is called once per severity in order."""
         call_log: List[str] = []
 
         @activity.defn(name="RunNucleiActivity")
-        async def track_nuclei(ctx: Dict[str, Any], severity: str) -> Dict:
+        async def track_nuclei(ctx: Dict[str, Any], severity: str, tag_batch: Optional[List[str]] = None) -> Dict:
             call_log.append(severity)
             return {}
 
@@ -183,12 +210,12 @@ class TestNucleiPlannerWorkflowSequential(IsolatedAsyncioTestCase):
         call_log: List[str] = []
 
         @activity.defn(name="RunNucleiActivity")
-        async def track_nuclei(ctx: Dict[str, Any], severity: str) -> Dict:
+        async def track_nuclei(ctx: Dict[str, Any], severity: str, tag_batch: Optional[List[str]] = None) -> Dict:
             call_log.append(severity)
             return {}
 
         result = await self._run_workflow(
-            _ctx(severities=None),  # no explicit list → defaults
+            _ctx(severities=None),
             track_nuclei,
             "test-nuclei-defaults",
         )
@@ -197,10 +224,7 @@ class TestNucleiPlannerWorkflowSequential(IsolatedAsyncioTestCase):
         self.assertEqual(
             call_log,
             list(NUCLEI_DEFAULT_SEVERITIES),
-            msg=(
-                f"Expected default severities {list(NUCLEI_DEFAULT_SEVERITIES)}; "
-                f"got {call_log}"
-            ),
+            msg=f"Expected default severities {list(NUCLEI_DEFAULT_SEVERITIES)}; got {call_log}",
         )
 
     async def test_run_nuclei_false_skips_all_nuclei_activity_calls(self):
@@ -208,7 +232,7 @@ class TestNucleiPlannerWorkflowSequential(IsolatedAsyncioTestCase):
         call_log: List[str] = []
 
         @activity.defn(name="RunNucleiActivity")
-        async def track_nuclei(ctx: Dict[str, Any], severity: str) -> Dict:
+        async def track_nuclei(ctx: Dict[str, Any], severity: str, tag_batch: Optional[List[str]] = None) -> Dict:
             call_log.append(severity)
             return {}
 
@@ -230,7 +254,7 @@ class TestNucleiPlannerWorkflowSequential(IsolatedAsyncioTestCase):
         call_log: List[str] = []
 
         @activity.defn(name="RunNucleiActivity")
-        async def track_nuclei(ctx: Dict[str, Any], severity: str) -> Dict:
+        async def track_nuclei(ctx: Dict[str, Any], severity: str, tag_batch: Optional[List[str]] = None) -> Dict:
             call_log.append(severity)
             return {}
 
@@ -241,18 +265,14 @@ class TestNucleiPlannerWorkflowSequential(IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(result, {"status": "SUCCESS"})
-        self.assertEqual(
-            call_log,
-            ["critical"],
-            msg=f"Expected exactly one call for 'critical'; got {call_log}",
-        )
+        self.assertEqual(call_log, ["critical"])
 
     async def test_mark_complete_activity_always_fires(self):
         """MarkVulnerabilityScanCompleteActivity must be called exactly once."""
         mark_count: List[int] = []
 
         @activity.defn(name="RunNucleiActivity")
-        async def noop_nuclei(ctx: Dict[str, Any], severity: str) -> Dict:
+        async def noop_nuclei(ctx: Dict[str, Any], severity: str, tag_batch: Optional[List[str]] = None) -> Dict:
             return {}
 
         @activity.defn(name="MarkVulnerabilityScanCompleteActivity")
@@ -260,9 +280,7 @@ class TestNucleiPlannerWorkflowSequential(IsolatedAsyncioTestCase):
             mark_count.append(1)
             return {}
 
-        # Exclude the noop mark-complete; use the tracking version instead
-        support = [a for a in _NOOP_SUPPORT_ACTIVITIES
-                   if a is not _mock_mark_complete]
+        support = [a for a in _NOOP_SUPPORT_ACTIVITIES if a is not _mock_mark_complete]
 
         async with await WorkflowEnvironment.start_time_skipping() as env:
             async with Worker(
@@ -281,8 +299,135 @@ class TestNucleiPlannerWorkflowSequential(IsolatedAsyncioTestCase):
         self.assertEqual(
             sum(mark_count),
             1,
-            msg=(
-                f"MarkVulnerabilityScanCompleteActivity must be called exactly once; "
-                f"called {sum(mark_count)} time(s)"
-            ),
+            msg=f"MarkVulnerabilityScanCompleteActivity must be called exactly once; called {sum(mark_count)} time(s)",
+        )
+
+
+class TestNucleiPlannerTagBatching(IsolatedAsyncioTestCase):
+    """Verify tag-batch sequential execution added in v3.5.0.
+
+    GatherNucleiTagsActivity produces the tag list; NucleiPlannerWorkflow
+    groups them into batches of 3 and runs one RunNucleiActivity per
+    (severity, batch) pair sequentially.
+    """
+
+    async def _run_with_tags(self, severities, tags, wf_id):
+        """Run the workflow with a controlled tag list and collect (severity, batch) pairs."""
+        call_log: List[tuple] = []
+
+        @activity.defn(name="GatherNucleiTagsActivity")
+        async def mock_gather(ctx: Dict[str, Any]) -> List[str]:
+            return tags
+
+        @activity.defn(name="RunNucleiActivity")
+        async def track_nuclei(ctx: Dict[str, Any], severity: str, tag_batch: Optional[List[str]] = None) -> Dict:
+            call_log.append((severity, tag_batch))
+            return {}
+
+        support = [a for a in _NOOP_SUPPORT_ACTIVITIES
+                   if a.__name__ not in ("_mock_gather_tags",)]
+
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            async with Worker(
+                env.client,
+                task_queue="python-orchestrator-queue",
+                workflows=[NucleiPlannerWorkflow],
+                activities=[mock_gather, track_nuclei, *support],
+            ):
+                await env.client.execute_workflow(
+                    NucleiPlannerWorkflow.run,
+                    _ctx(severities=severities),
+                    id=wf_id,
+                    task_queue="python-orchestrator-queue",
+                )
+
+        return call_log
+
+    async def test_no_tags_produces_one_call_per_severity_with_none_batch(self):
+        """With no tags, each severity gets exactly one call with tag_batch=None."""
+        call_log = await self._run_with_tags(
+            severities=["critical", "high"],
+            tags=[],
+            wf_id="test-tags-none",
+        )
+        self.assertEqual(call_log, [("critical", None), ("high", None)])
+
+    async def test_three_tags_produces_one_batch_per_severity(self):
+        """Exactly 3 tags → one batch per severity (no split needed)."""
+        tags = ["wordpress", "joomla", "drupal"]
+        call_log = await self._run_with_tags(
+            severities=["critical", "high"],
+            tags=tags,
+            wf_id="test-tags-one-batch",
+        )
+        self.assertEqual(call_log, [
+            ("critical", ["wordpress", "joomla", "drupal"]),
+            ("high",     ["wordpress", "joomla", "drupal"]),
+        ])
+
+    async def test_five_tags_produces_two_batches_per_severity_in_order(self):
+        """5 tags → 2 batches ([0:3], [3:]) per severity, severity-first ordering."""
+        tags = ["apache", "drupal", "joomla", "nginx", "wordpress"]
+        call_log = await self._run_with_tags(
+            severities=["critical", "high"],
+            tags=tags,
+            wf_id="test-tags-two-batches",
+        )
+        expected = [
+            ("critical", ["apache", "drupal", "joomla"]),
+            ("critical", ["nginx", "wordpress"]),
+            ("high",     ["apache", "drupal", "joomla"]),
+            ("high",     ["nginx", "wordpress"]),
+        ]
+        self.assertEqual(call_log, expected)
+
+    async def test_seven_tags_three_batches_per_severity(self):
+        """7 tags → 3 batches ([0:3], [3:6], [6:]) per severity."""
+        tags = ["a", "b", "c", "d", "e", "f", "g"]
+        call_log = await self._run_with_tags(
+            severities=["critical"],
+            tags=tags,
+            wf_id="test-tags-three-batches",
+        )
+        expected = [
+            ("critical", ["a", "b", "c"]),
+            ("critical", ["d", "e", "f"]),
+            ("critical", ["g"]),
+        ]
+        self.assertEqual(call_log, expected)
+
+    async def test_gather_tags_called_once_before_severity_loop(self):
+        """GatherNucleiTagsActivity fires exactly once regardless of severity/batch count."""
+        gather_count: List[int] = []
+
+        @activity.defn(name="GatherNucleiTagsActivity")
+        async def counting_gather(ctx: Dict[str, Any]) -> List[str]:
+            gather_count.append(1)
+            return ["wordpress", "apache", "nginx", "joomla"]
+
+        @activity.defn(name="RunNucleiActivity")
+        async def noop_nuclei(ctx: Dict[str, Any], severity: str, tag_batch: Optional[List[str]] = None) -> Dict:
+            return {}
+
+        support = [a for a in _NOOP_SUPPORT_ACTIVITIES
+                   if a.__name__ not in ("_mock_gather_tags",)]
+
+        async with await WorkflowEnvironment.start_time_skipping() as env:
+            async with Worker(
+                env.client,
+                task_queue="python-orchestrator-queue",
+                workflows=[NucleiPlannerWorkflow],
+                activities=[counting_gather, noop_nuclei, *support],
+            ):
+                await env.client.execute_workflow(
+                    NucleiPlannerWorkflow.run,
+                    _ctx(severities=["critical", "high", "medium"]),
+                    id="test-gather-once",
+                    task_queue="python-orchestrator-queue",
+                )
+
+        self.assertEqual(
+            sum(gather_count),
+            1,
+            msg=f"GatherNucleiTagsActivity must fire exactly once; fired {sum(gather_count)} time(s)",
         )

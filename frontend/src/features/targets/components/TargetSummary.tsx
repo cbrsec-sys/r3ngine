@@ -68,6 +68,7 @@ import { KpiCard } from '../../../components/KpiCard';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { SubdomainsTab } from '../../scans/components/SubdomainsTab';
 import { EndpointsTab } from '../../scans/components/EndpointsTab';
+import { ParametersTab } from '../../scans/components/ParametersTab';
 import { DirectoriesTab } from '../../scans/components/DirectoriesTab';
 import { VulnerabilityTable } from '../../vulnerabilities/components/VulnerabilityTable';
 import PluginComponent from '../../plugins/components/PluginComponent';
@@ -156,6 +157,7 @@ export const TargetSummary = () => {
     { label: 'SUBDOMAINS', icon: Globe },
     { label: 'DIRECTORIES', icon: Folder },
     { label: 'URLS', icon: LinkIcon },
+    { label: 'PARAMETERS', icon: Search },
     { label: 'VULNERABILITIES', icon: ShieldAlert },
     { label: 'ATTACK SURFACE', icon: MapIcon },
     { label: 'MONITORING', icon: Eye },
@@ -705,6 +707,7 @@ export const TargetSummary = () => {
         {tabs[activeTab]?.label === 'SUBDOMAINS' && <SubdomainsTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
         {tabs[activeTab]?.label === 'DIRECTORIES' && <DirectoriesTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
         {tabs[activeTab]?.label === 'URLS' && <EndpointsTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
+        {tabs[activeTab]?.label === 'PARAMETERS' && <ParametersTab targetId={parseInt(targetId || '0')} />}
         {tabs[activeTab]?.label === 'VULNERABILITIES' && <PluginComponent 
       name="VulnerabilityTable" 
       default={VulnerabilityTable} 

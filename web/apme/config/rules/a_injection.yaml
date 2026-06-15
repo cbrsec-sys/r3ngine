@@ -1,0 +1,187 @@
+# Category A — Injection (9 rules)
+rules:
+
+  - name: sqli_to_db_access
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: sqli
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: db_access
+        confidence: 0.90
+
+  - name: sqli_verified_to_account_takeover
+    mitre_id: "T1078"
+    if:
+      node.type: Vulnerability
+      node.subtype: sqli
+      node.property:
+        - "severity:>=3"
+        - "validated:True"
+      node.confidence: ">=0.60"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.85
+
+  - name: command_injection_to_rce
+    mitre_id: "T1059"
+    if:
+      node.type: Vulnerability
+      node.subtype: command_injection
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.90
+
+  - name: code_injection_to_rce
+    mitre_id: "T1059"
+    if:
+      node.type: Vulnerability
+      node.subtype: code_injection
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.85
+
+  - name: nosql_injection_to_db_access
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: nosql_injection
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: db_access
+        confidence: 0.80
+
+  - name: xpath_injection_to_data_exfil
+    mitre_id: "T1083"
+    if:
+      node.type: Vulnerability
+      node.subtype: xpath_injection
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.75
+
+  - name: ldap_injection_to_auth_bypass
+    mitre_id: "T1548"
+    if:
+      node.type: Vulnerability
+      node.subtype: ldap_injection
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.80
+
+  - name: log_injection_to_rce
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: log_injection
+      node.property: "severity:>=3"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.85
+
+  - name: ssti_to_rce
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: ssti
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.85
+
+  - name: blind_sqli_to_db_access
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: blind_sqli
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: db_access
+        confidence: 0.55
+
+  - name: blind_sqli_verified_to_db_access
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: blind_sqli
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: db_access
+        confidence: 0.85
+
+  - name: second_order_sqli_to_account_takeover
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: second_order_sqli
+      node.property: "severity:>=3"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.60
+
+  - name: nosql_injection_to_auth_bypass
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: nosql_injection
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.75
+
+  - name: ognl_injection_to_rce
+    mitre_id: "T1059"
+    if:
+      node.type: Vulnerability
+      node.subtype: ognl_injection
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.90
+        requires_java: true
+
+  - name: blind_cmdi_to_rce
+    mitre_id: "T1059"
+    if:
+      node.type: Vulnerability
+      node.subtype: blind_cmdi
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.55
+
+  - name: blind_cmdi_verified_to_rce
+    mitre_id: "T1059"
+    if:
+      node.type: Vulnerability
+      node.subtype: blind_cmdi
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.90

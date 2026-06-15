@@ -50,6 +50,7 @@ import {
   useBurpHealth,
 } from '../api/pluginsApi';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 
 interface Props {
@@ -365,7 +366,7 @@ const PluginDocsModal: React.FC<DocsModalProps> = ({ open, onClose, plugin }) =>
                     File: {filename}
                   </Typography>
                 )}
-                <ReactMarkdown>{content}</ReactMarkdown>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
               </Box>
             ))}
           </Box>
@@ -712,7 +713,7 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin, onInstallStart
                 src={plugin?.icon_path ? `/api/plugins/${plugin.slug}/icon/` : undefined}
                 sx={{ bgcolor: isMarketplace && !isInstalled ? '#00ffaa' : '#0076FF', width: 48, height: 48, color: '#000' }}
               >
-                {!plugin?.icon_path && data.name[0]}
+                {data.name[0]}
               </Avatar>
               <Box>
                 <Typography variant="h6" sx={{ fontWeight: "bold", color: '#fff', minHeight: '3.1em', lineHeight: 1.235, display: 'flex', alignItems: 'flex-start' }}>
@@ -732,12 +733,32 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin, onInstallStart
 
             {isMarketplace ? (
               isInstalled ? (
-                <Chip
-                  icon={<InstalledIcon sx={{ fontSize: '14px !important' }} />}
-                  label="INSTALLED"
-                  size="small"
-                  sx={{ bgcolor: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0, 255, 170, 0.2)', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}
-                />
+                marketplacePlugin?.update_available ? (
+                  <Button
+                    size="small"
+                    variant="contained"
+                    startIcon={installMutation.isPending ? <CircularProgress size={12} color="inherit" /> : <InstallIcon />}
+                    onClick={handleInstall}
+                    disabled={installMutation.isPending}
+                    sx={{
+                      bgcolor: '#ffb74d',
+                      color: '#000',
+                      fontFamily: 'Orbitron',
+                      fontWeight: 900,
+                      fontSize: '10px',
+                      '&:hover': { bgcolor: '#ffcc80' }
+                    }}
+                  >
+                    UPDATE TO v{marketplacePlugin.version}
+                  </Button>
+                ) : (
+                  <Chip
+                    icon={<InstalledIcon sx={{ fontSize: '14px !important' }} />}
+                    label="INSTALLED"
+                    size="small"
+                    sx={{ bgcolor: 'rgba(0, 255, 170, 0.1)', color: '#00ffaa', border: '1px solid rgba(0, 255, 170, 0.2)', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}
+                  />
+                )
               ) : (
                 <Button
                   size="small"

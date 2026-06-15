@@ -68,20 +68,6 @@
           - 443
           - 4444
           - 8443
-      brute_force_scan:
-        users_wordlist:
-          - top_default_usernames.txt
-          - most_common_usernames.txt
-        pass_wordlist:
-          - top_default_passwords.txt
-          - most_common_passwords.txt
-        services:
-          - ssh
-          - ftp
-          - http
-          - smb
-          - rdp
-          - telnet
-        stop_on_success: true
+
       spiderfoot_scan:
         modules: all

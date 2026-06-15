@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid, Box, Container, Typography, CircularProgress, Alert } from '@mui/material';
+import { Grid, Box, Container, Typography, CircularProgress, Alert, useTheme } from '@mui/material';
 import { useDashboardData } from './api';
 import { KpiGrid } from './components/KPIs';
 import { TrendCharts } from './components/TrendCharts';
@@ -16,6 +16,8 @@ export const DashboardPage: React.FC = () => {
   const { setVersion, setProjectName } = useAppContext();
   const { projectSlug = 'default' } = useParams({ strict: false });
   const { data, isLoading, error } = useDashboardData(projectSlug);
+  const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
 
   React.useEffect(() => {
     if (data) {
@@ -53,17 +55,30 @@ export const DashboardPage: React.FC = () => {
       <Box sx={{ mb: 5 }}>
         <Typography variant="h4" sx={{
           fontWeight: 900,
-          fontFamily: 'Orbitron',
+          fontFamily: 'var(--r3-heading-font)',
           mb: 1,
-          letterSpacing: 3,
-          textShadow: '0 0 25px rgba(0, 243, 255, 0.6), 0 0 10px rgba(0, 243, 255, 0.4)',
-          color: '#fff',
+          letterSpacing: isLight ? 1 : 3,
+          textShadow: isLight ? 'none' : '0 0 25px rgba(0, 243, 255, 0.6), 0 0 10px rgba(0, 243, 255, 0.4)',
+          color: isLight ? theme.palette.text.primary : '#fff',
           textTransform: 'uppercase'
         }}>
           {data.project_info.name.toUpperCase()} Dashboard
         </Typography>
-        <Typography variant="body2" sx={{ color: 'rgba(0, 243, 255, 0.6)', display: 'flex', alignItems: 'center', gap: 1, fontWeight: 700, letterSpacing: 1 }}>
-          <Box component="span" sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'primary.main', boxShadow: '0 0 10px #00f3ff' }} />
+        <Typography variant="body2" sx={{
+          color: isLight ? theme.palette.text.secondary : 'rgba(0, 243, 255, 0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1,
+          fontWeight: 700,
+          letterSpacing: 1
+        }}>
+          <Box component="span" sx={{
+            width: 8,
+            height: 8,
+            borderRadius: '50%',
+            bgcolor: 'primary.main',
+            boxShadow: isLight ? 'none' : '0 0 10px #00f3ff'
+          }} />
           REAL-TIME TACTICAL INTELLIGENCE FEED
         </Typography>
       </Box>

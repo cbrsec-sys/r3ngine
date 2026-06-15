@@ -1,0 +1,146 @@
+# Category F — Client-Side (7 rules)
+rules:
+
+  - name: xss_to_auth_access
+    mitre_id: "T1189"
+    if:
+      node.type: Vulnerability
+      node.subtype: xss
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.60
+
+  - name: xss_to_session_hijack
+    mitre_id: "T1539"
+    if:
+      node.type: Vulnerability
+      node.subtype: xss
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: session_hijacking
+        confidence: 0.65
+        requires_victim: true
+
+  - name: xss_to_credential_theft
+    mitre_id: "T1539"
+    if:
+      node.type: Vulnerability
+      node.subtype: xss
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: credential_harvesting
+        confidence: 0.60
+        requires_victim: true
+
+  - name: clickjacking_to_account_takeover
+    mitre_id: "T1185"
+    if:
+      node.type: Vulnerability
+      node.subtype: clickjacking
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.60
+        requires_victim: true
+
+  - name: csrf_to_state_change
+    mitre_id: "T1185"
+    if:
+      node.type: Vulnerability
+      node.subtype: csrf
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.65
+        requires_victim: true
+
+  - name: redirect_to_auth_access
+    mitre_id: "T1204.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: open_redirect
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.50
+
+  - name: open_redirect_to_phishing
+    mitre_id: "T1566.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: open_redirect
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: phishing_amplification
+        confidence: 0.60
+
+  - name: blind_xss_to_credential_harvesting
+    mitre_id: "T1539"
+    if:
+      node.type: Vulnerability
+      node.subtype: blind_xss
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: credential_harvesting
+        confidence: 0.50
+        requires_victim: true
+
+  - name: dom_xss_to_account_takeover
+    mitre_id: "T1539"
+    if:
+      node.type: Vulnerability
+      node.subtype: xss
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.65
+        requires_victim: true
+
+  - name: websocket_hijacking_to_auth_access
+    mitre_id: "T1185"
+    if:
+      node.type: Vulnerability
+      node.subtype: websocket_hijacking
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: authenticated_access
+        confidence: 0.70
+        requires_victim: true
+
+  - name: iframe_injection_to_phishing
+    mitre_id: "T1566.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: misconfig
+      node.property: "severity:>=2"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: phishing_amplification
+        confidence: 0.55
+        requires_victim: true
+
+  - name: postmessage_origin_bypass_to_data_exfil
+    mitre_id: "T1185"
+    if:
+      node.type: Vulnerability
+      node.subtype: prototype_pollution
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.60
+        requires_nodejs: true
+        requires_victim: true

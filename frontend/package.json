@@ -1,7 +1,7 @@
 {
   "name": "frontend",
   "private": true,
-  "version": "1.7.0",
+  "version": "1.8.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -52,6 +52,7 @@
     "react-dom": "^19.2.5",
     "react-leaflet": "^5.0.0",
     "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.0",
     "react-router-dom": "^7.15.0",
     "react-simple-code-editor": "^0.14.1",
     "tailwind-merge": "^3.5.0",

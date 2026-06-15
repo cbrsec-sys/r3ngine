@@ -446,13 +446,72 @@ class EndPoint(models.Model):
 
 
 class Parameter(models.Model):
+	"""Represents a discovered HTTP/GraphQL/JSON parameter for an endpoint.
+
+	Populated by existing tools (Arjun, ParamSpider, LinkFinder, Kiterunner)
+	and enriched by the Custom Parameter Discovery Engine (CPDE) with
+	confidence scoring, multi-source correlation, and location metadata.
+	"""
+
 	id = models.AutoField(primary_key=True)
 	endpoint = models.ForeignKey(EndPoint, on_delete=models.CASCADE, related_name='parameters')
 	name = models.CharField(max_length=1000)
 	value = models.CharField(max_length=1000, null=True, blank=True)
+	# type stores the tool source label (e.g. 'Arjun', 'LinkFinder', 'js_ast', 'openapi')
 	type = models.CharField(max_length=100, null=True, blank=True)
 	impact = models.CharField(max_length=100, null=True, blank=True)
 	discovered_date = models.DateTimeField(auto_now_add=True)
+
+	# ── CPDE Intelligence Fields ──────────────────────────────────────────────
+	# Confidence score (0–100) aggregated across all evidence sources.
+	# 0 = legacy/unknown (set by pre-CPDE tools), ≥50 = corroborated by CPDE.
+	confidence = models.IntegerField(
+		default=0,
+		help_text="0-100 confidence score aggregated from all evidence sources"
+	)
+	# JSON list of source labels that contributed to this parameter record,
+	# e.g. ["arjun", "js_ast", "openapi"]. Empty for legacy records.
+	sources = models.JSONField(
+		default=list,
+		help_text="Evidence source labels e.g. ['arjun','js_ast','openapi']"
+	)
+	# Where the parameter appears in the request:
+	# json_body | query_string | header | graphql_var | form_data | path
+	param_location = models.CharField(
+		max_length=50,
+		null=True,
+		blank=True,
+		help_text="json_body|query_string|header|graphql_var|form_data|path"
+	)
+	# JS-inferred data type (string, number, boolean, object, array).
+	# Null for parameters discovered by non-AST tools.
+	data_type = models.CharField(
+		max_length=100,
+		null=True,
+		blank=True,
+		help_text="Inferred JS type: string, number, boolean, object, array"
+	)
+	# True when the parameter name matches known auth patterns
+	# (e.g. token, Authorization, X-API-Key, session_id).
+	is_auth_related = models.BooleanField(
+		default=False,
+		help_text="True when name matches auth header/token patterns"
+	)
+	# Source-type flags — set by CPDE to enable fast graph/API filtering.
+	observed_in_js = models.BooleanField(default=False)
+	observed_in_openapi = models.BooleanField(default=False)
+	observed_in_graphql = models.BooleanField(default=False)
+	# Direct denormalized FK to ScanHistory for efficient scan-scoped queries.
+	# Avoids the endpoint→scan_history join on every parameter listing.
+	# Null for legacy records created before this field existed.
+	scan_history = models.ForeignKey(
+		'ScanHistory',
+		on_delete=models.CASCADE,
+		null=True,
+		blank=True,
+		related_name='parameters',
+		help_text="Direct scan FK — denormalized for efficient scan-scoped queries"
+	)
 
 	def __str__(self):
 		return f"{self.name} ({self.type})"
@@ -499,6 +558,14 @@ class CveId(models.Model):
 	is_poc = models.BooleanField(default=False)
 	is_template = models.BooleanField(default=False)
 	
+	# SploitScan and LLM Caching fields
+	ai_risk_assessment = models.TextField(null=True, blank=True)
+	public_exploits = models.JSONField(default=list, blank=True)
+	hackerone_data = models.JSONField(default=dict, blank=True)
+	patching_priority = models.CharField(max_length=10, null=True, blank=True)
+	mitigation_ideas = models.TextField(null=True, blank=True)
+
+	
 	related_cves = models.ManyToManyField(
 		'self', 
 		symmetrical=False, 
@@ -508,6 +575,19 @@ class CveId(models.Model):
 
 	def __str__(self):
 		return f"{self.name} (CVSS: {self.cvss_v31_base_score})"
+
+
+class EpssFeedData(models.Model):
+	"""
+	Stores the daily bulk EPSS data feed locally to prevent hitting API rate limits.
+	"""
+	cve_id = models.CharField(max_length=50, primary_key=True)
+	epss_score = models.FloatField()
+	epss_percentile = models.FloatField()
+	date_fetched = models.DateTimeField(auto_now=True)
+
+	def __str__(self):
+		return f"{self.cve_id} (EPSS: {self.epss_score})"
 
 
 class CweId(models.Model):
@@ -811,6 +891,9 @@ class IpAddress(models.Model):
 	version = models.IntegerField(blank=True, null=True)
 	is_private = models.BooleanField(default=False)
 	reverse_pointer = models.CharField(max_length=100, blank=True, null=True)
+	asn = models.CharField(max_length=20, blank=True, null=True)
+	asn_cidr = models.CharField(max_length=50, blank=True, null=True)
+	asn_org = models.CharField(max_length=200, blank=True, null=True)
 	# this is used for querying which ip was discovered during subcan
 	ip_subscan_ids = models.ManyToManyField('SubScan', related_name='ip_subscan_ids')
 

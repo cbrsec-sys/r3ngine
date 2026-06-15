@@ -35,7 +35,7 @@
           - graphql-cop
         scan_only_active: true
         threads: 30
-        kiterunner_wordlist: routes-large.kite
+        kr_wordlist: routes-large.kite
         arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
         use_api_wordlist: true
       dir_file_fuzz:
@@ -78,6 +78,9 @@
       vulnerability_scan:
         run_acunetix: true
         run_wpscan: true
+        run_wptaint_scan: true
+        wpscan_enumeration: vp,vt,u
+        wpscan_detection_mode: mixed
       attack_path_modeling:
         enabled: true
       spiderfoot_scan:

@@ -13,6 +13,10 @@ if [ "$DEBUG" = "1" ]; then
     # echo "Production mode: Building frontend..."
     # npm run build
 fi
+# Ensure searchsploit RC file is copied to root home directory if available
+if [ -f "/usr/src/exploitdb/.searchsploit_rc" ]; then
+  cp /usr/src/exploitdb/.searchsploit_rc /root/.searchsploit_rc
+fi
 
 cd /usr/src/app
 
@@ -28,17 +32,23 @@ python3 manage.py migrate --noinput
 echo "Syncing roles..."
 python3 manage.py sync_roles
 
-# Load default fixtures (Scan Engines, Tools, Keywords)
-echo "Loading default fixtures..."
-python3 manage.py loaddata fixtures/external_tools.yaml
-python3 manage.py loaddata fixtures/default_keywords.yaml
-# Load default fixtures
-for f in fixtures/scan_engines/*.yaml; do
-  python3 manage.py loaddata "$f" --app scanEngine.EngineType
-done
-for f in fixtures/hardware_profiles/*.yaml; do
-  python3 manage.py loaddata "$f" --app scanEngine.HardwareProfile
-done
+# Check if fixtures are already loaded
+echo "Checking if default fixtures are already loaded..."
+if ! python3 manage.py shell -c "from scanEngine.models import EngineType; import sys; sys.exit(0 if EngineType.objects.exists() else 1)"; then
+    echo "Loading default fixtures..."
+    python3 manage.py loaddata fixtures/external_tools.yaml
+    python3 manage.py loaddata fixtures/default_keywords.yaml
+    
+    for f in fixtures/scan_engines/*.yaml; do
+        python3 manage.py loaddata "$f" --app scanEngine.EngineType
+    done
+    
+    for f in fixtures/hardware_profiles/*.yaml; do
+        python3 manage.py loaddata "$f" --app scanEngine.HardwareProfile
+    done
+else
+    echo "Default fixtures already exist. Skipping..."
+fi
 
 # Start the server
 echo "Starting reNgine server..."

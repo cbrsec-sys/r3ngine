@@ -1,0 +1,54 @@
+# Category M — High Value Target Rules (4 rules)
+# Replaces the removed broken any_vuln_on_hvt rule.
+rules:
+
+  - name: critical_vuln_on_sensitive_asset
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.property:
+        - "severity:>=4"
+        - "sensitivity:high"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: hvt_compromise
+        confidence: 0.85
+
+  - name: high_vuln_on_sensitive_asset_validated
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.property:
+        - "severity:>=3"
+        - "sensitivity:high"
+        - "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: hvt_compromise
+        confidence: 0.75
+
+  - name: rce_on_sensitive_to_full_compromise
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: rce
+      node.property: "sensitivity:high"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: hvt_compromise
+        confidence: 0.90
+
+  - name: sqli_on_db_asset_to_full_compromise
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: sqli
+      node.property: "severity:>=3"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: hvt_compromise
+        confidence: 0.88

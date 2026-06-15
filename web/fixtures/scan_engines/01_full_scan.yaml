@@ -17,6 +17,7 @@
         enable_http_crawl: true
         threads: 30
         timeout: 5
+        bbot: false
       dns_security:
         enable_axfr: true
         enable_dnssec_check: true
@@ -157,7 +158,7 @@
           - graphql-cop
         scan_only_active: true
         threads: 30
-        kiterunner_wordlist: routes-large.kite
+        kr_wordlist: routes-large.kite
         arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
         use_api_wordlist: false
       vigolium_analysis:
@@ -175,6 +176,7 @@
         run_crlfuzz: true
         run_acunetix: true
         run_wpscan: true
+        run_wptaint_scan: true
         run_s3scanner: true
         run_vigolium: true
         enable_http_crawl: true
@@ -220,22 +222,7 @@
       waf_bypass:
         use_nuclei: true
         use_benchmarking: true
-      brute_force_scan:
-        users_wordlist:
-          - top_default_usernames.txt
-          - most_common_usernames.txt
-        pass_wordlist:
-          - top_default_passwords.txt
-          - most_common_passwords.txt
-        services:
-          - ssh
-          - ftp
-          - http
-          - smb
-          - rdp
-          - telnet
-        threads: 5
-        stop_on_success: true
+
       firewall_vpn_scan:
         run_ike_scan: true
         run_sslscan: true
@@ -266,3 +253,22 @@
         trufflehog: true
         gitleaks: true
         leaklookup: true
+      code_scan:
+        grype: true
+        trivy: true
+      cidr_recon:
+        use_arp: false
+      host_recon:
+        run_nuclei: false
+      url_fuzz:
+        fuzzers:
+          - ffuf
+          - feroxbuster
+        hunt_secrets: false
+      url_crawl:
+        passive: false
+        active: false
+        hunt_secrets: false
+      url_params_fuzz:
+        fuzz_values: false
+        hunt_secrets: false

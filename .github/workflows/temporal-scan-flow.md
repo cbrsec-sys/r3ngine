@@ -11,41 +11,63 @@ flowchart TD
     end
 
     LC --> F1(( ))
-    F1 --> SD & AI & FW & OS & SF
+    F1 --> SD & AI & FW & DNS & OS & SF & BD
 
     subgraph T1["🔍 Tier 1 — Discovery  ·  all parallel"]
         direction TB
         SD[RunSubdomainDiscoveryActivity]
         AI[RunAmassIntelDiscoveryActivity]
         FW[RunFirewallVPNScanActivity]
+        DNS[RunDNSSecurityActivity]
         OS["RunGenericTaskActivity · osint"]
-        SF["RunGenericTaskActivity · spiderfoot_scan\n─ requires yaml spiderfoot_scan block"]
+        SF["RunGenericTaskActivity · spiderfoot_scan
+─ requires yaml spiderfoot_scan block"]
+        BD["RunGenericTaskActivity · subdomain_discovery
+uses_tools: [baddns]"]
     end
 
-    SD & AI & FW & OS & SF --> J1(( ))
+    SD & AI & FW & DNS & OS & SF & BD --> J1(( ))
     J1 --> PDR[ParseDiscoveryResultsActivity]
     PDR --> CP1{{"⏸ Pause Checkpoint"}}
 
     CP1 --> F2(( ))
-    F2 --> HC & PS & SS
+    F2 --> HC & PS & VD
 
-    subgraph T2["🌐 Tier 2 — HTTP Crawl · Port Scan · Screenshot  ·  all parallel"]
+    subgraph T2["🌐 Tier 2 — Endpoint Discovery  ·  all parallel"]
         direction TB
-        HC["RunHTTPCrawlActivity\n─ global config · feeds Tiers 3 & 4"] --> PHC[ParseHTTPCrawlResultsActivity]
-        PS[RunPortScanActivity]
+        HC["SeedEndpointsForCrawlActivity → RunHTTPCrawlActivity"] --> PHC[ParseHTTPCrawlResultsActivity]
+        PS[RunPortScanActivity] --> GDS["GetDiscoveredServicesActivity → _fan_out_search_vulns"]
+        VD["RunVigoliumDiscoveryActivity
+─ requires vigolium_discovery.run_vigolium_discovery"]
+    end
+
+    PHC & GDS & VD --> PT2[Dispatch tier_2 plugins]
+    PT2 --> F3(( ))
+    F3 --> FU & SS
+
+    subgraph T3["🔗 Tier 3 — URL Fetching + Screenshot  ·  parallel"]
+        direction TB
+        FU[RunFetchURLActivity]
         SS[RunScreenshotActivity]
     end
 
-    PHC & PS & SS --> J2(( ))
+    FU & SS --> HCB
 
-    J2 --> FU
-
-    subgraph T3["🔗 Tier 3 — URL Fetching  ·  sequential"]
+    subgraph T3A["🌉 Tier 3a — HTTP Crawl Bridge"]
         direction TB
-        FU[RunFetchURLActivity]
+        HCB["RunHTTPCrawlBridgeActivity
+─ runs if fetch_url is enabled"]
     end
 
-    FU --> DFF
+    HCB --> PD
+
+    subgraph T3B["🔍 Tier 3b — Parameter Discovery"]
+        direction TB
+        PD["RunParamDiscoveryActivity
+─ requires param_discovery task"]
+    end
+
+    PD --> DFF
 
     subgraph T4["📁 Tier 4 — Directory & File Fuzzing  ·  sequential"]
         direction TB
@@ -55,47 +77,52 @@ flowchart TD
     PFF --> PER[ParseEnumerationResultsActivity]
     PER --> CP2{{"⏸ Pause Checkpoint"}}
 
-    CP2 --> F3(( ))
-    F3 --> WAD & WD & SEC
+    CP2 --> F4(( ))
+    F4 --> WAD & WD & SEC & VA
 
     subgraph T5["🔬 Tier 5 — Analysis  ·  all parallel"]
         direction TB
         WAD[RunWebAPIDiscoveryActivity]
         WD[RunWAFDetectionActivity]
         SEC[RunSecretScanningActivity]
+        VA["RunVigoliumAnalysisActivity
+─ requires vigolium_analysis.run_vigolium_analysis"]
     end
 
-    WAD & WD & SEC --> J3(( ))
+    WAD & WD & SEC & VA --> J3(( ))
     J3 --> PAR[ParseAnalysisResultsActivity]
     PAR --> CP3{{"⏸ Pause Checkpoint"}}
 
-    CP3 --> F4(( ))
-    F4 --> NUC & WB & BF
+    CP3 --> NP
 
-    subgraph T6["🎯 Tier 6 — Assessment  ·  all parallel"]
+    subgraph T6["🎯 Tier 6 — Security Assessment"]
         direction TB
-        subgraph NP["NucleiPlannerWorkflow · child workflow"]
+        subgraph NP["NucleiPlannerWorkflow · child workflow · runs first"]
             direction TB
-            NUC[RunVulnerabilityScanActivity]
+            NUC["RunNucleiActivity & other vuln scanners
+(CRLFuzz, Dalfox, S3Scanner, Acunetix, Cpanel, WPScan, React2Shell, Semgrep, VigoliumScan, WPTaint)"]
         end
+        NP --> WB
         WB[RunWAFBypassActivity]
-        BF[RunBruteForceScanActivity]
     end
 
-    NUC & WB & BF --> J4(( ))
-    J4 --> PASM[ParseAssessmentResultsActivity]
+    WB --> PASM[ParseAssessmentResultsActivity]
     PASM --> CP4{{"⏸ Pause Checkpoint"}}
 
     CP4 --> CV
 
     subgraph T7["🧠 Tier 7 — Intelligence  ·  sequential"]
         direction TB
-        CV[CorrelateVulnerabilitiesActivity] --> CR[CalculateRiskScoresActivity]
-        CR --> GI["GenerateImpactAssessmentActivity\n─ requires enable_ai_impact_analysis: true"]
-        GI --> SG["SyncGraphActivity  ·  APME + Neo4j\n─ requires attack_path_modeling.enabled: true"]
+        CV[CorrelateVulnerabilitiesActivity]
+        EC[EnrichScanCVEsActivity]
+        CR[CalculateRiskScoresActivity]
+        GI[GenerateImpactAssessmentActivity]
+        SG[SyncGraphActivity]
+        APME["RunGenericTaskActivity · run_apme"]
+        CV --> EC --> CR --> GI --> SG --> APME
     end
 
-    SG --> SN[SendScanNotificationActivity]
+    APME --> SN[SendScanNotificationActivity]
     SN --> DONE([✓ Scan Complete])
 ```
 
@@ -106,7 +133,7 @@ flowchart TD
 | `(( ))` | Fork / Join — marks where parallel branches split or rejoin |
 | `{{"⏸ …"}}` | Pause checkpoint — workflow blocks here on a `pause` signal until `resume` |
 | `─ requires …` | Node only runs when the noted YAML flag is present and true |
-| Nested subgraph | `NucleiPlannerWorkflow` runs as a **child workflow** with its own independent Temporal history |
+| Nested subgraph | `NucleiPlannerWorkflow` runs as a child workflow with its own independent Temporal history |
 
 ## Tier boundaries
 
@@ -114,18 +141,43 @@ flowchart TD
 |------|-------------|---------------------|
 | Step 0 | Sequential | `LoadCheckpointActivity` |
 | Tier 1 | All parallel (`asyncio.gather`) | `ParseDiscoveryResultsActivity` |
-| Tier 2 | All parallel (`asyncio.gather`) | All of `ParseHTTPCrawlResults`, `RunPortScan`, `RunScreenshot` |
-| Tier 3 | Sequential | `RunFetchURLActivity` |
+| Tier 2 | All parallel (`asyncio.gather`) | `ParseHTTPCrawlResultsActivity` + `_fan_out_search_vulns` + optional `RunVigoliumDiscoveryActivity` + tier 2 plugin dispatch |
+| Tier 3 | Parallel | `RunFetchURLActivity` + `RunScreenshotActivity` |
+| Tier 3a | Sequential | `RunHTTPCrawlBridgeActivity` |
+| Tier 3b | Sequential | `RunParamDiscoveryActivity` |
 | Tier 4 | Sequential | `ParseFuzzResultsActivity` |
-| → | | `ParseEnumerationResultsActivity` |
+| -> | | `ParseEnumerationResultsActivity` |
 | Tier 5 | All parallel (`asyncio.gather`) | `ParseAnalysisResultsActivity` |
-| Tier 6 | All parallel (`asyncio.gather`) | `ParseAssessmentResultsActivity` |
-| Tier 7 | Sequential chain | `SyncGraphActivity` |
+| Tier 6 | `NucleiPlannerWorkflow` first, then concurrent activities | `ParseAssessmentResultsActivity` |
+| Tier 7 | Sequential chain | `CorrelateVulnerabilitiesActivity` -> `EnrichScanCVEsActivity` -> `CalculateRiskScoresActivity` -> `GenerateImpactAssessmentActivity` -> `SyncGraphActivity` -> `run_apme` |
 
-## http_crawl — global config note
+## http_crawl dependency note
 
-`http_crawl` runs in **Tier 2** and populates the endpoint database via `httpx`. Its results are the foundation for:
-- **Tier 3** (`fetch_url`) — harvests URLs and applies GF patterns against crawled endpoints
-- **Tier 4** (`dir_file_fuzz`) — fuzzes directories against the URL set built in Tiers 2–3
+`http_crawl` runs in Tier 2 and populates the endpoint database via `httpx`. Its results directly feed:
+- Tier 3 `fetch_url`
+- Tier 3 `screenshot`
+- Tier 3a `http_crawl_bridge`
+- Tier 3b `param_discovery`
+- Tier 4 `dir_file_fuzz`
 
-This is why Tiers 3 and 4 are sequential rather than parallel with Tier 2.
+This is why the pipeline waits for Tier 2 before continuing.
+
+## Workflow inventory
+
+The diagram above covers the full-scan path implemented by `MasterScanWorkflow`. The same module also defines these durable workflows:
+
+| Workflow | Role |
+|----------|------|
+| `NucleiPlannerWorkflow` | Child workflow for vulnerability scanning; runs scanner stages sequentially |
+| `SubScanWorkflow` | Runs one or more subdomain-scoped tasks using the same tier model |
+| `StressTestWorkflow` | Sequential endpoint/tool stress execution with `kill_switch` cancellation |
+| `MonitoringWorkflow` | Periodic per-domain monitoring launched by Temporal schedules |
+| `ScheduledScanWorkflow` | Creates scan context, then launches `MasterScanWorkflow` as a child workflow |
+| `StartupSyncWorkflow` | One-shot startup maintenance tasks such as graph sync and CVE refresh |
+| `GoExecutorTaskWorkflow` | Routes heavy command execution to the dedicated Go worker queue |
+| `ApmeTaskWorkflow` | On-demand attack-path modeling workflow started from the API |
+| `IdentityEnrichmentWorkflow` | OSINT enrichment for names and emails |
+| `GeoLocalizeWorkflow` | Geolocation enrichment for discovered IPs |
+| `HackerOneImportWorkflow` | Bulk program import from HackerOne |
+| `HackerOneSyncBookmarkedWorkflow` | Syncs bookmarked HackerOne programs |
+| `ProxyFetchWorkflow` | Fetches and validates proxy lists in the background |

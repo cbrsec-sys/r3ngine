@@ -2,10 +2,14 @@ import React from 'react';
 import { Box, Card, CardContent, Typography, useTheme } from '@mui/material';
 import Chart from 'react-apexcharts';
 import type { DashboardData } from '../api';
+import { themeTokens } from '../../../theme/tokens';
 
 
 export const TrendCharts: React.FC<{ data: DashboardData['trends'] }> = ({ data }) => {
   const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
+  const chartColors = isLight ? themeTokens.enterprise.charts.area : ['#00f3ff', '#ff003c', '#7000ff'];
+  const chartMode = isLight ? 'light' : 'dark';
 
   const areaOptions: any = {
     chart: {
@@ -19,7 +23,7 @@ export const TrendCharts: React.FC<{ data: DashboardData['trends'] }> = ({ data 
       type: 'gradient',
       gradient: {
         shadeIntensity: 1,
-        opacityFrom: 0.45,
+        opacityFrom: isLight ? 0.25 : 0.45,
         opacityTo: 0.05,
         stops: [20, 100]
       }
@@ -30,8 +34,8 @@ export const TrendCharts: React.FC<{ data: DashboardData['trends'] }> = ({ data 
     },
     yaxis: { labels: { show: false } },
     grid: { borderColor: theme.palette.divider, strokeDashArray: 4 },
-    tooltip: { theme: 'dark' },
-    colors: ['#00f3ff', '#ff003c', '#7000ff']
+    tooltip: { theme: chartMode },
+    colors: chartColors
   };
 
   const series = [
@@ -41,16 +45,16 @@ export const TrendCharts: React.FC<{ data: DashboardData['trends'] }> = ({ data 
   ];
 
   return (
-    <Card sx={{ 
-      height: 500, 
-      bgcolor: 'rgba(5, 5, 15, 0.6)', 
-      backdropFilter: 'blur(10px)', 
-      border: '1px solid rgba(0, 243, 255, 0.1)',
+    <Card sx={{
+      height: 500,
+      bgcolor: isLight ? theme.palette.background.paper : 'rgba(5, 5, 15, 0.6)',
+      backdropFilter: isLight ? 'none' : 'blur(10px)',
+      border: isLight ? `1px solid ${theme.palette.divider}` : '1px solid rgba(0, 243, 255, 0.1)',
       display: 'flex',
       flexDirection: 'column'
     }}>
       <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-        <Typography variant="h6" sx={{ mb: 3, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: 1, fontFamily: 'Orbitron' }}>
+        <Typography variant="h6" sx={{ mb: 3, fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: 1, fontFamily: 'var(--r3-heading-font)' }}>
           7-Day Activity Horizon
         </Typography>
         <Box sx={{ flexGrow: 1 }}>

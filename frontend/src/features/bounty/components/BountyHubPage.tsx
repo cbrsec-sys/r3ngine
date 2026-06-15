@@ -28,8 +28,10 @@ import {
   Tooltip,
   Snackbar,
   Divider,
-  Alert
+  Alert,
+  useTheme
 } from '@mui/material';
+import { PageHeader } from '../../../components/PageHeader';
 import {
   Search,
   Filter,
@@ -92,6 +94,9 @@ export const BountyHubPage: React.FC = () => {
   });
 
   const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
+
+  const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
 
   const [sortKey, sortOrder] = sortBy.split('-');
   const { data: programs, isLoading, error } = useBountyPrograms({
@@ -183,25 +188,14 @@ export const BountyHubPage: React.FC = () => {
   return (
     <Box sx={{ p: 4, bgcolor: '#0a0a0a', minHeight: '100vh' }}>
       {/* Header */}
-      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", mb: 4 }}>
-        <Box>
-          <Typography variant="h4" sx={{
-            fontFamily: 'Orbitron',
-            fontWeight: 900,
-            color: '#fff',
-            textShadow: '0 0 15px rgba(0, 243, 255, 0.3)',
-            mb: 1
-          }}>
-            BOUNTY HUB
-          </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
-            INTEGRATED VULNERABILITY RESOURCES V3
-          </Typography>
-        </Box>
-
-        <Stack direction="row" spacing={2}>
+      <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start", mb: 0 }}>
+        <PageHeader
+          title="BOUNTY HUB"
+          subtitle="INTEGRATED VULNERABILITY RESOURCES V3"
+        />
+        <Stack direction="row" spacing={2} sx={{ pt: 0.5 }}>
           {/* Action buttons removed from header to match legacy floating container if selected */}
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', alignSelf: 'center', fontFamily: 'Orbitron' }}>
+          <Typography variant="caption" sx={{ color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.3)', alignSelf: 'center', fontFamily: 'Orbitron' }}>
             {programs?.length || 0} PROGRAMS SYNCED
           </Typography>
         </Stack>
@@ -210,8 +204,9 @@ export const BountyHubPage: React.FC = () => {
       {/* Filters Bar */}
       <Box sx={{
         p: 2,
-        bgcolor: 'rgba(255,255,255,0.02)',
-        border: '1px solid rgba(255,255,255,0.05)',
+        bgcolor: isLight ? theme.palette.background.paper : 'rgba(255,255,255,0.02)',
+        border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}`,
+        boxShadow: isLight ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
         borderRadius: 2,
         mb: 4
       }}>
@@ -224,10 +219,10 @@ export const BountyHubPage: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               slotProps={{
                 input: {
-                  startAdornment: <Search size={18} style={{ color: 'rgba(255,255,255,0.3)', marginRight: 8 }} />
+                  startAdornment: <Search size={18} style={{ color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.3)', marginRight: 8 }} />
                 }
               }}
-              sx={{ '& .MuiOutlinedInput-root': { bgcolor: 'rgba(255,255,255,0.01)' } }}
+              sx={{ '& .MuiOutlinedInput-root': { bgcolor: isLight ? 'transparent' : 'rgba(255,255,255,0.01)' } }}
             />
           </Grid>
           <Grid size={{ xs: 12, md: 2 }}>
@@ -235,7 +230,7 @@ export const BountyHubPage: React.FC = () => {
               <Select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.01)' }}
+                sx={{ color: isLight ? theme.palette.text.primary : '#fff', bgcolor: isLight ? 'transparent' : 'rgba(255,255,255,0.01)' }}
               >
                 <MenuItem value="All">All Types</MenuItem>
                 <MenuItem value="Bounty Eligible">Bounty Eligible</MenuItem>
@@ -249,7 +244,7 @@ export const BountyHubPage: React.FC = () => {
               <Select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value)}
-                sx={{ color: '#fff', bgcolor: 'rgba(255,255,255,0.01)' }}
+                sx={{ color: isLight ? theme.palette.text.primary : '#fff', bgcolor: isLight ? 'transparent' : 'rgba(255,255,255,0.01)' }}
               >
                 <MenuItem value="age-desc">Most Recent</MenuItem>
                 <MenuItem value="age-asc">Least Recent</MenuItem>
@@ -264,11 +259,11 @@ export const BountyHubPage: React.FC = () => {
             <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end" }}>
               <FormControlLabel
                 control={<Checkbox checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />}
-                label={<Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Show Closed</Typography>}
+                label={<Typography variant="body2" sx={{ color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.6)' }}>Show Closed</Typography>}
               />
               <FormControlLabel
                 control={<Checkbox checked={showBookmarked} onChange={(e) => setShowBookmarked(e.target.checked)} />}
-                label={<Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)' }}>Bookmarked</Typography>}
+                label={<Typography variant="body2" sx={{ color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.6)' }}>Bookmarked</Typography>}
               />
             </Stack>
           </Grid>

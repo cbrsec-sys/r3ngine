@@ -1,0 +1,56 @@
+# Category L — Lateral Movement & Post-Exploitation (5 rules)
+rules:
+
+  - name: execution_to_pivot
+    mitre_id: "T1090"
+    if:
+      node.type: Capability
+      node.subtype: rce_execution
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: pivot
+        confidence: 0.85
+
+  - name: pivot_to_internal_discovery
+    mitre_id: "T1046"
+    if:
+      node.type: Capability
+      node.subtype: pivot
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: internal_discovery
+        confidence: 0.80
+
+  - name: internal_discovery_to_lateral
+    mitre_id: "T1021"
+    if:
+      node.type: Capability
+      node.subtype: internal_discovery
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: lateral_movement
+        confidence: 0.75
+
+  - name: credential_to_lateral_movement
+    mitre_id: "T1021"
+    if:
+      node.type: Credential
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: lateral_movement
+        confidence: 0.80
+
+  - name: admin_access_to_persistence
+    mitre_id: "T1505"
+    if:
+      node.type: Privilege
+      node.subtype: admin
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: persistence
+        confidence: 0.75

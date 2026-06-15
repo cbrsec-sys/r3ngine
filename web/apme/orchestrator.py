@@ -29,7 +29,7 @@ from apme.ingestion.credentials import ingest_credentials
 from apme.ingestion.vulnerabilities import ingest_vulnerabilities
 from apme.models.node import Node
 from apme.models.path import AttackPath
-from apme.output.serializer import serialize_paths
+from apme.output.serializer import serialize_paths, serialize_path
 
 logger = logging.getLogger(__name__)
 
@@ -44,12 +44,24 @@ class APMEOrchestrator:
         self.top_n = top_n
         self._scorer = Scorer()
 
-    def run(self, scan_history_id: int) -> Dict[str, Any]:
+    def run(self, scan_history_id: int, heartbeat_fn=None) -> Dict[str, Any]:
         """
         Execute the full APME pipeline for a scan.
 
+        Args:
+            scan_history_id: The scan to model.
+            heartbeat_fn: Optional callable invoked between pipeline steps
+                          to report progress (e.g. Temporal activity.heartbeat).
+
         Returns a dict with path results suitable for persistence and API output.
         """
+        def _heartbeat(detail: str):
+            if heartbeat_fn:
+                try:
+                    heartbeat_fn(detail)
+                except Exception:
+                    pass
+
         logger.info(f"APME Orchestrator: Starting for scan_history_id={scan_history_id}")
 
         # Resolve Target Domain from ScanHistory to ensure we ingest ALL historical and current scan data
@@ -68,6 +80,12 @@ class APMEOrchestrator:
         all_nodes.extend(asset_nodes + ep_nodes + vuln_nodes + cred_nodes)
         all_edges.extend(asset_edges + ep_edges + vuln_edges + cred_edges)
 
+        # Technology ingestion (Phase 1)
+        from apme.ingestion.assets import ingest_technologies
+        tech_nodes, tech_edges = ingest_technologies(target_id)
+        all_nodes.extend(tech_nodes)
+        all_edges.extend(tech_edges)
+
         # Inject virtual goal nodes (Objectives) to ensure rules have targets
         goal_nodes = self._generate_virtual_goal_nodes(scan_history_id)
         all_nodes.extend(goal_nodes)
@@ -79,6 +97,8 @@ class APMEOrchestrator:
         if not all_nodes:
             logger.warning("APME: No data to model. Graph is empty. Aborting.")
             return {"total_paths": 0, "returned_paths": 0, "paths": []}
+
+        _heartbeat("step 1/7 ingestion complete")
 
         # ── Step 2: Build Graph ───────────────────────────────────────────────
         logger.info("APME [2/7] Building Neo4j graph...")
@@ -92,11 +112,15 @@ class APMEOrchestrator:
             builder.close()
             return {"total_paths": 0, "returned_paths": 0, "paths": [], "error": str(exc)}
 
+        _heartbeat("step 2/7 graph built")
+
         # ── Step 3: Enrich Graph ──────────────────────────────────────────────
         logger.info("APME [3/7] Enriching graph via rules engine...")
         enricher = GraphEnricher(builder)
         derived_edges = enricher.enrich(all_nodes, scan_history_id)
         logger.info(f"APME [3/7] Derived {len(derived_edges)} new edges from rules.")
+
+        _heartbeat("step 3/7 enrichment complete")
 
         # ── Step 4 & 5: Pathfinding ───────────────────────────────────────────
         logger.info("APME [4/7] Running pathfinding algorithms...")
@@ -110,6 +134,7 @@ class APMEOrchestrator:
             pathfinder.close()
 
         logger.info(f"APME [4/7] Found {len(paths)} candidate paths (pre-scoring).")
+        _heartbeat("step 4/7 pathfinding complete")
 
         if not paths:
             logger.info("APME: No attack paths found for this scan.")
@@ -121,10 +146,14 @@ class APMEOrchestrator:
         node_index: Dict[str, Node] = {n.id: n for n in all_nodes}
 
         for path in paths:
-            metadata = self._build_path_metadata(path, node_index)
+            metadata = self._build_path_metadata(path, node_index, builder, scan_history_id)
             self._scorer.score(path, metadata)
 
         scored_paths = self._scorer.sort_paths(paths)
+        scored_paths = self._scorer.deduplicate(scored_paths)
+        scored_paths = self._scorer.sort_paths(scored_paths)
+
+        _heartbeat("step 5/7 scoring complete")
 
         # ── Step 7: Persist & Return ──────────────────────────────────────────
         logger.info(f"APME [6/7] Persisting top {self.top_n} paths...")
@@ -134,7 +163,7 @@ class APMEOrchestrator:
 
         builder.close()
 
-        result = serialize_paths(scored_paths, top_n=self.top_n)
+        result = serialize_paths(scored_paths, node_index=node_index, top_n=self.top_n)
         logger.info(
             f"APME [7/7] Complete. "
             f"total_paths={result['total_paths']}, "
@@ -147,9 +176,21 @@ class APMEOrchestrator:
     # ──────────────────────────────────────────────────────────────────────────
 
     def _build_path_metadata(
-        self, path: AttackPath, node_index: Dict[str, Node]
+        self, path: AttackPath, node_index: Dict[str, Node],
+        builder: Optional["GraphBuilder"] = None,
+        scan_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        """Extract scoring metadata from path nodes."""
+        """Extract scoring metadata from path nodes.
+
+        Args:
+            path (AttackPath): The attack path object.
+            node_index (Dict[str, Node]): Map of node ID to Node object.
+            builder (GraphBuilder, optional): The active GraphBuilder instance.
+            scan_id (int, optional): The unique ID of the scan.
+
+        Returns:
+            Dict[str, Any]: A dictionary containing scoring metadata.
+        """
         max_severity = -1
         max_cvss = 0.0
         privilege_gained = "none"
@@ -171,6 +212,34 @@ class APMEOrchestrator:
                 elif to_node.type == "Privilege":
                     privilege_gained = to_node.subtype
 
+        # EPSS, CISA KEV, and Phase 5 vulnerability properties
+        epss_percentile = 0.0
+        has_cisa_kev = False
+        path_confidence_product = 1.0
+        has_poc = False
+        has_exploit_url = False
+        has_metasploit = False
+        cve_published_date = None
+
+        for step in path.steps:
+            path_confidence_product *= step.confidence
+            to_node = node_index.get(step.to_id)
+            if to_node and to_node.type == "Vulnerability":
+                epss_val = to_node.properties.get("epss_percentile") or 0.0
+                if float(epss_val) > epss_percentile:
+                    epss_percentile = float(epss_val)
+                if to_node.properties.get("is_cisa_kev"):
+                    has_cisa_kev = True
+                if to_node.properties.get("is_poc"):
+                    has_poc = True
+                if to_node.properties.get("exploit_url"):
+                    has_exploit_url = True
+                if to_node.properties.get("has_metasploit"):
+                    has_metasploit = True
+                pub_date = to_node.properties.get("cve_published_date")
+                if pub_date is not None and cve_published_date is None:
+                    cve_published_date = pub_date
+
         # Target node sensitivity (final node in path)
         target_sensitivity = "low"
         last_step_node = node_index.get(path.end)
@@ -188,6 +257,11 @@ class APMEOrchestrator:
             elif cap == "internal_discovery":
                 blast_radius = 15
 
+        # Target node degree (connectivity) via Neo4j query
+        target_node_degree = 1
+        if builder and path.end:
+            target_node_degree = builder.query_node_degree(path.end, scan_id)
+
         return {
             "severity": max_severity,
             "cvss_score": max_cvss,
@@ -195,6 +269,14 @@ class APMEOrchestrator:
             "validated_steps": validated_steps,
             "target_sensitivity": target_sensitivity,
             "blast_radius": blast_radius,
+            "epss_percentile":         epss_percentile,
+            "has_cisa_kev":            has_cisa_kev,
+            "path_confidence_product": min(max(path_confidence_product, 0.0), 1.0),
+            "has_poc":                 has_poc,
+            "has_exploit_url":         has_exploit_url,
+            "has_metasploit":          has_metasploit,
+            "cve_published_date":      cve_published_date,
+            "target_node_degree":      target_node_degree,
         }
 
     def _generate_virtual_goal_nodes(self, scan_history_id: int) -> List[Node]:
@@ -261,9 +343,9 @@ class APMEOrchestrator:
                                 "apme_path_id": path.id,
                                 "risk": path.risk,
                                 "score": path.score,
-                                "steps": [s.to_dict() for s in path.steps],
+                                "steps": serialize_path(path, node_index)["steps"],
                                 "narrative": narrative,
-                                "metadata": self._build_path_metadata(path, node_index),
+                                "metadata": self._build_path_metadata(path, node_index, scan_id=scan_history_id),
                             },
                             "potential_impact": narrative,
                             "remediation_priority": self._risk_to_priority(path.risk),
@@ -282,9 +364,9 @@ class APMEOrchestrator:
                                 "apme_path_id": path.id,
                                 "risk": path.risk,
                                 "score": path.score,
-                                "steps": [s.to_dict() for s in path.steps],
+                                "steps": serialize_path(path, node_index)["steps"],
                                 "narrative": narrative,
-                                "metadata": self._build_path_metadata(path, node_index),
+                                "metadata": self._build_path_metadata(path, node_index, scan_id=scan_history_id),
                             },
                             "potential_impact": narrative,
                             "remediation_priority": self._risk_to_priority(path.risk),

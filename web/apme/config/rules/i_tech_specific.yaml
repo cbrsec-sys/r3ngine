@@ -1,0 +1,65 @@
+# Category I — Web Technology-Specific (5 rules)
+rules:
+
+  - name: wordpress_plugin_to_rce
+    mitre_id: "T1505.003"
+    if:
+      node.type: Vulnerability
+      node.subtype: rce
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.80
+        requires_wordpress: true
+
+  - name: wordpress_sqli_to_db_access
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: sqli
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: db_access
+        confidence: 0.85
+        requires_wordpress: true
+
+  - name: spring_actuator_to_data_exfil
+    mitre_id: "T1083"
+    if:
+      node.type: Vulnerability
+      node.subtype: misconfig
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.80
+        requires_java: true
+
+  - name: jenkins_unauth_to_rce
+    mitre_id: "T1059"
+    if:
+      node.type: Vulnerability
+      node.subtype: misconfig
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.90
+        requires_java: true
+
+  - name: log4j_to_rce
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: log_injection
+      node.property:
+        - "severity:>=4"
+        - "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.95

@@ -1,0 +1,57 @@
+# Category B — File Operations (5 rules)
+rules:
+
+  - name: lfi_to_rce
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: lfi
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.70
+
+  - name: lfi_to_data_exfil
+    mitre_id: "T1083"
+    if:
+      node.type: Vulnerability
+      node.subtype: lfi
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.80
+
+  - name: path_traversal_to_data_exfil
+    mitre_id: "T1083"
+    if:
+      node.type: Vulnerability
+      node.subtype: path_traversal
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: data_exfil
+        confidence: 0.80
+
+  - name: file_upload_to_rce
+    mitre_id: "T1190"
+    if:
+      node.type: Vulnerability
+      node.subtype: file_upload
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.90
+
+  - name: file_upload_to_persistence
+    mitre_id: "T1505.003"
+    if:
+      node.type: Vulnerability
+      node.subtype: file_upload
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: persistence
+        confidence: 0.85

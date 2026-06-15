@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Chip, IconButton, Popover, Typography, TextField, List, ListItem, ListItemText, ListItemIcon, Button, useTheme, MenuItem } from '@mui/material';
+import { Box, Chip, IconButton, Popover, Typography, TextField, List, ListItemText, ListItemIcon, Button, useTheme, MenuItem, alpha } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
 
 export interface FilterFacetOption {
@@ -33,6 +33,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
   placeholder = 'Filter or command...',
 }) => {
   const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
   const [activeFacetId, setActiveFacetId] = useState<string | null>(null);
   
@@ -83,19 +84,23 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
       sx={{
         display: 'flex',
         alignItems: 'center',
-        backgroundColor: 'rgba(10, 25, 41, 0.7)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(0, 243, 255, 0.3)',
+        backgroundColor: isLight ? theme.palette.background.paper : 'rgba(10, 25, 41, 0.7)',
+        backdropFilter: isLight ? 'none' : 'blur(10px)',
+        border: isLight
+          ? `1px solid ${theme.palette.divider}`
+          : '1px solid rgba(0, 243, 255, 0.3)',
         borderRadius: '8px',
         padding: '4px 12px',
         transition: 'all 0.3s ease',
         '&:focus-within': {
-          border: '1px solid rgba(0, 243, 255, 0.8)',
-          boxShadow: '0 0 10px rgba(0, 243, 255, 0.2)',
+          border: `1px solid ${isLight ? theme.palette.primary.main : 'rgba(0, 243, 255, 0.8)'}`,
+          boxShadow: isLight
+            ? `0 0 0 3px ${alpha(theme.palette.primary.main, 0.12)}`
+            : '0 0 10px rgba(0, 243, 255, 0.2)',
         },
       }}
     >
-      <IconButton size="small" onClick={handleOpenFilters} sx={{ color: 'rgba(0, 243, 255, 0.8)', mr: 1 }}>
+      <IconButton size="small" onClick={handleOpenFilters} sx={{ color: theme.palette.primary.main, mr: 1 }}>
         <FilterListIcon fontSize="small" />
       </IconButton>
       
@@ -111,7 +116,9 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
             size="small"
             sx={{
               mr: 1,
-              backgroundColor: 'rgba(0, 0, 0, 0.5)',
+              backgroundColor: isLight
+                ? alpha(getFacetColor(facetId, value), 0.08)
+                : 'rgba(0, 0, 0, 0.5)',
               border: `1px solid ${getFacetColor(facetId, value)}`,
               color: getFacetColor(facetId, value),
               fontWeight: 'bold',
@@ -119,7 +126,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
               '& .MuiChip-deleteIcon': {
                 color: getFacetColor(facetId, value),
                 '&:hover': {
-                  color: '#fff',
+                  color: isLight ? theme.palette.text.primary : '#fff',
                 }
               }
             }}
@@ -138,10 +145,10 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
           '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottom: 'none' },
           '& .MuiInput-underline:after': { borderBottom: 'none' },
           input: {
-            color: '#fff',
+            color: isLight ? theme.palette.text.primary : '#fff',
             fontFamily: 'monospace',
             '&::placeholder': {
-              color: 'rgba(255, 255, 255, 0.5)',
+              color: isLight ? theme.palette.text.secondary : 'rgba(255, 255, 255, 0.5)',
               opacity: 1,
             },
           },
@@ -164,14 +171,16 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
         sx={{
           '& .MuiPopover-paper': {
             mt: 1,
-            backgroundColor: 'rgba(10, 25, 41, 0.95)',
-            backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(0, 243, 255, 0.3)',
+            backgroundColor: isLight ? theme.palette.background.paper : 'rgba(10, 25, 41, 0.95)',
+            backdropFilter: isLight ? 'none' : 'blur(10px)',
+            border: isLight
+              ? `1px solid ${theme.palette.divider}`
+              : '1px solid rgba(0, 243, 255, 0.3)',
             borderRadius: '8px',
             minWidth: 250,
             maxHeight: 400,
-            color: '#fff',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
+            color: isLight ? theme.palette.text.primary : '#fff',
+            boxShadow: isLight ? theme.shadows[4] : '0 4px 20px rgba(0,0,0,0.5)',
           }
         }}
       >
@@ -182,15 +191,17 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
                 key={facet.id}
                 onClick={() => setActiveFacetId(facet.id)}
                 sx={{
-                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}`,
                   '&:hover': {
-                    backgroundColor: 'rgba(0, 243, 255, 0.1)',
+                    backgroundColor: isLight
+                      ? alpha(theme.palette.primary.main, 0.08)
+                      : 'rgba(0, 243, 255, 0.1)',
                   }
                 }}
               >
                 <ListItemText 
                   primary={
-                    <Typography sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: 'rgba(0, 243, 255, 0.9)' }}>
+                    <Typography sx={{ fontFamily: 'monospace', fontWeight: 'bold', color: isLight ? theme.palette.primary.main : 'rgba(0, 243, 255, 0.9)' }}>
                       {facet.label}
                     </Typography>
                   }
@@ -200,15 +211,15 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
           </List>
         ) : (
           <Box>
-            <Box sx={{ p: 1, borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', alignItems: 'center' }}>
+            <Box sx={{ p: 1, borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.1)'}`, display: 'flex', alignItems: 'center' }}>
               <Button 
                 size="small" 
                 onClick={() => setActiveFacetId(null)}
-                sx={{ color: 'rgba(255,255,255,0.6)', minWidth: 'auto', p: 0, mr: 1 }}
+                sx={{ color: theme.palette.text.secondary, minWidth: 'auto', p: 0, mr: 1 }}
               >
                 ←
               </Button>
-              <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#fff', flex: 1 }}>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace', color: isLight ? theme.palette.text.primary : '#fff', flex: 1 }}>
                 Select {facets.find(f => f.id === activeFacetId)?.label}
               </Typography>
             </Box>
@@ -219,7 +230,9 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
                   onClick={() => handleSelectFacetValue(activeFacetId, option.value)}
                   sx={{
                     '&:hover': {
-                      backgroundColor: 'rgba(0, 243, 255, 0.1)',
+                      backgroundColor: isLight
+                        ? alpha(theme.palette.primary.main, 0.08)
+                        : 'rgba(0, 243, 255, 0.1)',
                     }
                   }}
                 >

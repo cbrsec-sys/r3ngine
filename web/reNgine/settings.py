@@ -40,6 +40,11 @@ DEFAULT_HTTP_TIMEOUT = env.int('DEFAULT_HTTP_TIMEOUT', default=5) # seconds
 DEFAULT_RETRIES = env.int('DEFAULT_RETRIES', default=1)
 DEFAULT_THREADS = env.int('DEFAULT_THREADS', default=30)
 DEFAULT_GET_GPT_REPORT = env.bool('DEFAULT_GET_GPT_REPORT', default=True)
+
+# Acunetix (AWVS) Configuration
+ACUNETIX_POLL_INTERVAL = env.int('ACUNETIX_POLL_INTERVAL', default=30)  # seconds
+ACUNETIX_MAX_RETRIES = env.int('ACUNETIX_MAX_RETRIES', default=720)     # 12 hours
+ACUNETIX_REQUEST_TIMEOUT = env.int('ACUNETIX_REQUEST_TIMEOUT', default=30)  # seconds
 VITE_DEV_SERVER_URL = env('VITE_DEV_SERVER_URL', default='https://localhost:5173')
 VITE_ENABLED = env.bool('VITE_ENABLED', default=DEBUG)
 
@@ -164,6 +169,7 @@ INSTALLED_APPS = [
     'apme.apps.ApmeConfig',
     'channels',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
     'corsheaders',
 ]
 
@@ -264,6 +270,17 @@ REST_FRAMEWORK = {
 
 SWAGGER_SETTINGS = {
     'DEFAULT_INFO': 'reNgine.openapi_info.info',
+    'SECURITY_DEFINITIONS': {
+        'Bearer': {
+            'type': 'apiKey',
+            'name': 'Authorization',
+            'in': 'header',
+            'description': 'JWT token — prefix with "Bearer ": `Bearer <token>`',
+        }
+    },
+    'USE_SESSION_AUTH': True,
+    'LOGIN_URL': '/login/',
+    'LOGOUT_URL': '/logout/',
 }
 WSGI_APPLICATION = 'reNgine.wsgi.application'
 ASGI_APPLICATION = 'reNgine.routing.application'
@@ -361,6 +378,7 @@ REDIS_URL = os.environ.get('REDIS_URL', 'redis://redis:6379/0')
 _parsed_redis = urllib.parse.urlparse(REDIS_URL)
 REDIS_HOST = _parsed_redis.hostname or 'redis'
 REDIS_PORT = _parsed_redis.port or 6379
+REDIS_PASSWORD = _parsed_redis.password or None
 '''
 ROLES and PERMISSIONS
 '''
@@ -399,6 +417,12 @@ LOGGING = {
         'null': {
             'class': 'logging.NullHandler',
         },
+        'temporal_file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': '/usr/src/app/temporal.log',
+            'formatter': 'verbose',
+        },
     },
     'formatters': {
         'verbose': {
@@ -436,21 +460,30 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': False,
         },
+        # Temporal activities — write INFO+ to temporal.log; propagate to 'reNgine' for console
+        'reNgine.temporal_activities': {
+            'handlers': ['temporal_file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
         # Scan tasks — use the task formatter so output is easy to grep
         'reNgine.tasks': {
             'handlers': ['task', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
-        # All other reNgine modules (utils.graph, cve_enrichment, etc.)
+        # All reNgine modules — use the task formatter for consistent grep-friendly output.
+        # The task formatter produces: module.funcName | LEVEL | message
+        # Specific child loggers (e.g. reNgine.tasks, reNgine.temporal_activities) are
+        # listed above with propagate=False to override this catch-all where needed.
         'reNgine': {
-            'handlers': ['console', 'error_file'],
+            'handlers': ['task', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
         # Plugin code
         'plugins': {
-            'handlers': ['task', 'console', 'error_file'],
+            'handlers': ['task', 'error_file'],
             'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
@@ -534,8 +567,6 @@ LOGIN_REQUIRED_IGNORE_PATHS = [
     r'^/mapi/auth/token/',
     r'^/mapi/auth/token/refresh/',
     r'^/mapi/.*$',
-    r'^/swagger/',
-    r'^/redoc/',
 ]
 
 from datetime import timedelta
@@ -543,7 +574,7 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': False,
+    'BLACKLIST_AFTER_ROTATION': True,
     'ALGORITHM': 'HS256',
     'SIGNING_KEY': SECRET_KEY,
     'AUTH_HEADER_TYPES': ('Bearer',),

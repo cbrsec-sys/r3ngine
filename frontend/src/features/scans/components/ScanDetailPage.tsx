@@ -90,6 +90,7 @@ import { KpiCard } from '../../../components/KpiCard';
 import { SubdomainsTab } from './SubdomainsTab';
 import { DirectoriesTab } from './DirectoriesTab';
 import { EndpointsTab } from './EndpointsTab';
+import { ParametersTab } from './ParametersTab';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { VulnerabilityTable } from '../../vulnerabilities/components/VulnerabilityTable';
 import { useGptVulnerabilityDetails } from '../../vulnerabilities/api';
@@ -1372,6 +1373,7 @@ export const ScanDetailPage = () => {
     { label: 'SCREENSHOTS', icon: Camera, show: data.scan_info.tasks?.includes('screenshot') },
     { label: 'DIRECTORIES', icon: Folder, show: data.scan_info.tasks?.includes('dir_file_fuzz') },
     { label: 'URLS', icon: LinkIcon },
+    { label: 'PARAMETERS', icon: Search },
     { label: 'VULNERABILITIES', icon: ShieldAlert, show: data.vulnerability_count > 0 },
     { label: 'EXPLOITS', icon: Zap, show: data.exploitable_count > 0 },
     { label: 'OSINT', icon: Search, show: data.scan_info.tasks?.includes('osint') },
@@ -1921,7 +1923,10 @@ export const ScanDetailPage = () => {
     <EndpointsTab projectSlug={projectSlug} scanId={parseInt(scanId)} matchedGfCounts={data.matched_gf_count} />
   );
 
-  // TODO NEEDS TO BE FIXED AS WELL TO ENSURE THE DIRECTORIES TAB PROPERLY RENDERS DATA
+  const renderParameters = () => (
+    <ParametersTab scanId={parseInt(scanId)} />
+  );
+
   const renderDirectories = () => (
     <DirectoriesTab projectSlug={projectSlug} scanId={parseInt(scanId)} subdomainId={0} subdomainName={data.target_info?.name || ''} targetId={data.target_info?.id || 0} />
   );
@@ -2162,6 +2167,7 @@ export const ScanDetailPage = () => {
                 {tabs[activeTab]?.label === 'SUBDOMAINS' && renderSubdomains()}
                 {tabs[activeTab]?.label === 'DIRECTORIES' && renderDirectories()}
                 {tabs[activeTab]?.label === 'URLS' && renderEndpoints()}
+                {tabs[activeTab]?.label === 'PARAMETERS' && renderParameters()}
                 {tabs[activeTab]?.label === 'VULNERABILITIES' && renderVulnerabilities()}
                 {tabs[activeTab]?.label === 'BUCKETS' && renderBuckets()}
                 {tabs[activeTab]?.label === 'SCREENSHOTS' && <ScreenshotsTab projectSlug={projectSlug} scanId={parseInt(scanId)} />}
@@ -2182,7 +2188,7 @@ export const ScanDetailPage = () => {
                   />
                 )}
 
-                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'VULNERABILITIES', 'BUCKETS', 'SCREENSHOTS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION', 'ATTACK PATHS'].includes(tabs[activeTab]?.label) && !tabs[activeTab]?.isPlugin && (
+                {!['HOME', 'SUBDOMAINS', 'DIRECTORIES', 'URLS', 'PARAMETERS', 'VULNERABILITIES', 'BUCKETS', 'SCREENSHOTS', 'OSINT', 'LEAKS', 'EXPLOITS', 'RECON NOTES', 'ATTACK SURFACE', 'VISUALIZATION', 'ATTACK PATHS'].includes(tabs[activeTab]?.label) && !tabs[activeTab]?.isPlugin && (
                   <Box sx={{ p: 4, textAlign: 'center', border: '1px dashed rgba(255,255,255,0.1)', borderRadius: 2 }}>
                     <Typography sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>MODULE STAGING AREA: {tabs[activeTab]?.label}</Typography>
                     <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.65rem', mt: 1 }}>SYNCHRONIZING DATA FROM LEGACY INTERFACE...</Typography>

@@ -13,7 +13,9 @@ import {
   IconButton,
   Button,
   LinearProgress,
-  Tooltip
+  Tooltip,
+  useTheme,
+  alpha,
 } from '@mui/material';
 import {
   Folder,
@@ -25,11 +27,24 @@ import {
 import { useProjects, useDeleteProject } from './api';
 import { Link } from '@tanstack/react-router';
 import { AddProjectModal } from './components/AddProjectModal';
+import { PageHeader } from '../../components/PageHeader';
 
 export const ProjectsPage: React.FC = () => {
   const { data: projects, isLoading } = useProjects();
   const { mutate: deleteProject } = useDeleteProject();
   const [isAddModalOpen, setIsAddModalOpen] = React.useState(false);
+  const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
+
+  const headerStyles = {
+    color: isLight ? theme.palette.text.secondary : '#fff',
+    fontWeight: 800,
+    fontFamily: 'var(--r3-heading-font)',
+    fontSize: '0.75rem',
+    letterSpacing: 1,
+    borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`,
+    py: 2
+  };
 
   const handleDelete = (id: number, name: string) => {
     if (window.confirm(`Are you sure you want to delete ${name}? You won't be able to revert this, all targets and scan results also will be deleted!`)) {
@@ -37,32 +52,33 @@ export const ProjectsPage: React.FC = () => {
     }
   };
 
-  if (isLoading) return <LinearProgress sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />;
+  if (isLoading) return <LinearProgress color="primary" />;
 
   return (
     <Box sx={{ p: 3 }}>
       {/* Header */}
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-        <Box>
-          <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', letterSpacing: 2 }}>
-            PROJECTS
-          </Typography>
-          <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.6)', fontFamily: 'Orbitron', letterSpacing: 1 }}>
-            Central Control / Project Management
-          </Typography>
-        </Box>
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 0 }}>
+        <PageHeader
+          title="PROJECTS"
+          subtitle="Central Control / Project Management"
+        />
         <Button
           variant="contained"
           onClick={() => setIsAddModalOpen(true)}
           startIcon={<Plus size={18} />}
           sx={{
-            bgcolor: 'rgba(0, 243, 255, 0.1)',
-            color: '#00f3ff',
-            fontFamily: 'Orbitron',
+            bgcolor: isLight ? theme.palette.primary.main : 'rgba(0, 243, 255, 0.1)',
+            color: isLight ? '#fff' : '#00f3ff',
+            fontFamily: 'var(--r3-heading-font)',
             fontWeight: 800,
-            border: '1px solid rgba(0, 243, 255, 0.3)',
+            border: isLight
+              ? `1px solid ${theme.palette.primary.main}`
+              : '1px solid rgba(0, 243, 255, 0.3)',
             px: 3,
-            '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderColor: '#00f3ff' }
+            '&:hover': {
+              bgcolor: isLight ? theme.palette.primary.dark : 'rgba(0, 243, 255, 0.2)',
+              borderColor: isLight ? theme.palette.primary.dark : '#00f3ff',
+            }
           }}
         >
           CREATE NEW PROJECT
@@ -71,15 +87,16 @@ export const ProjectsPage: React.FC = () => {
 
       {/* Projects Table Card */}
       <Card sx={{
-        bgcolor: 'rgba(10, 10, 25, 0.8)',
-        backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(255, 255, 255, 0.05)',
+        bgcolor: isLight ? theme.palette.background.paper : 'rgba(10, 10, 25, 0.8)',
+        backdropFilter: isLight ? 'none' : 'blur(10px)',
+        border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`,
         borderRadius: 3,
-        overflow: 'hidden'
+        overflow: 'hidden',
+        boxShadow: isLight ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
       }}>
         <TableContainer>
           <Table>
-            <TableHead sx={{ bgcolor: 'rgba(50, 20, 80, 0.3)' }}>
+            <TableHead sx={{ bgcolor: isLight ? alpha(theme.palette.primary.main, 0.05) : 'rgba(50, 20, 80, 0.3)' }}>
               <TableRow>
                 <TableCell sx={{ ...headerStyles, pl: 10 }}>PROJECT NAME</TableCell>
                 <TableCell sx={headerStyles}>SLUG</TableCell>
@@ -91,36 +108,36 @@ export const ProjectsPage: React.FC = () => {
                 <TableRow
                   key={project.id}
                   sx={{
-                    '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.03)' },
+                    '&:hover': { bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255, 255, 255, 0.03)' },
                     transition: 'all 0.2s'
                   }}
                 >
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', pl: 10 }}>
+                  <TableCell sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, pl: 10 }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
-                      <Typography variant="body1" sx={{ fontWeight: 800, color: '#fff' }}>
+                      <Typography variant="body1" sx={{ fontWeight: 800, color: isLight ? theme.palette.text.primary : '#fff' }}>
                         {project.name}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.4)', mt: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: theme.palette.text.secondary, mt: 0.5 }}>
                         Created {project.insert_date_humanized || project.insert_date}
                       </Typography>
                     </Box>
                   </TableCell>
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <TableCell sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}` }}>
                     <Chip
                       label={project.slug}
                       size="small"
                       sx={{
-                        bgcolor: 'rgba(0, 243, 255, 0.05)',
-                        color: '#00f3ff',
+                        bgcolor: alpha(theme.palette.primary.main, 0.08),
+                        color: theme.palette.primary.main,
                         fontWeight: 700,
                         fontSize: '0.65rem',
                         borderRadius: 1,
                         height: 24,
-                        border: '1px solid rgba(0, 243, 255, 0.2)'
+                        border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`
                       }}
                     />
                   </TableCell>
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255, 255, 255, 0.05)', textAlign: 'center' }}>
+                  <TableCell sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, textAlign: 'center' }}>
                     <Box sx={{ display: 'flex', gap: 1, justifyContent: 'center' }}>
                       <Button
                         component={Link}
@@ -129,12 +146,15 @@ export const ProjectsPage: React.FC = () => {
                         variant="outlined"
                         startIcon={<ChevronRight size={14} />}
                         sx={{
-                          borderColor: 'rgba(0, 243, 255, 0.3)',
-                          color: '#00f3ff',
-                          fontFamily: 'Orbitron',
+                          borderColor: isLight ? alpha(theme.palette.primary.main, 0.4) : 'rgba(0, 243, 255, 0.3)',
+                          color: theme.palette.primary.main,
+                          fontFamily: 'var(--r3-heading-font)',
                           fontSize: '0.65rem',
                           fontWeight: 700,
-                          '&:hover': { borderColor: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)' }
+                          '&:hover': {
+                            borderColor: theme.palette.primary.main,
+                            bgcolor: alpha(theme.palette.primary.main, 0.05)
+                          }
                         }}
                       >
                         OPEN DASHBOARD
@@ -168,12 +188,3 @@ export const ProjectsPage: React.FC = () => {
   );
 };
 
-const headerStyles = {
-  color: '#fff',
-  fontWeight: 800,
-  fontFamily: 'Orbitron',
-  fontSize: '0.75rem',
-  letterSpacing: 1,
-  borderBottom: '1px solid rgba(255, 255, 255, 0.05)',
-  py: 2
-};

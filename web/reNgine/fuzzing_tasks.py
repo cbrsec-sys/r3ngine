@@ -267,8 +267,8 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		ffuf_base_cmd += f' -t {threads}' if threads and threads > 0 else ''
 		ffuf_base_cmd += f' -timeout {timeout}' if timeout and timeout > 0 else ''
 		ffuf_base_cmd += ' -se' if stop_on_error else ''
-		ffuf_base_cmd += ' -fr' if follow_redirect else ' -fr'
-		ffuf_base_cmd += ' -ac' if auto_calibration else ' -ac'
+		ffuf_base_cmd += ' -r' if follow_redirect else ''
+		ffuf_base_cmd += ' -ac' if auto_calibration else ''
 		ffuf_base_cmd += f' -mc {mc}' if mc else ''
 
 		has_ua = any('user-agent' in h.lower() for h in custom_headers_list)
@@ -447,7 +447,9 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 						dirsearch_output = f'{self.results_dir}/dirsearch_{subdomain_name}.json'
 						target_url_stripped = target_url.rstrip('/')
 						dcmd = f'{dirsearch_base_cmd} -u {target_url_stripped} --format=json -o {dirsearch_output} --no-color'
-						dcmd = opsec.apply_stealth('dirsearch', dcmd)
+						if proxy:
+							dcmd += f' --proxy {proxy}'
+						dcmd = opsec.apply_stealth('dirsearch', dcmd, proxy=proxy)
 
 						dirscan_ds = DirectoryScan.objects.create(
 							scanned_date=timezone.now(),

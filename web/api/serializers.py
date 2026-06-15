@@ -1092,10 +1092,24 @@ class TechnologySerializer(serializers.ModelSerializer):
 		fields = '__all__'
 
 
+class ParameterEndpointSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = EndPoint
+		fields = ['id', 'http_url']
+
+
 class ParameterSerializer(serializers.ModelSerializer):
+	endpoint = ParameterEndpointSerializer(read_only=True)
+
 	class Meta:
 		model = Parameter
-		fields = ['name', 'value', 'type']
+		fields = [
+			'id', 'name', 'value', 'type',
+			'confidence', 'sources', 'param_location',
+			'data_type', 'is_auth_related',
+			'observed_in_js', 'observed_in_openapi', 'observed_in_graphql',
+			'endpoint',
+		]
 
 
 class PortSerializer(serializers.ModelSerializer):
@@ -1155,10 +1169,14 @@ class DirectoryScanSerializer(serializers.ModelSerializer):
 		fields = '__all__'
 
 	def get_scanned_date(self, DirectoryScan):
-		return DirectoryScan.scanned_date.strftime("%b %d, %Y %H:%M")
+		if DirectoryScan.scanned_date:
+			return DirectoryScan.scanned_date.strftime("%b %d, %Y %H:%M")
+		return None
 
 	def get_formatted_date_for_id(self, DirectoryScan):
-		return DirectoryScan.scanned_date.strftime("%b_%d_%Y_%H_%M")
+		if DirectoryScan.scanned_date:
+			return DirectoryScan.scanned_date.strftime("%b_%d_%Y_%H_%M")
+		return None
 
 
 class IpSubdomainSerializer(serializers.ModelSerializer):
@@ -1317,7 +1335,9 @@ class VulnerabilitySerializer(serializers.ModelSerializer):
 	validation_results = ValidationResultSerializer(many=True, read_only=True)
 
 	def get_discovered_date(self, Vulnerability):
-		return Vulnerability.discovered_date.strftime("%b %d, %Y %H:%M")
+		if Vulnerability.discovered_date:
+			return Vulnerability.discovered_date.strftime("%b %d, %Y %H:%M")
+		return None
 
 	def get_severity(self, Vulnerability):
 		if Vulnerability.severity == 0:
@@ -1420,3 +1440,10 @@ class HardwareProfileSerializer(serializers.ModelSerializer):
 	class Meta:
 		model = HardwareProfile
 		fields = '__all__'
+
+
+class ScanProfileSerializer(serializers.ModelSerializer):
+	class Meta:
+		model = ScanProfile
+		fields = '__all__'
+		read_only_fields = ['id', 'is_builtin', 'created_at', 'updated_at']

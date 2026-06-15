@@ -956,3 +956,9 @@ class Neo4jManager:
         with self.driver.session() as session:
             session.run(query)
         logger.info("Neo4j database has been reset (all nodes deleted).")
+
+
+def get_neo4j_driver():
+    """Return a live Neo4j driver instance, or None if Neo4j is unreachable."""
+    mgr = Neo4jManager()
+    return mgr.driver

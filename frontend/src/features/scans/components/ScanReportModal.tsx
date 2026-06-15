@@ -16,9 +16,11 @@ import {
   IconButton,
   Stack,
   Divider,
-  CircularProgress
+  CircularProgress,
+  TextField,
+  Collapse
 } from '@mui/material';
-import { X, FileText, Shield, FileSearch, Download } from 'lucide-react';
+import { X, FileText, Shield, FileSearch, Download, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface ScanReportModalProps {
   open: boolean;
@@ -31,9 +33,12 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
   const [reportTemplate, setReportTemplate] = useState('modern');
   const [ignoreInfoVuln, setIgnoreInfoVuln] = useState(false);
   const [includeAttackSurface, setIncludeAttackSurface] = useState(false);
+  const [includeAttackPaths, setIncludeAttackPaths] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<string | null>(null);
   const [reportUrl, setReportUrl] = useState<string | null>(null);
+  const [comments, setComments] = useState('');
+  const [commentsExpanded, setCommentsExpanded] = useState(false);
 
   const pollReportStatus = async (reportId: number) => {
     setIsGenerating(true);
@@ -86,7 +91,9 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
         report_template: reportTemplate,
         ignore_info_vuln: ignoreInfoVuln ? 'True' : 'False',
         include_attack_surface_map: includeAttackSurface ? 'True' : 'False',
-        download: download ? 'True' : 'False'
+        include_attack_paths: includeAttackPaths ? 'True' : 'False',
+        download: download ? 'True' : 'False',
+        comments: comments
       });
       
       const response = await fetch(`/scan/create_report/${scanId}?${params.toString()}`, {
@@ -240,7 +247,10 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                 <RadioGroup row value={reportTemplate} onChange={(e) => {
                   const val = e.target.value;
                   setReportTemplate(val);
-                  if (val !== 'enterprise' && val !== 'cyber_pro') setIncludeAttackSurface(false);
+                  if (val !== 'enterprise' && val !== 'cyber_pro') {
+                    setIncludeAttackSurface(false);
+                    setIncludeAttackPaths(false);
+                  }
                 }}>
                   <FormControlLabel
                     value="default"
@@ -306,8 +316,82 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                     </Box>
                   }
                 />
+
+                <FormControlLabel
+                  control={
+                    <Checkbox
+                      checked={includeAttackPaths}
+                      disabled={reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro'}
+                      onChange={(e) => setIncludeAttackPaths(e.target.checked)}
+                      sx={{ 
+                        color: 'rgba(0,243,255,0.1)', 
+                        '&.Mui-checked': { color: '#00f3ff' },
+                        '&.Mui-disabled': { color: 'rgba(255,255,255,0.05)' }
+                      }}
+                    />
+                  }
+                  label={
+                    <Box>
+                      <Typography sx={{ 
+                        color: (reportTemplate === 'enterprise' || reportTemplate === 'cyber_pro') ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)', 
+                        fontSize: '0.8rem', 
+                        fontWeight: 600,
+                        transition: 'color 0.2s'
+                      }}>
+                        Include Attack Paths
+                      </Typography>
+                      {reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro' && (
+                        <Typography sx={{ color: 'rgba(0,243,255,0.3)', fontSize: '0.65rem' }}>Only available for Enterprise/Pro templates</Typography>
+                      )}
+                    </Box>
+                  }
+                />
               </Stack>
             </Stack>
+          </Box>
+
+          <Divider sx={{ borderColor: 'rgba(0, 243, 255, 0.1)' }} />
+
+          <Box sx={{ opacity: isGenerating ? 0.5 : 1, pointerEvents: isGenerating ? 'none' : 'auto' }}>
+            <Box
+              onClick={() => setCommentsExpanded(!commentsExpanded)}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                userSelect: 'none',
+                mb: commentsExpanded ? 2 : 0,
+                '&:hover': {
+                  opacity: 0.8
+                }
+              }}
+            >
+              <Typography sx={{
+                color: '#00f3ff',
+                fontFamily: 'Orbitron',
+                fontSize: '0.75rem',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <MessageSquare size={14} /> ASSESSMENT COMMENTS (OPTIONAL)
+              </Typography>
+              {commentsExpanded ? <ChevronUp size={16} color="#00f3ff" /> : <ChevronDown size={16} color="#00f3ff" />}
+            </Box>
+            
+            <Collapse in={commentsExpanded}>
+              <TextField
+                fullWidth
+                multiline
+                rows={4}
+                placeholder="Enter any comments or notes about the assessment to insert into the {comments} placeholder..."
+                value={comments}
+                onChange={(e) => setComments(e.target.value)}
+                sx={fieldStyles}
+              />
+            </Collapse>
           </Box>
         </Stack>
       </DialogContent>
@@ -384,5 +468,19 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
       </DialogActions>
     </Dialog>
   );
+};
+
+const fieldStyles = {
+  '& .MuiOutlinedInput-root': {
+    color: '#fff',
+    '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+    '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
+    '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+    bgcolor: 'rgba(255,255,255,0.03)',
+  },
+  '& .MuiInputLabel-root': {
+    color: 'rgba(255,255,255,0.4)',
+    '&.Mui-focused': { color: '#00f3ff' }
+  },
 };
 

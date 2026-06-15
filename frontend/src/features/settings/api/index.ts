@@ -596,6 +596,55 @@ export const useOllamaPullStatus = (slug: string, model: string | null) => {
   });
 };
 
+export const useOllamaServiceStatus = (slug: string) => {
+  return useQuery<{ status: string; running: boolean }>({
+    queryKey: ['ollama-service-status', slug],
+    queryFn: async () => {
+      const response = await axios.get(`/scanEngine/${slug}/ollama/service_status`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      return response.data;
+    },
+    refetchInterval: 5000,
+  });
+};
+
+export const useStartOllamaService = (slug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await axios.post(`/scanEngine/${slug}/ollama/service_start`, {}, {
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'Accept': 'application/json'
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ollama-service-status', slug] });
+    },
+  });
+};
+
+export const useStopOllamaService = (slug: string) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async () => {
+      const response = await axios.post(`/scanEngine/${slug}/ollama/service_stop`, {}, {
+        headers: {
+          'X-CSRFToken': getCsrfToken(),
+          'Accept': 'application/json'
+        }
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ollama-service-status', slug] });
+    },
+  });
+};
+
 export const useTestLlmConnection = (slug: string) => {
   return useMutation<TestLlmConnectionResult, Error, { provider: string; api_key: string; model: string }>({
     mutationFn: async (data) => {

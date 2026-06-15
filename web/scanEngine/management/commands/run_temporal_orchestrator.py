@@ -62,11 +62,26 @@ from reNgine.temporal_workflows import (
     MonitoringWorkflow,
     GoExecutorTaskWorkflow,
     ApmeTaskWorkflow,
+    RecalculateApmeWorkflow,
     IdentityEnrichmentWorkflow,
     GeoLocalizeWorkflow,
     HackerOneImportWorkflow,
     HackerOneSyncBookmarkedWorkflow,
     ProxyFetchWorkflow,
+    # Phase 2 — rengine-ng standalone workflows
+    UserHuntWorkflow,
+    URLBypassWorkflow,
+    WordPressWorkflow,
+    HostReconWorkflow,
+    CIDRReconWorkflow,
+    CodeScanWorkflow,
+    DomainReconWorkflow,
+    SubdomainReconWorkflow,
+    URLCrawlWorkflow,
+    URLDirSearchWorkflow,
+    URLFuzzWorkflow,
+    URLParamsFuzzWorkflow,
+    URLVulnWorkflow,
 )
 
 # Activities (all Python-side activities are registered here)
@@ -113,6 +128,7 @@ from reNgine.temporal_activities import (
 
     # Tier 6: Assessment
     run_nuclei_activity,
+    gather_nuclei_tags_activity,
     run_crlfuzz_activity,
     run_dalfox_activity,
     run_s3scanner_activity,
@@ -149,11 +165,42 @@ from reNgine.temporal_activities import (
     setup_scheduled_scan_activity,
     run_monitoring_check_activity,
     run_llm_apme_activity,
+    recalculate_apme_activity,
     enrich_identities_activity,
     geo_localize_activity,
     import_hackerone_programs_activity,
     sync_bookmarked_programs_activity,
     fetch_proxies_activity,
+
+    # Phase 1 — rengine-ng workflow tool activities
+    get_discovered_services_activity,
+    get_discovered_ips_activity,
+    run_getasn_activity,
+    run_netdetect_activity,
+    run_jswhois_activity,
+    run_whoisdomain_activity,
+    run_bbot_activity,
+    run_dnsx_activity,
+    run_wafw00f_activity,
+    run_fping_activity,
+    run_arpscan_activity,
+    run_mapcidr_activity,
+    run_sshaudit_activity,
+    run_wpprobe_activity,
+    run_search_vulns_activity,
+    run_xurlfind3r_activity,
+    run_urlfinder_activity,
+    run_cariddi_activity,
+    run_bup_activity,
+    run_arjun_activity,
+    run_feroxbuster_activity,
+    run_gf_activity,
+    run_grype_scan_activity,
+    run_trivy_secret_scan_activity,
+    run_urlparser_activity,
+    run_wptaint_scan_activity,
+    run_param_discovery_activity,
+    run_http_crawl_bridge_activity,
 )
 
 
@@ -168,6 +215,7 @@ _STARTUP_SYNC_TASKS = [
     ("sync_semgrep_rules", 30, False),
     ("recover_stuck_scans", 30, True),
     ("sync_cve_data", 300, False),
+    ("sync_epss_data", 10, False),
 ]
 
 
@@ -220,6 +268,42 @@ async def _register_startup_schedule(
         ),
     )
     logger.info(f"[Startup] Registered one-shot schedule '{schedule_id}' → workflow '{workflow_id}' (fires in ~{interval_seconds}s)")
+
+
+async def _register_daily_cron_schedule(
+    client: Client, task_name: str, hour: int = 8, minute: int = 0
+) -> None:
+    """Create a daily cron schedule for a startup sync task."""
+    from temporalio.client import ScheduleCalendarSpec, ScheduleRange
+    schedule_id = f"daily-cron-{task_name.replace('_', '-')}"
+    
+    # Try to delete if exists to allow recreating/updating
+    try:
+        handle = client.get_schedule_handle(schedule_id)
+        await handle.delete()
+    except Exception:
+        pass
+
+    await client.create_schedule(
+        schedule_id,
+        Schedule(
+            action=ScheduleActionStartWorkflow(
+                StartupSyncWorkflow.run,
+                args=[task_name],
+                id=f"{schedule_id}-workflow",
+                task_queue="python-orchestrator-queue",
+            ),
+            spec=ScheduleSpec(
+                calendars=[ScheduleCalendarSpec(
+                    hour=[ScheduleRange(hour)],
+                    minute=[ScheduleRange(minute)],
+                )],
+            ),
+            policy=SchedulePolicy(overlap=ScheduleOverlapPolicy.SKIP),
+            state=ScheduleState(note=f"Daily cron sync: {task_name}"),
+        ),
+    )
+    logger.info(f"[Startup] Registered daily cron schedule '{schedule_id}' for {hour:02d}:{minute:02d}")
 
 
 class Command(BaseCommand):
@@ -310,6 +394,11 @@ class Command(BaseCommand):
                 except Exception as sched_err:
                     # Non-fatal: log and continue — don't block worker startup
                     logger.error(f"[Startup] Failed to register schedule for '{task_name}': {sched_err}")
+                    
+            try:
+                await _register_daily_cron_schedule(client, "sync_epss_data", hour=8, minute=0)
+            except Exception as sched_err:
+                logger.error(f"[Startup] Failed to register daily cron schedule for 'sync_epss_data': {sched_err}")
 
             # -------------------------------------------------------------------
             # Collect all registered activities
@@ -341,6 +430,7 @@ class Command(BaseCommand):
 
                 # Tier 2
                 run_http_crawl_activity,
+                run_http_crawl_bridge_activity,
                 parse_http_crawl_results_activity,
                 run_port_scan_activity,
                 run_screenshot_activity,
@@ -348,6 +438,7 @@ class Command(BaseCommand):
                 parse_enumeration_results_activity,
 
                 # Tier 3/4
+                run_param_discovery_activity,
                 run_dir_file_fuzz_activity,
                 parse_fuzz_results_activity,
 
@@ -359,6 +450,7 @@ class Command(BaseCommand):
 
                 # Tier 6
                 run_nuclei_activity,
+                gather_nuclei_tags_activity,
                 run_crlfuzz_activity,
                 run_dalfox_activity,
                 run_s3scanner_activity,
@@ -367,6 +459,7 @@ class Command(BaseCommand):
                 run_react2shell_activity,
                 run_wpscan_activity,
                 run_semgrep_activity,
+                run_wptaint_scan_activity,
                 run_vigolium_scan_activity,
                 run_vigolium_discovery_activity,
                 run_vigolium_analysis_activity,
@@ -399,11 +492,39 @@ class Command(BaseCommand):
                 
                 # New utility / integration activities
                 run_llm_apme_activity,
+                recalculate_apme_activity,
                 enrich_identities_activity,
                 geo_localize_activity,
                 import_hackerone_programs_activity,
                 sync_bookmarked_programs_activity,
                 fetch_proxies_activity,
+
+                # Phase 1 — rengine-ng workflow tool activities
+                get_discovered_services_activity,
+                get_discovered_ips_activity,
+                run_getasn_activity,
+                run_netdetect_activity,
+                run_jswhois_activity,
+                run_whoisdomain_activity,
+                run_bbot_activity,
+                run_dnsx_activity,
+                run_wafw00f_activity,
+                run_fping_activity,
+                run_arpscan_activity,
+                run_mapcidr_activity,
+                run_sshaudit_activity,
+                run_wpprobe_activity,
+                run_search_vulns_activity,
+                run_xurlfind3r_activity,
+                run_urlfinder_activity,
+                run_cariddi_activity,
+                run_bup_activity,
+                run_arjun_activity,
+                run_feroxbuster_activity,
+                run_gf_activity,
+                run_grype_scan_activity,
+                run_trivy_secret_scan_activity,
+                run_urlparser_activity,
             ]
 
             # -------------------------------------------------------------------
@@ -417,11 +538,21 @@ class Command(BaseCommand):
                 plugin_activities = await sync_to_async(PluginTemporalRegistry.get_all_plugin_activities)()
                 
                 # Append to existing
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow] + plugin_workflows
+                _p2_workflows = [UserHuntWorkflow, URLBypassWorkflow, WordPressWorkflow,
+                                 HostReconWorkflow, CIDRReconWorkflow, CodeScanWorkflow,
+                                 DomainReconWorkflow, SubdomainReconWorkflow, URLCrawlWorkflow,
+                                 URLDirSearchWorkflow, URLFuzzWorkflow, URLParamsFuzzWorkflow,
+                                 URLVulnWorkflow]
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow] + _p2_workflows + plugin_workflows
                 all_activities.extend(plugin_activities)
             except Exception as e:
                 logger.error(f"Failed to load dynamic plugin temporal exports: {e}")
-                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow]
+                _p2_workflows = [UserHuntWorkflow, URLBypassWorkflow, WordPressWorkflow,
+                                 HostReconWorkflow, CIDRReconWorkflow, CodeScanWorkflow,
+                                 DomainReconWorkflow, SubdomainReconWorkflow, URLCrawlWorkflow,
+                                 URLDirSearchWorkflow, URLFuzzWorkflow, URLParamsFuzzWorkflow,
+                                 URLVulnWorkflow]
+                all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow] + _p2_workflows
 
             # -------------------------------------------------------------------
             # Start the Temporal Worker
@@ -472,7 +603,12 @@ class Command(BaseCommand):
             def listen():
                 while True:
                     try:
-                        rdb = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
+                        rdb = redis.StrictRedis(
+                            host=settings.REDIS_HOST,
+                            port=settings.REDIS_PORT,
+                            password=settings.REDIS_PASSWORD,
+                            db=0
+                        )
                         pubsub = rdb.pubsub()
                         pubsub.subscribe('orchestrator_control')
                         logger.info("[Control] Subscribed to orchestrator_control Redis channel.")

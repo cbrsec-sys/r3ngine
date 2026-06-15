@@ -10,9 +10,12 @@ logger = logging.getLogger(__name__)
 
 from datetime import datetime
 from django import http
+from django.conf import settings
 from django.contrib import messages
+from django.http import HttpRequest
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.contrib.auth.decorators import login_required
 from rolepermissions.decorators import has_permission_decorator
 
 from reNgine.common_func import *
@@ -763,6 +766,36 @@ def get_ollama_pull_status(request, slug):
         'log': log
     })
 
+@has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def get_ollama_service_status(request, slug):
+    from reNgine.ollama_manager import OllamaManager, OllamaUnavailableError
+    manager = OllamaManager()
+    is_running = manager.is_running()
+    return http.JsonResponse({'status': 'success', 'running': is_running})
+
+@has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def start_ollama_service(request, slug):
+    if request.method != 'POST':
+        return http.JsonResponse({'status': 'error', 'message': 'POST required'}, status=400)
+    
+    from reNgine.ollama_manager import OllamaManager, OllamaStartError
+    manager = OllamaManager()
+    try:
+        manager.start()
+        return http.JsonResponse({'status': 'success', 'message': 'Ollama service started.'})
+    except OllamaStartError as e:
+        return http.JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+@has_permission_decorator(PERM_MODIFY_SYSTEM_CONFIGURATIONS, redirect_url=FOUR_OH_FOUR_URL)
+def stop_ollama_service(request, slug):
+    if request.method != 'POST':
+        return http.JsonResponse({'status': 'error', 'message': 'POST required'}, status=400)
+    
+    from reNgine.ollama_manager import OllamaManager
+    manager = OllamaManager()
+    manager.stop()
+    return http.JsonResponse({'status': 'success', 'message': 'Ollama service stopped.'})
+
 
 def _test_llm_provider(provider: str, api_key: str, model: str) -> dict:
     """Send a minimal prompt to the given provider and return a result dict.
@@ -976,7 +1009,6 @@ def api_vault(request, slug):
         key_acunetix_key = _pick('key_acunetix_key', 'acunetix_key')
         key_hunterio = _pick('key_hunterio', 'hunterio_key')
         linkedin_username = _pick('linkedin_username', 'linkedin_username')
-        linkedin_password = _pick('linkedin_password', 'linkedin_password')
         key_wpscan = _pick('key_wpscan', 'wpscan_key')
         key_projectdiscovery = _pick('key_projectdiscovery', 'projectdiscovery_key')
 
@@ -1082,13 +1114,10 @@ def api_vault(request, slug):
                 defaults={'key': key_projectdiscovery or ""}
             )
 
-        if (linkedin_username is not None) or (linkedin_password is not None):
+        if linkedin_username is not None:
             LinkedInCredentials.objects.update_or_create(
                 id=1,
-                defaults={
-                    'username': linkedin_username or "",
-                    'password': linkedin_password or ""
-                }
+                defaults={'username': linkedin_username or ""}
             )
 
         delete_sf_key = request.POST.get('delete_sf_key')
@@ -1134,7 +1163,6 @@ def api_vault(request, slug):
             'acunetix_key': context['acunetix_key'].api_key if context['acunetix_key'] else "",
             'hunterio_key': HunterIOAPIKey.objects.first().key if HunterIOAPIKey.objects.exists() else "",
             'linkedin_username': LinkedInCredentials.objects.first().username if LinkedInCredentials.objects.exists() else "",
-            'linkedin_password': LinkedInCredentials.objects.first().password if LinkedInCredentials.objects.exists() else "",
             'wpscan_key': WpScanAPIKey.objects.first().key if WpScanAPIKey.objects.exists() else "",
             'projectdiscovery_key': ProjectDiscoveryAPIKey.objects.first().key if ProjectDiscoveryAPIKey.objects.exists() else "",
         })
@@ -1257,3 +1285,18 @@ def get_full_yaml_config(request, slug):
         return http.JsonResponse({'status': 'success', 'content': content})
     except Exception as e:
         return http.JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
+@login_required
+def yaml_config_reference(request: HttpRequest, slug: str) -> http.JsonResponse:
+    """Return the full YAML configuration reference (static file, all config keys documented)."""
+    ref_path = os.path.join(settings.BASE_DIR, 'scanEngine', 'reference', 'full_yaml_config.yaml')
+    try:
+        with open(ref_path, 'r') as f:
+            content = f.read()
+        return http.JsonResponse({'status': 'success', 'content': content})
+    except OSError:
+        return http.JsonResponse(
+            {'status': 'error', 'content': '', 'message': 'Reference config not found'},
+            status=404,
+        )

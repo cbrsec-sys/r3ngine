@@ -22,7 +22,7 @@ class PluginViewSet(viewsets.ModelViewSet):
     def get_permissions(self):
         # Read-only actions (list, retrieve, registry, install-status) require only authentication.
         # All mutating or privileged actions require admin/staff.
-        read_only_actions = {'list', 'retrieve', 'registry', 'install_status'}
+        read_only_actions = {'list', 'retrieve', 'registry', 'install_status', 'get_icon', 'get_docs'}
         if self.action in read_only_actions:
             return [IsAuthenticated()]
         return [IsAdminUser()]
@@ -96,7 +96,12 @@ class PluginViewSet(viewsets.ModelViewSet):
         import redis
         from django.conf import settings
         try:
-            rdb = redis.StrictRedis(host=settings.REDIS_HOST, port=settings.REDIS_PORT, db=0)
+            rdb = redis.StrictRedis(
+                host=settings.REDIS_HOST,
+                port=settings.REDIS_PORT,
+                password=settings.REDIS_PASSWORD,
+                db=0
+            )
             rdb.publish('orchestrator_control', 'restart')
             return Response({'success': True, 'message': 'Restart command sent to orchestrator.'})
         except Exception as e:

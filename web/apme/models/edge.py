@@ -12,6 +12,7 @@ EDGE_TYPES = {
     "ESCALATES_TO",   # identity -> privilege
     "TRUSTS",         # system -> system (lateral movement)
     "CONNECTED_TO",   # network pivot
+    "USES_TECH",      # asset -> technology
 }
 
 
