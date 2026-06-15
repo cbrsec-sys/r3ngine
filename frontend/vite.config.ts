@@ -1,12 +1,21 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import basicSsl from '@vitejs/plugin-basic-ssl';
+import federation from '@originjs/vite-plugin-federation';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ command }) => ({
   plugins: [
     react(),
     basicSsl(),
+    federation({
+      name: 'r3ngine-host',
+      filename: 'remoteEntry.js',
+      exposes: {
+        './pluginCardRegistry': './src/features/plugins/store/pluginCardRegistry',
+      },
+      shared: ['react', 'react-dom', 'zustand'],
+    }),
   ],
   base: command === 'serve' ? '/' : '/staticfiles/',
   build: {
