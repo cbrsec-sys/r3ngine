@@ -263,7 +263,9 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		ffuf_base_cmd += f' -rate {rate_limit}' if rate_limit > 0 else ''
 		if recursive_level > 0:
 			ffuf_base_cmd += f' -recursion -recursion-depth {recursive_level}'
-		ffuf_base_cmd += f' -maxtime-job {max_time}' if max_time > 0 else ''
+			if max_time > 0:
+				job_time = max(30, max_time // (recursive_level + 1))
+				ffuf_base_cmd += f' -maxtime-job {job_time}'
 		ffuf_base_cmd += f' -t {threads}' if threads and threads > 0 else ''
 		ffuf_base_cmd += f' -timeout {timeout}' if timeout and timeout > 0 else ''
 		ffuf_base_cmd += ' -se' if stop_on_error else ''

@@ -278,3 +278,60 @@ class TestFfufUrlAndHeaderConstruction(TestCase):
         cmd = result['ffuf_base_cmd']
         self.assertIn("-H 'X-Test: val\"ue'", cmd,
                       f"Double-quote inside value must remain inside single quotes. Got: {cmd}")
+
+
+class TestFfufMaxtimeJob(TestCase):
+    """Bug #8: -maxtime-job must be less than -maxtime when recursion is enabled."""
+
+    def _config(self, max_time, recursive_level):
+        return {
+            'dir_file_fuzz': {
+                'auto_calibration': False,
+                'rate_limit': 0,
+                'threads': 10,
+                'wordlist_name': 'dicc',
+                'extensions': [],
+                'match_http_status': [200],
+                'recursive_level': recursive_level,
+                'max_time': max_time,
+                'stop_on_error': False,
+                'follow_redirect': False,
+                'timeout': 10,
+            }
+        }
+
+    def test_maxtime_job_less_than_maxtime_for_recursive_scan(self):
+        result = _prepare(self._config(max_time=300, recursive_level=2))
+        self.assertIsNotNone(result, "_prepare() must return a dict, not None")
+        self.assertIn('ffuf_base_cmd', result, "prepare_only=True must return ffuf_base_cmd key")
+        cmd = result['ffuf_base_cmd']
+        import re
+        maxtime_match = re.search(r'-maxtime (\d+)', cmd)
+        maxtime_job_match = re.search(r'-maxtime-job (\d+)', cmd)
+        self.assertIsNotNone(maxtime_match, "Command must contain -maxtime")
+        self.assertIsNotNone(maxtime_job_match, "Command must contain -maxtime-job when recursive")
+        maxtime = int(maxtime_match.group(1))
+        maxtime_job = int(maxtime_job_match.group(1))
+        self.assertLess(maxtime_job, maxtime,
+                        f"-maxtime-job ({maxtime_job}) must be < -maxtime ({maxtime})")
+
+    def test_maxtime_job_has_floor_of_30(self):
+        """Even with high depth and low max_time, -maxtime-job must not drop below 30s."""
+        result = _prepare(self._config(max_time=60, recursive_level=10))
+        self.assertIsNotNone(result, "_prepare() must return a dict, not None")
+        self.assertIn('ffuf_base_cmd', result, "prepare_only=True must return ffuf_base_cmd key")
+        cmd = result['ffuf_base_cmd']
+        import re
+        maxtime_job_match = re.search(r'-maxtime-job (\d+)', cmd)
+        self.assertIsNotNone(maxtime_job_match, "Command must contain -maxtime-job when recursive")
+        self.assertGreaterEqual(int(maxtime_job_match.group(1)), 30,
+                                "-maxtime-job floor must be at least 30 seconds")
+
+    def test_no_recursion_no_maxtime_job(self):
+        """When recursive_level=0, -maxtime-job must not appear."""
+        result = _prepare(self._config(max_time=300, recursive_level=0))
+        self.assertIsNotNone(result, "_prepare() must return a dict, not None")
+        self.assertIn('ffuf_base_cmd', result, "prepare_only=True must return ffuf_base_cmd key")
+        cmd = result['ffuf_base_cmd']
+        self.assertNotIn('-maxtime-job', cmd,
+                         "Non-recursive scan must not have -maxtime-job flag")
