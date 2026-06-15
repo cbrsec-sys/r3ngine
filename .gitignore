@@ -13,6 +13,7 @@ db.sqlite3-journal
 media
 .dev
 release.ps1
+.worktrees/
 
 ### Django.Python Stack ###
 # Byte-compiled / optimized / DLL files
