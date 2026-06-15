@@ -6908,15 +6908,23 @@ def _build_vuln_detail_url(base_url: str, scan_id: str, session_id: str, vuln_id
 def _normalize_acunetix_target_url(target_url: str, target_name: str) -> str:
 	normalized_url = (target_url or '').strip()
 	if normalized_url and validators.url(normalized_url):
-		return normalized_url.rstrip('/')
+		parsed_host = urlparse(normalized_url).hostname
+		if parsed_host == target_name:
+			return normalized_url.rstrip('/')
+		logger.warning(
+			f"Ignoring mismatched Acunetix target URL '{normalized_url}' for target '{target_name}'. "
+			"Falling back to the subdomain name."
+		)
 	return f"https://{target_name}".rstrip('/')
 
 
 def _find_acunetix_target(targets_data: dict, target_name: str, target_url: str):
 	normalized_url = _normalize_acunetix_target_url(target_url, target_name)
+	normalized_host = urlparse(normalized_url).hostname or target_name
 	for target in targets_data.get('targets', []):
 		address = str(target.get('address', '')).rstrip('/')
-		if address == normalized_url or address.endswith(target_name):
+		address_host = urlparse(address).hostname or address
+		if address == normalized_url or address_host == normalized_host:
 			return target
 	return None
 
