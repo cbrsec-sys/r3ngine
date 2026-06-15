@@ -324,7 +324,7 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
 
     # ParamSpider
     if clone_repo ParamSpider https://github.com/devanshbatham/ParamSpider; then
-        cd /usr/src/github/ParamSpider && pip3 install -q . && cd -
+        cd /usr/src/github/ParamSpider && pip3 install -q . && python3 setup.py install && cd -
         rm -rf /usr/src/github/ParamSpider/.git
         log_done
     fi
@@ -332,7 +332,7 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
     # LinkFinder
     if clone_repo LinkFinder https://github.com/GerbenJavado/LinkFinder.git; then
         pip3 install -q -r /usr/src/github/LinkFinder/requirements.txt
-        cd /usr/src/github/LinkFinder && python3 setup.py install -q && cd -
+        cd /usr/src/github/LinkFinder && python3 setup.py install -q && pip3 install jsbeautifier && cd -
         rm -rf /usr/src/github/LinkFinder/.git
         log_done
     fi
