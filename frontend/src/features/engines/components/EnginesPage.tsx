@@ -115,7 +115,7 @@ export const EnginesPage: React.FC = () => {
               onClick={() => setAddEngineOpen(true)}
               sx={{
                 borderColor: 'rgba(112, 0, 255, 0.5)',
-                color: '#fff',
+                color: isLight ? '#7000ff' : '#fff',
                 fontFamily: 'Orbitron',
                 fontWeight: 700,
                 fontSize: '0.7rem',
@@ -136,7 +136,7 @@ export const EnginesPage: React.FC = () => {
               onClick={() => setUploadWordlistOpen(true)}
               sx={{
                 borderColor: 'rgba(255, 0, 255, 0.5)',
-                color: '#fff',
+                color: isLight ? '#ff00ff' : '#fff',
                 fontFamily: 'Orbitron',
                 fontWeight: 700,
                 fontSize: '0.7rem',
