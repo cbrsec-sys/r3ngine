@@ -6877,7 +6877,7 @@ def _validate_subdomain_name(subdomain_name: str) -> bool:
 	if not subdomain_name:
 		return True
 
-	if not validators.domain(subdomain_name, skip_ipv4=False):
+	if not validators.domain(subdomain_name):
 		raise ValueError(f"Invalid subdomain format: {subdomain_name}")
 
 	return True
@@ -6905,6 +6905,165 @@ def _build_vuln_detail_url(base_url: str, scan_id: str, session_id: str, vuln_id
 	return f"{base_url}/api/v1/vulnerabilities/{vuln_id}"
 
 
+def _normalize_acunetix_target_url(target_url: str, target_name: str) -> str:
+	normalized_url = (target_url or '').strip()
+	if normalized_url and validators.url(normalized_url):
+		return normalized_url.rstrip('/')
+	return f"https://{target_name}".rstrip('/')
+
+
+def _find_acunetix_target(targets_data: dict, target_name: str, target_url: str):
+	normalized_url = _normalize_acunetix_target_url(target_url, target_name)
+	for target in targets_data.get('targets', []):
+		address = str(target.get('address', '')).rstrip('/')
+		if address == normalized_url or address.endswith(target_name):
+			return target
+	return None
+
+
+def _get_acunetix_profile_id(base_url: str, headers: dict, verify, timeout: int):
+	fallback_profile_id = "11111111-1111-1111-1111-111111111111"
+	try:
+		resp = requests.get(
+			f"{base_url}/api/v1/scanning_profiles",
+			headers=headers,
+			verify=verify,
+			timeout=timeout,
+		)
+		if resp.status_code != 200:
+			return fallback_profile_id
+
+		data = resp.json()
+		profiles = (
+			data.get('scanning_profiles')
+			or data.get('profiles')
+			or data.get('data')
+			or []
+		)
+		for profile in profiles:
+			name = str(profile.get('name', '')).lower()
+			profile_id = profile.get('profile_id')
+			if profile_id and ('full scan' in name or name == 'full scan'):
+				return profile_id
+		if profiles and profiles[0].get('profile_id'):
+			return profiles[0]['profile_id']
+	except Exception as exc:
+		logger.warning(f"Failed to resolve Acunetix scanning profile dynamically: {exc}")
+	return fallback_profile_id
+
+
+def _create_or_reuse_acunetix_target(base_url: str, headers: dict, verify, timeout: int, target_name: str, target_url: str):
+	targets_resp = requests.get(
+		f"{base_url}/api/v1/targets",
+		headers=headers,
+		verify=verify,
+		timeout=timeout,
+	)
+	if targets_resp.status_code == 200:
+		targets_data = targets_resp.json()
+		existing_target = _find_acunetix_target(targets_data, target_name, target_url)
+		if existing_target:
+			return existing_target.get('target_id')
+
+	normalized_url = _normalize_acunetix_target_url(target_url, target_name)
+	create_payload = {
+		'address': normalized_url,
+		'description': f'r3ngine target {target_name}',
+		'criticality': 10,
+	}
+	create_resp = requests.post(
+		f"{base_url}/api/v1/targets",
+		headers=headers,
+		json=create_payload,
+		verify=verify,
+		timeout=timeout,
+	)
+	if create_resp.status_code not in (200, 201):
+		logger.error(
+			f"Failed to create Acunetix target for {target_name}. "
+			f"status={create_resp.status_code} body={create_resp.text[:500]}"
+		)
+		return None
+
+	create_data = create_resp.json()
+	target_id = create_data.get('target_id')
+	if target_id:
+		return target_id
+
+	refetched_targets_resp = requests.get(
+		f"{base_url}/api/v1/targets",
+		headers=headers,
+		verify=verify,
+		timeout=timeout,
+	)
+	if refetched_targets_resp.status_code == 200:
+		refetched_target = _find_acunetix_target(refetched_targets_resp.json(), target_name, target_url)
+		if refetched_target:
+			return refetched_target.get('target_id')
+	return None
+
+
+def _start_acunetix_scan_direct(base_url: str, headers: dict, verify, timeout: int, target_id: str):
+	profile_id = _get_acunetix_profile_id(base_url, headers, verify, timeout)
+	scan_payload = {
+		'target_id': target_id,
+		'profile_id': profile_id,
+		'schedule': {
+			'disable': False,
+			'start_date': None,
+			'time_sensitive': False,
+		},
+	}
+	scan_resp = requests.post(
+		f"{base_url}/api/v1/scans",
+		headers=headers,
+		json=scan_payload,
+		verify=verify,
+		timeout=timeout,
+	)
+	if scan_resp.status_code not in (200, 201):
+		logger.error(
+			f"Failed to start Acunetix scan for target_id={target_id}. "
+			f"status={scan_resp.status_code} body={scan_resp.text[:500]}"
+		)
+		return None
+	return scan_resp.json()
+
+
+def _fetch_acunetix_vulnerabilities(vulns_url: str, headers: dict, verify, timeout: int):
+	collected_vulnerabilities = []
+	next_url = vulns_url
+	visited_urls = set()
+
+	while next_url and next_url not in visited_urls:
+		visited_urls.add(next_url)
+		resp = requests.get(
+			next_url,
+			headers=headers,
+			verify=verify,
+			timeout=timeout,
+		)
+		logger.info(f"Acunetix vulnerabilities response code: {resp.status_code} for {next_url}")
+		if resp.status_code != 200:
+			return resp, collected_vulnerabilities
+
+		data = resp.json()
+		collected_vulnerabilities.extend(data.get('vulnerabilities', []))
+
+		pagination = data.get('pagination', {}) or {}
+		next_cursor = pagination.get('next_cursor')
+		next_link = pagination.get('next')
+		if next_link:
+			next_url = next_link
+		elif next_cursor:
+			separator = '&' if '?' in vulns_url else '?'
+			next_url = f"{vulns_url}{separator}c={next_cursor}"
+		else:
+			next_url = None
+
+	return None, collected_vulnerabilities
+
+
 def acunetix_scan(
 		self,
 		domain_id,
@@ -6918,10 +7077,6 @@ def acunetix_scan(
 	"""
 	if ctx is None:
 		ctx = {}
-
-	if not Acunetix:
-		logger.error("Acunetix library not found. Skipping Acunetix scan.")
-		return False
 
 	if subdomain_name:
 		try:
@@ -6955,34 +7110,36 @@ def acunetix_scan(
 		return False
 	logger.info(f"Acunetix credentials configured for: {creds.server_url}")
 	try:
-		acunetix = Acunetix(host=creds.server_url, api=creds.api_key)
-		logger.info(f"Acunetix instance created: {acunetix}")
 		logger.info(f"Starting Acunetix scan for {target_url}")
-		
-		# Use the library's start_scan which typically adds target and starts scan
-		# Based on the user provided example
-		scan_info = acunetix.start_scan(target_url)
-		scan_id = scan_info.get('scan_id')
-		target_id = scan_info.get('target_id')
-		
-		# Now we need to poll for status and fetch findings.
+
+		base_url = f"{creds.server_url}".rstrip('/')
 		headers = {
 			'X-Auth': creds.api_key,
 			'Content-Type': 'application/json'
 		}
-		base_url = f"{creds.server_url}"
 		import os as _os
 		_acunetix_verify = _os.environ.get('ACUNETIX_CA_BUNDLE', False)
-		
-		# If target_id wasn't in scan_info, try to find it
+
+		target_id = _create_or_reuse_acunetix_target(
+			base_url=base_url,
+			headers=headers,
+			verify=_acunetix_verify,
+			timeout=settings.ACUNETIX_REQUEST_TIMEOUT,
+			target_name=target_name,
+			target_url=target_url,
+		)
 		if not target_id:
-			targets_data = acunetix.targets()
-			target = next((
-				t for t in targets_data.get('targets', [])
-				if target_name in t['address'] or target_url in t['address']
-			), None)
-			if target:
-				target_id = target['target_id']
+			logger.error(f"Could not create or locate Acunetix target for {target_name}")
+			return False
+
+		scan_info = _start_acunetix_scan_direct(
+			base_url=base_url,
+			headers=headers,
+			verify=_acunetix_verify,
+			timeout=settings.ACUNETIX_REQUEST_TIMEOUT,
+			target_id=target_id,
+		) or {}
+		scan_id = scan_info.get('scan_id')
 
 		if not target_id:
 			logger.error(f"Target {target_name} not found in Acunetix after start_scan.")
@@ -7045,8 +7202,9 @@ def acunetix_scan(
 			# Fallback to querying by target_id
 			vulns_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
 
-		logger.info(f"Fetching Acunetix vulnerabilities from: {vulns_url}")
-		vulns_resp = requests.get(vulns_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
+		active_vulns_url = vulns_url
+		logger.info(f"Fetching Acunetix vulnerabilities from: {active_vulns_url}")
+		vulns_resp = requests.get(active_vulns_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 		logger.info(f"Acunetix vulnerabilities response code: {vulns_resp.status_code}")
 
 		# If the URL returned 400 or 404, try fallbacks
@@ -7056,6 +7214,7 @@ def acunetix_scan(
 			logger.info(f"Retrying with fallback 1 URL: {fallback_url}")
 			vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 			logger.info(f"Fallback 1 response code: {vulns_resp.status_code}")
+			active_vulns_url = fallback_url
 
 			# Fallback 2: try querying by target_id
 			if vulns_resp.status_code in [400, 404]:
@@ -7063,10 +7222,20 @@ def acunetix_scan(
 				logger.info(f"Retrying with fallback 2 URL: {fallback_url}")
 				vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 				logger.info(f"Fallback 2 response code: {vulns_resp.status_code}")
+				active_vulns_url = fallback_url
 
+		v_list = []
 		if vulns_resp.status_code == 200:
-			vulns_data = vulns_resp.json()
-			v_list = vulns_data.get('vulnerabilities', [])
+			_, v_list = _fetch_acunetix_vulnerabilities(
+				active_vulns_url,
+				headers=headers,
+				verify=_acunetix_verify,
+				timeout=settings.ACUNETIX_REQUEST_TIMEOUT,
+			)
+		elif vulns_resp.status_code in [400, 404]:
+			logger.warning("Acunetix vulnerability fetch did not return a valid list after fallbacks.")
+
+		if v_list:
 			logger.info(f"Found {len(v_list)} vulnerabilities in Acunetix scan report.")
 			for vuln in v_list:
 				# Get full details for each vuln using helper function for URL building

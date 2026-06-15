@@ -222,33 +222,76 @@ class ToolExecutionTest(TransactionTestCase):
                 api_key="test_key"
             )
             
-            # Patch Acunetix and requests in reNgine.tasks
-            with patch('reNgine.tasks.Acunetix') as mock_acunetix_cls, \
-                 patch('reNgine.tasks.requests.get') as mock_requests_get:
-                
-                mock_acunetix = MagicMock()
-                mock_acunetix_cls.return_value = mock_acunetix
-                mock_acunetix.trigger_scan.return_value = True
-                
-                # Mock requests responses for target and scan status
+            # Patch direct AWVS REST requests in reNgine.tasks
+            with patch('reNgine.tasks.requests.get') as mock_requests_get, \
+                 patch('reNgine.tasks.requests.post') as mock_requests_post:
+
+                # Mock target discovery, profile discovery, scan status, scan details, vulnerabilities
                 mock_targets_resp = MagicMock()
                 mock_targets_resp.status_code = 200
                 mock_targets_resp.json.return_value = {
                     'targets': [{'address': self.domain_name, 'target_id': 'test-target-id'}]
                 }
-                
-                mock_scans_resp = MagicMock()
-                mock_scans_resp.status_code = 200
-                mock_scans_resp.json.return_value = {
-                    'scans': [{'current_session': {'status': 'completed'}}]
+
+                mock_profiles_resp = MagicMock()
+                mock_profiles_resp.status_code = 200
+                mock_profiles_resp.json.return_value = {
+                    'scanning_profiles': [{'name': 'Full Scan', 'profile_id': 'full-scan-profile'}]
                 }
-                
-                mock_requests_get.side_effect = [mock_targets_resp, mock_scans_resp]
-                
+
+                mock_scan_status_resp = MagicMock()
+                mock_scan_status_resp.status_code = 200
+                mock_scan_status_resp.json.return_value = {
+                    'current_session': {'status': 'completed', 'scan_session_id': 'session-1'}
+                }
+
+                mock_vulns_resp = MagicMock()
+                mock_vulns_resp.status_code = 200
+                mock_vulns_resp.json.return_value = {
+                    'vulnerabilities': [{'vuln_id': 'vuln-1'}],
+                    'pagination': {}
+                }
+
+                mock_vuln_detail_resp = MagicMock()
+                mock_vuln_detail_resp.status_code = 200
+                mock_vuln_detail_resp.json.return_value = {
+                    'vt_name': 'Acunetix Sample Finding',
+                    'severity': 2,
+                    'description': 'Sample vulnerability description',
+                    'impact': 'Sample impact',
+                    'recommendation': 'Sample remediation',
+                    'affects_url': f'https://{self.domain_name}/login',
+                    'request': 'GET /login',
+                    'response': 'HTTP/1.1 200 OK',
+                    'vt_id': 'vt-123',
+                    'references': [{'href': 'https://example.com/advisory', 'rel': 'CVE-2024-1234'}],
+                    'cwe_id': 79,
+                }
+
+                mock_requests_get.side_effect = [
+                    mock_targets_resp,
+                    mock_profiles_resp,
+                    mock_scan_status_resp,
+                    mock_scan_status_resp,
+                    mock_vulns_resp,
+                    mock_vuln_detail_resp,
+                ]
+
+                mock_start_scan_resp = MagicMock()
+                mock_start_scan_resp.status_code = 201
+                mock_start_scan_resp.json.return_value = {
+                    'scan_id': 'scan-1',
+                    'target_id': 'test-target-id',
+                }
+                mock_requests_post.return_value = mock_start_scan_resp
+
                 res = acunetix_scan(self.task, self.domain.id, self.scan.id, self.ctx)
                 print(f"[DEBUG] acunetix_scan result: {res}")
-                
-                mock_acunetix.start_scan.assert_called()
+                self.assertTrue(res)
+                mock_requests_post.assert_called()
+                vulns = Vulnerability.objects.filter(scan_history=self.scan, source='Acunetix')
+                self.assertEqual(vulns.count(), 1)
+                self.assertEqual(vulns.first().name, 'Acunetix Sample Finding')
 
     def test_holehe_execution(self):
         email = "test@defijn.io"
