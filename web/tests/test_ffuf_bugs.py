@@ -114,3 +114,50 @@ class TestFfufRateLimiting(TestCase):
         result = opsec._apply_ffuf(cmd)
         self.assertEqual(result.count('-rate'), 1,
                          "opsec must not add a second -rate flag")
+
+
+class TestFfufAcMcConflict(TestCase):
+    """Bug #3: -ac and -mc must not both appear in the same command."""
+
+    def _config(self, auto_calibration, match_statuses=None):
+        return {
+            'dir_file_fuzz': {
+                'auto_calibration': auto_calibration,
+                'rate_limit': 0,
+                'threads': 10,
+                'wordlist_name': 'dicc',
+                'extensions': [],
+                'match_http_status': match_statuses if match_statuses is not None else [200, 204],
+                'recursive_level': 0,
+                'max_time': 0,
+                'stop_on_error': False,
+                'follow_redirect': False,
+                'timeout': 10,
+            }
+        }
+
+    def test_auto_calibration_true_omits_mc(self):
+        result = _prepare(self._config(auto_calibration=True))
+        self.assertIsNotNone(result, "_prepare() must return a dict, not None")
+        self.assertIn('ffuf_base_cmd', result, "prepare_only=True must return ffuf_base_cmd key")
+        cmd = result['ffuf_base_cmd']
+        self.assertIn('-ac', cmd)
+        self.assertNotIn('-mc', cmd,
+                         "When auto_calibration=True, -mc must be omitted")
+
+    def test_auto_calibration_false_adds_mc(self):
+        result = _prepare(self._config(auto_calibration=False))
+        self.assertIsNotNone(result, "_prepare() must return a dict, not None")
+        self.assertIn('ffuf_base_cmd', result, "prepare_only=True must return ffuf_base_cmd key")
+        cmd = result['ffuf_base_cmd']
+        self.assertNotIn('-ac', cmd)
+        self.assertIn('-mc 200,204', cmd,
+                      "When auto_calibration=False, -mc must be present")
+
+    def test_auto_calibration_true_never_has_both(self):
+        result = _prepare(self._config(auto_calibration=True, match_statuses=[200, 301, 403]))
+        self.assertIsNotNone(result, "_prepare() must return a dict, not None")
+        self.assertIn('ffuf_base_cmd', result, "prepare_only=True must return ffuf_base_cmd key")
+        cmd = result['ffuf_base_cmd']
+        self.assertFalse('-ac' in cmd and '-mc' in cmd,
+                         "Command must never contain both -ac and -mc")
