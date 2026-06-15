@@ -19,5 +19,7 @@ def get_task_counts(scan):
         .exclude(name__in=success_names)
         .values('name').distinct().count()
     )
-    total = len(scan.tasks or [])
+    db_total = scan.scanactivity_set.values('name').distinct().count()
+    total = db_total if db_total > 0 else len(scan.tasks or [])
     return successful, failed, total
+
