@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 import React, { useMemo } from 'react';
 import ReactECharts from 'echarts-for-react';
 import { useStressStore } from '../../../store/stressStore';
@@ -7,6 +8,7 @@ interface StressHeatmapProps {
 }
 
 export const StressHeatmap: React.FC<StressHeatmapProps> = ({ data }) => {
+  const { tokens } = useThemeTokens();
   const { setSelectedEndpoint } = useStressStore();
   
   const options = useMemo(() => {

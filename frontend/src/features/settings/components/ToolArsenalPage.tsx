@@ -47,8 +47,10 @@ import {
 import type { InstalledTool } from '../api';
 import { useParams } from '@tanstack/react-router';
 import { ToolFormModal } from './ToolFormModal';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ToolArsenalPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug } = useParams({ from: '/$projectSlug/settings/tools-arsenal' });
   const [filter, setFilter] = useState<'all' | 'default' | 'custom'>('all');
   const [currentVersions, setCurrentVersions] = useState<Record<number, string>>({});
@@ -190,7 +192,7 @@ export const ToolArsenalPage: React.FC = () => {
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
       </Box>
     );
   }
@@ -199,10 +201,10 @@ export const ToolArsenalPage: React.FC = () => {
     <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', mb: 1, letterSpacing: '2px' }}>
+          <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: 'text.primary', mb: 1, letterSpacing: '2px' }}>
             TOOL ARSENAL
           </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(0,243,255,0.6)', fontFamily: 'monospace' }}>
+          <Typography variant="body2" sx={{ color: `${tokens.accent.primary}99`, fontFamily: 'monospace' }}>
             {`// Manage external security components and update routines`}
           </Typography>
         </Box>
@@ -213,15 +215,15 @@ export const ToolArsenalPage: React.FC = () => {
                 key={f}
                 onClick={() => setFilter(f)}
                 sx={{
-                  bgcolor: filter === f ? 'rgba(0,243,255,0.1)' : 'transparent',
-                  color: filter === f ? '#00f3ff' : 'rgba(255,255,255,0.5)',
-                  borderColor: filter === f ? '#00f3ff' : 'rgba(0,243,255,0.3)',
+                  bgcolor: filter === f ? `${tokens.accent.primary}1A` : 'transparent',
+                  color: filter === f ? tokens.accent.primary : 'text.secondary',
+                  borderColor: filter === f ? tokens.accent.primary : `${tokens.accent.primary}4D`,
                   fontFamily: 'Orbitron',
                   fontSize: '10px',
                   px: 2,
                   '&:hover': {
-                    borderColor: '#00f3ff',
-                    bgcolor: 'rgba(0,243,255,0.05)'
+                    borderColor: tokens.accent.primary,
+                    bgcolor: `${tokens.accent.primary}0D`
                   }
                 }}
               >
@@ -234,13 +236,13 @@ export const ToolArsenalPage: React.FC = () => {
             startIcon={<Plus size={18} />}
             onClick={() => setModal({ open: true })}
             sx={{
-              bgcolor: '#00f3ff',
+              bgcolor: tokens.accent.primary,
               color: '#000',
               fontWeight: 'bold',
               fontFamily: 'Orbitron',
               fontSize: '11px',
-              '&:hover': { bgcolor: '#00d8e4' },
-              boxShadow: '0 0 15px rgba(0,243,255,0.3)'
+              '&:hover': { bgcolor: tokens.accent.primary, filter: 'brightness(1.1)' },
+              boxShadow: `0 0 15px ${tokens.accent.primary}4D`
             }}
           >
             ADD TOOL
@@ -263,8 +265,9 @@ export const ToolArsenalPage: React.FC = () => {
         {filteredTools.map((tool) => (
           <Box key={tool.id} sx={{ height: '100%' }}>
             <Card sx={{
-              bgcolor: 'rgba(10, 10, 15, 0.85)',
-              border: `1px solid ${tool.is_default ? 'rgba(0, 243, 255, 0.15)' : 'rgba(255, 0, 255, 0.15)'}`,
+              bgcolor: 'background.paper',
+              border: 1,
+              borderColor: tool.is_default ? `${tokens.accent.primary}26` : `${tokens.accent.secondary}26`,
               height: '580px',
               width: '100%',
               display: 'flex',
@@ -273,8 +276,8 @@ export const ToolArsenalPage: React.FC = () => {
               overflow: 'hidden',
               backdropFilter: 'blur(10px)',
               '&:hover': {
-                border: `1px solid ${tool.is_default ? '#00f3ff' : '#ff00ff'}`,
-                boxShadow: `0 0 20px ${tool.is_default ? 'rgba(0, 243, 255, 0.1)' : 'rgba(255, 0, 255, 0.1)'}`,
+                borderColor: tool.is_default ? tokens.accent.primary : tokens.accent.secondary,
+                boxShadow: `0 0 20px ${tool.is_default ? `${tokens.accent.primary}1A` : `${tokens.accent.secondary}1A`}`,
                 transform: 'translateY(-2px)',
                 transition: 'all 0.3s ease'
               }
@@ -284,8 +287,8 @@ export const ToolArsenalPage: React.FC = () => {
                 position: 'absolute',
                 top: 0,
                 left: 0,
-                bgcolor: tool.is_default ? 'rgba(0, 243, 255, 0.2)' : 'rgba(255, 0, 255, 0.2)',
-                color: tool.is_default ? '#00f3ff' : '#ff00ff',
+                bgcolor: tool.is_default ? `${tokens.accent.primary}33` : `${tokens.accent.secondary}33`,
+                color: tool.is_default ? tokens.accent.primary : tokens.accent.secondary,
                 px: 1,
                 py: 0.5,
                 fontSize: '9px',
@@ -296,7 +299,8 @@ export const ToolArsenalPage: React.FC = () => {
                 gap: 0.5,
                 zIndex: 1,
                 borderBottomRightRadius: '4px',
-                border: '1px solid rgba(255,255,255,0.05)'
+                border: '1px solid',
+                borderColor: 'divider'
               }}>
                 <Shield size={10} />
                 {tool.is_default ? 'DEFAULT' : 'CUSTOM'}
@@ -307,7 +311,7 @@ export const ToolArsenalPage: React.FC = () => {
                 <IconButton
                   size="small"
                   onClick={(e) => handleMenuOpen(tool.id, e)}
-                  sx={{ color: 'rgba(255,255,255,0.4)', '&:hover': { color: '#00f3ff' } }}
+                  sx={{ color: 'text.disabled', '&:hover': { color: tokens.accent.primary } }}
                 >
                   <MoreVertical size={16} />
                 </IconButton>
@@ -318,20 +322,20 @@ export const ToolArsenalPage: React.FC = () => {
                   slotProps={{
                     paper: {
                       sx: {
-                        bgcolor: '#0a0a0a',
-                        color: '#fff',
-                        border: '1px solid rgba(0,243,255,0.2)',
+                        bgcolor: 'background.paper',
+                        color: 'text.primary',
+                        border: `1px solid ${tokens.accent.primary}33`,
                         '& .MuiMenuItem-root': { fontSize: '11px', fontFamily: 'Orbitron' },
-                        '& .MuiMenuItem-root:hover': { bgcolor: 'rgba(0,243,255,0.1)' }
+                        '& .MuiMenuItem-root:hover': { bgcolor: `${tokens.accent.primary}1A` }
                       }
                     }
                   }}
                 >
                   <MenuItem onClick={() => { handleMenuClose(tool.id); setModal({ open: true, tool }); }}>
-                    <Edit3 size={14} style={{ marginRight: 8, color: '#00f3ff' }} /> MODIFY
+                    <Edit3 size={14} style={{ marginRight: 8, color: tokens.accent.primary }} /> MODIFY
                   </MenuItem>
                   {!tool.is_default && (
-                    <MenuItem onClick={() => { handleMenuClose(tool.id); handleUninstall(tool.id, tool.name); }} sx={{ color: '#ff1744' }}>
+                    <MenuItem onClick={() => { handleMenuClose(tool.id); handleUninstall(tool.id, tool.name); }} sx={{ color: 'error.main' }}>
                       <Trash2 size={14} style={{ marginRight: 8 }} /> UNINSTALL
                     </MenuItem>
                   )}
@@ -349,18 +353,19 @@ export const ToolArsenalPage: React.FC = () => {
                     width: 60,
                     height: 60,
                     mb: 2,
-                    bgcolor: 'rgba(255,255,255,0.03)',
-                    border: '1px solid rgba(255,255,255,0.1)'
+                    bgcolor: 'action.hover',
+                    border: '1px solid',
+                    borderColor: 'divider'
                   }}
                 >
-                  {!tool.logo_url && <Hammer size={30} color="rgba(0,243,255,0.4)" />}
+                  {!tool.logo_url && <Hammer size={30} color={`${tokens.accent.primary}66`} />}
                 </Avatar>
 
                 <Box sx={{ height: '45px', display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 1 }}>
                   <Typography variant="h6" sx={{
                     fontFamily: 'Orbitron',
                     fontWeight: 'bold',
-                    color: '#fff',
+                    color: 'text.primary',
                     textAlign: 'center',
                     fontSize: '18px',
                     letterSpacing: '1px',
@@ -374,35 +379,36 @@ export const ToolArsenalPage: React.FC = () => {
                 </Box>
 
                 <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-                  <Typography component="a" href={tool.github_url} target="_blank" sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none', '&:hover': { color: '#00f3ff' } }}>
+                  <Typography component="a" href={tool.github_url} target="_blank" sx={{ color: 'text.disabled', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none', '&:hover': { color: tokens.accent.primary } }}>
                     GITHUB <ExternalLink size={10} />
                   </Typography>
                   {tool.license_url && (
-                    <Typography component="a" href={tool.license_url} target="_blank" sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none', '&:hover': { color: '#00f3ff' } }}>
+                    <Typography component="a" href={tool.license_url} target="_blank" sx={{ color: 'text.disabled', fontSize: '10px', display: 'flex', alignItems: 'center', gap: 0.5, textDecoration: 'none', '&:hover': { color: tokens.accent.primary } }}>
                       LICENSE <ExternalLink size={10} />
                     </Typography>
                   )}
                 </Box>
 
                 {/* Divider */}
-                <Box sx={{ width: '40px', height: '2px', bgcolor: tool.is_default ? '#00f3ff' : '#ff00ff', mb: 3, opacity: 0.5 }} />
+                <Box sx={{ width: '40px', height: '2px', bgcolor: tool.is_default ? tokens.accent.primary : tokens.accent.secondary, mb: 3, opacity: 0.5 }} />
 
                 {/* Version Section */}
                 <Box sx={{ textAlign: 'center', mb: 3 }}>
-                  <Typography sx={{ color: '#ff00ff', fontSize: '9px', fontFamily: 'Orbitron', fontWeight: 'bold', letterSpacing: '1px', mb: 1 }}>
+                  <Typography sx={{ color: tokens.accent.secondary, fontSize: '9px', fontFamily: 'Orbitron', fontWeight: 'bold', letterSpacing: '1px', mb: 1 }}>
                     INSTALLED VERSION
                   </Typography>
                   <Box sx={{
-                    bgcolor: 'rgba(0,0,0,0.3)',
+                    bgcolor: 'action.hover',
                     px: 2,
                     py: 0.5,
                     borderRadius: '4px',
-                    border: versionError[tool.id] ? '1px solid rgba(255, 23, 68, 0.3)' : '1px solid rgba(255,255,255,0.05)',
+                    border: 1,
+                    borderColor: versionError[tool.id] ? 'error.main' : 'divider',
                     display: 'inline-block',
                     minWidth: '80px'
                   }}>
                     <Typography sx={{
-                      color: versionError[tool.id] ? '#ff1744' : (currentVersions[tool.id] ? '#00f3ff' : 'rgba(255,255,255,0.2)'),
+                      color: versionError[tool.id] ? 'error.main' : (currentVersions[tool.id] ? tokens.accent.primary : 'text.disabled'),
                       fontSize: versionError[tool.id] ? '9px' : '13px',
                       fontFamily: 'monospace',
                       fontWeight: 'bold'
@@ -432,10 +438,10 @@ export const ToolArsenalPage: React.FC = () => {
                   display: 'flex',
                   flexDirection: 'column',
                   '&::-webkit-scrollbar': { width: '4px' },
-                  '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0,243,255,0.1)', borderRadius: '10px' }
+                  '&::-webkit-scrollbar-thumb': { bgcolor: `${tokens.accent.primary}1A`, borderRadius: '10px' }
                 }}>
                   <Typography variant="body2" sx={{
-                    color: 'rgba(255,255,255,0.5)',
+                    color: 'text.secondary',
                     textAlign: 'center',
                     fontSize: '11px',
                     lineHeight: 1.6,
@@ -458,16 +464,16 @@ export const ToolArsenalPage: React.FC = () => {
                     }}
                     disabled={loadingTools[tool.id]}
                     sx={{
-                      borderColor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00e676' : 'rgba(0,243,255,0.2)',
+                      borderColor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00e676' : `${tokens.accent.primary}33`,
                       bgcolor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00e676' : 'transparent',
-                      color: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#000' : '#00f3ff',
+                      color: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#000' : tokens.accent.primary,
                       fontSize: '10px',
                       fontWeight: 'bold',
                       fontFamily: 'Orbitron',
                       py: 1,
                       '&:hover': {
-                        bgcolor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00c853' : 'rgba(0,243,255,0.1)',
-                        borderColor: '#00f3ff'
+                        bgcolor: latestVersions[tool.id] && latestVersions[tool.id] !== currentVersions[tool.id] ? '#00c853' : `${tokens.accent.primary}1A`,
+                        borderColor: tokens.accent.primary
                       }
                     }}
                   >
@@ -477,7 +483,7 @@ export const ToolArsenalPage: React.FC = () => {
                   </Button>
                 </Box>
               </CardContent>
-              {loadingTools[tool.id] && <LinearProgress sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, bgcolor: 'transparent', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />}
+              {loadingTools[tool.id] && <LinearProgress sx={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 2, bgcolor: 'transparent', '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary } }} />}
             </Card>
           </Box>
         ))}

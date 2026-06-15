@@ -36,8 +36,10 @@ import { useParams } from '@tanstack/react-router';
 import { useOpSecSettings, useUpdateOpSecSettings } from '../api';
 import type { OpSecSettings } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const OpSecSettingsPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: settings, isLoading: isSettingsLoading } = useOpSecSettings(projectSlug);
   const updateSettings = useUpdateOpSecSettings(projectSlug);
@@ -147,7 +149,7 @@ export const OpSecSettingsPage: React.FC = () => {
     }
   };
 
-  if (isSettingsLoading || !formData) return <LinearProgress sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />;
+  if (isSettingsLoading || !formData) return <LinearProgress sx={{ bgcolor: `${tokens.accent.primary}1A`, '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary } }} />;
 
   return (
     <Box sx={{ p: 3 }}>
@@ -157,18 +159,18 @@ export const OpSecSettingsPage: React.FC = () => {
             fontFamily: 'Orbitron', 
             fontWeight: 900, 
             letterSpacing: 2, 
-            color: '#fff',
-            textShadow: '0 0 20px rgba(0, 243, 255, 0.5)',
+            color: 'text.primary',
+            textShadow: `0 0 20px ${tokens.accent.primary}80`,
             mb: 1
           }}>
             OPSEC SETTINGS
           </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary', letterSpacing: 1 }}>
             STEALTH & OPERATIONAL SECURITY CONFIGURATION
           </Typography>
         </Box>
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron' }}>
-          SETTINGS {'>'} <span style={{ color: '#00f3ff' }}>OPSEC</span>
+        <Typography variant="caption" sx={{ color: 'text.disabled', fontFamily: 'Orbitron' }}>
+          SETTINGS {'>'} <span style={{ color: tokens.accent.primary }}>OPSEC</span>
         </Typography>
       </Box>
 
@@ -177,10 +179,10 @@ export const OpSecSettingsPage: React.FC = () => {
           severity="info" 
           icon={<Shield size={20} />}
           sx={{ 
-            bgcolor: 'rgba(0, 243, 255, 0.05)', 
-            color: '#00f3ff',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
-            '& .MuiAlert-icon': { color: '#00f3ff' }
+            bgcolor: `${tokens.accent.primary}0D`, 
+            color: tokens.accent.primary,
+            border: `1px solid ${tokens.accent.primary}33`,
+            '& .MuiAlert-icon': { color: tokens.accent.primary }
           }}
         >
           Configure stealth parameters to bypass WAFs, avoid rate limits, and minimize detection.
@@ -195,30 +197,30 @@ export const OpSecSettingsPage: React.FC = () => {
                   checked={formData.enable_opsec} 
                   onChange={() => handleToggle('enable_opsec')}
                   sx={{
-                    '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                    '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                    '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
                   }}
                 />
               }
               label={
-                <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.9rem', fontWeight: 700 }}>
+                <Typography sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontSize: '0.9rem', fontWeight: 700 }}>
                   ENABLE GLOBAL OPSEC MODE
                 </Typography>
               }
             />
-            <Typography variant="caption" sx={{ display: 'block', color: 'rgba(255,255,255,0.4)', mt: 1 }}>
+            <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', mt: 1 }}>
               Master switch to enable/disable stealth features for all compatible tools.
             </Typography>
           </Box>
         </TacticalPanel>
 
         <Box>
-          <Typography variant="h6" sx={{ color: '#fff', fontFamily: 'Orbitron', mb: 2, fontSize: '0.8rem', letterSpacing: 1 }}>
+          <Typography variant="h6" sx={{ color: 'text.primary', fontFamily: 'Orbitron', mb: 2, fontSize: '0.8rem', letterSpacing: 1 }}>
             STEALTH PRESETS
           </Typography>
           <Grid container spacing={2}>
             {[
-              { id: 'quiet', title: 'QUIET', icon: Wind, color: '#00f3ff', desc: 'Maximum stealth. Very slow. Random jitter (50%), long delays (5s), HTTP/2 only.' },
+              { id: 'quiet', title: 'QUIET', icon: Wind, color: tokens.accent.primary, desc: 'Maximum stealth. Very slow. Random jitter (50%), long delays (5s), HTTP/2 only.' },
               { id: 'balanced', title: 'BALANCED', icon: Activity, color: '#4caf50', desc: 'Optimized for reliability. 100ms delay, 10% jitter, random UA, WAF bypass.' },
               { id: 'aggressive', title: 'AGGRESSIVE', icon: Zap, color: '#f44336', desc: 'Low stealth. Fast scans. Only random UA and basic WAF bypass enabled.' }
             ].map((preset) => (
@@ -227,8 +229,9 @@ export const OpSecSettingsPage: React.FC = () => {
                   onClick={() => applyPreset(preset.id as any)}
                   sx={{ 
                     cursor: 'pointer',
-                    bgcolor: activePreset === preset.id ? `rgba(${preset.id === 'quiet' ? '0, 243, 255' : preset.id === 'balanced' ? '76, 175, 80' : '244, 67, 54'}, 0.1)` : 'rgba(255,255,255,0.02)',
-                    border: `1px solid ${activePreset === preset.id ? preset.color : 'rgba(255,255,255,0.1)'}`,
+                    bgcolor: activePreset === preset.id ? `rgba(${preset.id === 'quiet' ? 'var(--mui-palette-primary-mainChannel)' : preset.id === 'balanced' ? '76, 175, 80' : '244, 67, 54'}, 0.1)` : 'action.hover',
+                    border: 1,
+                    borderColor: activePreset === preset.id ? preset.color : 'divider',
                     transition: 'all 0.3s',
                     '&:hover': { transform: 'translateY(-4px)', borderColor: preset.color }
                   }}
@@ -238,7 +241,7 @@ export const OpSecSettingsPage: React.FC = () => {
                     <Typography sx={{ color: preset.color, fontFamily: 'Orbitron', fontWeight: 800, mb: 1 }}>
                       {preset.title}
                     </Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', lineHeight: 1.4, display: 'block' }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', lineHeight: 1.4, display: 'block' }}>
                       {preset.desc}
                     </Typography>
                   </CardContent>
@@ -274,7 +277,7 @@ export const OpSecSettingsPage: React.FC = () => {
                 <Box>
                   <FormControlLabel
                     control={<Switch checked={formData.enable_rate_limit} onChange={() => handleToggle('enable_rate_limit')} size="small" />}
-                    label={<Typography variant="body2" sx={{ color: '#fff' }}>Enable Max RPS</Typography>}
+                    label={<Typography variant="body2" sx={{ color: 'text.primary' }}>Enable Max RPS</Typography>}
                   />
                   <TextField 
                     fullWidth 
@@ -284,10 +287,10 @@ export const OpSecSettingsPage: React.FC = () => {
                     onChange={(e) => handleChange('max_rps', parseInt(e.target.value))}
                     disabled={!formData.enable_rate_limit}
                     placeholder="10"
-                    sx={inputStyle}
+                    sx={getInputStyle(tokens)}
                     slotProps={{
                       input: {
-                        endAdornment: <InputAdornment position="end" sx={{ '& .MuiTypography-root': { color: 'rgba(255,255,255,0.3)' } }}>RPS</InputAdornment>
+                        endAdornment: <InputAdornment position="end" sx={{ '& .MuiTypography-root': { color: 'text.disabled' } }}>RPS</InputAdornment>
                       }
                     }}
                   />
@@ -295,7 +298,7 @@ export const OpSecSettingsPage: React.FC = () => {
                 <Box>
                   <FormControlLabel
                     control={<Switch checked={formData.enable_delay} onChange={() => handleToggle('enable_delay')} size="small" />}
-                    label={<Typography variant="body2" sx={{ color: '#fff' }}>Enable Delay</Typography>}
+                    label={<Typography variant="body2" sx={{ color: 'text.primary' }}>Enable Delay</Typography>}
                   />
                   <TextField 
                     fullWidth 
@@ -305,10 +308,10 @@ export const OpSecSettingsPage: React.FC = () => {
                     onChange={(e) => handleChange('delay_ms', parseInt(e.target.value))}
                     disabled={!formData.enable_delay}
                     placeholder="0"
-                    sx={inputStyle}
+                    sx={getInputStyle(tokens)}
                     slotProps={{
                       input: {
-                        endAdornment: <InputAdornment position="end" sx={{ '& .MuiTypography-root': { color: 'rgba(255,255,255,0.3)' } }}>ms</InputAdornment>
+                        endAdornment: <InputAdornment position="end" sx={{ '& .MuiTypography-root': { color: 'text.disabled' } }}>ms</InputAdornment>
                       }
                     }}
                   />
@@ -316,7 +319,7 @@ export const OpSecSettingsPage: React.FC = () => {
                 <Box>
                   <FormControlLabel
                     control={<Switch checked={formData.enable_jitter} onChange={() => handleToggle('enable_jitter')} size="small" />}
-                    label={<Typography variant="body2" sx={{ color: '#fff' }}>Enable Jitter</Typography>}
+                    label={<Typography variant="body2" sx={{ color: 'text.primary' }}>Enable Jitter</Typography>}
                   />
                   <TextField 
                     fullWidth 
@@ -326,10 +329,10 @@ export const OpSecSettingsPage: React.FC = () => {
                     onChange={(e) => handleChange('jitter_percent', parseInt(e.target.value))}
                     disabled={!formData.enable_jitter}
                     placeholder="0"
-                    sx={inputStyle}
+                    sx={getInputStyle(tokens)}
                     slotProps={{
                       input: {
-                        endAdornment: <InputAdornment position="end" sx={{ '& .MuiTypography-root': { color: 'rgba(255,255,255,0.3)' } }}>%</InputAdornment>
+                        endAdornment: <InputAdornment position="end" sx={{ '& .MuiTypography-root': { color: 'text.disabled' } }}>%</InputAdornment>
                       }
                     }}
                   />
@@ -342,18 +345,18 @@ export const OpSecSettingsPage: React.FC = () => {
             <TacticalPanel title="NETWORK" icon={<Globe size={20} />}>
               <Stack spacing={3} sx={{ p: 1 }}>
                 <FormControl fullWidth size="small">
-                  <InputLabel sx={{ color: 'rgba(255,255,255,0.5)' }}>Preferred HTTP Protocol</InputLabel>
+                  <InputLabel sx={{ color: 'text.secondary' }}>Preferred HTTP Protocol</InputLabel>
                   <Select
                     value={formData.http_protocol}
                     onChange={(e) => handleChange('http_protocol', e.target.value)}
                     label="Preferred HTTP Protocol"
                     sx={{
-                      color: '#fff',
-                      bgcolor: 'rgba(255,255,255,0.02)',
-                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
-                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.3)' },
-                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' },
-                      '& .MuiSvgIcon-root': { color: '#00f3ff' }
+                      color: 'text.primary',
+                      bgcolor: 'action.hover',
+                      '& .MuiOutlinedInput-notchedOutline': { borderColor: 'divider' },
+                      '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${tokens.accent.primary}4D` },
+                      '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: tokens.accent.primary },
+                      '& .MuiSvgIcon-root': { color: tokens.accent.primary }
                     }}
                   >
                     <MenuItem value="http1.1">HTTP/1.1</MenuItem>
@@ -361,7 +364,7 @@ export const OpSecSettingsPage: React.FC = () => {
                   </Select>
                 </FormControl>
                 <Box>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1, display: 'block' }}>Custom DNS Servers (per line)</Typography>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', mb: 1, display: 'block' }}>Custom DNS Servers (per line)</Typography>
                   <TextField 
                     multiline 
                     rows={4} 
@@ -369,7 +372,7 @@ export const OpSecSettingsPage: React.FC = () => {
                     value={formData.custom_dns_servers}
                     onChange={(e) => handleChange('custom_dns_servers', e.target.value)}
                     placeholder="8.8.8.8\n1.1.1.1" 
-                    sx={inputStyle} 
+                    sx={getInputStyle(tokens)} 
                   />
                 </Box>
               </Stack>
@@ -381,9 +384,9 @@ export const OpSecSettingsPage: React.FC = () => {
               <Stack spacing={2} sx={{ p: 1 }}>
                 <FormControlLabel
                   control={<Switch checked={formData.enable_metadata_stripping} onChange={() => handleToggle('enable_metadata_stripping')} size="small" />}
-                  label={<Typography variant="body2" sx={{ color: '#fff' }}>Automatic Metadata Stripping</Typography>}
+                  label={<Typography variant="body2" sx={{ color: 'text.primary' }}>Automatic Metadata Stripping</Typography>}
                 />
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', lineHeight: 1.4 }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', lineHeight: 1.4 }}>
                   Cleans EXIF, GPS, and author metadata from discovered files (PDF, JPG, PNG, etc.) to prevent data leakage.
                 </Typography>
               </Stack>
@@ -398,14 +401,14 @@ export const OpSecSettingsPage: React.FC = () => {
             onClick={handleSave}
             disabled={updateSettings.isPending}
             sx={{
-              bgcolor: 'rgba(0, 243, 255, 0.1)',
-              color: '#00f3ff',
-              border: '1px solid rgba(0, 243, 255, 0.3)',
+              bgcolor: `${tokens.accent.primary}1A`,
+              color: tokens.accent.primary,
+              border: `1px solid ${tokens.accent.primary}4D`,
               fontFamily: 'Orbitron',
               fontWeight: 800,
               px: 4,
               py: 1.5,
-              '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)', boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)' }
+              '&:hover': { bgcolor: `${tokens.accent.primary}33`, boxShadow: `0 0 20px ${tokens.accent.primary}66` }
             }}
           >
             {updateSettings.isPending ? 'SAVING...' : 'SAVE OPSEC CONFIGURATION'}
@@ -427,7 +430,7 @@ export const OpSecSettingsPage: React.FC = () => {
             fontFamily: 'Orbitron', 
             fontSize: '0.8rem',
             fontWeight: 700,
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}E6` : 'rgba(255, 0, 85, 0.9)',
             color: '#000',
             '& .MuiAlert-icon': { color: '#000' }
           }}
@@ -439,16 +442,16 @@ export const OpSecSettingsPage: React.FC = () => {
   );
 };
 
-const inputStyle = {
+const getInputStyle = (tokens: any) => ({
   '& .MuiOutlinedInput-root': {
-    color: '#fff',
-    bgcolor: 'rgba(255,255,255,0.02)',
-    '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-    '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
-    '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+    color: 'text.primary',
+    bgcolor: 'action.hover',
+    '& fieldset': { borderColor: 'divider' },
+    '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+    '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
   },
   '& .Mui-disabled': {
     opacity: 0.5,
     bgcolor: 'rgba(0,0,0,0.2)'
   }
-};
+});

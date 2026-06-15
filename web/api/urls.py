@@ -17,7 +17,7 @@ class ThrottledTokenObtainPairView(TokenObtainPairView):
 from .views import *
 from .dashboard_views import DashboardAPIView, CWEInfoAPIView
 from .target_summary_views import TargetSummaryAPIView
-from .scan_summary_views import ScanSummaryAPIView
+from .scan_summary_views import ScanSummaryAPIView, ScanAiExportAPIView
 
 from .scheduled_scans import ScheduledScanViewSet
 from .subscans import SubScanViewSet
@@ -349,6 +349,14 @@ urlpatterns = [
         ResumeScan.as_view(),
         name='resume_scan'),
     path(
+        'action/pause/scan/',
+        PauseScan.as_view(),
+        name='pause_scan'),
+    path(
+        'action/unpause/scan/',
+        UnpauseScan.as_view(),
+        name='unpause_scan'),
+    path(
         'fetch/results/subscan/',
         FetchSubscanResults.as_view(),
         name='fetch_subscan_results'),
@@ -436,6 +444,11 @@ urlpatterns = [
         'scan-summary/<slug:slug>/<int:id>/',
         ScanSummaryAPIView.as_view(),
         name='scan_summary_api'
+    ),
+    path(
+        'scan-summary/<slug:slug>/<int:id>/export-ai/',
+        ScanAiExportAPIView.as_view(),
+        name='scan_summary_export_ai_api'
     ),
     path(
         'notification-settings/',

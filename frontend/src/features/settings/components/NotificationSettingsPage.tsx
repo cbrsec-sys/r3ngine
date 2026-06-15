@@ -32,8 +32,10 @@ import { useParams } from '@tanstack/react-router';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { useNotificationSettings, useUpdateNotificationSettings } from '../api';
 import type { NotificationSettings } from '../api';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const NotificationSettingsPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug } = useParams({ from: '/$projectSlug' });
   const { data: settings, isLoading, error } = useNotificationSettings();
   const updateSettings = useUpdateNotificationSettings();
@@ -80,7 +82,7 @@ export const NotificationSettingsPage: React.FC = () => {
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
       </Box>
     );
   }
@@ -100,8 +102,8 @@ export const NotificationSettingsPage: React.FC = () => {
       <Box sx={{ 
         p: 1, 
         borderRadius: '8px', 
-        bgcolor: 'rgba(0, 243, 255, 0.1)', 
-        color: '#00f3ff',
+        bgcolor: `${tokens.accent.primary}1A`, 
+        color: tokens.accent.primary,
         display: 'flex'
       }}>
         {icon}
@@ -118,10 +120,10 @@ export const NotificationSettingsPage: React.FC = () => {
         {/* Header Section */}
         <Grid size={{xs: 12, md: 7}} sx={{ mb: 2 }}>
           <Box>
-            <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', mb: 1, letterSpacing: 2 }}>
+            <Typography variant="h4" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: 'text.primary', mb: 1, letterSpacing: 2 }}>
               NOTIFICATION LINKS
             </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', fontFamily: 'Inter', maxWidth: 600 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', fontFamily: 'Inter', maxWidth: 600 }}>
               Configure tactical relays for real-time operation updates across your infrastructure.
             </Typography>
           </Box>
@@ -134,13 +136,13 @@ export const NotificationSettingsPage: React.FC = () => {
               onClick={() => handleSave(true)}
               disabled={updateSettings.isPending}
               sx={{
-                borderColor: '#00f3ff',
-                color: '#00f3ff',
+                borderColor: tokens.accent.primary,
+                color: tokens.accent.primary,
                 fontFamily: 'Orbitron',
                 fontSize: '11px',
                 px: 3,
                 height: '36px',
-                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)', borderColor: '#00f3ff' }
+                '&:hover': { bgcolor: `${tokens.accent.primary}1A`, borderColor: tokens.accent.primary }
               }}
             >
               TEST SIGNAL
@@ -151,14 +153,14 @@ export const NotificationSettingsPage: React.FC = () => {
               onClick={() => handleSave(false)}
               disabled={updateSettings.isPending}
               sx={{
-                bgcolor: '#00f3ff',
+                bgcolor: tokens.accent.primary,
                 color: '#000',
                 fontFamily: 'Orbitron',
                 fontWeight: 900,
                 fontSize: '11px',
                 px: 3,
                 height: '36px',
-                '&:hover': { bgcolor: '#00c8d4' }
+                '&:hover': { bgcolor: tokens.accent.primary, filter: 'brightness(1.1)' }
               }}
             >
               {updateSettings.isPending ? <CircularProgress size={16} color="inherit" /> : 'SAVE CONFIG'}
@@ -181,8 +183,8 @@ export const NotificationSettingsPage: React.FC = () => {
                     checked={formData.send_to_slack || false} 
                     onChange={handleChange('send_to_slack')}
                     sx={{
-                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
                     }}
                   />
                 </Stack>
@@ -196,16 +198,16 @@ export const NotificationSettingsPage: React.FC = () => {
                   placeholder="https://hooks.slack.com/services/..."
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                      '&:hover fieldset': { borderColor: 'rgba(0,243,255,0.5)' },
+                      '& fieldset': { borderColor: 'divider' },
+                      '&:hover fieldset': { borderColor: `${tokens.accent.primary}80` },
                     },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)' },
-                    '& .MuiInputBase-input': { color: '#fff' }
+                    '& .MuiInputLabel-root': { color: 'text.secondary' },
+                    '& .MuiInputBase-input': { color: 'text.primary' }
                   }}
                 />
               </Box>
 
-              <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+              <Divider sx={{ borderColor: 'divider' }} />
 
               {/* Discord */}
               <Box>
@@ -218,8 +220,8 @@ export const NotificationSettingsPage: React.FC = () => {
                     checked={formData.send_to_discord || false} 
                     onChange={handleChange('send_to_discord')}
                     sx={{
-                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
                     }}
                   />
                 </Stack>
@@ -233,16 +235,16 @@ export const NotificationSettingsPage: React.FC = () => {
                   placeholder="https://discord.com/api/webhooks/..."
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                      '&:hover fieldset': { borderColor: 'rgba(0,243,255,0.5)' },
+                      '& fieldset': { borderColor: 'divider' },
+                      '&:hover fieldset': { borderColor: `${tokens.accent.primary}80` },
                     },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)' },
-                    '& .MuiInputBase-input': { color: '#fff' }
+                    '& .MuiInputLabel-root': { color: 'text.secondary' },
+                    '& .MuiInputBase-input': { color: 'text.primary' }
                   }}
                 />
               </Box>
 
-              <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+              <Divider sx={{ borderColor: 'divider' }} />
 
               {/* Telegram */}
               <Box>
@@ -255,8 +257,8 @@ export const NotificationSettingsPage: React.FC = () => {
                     checked={formData.send_to_telegram || false} 
                     onChange={handleChange('send_to_telegram')}
                     sx={{
-                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
                     }}
                   />
                 </Stack>
@@ -289,18 +291,18 @@ export const NotificationSettingsPage: React.FC = () => {
                       disabled={!formData.send_to_telegram}
                       sx={{
                         '& .MuiOutlinedInput-root': {
-                          '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                          '&:hover fieldset': { borderColor: 'rgba(0,243,255,0.5)' },
+                          '& fieldset': { borderColor: 'divider' },
+                          '&:hover fieldset': { borderColor: `${tokens.accent.primary}80` },
                         },
-                        '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)' },
-                        Mini: { color: '#fff' }
+                        '& .MuiInputLabel-root': { color: 'text.secondary' },
+                        '& .MuiInputBase-input': { color: 'text.primary' }
                       }}
                     />
                   </Grid>
                 </Grid>
               </Box>
 
-              <Divider sx={{ borderColor: 'rgba(255,255,255,0.05)' }} />
+              <Divider sx={{ borderColor: 'divider' }} />
 
               {/* Lark */}
               <Box>
@@ -313,8 +315,8 @@ export const NotificationSettingsPage: React.FC = () => {
                     checked={formData.send_to_lark || false} 
                     onChange={handleChange('send_to_lark')}
                     sx={{
-                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
                     }}
                   />
                 </Stack>
@@ -328,11 +330,11 @@ export const NotificationSettingsPage: React.FC = () => {
                   placeholder="https://open.larksuite.com/open-apis/bot/v2/hook/..."
                   sx={{
                     '& .MuiOutlinedInput-root': {
-                      '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                      '&:hover fieldset': { borderColor: 'rgba(0,243,255,0.5)' },
+                      '& fieldset': { borderColor: 'divider' },
+                      '&:hover fieldset': { borderColor: `${tokens.accent.primary}80` },
                     },
-                    '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)' },
-                    '& .MuiInputBase-input': { color: '#fff' }
+                    '& .MuiInputLabel-root': { color: 'text.secondary' },
+                    '& .MuiInputBase-input': { color: 'text.primary' }
                   }}
                 />
               </Box>
@@ -358,14 +360,14 @@ export const NotificationSettingsPage: React.FC = () => {
                         checked={formData[trigger.id as keyof NotificationSettings] as boolean || false} 
                         onChange={handleChange(trigger.id as keyof NotificationSettings)}
                         sx={{
-                          '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                          '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                          '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
                         }}
                       />
                     }
                     label={
                       <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                        <Box sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex' }}>{trigger.icon}</Box>
+                        <Box sx={{ color: 'text.secondary', display: 'flex' }}>{trigger.icon}</Box>
                         <Typography variant="body2">{trigger.label}</Typography>
                       </Stack>
                     }
@@ -373,7 +375,7 @@ export const NotificationSettingsPage: React.FC = () => {
                       m: 0, 
                       p: 1.5, 
                       borderRadius: '8px', 
-                      bgcolor: 'rgba(255,255,255,0.03)',
+                      bgcolor: 'action.hover',
                       width: '100%',
                       justifyContent: 'space-between',
                       flexDirection: 'row-reverse'
@@ -398,10 +400,10 @@ export const NotificationSettingsPage: React.FC = () => {
                   }
                   label={
                     <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                      <Box sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex' }}><FileText size={18} /></Box>
+                      <Box sx={{ color: 'text.secondary', display: 'flex' }}><FileText size={18} /></Box>
                       <Box>
                         <Typography variant="body2">Upload Scan Output Files</Typography>
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
+                        <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block' }}>
                           Available for Discord
                         </Typography>
                       </Box>
@@ -411,7 +413,7 @@ export const NotificationSettingsPage: React.FC = () => {
                     m: 0, 
                     p: 1.5, 
                     borderRadius: '8px', 
-                    bgcolor: 'rgba(255,255,255,0.03)',
+                    bgcolor: 'action.hover',
                     width: '100%',
                     justifyContent: 'space-between',
                     flexDirection: 'row-reverse'
@@ -431,10 +433,10 @@ export const NotificationSettingsPage: React.FC = () => {
                   }
                   label={
                     <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
-                      <Box sx={{ color: 'rgba(255,255,255,0.5)', display: 'flex' }}><AlertTriangle size={18} /></Box>
+                      <Box sx={{ color: 'text.secondary', display: 'flex' }}><AlertTriangle size={18} /></Box>
                       <Box>
                         <Typography variant="body2">Send Task Tracebacks</Typography>
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
+                        <Typography variant="caption" sx={{ color: 'text.disabled', display: 'block' }}>
                           Include debug info on failures
                         </Typography>
                       </Box>
@@ -444,7 +446,7 @@ export const NotificationSettingsPage: React.FC = () => {
                     m: 0, 
                     p: 1.5, 
                     borderRadius: '8px', 
-                    bgcolor: 'rgba(255,255,255,0.03)',
+                    bgcolor: 'action.hover',
                     width: '100%',
                     justifyContent: 'space-between',
                     flexDirection: 'row-reverse'
@@ -468,10 +470,10 @@ export const NotificationSettingsPage: React.FC = () => {
           severity={snackbar.severity}
           sx={{ 
             width: '100%', 
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.1)' : 'rgba(255, 0, 60, 0.1)',
-            color: snackbar.severity === 'success' ? '#00f3ff' : '#ff003c',
-            border: `1px solid ${snackbar.severity === 'success' ? '#00f3ff' : '#ff003c'}`,
-            '& .MuiAlert-icon': { color: snackbar.severity === 'success' ? '#00f3ff' : '#ff003c' }
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}1A` : 'rgba(255, 0, 60, 0.1)',
+            color: snackbar.severity === 'success' ? tokens.accent.primary : '#ff003c',
+            border: `1px solid ${snackbar.severity === 'success' ? tokens.accent.primary : '#ff003c'}`,
+            '& .MuiAlert-icon': { color: snackbar.severity === 'success' ? tokens.accent.primary : '#ff003c' }
           }}
         >
           {snackbar.message}

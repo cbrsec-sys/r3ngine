@@ -29,8 +29,10 @@ import {
 import PluginInventory from '../components/PluginInventory';
 import PipelineBuilder from '../components/PipelineBuilder';
 import InstallProgressOverlay from '../components/InstallProgressOverlay';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 const PluginManagementPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const [activeTab, setActiveTab] = useState(0);
   const [installId, setInstallId] = useState<string | null>(null);
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
@@ -95,8 +97,8 @@ const PluginManagementPage: React.FC = () => {
   if (isLoading) {
     return (
       <Box sx={{ display: "flex", flexDirection: 'column', alignItems: "center", justifyContent: 'center', height: '60vh', gap: 2 }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
-        <Typography sx={{ fontFamily: 'Orbitron', color: 'rgba(255,255,255,0.5)', fontSize: '0.8rem', letterSpacing: 2 }}>
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
+        <Typography sx={{ fontFamily: 'Orbitron', color: 'text.secondary', fontSize: '0.8rem', letterSpacing: 2 }}>
           BROWSING THE MARKETPLACE...
         </Typography>
       </Box>
@@ -114,12 +116,12 @@ const PluginManagementPage: React.FC = () => {
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", mb: 6 }}>
         <Box>
           <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 1 }}>
-            <Shield size={32} color="#00f3ff" />
-            <Typography variant="h3" sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: -1, color: '#fff' }}>
+            <Shield size={32} color={tokens.accent.primary} />
+            <Typography variant="h3" sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: -1, color: 'text.primary' }}>
               PLUGIN ORCHESTRATION
             </Typography>
           </Stack>
-          <Typography variant="body1" sx={{ color: 'rgba(255,255,255,0.5)', maxWidth: 600 }}>
+          <Typography variant="body1" sx={{ color: 'text.secondary', maxWidth: 600 }}>
             Extend system capabilities with modular reconnaissance engines and intelligence layers. 
             Maintain total control over the execution pipeline.
           </Typography>
@@ -129,15 +131,15 @@ const PluginManagementPage: React.FC = () => {
           component="label"
           startIcon={<UploadIcon />}
           sx={{
-            bgcolor: '#00f3ff',
-            color: '#000',
+            bgcolor: tokens.accent.primary,
+            color: 'background.default',
             fontFamily: 'Orbitron',
             fontWeight: 900,
             borderRadius: 0,
             px: 4,
             py: 1.5,
             clipPath: 'polygon(10% 0, 100% 0, 90% 100%, 0% 100%)',
-            '&:hover': { bgcolor: '#00d8e4' }
+            '&:hover': { bgcolor: tokens.accent.primary }
           }}
         >
           UPLOAD PLUGIN
@@ -159,24 +161,26 @@ const PluginManagementPage: React.FC = () => {
         borderRadius: 0, 
         overflow: 'hidden', 
         bgcolor: 'transparent',
-        border: '1px solid rgba(255,255,255,0.05)'
+        border: 1,
+        borderColor: 'divider'
       }}>
         <Tabs
           value={activeTab}
           onChange={(_, val) => setActiveTab(val)}
           sx={{ 
-            borderBottom: '1px solid rgba(255,255,255,0.1)',
-            bgcolor: 'rgba(255,255,255,0.02)',
+            borderBottom: 1,
+            borderColor: 'divider',
+            bgcolor: 'action.hover',
             '& .MuiTab-root': {
               minHeight: 70,
               fontFamily: 'Orbitron',
               fontWeight: 800,
               fontSize: '0.8rem',
               letterSpacing: 1,
-              color: 'rgba(255,255,255,0.4)',
-              '&.Mui-selected': { color: '#00f3ff' }
+              color: 'text.disabled',
+              '&.Mui-selected': { color: tokens.accent.primary }
             },
-            '& .MuiTabs-indicator': { bgcolor: '#00f3ff', height: 3 }
+            '& .MuiTabs-indicator': { bgcolor: tokens.accent.primary, height: 3 }
           }}
         >
           <Tab icon={<ExtensionIcon sx={{ fontSize: 20 }} />} iconPosition="start" label="INVENTORY" />

@@ -22,8 +22,10 @@ import {
   Shield,
 } from 'lucide-react';
 import { useParams } from '@tanstack/react-router';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ProfileSettingsPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug } = useParams({ from: '/$projectSlug' });
   const [showOldPassword, setShowOldPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -126,22 +128,23 @@ export const ProfileSettingsPage: React.FC = () => {
             fontFamily: 'Orbitron', 
             fontWeight: 900, 
             letterSpacing: 2,
-            color: '#fff',
-            textShadow: '0 0 15px rgba(0, 243, 255, 0.3)'
+            color: 'text.primary',
+            textShadow: `0 0 15px ${tokens.accent.primary}4D`
           }}
         >
           MY PROFILE
         </Typography>
-        <Box sx={{ flexGrow: 1, height: '1px', background: 'linear-gradient(90deg, rgba(0, 243, 255, 0.5), transparent)' }} />
+        <Box sx={{ flexGrow: 1, height: '1px', background: `linear-gradient(90deg, ${tokens.accent.primary}80, transparent)` }} />
       </Box>
 
       <Paper
         elevation={0}
         sx={{
           p: 4,
-          background: 'rgba(10, 10, 15, 0.7)',
+          background: 'background.paper',
           backdropFilter: 'blur(10px)',
-          border: '1px solid rgba(0, 243, 255, 0.1)',
+          border: 1,
+          borderColor: 'divider',
           borderRadius: 2,
           position: 'relative',
           overflow: 'hidden',
@@ -152,7 +155,7 @@ export const ProfileSettingsPage: React.FC = () => {
             left: 0,
             width: '100%',
             height: '2px',
-            background: 'linear-gradient(90deg, transparent, #00f3ff, transparent)',
+            background: `linear-gradient(90deg, transparent, ${tokens.accent.primary}, transparent)`,
             opacity: 0.5
           }
         }}
@@ -162,7 +165,7 @@ export const ProfileSettingsPage: React.FC = () => {
           sx={{ 
             fontFamily: 'Orbitron', 
             mb: 4, 
-            color: '#00f3ff',
+            color: tokens.accent.primary,
             display: 'flex',
             alignItems: 'center',
             gap: 1.5,
@@ -175,7 +178,7 @@ export const ProfileSettingsPage: React.FC = () => {
         <Grid container spacing={4}>
           {/* Username Section */}
           <Grid size={{xs: 12}} >
-            <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1, textTransform: 'uppercase', letterSpacing: 1 }}>
+            <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1, textTransform: 'uppercase', letterSpacing: 1 }}>
               Username
             </Typography>
             <TextField
@@ -194,16 +197,16 @@ export const ProfileSettingsPage: React.FC = () => {
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  bgcolor: 'rgba(255,255,255,0.03)',
-                  color: 'rgba(255,255,255,0.5)',
-                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                  bgcolor: 'action.hover',
+                  color: 'text.secondary',
+                  '& fieldset': { borderColor: 'divider' },
                 }
               }}
             />
           </Grid>
 
           <Grid size={{xs: 12}} >
-            <Divider sx={{ borderColor: 'rgba(0, 243, 255, 0.1)', my: 2 }} />
+            <Divider sx={{ borderColor: 'divider', my: 2 }} />
           </Grid>
 
           {/* Change Password Section */}
@@ -213,7 +216,7 @@ export const ProfileSettingsPage: React.FC = () => {
               sx={{ 
                 fontFamily: 'Orbitron', 
                 mb: 3, 
-                color: '#fff',
+                color: 'text.primary',
                 fontSize: '1rem',
                 letterSpacing: 1,
                 display: 'flex',
@@ -221,14 +224,14 @@ export const ProfileSettingsPage: React.FC = () => {
                 gap: 1
               }}
             >
-              <Lock size={18} color="#00f3ff" />
+              <Lock size={18} color={tokens.accent.primary} />
               CHANGE PASSWORD
             </Typography>
 
             <form onSubmit={handlePasswordChange}>
               <Grid container spacing={3}>
                 <Grid size={{xs: 12}} >
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.6)', mb: 1 }}>
+                  <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>
                     Old Password
                   </Typography>
                   <TextField
@@ -243,19 +246,31 @@ export const ProfileSettingsPage: React.FC = () => {
                       input: {
                         endAdornment: (
                           <InputAdornment position="end">
-                            <IconButton onClick={() => setShowOldPassword(!showOldPassword)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                              <IconButton onClick={() => setShowOldPassword(!showOldPassword)} edge="end" sx={{ color: 'text.disabled' }}>
                               {showOldPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </IconButton>
                           </InputAdornment>
                         ),
                       }
                     }}
-                    sx={textFieldStyle}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        color: 'text.primary',
+                        bgcolor: 'action.hover',
+                        '& fieldset': { borderColor: 'divider' },
+                        '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                        '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
+                      },
+                      '& .MuiInputBase-input::placeholder': {
+                        color: 'text.disabled',
+                        opacity: 1,
+                      }
+                    }}
                   />
                 </Grid>
 
                 <Grid size={{xs: 12, md: 6}} >
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.6)', mb: 1 }}>
+                  <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>
                     New Password
                   </Typography>
                   <TextField
@@ -270,19 +285,31 @@ export const ProfileSettingsPage: React.FC = () => {
                       input: {
                         endAdornment: (
                           <InputAdornment position="end">
-                            <IconButton onClick={() => setShowNewPassword(!showNewPassword)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                              <IconButton onClick={() => setShowNewPassword(!showNewPassword)} edge="end" sx={{ color: 'text.disabled' }}>
                               {showNewPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </IconButton>
                           </InputAdornment>
                         ),
                       }
                     }}
-                    sx={textFieldStyle}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        color: 'text.primary',
+                        bgcolor: 'action.hover',
+                        '& fieldset': { borderColor: 'divider' },
+                        '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                        '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
+                      },
+                      '& .MuiInputBase-input::placeholder': {
+                        color: 'text.disabled',
+                        opacity: 1,
+                      }
+                    }}
                   />
                 </Grid>
 
                 <Grid size={{xs: 12, md: 6}} >
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(255,255,255,0.6)', mb: 1 }}>
+                  <Typography variant="subtitle2" sx={{ color: 'text.secondary', mb: 1 }}>
                     Confirm Password
                   </Typography>
                   <TextField
@@ -297,14 +324,26 @@ export const ProfileSettingsPage: React.FC = () => {
                       input: {
                         endAdornment: (
                           <InputAdornment position="end">
-                            <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                              <IconButton onClick={() => setShowConfirmPassword(!showConfirmPassword)} edge="end" sx={{ color: 'text.disabled' }}>
                               {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </IconButton>
                           </InputAdornment>
                         ),
                       }
                     }}
-                    sx={textFieldStyle}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        color: 'text.primary',
+                        bgcolor: 'action.hover',
+                        '& fieldset': { borderColor: 'divider' },
+                        '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                        '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
+                      },
+                      '& .MuiInputBase-input::placeholder': {
+                        color: 'text.disabled',
+                        opacity: 1,
+                      }
+                    }}
                   />
                 </Grid>
 
@@ -313,17 +352,17 @@ export const ProfileSettingsPage: React.FC = () => {
                     type="submit"
                     variant="contained"
                     sx={{
-                      bgcolor: 'rgba(0, 243, 255, 0.1)',
-                      color: '#00f3ff',
-                      border: '1px solid #00f3ff',
+                      bgcolor: `${tokens.accent.primary}1A`,
+                      color: tokens.accent.primary,
+                      border: `1px solid ${tokens.accent.primary}`,
                       fontFamily: 'Orbitron',
                       fontWeight: 600,
                       px: 4,
                       py: 1,
                       '&:hover': {
-                        bgcolor: '#00f3ff',
+                        bgcolor: tokens.accent.primary,
                         color: '#000',
-                        boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)'
+                        boxShadow: `0 0 20px ${tokens.accent.primary}66`
                       }
                     }}
                   >
@@ -354,7 +393,7 @@ export const ProfileSettingsPage: React.FC = () => {
             <Typography variant="h6" sx={{ color: '#ff003c', fontFamily: 'Orbitron', fontSize: '0.9rem', mb: 1 }}>
               SECURITY PROTOCOL
             </Typography>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', lineHeight: 1.6 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', lineHeight: 1.6 }}>
               Ensure your password is at least 12 characters long and contains a mix of alphanumeric characters and special symbols. 
               Avoid reusing passwords from other platforms. Your security is the priority of the reNgine perimeter.
             </Typography>
@@ -384,18 +423,4 @@ export const ProfileSettingsPage: React.FC = () => {
       </Snackbar>
     </Box>
   );
-};
-
-const textFieldStyle = {
-  '& .MuiOutlinedInput-root': {
-    color: '#fff',
-    bgcolor: 'rgba(255,255,255,0.03)',
-    '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-    '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
-    '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
-  },
-  '& .MuiInputBase-input::placeholder': {
-    color: 'rgba(255,255,255,0.2)',
-    opacity: 1,
-  }
 };

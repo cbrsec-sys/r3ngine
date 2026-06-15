@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../theme/useThemeTokens';
 import React from 'react';
 import { Box, Typography, Card, CardContent, useTheme } from '@mui/material';
 import type { SxProps, Theme } from '@mui/material';
@@ -13,6 +14,7 @@ export interface KpiCardProps {
 }
 
 export const KpiCard: React.FC<KpiCardProps> = ({ title, value, icon: Icon, color, subtitle, sx }) => {
+  const { tokens } = useThemeTokens();
   const theme = useTheme();
   const isLight = theme.palette.mode === 'light';
 

@@ -1,10 +1,14 @@
 import type { components } from '@/types/api';
 
-export type ScanHistory = components["schemas"]["ScanHistory"] & {
+export type ScanHistory = Omit<components["schemas"]["ScanHistory"], "scan_status"> & {
+  scan_status?: number;
   is_spiderfoot_running?: boolean;
   successful_task_count?: number;
   failed_task_count?: number;
   total_task_count?: number;
+  current_tier?: number;
+  total_tiers?: number;
+  current_tier_progress?: number;
 };
 export type ScheduledScan = components["schemas"]["PeriodicTask"];
 export type SubScan = components["schemas"]["SubScan"];

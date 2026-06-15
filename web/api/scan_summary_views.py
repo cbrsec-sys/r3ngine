@@ -1,4 +1,5 @@
 from django.db.models import Count, Q, F
+from django.http import FileResponse
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework.views import APIView
@@ -17,6 +18,7 @@ from startScan.models import (
 from recon_note.models import TodoNote
 from reNgine.utilities import get_screenshot_path
 from reNgine.definitions import RUNNING_TASK
+from reNgine.exporters.ai_bundle import AiExportOptions, FORMAT_VERSION, build_ai_export_zip
 from api.scan_task_counts import get_task_counts
 
 from api.target_summary_serializers import TargetSummarySerializer, TacticalScanHistorySerializer
@@ -339,3 +341,39 @@ class ScanSummaryAPIView(APIView):
 
         serializer = TargetSummarySerializer(data)
         return Response(serializer.data)
+
+
+class ScanAiExportAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, slug, id):
+        try:
+            project = Project.objects.get(slug=slug)
+            scan = ScanHistory.objects.select_related("domain", "scan_type").get(id=id, domain__project=project)
+        except (Project.DoesNotExist, ScanHistory.DoesNotExist):
+            return Response({"error": "Scan not found"}, status=404)
+
+        payload = request.data or {}
+        preset = payload.get("preset", "analyst_assist")
+        if preset != "analyst_assist":
+            return Response({"error": "Unsupported preset"}, status=400)
+
+        options = AiExportOptions(
+            preset=preset,
+            include_raw_outputs=bool(payload.get("include_raw_outputs", False)),
+            include_timeline=bool(payload.get("include_timeline", True)),
+            include_sidecars=bool(payload.get("include_sidecars", True)),
+            format_version=payload.get("format_version") or FORMAT_VERSION,
+        )
+
+        try:
+            zip_buffer, filename = build_ai_export_zip(scan=scan, options=options)
+        except Exception as exc:
+            return Response({"error": f"Failed to build AI export: {exc}"}, status=500)
+
+        return FileResponse(
+            zip_buffer,
+            as_attachment=True,
+            filename=filename,
+            content_type="application/zip",
+        )

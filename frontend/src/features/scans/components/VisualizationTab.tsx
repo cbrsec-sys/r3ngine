@@ -4,6 +4,7 @@ import { Download, Maximize2, Minimize2, ZoomIn, ZoomOut, RefreshCw } from 'luci
 import * as d3 from 'd3';
 import axios from 'axios';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 interface VisualizationNode {
   description: string;
@@ -26,6 +27,7 @@ interface VisualizationTabProps {
 }
 
 const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId, targetId }) => {
+  const { tokens } = useThemeTokens();
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [loading, setLoading] = useState(true);
@@ -147,8 +149,8 @@ const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId
 
       nodeEnter.append("circle")
         .attr("r", 6)
-        .attr("fill", (d: any) => d._children ? "#00f3ff" : "rgba(255,255,255,0.2)")
-        .attr("stroke", "#00f3ff")
+        .attr("fill", (d: any) => d._children ? tokens.accent.primary : "rgba(255,255,255,0.2)")
+        .attr("stroke", tokens.accent.primary)
         .attr("stroke-width", 1.5)
         .style("cursor", "pointer");
 
@@ -176,7 +178,7 @@ const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId
         .attr("stroke-opacity", 1);
 
       nodeUpdate.select("circle")
-        .attr("fill", (d: any) => d._children ? "#00f3ff" : "rgba(10,10,15,0.8)");
+        .attr("fill", (d: any) => d._children ? tokens.accent.primary : "rgba(10,10,15,0.8)");
 
       const nodeExit = node.exit().transition(transition as any).remove()
         .attr("transform", d => `translate(${source.y},${source.x})`)
@@ -244,7 +246,7 @@ const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '400px' }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
       </Box>
     );
   }
@@ -253,7 +255,7 @@ const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId
     return (
       <Box sx={{ p: 4, textAlign: 'center' }}>
         <Typography color="error">{error}</Typography>
-        <IconButton onClick={fetchData} sx={{ mt: 2, color: '#00f3ff' }}>
+        <IconButton onClick={fetchData} sx={{ mt: 2, color: tokens.accent.primary }}>
           <RefreshCw size={20} />
         </IconButton>
       </Box>
@@ -274,15 +276,15 @@ const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId
                 onChange={(e) => setExpandAll(e.target.checked)}
                 size="small"
                 sx={{ 
-                  '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                  '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                  '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
                 }}
               />
             }
             label={<Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 900, fontFamily: 'Orbitron' }}>EXPAND ALL</Typography>}
           />
           <Tooltip title="Download as PNG">
-            <IconButton size="small" onClick={handleDownload} sx={{ color: '#00f3ff' }}>
+            <IconButton size="small" onClick={handleDownload} sx={{ color: tokens.accent.primary }}>
               <Download size={16} />
             </IconButton>
           </Tooltip>
@@ -305,11 +307,11 @@ const VisualizationTab: React.FC<VisualizationTabProps> = ({ projectSlug, scanId
             right: 20, 
             p: 1.5, 
             bgcolor: 'rgba(10,10,15,0.9)', 
-            border: '1px solid rgba(0,243,255,0.2)',
+            border: `1px solid ${tokens.accent.primary}33`,
             backdropFilter: 'blur(10px)'
           }}
         >
-          <Typography sx={{ fontSize: '0.6rem', color: '#00f3ff', fontWeight: 900, mb: 1, fontFamily: 'Orbitron' }}>LEGEND</Typography>
+          <Typography sx={{ fontSize: '0.6rem', color: tokens.accent.primary, fontWeight: 900, mb: 1, fontFamily: 'Orbitron' }}>LEGEND</Typography>
           <Stack spacing={0.5}>
             <LegendItem color="#00ff62" label="200 OK / SAFE" />
             <LegendItem color="#ff003c" label="40x / INTERESTING / CRITICAL" />

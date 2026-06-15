@@ -32,8 +32,10 @@ import {
 import { useParams } from '@tanstack/react-router';
 import { useApiVault, useUpdateApiVault } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ApiVaultPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: settings, isLoading } = useApiVault(projectSlug);
   const updateSettings = useUpdateApiVault(projectSlug);
@@ -114,14 +116,14 @@ export const ApiVaultPage: React.FC = () => {
     });
   };
 
-  if (isLoading) return <LinearProgress sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />;
+  if (isLoading) return <LinearProgress sx={{ bgcolor: `${tokens.accent.primary}1A`, '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary } }} />;
 
   const KeyField = ({ label, description, field, placeholder, icon: Icon, url }: any) => (
     <Box sx={{ mb: 4 }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Icon size={18} color="#00f3ff" />
-          <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.85rem', fontWeight: 700 }}>
+          <Icon size={18} color={tokens.accent.primary} />
+          <Typography sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontSize: '0.85rem', fontWeight: 700 }}>
             {label}
           </Typography>
         </Box>
@@ -131,13 +133,13 @@ export const ApiVaultPage: React.FC = () => {
             target="_blank"
             size="small"
             endIcon={<ExternalLink size={12} />}
-            sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', '&:hover': { color: '#00f3ff' } }}
+            sx={{ color: 'text.secondary', fontSize: '10px', '&:hover': { color: tokens.accent.primary } }}
           >
             GET KEY
           </Button>
         )}
       </Box>
-      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 2, display: 'block' }}>
+      <Typography variant="caption" sx={{ color: 'text.secondary', mb: 2, display: 'block' }}>
         {description}
       </Typography>
       <TextField
@@ -151,7 +153,7 @@ export const ApiVaultPage: React.FC = () => {
           input: {
             endAdornment: (
               <InputAdornment position="end">
-                <IconButton onClick={() => toggleVisibility(field)} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                <IconButton onClick={() => toggleVisibility(field)} edge="end" sx={{ color: 'text.disabled' }}>
                   {showKeys[field] ? <EyeOff size={18} /> : <Eye size={18} />}
                 </IconButton>
               </InputAdornment>
@@ -160,12 +162,12 @@ export const ApiVaultPage: React.FC = () => {
         }}
         sx={{
           '& .MuiOutlinedInput-root': {
-            color: '#fff',
-            bgcolor: 'rgba(255,255,255,0.02)',
+            color: 'text.primary',
+            bgcolor: 'action.hover',
             fontFamily: 'monospace',
-            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-            '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
-            '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+            '& fieldset': { borderColor: 'divider' },
+            '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+            '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
           }
         }}
       />
@@ -180,18 +182,18 @@ export const ApiVaultPage: React.FC = () => {
             fontFamily: 'Orbitron',
             fontWeight: 900,
             letterSpacing: 2,
-            color: '#fff',
-            textShadow: '0 0 20px rgba(0, 243, 255, 0.5)',
+            color: 'text.primary',
+            textShadow: `0 0 20px ${tokens.accent.primary}80`,
             mb: 1
           }}>
             API VAULT
           </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary', letterSpacing: 1 }}>
             CENTRALIZED CREDENTIAL MANAGEMENT
           </Typography>
         </Box>
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron' }}>
-          SETTINGS {'>'} <span style={{ color: '#00f3ff' }}>API VAULT</span>
+        <Typography variant="caption" sx={{ color: 'text.disabled', fontFamily: 'Orbitron' }}>
+          SETTINGS {'>'} <span style={{ color: tokens.accent.primary }}>API VAULT</span>
         </Typography>
       </Box>
 
@@ -200,10 +202,10 @@ export const ApiVaultPage: React.FC = () => {
           severity="info"
           icon={<Lock size={20} />}
           sx={{
-            bgcolor: 'rgba(0, 243, 255, 0.05)',
-            color: '#00f3ff',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
-            '& .MuiAlert-icon': { color: '#00f3ff' }
+            bgcolor: `${tokens.accent.primary}0D`,
+            color: tokens.accent.primary,
+            border: `1px solid ${tokens.accent.primary}33`,
+            '& .MuiAlert-icon': { color: tokens.accent.primary }
           }}
         >
           API keys are stored securely and used across various discovery and OSINT modules.
@@ -268,12 +270,12 @@ export const ApiVaultPage: React.FC = () => {
             <Box sx={{ mt: 3 }}>
               <TacticalPanel title="SOCIAL INTELLIGENCE" icon={<Shield size={20} />}>
                 <Box sx={{ p: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 3, display: 'block' }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', mb: 3, display: 'block' }}>
                     Credentials for LinkedInt employee scraping. Dedicated accounts are recommended.
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid size={{ xs: 12 }} >
-                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>LINKEDIN USERNAME / EMAIL</Typography>
+                      <Typography sx={{ color: 'text.secondary', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>LINKEDIN USERNAME / EMAIL</Typography>
                       <TextField
                         fullWidth
                         size="small"
@@ -282,16 +284,18 @@ export const ApiVaultPage: React.FC = () => {
                         placeholder="research@example.com"
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            color: '#fff',
-                            bgcolor: 'rgba(255,255,255,0.02)',
+                            color: 'text.primary',
+                            bgcolor: 'action.hover',
                             fontFamily: 'monospace',
-                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                            '& fieldset': { borderColor: 'divider' },
+                            '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                            '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
                           }
                         }}
                       />
                     </Grid>
                     <Grid size={{ xs: 12 }} >
-                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>LINKEDIN PASSWORD</Typography>
+                      <Typography sx={{ color: 'text.secondary', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>LINKEDIN PASSWORD</Typography>
                       <TextField
                         fullWidth
                         size="small"
@@ -303,7 +307,7 @@ export const ApiVaultPage: React.FC = () => {
                           input: {
                             endAdornment: (
                               <InputAdornment position="end">
-                                <IconButton onClick={() => toggleVisibility('linkedin_password')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                                <IconButton onClick={() => toggleVisibility('linkedin_password')} edge="end" sx={{ color: 'text.disabled' }}>
                                   {showKeys.linkedin_password ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </IconButton>
                               </InputAdornment>
@@ -312,10 +316,12 @@ export const ApiVaultPage: React.FC = () => {
                         }}
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            color: '#fff',
-                            bgcolor: 'rgba(255,255,255,0.02)',
+                            color: 'text.primary',
+                            bgcolor: 'action.hover',
                             fontFamily: 'monospace',
-                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                            '& fieldset': { borderColor: 'divider' },
+                            '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                            '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
                           }
                         }}
                       />
@@ -330,12 +336,12 @@ export const ApiVaultPage: React.FC = () => {
             <Stack spacing={3}>
               <TacticalPanel title="CENSYS CONFIGURATION" icon={<Search size={20} />}>
                 <Box sx={{ p: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 3, display: 'block' }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', mb: 3, display: 'block' }}>
                     Censys keys are used for origin discovery and SSL serial matching.
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid size={{ xs: 12 }} >
-                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API KEY</Typography>
+                      <Typography sx={{ color: 'text.secondary', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API KEY</Typography>
                       <TextField
                         fullWidth
                         size="small"
@@ -347,7 +353,7 @@ export const ApiVaultPage: React.FC = () => {
                           input: {
                             endAdornment: (
                               <InputAdornment position="end">
-                                <IconButton onClick={() => toggleVisibility('censys_key')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                                <IconButton onClick={() => toggleVisibility('censys_key')} edge="end" sx={{ color: 'text.disabled' }}>
                                   {showKeys.censys_key ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </IconButton>
                               </InputAdornment>
@@ -356,10 +362,12 @@ export const ApiVaultPage: React.FC = () => {
                         }}
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            color: '#fff',
-                            bgcolor: 'rgba(255,255,255,0.02)',
+                            color: 'text.primary',
+                            bgcolor: 'action.hover',
                             fontFamily: 'monospace',
-                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                            '& fieldset': { borderColor: 'divider' },
+                            '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                            '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
                           }
                         }}
                       />
@@ -370,7 +378,7 @@ export const ApiVaultPage: React.FC = () => {
                     target="_blank"
                     size="small"
                     startIcon={<ExternalLink size={12} />}
-                    sx={{ mt: 2, color: '#00f3ff', fontSize: '10px' }}
+                    sx={{ mt: 2, color: tokens.accent.primary, fontSize: '10px' }}
                   >
                     GET CENSYS KEY
                   </Button>
@@ -379,12 +387,12 @@ export const ApiVaultPage: React.FC = () => {
 
               <TacticalPanel title="HACKERONE (BUG BOUNTY)" icon={<Zap size={20} />}>
                 <Box sx={{ p: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 3, display: 'block' }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', mb: 3, display: 'block' }}>
                     Used to import targets, bookmarked programs, and submit automated reports.
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid size={{ xs: 12 }} >
-                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>USERNAME (NOT EMAIL)</Typography>
+                      <Typography sx={{ color: 'text.secondary', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>USERNAME (NOT EMAIL)</Typography>
                       <TextField
                         fullWidth
                         size="small"
@@ -393,16 +401,18 @@ export const ApiVaultPage: React.FC = () => {
                         placeholder="Enter Hackerone Username"
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            color: '#fff',
-                            bgcolor: 'rgba(255,255,255,0.02)',
+                            color: 'text.primary',
+                            bgcolor: 'action.hover',
                             fontFamily: 'monospace',
-                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                            '& fieldset': { borderColor: 'divider' },
+                            '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                            '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
                           }
                         }}
                       />
                     </Grid>
                     <Grid size={{ xs: 12 }} >
-                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API TOKEN</Typography>
+                      <Typography sx={{ color: 'text.secondary', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API TOKEN</Typography>
                       <TextField
                         fullWidth
                         size="small"
@@ -414,7 +424,7 @@ export const ApiVaultPage: React.FC = () => {
                           input: {
                             endAdornment: (
                               <InputAdornment position="end">
-                                <IconButton onClick={() => toggleVisibility('hackerone_key')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                                <IconButton onClick={() => toggleVisibility('hackerone_key')} edge="end" sx={{ color: 'text.disabled' }}>
                                   {showKeys.hackerone_key ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </IconButton>
                               </InputAdornment>
@@ -423,10 +433,12 @@ export const ApiVaultPage: React.FC = () => {
                         }}
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            color: '#fff',
-                            bgcolor: 'rgba(255,255,255,0.02)',
+                            color: 'text.primary',
+                            bgcolor: 'action.hover',
                             fontFamily: 'monospace',
-                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                            '& fieldset': { borderColor: 'divider' },
+                            '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                            '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
                           }
                         }}
                       />
@@ -438,7 +450,7 @@ export const ApiVaultPage: React.FC = () => {
                       target="_blank"
                       size="small"
                       startIcon={<ExternalLink size={12} />}
-                      sx={{ color: '#00f3ff', fontSize: '10px' }}
+                      sx={{ color: tokens.accent.primary, fontSize: '10px' }}
                     >
                       GENERATE TOKEN
                     </Button>
@@ -448,12 +460,12 @@ export const ApiVaultPage: React.FC = () => {
 
               <TacticalPanel title="ACUNETIX (AWVS)" icon={<Shield size={20} />}>
                 <Box sx={{ p: 1 }}>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', mb: 3, display: 'block' }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', mb: 3, display: 'block' }}>
                     Connect your Acunetix instance for automated vulnerability scanning.
                   </Typography>
                   <Grid container spacing={2}>
                     <Grid size={{ xs: 12 }} >
-                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>SERVER URL</Typography>
+                      <Typography sx={{ color: 'text.secondary', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>SERVER URL</Typography>
                       <TextField
                         fullWidth
                         size="small"
@@ -462,16 +474,18 @@ export const ApiVaultPage: React.FC = () => {
                         placeholder="https://acunetix.example.com:3443"
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            color: '#fff',
-                            bgcolor: 'rgba(255,255,255,0.02)',
+                            color: 'text.primary',
+                            bgcolor: 'action.hover',
                             fontFamily: 'monospace',
-                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                            '& fieldset': { borderColor: 'divider' },
+                            '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                            '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
                           }
                         }}
                       />
                     </Grid>
                     <Grid size={{ xs: 12 }} >
-                      <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API KEY</Typography>
+                      <Typography sx={{ color: 'text.secondary', fontSize: '11px', mb: 1, fontFamily: 'Orbitron' }}>API KEY</Typography>
                       <TextField
                         fullWidth
                         size="small"
@@ -483,7 +497,7 @@ export const ApiVaultPage: React.FC = () => {
                           input: {
                             endAdornment: (
                               <InputAdornment position="end">
-                                <IconButton onClick={() => toggleVisibility('acunetix_key')} edge="end" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                                <IconButton onClick={() => toggleVisibility('acunetix_key')} edge="end" sx={{ color: 'text.disabled' }}>
                                   {showKeys.acunetix_key ? <EyeOff size={16} /> : <Eye size={16} />}
                                 </IconButton>
                               </InputAdornment>
@@ -492,10 +506,12 @@ export const ApiVaultPage: React.FC = () => {
                         }}
                         sx={{
                           '& .MuiOutlinedInput-root': {
-                            color: '#fff',
-                            bgcolor: 'rgba(255,255,255,0.02)',
+                            color: 'text.primary',
+                            bgcolor: 'action.hover',
                             fontFamily: 'monospace',
-                            '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                            '& fieldset': { borderColor: 'divider' },
+                            '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                            '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
                           }
                         }}
                       />
@@ -527,14 +543,14 @@ export const ApiVaultPage: React.FC = () => {
             onClick={handleSave}
             disabled={updateSettings.isPending}
             sx={{
-              bgcolor: 'rgba(0, 243, 255, 0.1)',
-              color: '#00f3ff',
-              border: '1px solid rgba(0, 243, 255, 0.3)',
+              bgcolor: `${tokens.accent.primary}1A`,
+              color: tokens.accent.primary,
+              border: `1px solid ${tokens.accent.primary}4D`,
               fontFamily: 'Orbitron',
               fontWeight: 800,
               px: 4,
               py: 1.5,
-              '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)', boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)' }
+              '&:hover': { bgcolor: `${tokens.accent.primary}33`, boxShadow: `0 0 20px ${tokens.accent.primary}66` }
             }}
           >
             {updateSettings.isPending ? 'SYNCHRONIZING...' : 'UPDATE API VAULT'}
@@ -556,7 +572,7 @@ export const ApiVaultPage: React.FC = () => {
             fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}E6` : 'rgba(255, 0, 85, 0.9)',
             color: '#000',
             '& .MuiAlert-icon': { color: '#000' }
           }}

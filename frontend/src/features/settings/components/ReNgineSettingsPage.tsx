@@ -31,8 +31,10 @@ import {
   useToggleScanQueueing
 } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ReNgineSettingsPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { data: systemInfo, isLoading } = useRengineSystemSettings();
   const deleteScanResults = useDeleteAllScanResults();
   const deleteScreenshots = useDeleteAllScreenshots();
@@ -183,7 +185,7 @@ export const ReNgineSettingsPage: React.FC = () => {
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 10 }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
       </Box>
     );
   }
@@ -192,8 +194,8 @@ export const ReNgineSettingsPage: React.FC = () => {
   const isDanger = percent >= 90;
   const isWarning = percent >= 70;
 
-  const gaugeColor = isDanger ? '#ff1100' : (isWarning ? '#ffcc00' : '#00f3ff');
-  const gradientColor = isDanger ? '#cc0000' : (isWarning ? '#997700' : '#0084ff');
+  const gaugeColor = isDanger ? '#ff1100' : (isWarning ? '#ffcc00' : tokens.accent.primary);
+  const gradientColor = isDanger ? '#cc0000' : (isWarning ? '#997700' : tokens.accent.primary);
 
   const chartOptions: any = {
     chart: {
@@ -227,7 +229,7 @@ export const ReNgineSettingsPage: React.FC = () => {
           value: {
             offsetY: -2,
             fontSize: '22px',
-            color: '#fff',
+            color: 'text.primary',
             fontWeight: 900,
             fontFamily: 'Orbitron'
           }
@@ -260,10 +262,10 @@ export const ReNgineSettingsPage: React.FC = () => {
     <Box sx={{ p: 3, maxWidth: 1200, mx: 'auto' }}>
       <Stack spacing={3}>
         <Box>
-          <Typography variant="h4" sx={{ color: '#fff', fontFamily: 'Orbitron', fontWeight: 900, mb: 1 }}>
+          <Typography variant="h4" sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontWeight: 900, mb: 1 }}>
             RENGINE SYSTEM CONFIG
           </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
             Monitor system resources and perform global maintenance actions.
           </Typography>
         </Box>
@@ -281,10 +283,10 @@ export const ReNgineSettingsPage: React.FC = () => {
               }
               label={
                 <Box>
-                  <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontWeight: 600 }}>
+                  <Typography sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontWeight: 600 }}>
                     Enable Scan Queueing
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                     When enabled, running main scans and subscans will queue rather than running concurrently, allowing max 1 main scan and 1 specific subscan at a time.
                   </Typography>
                 </Box>
@@ -297,10 +299,10 @@ export const ReNgineSettingsPage: React.FC = () => {
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, p: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box>
-                <Typography sx={{ color: '#00f3ff', fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
+                <Typography sx={{ color: tokens.accent.primary, fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
                   Export Configuration
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                   Download a ZIP containing all configured API keys, tool configs, custom scan engines, and custom wordlists.
                 </Typography>
               </Box>
@@ -311,14 +313,14 @@ export const ReNgineSettingsPage: React.FC = () => {
                 disabled={isExporting}
                 startIcon={isExporting ? <CircularProgress size={18} /> : <Download size={18} />}
                 sx={{
-                  borderColor: '#00f3ff',
-                  color: '#00f3ff',
+                  borderColor: tokens.accent.primary,
+                  color: tokens.accent.primary,
                   fontFamily: 'Orbitron',
                   fontWeight: 900,
                   px: 3,
                   '&:hover': {
-                    bgcolor: 'rgba(0, 243, 255, 0.1)',
-                    borderColor: '#00f3ff'
+                    bgcolor: `${tokens.accent.primary}1A`,
+                    borderColor: tokens.accent.primary
                   }
                 }}
               >
@@ -326,14 +328,14 @@ export const ReNgineSettingsPage: React.FC = () => {
               </Button>
             </Box>
 
-            <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+            <Divider sx={{ borderColor: 'divider' }} />
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box>
-                <Typography sx={{ color: '#00f3ff', fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
+                <Typography sx={{ color: tokens.accent.primary, fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
                   Export Scan Results
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary' }}>
                   Download a ZIP containing all scan results and reports from the container. This may take some time depending on size.
                 </Typography>
               </Box>
@@ -344,14 +346,14 @@ export const ReNgineSettingsPage: React.FC = () => {
                 disabled={isExportingScanResults}
                 startIcon={isExportingScanResults ? <CircularProgress size={18} /> : <Download size={18} />}
                 sx={{
-                  borderColor: '#00f3ff',
-                  color: '#00f3ff',
+                  borderColor: tokens.accent.primary,
+                  color: tokens.accent.primary,
                   fontFamily: 'Orbitron',
                   fontWeight: 900,
                   px: 3,
                   '&:hover': {
-                    bgcolor: 'rgba(0, 243, 255, 0.1)',
-                    borderColor: '#00f3ff'
+                    bgcolor: `${tokens.accent.primary}1A`,
+                    borderColor: tokens.accent.primary
                   }
                 }}
               >
@@ -359,14 +361,14 @@ export const ReNgineSettingsPage: React.FC = () => {
               </Button>
             </Box>
 
-            <Divider sx={{ borderColor: 'rgba(255,255,255,0.1)' }} />
+            <Divider sx={{ borderColor: 'divider' }} />
 
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <Box sx={{ flex: 1 }}>
                 <Typography sx={{ color: '#00ff9d', fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
                   Import Configuration
                 </Typography>
-                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mb: 1 }}>
+                <Typography variant="body2" sx={{ color: 'text.secondary', mb: 1 }}>
                   Upload a previously exported ZIP backup to restore API keys, engines, tools, and wordlists.
                 </Typography>
                 <Stack direction="row" sx={{ spacing: 2, alignItems: 'center' }}>
@@ -394,7 +396,7 @@ export const ReNgineSettingsPage: React.FC = () => {
                     />
                   </Button>
                   {importFile && (
-                    <Typography variant="body2" sx={{ color: '#fff' }}>
+                    <Typography variant="body2" sx={{ color: 'text.primary' }}>
                       {importFile.name}
                     </Typography>
                   )}
@@ -408,7 +410,7 @@ export const ReNgineSettingsPage: React.FC = () => {
                         color="success"
                       />
                     }
-                    label={<Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.7)' }}>Overwrite existing configurations</Typography>}
+                    label={<Typography variant="body2" sx={{ color: 'text.secondary' }}>Overwrite existing configurations</Typography>}
                   />
                 </Box>
               </Box>
@@ -519,10 +521,10 @@ export const ReNgineSettingsPage: React.FC = () => {
           severity="info"
           icon={<AlertTriangle size={20} />}
           sx={{
-            bgcolor: 'rgba(0, 243, 255, 0.05)',
-            color: '#00f3ff',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
-            '& .MuiAlert-icon': { color: '#00f3ff' }
+            bgcolor: `${tokens.accent.primary}0D`,
+            color: tokens.accent.primary,
+            border: `1px solid ${tokens.accent.primary}33`,
+            '& .MuiAlert-icon': { color: tokens.accent.primary }
           }}
         >
           System maintenance actions affect all projects globally. Ensure you have backups before performing purge operations.
@@ -543,7 +545,7 @@ export const ReNgineSettingsPage: React.FC = () => {
             fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}E6` : 'rgba(255, 0, 85, 0.9)',
             color: '#000',
             '& .MuiAlert-icon': { color: '#000' }
           }}
@@ -558,25 +560,25 @@ export const ReNgineSettingsPage: React.FC = () => {
 const MetricCard: React.FC<{ label: string; value: string; icon: React.ReactNode; statusColor?: string }> = ({ label, value, icon, statusColor }) => (
   <Paper sx={{
     p: 2,
-    bgcolor: 'rgba(255,255,255,0.02)',
+    bgcolor: 'action.hover',
     border: '1px solid',
-    borderColor: statusColor ? `${statusColor}33` : 'rgba(255,255,255,0.05)',
+    borderColor: statusColor ? `${statusColor}33` : 'divider',
     display: 'flex',
     flexDirection: 'column',
     gap: 1,
     transition: 'all 0.3s ease',
     '&:hover': {
-      bgcolor: 'rgba(255,255,255,0.04)',
-      borderColor: statusColor ? statusColor : 'rgba(255,255,255,0.1)',
+      bgcolor: 'action.selected',
+      borderColor: statusColor ? statusColor : 'text.disabled',
     }
   }}>
     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
       {icon}
-      <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem', fontWeight: 900, fontFamily: 'Orbitron' }}>
+      <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', fontWeight: 900, fontFamily: 'Orbitron' }}>
         {label}
       </Typography>
     </Box>
-    <Typography sx={{ color: '#fff', fontSize: '1.2rem', fontWeight: 900, fontFamily: 'Orbitron' }}>
+    <Typography sx={{ color: 'text.primary', fontSize: '1.2rem', fontWeight: 900, fontFamily: 'Orbitron' }}>
       {value}
     </Typography>
   </Paper>
@@ -594,7 +596,7 @@ const MaintenanceRow: React.FC<{
       <Typography sx={{ color: '#ff0055', fontWeight: 900, mb: 0.5, textTransform: 'uppercase' }}>
         {title}
       </Typography>
-      <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+      <Typography variant="body2" sx={{ color: 'text.secondary' }}>
         {description}
       </Typography>
     </Box>

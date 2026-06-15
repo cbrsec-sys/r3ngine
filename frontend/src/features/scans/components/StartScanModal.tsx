@@ -127,6 +127,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
         paper: {
           sx: {
             bgcolor: 'rgba(10, 10, 20, 0.95)',
+            color: 'rgba(255, 255, 255, 0.92)',
             backdropFilter: 'blur(20px)',
             border: '1px solid rgba(0, 255, 98, 0.2)',
             borderRadius: 4,
@@ -139,8 +140,9 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        borderBottom: '1px solid rgba(255,255,255,0.05)',
-        pb: 2
+        borderBottom: 1, borderColor: 'divider',
+        pb: 2,
+        color: 'rgba(255, 255, 255, 0.92)'
       }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box sx={{
@@ -157,7 +159,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
               fontFamily: 'Orbitron',
               fontWeight: 800,
               letterSpacing: 1,
-              color: '#fff',
+              color: 'rgba(255, 255, 255, 0.95)',
               lineHeight: 1.2
             }}>
               LAUNCH RECONNAISSANCE
@@ -167,13 +169,13 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
             </Typography>
           </Box>
         </Box>
-        <IconButton onClick={handleClose} sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#ff003c' } }}>
+        <IconButton onClick={handleClose} sx={{ color: 'rgba(255,255,255,0.45)', '&:hover': { color: '#ff003c' } }}>
           <X size={20} />
         </IconButton>
       </DialogTitle>
 
       <form onSubmit={handleSubmit}>
-        <DialogContent sx={{ mt: 2 }}>
+        <DialogContent sx={{ mt: 2, color: 'rgba(255,255,255,0.9)' }}>
           {error && (
             <Alert severity="error" sx={{
               mb: 3,
@@ -188,7 +190,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
 
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 6 }} >
-              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 800, mb: 1, display: 'block' }}>
+              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.65)', fontWeight: 800, mb: 1, display: 'block' }}>
                 PRIMARY CONFIGURATION
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -255,7 +257,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
                     />
                   }
                   label={
-                    <Typography sx={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.92)', fontSize: '0.85rem', fontWeight: 600 }}>
                       Enable SpiderFoot OSINT
                     </Typography>
                   }
@@ -272,7 +274,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
                     />
                   }
                   label={
-                    <Typography sx={{ color: '#fff', fontSize: '0.85rem', fontWeight: 600 }}>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.92)', fontSize: '0.85rem', fontWeight: 600 }}>
                       Custom Github Dorks
                     </Typography>
                   }
@@ -320,7 +322,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
             </Grid>
 
             <Grid size={{ xs: 12, md: 6 }} >
-              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 800, mb: 1, display: 'block' }}>
+              <Typography variant="overline" sx={{ color: 'rgba(255,255,255,0.65)', fontWeight: 800, mb: 1, display: 'block' }}>
                 ADVANCED SCOPE
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
@@ -411,11 +413,11 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
                         }
                         label={
                           <Box>
-                            <Typography sx={{ fontSize: '0.8rem', color: '#fff', fontWeight: 700 }}>
+                            <Typography sx={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.92)', fontWeight: 700 }}>
                               {plugin.name}
                             </Typography>
                             {plugin.description && (
-                              <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)' }}>
+                              <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)' }}>
                                 {plugin.description}
                               </Typography>
                             )}
@@ -450,7 +452,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
             variant="text"
             size="small"
             onClick={() => setShowWorkflows(v => !v)}
-            sx={{ color: 'text.secondary', textTransform: 'none' }}
+            sx={{ color: 'rgba(255,255,255,0.72)', textTransform: 'none' }}
           >
             {showWorkflows ? '▲ Hide Quick Workflows' : '▼ Quick Workflow Launch'}
           </Button>
@@ -468,7 +470,7 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
           <Button
             onClick={handleClose}
             sx={{
-              color: 'rgba(255,255,255,0.5)',
+              color: 'rgba(255,255,255,0.72)',
               fontFamily: 'Orbitron',
               fontSize: '0.7rem',
               fontWeight: 800
@@ -507,18 +509,21 @@ export const StartScanModal: React.FC<StartScanModalProps> = ({
 
 const fieldStyles = {
   '& .MuiOutlinedInput-root': {
-    color: '#fff',
+    color: 'rgba(255,255,255,0.92)',
     '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
     '&:hover fieldset': { borderColor: 'rgba(0, 255, 98, 0.3)' },
     '&.Mui-focused fieldset': { borderColor: '#00ff62' },
     bgcolor: 'rgba(255,255,255,0.03)',
+    '& input': { color: 'rgba(255,255,255,0.92)' },
+    '& textarea': { color: 'rgba(255,255,255,0.92)' },
   },
   '& .MuiInputLabel-root': {
-    color: 'rgba(255,255,255,0.4)',
+    color: 'rgba(255,255,255,0.7)',
     '&.Mui-focused': { color: '#00ff62' }
   },
-  '& .MuiSelect-icon': { color: 'rgba(255,255,255,0.4)' },
-  '& .MuiFormHelperText-root': { color: 'rgba(255,255,255,0.3)' }
+  '& .MuiSelect-select': { color: 'rgba(255,255,255,0.92)' },
+  '& .MuiSelect-icon': { color: 'rgba(255,255,255,0.7)' },
+  '& .MuiFormHelperText-root': { color: 'rgba(255,255,255,0.55)' }
 };
 
 const switchStyles = {

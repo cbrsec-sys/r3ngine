@@ -4,7 +4,7 @@ include .env
 # Credits: https://github.com/sherifabdlnaby/elastdocker/
 
 # This for future release of Compose that will use Docker Buildkit, which is much efficient.
-COMPOSE_PREFIX_CMD := COMPOSE_DOCKER_CLI_BUILD=1
+COMPOSE_PREFIX_CMD := DOCKER_BUILDKIT=1 COMPOSE_DOCKER_CLI_BUILD=1
 
 COMPOSE_ALL_FILES := --env-file .env -f docker/docker-compose.yml
 COMPOSE_DEV_FILES := --env-file .env -f docker/docker-compose.dev.yml
@@ -33,6 +33,15 @@ devup:				## Build and start all services in development mode.
 
 build:			## Build all services.
 	${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} build ${SERVICES}
+
+build-web:		## Build only the web/orchestrator/executor shared image.
+	${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} build web
+
+build-clean:		## Rebuild ALL services from scratch (no cache).
+	${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} build --no-cache ${SERVICES}
+
+restart-apps:		## Restart only web, temporal-python-orchestrator, and temporal-go-executor.
+	${COMPOSE_PREFIX_CMD} ${DOCKER_COMPOSE} ${COMPOSE_ALL_FILES} restart web temporal-python-orchestrator temporal-go-executor
 
 username:		## Generate Username (Use only after make up).
 ifeq ($(isNonInteractive), true)

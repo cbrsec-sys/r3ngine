@@ -1,10 +1,9 @@
+import { useThemeTokens } from '../theme/useThemeTokens';
 import React from 'react';
-import { Box, Typography, Button, useTheme, alpha } from '@mui/material';
+import { Box, Typography, Button, alpha } from '@mui/material';
 
 export const PlaceholderPage: React.FC<{ title: string; icon: React.ReactNode }> = ({ title, icon }) => {
-  const theme = useTheme();
-  const isLight = theme.palette.mode === 'light';
-
+  const { theme, isLight, tokens } = useThemeTokens();
   return (
     <Box
       sx={{
@@ -24,14 +23,14 @@ export const PlaceholderPage: React.FC<{ title: string; icon: React.ReactNode }>
         p: 4
       }}
     >
-      <Box sx={{ color: theme.palette.primary.main, mb: 3 }}>
+      <Box sx={{ color: tokens.accent.primary, mb: 3 }}>
         {icon}
       </Box>
       <Typography variant="h4" sx={{
-        fontFamily: 'var(--r3-heading-font)',
+        fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
         fontWeight: 900,
         mb: 2,
-        color: isLight ? theme.palette.text.primary : '#fff'
+        color: 'text.primary'
       }}>
         {title.toUpperCase()}
       </Typography>
@@ -46,10 +45,10 @@ export const PlaceholderPage: React.FC<{ title: string; icon: React.ReactNode }>
       <Button
         variant="outlined"
         sx={{
-          borderColor: theme.palette.primary.main,
-          color: theme.palette.primary.main,
+          borderColor: tokens.accent.primary,
+          color: tokens.accent.primary,
           '&:hover': {
-            bgcolor: alpha(theme.palette.primary.main, 0.08),
+            bgcolor: alpha(tokens.accent.primary, 0.08),
           }
         }}
       >

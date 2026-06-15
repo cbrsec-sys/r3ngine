@@ -222,33 +222,235 @@ class ToolExecutionTest(TransactionTestCase):
                 api_key="test_key"
             )
             
-            # Patch Acunetix and requests in reNgine.tasks
-            with patch('reNgine.tasks.Acunetix') as mock_acunetix_cls, \
-                 patch('reNgine.tasks.requests.get') as mock_requests_get:
-                
-                mock_acunetix = MagicMock()
-                mock_acunetix_cls.return_value = mock_acunetix
-                mock_acunetix.trigger_scan.return_value = True
-                
-                # Mock requests responses for target and scan status
+            # Patch direct AWVS REST requests in reNgine.tasks
+            with patch('reNgine.tasks.requests.get') as mock_requests_get, \
+                 patch('reNgine.tasks.requests.post') as mock_requests_post:
+
+                # Mock target discovery, profile discovery, scan status, scan details, vulnerabilities
                 mock_targets_resp = MagicMock()
                 mock_targets_resp.status_code = 200
                 mock_targets_resp.json.return_value = {
                     'targets': [{'address': self.domain_name, 'target_id': 'test-target-id'}]
                 }
-                
-                mock_scans_resp = MagicMock()
-                mock_scans_resp.status_code = 200
-                mock_scans_resp.json.return_value = {
-                    'scans': [{'current_session': {'status': 'completed'}}]
+
+                mock_profiles_resp = MagicMock()
+                mock_profiles_resp.status_code = 200
+                mock_profiles_resp.json.return_value = {
+                    'scanning_profiles': [{'name': 'Full Scan', 'profile_id': 'full-scan-profile'}]
                 }
-                
-                mock_requests_get.side_effect = [mock_targets_resp, mock_scans_resp]
-                
+
+                mock_scan_status_resp = MagicMock()
+                mock_scan_status_resp.status_code = 200
+                mock_scan_status_resp.json.return_value = {
+                    'current_session': {'status': 'completed', 'scan_session_id': 'session-1'}
+                }
+
+                mock_vulns_resp = MagicMock()
+                mock_vulns_resp.status_code = 200
+                mock_vulns_resp.json.return_value = {
+                    'vulnerabilities': [{'vuln_id': 'vuln-1'}],
+                    'pagination': {}
+                }
+
+                mock_vuln_detail_resp = MagicMock()
+                mock_vuln_detail_resp.status_code = 200
+                mock_vuln_detail_resp.json.return_value = {
+                    'vt_name': 'Acunetix Sample Finding',
+                    'severity': 2,
+                    'description': 'Sample vulnerability description',
+                    'impact': 'Sample impact',
+                    'recommendation': 'Sample remediation',
+                    'affects_url': f'https://{self.domain_name}/login',
+                    'request': 'GET /login',
+                    'response': 'HTTP/1.1 200 OK',
+                    'vt_id': 'vt-123',
+                    'references': [{'href': 'https://example.com/advisory', 'rel': 'CVE-2024-1234'}],
+                    'cwe_id': 79,
+                }
+
+                mock_requests_get.side_effect = [
+                    mock_targets_resp,
+                    mock_profiles_resp,
+                    mock_scan_status_resp,
+                    mock_scan_status_resp,
+                    mock_vulns_resp,
+                    mock_vuln_detail_resp,
+                ]
+
+                mock_start_scan_resp = MagicMock()
+                mock_start_scan_resp.status_code = 201
+                mock_start_scan_resp.json.return_value = {
+                    'scan_id': 'scan-1',
+                    'target_id': 'test-target-id',
+                }
+                mock_requests_post.return_value = mock_start_scan_resp
+
                 res = acunetix_scan(self.task, self.domain.id, self.scan.id, self.ctx)
                 print(f"[DEBUG] acunetix_scan result: {res}")
-                
-                mock_acunetix.start_scan.assert_called()
+                self.assertTrue(res)
+                mock_requests_post.assert_called()
+                vulns = Vulnerability.objects.filter(scan_history=self.scan, source='Acunetix')
+                self.assertEqual(vulns.count(), 1)
+                self.assertEqual(vulns.first().name, 'Acunetix Sample Finding')
+
+    def test_acunetix_prefers_subdomain_id_over_stale_name(self):
+        AcunetixAPIKey.objects.create(
+            server_url="https://acunetix-instance:3443",
+            api_key="test_key"
+        )
+
+        other_subdomain = Subdomain.objects.create(
+            name="tf-test.defijn.io",
+            scan_history=self.scan,
+            target_domain=self.domain,
+            http_url="https://tf-test.defijn.io"
+        )
+        target_subdomain = Subdomain.objects.create(
+            name="test.defijn.io",
+            scan_history=self.scan,
+            target_domain=self.domain,
+            http_url="https://test.defijn.io"
+        )
+
+        with patch('reNgine.tasks.requests.get') as mock_requests_get, \
+             patch('reNgine.tasks.requests.post') as mock_requests_post:
+            mock_targets_resp = MagicMock()
+            mock_targets_resp.status_code = 200
+            mock_targets_resp.json.return_value = {'targets': []}
+
+            mock_profiles_resp = MagicMock()
+            mock_profiles_resp.status_code = 200
+            mock_profiles_resp.json.return_value = {
+                'scanning_profiles': [{'name': 'Full Scan', 'profile_id': 'full-scan-profile'}]
+            }
+
+            mock_scan_status_resp = MagicMock()
+            mock_scan_status_resp.status_code = 200
+            mock_scan_status_resp.json.return_value = {
+                'current_session': {'status': 'completed', 'scan_session_id': 'session-1'}
+            }
+
+            mock_vulns_resp = MagicMock()
+            mock_vulns_resp.status_code = 200
+            mock_vulns_resp.json.return_value = {'vulnerabilities': [], 'pagination': {}}
+
+            mock_requests_get.side_effect = [
+                mock_targets_resp,
+                mock_profiles_resp,
+                mock_scan_status_resp,
+                mock_scan_status_resp,
+                mock_vulns_resp,
+            ]
+
+            create_target_resp = MagicMock()
+            create_target_resp.status_code = 201
+            create_target_resp.json.return_value = {'target_id': 'target-1'}
+
+            start_scan_resp = MagicMock()
+            start_scan_resp.status_code = 201
+            start_scan_resp.json.return_value = {'scan_id': 'scan-1', 'target_id': 'target-1'}
+
+            mock_requests_post.side_effect = [create_target_resp, start_scan_resp]
+
+            res = acunetix_scan(
+                self.task,
+                self.domain.id,
+                self.scan.id,
+                self.ctx,
+                subdomain_id=target_subdomain.id,
+                subdomain_name=other_subdomain.name,
+                subdomain_http_url=other_subdomain.http_url,
+            )
+
+            self.assertTrue(res)
+            create_target_payload = mock_requests_post.call_args_list[0].kwargs['json']
+            self.assertEqual(create_target_payload['address'], 'https://test.defijn.io')
+
+    def test_acunetix_ignores_mismatched_subdomain_http_url(self):
+        AcunetixAPIKey.objects.create(
+            server_url="https://acunetix-instance:3443",
+            api_key="test_key"
+        )
+
+        target_subdomain = Subdomain.objects.create(
+            name="alertmanager.enjoy-gaming.live",
+            scan_history=self.scan,
+            target_domain=self.domain,
+            http_url="https://enjoy-gaming.live"
+        )
+
+        with patch('reNgine.tasks.requests.get') as mock_requests_get, \
+             patch('reNgine.tasks.requests.post') as mock_requests_post:
+            mock_targets_resp = MagicMock()
+            mock_targets_resp.status_code = 200
+            mock_targets_resp.json.return_value = {'targets': []}
+
+            mock_profiles_resp = MagicMock()
+            mock_profiles_resp.status_code = 200
+            mock_profiles_resp.json.return_value = {
+                'scanning_profiles': [{'name': 'Full Scan', 'profile_id': 'full-scan-profile'}]
+            }
+
+            mock_scan_status_resp = MagicMock()
+            mock_scan_status_resp.status_code = 200
+            mock_scan_status_resp.json.return_value = {
+                'current_session': {'status': 'completed', 'scan_session_id': 'session-1'}
+            }
+
+            mock_vulns_resp = MagicMock()
+            mock_vulns_resp.status_code = 200
+            mock_vulns_resp.json.return_value = {'vulnerabilities': [], 'pagination': {}}
+
+            mock_requests_get.side_effect = [
+                mock_targets_resp,
+                mock_profiles_resp,
+                mock_scan_status_resp,
+                mock_scan_status_resp,
+                mock_vulns_resp,
+            ]
+
+            create_target_resp = MagicMock()
+            create_target_resp.status_code = 201
+            create_target_resp.json.return_value = {'target_id': 'target-1'}
+
+            start_scan_resp = MagicMock()
+            start_scan_resp.status_code = 201
+            start_scan_resp.json.return_value = {'scan_id': 'scan-1', 'target_id': 'target-1'}
+
+            mock_requests_post.side_effect = [create_target_resp, start_scan_resp]
+
+            res = acunetix_scan(
+                self.task,
+                self.domain.id,
+                self.scan.id,
+                self.ctx,
+                subdomain_id=target_subdomain.id,
+                subdomain_name=target_subdomain.name,
+                subdomain_http_url=target_subdomain.http_url,
+            )
+
+            self.assertTrue(res)
+            create_target_payload = mock_requests_post.call_args_list[0].kwargs['json']
+            self.assertEqual(create_target_payload['address'], 'https://alertmanager.enjoy-gaming.live')
+
+    def test_find_acunetix_target_does_not_match_suffix_hostname(self):
+        from reNgine.tasks import _find_acunetix_target
+
+        targets_data = {
+            'targets': [
+                {'target_id': 'wrong', 'address': 'https://tf-test.enjoy-gaming.live'},
+                {'target_id': 'right', 'address': 'https://test.enjoy-gaming.live'},
+            ]
+        }
+
+        matched = _find_acunetix_target(
+            targets_data,
+            'test.enjoy-gaming.live',
+            'https://test.enjoy-gaming.live',
+        )
+
+        self.assertIsNotNone(matched)
+        self.assertEqual(matched['target_id'], 'right')
 
     def test_holehe_execution(self):
         email = "test@defijn.io"
