@@ -284,14 +284,14 @@ const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
       sx={{
         p: 1.5,
         mb: 1.25,
-        bgcolor: 'rgba(0,243,255,0.03)',
-        border: '1px solid rgba(0,243,255,0.15)',
+        bgcolor: alpha(theme.palette.primary.main, 0.03),
+        border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`,
         borderRadius: '6px',
         opacity: plugin.is_enabled ? 1 : 0.45,
       }}
     >
       <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center', mb: 1 }}>
-        <Box sx={{ color: '#00f3ff', flexShrink: 0 }}>
+        <Box sx={{ color: theme.palette.primary.main, flexShrink: 0 }}>
           <Settings2 size={14} />
         </Box>
         <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -307,8 +307,8 @@ const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
           size="small"
           sx={{
             height: 16, fontSize: '0.48rem', fontFamily: 'Orbitron', fontWeight: 900, flexShrink: 0,
-            bgcolor: 'rgba(0,243,255,0.08)', color: '#00f3ff',
-            border: '1px solid rgba(0,243,255,0.25)', '& .MuiChip-label': { px: 0.75 },
+            bgcolor: alpha(theme.palette.primary.main, 0.08), color: theme.palette.primary.main,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.25)}`, '& .MuiChip-label': { px: 0.75 },
           }}
         />
       </Stack>
@@ -332,13 +332,13 @@ const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
           color: '#fff',
           bgcolor: 'rgba(255,255,255,0.03)',
           '.MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
-          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0,243,255,0.3)' },
+          '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: alpha(theme.palette.primary.main, 0.3) },
           '.MuiSelect-icon': { color: 'rgba(255,255,255,0.4)' },
         }}
         MenuProps={{
           slotProps: {
             paper: {
-              sx: { bgcolor: '#0a0a14', border: '1px solid rgba(0,243,255,0.15)', color: '#fff' },
+              sx: { bgcolor: theme.palette.background.paper, border: `1px solid ${alpha(theme.palette.primary.main, 0.15)}`, color: theme.palette.common.white },
             },
           },
         }}
@@ -430,7 +430,7 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
       <Box sx={{ flex: '1 1 0', minWidth: 0 }}>
         {/* Header */}
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mb: 4 }}>
-          <Cpu size={20} color="#00f3ff" />
+          <Cpu size={20} color={theme.palette.primary.main} />
           <Box>
             <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: 1, color: '#fff', fontSize: '1.1rem' }}>
               EXECUTION PIPELINE
@@ -448,7 +448,7 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
             bgcolor: 'rgba(255,255,255,0.04)',
             '&::after': {
               content: '""', position: 'absolute', top: 0, bottom: 0, left: 0, right: 0,
-              background: 'linear-gradient(to bottom, #00f3ff 0%, transparent 100%)', opacity: 0.25,
+              background: `linear-gradient(to bottom, ${theme.palette.primary.main} 0%, transparent 100%)`, opacity: 0.25,
             },
           }} />
 
@@ -574,8 +574,8 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
           {configurablePlugins.length > 0 && (
             <>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
-                <Settings2 size={14} color="#00f3ff" />
-                <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.62rem', letterSpacing: 1.5, color: 'rgba(0,243,255,0.7)' }}>
+                <Settings2 size={14} color={theme.palette.primary.main} />
+                <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.62rem', letterSpacing: 1.5, color: alpha(theme.palette.primary.main, 0.7) }}>
                   CONFIGURABLE INJECTION
                 </Typography>
               </Stack>
