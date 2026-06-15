@@ -9,12 +9,12 @@ export default defineConfig(({ command }) => ({
     react(),
     basicSsl(),
     federation({
-      name: 'r3ngine-host',
+      name: 'host',
       filename: 'remoteEntry.js',
       exposes: {
         './pluginCardRegistry': './src/features/plugins/store/pluginCardRegistry',
       },
-      shared: ['react', 'react-dom', 'zustand'],
+      // CRITICAL: NO shared array — adding shared externalizes react/zustand and breaks the app
     }),
   ],
   base: command === 'serve' ? '/' : '/staticfiles/',
