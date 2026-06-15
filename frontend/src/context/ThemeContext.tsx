@@ -1,16 +1,15 @@
 import React, { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { hackerTheme, modernTheme, enterpriseTheme, v3LightTheme } from '../theme';
-import { alpha, type Theme } from '@mui/material/styles';
+import type { Theme } from '@mui/material/styles';
 
 import type { ThemeType } from '../theme/tokens';
-import { themeTokens } from '../theme/tokens';
+import { applyThemeCssVars } from '../theme/tokens';
 
 interface ThemeContextType {
   themeName: ThemeType;
   setTheme: (name: ThemeType) => void;
 }
-
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
@@ -18,9 +17,9 @@ const themes: Record<string, Theme> = {
   hacker: hackerTheme,
   modern: modernTheme,
   enterprise: enterpriseTheme,
-  clean: modernTheme, // Legacy mapping
-  script_kiddie: hackerTheme, // Legacy mapping
-  v3_light: v3LightTheme, // Custom light cyber theme
+  clean: modernTheme,
+  script_kiddie: hackerTheme,
+  v3_light: v3LightTheme,
 };
 
 export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -41,15 +40,8 @@ export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ childre
     document.body.setAttribute('data-v3-theme', themeName);
     document.body.setAttribute('data-ui-version', 'v3');
 
-    // Inject typography and motion variables
-    const root = document.documentElement;
-    const isEnterprise = themeName === 'enterprise' || themeName === 'v3_light';
-    const isCyber = themeName === 'hacker' || themeName === 'modern' || themeName === 'script_kiddie';
-    
-    root.style.setProperty('--r3-heading-font', isEnterprise ? '"Inter", sans-serif' : '"Orbitron", sans-serif');
-    root.style.setProperty('--r3-body-font', '"Inter", sans-serif');
-    root.style.setProperty('--r3-transition', themeTokens.effects.bezier);
-    
+    applyThemeCssVars(themeName);
+
     if (themeName === 'hacker') {
       document.body.classList.add('cyber-noise');
     } else {
@@ -57,7 +49,6 @@ export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
   }, [themeName]);
 
-  // Ensure we always have a theme object, fallback to hackerTheme
   const activeTheme = themes[themeName] || hackerTheme;
 
   return (
@@ -69,7 +60,6 @@ export const CustomThemeProvider: React.FC<{ children: ReactNode }> = ({ childre
     </ThemeContext.Provider>
   );
 };
-
 
 export const useAppTheme = () => {
   const context = useContext(ThemeContext);

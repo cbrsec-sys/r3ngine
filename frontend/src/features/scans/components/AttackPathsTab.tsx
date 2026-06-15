@@ -41,15 +41,7 @@ import {
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { Bot, Brain } from 'lucide-react';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
-
-// ─── Risk → color mapping ────────────────────────────────────────────────────
-const RISK_COLOR: Record<string, string> = {
-  critical: '#ff003c',
-  high: '#ff9f00',
-  medium: '#fffc00',
-  low: '#00ff62',
-  unknown: '#7000ff',
-};
+import { getSeverityColor } from '../../../theme/semanticColors';
 
 const RISK_LABEL: Record<string, string> = {
   critical: 'CRITICAL',
@@ -62,7 +54,7 @@ const RISK_LABEL: Record<string, string> = {
 // ─── Risk badge ───────────────────────────────────────────────────────────────
 const RiskBadge: React.FC<{ risk: string }> = ({ risk }) => {
   const { tokens } = useThemeTokens();
-  const color = RISK_COLOR[risk] ?? RISK_COLOR.unknown;
+  const color = getSeverityColor(risk, tokens);
   const label = RISK_LABEL[risk] ?? risk?.toUpperCase() ?? 'UNKNOWN';
   return (
     <Box
@@ -317,7 +309,7 @@ interface AttackPathCardProps {
 const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug }) => {
   const { tokens } = useThemeTokens();
   const [expanded, setExpanded] = useState(rank === 0);
-  const riskColor = RISK_COLOR[path.risk] ?? RISK_COLOR.unknown;
+  const riskColor = getSeverityColor(path.risk, tokens);
   const validatedCount = path.steps.filter((s) => s.validated).length;
   const inferredCount = path.steps.length - validatedCount;
   const { scanId: scanIdStr } = useParams({ strict: false });

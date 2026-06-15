@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { getSeverityColor as getSemanticSeverityColor } from '../../../theme/semanticColors';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { useParams, Link as RouterLink } from '@tanstack/react-router';
 import {
@@ -140,7 +141,7 @@ const VulnerabilityInfoModal: React.FC<{
   onClose: () => void;
   vulnerability: any;
 }> = ({ open, onClose, vulnerability }) => {
-  const { tokens } = useThemeTokens();
+  const { tokens, isLight } = useThemeTokens();
   const gptMutation = useGptVulnerabilityDetails();
   const [localVuln, setLocalVuln] = useState<any>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -152,10 +153,7 @@ const VulnerabilityInfoModal: React.FC<{
 
   if (!localVuln) return null;
 
-  const severityColor = Number(localVuln.severity) === 4 ? '#ff003c' :
-    Number(localVuln.severity) === 3 ? '#ff9f00' :
-      Number(localVuln.severity) === 2 ? '#fffc00' :
-        Number(localVuln.severity) === 1 ? '#00ff62' : tokens.accent.primary;
+  const severityColor = getSemanticSeverityColor(String(localVuln.severity ?? 'info'), tokens);
 
   const handleFetchGpt = async () => {
     if (!localVuln) return;
@@ -188,8 +186,10 @@ const VulnerabilityInfoModal: React.FC<{
       slotProps={{
         paper: {
           sx: {
-            bgcolor: '#0a0a0a',
-            backgroundImage: 'linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)',
+            bgcolor: 'background.paper',
+            backgroundImage: isLight
+              ? 'none'
+              : 'linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)',
             backgroundSize: '20px 20px',
             border: `1px solid ${severityColor}40`,
             borderRadius: 2,
@@ -249,8 +249,8 @@ const VulnerabilityInfoModal: React.FC<{
                         height: 16,
                         fontSize: '0.6rem',
                         bgcolor: 'action.hover',
-                        color: 'rgba(255,255,255,0.6)',
-                        border: '1px solid rgba(255,255,255,0.1)'
+                        color: 'text.secondary',
+                        border: `1px solid ${tokens.border.subtle}`
                       }}
                     />
                   )) || <Typography sx={{ color: 'rgba(255,255,255,0.2)', fontSize: '0.8rem' }}>N/A</Typography>}

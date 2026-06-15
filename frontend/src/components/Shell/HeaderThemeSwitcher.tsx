@@ -10,7 +10,7 @@ import {
 } from '@mui/material';
 import { Palette, Check } from 'lucide-react';
 import type { ThemeType } from '../../theme/tokens';
-import { themeTokens } from '../../theme/tokens';
+import { themeDefinitions } from '../../theme/tokens';
 
 import { useAppTheme } from '../../context/ThemeContext';
 
@@ -35,10 +35,10 @@ export const HeaderThemeSwitcher: React.FC = () => {
   };
 
   const themes: { id: ThemeType; label: string; color: string }[] = [
-    { id: 'hacker', label: 'V3 Hacker', color: themeTokens.hacker.neon.pink },
-    { id: 'modern', label: 'V3 Hybrid', color: themeTokens.modern.neon.cyan },
-    { id: 'enterprise', label: 'V3 Enterprise', color: themeTokens.enterprise.palette.primary },
-    { id: 'v3_light', label: 'V3 Light', color: themeTokens.v3_light.neon.cyan },
+    { id: 'hacker', label: 'V3 Hacker', color: themeDefinitions.hacker.accent.secondary },
+    { id: 'modern', label: 'V3 Hybrid', color: themeDefinitions.modern.accent.primary },
+    { id: 'enterprise', label: 'V3 Enterprise', color: themeDefinitions.enterprise.accent.primary },
+    { id: 'v3_light', label: 'V3 Light', color: themeDefinitions.v3_light.accent.primary },
   ];
 
 

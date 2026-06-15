@@ -52,13 +52,14 @@ import { StartScanModal } from '../../scans/components/StartScanModal';
 import type { Domain } from '../types';
 import type { ExtendedDomain } from './EditTargetModal';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { useTheme } from '@mui/material/styles';
 
 const ScanStatusCell: React.FC<{ status?: string, progress?: number }> = ({ status, progress = 0 }) => {
   const { tokens } = useThemeTokens();
   
   if (!status || status === 'NEW') {
     return (
-      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
         new
       </Typography>
     );
@@ -96,7 +97,7 @@ const ScanStatusCell: React.FC<{ status?: string, progress?: number }> = ({ stat
             />
             {status === 'INITITATED' ? 'starting' : 'running'}
           </Typography>
-          <Typography variant="caption" sx={{ color: '#fff', fontWeight: 800 }}>{progress}%</Typography>
+          <Typography variant="caption" sx={{ color: 'text.primary', fontWeight: 800 }}>{progress}%</Typography>
         </Box>
         <LinearProgress 
           variant="determinate" 
@@ -104,7 +105,7 @@ const ScanStatusCell: React.FC<{ status?: string, progress?: number }> = ({ stat
           sx={{ 
             height: 4, 
             borderRadius: 2,
-            bgcolor: 'rgba(255,255,255,0.05)',
+            bgcolor: 'action.hover',
             '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary }
           }} 
         />
@@ -130,7 +131,7 @@ const ScanStatusCell: React.FC<{ status?: string, progress?: number }> = ({ stat
 
   if (status === 'ABORTED') {
     return (
-      <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 0.5 }}>
         aborted
       </Typography>
     );
@@ -152,6 +153,17 @@ const ScanStatusCell: React.FC<{ status?: string, progress?: number }> = ({ stat
 };
 
 export const TargetList: React.FC = () => {
+  const theme = useTheme();
+  const { tokens } = useThemeTokens();
+  const headerStyles = {
+    color: theme.palette.text.secondary,
+    fontWeight: 800,
+    fontFamily: 'var(--r3-heading-font)',
+    fontSize: '0.75rem',
+    letterSpacing: 1,
+    borderBottom: `1px solid ${theme.palette.divider}`,
+    py: 1.5,
+  };
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: domains, isLoading, error } = useDomains(projectSlug);
   const { mutate: deleteTargets } = useDeleteTargets(projectSlug);
@@ -223,11 +235,11 @@ export const TargetList: React.FC = () => {
     <Box sx={{ p: 3 }}>
       {/* Top Breadcrumb Header */}
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-        <Typography variant="h5" sx={{ fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', letterSpacing: 1 }}>
+        <Typography variant="h5" sx={{ fontFamily: 'var(--r3-heading-font)', fontWeight: 900, color: 'text.primary', letterSpacing: 1 }}>
           TARGETS
         </Typography>
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', fontFamily: 'Orbitron' }}>
-          Targets {'>'} <span style={{ color: 'rgba(255,255,255,0.7)' }}>All Targets</span>
+        <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'var(--r3-heading-font)' }}>
+          Targets {'>'} <Box component="span" sx={{ color: 'text.secondary' }}>All Targets</Box>
         </Typography>
       </Box>
 
@@ -336,7 +348,7 @@ export const TargetList: React.FC = () => {
               width: 280,
               '& .MuiOutlinedInput-root': {
                 color: '#fff',
-                bgcolor: 'rgba(255,255,255,0.05)',
+                bgcolor: 'action.hover',
                 '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
               }
             }}
@@ -361,7 +373,7 @@ export const TargetList: React.FC = () => {
               size="small"
               sx={{ 
                 color: '#fff',
-                bgcolor: 'rgba(255,255,255,0.05)',
+                bgcolor: 'action.hover',
                 height: 32,
                 fontSize: '0.75rem',
                 fontFamily: 'Orbitron',
@@ -417,7 +429,7 @@ export const TargetList: React.FC = () => {
                   <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography variant="body2" sx={{ fontWeight: 800, color: '#fff' }}>{domain.name}</Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.primary' }}>{domain.name}</Typography>
                       {domain.most_recent_scan ? (
                         <Typography 
                           variant="caption" 
@@ -664,14 +676,4 @@ export const TargetList: React.FC = () => {
       )}
     </Box>
   );
-};
-
-const headerStyles = {
-  color: '#fff',
-  fontWeight: 800,
-  fontFamily: 'Orbitron',
-  fontSize: '0.75rem',
-  letterSpacing: 1,
-  borderBottom: '1px solid rgba(255,255,255,0.05)',
-  py: 1.5
 };

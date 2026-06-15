@@ -1,4 +1,5 @@
 import { useThemeTokens } from '../../theme/useThemeTokens';
+import { getMenuPaperSx } from '../../theme/semanticColors';
 import React, { useState } from 'react';
 import {
   Box,
@@ -91,10 +92,9 @@ interface NavItem {
 }
 
 export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { tokens } = useThemeTokens();
+  const { tokens, isLight, isCyber } = useThemeTokens();
   const theme = useTheme();
   const { themeName } = useAppTheme();
-  const isEnterprise = themeName === 'enterprise';
   const { version, projectName, setVersion } = useAppContext();
   const [isHovered, setIsHovered] = useState(false);
   const [openItems, setOpenItems] = useState<string[]>([]);
@@ -258,7 +258,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     { id: 'whois', title: 'Whois', icon: <Globe size={28} />, color: tokens.accent.primary },
     { id: 'cms', title: 'CMS Detector', icon: <Search size={28} />, color: tokens.accent.primary },
     { id: 'cve', title: 'CVE Lookup', icon: <Bug size={28} />, color: tokens.accent.secondary },
-    { id: 'waf', title: 'WAF Detector', icon: <ShieldAlert size={28} />, color: '#ff9800' },
+    { id: 'waf', title: 'WAF Detector', icon: <ShieldAlert size={28} />, color: tokens.accent.warning },
   ];
 
   return (
@@ -326,10 +326,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             const hasChildren = item.children && item.children.length > 0;
             const isOpen = openItems.includes(item.title);
             const isActive = activePath.startsWith(item.path);
-            const isEnterprise = themeName === 'enterprise';
-            const itemColor = isEnterprise
+            const itemColor = isLight
               ? (isActive ? theme.palette.primary.main : theme.palette.text.secondary)
-              : (isActive ? '#ec00ff' : tokens.accent.primary);
+              : (isActive ? tokens.accent.secondary : tokens.accent.primary);
 
             return (
               <React.Fragment key={item.title}>
@@ -358,7 +357,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       mr: isHovered ? 2 : 'auto',
                       justifyContent: 'center',
                       color: itemColor,
-                      filter: isEnterprise ? 'none' : `drop-shadow(0 0 5px ${itemColor}66)`
+                      filter: isCyber ? `drop-shadow(0 0 5px ${itemColor}66)` : 'none'
                     }}>
                       {item.icon}
                     </ListItemIcon>
@@ -389,8 +388,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                     <List component="div" disablePadding sx={{ ml: 2 }}>
                       {item.children?.map((child) => {
                         const isChildActive = activePath === child.path;
-                        const subActiveColor = isEnterprise ? theme.palette.primary.main : '#7000ff';
-                        const subInactiveColor = (isEnterprise || themeName === 'v3_light') ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)';
+                        const subActiveColor = isLight ? theme.palette.primary.main : tokens.severity.unknown;
+                        const subInactiveColor = theme.palette.text.secondary;
                         return (
                           <ListItemButton
                             key={child.title}
@@ -401,9 +400,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                               py: 0.5,
                               borderRadius: 1,
                               mb: 0.2,
-                              bgcolor: isChildActive ? 'rgba(112, 0, 255, 0.1)' : 'transparent',
+                              bgcolor: isChildActive ? alpha(theme.palette.primary.main, 0.1) : 'transparent',
                               '&:hover': {
-                                bgcolor: 'rgba(0, 243, 255, 0.05)',
+                                bgcolor: alpha(theme.palette.primary.main, 0.05),
                               }
                             }}
                           >
@@ -503,19 +502,19 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               <Box sx={{
                 display: 'flex',
                 alignItems: 'center',
-                bgcolor: isEnterprise ? alpha(theme.palette.text.primary, 0.05) : 'rgba(255, 255, 255, 0.03)',
+                bgcolor: isLight ? alpha(theme.palette.text.primary, 0.05) : alpha(theme.palette.text.primary, 0.03),
                 px: 2,
                 py: 0.5,
                 borderRadius: 10,
                 width: isMobileHeader ? 180 : 240,
-                border: isEnterprise ? `1px solid ${theme.palette.divider}` : '1px solid rgba(255,255,255,0.05)',
-                '&:hover': { borderColor: isEnterprise ? theme.palette.primary.main : 'rgba(0, 243, 255, 0.3)' }
+                border: `1px solid ${theme.palette.divider}`,
+                '&:hover': { borderColor: alpha(theme.palette.primary.main, 0.3) }
               }}>
                 <InputBase
                   placeholder="Universal Search..."
-                  sx={{ color: isEnterprise ? theme.palette.text.primary : 'rgba(255,255,255,0.4)', fontSize: '0.75rem', flex: 1, ml: 1 }}
+                  sx={{ color: theme.palette.text.secondary, fontSize: '0.75rem', flex: 1, ml: 1 }}
                 />
-                <Search size={14} style={{ color: isEnterprise ? theme.palette.primary.main : '#ec00ff', opacity: 0.8 }} />
+                <Search size={14} style={{ color: theme.palette.primary.main, opacity: 0.8 }} />
               </Box>
 
               {!isMobileHeader ? (
@@ -525,17 +524,17 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                     to={`/${projectSlug}/projects`}
                     sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5, textDecoration: 'none' }}
                   >
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: isEnterprise ? theme.palette.text.secondary : 'rgba(255,255,255,0.6)' }}>Projects</Typography>
-                    <ChevronDown size={14} style={{ opacity: 0.5, color: isEnterprise ? theme.palette.text.secondary : 'rgba(255,255,255,0.6)' }} />
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: theme.palette.text.secondary }}>Projects</Typography>
+                    <ChevronDown size={14} style={{ opacity: 0.5, color: theme.palette.text.secondary }} />
                   </Box>
 
                   <Box
                     onClick={handleQuickAddOpen}
                     sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: 0.5 }}
                   >
-                    <Plus size={14} style={{ opacity: 0.6, color: isEnterprise ? theme.palette.text.secondary : 'inherit' }} />
-                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: isEnterprise ? theme.palette.text.secondary : 'rgba(255,255,255,0.6)' }}>Quick Add</Typography>
-                    <ChevronDown size={14} style={{ opacity: 0.5, color: isEnterprise ? theme.palette.text.secondary : 'inherit' }} />
+                    <Plus size={14} style={{ opacity: 0.6, color: theme.palette.text.secondary }} />
+                    <Typography variant="body2" sx={{ fontSize: '0.8rem', color: theme.palette.text.secondary }}>Quick Add</Typography>
+                    <ChevronDown size={14} style={{ opacity: 0.5, color: theme.palette.text.secondary }} />
                   </Box>
 
                   <Box sx={{ display: 'flex', gap: 1, mx: 2 }}>
@@ -601,8 +600,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       }}
                     />
                     <Box sx={{ ml: 1, display: 'flex', alignItems: 'center' }}>
-                      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: isEnterprise ? theme.palette.text.primary : 'rgba(255,255,255,0.7)' }}>root</Typography>
-                      <ChevronDown size={14} style={{ opacity: 0.4, marginLeft: 4, color: isEnterprise ? theme.palette.text.secondary : 'inherit' }} />
+                      <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem', color: theme.palette.text.primary }}>root</Typography>
+                      <ChevronDown size={14} style={{ opacity: 0.4, marginLeft: 4, color: theme.palette.text.secondary }} />
                     </Box>
                   </Box>
                 </>
@@ -631,24 +630,24 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               slotProps={{
                 paper: {
                   sx: {
-                    bgcolor: isEnterprise ? theme.palette.background.paper : 'rgba(10, 10, 15, 0.95)',
+                    bgcolor: isLight ? theme.palette.background.paper : 'rgba(10, 10, 15, 0.95)',
                     backdropFilter: 'blur(12px)',
-                    border: isEnterprise ? `1px solid ${theme.palette.divider}` : '1px solid rgba(0, 243, 255, 0.2)',
+                    border: isLight ? `1px solid ${theme.palette.divider}` : '1px solid rgba(0, 243, 255, 0.2)',
                     borderRadius: 2,
                     minWidth: 200,
                     mt: 1.5,
-                    boxShadow: isEnterprise ? theme.shadows[4] : '0 8px 32px rgba(0,0,0,0.8)',
+                    boxShadow: isLight ? theme.shadows[4] : '0 8px 32px rgba(0,0,0,0.8)',
                     '& .MuiMenuItem-root': {
                       py: 1.5,
                       px: 2.5,
                       gap: 2,
-                      color: isEnterprise ? theme.palette.text.primary : 'rgba(255,255,255,0.7)',
+                      color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.7)',
                       fontFamily: 'var(--r3-heading-font)',
                       fontSize: '0.75rem',
                       letterSpacing: '1px',
                       '&:hover': {
-                        bgcolor: isEnterprise ? alpha(theme.palette.primary.main, 0.08) : 'rgba(0, 243, 255, 0.1)',
-                        color: isEnterprise ? theme.palette.primary.main : tokens.accent.primary,
+                        bgcolor: isLight ? alpha(theme.palette.primary.main, 0.08) : 'rgba(0, 243, 255, 0.1)',
+                        color: isLight ? theme.palette.primary.main : tokens.accent.primary,
                       }
                     }
                   }
@@ -680,14 +679,14 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               slotProps={{
                 paper: {
                   sx: {
-                    bgcolor: isEnterprise ? theme.palette.background.paper : 'rgba(10, 10, 15, 0.98)',
+                    bgcolor: isLight ? theme.palette.background.paper : 'rgba(10, 10, 15, 0.98)',
                     backdropFilter: 'blur(15px)',
-                    border: isEnterprise ? `1px solid ${theme.palette.divider}` : '1px solid rgba(0, 243, 255, 0.2)',
+                    border: isLight ? `1px solid ${theme.palette.divider}` : '1px solid rgba(0, 243, 255, 0.2)',
                     borderRadius: 3,
                     p: 2.5,
                     width: 320,
                     mt: 1.5,
-                    boxShadow: isEnterprise ? theme.shadows[4] : '0 10px 40px rgba(0,0,0,0.9)',
+                    boxShadow: isLight ? theme.shadows[4] : '0 10px 40px rgba(0,0,0,0.9)',
                     overflow: 'hidden',
                     '&::before': {
                       content: '""',
@@ -696,9 +695,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       left: 0,
                       right: 0,
                       height: '2px',
-                      background: isEnterprise
+                      background: isLight
                         ? `linear-gradient(90deg, ${theme.palette.primary.main}, ${theme.palette.secondary.main})`
-                        : 'linear-gradient(90deg, #00f3ff, #ff00ff)',
+                        : `linear-gradient(90deg, ${tokens.accent.primary}, ${tokens.accent.secondary})`,
                       zIndex: 1
                     }
                   }
@@ -709,16 +708,16 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             >
               <Box sx={{ px: 2, py: 1, mb: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Typography sx={{
-                  color: isEnterprise ? theme.palette.primary.main : tokens.accent.secondary,
+                  color: isLight ? theme.palette.primary.main : tokens.accent.secondary,
                   fontFamily: 'var(--r3-heading-font)',
                   fontSize: '0.75rem',
                   fontWeight: 900,
                   letterSpacing: '3px',
-                  textShadow: isEnterprise ? 'none' : '0 0 10px rgba(255, 0, 255, 0.5)'
+                  textShadow: isLight ? 'none' : '0 0 10px rgba(255, 0, 255, 0.5)'
                 }}>
                   TOOLBOX
                 </Typography>
-                <Box sx={{ width: 40, height: 1, bgcolor: isEnterprise ? theme.palette.divider : 'rgba(255,0,255,0.2)' }} />
+                <Box sx={{ width: 40, height: 1, bgcolor: isLight ? theme.palette.divider : 'rgba(255,0,255,0.2)' }} />
               </Box>
               <Grid container spacing={2}>
                 {toolboxItems.map((item) => (
@@ -736,17 +735,17 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         border: '1px solid transparent',
                         '&:hover': {
-                          bgcolor: isEnterprise ? alpha(theme.palette.primary.main, 0.08) : 'rgba(255, 255, 255, 0.03)',
-                          borderColor: isEnterprise ? alpha(theme.palette.primary.main, 0.2) : 'rgba(255, 255, 255, 0.05)',
+                          bgcolor: isLight ? alpha(theme.palette.primary.main, 0.08) : 'rgba(255, 255, 255, 0.03)',
+                          borderColor: isLight ? alpha(theme.palette.primary.main, 0.2) : 'rgba(255, 255, 255, 0.05)',
                           transform: 'translateY(-4px)',
-                          boxShadow: isEnterprise ? `0 4px 20px ${theme.palette.primary.main}15` : `0 4px 20px ${item.color}15`,
+                          boxShadow: isLight ? `0 4px 20px ${theme.palette.primary.main}15` : `0 4px 20px ${item.color}15`,
                           '& .icon-box': {
-                            color: isEnterprise ? theme.palette.primary.main : item.color,
-                            filter: isEnterprise ? 'none' : `drop-shadow(0 0 12px ${item.color}cc)`
+                            color: isLight ? theme.palette.primary.main : item.color,
+                            filter: isLight ? 'none' : `drop-shadow(0 0 12px ${item.color}cc)`
                           },
                           '& .item-text': {
-                            color: isEnterprise ? theme.palette.primary.main : '#fff',
-                            textShadow: isEnterprise ? 'none' : `0 0 8px ${item.color}aa`
+                            color: isLight ? theme.palette.primary.main : theme.palette.text.primary,
+                            textShadow: isLight ? 'none' : `0 0 8px ${item.color}aa`
                           }
                         }
                       }}
@@ -755,12 +754,12 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                         className="icon-box"
                         sx={{
                           mb: 2,
-                          color: isEnterprise ? theme.palette.text.secondary : 'rgba(255,255,255,0.3)',
+                          color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.3)',
                           transition: 'all 0.3s',
                           display: 'flex',
                           transform: 'scale(1)',
                           '& svg': {
-                            filter: isEnterprise ? 'none' : 'drop-shadow(0 0 2px rgba(255,255,255,0.1))'
+                            filter: isLight ? 'none' : 'drop-shadow(0 0 2px rgba(255,255,255,0.1))'
                           }
                         }}
                       >
@@ -768,7 +767,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       </Box>
                       <Typography className="item-text" sx={{
                         fontSize: '0.7rem',
-                        color: isEnterprise ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)',
+                        color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)',
                         fontFamily: 'var(--r3-heading-font)',
                         textAlign: 'center',
                         fontWeight: 700,
@@ -976,29 +975,25 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               slotProps={{
                 paper: {
                   sx: {
-                    bgcolor: 'rgba(10, 10, 15, 0.98)',
-                    backdropFilter: 'blur(15px)',
-                    border: '1px solid rgba(0, 243, 255, 0.2)',
-                    borderRadius: 2,
+                    ...getMenuPaperSx(isLight, theme, tokens),
                     minWidth: 240,
                     mt: 1.5,
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
                     overflow: 'hidden',
                     '& .MuiMenuItem-root': {
                       py: 1.5,
                       px: 2.5,
                       gap: 2,
-                      color: 'rgba(255,255,255,0.7)',
-                      fontFamily: 'Orbitron',
+                      color: theme.palette.text.secondary,
+                      fontFamily: 'var(--r3-heading-font)',
                       fontSize: '0.75rem',
                       letterSpacing: '1px',
                       transition: 'all 0.2s',
                       '&:hover': {
-                        bgcolor: 'rgba(0, 243, 255, 0.1)',
+                        bgcolor: alpha(theme.palette.primary.main, 0.1),
                         color: tokens.accent.primary,
                         '& .menu-icon': {
                           color: tokens.accent.primary,
-                          filter: 'drop-shadow(0 0 5px #00f3ffaa)'
+                          filter: isCyber ? `drop-shadow(0 0 5px ${tokens.accent.primary}aa)` : 'none',
                         }
                       }
                     }
@@ -1008,8 +1003,8 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               transformOrigin={{ horizontal: 'right', vertical: 'top' }}
               anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
             >
-              <Box sx={{ px: 2.5, py: 1.5, borderBottom: '1px solid rgba(255,255,255,0.05)', mb: 1 }}>
-                <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', fontWeight: 600, letterSpacing: 0.5 }}>
+              <Box sx={{ px: 2.5, py: 1.5, borderBottom: `1px solid ${theme.palette.divider}`, mb: 1 }}>
+                <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary, fontWeight: 600, letterSpacing: 0.5 }}>
                   Welcome root!
                 </Typography>
               </Box>
@@ -1029,25 +1024,25 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                 <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Admin Settings</Typography>
               </MenuItem>
 
-              <Divider sx={{ bgcolor: 'rgba(255,255,255,0.05)', my: 1 }} />
+              <Divider sx={{ bgcolor: theme.palette.divider, my: 1 }} />
 
               <MenuItem onClick={handleUpdateCheckClick}>
                 <RefreshCw size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
                 <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                   <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Check reNgine Update</Typography>
                   {updateAvailable && (
-                    <Typography sx={{ fontSize: '0.6rem', color: '#ff0055', fontWeight: 800 }}>Update Available!</Typography>
+                    <Typography sx={{ fontSize: '0.6rem', color: tokens.accent.error, fontWeight: 800 }}>Update Available!</Typography>
                   )}
                 </Box>
               </MenuItem>
 
-              <Divider sx={{ bgcolor: 'rgba(255,255,255,0.05)', my: 1 }} />
+              <Divider sx={{ bgcolor: theme.palette.divider, my: 1 }} />
 
               <MenuItem
                 onClick={handleMenuClose}
                 component="a"
                 href="/logout"
-                sx={{ '&:hover': { color: '#ff003c !important', bgcolor: 'rgba(255, 0, 60, 0.1) !important' } }}
+                sx={{ '&:hover': { color: `${tokens.accent.error} !important`, bgcolor: `${alpha(tokens.accent.error, 0.1)} !important` } }}
               >
                 <LogOut size={16} className="menu-icon" style={{ transition: 'all 0.2s' }} />
                 <Typography sx={{ fontSize: 'inherit', fontFamily: 'inherit', fontWeight: 600 }}>Logout</Typography>
