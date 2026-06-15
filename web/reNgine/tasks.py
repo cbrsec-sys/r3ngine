@@ -278,6 +278,9 @@ def initiate_scan_temporal(
 
 		scan.save()
 
+		from reNgine.utils.scan_cancellation import set_scan_stop_kill_switch
+		set_scan_stop_kill_switch(scan.id, enabled=False)
+
 		# ---- Create scan results directory ----
 		os.makedirs(scan.results_dir, exist_ok=True)
 
@@ -7901,6 +7904,9 @@ def resume_scan_temporal(scan_id):
 	scan.recovery_count = 0
 	scan.tasks = remaining_tasks
 	scan.save()
+
+	from reNgine.utils.scan_cancellation import set_scan_stop_kill_switch
+	set_scan_stop_kill_switch(scan.id, enabled=False)
 	
 	# Rebuild ctx — tasks must be in ctx so TargetProfilingActivity does not
 	# fall back to engine.tasks (the full original list) and reset the resume.
