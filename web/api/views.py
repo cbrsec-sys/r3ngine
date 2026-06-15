@@ -4556,6 +4556,31 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 	serializer_class = VulnerabilitySerializer
 	queryset = Vulnerability.objects.none()
 
+	@staticmethod
+	def _normalize_severity_filter(severity_value):
+		from reNgine.definitions import NUCLEI_SEVERITY_MAP
+
+		if severity_value is None:
+			return None
+
+		if isinstance(severity_value, int):
+			return severity_value
+
+		raw_value = str(severity_value).strip().lower()
+		if raw_value == '':
+			return None
+
+		if raw_value.lstrip('-').isdigit():
+			return int(raw_value)
+
+		aliases = {
+			'crit': 'critical',
+			'med': 'medium',
+			'informational': 'info',
+		}
+		normalized_value = aliases.get(raw_value, raw_value)
+		return NUCLEI_SEVERITY_MAP.get(normalized_value)
+
 	def get_queryset(self):
 		req = self.request
 		project = req.query_params.get('project')
@@ -4603,7 +4628,9 @@ class VulnerabilityViewSet(viewsets.ModelViewSet):
 		if vulnerability_name:
 			qs = qs.filter(Q(name=vulnerability_name)).distinct()
 		if severity:
-			qs = qs.filter(severity=severity)
+			severity_num = self._normalize_severity_filter(severity)
+			if severity_num is not None:
+				qs = qs.filter(severity=severity_num)
 		if validation_status:
 			qs = qs.filter(validation_status__iexact=validation_status)
 		if open_status is not None:

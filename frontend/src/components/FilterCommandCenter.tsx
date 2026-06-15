@@ -22,6 +22,7 @@ export interface FilterCommandCenterProps {
   onFilterChange: (filters: Record<string, string>) => void;
   searchQuery?: string;
   onSearchChange?: (search: string) => void;
+  onSearchSubmit?: () => void;
   placeholder?: string;
 }
 
@@ -31,6 +32,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
   onFilterChange,
   searchQuery = '',
   onSearchChange,
+  onSearchSubmit,
   placeholder = 'Filter or command...',
 }) => {
   const { tokens } = useThemeTokens();
@@ -134,6 +136,11 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
         placeholder={Object.keys(filters).length === 0 ? placeholder : ''}
         value={searchQuery}
         onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && onSearchSubmit) {
+            onSearchSubmit();
+          }
+        }}
         sx={{
           flex: 1,
           '& .MuiInput-underline:before': { borderBottom: 'none' },
