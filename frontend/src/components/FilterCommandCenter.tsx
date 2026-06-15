@@ -75,9 +75,12 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
 
   const getFacetLabel = (facetId: string, value: string) => {
     const facet = facets.find((f) => f.id === facetId);
+    const values = value.split(',').map((item) => item.trim()).filter(Boolean);
     if (facet?.options) {
-      const option = facet.options.find((o) => o.value === value);
-      if (option) return option.label;
+      const labels = values
+        .map((selectedValue) => facet.options?.find((o) => o.value === selectedValue)?.label || selectedValue)
+        .filter(Boolean);
+      if (labels.length > 0) return labels.join(', ');
     }
     return value;
   };
