@@ -161,3 +161,23 @@ class TestFfufAcMcConflict(TestCase):
         cmd = result['ffuf_base_cmd']
         self.assertFalse('-ac' in cmd and '-mc' in cmd,
                          "Command must never contain both -ac and -mc")
+
+
+class TestFfufDefaultMatchStatus(TestCase):
+    """Bug #4: default match status must include discovery-relevant codes."""
+
+    REQUIRED_CODES = [200, 204, 301, 302, 307, 401, 403, 405]
+
+    def test_default_match_status_includes_discovery_codes(self):
+        from reNgine.definitions import FFUF_DEFAULT_MATCH_HTTP_STATUS
+        for code in self.REQUIRED_CODES:
+            self.assertIn(code, FFUF_DEFAULT_MATCH_HTTP_STATUS,
+                          f"HTTP {code} must be in FFUF_DEFAULT_MATCH_HTTP_STATUS")
+
+    def test_no_duplicate_status_codes(self):
+        from reNgine.definitions import FFUF_DEFAULT_MATCH_HTTP_STATUS
+        self.assertEqual(
+            len(FFUF_DEFAULT_MATCH_HTTP_STATUS),
+            len(set(FFUF_DEFAULT_MATCH_HTTP_STATUS)),
+            "FFUF_DEFAULT_MATCH_HTTP_STATUS must not contain duplicates"
+        )
