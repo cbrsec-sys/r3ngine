@@ -1226,6 +1226,7 @@ def run_acunetix_activity(ctx: dict) -> bool:
         description='Acunetix Scan',
         domain_id=ctx.get('domain_id'),
         scan_history_id=ctx.get('scan_history_id'),
+        subdomain_id=ctx.get('subdomain_id'),
         subdomain_name=ctx.get('subdomain_name'),
         subdomain_http_url=ctx.get('subdomain_http_url'),
     )
