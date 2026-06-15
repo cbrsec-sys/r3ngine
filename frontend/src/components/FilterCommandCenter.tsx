@@ -21,6 +21,7 @@ export interface FilterCommandCenterProps {
   onFilterChange: (filters: Record<string, string>) => void;
   searchQuery?: string;
   onSearchChange?: (search: string) => void;
+  onSearchSubmit?: () => void;
   placeholder?: string;
 }
 
@@ -30,6 +31,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
   onFilterChange,
   searchQuery = '',
   onSearchChange,
+  onSearchSubmit,
   placeholder = 'Filter or command...',
 }) => {
   const theme = useTheme();
@@ -54,7 +56,19 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
   };
 
   const handleSelectFacetValue = (facetId: string, value: string) => {
-    onFilterChange({ ...filters, [facetId]: value });
+    const currentValues = filters[facetId]
+      ? filters[facetId].split(',').map((item) => item.trim()).filter(Boolean)
+      : [];
+    const nextValues = currentValues.includes(value)
+      ? currentValues.filter((item) => item !== value)
+      : [...currentValues, value];
+    const nextFilters = { ...filters };
+    if (nextValues.length > 0) {
+      nextFilters[facetId] = nextValues.join(',');
+    } else {
+      delete nextFilters[facetId];
+    }
+    onFilterChange(nextFilters);
     handleCloseFilters();
   };
 
@@ -72,9 +86,12 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
 
   const getFacetLabel = (facetId: string, value: string) => {
     const facet = facets.find((f) => f.id === facetId);
+    const values = value.split(',').map((item) => item.trim()).filter(Boolean);
     if (facet?.options) {
-      const option = facet.options.find((o) => o.value === value);
-      if (option) return option.label;
+      const labels = values
+        .map((selectedValue) => facet.options?.find((o) => o.value === selectedValue)?.label || selectedValue)
+        .filter(Boolean);
+      if (labels.length > 0) return labels.join(', ');
     }
     return value;
   };
@@ -126,7 +143,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
               '& .MuiChip-deleteIcon': {
                 color: getFacetColor(facetId, value),
                 '&:hover': {
-                  color: isLight ? theme.palette.text.primary : '#fff',
+                  color: 'text.primary',
                 }
               }
             }}
@@ -139,13 +156,18 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
         placeholder={Object.keys(filters).length === 0 ? placeholder : ''}
         value={searchQuery}
         onChange={(e) => onSearchChange && onSearchChange(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' && onSearchSubmit) {
+            onSearchSubmit();
+          }
+        }}
         sx={{
           flex: 1,
           '& .MuiInput-underline:before': { borderBottom: 'none' },
           '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottom: 'none' },
           '& .MuiInput-underline:after': { borderBottom: 'none' },
           input: {
-            color: isLight ? theme.palette.text.primary : '#fff',
+            color: 'text.primary',
             fontFamily: 'monospace',
             '&::placeholder': {
               color: isLight ? theme.palette.text.secondary : 'rgba(255, 255, 255, 0.5)',
@@ -179,7 +201,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
             borderRadius: '8px',
             minWidth: 250,
             maxHeight: 400,
-            color: isLight ? theme.palette.text.primary : '#fff',
+            color: 'text.primary',
             boxShadow: isLight ? theme.shadows[4] : '0 4px 20px rgba(0,0,0,0.5)',
           }
         }}
@@ -219,7 +241,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
               >
                 ←
               </Button>
-              <Typography variant="body2" sx={{ fontFamily: 'monospace', color: isLight ? theme.palette.text.primary : '#fff', flex: 1 }}>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.primary', flex: 1 }}>
                 Select {facets.find(f => f.id === activeFacetId)?.label}
               </Typography>
             </Box>

@@ -22,6 +22,7 @@ import {
 import { useParameters } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { copyToClipboard } from '../../endpoints/utils/copy';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 interface ParametersTabProps {
   scanId?: number;
@@ -29,6 +30,7 @@ interface ParametersTabProps {
 }
 
 export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }) => {
+  const { tokens } = useThemeTokens();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
@@ -83,7 +85,7 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 80) return '#00ff62';
-    if (confidence >= 50) return '#00f3ff';
+    if (confidence >= 50) return tokens.accent.primary;
     if (confidence >= 20) return '#ffae00';
     return '#888';
   };
@@ -98,8 +100,8 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
           borderRadius: '4px',
           overflow: 'hidden',
           flex: 1,
-          border: '1px solid rgba(0, 243, 255, 0.2)',
-          boxShadow: '0 0 20px rgba(0, 243, 255, 0.05)'
+          border: `1px solid ${tokens.accent.primary}33`,
+          boxShadow: `0 0 20px ${tokens.accent.primary}0D`
         }}>
           <InputBase
             placeholder={"Search Parameters..."}
@@ -111,23 +113,23 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
               px: 3,
               py: 1.5,
               fontSize: '0.9rem',
-              color: '#fff',
-              '&::placeholder': { color: 'rgba(255,255,255,0.3)', opacity: 1 }
+              color: 'text.primary',
+              '&::placeholder': { color: 'text.disabled', opacity: 1 }
             }}
           />
           <Button
             onClick={handleSearch}
             startIcon={<Search size={18} />}
             sx={{
-              bgcolor: 'rgba(0, 243, 255, 0.1)',
-              color: '#00f3ff',
+              bgcolor: `${tokens.accent.primary}15`,
+              color: tokens.accent.primary,
               px: 4,
               borderRadius: 0,
               fontWeight: 800,
               letterSpacing: 2,
               fontFamily: 'Orbitron',
-              borderLeft: '1px solid rgba(0, 243, 255, 0.2)',
-              '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+              borderLeft: `1px solid ${tokens.accent.primary}33`,
+              '&:hover': { bgcolor: `${tokens.accent.primary}33` }
             }}
           >
             SEARCH
@@ -250,13 +252,13 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
       {/* Main Tactical Panel */}
       <TacticalPanel title={"DISCOVERED PARAMETERS"} icon={<LayoutGrid size={14} />}>
         {/* Table Controls */}
-        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
-              RESULTS : <Box component="span" sx={{ color: '#00f3ff' }}>{data?.count || 0}</Box>
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: 'text.secondary', letterSpacing: 1 }}>
+              RESULTS : <Box component="span" sx={{ color: tokens.accent.primary }}>{data?.count || 0}</Box>
             </Typography>
-            <Box sx={{ px: 2, py: 0.5, bgcolor: 'rgba(0, 243, 255, 0.05)', borderRadius: 0.5, border: '1px solid rgba(0, 243, 255, 0.1)' }}>
-              <Typography sx={{ fontSize: '10px', fontWeight: 800, color: '#00f3ff', fontFamily: 'Orbitron' }}>
+            <Box sx={{ px: 2, py: 0.5, bgcolor: `${tokens.accent.primary}0D`, borderRadius: 0.5, border: `1px solid ${tokens.accent.primary}15` }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 800, color: tokens.accent.primary, fontFamily: 'Orbitron' }}>
                 PAGE {page} OF {Math.ceil((data?.count || 0) / 100) || 1}
               </Typography>
             </Box>
@@ -267,8 +269,8 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
                 size="small"
                 onClick={() => setFilterOpen(o => !o)}
                 sx={{
-                  color: filterOpen || activeFilterCount > 0 ? '#00f3ff' : 'rgba(255,255,255,0.5)',
-                  border: `1px solid ${filterOpen || activeFilterCount > 0 ? 'rgba(0,243,255,0.3)' : 'rgba(255,255,255,0.1)'}`,
+                  color: filterOpen || activeFilterCount > 0 ? tokens.accent.primary : 'text.secondary',
+                  border: `1px solid ${filterOpen || activeFilterCount > 0 ? `${tokens.accent.primary}4D` : 'rgba(255,255,255,0.1)'}`,
                   borderRadius: 1,
                   position: 'relative'
                 }}
@@ -287,7 +289,7 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
               </IconButton>
             </Tooltip>
             <Tooltip title="Export Data">
-              <IconButton size="small" sx={{ color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1 }}><Download size={16} /></IconButton>
+              <IconButton size="small" sx={{ color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}15`, border: `1px solid ${tokens.accent.primary}33`, borderRadius: 1 }}><Download size={16} /></IconButton>
             </Tooltip>
           </Box>
         </Box>
@@ -297,7 +299,7 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
           overflowX: 'auto',
           width: '100%',
           '&::-webkit-scrollbar': { height: '6px' },
-          '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderRadius: '3px' }
+          '&::-webkit-scrollbar-thumb': { bgcolor: `${tokens.accent.primary}33`, borderRadius: '3px' }
         }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead>
@@ -306,38 +308,38 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
                 borderBottom: '1px solid rgba(255,255,255,0.1)',
                 backgroundColor: 'rgba(255,255,255,0.02)'
               }}>
-                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>ENDPOINT URL</th>
-                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PARAMETER / VALUE</th>
-                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>INTELLIGENCE</th>
-                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SOURCES / CONFIDENCE</th>
+                <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>ENDPOINT URL</th>
+                <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PARAMETER / VALUE</th>
+                <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>INTELLIGENCE</th>
+                <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SOURCES / CONFIDENCE</th>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
                   <td colSpan={4} style={{ padding: '40px', textAlign: 'center' }}>
-                    <CircularProgress size={24} sx={{ color: '#00f3ff' }} />
+                    <CircularProgress size={24} sx={{ color: tokens.accent.primary }} />
                   </td>
                 </tr>
               ) : data?.results.map((param) => (
-                <tr key={param.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
+                <tr key={param.id} style={{ borderBottom: 1, borderColor: 'divider', transition: 'background 0.2s' }}>
                   <td style={{ padding: '16px', verticalAlign: 'top', maxWidth: '300px' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
                         <Typography sx={{
                           fontSize: '12px',
                           fontWeight: 500,
-                          color: '#fff',
+                          color: 'text.primary',
                           textDecoration: 'none',
                           wordBreak: 'break-all',
-                          '&:hover': { color: '#00f3ff' }
+                          '&:hover': { color: tokens.accent.primary }
                         }} component="a" href={/^https?:\/\//i.test(param.endpoint?.http_url ?? '') ? param.endpoint!.http_url : '#'} target="_blank">
                           {param.endpoint?.http_url}
                         </Typography>
                         <IconButton
                           size="small"
                           onClick={() => { const url = param.endpoint?.http_url; if (url) copyToClipboard(url); }}
-                          sx={{ color: 'rgba(255,255,255,0.2)', p: 0.5, '&:hover': { color: '#00f3ff' } }}
+                          sx={{ color: 'rgba(255,255,255,0.2)', p: 0.5, '&:hover': { color: tokens.accent.primary } }}
                         >
                           <Copy size={12} />
                         </IconButton>
@@ -348,7 +350,7 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#00f3ff', fontFamily: 'monospace' }}>
+                        <Typography sx={{ fontSize: '13px', fontWeight: 700, color: tokens.accent.primary, fontFamily: 'monospace' }}>
                           {param.name}
                         </Typography>
                         {param.data_type && (
@@ -360,7 +362,7 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
                         )}
                       </Box>
                       {param.value && (
-                        <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 1, border: '1px solid rgba(255,255,255,0.1)' }}>
+                        <Box sx={{ px: 1, py: 0.5, bgcolor: 'action.hover', borderRadius: 1, border: '1px solid rgba(255,255,255,0.1)' }}>
                           <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.7)', fontFamily: 'monospace', wordBreak: 'break-all' }}>
                             = {param.value}
                           </Typography>
@@ -386,14 +388,14 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
                         <Chip label="GRAPHQL" size="small" sx={{ height: 18, fontSize: '9px', fontWeight: 900, bgcolor: 'rgba(20,184,166,0.1)', color: '#14b8a6', border: '1px solid rgba(20,184,166,0.2)' }} />
                       )}
                       {(!param.is_auth_related && !param.param_location && !param.observed_in_js && !param.observed_in_openapi && !param.observed_in_graphql) && (
-                        <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Standard</Typography>
+                        <Typography sx={{ fontSize: '10px', color: 'text.disabled', fontStyle: 'italic' }}>Standard</Typography>
                       )}
                     </Box>
                   </td>
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
                     <Stack spacing={1}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron' }}>CONFIDENCE:</Typography>
+                        <Typography sx={{ fontSize: '10px', color: 'text.secondary', fontFamily: 'Orbitron' }}>CONFIDENCE:</Typography>
                         <Typography sx={{ fontSize: '11px', fontWeight: 900, color: getConfidenceColor(param.confidence) }}>
                           {param.confidence}%
                         </Typography>
@@ -440,17 +442,17 @@ export const ParametersTab: React.FC<ParametersTabProps> = ({ scanId, targetId }
             size="small"
             sx={{
               '& .MuiPaginationItem-root': {
-                color: 'rgba(255,255,255,0.4)',
+                color: 'text.secondary',
                 borderColor: 'rgba(255,255,255,0.1)',
                 fontFamily: 'Orbitron',
                 fontSize: '10px',
                 '&.Mui-selected': {
-                  bgcolor: 'rgba(0, 243, 255, 0.1)',
-                  color: '#00f3ff',
-                  borderColor: '#00f3ff'
+                  bgcolor: `${tokens.accent.primary}15`,
+                  color: tokens.accent.primary,
+                  borderColor: tokens.accent.primary
                 },
                 '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.05)'
+                  bgcolor: 'action.hover'
                 }
               }
             }}

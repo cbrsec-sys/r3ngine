@@ -8,7 +8,7 @@ import { themeTokens } from '../../../theme/tokens';
 export const TrendCharts: React.FC<{ data: DashboardData['trends'] }> = ({ data }) => {
   const theme = useTheme();
   const isLight = theme.palette.mode === 'light';
-  const chartColors = isLight ? themeTokens.enterprise.charts.area : ['#00f3ff', '#ff003c', '#7000ff'];
+  const chartColors = isLight ? themeTokens.enterprise.chart.series.slice(0, 3) : ['#00f3ff', '#ff003c', '#7000ff'];
   const chartMode = isLight ? 'light' : 'dark';
 
   const areaOptions: any = {

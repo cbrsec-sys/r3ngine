@@ -15,15 +15,21 @@ INTERNAL_TOOLS_PID=$!
 pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
 
 
-python3 manage.py loaddata fixtures/default_keywords.yaml --app scanEngine.InterestingLookupModel
-python3 manage.py loaddata fixtures/external_tools.yaml --app scanEngine.InstalledExternalTool
 
-# TEMPORARY FIX FOR langchain
-pip install requests==2.32.3 "urllib3>=1.26.0,<3.0.0" "charset-normalizer>=3.0.0,<4.0.0" "chardet>=5.0.0,<6.0.0"
-pip install tenacity==8.2.2
+python3 manage.py loaddata \
+    fixtures/default_keywords.yaml \
+    fixtures/external_tools.yaml
+
+
 
 # Temporary fix for whatportis bug
 sed -i 's/purge()/truncate()/g' "$(python3 -c "import whatportis.cli; print(whatportis.cli.__file__)")"
+
+# Temporary fix for Sublist3r get_csrftoken bug
+if [ -f "/usr/src/github/Sublist3r/sublist3r.py" ]; then
+  sed -i "s/token = csrf_regex.findall(resp)\[0\]/token = csrf_regex.findall(resp)[0] if csrf_regex.findall(resp) else ''/g" /usr/src/github/Sublist3r/sublist3r.py
+fi
+
 
 # update whatportis
 yes | whatportis --update
@@ -186,9 +192,7 @@ fi
 # httpx alias
 echo 'alias httpx="/usr/local/bin/httpx"' >> ~/.bashrc
 
-# TEMPORARY FIX FOR langchain
-pip install requests==2.32.3 "urllib3>=1.26.0,<3.0.0" "charset-normalizer>=3.0.0,<4.0.0" "chardet>=5.0.0,<6.0.0"
-pip3 install tenacity==8.2.2
+
 
 vulnx update
 

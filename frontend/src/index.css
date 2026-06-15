@@ -2,6 +2,34 @@
   --r3-heading-font: 'Orbitron', sans-serif;
   --r3-body-font: 'Inter', sans-serif;
   --r3-transition: cubic-bezier(0.32, 0.72, 0, 1);
+  /* Semantic tokens — overridden at runtime by applyThemeCssVars */
+  --r3-bg-primary: #0a0a0f;
+  --r3-bg-secondary: #12121a;
+  --r3-bg-glass: rgba(12, 10, 20, 0.75);
+  --r3-bg-elevated: #12121a;
+  --r3-text-primary: #e0e0e0;
+  --r3-text-secondary: rgba(224, 224, 224, 0.7);
+  --r3-text-muted: rgba(255, 255, 255, 0.4);
+  --r3-text-disabled: rgba(255, 255, 255, 0.2);
+  --r3-border-subtle: rgba(0, 243, 255, 0.2);
+  --r3-border-strong: rgba(0, 243, 255, 0.4);
+  --r3-accent-primary: #00f3ff;
+  --r3-accent-secondary: #bc13fe;
+  --r3-accent-success: #00ff62;
+  --r3-accent-warning: #ff9f00;
+  --r3-accent-error: #ff003c;
+  --r3-accent-info: #00aaff;
+  --r3-severity-critical: #ff003c;
+  --r3-severity-high: #ff9f00;
+  --r3-severity-medium: #fffc00;
+  --r3-severity-low: #00ff62;
+  --r3-severity-info: #00f3ff;
+  --r3-severity-unknown: #7000ff;
+  --r3-chart-grid: rgba(255, 255, 255, 0.05);
+  --r3-chart-tooltip-bg: rgba(5, 5, 20, 0.95);
+  --r3-chart-tooltip-text: #e0e0e0;
+  --r3-effect-radius: 18px;
+  --r3-effect-bezier: cubic-bezier(0.32, 0.72, 0, 1);
 }
 
 * {
@@ -54,13 +82,20 @@ h6 {
 }
 
 .neon-text {
+  text-shadow: 0 0 10px color-mix(in srgb, var(--r3-accent-primary) 50%, transparent);
+}
+
+[data-v3-theme="hacker"] .neon-text,
+[data-v3-theme="modern"] .neon-text,
+[data-v3-theme="script_kiddie"] .neon-text {
   text-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
 }
 
 .glass-panel {
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid var(--r3-border-subtle);
   border-radius: 12px;
+  background: var(--r3-bg-glass);
 }
 
 /* Custom Scrollbar */
@@ -73,43 +108,44 @@ h6 {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--r3-text-primary) 15%, transparent);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--r3-text-primary) 25%, transparent);
 }
+
 /* Map Marker Pulse */
 @keyframes mapPulse {
-  0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 243, 255, 0.7); }
-  70% { transform: scale(1); box-shadow: 0 0 0 10px rgba(0, 243, 255, 0); }
-  100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(0, 243, 255, 0); }
+  0% { transform: scale(0.95); box-shadow: 0 0 0 0 color-mix(in srgb, var(--r3-accent-primary) 70%, transparent); }
+  70% { transform: scale(1); box-shadow: 0 0 0 10px color-mix(in srgb, var(--r3-accent-primary) 0%, transparent); }
+  100% { transform: scale(0.95); box-shadow: 0 0 0 0 color-mix(in srgb, var(--r3-accent-primary) 0%, transparent); }
 }
 
 .map-marker-pulse {
-  background: #00f3ff;
+  background: var(--r3-accent-primary);
   border-radius: 50%;
   height: 10px;
   width: 10px;
-  box-shadow: 0 0 10px rgba(0, 243, 255, 0.5);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--r3-accent-primary) 50%, transparent);
   animation: mapPulse 2s infinite;
-  border: 1px solid rgba(255, 255, 255, 0.5);
+  border: 1px solid color-mix(in srgb, var(--r3-text-primary) 50%, transparent);
 }
 
 /* Tactical Map Tooltip */
 .leaflet-tooltip.tactical-tooltip {
-  background-color: rgba(5, 5, 20, 0.9) !important;
-  border: 1px solid rgba(0, 243, 255, 0.3) !important;
+  background-color: var(--r3-chart-tooltip-bg) !important;
+  border: 1px solid var(--r3-border-subtle) !important;
   border-radius: 4px !important;
   box-shadow: 0 0 15px rgba(0, 0, 0, 0.5) !important;
-  color: #fff !important;
+  color: var(--r3-chart-tooltip-text) !important;
   padding: 0 !important;
-  font-family: 'Orbitron', sans-serif !important;
+  font-family: var(--r3-heading-font) !important;
 }
 
 .leaflet-tooltip-top.tactical-tooltip:before {
-  border-top-color: rgba(0, 243, 255, 0.3) !important;
+  border-top-color: var(--r3-border-subtle) !important;
 }
 
 @keyframes tacticalPulse {
@@ -147,31 +183,30 @@ h6 {
 .progress-bar-flow {
   background: linear-gradient(
     90deg,
-    rgba(0, 243, 255, 0.8) 0%,
-    rgba(0, 168, 255, 1) 25%,
-    rgba(0, 243, 255, 0.8) 50%,
-    rgba(0, 168, 255, 1) 75%,
-    rgba(0, 243, 255, 0.8) 100%
+    color-mix(in srgb, var(--r3-accent-primary) 80%, transparent) 0%,
+    color-mix(in srgb, var(--r3-accent-info) 100%, transparent) 25%,
+    color-mix(in srgb, var(--r3-accent-primary) 80%, transparent) 50%,
+    color-mix(in srgb, var(--r3-accent-info) 100%, transparent) 75%,
+    color-mix(in srgb, var(--r3-accent-primary) 80%, transparent) 100%
   ) !important;
   background-size: 200% 100% !important;
   animation: progress-flow 2s linear infinite !important;
 }
 
-
 /* Cytoscape Context Menu */
 .custom-context-menu {
-  background: rgba(15, 23, 42, 0.95) !important;
+  background: var(--r3-bg-elevated) !important;
   backdrop-filter: blur(12px) !important;
-  border: 1px solid rgba(0, 243, 255, 0.3) !important;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 10px rgba(0, 243, 255, 0.2) !important;
+  border: 1px solid var(--r3-border-subtle) !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5), 0 0 10px color-mix(in srgb, var(--r3-accent-primary) 20%, transparent) !important;
   padding: 4px 0 !important;
   border-radius: 8px !important;
   min-width: 200px !important;
 }
 
 .custom-context-menu-item {
-  color: #e2e8f0 !important;
-  font-family: 'Orbitron', sans-serif !important;
+  color: var(--r3-text-primary) !important;
+  font-family: var(--r3-heading-font) !important;
   font-size: 10px !important;
   padding: 8px 16px !important;
   text-transform: uppercase !important;
@@ -180,13 +215,19 @@ h6 {
 }
 
 .custom-context-menu-item:hover {
-  background: rgba(0, 243, 255, 0.15) !important;
-  color: #00f3ff !important;
+  background: color-mix(in srgb, var(--r3-accent-primary) 15%, transparent) !important;
+  color: var(--r3-accent-primary) !important;
 }
 
 .custom-context-menu-item.cy-context-menu-item-separator {
   height: 1px !important;
-  background: rgba(255, 255, 255, 0.05) !important;
+  background: var(--r3-border-subtle) !important;
   margin: 4px 0 !important;
   padding: 0 !important;
+}
+
+/* Light theme: softer context menu shadow */
+[data-v3-theme="enterprise"] .custom-context-menu,
+[data-v3-theme="v3_light"] .custom-context-menu {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08) !important;
 }

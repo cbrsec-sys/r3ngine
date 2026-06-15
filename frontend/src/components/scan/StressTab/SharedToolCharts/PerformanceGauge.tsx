@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../../../../theme/useThemeTokens';
 import React, { useMemo } from 'react';
 import { useTheme, alpha } from '@mui/material';
 import ReactECharts from 'echarts-for-react';
@@ -25,6 +26,7 @@ export const PerformanceGauge: React.FC<PerformanceGaugeProps> = ({
   colorRanges = [],
   size = 200,
 }) => {
+  const { tokens } = useThemeTokens();
   const theme = useTheme();
 
   // Ensure valid data types

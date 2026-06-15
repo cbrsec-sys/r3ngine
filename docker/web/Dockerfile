@@ -5,7 +5,8 @@
 FROM node:22-alpine AS frontend-builder
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
-RUN npm install
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
 COPY frontend/ ./
 RUN npm run build
 
@@ -30,7 +31,9 @@ ENV GO111MODULE=on
 
 # All tools in one RUN: single cache-invalidation point, no intermediate layers
 # retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols.
-RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && \
     go install -ldflags="-s -w" -v github.com/jaeles-project/gospider@latest && \
     go install -ldflags="-s -w" -v github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006 && \
     go install -ldflags="-s -w" -v github.com/tomnomnom/unfurl@latest && \
@@ -38,7 +41,7 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest && \
-    go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.3.8 && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.9.0 && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
     go install -ldflags="-s -w" -v github.com/hakluke/hakrawler@latest && \
     go install -ldflags="-s -w" -v github.com/lc/gau/v2/cmd/gau@latest && \
@@ -59,11 +62,12 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/Chocapikk/wpprobe@latest && \
     go install -ldflags="-s -w" -v github.com/hueristiq/xurlfind3r/cmd/xurlfind3r@latest && \
     go install -ldflags="-s -w" -v github.com/edoardottt/cariddi/cmd/cariddi@latest && \
-    go install -ldflags="-s -w" -v github.com/dimasma0305/wp-taint-scan/cmd/taint-scan@latest && \
-    rm -rf /go/pkg /root/.cache/go-build
+    go install -ldflags="-s -w" -v github.com/dimasma0305/wp-taint-scan/cmd/taint-scan@latest
 
 # betterleaks has no published go install path — clone and build directly.
-RUN git clone --depth 1 https://github.com/betterleaks/betterleaks /tmp/betterleaks && \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    git clone --depth 1 https://github.com/betterleaks/betterleaks /tmp/betterleaks && \
     cd /tmp/betterleaks && make build && \
     cp betterleaks /go/bin/betterleaks && \
     rm -rf /tmp/betterleaks
@@ -80,10 +84,12 @@ FROM golang:1.25-bookworm AS executor-builder
 WORKDIR /build
 # Copy executor source from the repo root context
 COPY web/executor/go.mod web/executor/go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 COPY web/executor/ ./
-RUN CGO_ENABLED=0 GO111MODULE=on go build -ldflags="-s -w" -o /usr/local/bin/r3ngine-executor . && \
-    rm -rf /root/.cache/go-build /go/pkg
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GO111MODULE=on go build -ldflags="-s -w" -o /usr/local/bin/r3ngine-executor .
 
 # ===========================================================================
 # Stage: Vigolium Builder
@@ -112,8 +118,10 @@ WORKDIR /build/vigolium
 RUN make ensure-audit && make ensure-jsscan
 
 # Compile vigolium binary
-RUN go build -ldflags="-s -w" -o /usr/local/bin/vigolium ./cmd/vigolium && \
-    rm -rf /root/.cache/go-build /root/.bun /go/pkg /build/vigolium
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -ldflags="-s -w" -o /usr/local/bin/vigolium ./cmd/vigolium && \
+    rm -rf /build/vigolium
 
 
 # ===========================================================================
@@ -137,7 +145,10 @@ RUN git clone --depth 1 https://github.com/hahwul/dalfox /tmp/dalfox
 
 WORKDIR /tmp/dalfox
 
-RUN cargo build --release && \
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/tmp/dalfox/target \
+    cargo build --release && \
     cp target/release/dalfox /usr/local/bin/dalfox
 
 
@@ -369,8 +380,8 @@ RUN playwright install-deps chromium && \
 # Called blocking from temporal-python-orchestrator and temporal-go-executor
 # entrypoints. NOT called from the web entrypoint.
 # ---------------------------------------------------------------------------
-COPY docker/web/internal_tools.sh /usr/src/app/internal_tools.sh
-RUN chmod +x /usr/src/app/internal_tools.sh
+COPY docker/web/internal_tools.sh /usr/src/internal_tools.sh
+RUN chmod +x /usr/src/internal_tools.sh
 
 # ---------------------------------------------------------------------------
 # Copy application source (placed last — changes most frequently, so layers
@@ -381,8 +392,6 @@ COPY docker/web/entrypoint.sh /usr/src/app/entrypoint.sh
 COPY docker/temporal-python-orchestrator/entrypoint.sh /usr/src/app/temporal-entrypoint.sh
 COPY docker/temporal-go-executor/entrypoint.sh /usr/src/app/executor-entrypoint.sh
 RUN chmod +x /usr/src/app/entrypoint.sh /usr/src/app/temporal-entrypoint.sh /usr/src/app/executor-entrypoint.sh
-COPY docker/web/internal_tools.sh /usr/src/internal_tools.sh
-RUN chmod +x /usr/src/internal_tools.sh
 
 # ---------------------------------------------------------------------------
 # Copy built frontend from frontend-builder

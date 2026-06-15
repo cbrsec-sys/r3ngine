@@ -28,8 +28,10 @@ import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { useProxySettings, useUpdateProxySettings, useFetchProxies, useProxyTaskStatus, useTorStatus } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { ProxyValidationModal } from './ProxyValidationModal';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ProxySettingsPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data: settings, isLoading: isSettingsLoading } = useProxySettings(projectSlug);
   const updateSettings = useUpdateProxySettings(projectSlug);
@@ -168,7 +170,7 @@ export const ProxySettingsPage: React.FC = () => {
 
   const parsedProxies = proxyList.split('\n').map(p => p.trim()).filter(p => p.length > 0);
 
-  if (isSettingsLoading) return <LinearProgress sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />;
+  if (isSettingsLoading) return <LinearProgress sx={{ bgcolor: `${tokens.accent.primary}1A`, '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary } }} />;
 
   return (
     <Box sx={{ p: 3 }}>
@@ -178,30 +180,30 @@ export const ProxySettingsPage: React.FC = () => {
             fontFamily: 'Orbitron',
             fontWeight: 900,
             letterSpacing: 2,
-            color: '#fff',
-            textShadow: '0 0 20px rgba(0, 243, 255, 0.5)',
+            color: 'text.primary',
+            textShadow: `0 0 20px ${tokens.accent.primary}80`,
             mb: 1
           }}>
             PROXY SETTINGS
           </Typography>
-          <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
+          <Typography variant="body2" sx={{ color: 'text.secondary', letterSpacing: 1 }}>
             TRAFFIC ANONYMIZATION & RATE LIMIT BYPASS
           </Typography>
         </Box>
         <Box sx={{ textAlign: 'right' }}>
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron', display: 'block', mb: 1 }}>
-            SETTINGS {'>'} <span style={{ color: '#00f3ff' }}>PROXY</span>
+          <Typography variant="caption" sx={{ color: 'text.disabled', fontFamily: 'Orbitron', display: 'block', mb: 1 }}>
+            SETTINGS {'>'} <span style={{ color: tokens.accent.primary }}>PROXY</span>
           </Typography>
           <Box sx={{
             display: 'inline-flex',
             alignItems: 'center',
-            bgcolor: 'rgba(0, 243, 255, 0.1)',
+            bgcolor: `${tokens.accent.primary}1A`,
             px: 1.5,
             py: 0.5,
             borderRadius: 1,
-            border: '1px solid rgba(0, 243, 255, 0.3)'
+            border: `1px solid ${tokens.accent.primary}4D`
           }}>
-            <Typography variant="caption" sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontWeight: 700, letterSpacing: 1 }}>
+            <Typography variant="caption" sx={{ color: tokens.accent.primary, fontFamily: 'Orbitron', fontWeight: 700, letterSpacing: 1 }}>
               TOTAL PROXIES: {proxyList.split('\n').filter(p => p.trim() !== '').length}
             </Typography>
           </Box>
@@ -213,10 +215,10 @@ export const ProxySettingsPage: React.FC = () => {
           severity="info"
           icon={<Shield size={20} />}
           sx={{
-            bgcolor: 'rgba(0, 243, 255, 0.05)',
-            color: '#00f3ff',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
-            '& .MuiAlert-icon': { color: '#00f3ff' }
+            bgcolor: `${tokens.accent.primary}0D`,
+            color: tokens.accent.primary,
+            border: `1px solid ${tokens.accent.primary}33`,
+            '& .MuiAlert-icon': { color: tokens.accent.primary }
           }}
         >
           Every website has a limit to requests. Exceeding it results in blocks.
@@ -232,13 +234,13 @@ export const ProxySettingsPage: React.FC = () => {
                     checked={useProxy}
                     onChange={(e) => setUseProxy(e.target.checked)}
                     sx={{
-                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
                     }}
                   />
                 }
                 label={
-                  <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.9rem', fontWeight: 700 }}>
+                  <Typography sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontSize: '0.9rem', fontWeight: 700 }}>
                     ENABLE PROXY ROTATION
                   </Typography>
                 }
@@ -251,17 +253,17 @@ export const ProxySettingsPage: React.FC = () => {
                     onChange={(e) => setUseProxychains(e.target.checked)}
                     disabled={!useProxy}
                     sx={{
-                      '& .MuiSwitch-switchBase.Mui-checked': { color: '#ff00ff' },
-                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#ff00ff' }
+                      '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.secondary },
+                      '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.secondary }
                     }}
                   />
                 }
                 label={
                   <Box>
-                    <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.9rem', fontWeight: 700 }}>
+                    <Typography sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontSize: '0.9rem', fontWeight: 700 }}>
                       USE PROXYCHAINS WRAPPER
                     </Typography>
-                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
+                    <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
                       Force proxy usage for tools without native proxy support
                     </Typography>
                   </Box>
@@ -271,19 +273,20 @@ export const ProxySettingsPage: React.FC = () => {
 
             <Box sx={{
               mt: 3, p: 2,
-              bgcolor: 'rgba(255, 255, 255, 0.02)',
+              bgcolor: 'action.hover',
               borderRadius: 1,
-              border: '1px solid rgba(0, 243, 255, 0.1)',
+              border: 1,
+              borderColor: 'divider',
               display: 'flex',
               alignItems: 'center',
               gap: 2,
               flexWrap: { xs: 'wrap', md: 'nowrap' },
             }}>
               <Box sx={{ flex: 1, minWidth: 0 }}>
-                <Typography variant="subtitle2" sx={{ color: '#fff', fontFamily: 'Orbitron', mb: 0.5, fontWeight: 700 }}>
+                <Typography variant="subtitle2" sx={{ color: 'text.primary', fontFamily: 'Orbitron', mb: 0.5, fontWeight: 700 }}>
                   AUTOMATED PROXY FETCH LIMIT
                 </Typography>
-                <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'block' }}>
+                <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
                   Select the maximum number of raw proxies to scrape and check for liveness.
                   (Note: It may take a while to complete [~75000/10m:00s]. Validation rate: ~1/3%)
                 </Typography>
@@ -298,10 +301,10 @@ export const ProxySettingsPage: React.FC = () => {
                         checked={fetchLimit === n}
                         onChange={() => handleLimitChange(n)}
                         size="small"
-                        sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
+                        sx={{ color: `${tokens.accent.primary}4D`, '&.Mui-checked': { color: tokens.accent.primary } }}
                       />
                     }
-                    label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{n.toLocaleString()} Proxies</Typography>}
+                    label={<Typography sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{n.toLocaleString()} Proxies</Typography>}
                     sx={{ mr: 0 }}
                   />
                 ))}
@@ -311,10 +314,10 @@ export const ProxySettingsPage: React.FC = () => {
                       checked={fetchLimit === 'custom'}
                       onChange={() => handleLimitChange('custom')}
                       size="small"
-                      sx={{ color: 'rgba(0, 243, 255, 0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
+                      sx={{ color: `${tokens.accent.primary}4D`, '&.Mui-checked': { color: tokens.accent.primary } }}
                     />
                   }
-                  label={<Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.78rem' }}>Custom</Typography>}
+                  label={<Typography sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontSize: '0.78rem' }}>Custom</Typography>}
                   sx={{ mr: 0 }}
                 />
                 {fetchLimit === 'custom' && (
@@ -327,13 +330,13 @@ export const ProxySettingsPage: React.FC = () => {
                     sx={{
                       ml: 1,
                       width: 160,
-                      '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.75rem' },
+                      '& .MuiInputLabel-root': { color: 'text.secondary', fontFamily: 'Orbitron', fontSize: '0.75rem' },
                       '& .MuiOutlinedInput-root': {
-                        color: '#fff',
-                        bgcolor: 'rgba(255,255,255,0.02)',
-                        '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                        '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
-                        '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+                        color: 'text.primary',
+                        bgcolor: 'action.hover',
+                        '& fieldset': { borderColor: 'divider' },
+                        '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                        '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
                       },
                     }}
                   />
@@ -341,7 +344,7 @@ export const ProxySettingsPage: React.FC = () => {
               </Box>
             </Box>
 
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mt: 3, mb: 1, fontWeight: 600 }}>
+            <Typography variant="body2" sx={{ color: 'text.secondary', mt: 3, mb: 1, fontWeight: 600 }}>
               PROXY LIST (ONE PER LINE)
             </Typography>
             <TextField
@@ -355,13 +358,13 @@ export const ProxySettingsPage: React.FC = () => {
               placeholder="http://ip:port\nhttp://user:pass@ip:port"
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: '#fff',
-                  bgcolor: 'rgba(255,255,255,0.02)',
+                  color: 'text.primary',
+                  bgcolor: 'action.hover',
                   fontFamily: 'monospace',
                   fontSize: '0.85rem',
-                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                  '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
-                  '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+                  '& fieldset': { borderColor: 'divider' },
+                  '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                  '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
                 },
                 '& .Mui-disabled': {
                   opacity: 0.5,
@@ -371,17 +374,17 @@ export const ProxySettingsPage: React.FC = () => {
             />
 
             {currentTaskId && (
-              <Box sx={{ mb: 4, p: 2, bgcolor: 'rgba(255, 255, 255, 0.02)', borderRadius: 1, border: '1px solid rgba(0, 243, 255, 0.1)' }}>
+              <Box sx={{ mb: 4, p: 2, bgcolor: 'action.hover', borderRadius: 1, border: 1, borderColor: 'divider' }}>
                 <Stack direction="row" spacing={2} sx={{ alignItems: 'center', mb: 2 }}>
                   {(!taskStatus || taskStatus.status === 'PROGRESS' || taskStatus.status === 'PENDING') ? (
-                    <CircularProgress size={20} sx={{ color: '#00f3ff' }} />
+                    <CircularProgress size={20} sx={{ color: tokens.accent.primary }} />
                   ) : taskStatus.status === 'SUCCESS' ? (
                     <CheckCircle2 size={20} color="#00ff00" />
                   ) : (
                     <AlertCircle size={20} color="#ff0055" />
                   )}
                   <Box sx={{ flexGrow: 1 }}>
-                    <Typography variant="subtitle2" sx={{ color: '#fff', fontFamily: 'Orbitron', mb: 0.5 }}>
+                    <Typography variant="subtitle2" sx={{ color: 'text.primary', fontFamily: 'Orbitron', mb: 0.5 }}>
                       {taskStatus?.message || 'Initializing task...'}
                     </Typography>
                     <LinearProgress
@@ -391,11 +394,11 @@ export const ProxySettingsPage: React.FC = () => {
                         height: 6,
                         borderRadius: 3,
                         bgcolor: 'rgba(255, 255, 255, 0.05)',
-                        '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' }
+                        '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary }
                       }}
                     />
                   </Box>
-                  <Typography variant="caption" sx={{ color: 'rgba(255, 255, 255, 0.5)', fontFamily: 'Orbitron' }}>
+                  <Typography variant="caption" sx={{ color: 'text.secondary', fontFamily: 'Orbitron' }}>
                     {taskStatus?.progress || 0}%
                   </Typography>
                 </Stack>
@@ -419,11 +422,11 @@ export const ProxySettingsPage: React.FC = () => {
                 onClick={handleFetchClick}
                 disabled={fetchProxies.isPending || (taskStatus && taskStatus.status === 'PROGRESS')}
                 sx={{
-                  borderColor: '#00f3ff',
-                  color: '#00f3ff',
+                  borderColor: tokens.accent.primary,
+                  color: tokens.accent.primary,
                   fontFamily: 'Orbitron',
                   fontWeight: 800,
-                  '&:hover': { borderColor: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)' }
+                  '&:hover': { borderColor: tokens.accent.primary, bgcolor: `${tokens.accent.primary}1A` }
                 }}
               >
                 FETCH & UPDATE
@@ -437,13 +440,13 @@ export const ProxySettingsPage: React.FC = () => {
                       onChange={(e) => setValidateOnSave(e.target.checked)}
                       size="small"
                       sx={{
-                        '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' }
+                        '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary }
                       }}
                     />
                   }
                   label={
-                    <Typography sx={{ color: '#fff', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>
+                    <Typography sx={{ color: 'text.primary', fontFamily: 'Orbitron', fontSize: '0.8rem' }}>
                       VALIDATE ON SAVE
                     </Typography>
                   }
@@ -454,12 +457,12 @@ export const ProxySettingsPage: React.FC = () => {
                   onClick={handleSave}
                   disabled={updateSettings.isPending}
                   sx={{
-                    bgcolor: 'rgba(0, 243, 255, 0.1)',
-                    color: '#00f3ff',
-                    border: '1px solid rgba(0, 243, 255, 0.3)',
+                    bgcolor: `${tokens.accent.primary}1A`,
+                    color: tokens.accent.primary,
+                    border: `1px solid ${tokens.accent.primary}4D`,
                     fontFamily: 'Orbitron',
                     fontWeight: 800,
-                    '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)', boxShadow: '0 0 20px rgba(0, 243, 255, 0.4)' }
+                    '&:hover': { bgcolor: `${tokens.accent.primary}33`, boxShadow: `0 0 20px ${tokens.accent.primary}66` }
                   }}
                 >
                   {updateSettings.isPending ? 'SAVING...' : 'SAVE PROXIES'}
@@ -545,7 +548,7 @@ export const ProxySettingsPage: React.FC = () => {
             fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}E6` : 'rgba(255, 0, 85, 0.9)',
             color: '#000',
             '& .MuiAlert-icon': { color: '#000' }
           }}

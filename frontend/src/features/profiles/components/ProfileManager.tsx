@@ -21,7 +21,10 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const EMPTY_FORM: CreateProfilePayload = { name: '', description: '', category: 'speed' };
 
+import { useThemeTokens } from '../../../theme/useThemeTokens';
+
 export const ProfileManager: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { data: profiles = [], isLoading, refetch } = useScanProfiles();
   const createMutation = useCreateScanProfile();
   const deleteMutation = useDeleteScanProfile();
@@ -60,7 +63,7 @@ export const ProfileManager: React.FC = () => {
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
         <Typography
           variant="h6"
-          sx={{ fontFamily: 'Orbitron', fontWeight: 700, color: '#00ff62', fontSize: '0.9rem', letterSpacing: 1 }}
+          sx={{ fontFamily: 'Orbitron', fontWeight: 700, color: tokens.accent.primary, fontSize: '0.9rem', letterSpacing: 1 }}
         >
           SCAN PROFILES
         </Typography>
@@ -70,14 +73,14 @@ export const ProfileManager: React.FC = () => {
           size="small"
           onClick={() => setShowCreate(v => !v)}
           sx={{
-            borderColor: 'rgba(0, 255, 98, 0.5)',
-            color: '#00ff62',
+            borderColor: `${tokens.accent.primary}80`,
+            color: tokens.accent.primary,
             fontFamily: 'Orbitron',
             fontWeight: 700,
             fontSize: '0.7rem',
             '&:hover': {
-              borderColor: '#00ff62',
-              bgcolor: 'rgba(0, 255, 98, 0.1)',
+              borderColor: tokens.accent.primary,
+              bgcolor: `${tokens.accent.primary}15`,
             },
           }}
         >
@@ -88,13 +91,13 @@ export const ProfileManager: React.FC = () => {
       <Collapse in={showCreate}>
         <Box sx={{
           p: 2, mb: 3,
-          border: '1px solid rgba(0, 255, 98, 0.2)',
+          border: 1, borderColor: 'divider',
           borderRadius: 1,
-          bgcolor: 'rgba(0, 255, 98, 0.03)',
+          bgcolor: 'action.hover',
         }}>
           <Typography
             variant="subtitle2"
-            sx={{ mb: 2, fontFamily: 'Orbitron', fontWeight: 700, color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem' }}
+            sx={{ mb: 2, fontFamily: 'Orbitron', fontWeight: 700, color: 'text.secondary', fontSize: '0.75rem' }}
           >
             Create Custom Profile
           </Typography>
@@ -110,15 +113,15 @@ export const ProfileManager: React.FC = () => {
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 sx={{
                   '& .MuiOutlinedInput-root': {
-                    color: '#fff',
+                    color: 'text.primary',
                     '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                    '&:hover fieldset': { borderColor: 'rgba(0, 255, 98, 0.3)' },
-                    '&.Mui-focused fieldset': { borderColor: '#00ff62' },
-                    bgcolor: 'rgba(255,255,255,0.03)',
+                    '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                    '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
+                    bgcolor: 'action.hover',
                   },
                   '& .MuiInputLabel-root': {
-                    color: 'rgba(255,255,255,0.4)',
-                    '&.Mui-focused': { color: '#00ff62' },
+                    color: 'text.secondary',
+                    '&.Mui-focused': { color: tokens.accent.primary },
                   },
                 }}
               />
@@ -126,17 +129,17 @@ export const ProfileManager: React.FC = () => {
             <Grid size={{ xs: 12, sm: 6 }}>
               <FormControl fullWidth size="small" sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: '#fff',
+                  color: 'text.primary',
                   '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                  '&:hover fieldset': { borderColor: 'rgba(0, 255, 98, 0.3)' },
-                  '&.Mui-focused fieldset': { borderColor: '#00ff62' },
-                  bgcolor: 'rgba(255,255,255,0.03)',
+                  '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                  '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
+                  bgcolor: 'action.hover',
                 },
                 '& .MuiInputLabel-root': {
-                  color: 'rgba(255,255,255,0.4)',
-                  '&.Mui-focused': { color: '#00ff62' },
+                  color: 'text.secondary',
+                  '&.Mui-focused': { color: tokens.accent.primary },
                 },
-                '& .MuiSelect-icon': { color: 'rgba(255,255,255,0.4)' },
+                '& .MuiSelect-icon': { color: 'text.secondary' },
               }}>
                 <InputLabel>Category</InputLabel>
                 <Select

@@ -21,6 +21,25 @@ import {
   Collapse
 } from '@mui/material';
 import { X, FileText, Shield, FileSearch, Download, MessageSquare, ChevronDown, ChevronUp } from 'lucide-react';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
+
+const SectionTitle = ({ title, icon }: { title: string, icon?: React.ReactNode }) => {
+  const { tokens } = useThemeTokens();
+  return (
+    <Typography sx={{
+      color: tokens.accent.primary,
+      fontFamily: 'Orbitron',
+      fontSize: '0.75rem',
+      fontWeight: 800,
+      mb: 2,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 1
+    }}>
+      {icon} {title}
+    </Typography>
+  );
+};
 
 interface ScanReportModalProps {
   open: boolean;
@@ -29,6 +48,7 @@ interface ScanReportModalProps {
 }
 
 export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose, scanId }) => {
+  const { tokens } = useThemeTokens();
   const [reportType, setReportType] = useState('full');
   const [reportTemplate, setReportTemplate] = useState('modern');
   const [ignoreInfoVuln, setIgnoreInfoVuln] = useState(false);
@@ -126,12 +146,12 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
       slotProps={{
         paper: {
           sx: {
-            bgcolor: '#0d0c14',
+            bgcolor: 'background.default',
             backgroundImage: 'linear-gradient(rgba(0, 243, 255, 0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 243, 255, 0.02) 1px, transparent 1px)',
             backgroundSize: '20px 20px',
-            border: '1px solid rgba(0, 243, 255, 0.2)',
+            border: `1px solid ${tokens.accent.primary}33`,
             borderRadius: 0,
-            boxShadow: '0 0 30px rgba(0, 0, 0, 0.5), 0 0 10px rgba(0, 243, 255, 0.1)',
+            boxShadow: `0 0 30px rgba(0, 0, 0, 0.5), 0 0 10px ${tokens.accent.primary}15`,
           }
         }
       }}
@@ -139,18 +159,18 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
       <DialogTitle sx={{
         m: 0,
         p: 2,
-        bgcolor: 'rgba(0, 243, 255, 0.05)',
-        borderBottom: '1px solid rgba(0, 243, 255, 0.1)',
+        bgcolor: `${tokens.accent.primary}0D`,
+        borderBottom: `1px solid ${tokens.accent.primary}15`,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between'
       }}>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-          <FileText size={20} color="#00f3ff" />
+          <FileText size={20} color={tokens.accent.primary} />
           <Typography sx={{
             fontFamily: 'Orbitron',
             fontWeight: 900,
-            color: '#fff',
+            color: 'text.primary',
             letterSpacing: '0.1rem',
             fontSize: '1rem'
           }}>
@@ -158,7 +178,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
           </Typography>
         </Stack>
         {!isGenerating && (
-          <IconButton onClick={onClose} sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#ff003c' } }}>
+          <IconButton onClick={onClose} sx={{ color: 'text.secondary', '&:hover': { color: '#ff003c' } }}>
             <X size={20} />
           </IconButton>
         )}
@@ -169,16 +189,16 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
           {generationStatus && (
             <Box sx={{ 
               p: 2, 
-              bgcolor: reportUrl ? 'rgba(0, 255, 127, 0.05)' : 'rgba(0, 243, 255, 0.05)', 
-              border: `1px solid ${reportUrl ? 'rgba(0, 255, 127, 0.2)' : 'rgba(0, 243, 255, 0.2)'}`,
+              bgcolor: reportUrl ? 'rgba(0, 255, 127, 0.05)' : `${tokens.accent.primary}0D`, 
+              border: `1px solid ${reportUrl ? 'rgba(0, 255, 127, 0.2)' : `${tokens.accent.primary}33`}`,
               borderRadius: 1,
               display: 'flex',
               alignItems: 'center',
               gap: 2
             }}>
-              {isGenerating && <CircularProgress size={20} sx={{ color: '#00f3ff' }} />}
+              {isGenerating && <CircularProgress size={20} sx={{ color: tokens.accent.primary }} />}
               {!isGenerating && reportUrl && <Shield size={20} color="#00ff7f" />}
-              <Typography sx={{ color: reportUrl ? '#00ff7f' : '#00f3ff', fontSize: '0.8rem', fontWeight: 700, fontFamily: 'Orbitron' }}>
+              <Typography sx={{ color: reportUrl ? '#00ff7f' : tokens.accent.primary, fontSize: '0.8rem', fontWeight: 700, fontFamily: 'Orbitron' }}>
                 {generationStatus}
               </Typography>
             </Box>
@@ -186,7 +206,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
 
           <Box sx={{ opacity: isGenerating ? 0.5 : 1, pointerEvents: isGenerating ? 'none' : 'auto' }}>
             <Typography sx={{
-              color: '#00f3ff',
+              color: tokens.accent.primary,
               fontFamily: 'Orbitron',
               fontSize: '0.75rem',
               fontWeight: 800,
@@ -203,21 +223,21 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                 <Stack spacing={1}>
                   <FormControlLabel
                     value="full"
-                    control={<Radio sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
+                    control={<Radio sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }} />}
                     label={
                       <Box>
-                        <Typography sx={{ color: '#fff', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'Orbitron' }}>Full Scan Report</Typography>
-                        <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem' }}>Includes all findings: subdomains, endpoints, and vulnerabilities.</Typography>
+                        <Typography sx={{ color: 'text.primary', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'Orbitron' }}>Full Scan Report</Typography>
+                        <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>Includes all findings: subdomains, endpoints, and vulnerabilities.</Typography>
                       </Box>
                     }
                   />
                   <FormControlLabel
                     value="vulnerability"
-                    control={<Radio sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
+                    control={<Radio sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }} />}
                     label={
                       <Box>
-                        <Typography sx={{ color: '#fff', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'Orbitron' }}>Vulnerability Report</Typography>
-                        <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.7rem' }}>Focuses specifically on detected security vulnerabilities.</Typography>
+                        <Typography sx={{ color: 'text.primary', fontSize: '0.85rem', fontWeight: 700, fontFamily: 'Orbitron' }}>Vulnerability Report</Typography>
+                        <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>Focuses specifically on detected security vulnerabilities.</Typography>
                       </Box>
                     }
                   />
@@ -226,11 +246,11 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
             </FormControl>
           </Box>
 
-          <Divider sx={{ borderColor: 'rgba(0, 243, 255, 0.1)' }} />
+          <Divider sx={{ borderColor: `${tokens.accent.primary}15` }} />
 
           <Box sx={{ opacity: isGenerating ? 0.5 : 1, pointerEvents: isGenerating ? 'none' : 'auto' }}>
             <Typography sx={{
-              color: '#00f3ff',
+              color: tokens.accent.primary,
               fontFamily: 'Orbitron',
               fontSize: '0.75rem',
               fontWeight: 800,
@@ -254,23 +274,23 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                 }}>
                   <FormControlLabel
                     value="default"
-                    control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
-                    label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Default</Typography>}
+                    control={<Radio size="small" sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }} />}
+                    label={<Typography sx={{ color: 'text.primary', fontSize: '0.8rem', fontWeight: 600 }}>Default</Typography>}
                   />
                   <FormControlLabel
                     value="modern"
-                    control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
-                    label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Modern (V2)</Typography>}
+                    control={<Radio size="small" sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }} />}
+                    label={<Typography sx={{ color: 'text.primary', fontSize: '0.8rem', fontWeight: 600 }}>Modern (V2)</Typography>}
                   />
                   <FormControlLabel
                     value="enterprise"
-                    control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
-                    label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Enterprise</Typography>}
+                    control={<Radio size="small" sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }} />}
+                    label={<Typography sx={{ color: 'text.primary', fontSize: '0.8rem', fontWeight: 600 }}>Enterprise</Typography>}
                   />
                   <FormControlLabel
                     value="cyber_pro"
-                    control={<Radio size="small" sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }} />}
-                    label={<Typography sx={{ color: '#fff', fontSize: '0.8rem', fontWeight: 600 }}>Cyber Pro</Typography>}
+                    control={<Radio size="small" sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }} />}
+                    label={<Typography sx={{ color: 'text.primary', fontSize: '0.8rem', fontWeight: 600 }}>Cyber Pro</Typography>}
                   />
                 </RadioGroup>
               </Box>
@@ -281,7 +301,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                     <Checkbox
                       checked={ignoreInfoVuln}
                       onChange={(e) => setIgnoreInfoVuln(e.target.checked)}
-                      sx={{ color: 'rgba(0,243,255,0.2)', '&.Mui-checked': { color: '#00f3ff' } }}
+                      sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }}
                     />
                   }
                   label={<Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', fontWeight: 600 }}>Ignore Information Vulnerabilities</Typography>}
@@ -294,8 +314,8 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                       disabled={reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro'}
                       onChange={(e) => setIncludeAttackSurface(e.target.checked)}
                       sx={{ 
-                        color: 'rgba(0,243,255,0.1)', 
-                        '&.Mui-checked': { color: '#00f3ff' },
+                        color: `${tokens.accent.primary}15`, 
+                        '&.Mui-checked': { color: tokens.accent.primary },
                         '&.Mui-disabled': { color: 'rgba(255,255,255,0.05)' }
                       }}
                     />
@@ -311,7 +331,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                         Include Attack Surface Map
                       </Typography>
                       {reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro' && (
-                        <Typography sx={{ color: 'rgba(0,243,255,0.3)', fontSize: '0.65rem' }}>Only available for Enterprise/Pro templates</Typography>
+                        <Typography sx={{ color: `${tokens.accent.primary}4D`, fontSize: '0.65rem' }}>Only available for Enterprise/Pro templates</Typography>
                       )}
                     </Box>
                   }
@@ -350,7 +370,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
             </Stack>
           </Box>
 
-          <Divider sx={{ borderColor: 'rgba(0, 243, 255, 0.1)' }} />
+          <Divider sx={{ borderColor: `${tokens.accent.primary}15` }} />
 
           <Box sx={{ opacity: isGenerating ? 0.5 : 1, pointerEvents: isGenerating ? 'none' : 'auto' }}>
             <Box
@@ -368,7 +388,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
               }}
             >
               <Typography sx={{
-                color: '#00f3ff',
+                color: tokens.accent.primary,
                 fontFamily: 'Orbitron',
                 fontSize: '0.75rem',
                 fontWeight: 800,
@@ -378,7 +398,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
               }}>
                 <MessageSquare size={14} /> ASSESSMENT COMMENTS (OPTIONAL)
               </Typography>
-              {commentsExpanded ? <ChevronUp size={16} color="#00f3ff" /> : <ChevronDown size={16} color="#00f3ff" />}
+              {commentsExpanded ? <ChevronUp size={16} color={tokens.accent.primary} /> : <ChevronDown size={16} color={tokens.accent.primary} />}
             </Box>
             
             <Collapse in={commentsExpanded}>
@@ -389,24 +409,24 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                 placeholder="Enter any comments or notes about the assessment to insert into the {comments} placeholder..."
                 value={comments}
                 onChange={(e) => setComments(e.target.value)}
-                sx={fieldStyles}
+                sx={getFieldStyles(tokens)}
               />
             </Collapse>
           </Box>
         </Stack>
       </DialogContent>
 
-      <DialogActions sx={{ p: 3, bgcolor: 'rgba(0, 243, 255, 0.02)', borderTop: '1px solid rgba(0, 243, 255, 0.1)' }}>
+      <DialogActions sx={{ p: 3, bgcolor: 'rgba(0, 243, 255, 0.02)', borderTop: `1px solid ${tokens.accent.primary}15` }}>
         <Button
           onClick={onClose}
           disabled={isGenerating}
           sx={{
-            color: 'rgba(255,255,255,0.5)',
+            color: 'text.secondary',
             fontFamily: 'Orbitron',
             fontWeight: 800,
             fontSize: '0.7rem',
             mr: 'auto',
-            '&:hover': { color: '#fff' }
+            '&:hover': { color: 'text.primary' }
           }}
         >
           CANCEL
@@ -435,13 +455,13 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
               onClick={handlePreview}
               disabled={isGenerating}
               sx={{
-                color: '#00f3ff',
+                color: tokens.accent.primary,
                 fontFamily: 'Orbitron',
                 fontWeight: 800,
                 fontSize: '0.7rem',
-                border: '1px solid rgba(0, 243, 255, 0.3)',
+                border: `1px solid ${tokens.accent.primary}4D`,
                 px: 2,
-                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.05)', borderColor: '#00f3ff' }
+                '&:hover': { bgcolor: `${tokens.accent.primary}0D`, borderColor: tokens.accent.primary }
               }}
             >
               PREVIEW
@@ -452,7 +472,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
               disabled={isGenerating}
               startIcon={isGenerating ? <CircularProgress size={16} sx={{ color: '#000' }} /> : <Download size={16} />}
               sx={{
-                bgcolor: '#00f3ff',
+                bgcolor: tokens.accent.primary,
                 color: '#000',
                 fontFamily: 'Orbitron',
                 fontWeight: 900,
@@ -470,17 +490,17 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
   );
 };
 
-const fieldStyles = {
+const getFieldStyles = (tokens: any) => ({
   '& .MuiOutlinedInput-root': {
-    color: '#fff',
+    color: 'text.primary',
     '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-    '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.3)' },
-    '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+    '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+    '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
     bgcolor: 'rgba(255,255,255,0.03)',
   },
   '& .MuiInputLabel-root': {
-    color: 'rgba(255,255,255,0.4)',
-    '&.Mui-focused': { color: '#00f3ff' }
+    color: 'text.secondary',
+    '&.Mui-focused': { color: tokens.accent.primary }
   },
-};
+});
 
