@@ -84,7 +84,7 @@ import {
   GitBranch,
   Brain
 } from 'lucide-react';
-import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois } from '../api';
+import { useScanSummary, useActivityLogs, useScanLogs, useFetchWhois, useStopScan } from '../api';
 import type { Command, SubScan, Vulnerability, ScanActivity, Subdomain, ScanSummaryResponse, TodoNote } from '../types';
 import Chart from 'react-apexcharts';
 import { GeoMap } from '../../dashboard/components/GeoMap';
@@ -1336,6 +1336,7 @@ export const ScanDetailPage = () => {
   const { projectSlug, scanId } = useParams({ from: '/$projectSlug/scan/detail/$scanId' });
   const { data, isLoading } = useScanSummary(projectSlug, parseInt(scanId));
   const fetchWhois = useFetchWhois(projectSlug, parseInt(scanId));
+  const stopScanMutation = useStopScan(projectSlug);
   const { data: plugins } = usePlugins();
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
@@ -2027,6 +2028,26 @@ export const ScanDetailPage = () => {
               >
                 RESCAN
               </Button>
+              {!isTerminal && (
+                <Button
+                  variant="contained"
+                  startIcon={stopScanMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <AlertTriangle size={16} />}
+                  onClick={() => stopScanMutation.mutate(parseInt(scanId))}
+                  disabled={stopScanMutation.isPending}
+                  sx={{
+                    bgcolor: isLight ? `${tokens.accent.error}1A` : 'rgba(255, 0, 60, 0.1)',
+                    color: isLight ? tokens.accent.error : '#ff003c',
+                    border: isLight ? `1px solid ${tokens.accent.error}4D` : '1px solid rgba(255, 0, 60, 0.3)',
+                    fontFamily: 'Orbitron',
+                    fontSize: '0.65rem',
+                    fontWeight: 900,
+                    px: 2,
+                    '&:hover': { bgcolor: isLight ? `${tokens.accent.error}33` : 'rgba(255, 0, 60, 0.2)' }
+                  }}
+                >
+                  STOP
+                </Button>
+              )}
               <Button
                 variant="contained"
                 startIcon={<FileText size={16} />}
