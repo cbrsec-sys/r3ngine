@@ -8,6 +8,7 @@ import { ActivityFeed } from './components/ActivityFeed';
 import { VulnerabilityFeed } from './components/VulnerabilityFeed';
 import { GeoMap } from './components/GeoMap';
 import { useAppContext } from '../../context/AppContext';
+import PluginCardSlot from '../plugins/components/PluginCardSlot';
 
 
 import { useParams } from '@tanstack/react-router';
@@ -108,6 +109,7 @@ export const DashboardPage: React.FC = () => {
           <DistributionCharts data={data} />
         </Grid>
       </Grid>
+      <PluginCardSlot context={{ type: 'dashboard' }} />
     </Container>
   );
 };
