@@ -255,6 +255,9 @@ export const useStopScan = (projectSlug: string) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['scans-history', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['scan-summary'] });
+      queryClient.invalidateQueries({ queryKey: ['scan-status', projectSlug] });
+      queryClient.invalidateQueries({ queryKey: ['domains', projectSlug] });
     },
   });
 };
@@ -684,4 +687,3 @@ export const useUnpauseScan = (projectSlug: string) => {
     },
   });
 };
-
