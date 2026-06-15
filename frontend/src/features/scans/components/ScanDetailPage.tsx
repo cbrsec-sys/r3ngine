@@ -438,10 +438,11 @@ const StatusBadge: React.FC<{ status: number, compact?: boolean, isSpiderFootRun
   const configs: any = {
     [-1]: { label: 'PENDING', color: isLight ? tokens.accent.warning : '#ff9f00', icon: Clock },
     [0]: { label: 'FAILED', color: isLight ? tokens.accent.error : '#ff003c', icon: AlertTriangle },
-    [1]: { label: 'PENDING', color: tokens.accent.primary, icon: Activity },
+    [1]: { label: 'RUNNING', color: tokens.accent.primary, icon: Activity },
     [2]: { label: 'SUCCESS', color: isLight ? tokens.accent.success : '#00ff62', icon: Shield },
     [3]: { label: 'ABORTED', color: isLight ? tokens.accent.error : '#ff003c', icon: AlertTriangle },
     [4]: { label: 'PARTIALLY COMPLETE', color: isLight ? tokens.accent.warning : '#fffc00', icon: AlertTriangle },
+    [5]: { label: 'PAUSED', color: isLight ? tokens.accent.warning : '#ffb300', icon: Clock },
   };
   const config = configs[status] || { label: 'UNKNOWN', color: 'text.primary', icon: Info };
   const Icon = config.icon;
