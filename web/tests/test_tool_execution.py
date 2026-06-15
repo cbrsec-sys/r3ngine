@@ -293,6 +293,79 @@ class ToolExecutionTest(TransactionTestCase):
                 self.assertEqual(vulns.count(), 1)
                 self.assertEqual(vulns.first().name, 'Acunetix Sample Finding')
 
+    def test_acunetix_prefers_subdomain_id_over_stale_name(self):
+        AcunetixAPIKey.objects.create(
+            server_url="https://acunetix-instance:3443",
+            api_key="test_key"
+        )
+
+        other_subdomain = Subdomain.objects.create(
+            name="tf-test.defijn.io",
+            scan_history=self.scan,
+            target_domain=self.domain,
+            http_url="https://tf-test.defijn.io"
+        )
+        target_subdomain = Subdomain.objects.create(
+            name="test.defijn.io",
+            scan_history=self.scan,
+            target_domain=self.domain,
+            http_url="https://test.defijn.io"
+        )
+
+        with patch('reNgine.tasks.requests.get') as mock_requests_get, \
+             patch('reNgine.tasks.requests.post') as mock_requests_post:
+            mock_targets_resp = MagicMock()
+            mock_targets_resp.status_code = 200
+            mock_targets_resp.json.return_value = {'targets': []}
+
+            mock_profiles_resp = MagicMock()
+            mock_profiles_resp.status_code = 200
+            mock_profiles_resp.json.return_value = {
+                'scanning_profiles': [{'name': 'Full Scan', 'profile_id': 'full-scan-profile'}]
+            }
+
+            mock_scan_status_resp = MagicMock()
+            mock_scan_status_resp.status_code = 200
+            mock_scan_status_resp.json.return_value = {
+                'current_session': {'status': 'completed', 'scan_session_id': 'session-1'}
+            }
+
+            mock_vulns_resp = MagicMock()
+            mock_vulns_resp.status_code = 200
+            mock_vulns_resp.json.return_value = {'vulnerabilities': [], 'pagination': {}}
+
+            mock_requests_get.side_effect = [
+                mock_targets_resp,
+                mock_profiles_resp,
+                mock_scan_status_resp,
+                mock_scan_status_resp,
+                mock_vulns_resp,
+            ]
+
+            create_target_resp = MagicMock()
+            create_target_resp.status_code = 201
+            create_target_resp.json.return_value = {'target_id': 'target-1'}
+
+            start_scan_resp = MagicMock()
+            start_scan_resp.status_code = 201
+            start_scan_resp.json.return_value = {'scan_id': 'scan-1', 'target_id': 'target-1'}
+
+            mock_requests_post.side_effect = [create_target_resp, start_scan_resp]
+
+            res = acunetix_scan(
+                self.task,
+                self.domain.id,
+                self.scan.id,
+                self.ctx,
+                subdomain_id=target_subdomain.id,
+                subdomain_name=other_subdomain.name,
+                subdomain_http_url=other_subdomain.http_url,
+            )
+
+            self.assertTrue(res)
+            create_target_payload = mock_requests_post.call_args_list[0].kwargs['json']
+            self.assertEqual(create_target_payload['address'], 'https://test.defijn.io')
+
     def test_holehe_execution(self):
         email = "test@defijn.io"
         print(f"\n[DEBUG] Starting Holehe test.")

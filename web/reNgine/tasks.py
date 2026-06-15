@@ -7070,6 +7070,7 @@ def acunetix_scan(
 		scan_history_id=None,
 		ctx=None,
 		description=None,
+		subdomain_id=None,
 		subdomain_name=None,
 		subdomain_http_url=None):
 	"""
@@ -7088,18 +7089,25 @@ def acunetix_scan(
 	logger.info(f"Starting Acunetix scan for domain ID: {domain_id}")
 	scan_history = ScanHistory.objects.get(pk=scan_history_id) if scan_history_id else None
 	domain = Domain.objects.get(pk=domain_id)
-	target_name = subdomain_name or domain.name
-	target_url = subdomain_http_url or f"https://{target_name}"
 
 	# Resolve subdomain and subscan objects for association
 	from startScan.models import SubScan
 	subdomain = None
-	if subdomain_name:
+	if subdomain_id:
+		subdomain = Subdomain.objects.filter(pk=subdomain_id).first()
+	if not subdomain and subdomain_name:
 		subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=scan_history).first()
 		if not subdomain and scan_history:
 			subdomain = Subdomain.objects.filter(name=subdomain_name, target_domain=domain).first()
 	if not subdomain:
 		subdomain = getattr(self, 'subdomain', None)
+
+	if subdomain:
+		subdomain_name = subdomain.name
+		subdomain_http_url = subdomain.http_url or subdomain_http_url
+
+	target_name = subdomain_name or domain.name
+	target_url = subdomain_http_url or f"https://{target_name}"
 
 	subscan = getattr(self, 'subscan', None)
 	
