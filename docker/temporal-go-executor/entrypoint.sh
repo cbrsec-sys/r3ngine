@@ -6,9 +6,9 @@
 # Start deferred tool installer in the background so normal setup tasks
 # run in parallel. We wait for it to finish just before the executor starts.
 # ---------------------------------------------------------------------------
-#echo "[entrypoint] Starting deferred tool installer in background..."
-#/usr/src/app/internal_tools.sh &
-#INTERNAL_TOOLS_PID=$!
+echo "[entrypoint] Starting deferred tool installer in background..."
+/usr/src/internal_tools.sh &
+INTERNAL_TOOLS_PID=$!
 
 # vulscan (nmap script)
 if [ ! -d "/usr/src/github/scipag_vulscan" ]; then

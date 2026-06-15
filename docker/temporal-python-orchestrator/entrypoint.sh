@@ -7,9 +7,9 @@
 # (wordlists, nuclei templates, etc.) run in parallel. We wait for it to
 # finish just before the Temporal worker starts.
 # ---------------------------------------------------------------------------
-#echo "[entrypoint] Starting deferred tool installer in background..."
-#/usr/src/app/internal_tools.sh &
-#INTERNAL_TOOLS_PID=$!
+echo "[entrypoint] Starting deferred tool installer in background..."
+/usr/src/internal_tools.sh &
+INTERNAL_TOOLS_PID=$!
 
 # Ensure OpenSSL compatibility
 pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0

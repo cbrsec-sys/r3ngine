@@ -106,7 +106,7 @@ if ! command -v k6 &>/dev/null; then
     ARCH=$(dpkg --print-architecture)
     if [ "${ARCH}" = "arm64" ]; then K6_ARCH="arm64"; else K6_ARCH="amd64"; fi
     wget -q "https://github.com/grafana/k6/releases/download/v0.50.0/k6-v0.50.0-linux-${K6_ARCH}.tar.gz" -O /tmp/k6.tar.gz
-    tar -xf /tmp/k6.tar.gz "k6-v0.50.0-linux-${K6_ARCH}/k6" -C /tmp
+    tar -xf /tmp/k6.tar.gz -C /tmp
     mv "/tmp/k6-v0.50.0-linux-${K6_ARCH}/k6" /usr/local/bin/
     rm -rf /tmp/k6.tar.gz "/tmp/k6-v0.50.0-linux-${K6_ARCH}"
     log_done
