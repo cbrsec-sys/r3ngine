@@ -1,0 +1,93 @@
+# Category S — Supply Chain (8 rules)
+rules:
+
+  - name: github_actions_injection_to_ci_execution
+    mitre_id: "T1195.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: github_actions_injection
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: ci_pipeline_execution
+        confidence: 0.85
+
+  - name: ci_artifact_poisoning_to_supply_chain
+    mitre_id: "T1195.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: ci_artifact_poisoning
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: supply_chain_compromise
+        confidence: 0.80
+
+  - name: typosquatting_to_supply_chain
+    mitre_id: "T1195.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: typosquatting
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: supply_chain_compromise
+        confidence: 0.70
+
+  - name: compromised_registry_to_rce_execution
+    mitre_id: "T1195.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: compromised_registry
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: rce_execution
+        confidence: 0.85
+
+  - name: ci_execution_to_credential_harvesting
+    mitre_id: "T1552"
+    if:
+      node.type: Capability
+      node.subtype: ci_pipeline_execution
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: credential_harvesting
+        confidence: 0.85
+
+  - name: ci_execution_to_code_exfil
+    mitre_id: "T1213"
+    if:
+      node.type: Capability
+      node.subtype: ci_pipeline_execution
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: code_exfiltration
+        confidence: 0.80
+
+  - name: github_token_to_ci_execution
+    mitre_id: "T1528"
+    if:
+      node.type: Credential
+      node.subtype: github_token
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: ci_pipeline_execution
+        confidence: 0.85
+
+  - name: supply_chain_compromise_to_hvt_compromise
+    mitre_id: "T1195"
+    if:
+      node.type: Capability
+      node.subtype: supply_chain_compromise
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: hvt_compromise
+        confidence: 0.80

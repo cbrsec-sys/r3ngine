@@ -21,6 +21,20 @@ import { X, Target, Globe, Building2, Terminal, Activity, Clock, Settings2, Sear
 import { useAddTarget, useOrganizations, useEngines, useResolveIP } from '../api';
 import { Checkbox, List, ListItem, ListItemButton, ListItemIcon, ListItemText } from '@mui/material';
 
+const TARGET_TYPES = [
+  { value: 'domain',         label: 'Domain',            placeholder: 'example.com',                     description: 'Full domain scan (7-tier pipeline)' },
+  { value: 'host',           label: 'Host',               placeholder: 'target.example.com',              description: 'Host/hostname reconnaissance' },
+  { value: 'ip',             label: 'IP Address',         placeholder: '192.0.2.1',                       description: 'Single IP reconnaissance' },
+  { value: 'url',            label: 'URL',                placeholder: 'https://example.com',             description: 'URL crawl and vulnerability scan' },
+  { value: 'cidr',           label: 'CIDR / Network',     placeholder: '192.168.0.0/24',                  description: 'Network range discovery' },
+  { value: 'email',          label: 'Email',              placeholder: 'user@example.com',                description: 'Email breach hunt (h8mail + maigret)' },
+  { value: 'username',       label: 'Username',           placeholder: 'johndoe',                         description: 'Account search across platforms' },
+  { value: 'phone',          label: 'Phone',              placeholder: '+1 555 123 4567',                 description: 'Phone number OSINT' },
+  { value: 'crypto_address', label: 'Crypto Address',     placeholder: '0x742d35Cc...',                   description: 'Crypto wallet OSINT' },
+  { value: 'code_path',      label: 'Code / Repository',  placeholder: 'https://github.com/user/repo',    description: 'Source code secrets and CVE scan' },
+] as const;
+type TargetTypeValue = typeof TARGET_TYPES[number]['value'];
+
 interface AddTargetModalProps {
   open: boolean;
   onClose: () => void;
@@ -39,6 +53,7 @@ export const AddTargetModal: React.FC<AddTargetModalProps> = ({ open, onClose, p
     monitor_scan_scope: 'none',
     starting_point_path: '',
     excluded_paths: '',
+    target_type: 'domain' as TargetTypeValue,
   });
 
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -52,11 +67,13 @@ export const AddTargetModal: React.FC<AddTargetModalProps> = ({ open, onClose, p
   const { mutate: addTarget, isPending, error, reset } = useAddTarget(projectSlug);
   const { mutate: resolveIP, isPending: isResolving } = useResolveIP();
 
+  const selectedTypeMeta = TARGET_TYPES.find(t => t.value === formData.target_type);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    addTarget({ 
-      domain_name: formData.domain_name, 
+    addTarget({
+      domain_name: formData.domain_name,
       slug: projectSlug,
       organization: formData.organization,
       h1_team_handle: formData.h1_team_handle,
@@ -67,6 +84,7 @@ export const AddTargetModal: React.FC<AddTargetModalProps> = ({ open, onClose, p
       monitor_scan_scope: formData.monitor_scan_scope,
       starting_point_path: formData.starting_point_path || undefined,
       excluded_paths: formData.excluded_paths ? formData.excluded_paths.split('\n').filter(p => p.trim()) : [],
+      target_type: formData.target_type,
     }, {
       onSuccess: () => {
         onClose();
@@ -81,6 +99,7 @@ export const AddTargetModal: React.FC<AddTargetModalProps> = ({ open, onClose, p
           monitor_scan_scope: 'none',
           starting_point_path: '',
           excluded_paths: '',
+          target_type: 'domain',
         });
         reset();
       },
@@ -183,14 +202,41 @@ export const AddTargetModal: React.FC<AddTargetModalProps> = ({ open, onClose, p
 
           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             <TextField
-              label="Domains / IPs / URLs"
+              label="Target Type"
+              select
+              fullWidth
+              value={formData.target_type}
+              onChange={(e) => setFormData({ ...formData, target_type: e.target.value as TargetTypeValue })}
+              sx={fieldStyles}
+              slotProps={{
+                input: {
+                  startAdornment: <Target size={18} style={{ marginRight: 12, color: '#00f3ff' }} />
+                }
+              }}
+            >
+              {TARGET_TYPES.map((type) => (
+                <MenuItem key={type.value} value={type.value}>
+                  <Box>
+                    <Typography sx={{ fontSize: '0.85rem', color: '#fff', lineHeight: 1.2 }}>
+                      {type.label}
+                    </Typography>
+                    <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', lineHeight: 1.2 }}>
+                      {type.description}
+                    </Typography>
+                  </Box>
+                </MenuItem>
+              ))}
+            </TextField>
+
+            <TextField
+              label="Targets"
               fullWidth
               required
               multiline
               rows={4}
               value={formData.domain_name}
               onChange={(e) => setFormData({ ...formData, domain_name: e.target.value })}
-              placeholder="example.com&#10;192.168.1.1&#10;https://api.example.com"
+              placeholder={selectedTypeMeta?.placeholder ?? 'example.com'}
               sx={fieldStyles}
               helperText="Enter multiple targets separated by newlines"
               slotProps={{

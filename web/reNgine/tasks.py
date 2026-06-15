@@ -181,6 +181,7 @@ def initiate_scan_temporal(
 		custom_dorks=None,
 		enable_spiderfoot_scan=False,
 		selected_plugin_slugs=None,
+		profile_ctx=None,
 	):
 	"""Initiate a new scan using Temporal durable workflow orchestration.
 
@@ -228,7 +229,7 @@ def initiate_scan_temporal(
 		gf_patterns = config.get(GF_PATTERNS, [])
 		api_discovery_config = config.get(WEB_API_DISCOVERY, {})
 		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
-		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
+		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
 		# ---- Get domain ----
 		domain = Domain.objects.get(pk=domain_id)
@@ -372,6 +373,7 @@ def initiate_scan_temporal(
 			'use_tor': bool(_proxy and _proxy.use_tor),
 			'selected_plugin_slugs': selected_plugin_slugs or [],
 			'hardware_profile': hardware_profile_ctx,
+			'profile': profile_ctx or {},
 		}
 
 		# ---- Start MasterScanWorkflow on Temporal ----
@@ -524,7 +526,7 @@ def initiate_subscan_temporal(
 		# ---- Get web_api_discovery config ----
 		api_discovery_config = config.get(WEB_API_DISCOVERY, {})
 		api_discovery_tools = api_discovery_config.get(USES_TOOLS, [])
-		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
+		kr_wordlist = api_discovery_config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 
 		# ---- Create scan activity records of SubScan Model ----
 		subscans_info = []
@@ -1219,6 +1221,18 @@ def osint(self, host=None, ctx={}, description=None):
 	Returns:
 		dict: Results from osint discovery and dorking.
 	"""
+	# Copy theHarvester api-keys.yaml to /root/.theHarvester/api-keys.yaml
+	source_api_keys = '/usr/src/github/theHarvester/api-keys.yaml'
+	target_dir = '/root/.theHarvester'
+	target_api_keys = f'{target_dir}/api-keys.yaml'
+	try:
+		if os.path.exists(source_api_keys):
+			os.makedirs(target_dir, exist_ok=True)
+			shutil.copyfile(source_api_keys, target_api_keys)
+			logger.info('Copied theHarvester api-keys.yaml to /root/.theHarvester/api-keys.yaml')
+	except Exception as e:
+		logger.error(f'Failed to copy theHarvester api-keys.yaml: {e}')
+
 	config = self.yaml_configuration.get(OSINT) or OSINT_DEFAULT_CONFIG
 	results = {}
 
@@ -1254,6 +1268,19 @@ def osint(self, host=None, ctx={}, description=None):
 	# Deep Pursuit OSINT Pipeline (holehe, maigret, LinkedInt)
 	logger.info('Starting Deep Pursuit OSINT Pipeline...')
 	osint_orchestrator(scan_history_id=self.scan.id)
+
+	# Run h8mail after all OSINT tasks are finished
+	osint_lookup = config.get(OSINT_DISCOVER, [])
+	if 'emails' in osint_lookup:
+		h8mail(
+			self,
+			config=config,
+			host=self.scan.domain.name,
+			scan_history_id=self.scan.id,
+			activity_id=self.activity_id,
+			results_dir=self.results_dir,
+			ctx=ctx
+		)
 
 	logger.info('OSINT Tasks finished...')
 	return True
@@ -1309,17 +1336,6 @@ def osint_discovery(self, config, host, scan_history_id, activity_id, results_di
 		# 			'documents_limit': documents_limit
 		# 		})
 		# 		meta_info.append(save_metadata_info(meta_dict))
-
-	if 'emails' in osint_lookup:
-		h8mail(
-			self,
-			config=config,
-			host=host,
-			scan_history_id=scan_history_id,
-			activity_id=activity_id,
-			results_dir=results_dir,
-			ctx=ctx
-		)
 
 	if 'employees' in osint_lookup:
 		ctx['track'] = False
@@ -1814,6 +1830,22 @@ def h8mail(self, config, host, scan_history_id, activity_id, results_dir, ctx={}
 	input_path = f'{results_dir}/emails.txt'
 	output_file = f'{results_dir}/h8mail.json'
 
+	# Retrieve all emails from DB and create emails.txt if not exists or update it
+	emails = scan_history.emails.all()
+	emails_list = [email.address for email in emails]
+	
+	target = ctx.get('target')
+	if target and target not in emails_list:
+		emails_list.append(target)
+		
+	if not emails_list:
+		logger.warning('No emails found to run h8mail against. Skipping.')
+		return []
+
+	with open(input_path, 'w') as f:
+		for email in set(emails_list):
+			f.write(f'{email}\n')
+
 	cmd = f'h8mail -t {input_path} --json {output_file}'
 	history_file = f'{results_dir}/commands.txt'
 
@@ -2117,7 +2149,13 @@ def spiderfoot_scan(self, host=None, ctx={}, description=None):
 	logger.warning(f"[SPIDERFOOT] Executing command: {cmd}")
 	
 	# Initialize stateful parser with Redis dedup
-	redis_client = Redis(host="redis", port=6379, decode_responses=True)
+	from django.conf import settings
+	redis_client = Redis(
+		host=settings.REDIS_HOST,
+		port=settings.REDIS_PORT,
+		password=settings.REDIS_PASSWORD,
+		decode_responses=True
+	)
 	parser = SpiderFootBatchParser(dedup_backend=redis_client, scan_id=self.scan_id, target_domain=self.domain.name)
 	
 	batch = []
@@ -2254,37 +2292,53 @@ def _process_spiderfoot_batch(self, batch, ctx, host):
 
 def screenshot(self, ctx={}, description=None):
 	"""Embedded Playwright Screenshot task.
-	
+
+	Queries is_default=True endpoints directly — one per subdomain root — and
+	passes the full http_url (including path) to the capture engine.
+	Mirrors the rengine-ng approach; fixes the single-screenshot bug caused by
+	the Subdomain http_url/http_status strict filter.
+
 	Args:
 		description (str, optional): Task description shown in UI.
 	"""
 	from reNgine.screenshot.tasks import take_screenshot_and_save
 
-	# Config
 	config = self.yaml_configuration.get(SCREENSHOT) or {}
-	enable_http_crawl = config.get(ENABLE_HTTP_CRAWL, DEFAULT_ENABLE_HTTP_CRAWL)
 	intensity = config.get(INTENSITY) or self.yaml_configuration.get(INTENSITY, DEFAULT_SCAN_INTENSITY)
-	
-	# If intensity is normal, grab only the root endpoints of each subdomain
-	strict = True if intensity == 'normal' else False
+	strict = intensity == 'normal'
 
-	# Get subdomains to process
-	subdomains = Subdomain.objects.filter(scan_history=self.scan)
-	
-	# If strict/normal intensity, we only care about subdomains that are definitely alive
-	if strict:
-		subdomains = subdomains.filter(http_status__gt=0).exclude(http_url__isnull=True)
-	
-	logger.info(f"Starting Playwright screenshot capture for {subdomains.count()} subdomains...")
-	
+	# is_default=True excludes both False and NULL; null=True on the field is intentional
+	# (NULL means "not yet determined", not "yes"). subdomain__isnull=False guards against
+	# orphaned endpoints that would cause take_screenshot_and_save to raise DoesNotExist.
+	endpoints = (
+		EndPoint.objects
+		.filter(scan_history=self.scan, is_default=True)
+		.filter(subdomain__isnull=False)
+		.exclude(http_url__isnull=True)
+		.exclude(http_url='')
+		.select_related('subdomain')
+	)
+
+	# No http_status filter: is_default endpoints are created before http_crawl probes them,
+	# so they always have http_status=0. Playwright handles unreachable URLs gracefully.
+	# intensity=normal still limits scope via is_default=True (one endpoint per subdomain root).
+	_ = strict  # reserved for future per-intensity tuning
+
+	endpoint_list = list(endpoints)
+	logger.info("Starting Playwright screenshot capture for %d default endpoints...", len(endpoint_list))
+
 	success_count = 0
-	for subdomain in subdomains:
-		# The internal task handles browser lifecycle, metadata, and DB persistence
-		if take_screenshot_and_save(subdomain.id, self.scan_id, self.results_dir, activity_id=self.activity_id):
+	for endpoint in endpoint_list:
+		if take_screenshot_and_save(
+			subdomain_id=endpoint.subdomain_id,
+			scan_id=self.scan_id,
+			results_dir=self.results_dir,
+			activity_id=self.activity_id,
+			url_override=endpoint.http_url,
+		):
 			success_count += 1
-			
+
 	self.notify(fields={'Screenshots': f'Successfully captured {success_count} screenshots using Embedded Playwright.'})
-	
 	return True
 
 
@@ -3176,7 +3230,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	scan_id = ctx.get('scan_history_id')
 	config = self.yaml_configuration.get(WEB_API_DISCOVERY) or {}
 	uses_tools = ctx.get('api_discovery_tools') or config.get(USES_TOOLS, ['kiterunner', 'arjun', 'linkfinder', 'paramspider', 'semgrep'])
-	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-large.kite')
+	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
 	arjun_methods = config.get(ARJUN_METHODS, ARJUN_DEFAULT_METHODS)
@@ -3365,9 +3419,12 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		# LinkFinder - per URL (fast; fetches and extracts JS links)
 		if 'linkfinder' in uses_tools:
 			lf_output = f"{results_dir}/lf_{subdomain_name}.txt"
-			cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -d -i {url} -o cli | tee {lf_output}"
-			logger.warning('[WEB_API] LinkFinder: running on %s | cmd: %s', subdomain_name, cmd)
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+			if os.path.exists(lf_output) and os.path.getsize(lf_output) > 0:
+				logger.warning('[WEB_API] LinkFinder: cache hit for %s — loading existing results', subdomain_name)
+			else:
+				cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -d -i {url} -o cli | tee {lf_output}"
+				logger.warning('[WEB_API] LinkFinder: running on %s | cmd: %s', subdomain_name, cmd)
+				run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
 			if os.path.exists(lf_output):
 				try:
 					lf_endpoints = 0
@@ -3394,39 +3451,50 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			else:
 				logger.warning('[WEB_API] LinkFinder: output file missing for %s', subdomain_name)
 
-		# InQL - GraphQL Discovery
+		# InQL - GraphQL Discovery (only when a GraphQL endpoint is detected)
 		if 'inql' in uses_tools:
-			inql_output = f"{results_dir}/inql_{subdomain_name}"
-			cmd = f"inql -t {url} -o {inql_output}"
-			proxy = get_random_proxy()
-			if proxy:
-				cmd += f" -p {proxy}"
-			logger.warning('[WEB_API] InQL: running on %s | cmd: %s', subdomain_name, cmd)
-			run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
-			if os.path.exists(inql_output):
-				try:
-					inql_findings = parse_inql_results(inql_output)
-					for finding in inql_findings:
-						save_endpoint(url, ctx=ctx, subdomain=subdomain, source='InQL (GraphQL Found)')
-					logger.warning('[WEB_API] InQL: %s → %d GraphQL findings saved', subdomain_name, len(inql_findings))
-				except Exception as e:
-					logger.error('[WEB_API] InQL: error parsing results for %s: %s', subdomain_name, e)
+			if not has_graphql_endpoint(self.scan_id, url):
+				logger.warning('[WEB_API] InQL: no GraphQL endpoint detected, skipping %s', subdomain_name)
 			else:
-				logger.warning('[WEB_API] InQL: no output directory found for %s', subdomain_name)
+				inql_output = f"{results_dir}/inql_{subdomain_name}"
+				cmd = f"inql -t {url} -o {inql_output}"
+				proxy = get_random_proxy()
+				if proxy:
+					cmd += f" -p {proxy}"
+				logger.warning('[WEB_API] InQL: running on %s | cmd: %s', subdomain_name, cmd)
+				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
+				if os.path.exists(inql_output):
+					try:
+						inql_findings = parse_inql_results(inql_output)
+						for finding in inql_findings:
+							save_endpoint(url, ctx=ctx, subdomain=subdomain, source='InQL (GraphQL Found)')
+						from reNgine.cpde.graphql_enricher import enrich_graphql_params
+						enrich_graphql_params(inql_output, url, subdomain, ctx)
+						logger.warning('[WEB_API] InQL: %s → %d GraphQL findings saved', subdomain_name, len(inql_findings))
+					except Exception as e:
+						logger.error('[WEB_API] InQL: error parsing results for %s: %s', subdomain_name, e)
+				else:
+					logger.warning('[WEB_API] InQL: no output directory found for %s', subdomain_name)
 
-		# jwt_tool - JWT security testing
+		# jwt_tool - JWT security testing (only when JWT tokens have been found)
 		if JWT_TOOL in uses_tools:
-			logger.warning('[WEB_API] jwt_tool: running on %s', subdomain_name)
-			from reNgine.api_tasks import run_jwt_scan
-			run_jwt_scan(self, ctx, url, subdomain, results_dir)
-			logger.warning('[WEB_API] jwt_tool: finished on %s', subdomain_name)
+			if has_jwt_tokens(self.scan_id, subdomain=subdomain):
+				logger.warning('[WEB_API] jwt_tool: JWT tokens found, running on %s', subdomain_name)
+				from reNgine.api_tasks import run_jwt_scan
+				run_jwt_scan(self, ctx, url, subdomain, results_dir)
+				logger.warning('[WEB_API] jwt_tool: finished on %s', subdomain_name)
+			else:
+				logger.warning('[WEB_API] jwt_tool: no JWT tokens detected, skipping %s', subdomain_name)
 
-		# graphql-cop - GraphQL security audit
+		# graphql-cop - GraphQL security audit (only when a GraphQL endpoint is detected)
 		if GRAPHQL_COP in uses_tools:
-			logger.warning('[WEB_API] graphql-cop: running on %s', subdomain_name)
-			from reNgine.api_tasks import run_graphql_cop
-			run_graphql_cop(self, ctx, url, subdomain)
-			logger.warning('[WEB_API] graphql-cop: finished on %s', subdomain_name)
+			if not has_graphql_endpoint(self.scan_id, url):
+				logger.warning('[WEB_API] graphql-cop: no GraphQL endpoint detected, skipping %s', subdomain_name)
+			else:
+				logger.warning('[WEB_API] graphql-cop: running on %s', subdomain_name)
+				from reNgine.api_tasks import run_graphql_cop
+				run_graphql_cop(self, ctx, url, subdomain)
+				logger.warning('[WEB_API] graphql-cop: finished on %s', subdomain_name)
 
 	# Semgrep - Post-discovery pattern matching
 	if 'semgrep' in uses_tools:
@@ -3604,7 +3672,6 @@ def get_vulnerability_gpt_report(vuln, vulnerability_id=None):
 
 	# 2. Check if in global cache (GPTVulnerabilityReport) already exists
 	stored = GPTVulnerabilityReport.objects.filter(
-		url_path=path,
 		title=title
 	).first()
 
@@ -3637,19 +3704,31 @@ def get_vulnerability_gpt_report(vuln, vulnerability_id=None):
 
 	# 4. Update all matching vulnerabilities that don't have GPT info yet, or at least the specific one
 	if response.get('status'):
-		# Update matching vulnerabilities
-		for v in Vulnerability.objects.filter(name=title, http_url__icontains=path):
+		def _apply_gpt_fields(v):
 			v.description = response.get('description', v.description)
 			v.impact = response.get('impact', v.impact)
 			v.remediation = response.get('remediation', v.remediation)
 			v.is_gpt_used = True
 			v.save()
-
 			for url in response.get('references', []):
-				ref, created = VulnerabilityReference.objects.get_or_create(url=url)
+				ref, _ = VulnerabilityReference.objects.get_or_create(url=url)
 				v.references.add(ref)
 			v.save()
-	
+
+		# Always update the specific requested vulnerability first (handles NULL http_url)
+		if vulnerability_id:
+			try:
+				_apply_gpt_fields(Vulnerability.objects.get(id=vulnerability_id))
+			except Vulnerability.DoesNotExist:
+				pass
+
+		# Also bulk-update any other findings with the same name/path that lack GPT data
+		qs = Vulnerability.objects.filter(name=title, http_url__icontains=path, is_gpt_used=False)
+		if vulnerability_id:
+			qs = qs.exclude(id=vulnerability_id)
+		for v in qs:
+			_apply_gpt_fields(v)
+
 	return response
 
 
@@ -3674,7 +3753,7 @@ def add_gpt_description_db(title, path, description, impact, remediation, refere
 			gpt_report.references.add(ref)
 		gpt_report.save()
 
-def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, parse_only=None, severity=None):
+def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, parse_only=None, severity=None, tags_override=None, proxies_file_path=None):
 	"""HTTP vulnerability scan using Nuclei
 
 	Args:
@@ -3718,30 +3797,37 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		severities = [severity_filter]
 	else:
 		severities = nuclei_specific_config.get(NUCLEI_SEVERITY, NUCLEI_DEFAULT_SEVERITIES)
-	tags = nuclei_specific_config.get(NUCLEI_TAGS, [])
-	
-	# Intelligence-Driven Scanning: Inject tags based on detected technologies
-	tech_tags = []
-	all_techs = set()
-	if self.scan:
-		# Get all technologies discovered for this scan
-		subdomains = Subdomain.objects.filter(scan_history=self.scan)
+	if tags_override is not None:
+		# Tags were pre-computed and batched by NucleiPlannerWorkflow via
+		# GatherNucleiTagsActivity.  Use them directly; skip the tech-detection
+		# block so we don't re-query the DB on every batch call.
+		tags = ','.join(tags_override) if tags_override else ''
 		all_techs = set()
-		for sub in subdomains:
-			# assuming technologies is a many-to-many field with 'name' attribute
-			all_techs.update(sub.technologies.values_list('name', flat=True))
-		
-		if all_techs:
-			tech_tags = get_nuclei_tags_from_techs(list(all_techs))
-			logger.info(f'Detected technologies: {list(all_techs)}. Adding targeted Nuclei tags: {tech_tags}')
-
-	if tech_tags:
-		# Combine user tags with tech tags
-		user_tags = set(tags if isinstance(tags, list) else tags.split(',') if tags else [])
-		user_tags.update(tech_tags)
-		tags = ','.join(user_tags)
 	else:
-		tags = ','.join(tags) if isinstance(tags, list) else tags
+		tags = nuclei_specific_config.get(NUCLEI_TAGS, [])
+
+		# Intelligence-Driven Scanning: Inject tags based on detected technologies
+		tech_tags = []
+		all_techs = set()
+		if self.scan:
+			# Get all technologies discovered for this scan
+			subdomains = Subdomain.objects.filter(scan_history=self.scan)
+			all_techs = set()
+			for sub in subdomains:
+				# assuming technologies is a many-to-many field with 'name' attribute
+				all_techs.update(sub.technologies.values_list('name', flat=True))
+
+			if all_techs:
+				tech_tags = get_nuclei_tags_from_techs(list(all_techs))
+				logger.info('Detected technologies: %s. Adding targeted Nuclei tags: %s', list(all_techs), tech_tags)
+
+		if tech_tags:
+			# Combine user tags with tech tags
+			user_tags = set(tags if isinstance(tags, list) else tags.split(',') if tags else [])
+			user_tags.update(tech_tags)
+			tags = ','.join(user_tags)
+		else:
+			tags = ','.join(tags) if isinstance(tags, list) else tags
 
 	nuclei_templates = nuclei_specific_config.get(NUCLEI_TEMPLATE)
 	custom_nuclei_templates = nuclei_specific_config.get(NUCLEI_CUSTOM_TEMPLATE)
@@ -3781,10 +3867,17 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	# Build templates
 	logger.info('Updating Nuclei templates ...')
 	# Wordfence Templates integration — 70k+ WordPress CVE templates, daily-updated
-	is_wordpress_detected = any(
-		'wordpress' in t.lower() or 'wp-' in t.lower()
-		for t in all_techs
-	) if all_techs else False
+	# When tags_override is used, all_techs is empty; check the batch tags instead.
+	if tags_override is not None:
+		is_wordpress_detected = any(
+			'wordpress' in t.lower() or 'wp-' in t.lower()
+			for t in (tags_override or [])
+		)
+	else:
+		is_wordpress_detected = any(
+			'wordpress' in t.lower() or 'wp-' in t.lower()
+			for t in all_techs
+		) if all_techs else False
 	wordfence_exists = False
 	if is_wordpress_detected:
 		logger.info("WordPress detected. Preparing Wordfence Nuclei Templates...")
@@ -3850,7 +3943,10 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	if formatted_headers:
 		cmd += f' {formatted_headers}'
 	cmd += f' '
-	if 'http' in proxy:
+	
+	if proxies_file_path and os.path.exists(proxies_file_path):
+		cmd += f' -proxy {proxies_file_path}'
+	elif 'http' in proxy:
 		cmd += f' -proxy {proxy}' 
 	cmd += f' -l {input_path}'
 	cmd += f' -c {str(concurrency)}' if concurrency > 0 else ''
@@ -4530,7 +4626,7 @@ def http_crawl(
 			except MultipleObjectsReturned:
 				tech = Technology.objects.filter(name=technology).first()
 			endpoint.techs.add(tech)
-			if endpoint.is_default and subdomain:
+			if subdomain:
 				subdomain.technologies.add(tech)
 				subdomain.save()
 			endpoint.save()
@@ -5250,15 +5346,20 @@ def get_severity_from_cvss(cvss_score):
 def parse_nmap_vulners_output(script_output, url='', service_title=''):
 	"""Parse nmap vulners script output.
 
+	All findings for the same service are grouped into a single vulnerability
+	record. Individual findings are rendered as a formatted table in the
+	description so the UI shows one row per service rather than one row per CVE/ID.
+
 	Args:
 		script_output (str): Script output.
 
 	Returns:
-		list: List of found vulnerabilities.
+		list: Single-element list containing the grouped vulnerability, or [].
 	"""
 	if not script_output or not isinstance(script_output, str):
 		return []
-	vulns = []
+
+	findings = []
 	lines = script_output.split('\n')
 	for line in lines:
 		line = line.strip()
@@ -5270,21 +5371,11 @@ def parse_nmap_vulners_output(script_output, url='', service_title=''):
 			try:
 				vuln_cvss = float(parts[1])
 			except (ValueError, TypeError):
-				continue # Not a vuln line
+				continue  # Not a vuln line
 
 			vuln_url = parts[2]
 			is_exploit = '*EXPLOIT*' in line
 
-			# Determine a better vulnerability name
-			vuln_name = vuln_id
-			if service_title:
-				vuln_name = f"{service_title} ({vuln_id})"
-
-			# Extract tags
-			tags = []
-			if is_exploit:
-				tags.append('is exploit')
-			
 			source_tag = ''
 			vuln_url_lower = vuln_url.lower()
 			if 'packetstorm' in vuln_url_lower:
@@ -5297,73 +5388,79 @@ def parse_nmap_vulners_output(script_output, url='', service_title=''):
 				source_tag = '1337day'
 			elif 'exploit-db' in vuln_url_lower or 'edb' in vuln_id.lower():
 				source_tag = 'exploit-db'
-			
-			if source_tag:
-				tags.append(source_tag)
 
-			# Create a base vulnerability object
-			vuln = {
-				'name': vuln_name,
-				'type': 'nmap-vulners-nse',
-				'severity': get_severity_from_cvss(vuln_cvss),
-				'description': f"Vulnerability found by nmap vulners script: {vuln_id}. Product: {service_title}",
-				'cvss_score': vuln_cvss,
-				'references': [vuln_url],
-				'cve_ids': [],
-				'cwe_ids': [],
-				'tags': tags,
-				'group_key': service_title
-			}
+			findings.append({
+				'id': vuln_id,
+				'cvss': vuln_cvss,
+				'url': vuln_url,
+				'is_exploit': is_exploit,
+				'source_tag': source_tag,
+			})
 
-			# If it's a CVE, try to enrich it with cve_to_vuln
-			if vuln_id.startswith('CVE-'):
-				enriched_vuln = cve_to_vuln(vuln_id, vuln_type='nmap-vulners-nse')
-				if enriched_vuln:
-					# Use enriched data but keep some nmap specifics if needed
-					old_tags = vuln.get('tags', [])
-					vuln.update(enriched_vuln)
-					
-					# Merge tags
-					if 'tags' not in vuln:
-						vuln['tags'] = []
-					vuln['tags'].extend(old_tags)
-					vuln['tags'] = list(set(vuln['tags']))
-					vuln['group_key'] = service_title  # preserve group_key after CVE enrichment overwrites
-
-					# Improve name if service_title is present
-					if service_title:
-						# If enriched name is just the CVE, use service title
-						if enriched_vuln.get('name') == vuln_id:
-							vuln['name'] = f"{service_title} ({vuln_id})"
-						else:
-							# Combine them if they are different
-							if service_title.lower() not in enriched_vuln.get('name', '').lower():
-								vuln['name'] = f"{service_title}: {enriched_vuln.get('name')}"
-					
-					# Ensure the CVSS score from nmap is used if API has -1 or something
-					if vuln.get('cvss_score', -1) == -1:
-						vuln['cvss_score'] = vuln_cvss
-						vuln['severity'] = get_severity_from_cvss(vuln_cvss)
-
-			if vuln:
-				vuln['source'] = 'VULNERS'
-				if is_exploit:
-					vuln['exploit_url'] = vuln_url
-				vulns.append(vuln)
-
-	# If no structured findings found, fallback to the old regex
-	if not vulns:
-		# Check for CVE in script output
+	# Fallback to CVE regex when the script output uses a non-standard format
+	if not findings:
 		CVE_REGEX = re.compile(r'.*(CVE-\d\d\d\d-\d+).*')
-		matches = CVE_REGEX.findall(script_output)
-		matches = list(dict.fromkeys(matches))
-		for cve_id in matches: # get CVE info
-			vuln = cve_to_vuln(cve_id, vuln_type='nmap-vulners-nse')
-			if vuln:
-				vuln['source'] = 'VULNERS'
-				vuln['group_key'] = service_title
-				vulns.append(vuln)
-	return vulns
+		matches = list(dict.fromkeys(CVE_REGEX.findall(script_output)))
+		for cve_id in matches:
+			findings.append({'id': cve_id, 'cvss': 0.0, 'url': '', 'is_exploit': False, 'source_tag': ''})
+
+	if not findings:
+		return []
+
+	# Aggregate across all findings
+	max_cvss = max(f['cvss'] for f in findings)
+	all_tags = set()
+	all_references = []
+	best_exploit_url = None
+	for f in findings:
+		if f['is_exploit']:
+			all_tags.add('is exploit')
+			if best_exploit_url is None:
+				best_exploit_url = f['url']
+		if f['source_tag']:
+			all_tags.add(f['source_tag'])
+		if f['url']:
+			all_references.append(f['url'])
+
+	# Build a plain-text table for the description (rendered with pre-wrap in the UI)
+	col_id_w = max(len(f['id']) for f in findings)
+	col_id_w = max(col_id_w, 10)
+	header_line  = f"{'ID':<{col_id_w}}  {'CVSS':>6}  {'Source':<15}  Exploit"
+	divider_line = f"{'-' * col_id_w}  {'-' * 6}  {'-' * 15}  -------"
+	rows = []
+	for f in findings:
+		exploit_marker = 'Yes' if f['is_exploit'] else 'No'
+		rows.append(
+			f"{f['id']:<{col_id_w}}  {f['cvss']:>6.1f}  {f['source_tag'] or '':<15}  {exploit_marker}"
+		)
+
+	product_label = service_title or 'Unknown service'
+	description = (
+		f"Vulnerabilities found by nmap vulners NSE script for: {product_label}\n"
+		f"Total findings: {len(findings)}  |  Highest CVSS: {max_cvss}\n\n"
+		f"{header_line}\n{divider_line}\n"
+		+ '\n'.join(rows)
+	)
+
+	vuln_name = f"{service_title} (Vulners NSE)" if service_title else "Vulners NSE Findings"
+
+	grouped_vuln = {
+		'name': vuln_name,
+		'type': 'nmap-vulners-nse',
+		'severity': get_severity_from_cvss(max_cvss),
+		'description': description,
+		'cvss_score': max_cvss,
+		'references': all_references,
+		'cve_ids': [],
+		'cwe_ids': [],
+		'tags': list(all_tags),
+		'source': 'VULNERS',
+		'group_key': service_title,
+	}
+	if best_exploit_url:
+		grouped_vuln['exploit_url'] = best_exploit_url
+
+	return [grouped_vuln]
 
 
 def cve_to_vuln(cve_id, vuln_type=''):
@@ -6781,16 +6878,92 @@ def map_acunetix_severity(severity):
 	return mapping.get(severity, 0)
 
 
-def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=None):
+def _validate_subdomain_name(subdomain_name: str) -> bool:
 	"""
-	Run Acunetix (AWVS) scan for the given domain.
+	Validate subdomain name format before using in API calls.
+
+	Args:
+		subdomain_name: The subdomain to validate
+
+	Returns:
+		bool: True if valid or empty/None (optional parameter)
+
+	Raises:
+		ValueError: If subdomain format is invalid
 	"""
+	if not subdomain_name:
+		return True
+
+	if not validators.domain(subdomain_name, skip_ipv4=False):
+		raise ValueError(f"Invalid subdomain format: {subdomain_name}")
+
+	return True
+
+
+def _build_vuln_detail_url(base_url: str, scan_id: str, session_id: str, vuln_id: str) -> str:
+	"""
+	Build the correct vulnerability detail URL based on available session info.
+
+	AWVS API uses different URL patterns across versions:
+	- With session_id: /scans/{scan_id}/results/{session_id}/vulnerabilities/{vuln_id}
+	- Fallback: /vulnerabilities/{vuln_id}
+
+	Args:
+		base_url: Base Acunetix API URL
+		scan_id: Scan ID
+		session_id: Session or result ID
+		vuln_id: Vulnerability ID
+
+	Returns:
+		str: The correct vulnerability detail endpoint URL
+	"""
+	if scan_id and session_id:
+		return f"{base_url}/api/v1/scans/{scan_id}/results/{session_id}/vulnerabilities/{vuln_id}"
+	return f"{base_url}/api/v1/vulnerabilities/{vuln_id}"
+
+
+def acunetix_scan(
+		self,
+		domain_id,
+		scan_history_id=None,
+		ctx=None,
+		description=None,
+		subdomain_name=None,
+		subdomain_http_url=None):
+	"""
+	Run Acunetix (AWVS) scan for the given domain or a subdomain target.
+	"""
+	if ctx is None:
+		ctx = {}
+
 	if not Acunetix:
 		logger.error("Acunetix library not found. Skipping Acunetix scan.")
 		return False
+
+	if subdomain_name:
+		try:
+			_validate_subdomain_name(subdomain_name)
+		except ValueError as e:
+			logger.error(f"Invalid subdomain provided to acunetix_scan: {e}")
+			return False
+
 	logger.info(f"Starting Acunetix scan for domain ID: {domain_id}")
 	scan_history = ScanHistory.objects.get(pk=scan_history_id) if scan_history_id else None
 	domain = Domain.objects.get(pk=domain_id)
+	target_name = subdomain_name or domain.name
+	target_url = subdomain_http_url or f"https://{target_name}"
+
+	# Resolve subdomain and subscan objects for association
+	from startScan.models import SubScan
+	subdomain = None
+	if subdomain_name:
+		subdomain = Subdomain.objects.filter(name=subdomain_name, scan_history=scan_history).first()
+		if not subdomain and scan_history:
+			subdomain = Subdomain.objects.filter(name=subdomain_name, target_domain=domain).first()
+	if not subdomain:
+		subdomain = getattr(self, 'subdomain', None)
+
+	subscan = getattr(self, 'subscan', None)
 	
 	# Get credentials from vault
 	creds = AcunetixAPIKey.objects.first()
@@ -6801,13 +6974,12 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 	try:
 		acunetix = Acunetix(host=creds.server_url, api=creds.api_key)
 		logger.info(f"Acunetix instance created: {acunetix}")
-		
-		target_url = f"https://{domain.name}"
 		logger.info(f"Starting Acunetix scan for {target_url}")
 		
 		# Use the library's start_scan which typically adds target and starts scan
 		# Based on the user provided example
-		scan_info = acunetix.start_scan(domain.name)
+		scan_info = acunetix.start_scan(target_url)
+		scan_id = scan_info.get('scan_id')
 		target_id = scan_info.get('target_id')
 		
 		# Now we need to poll for status and fetch findings.
@@ -6822,55 +6994,107 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 		# If target_id wasn't in scan_info, try to find it
 		if not target_id:
 			targets_data = acunetix.targets()
-			target = next((t for t in targets_data.get('targets', []) if domain.name in t['address']), None)
+			target = next((
+				t for t in targets_data.get('targets', [])
+				if target_name in t['address'] or target_url in t['address']
+			), None)
 			if target:
 				target_id = target['target_id']
 
 		if not target_id:
-			logger.error(f"Target {domain.name} not found in Acunetix after start_scan.")
+			logger.error(f"Target {target_name} not found in Acunetix after start_scan.")
 			return False
 			
-		# Wait for scan to complete
-		# We'll poll /api/v1/scans
-		scan_id = None
-		max_retries = 360 # 1 hour
-		retries = 0
-		while retries < max_retries:
-			scans_resp = requests.get(f"{base_url}/api/v1/scans?q=target_id:{target_id}", headers=headers, verify=_acunetix_verify)
+		# If scan_id wasn't in scan_info, try to find it from scans query by target_id
+		if not scan_id:
+			scans_resp = requests.get(f"{base_url}/api/v1/scans?q=target_id:{target_id}", headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
 			if scans_resp.status_code == 200:
 				scans_data = scans_resp.json()
 				scans_list = scans_data.get('scans', [])
 				if scans_list:
-					latest_scan = scans_list[0]
-					current_status = latest_scan.get('current_session', {}).get('status')
-					
-					if current_status == 'completed':
-						logger.info(f"Acunetix scan for {domain.name} completed.")
-						scan_id = latest_scan.get('scan_id')
-						break
-					elif current_status in ['failed', 'aborted']:
-						logger.error(f"Acunetix scan for {domain.name} {current_status}.")
-						return False
-			
-			time.sleep(10)
+					scan_id = scans_list[0].get('scan_id')
+
+		if not scan_id:
+			logger.error(f"Could not determine scan_id for Acunetix scan on target {target_name}")
+			return False
+
+		# Wait for scan to complete
+		# We'll poll /api/v1/scans/{scan_id} directly
+		max_retries = settings.ACUNETIX_MAX_RETRIES
+		poll_interval = settings.ACUNETIX_POLL_INTERVAL
+		retries = 0
+		while retries < max_retries:
+			scan_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
+			if scan_resp.status_code == 200:
+				scan_data = scan_resp.json()
+				current_session = scan_data.get('current_session', {})
+				current_status = current_session.get('status')
+				logger.info(f"Acunetix scan {scan_id} status: {current_status} (retry {retries}/{max_retries})")
+
+				if current_status == 'completed':
+					logger.info(f"Acunetix scan for {target_name} completed.")
+					break
+				elif current_status in ['failed', 'aborted']:
+					logger.error(f"Acunetix scan for {target_name} ended with status: {current_status}.")
+					return False
+			else:
+				logger.warning(f"Failed to fetch scan status for {scan_id}, status code: {scan_resp.status_code}")
+
+			time.sleep(poll_interval)
 			retries += 1
+		else:
+			logger.error(f"Acunetix scan for {target_name} timed out after {max_retries} retries.")
+			return False
 			
 		# Fetch Vulnerabilities for the specific scan
-		if not scan_id:
-			# Fallback to target_id if scan_id not found
-			vulns_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
-		else:
-			# Fetch vulnerabilities for the specific scan
-			# Note: The API for scan vulnerabilities might be different, 
-			# but q=scan_id:ID or the sub-resource works in many versions.
-			vulns_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
+		vulns_url = None
+		session_id = None
+		# Fetch scan details to get the scan session/result ID (which differs across AWVS versions)
+		scan_detail_resp = requests.get(f"{base_url}/api/v1/scans/{scan_id}", headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
+		if scan_detail_resp.status_code == 200:
+			scan_detail = scan_detail_resp.json()
+			session = scan_detail.get('current_session', {})
+			session_id = session.get('scan_session_id') or session.get('result_id')
+			if session_id:
+				vulns_url = f"{base_url}/api/v1/scans/{scan_id}/results/{session_id}/vulnerabilities"
 
-		vulns_resp = requests.get(vulns_url, headers=headers, verify=_acunetix_verify)
+		if not vulns_url:
+			# Fallback to querying by target_id
+			vulns_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
+
+		logger.info(f"Fetching Acunetix vulnerabilities from: {vulns_url}")
+		vulns_resp = requests.get(vulns_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
+		logger.info(f"Acunetix vulnerabilities response code: {vulns_resp.status_code}")
+
+		# If the URL returned 400 or 404, try fallbacks
+		if vulns_resp.status_code in [400, 404]:
+			# Fallback 1: try /api/v1/scans/{scan_id}/vulnerabilities
+			fallback_url = f"{base_url}/api/v1/scans/{scan_id}/vulnerabilities"
+			logger.info(f"Retrying with fallback 1 URL: {fallback_url}")
+			vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
+			logger.info(f"Fallback 1 response code: {vulns_resp.status_code}")
+
+			# Fallback 2: try querying by target_id
+			if vulns_resp.status_code in [400, 404]:
+				fallback_url = f"{base_url}/api/v1/vulnerabilities?q=target_id:{target_id}"
+				logger.info(f"Retrying with fallback 2 URL: {fallback_url}")
+				vulns_resp = requests.get(fallback_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
+				logger.info(f"Fallback 2 response code: {vulns_resp.status_code}")
+
 		if vulns_resp.status_code == 200:
 			vulns_data = vulns_resp.json()
-			for vuln in vulns_data.get('vulnerabilities', []):
-				# Get full details for each vuln
-				vuln_detail_resp = requests.get(f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}", headers=headers, verify=_acunetix_verify)
+			v_list = vulns_data.get('vulnerabilities', [])
+			logger.info(f"Found {len(v_list)} vulnerabilities in Acunetix scan report.")
+			for vuln in v_list:
+				# Get full details for each vuln using helper function for URL building
+				vuln_detail_url = _build_vuln_detail_url(base_url, scan_id, session_id, vuln['vuln_id'])
+
+				# Try session-scoped URL first, fallback to global URL if needed
+				vuln_detail_resp = requests.get(vuln_detail_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
+				if vuln_detail_resp.status_code == 404:
+					global_url = f"{base_url}/api/v1/vulnerabilities/{vuln['vuln_id']}"
+					vuln_detail_resp = requests.get(global_url, headers=headers, verify=_acunetix_verify, timeout=settings.ACUNETIX_REQUEST_TIMEOUT)
+
 				if vuln_detail_resp.status_code == 200:
 					v_detail = vuln_detail_resp.json()
 					
@@ -6910,7 +7134,12 @@ def acunetix_scan(self, domain_id, scan_history_id=None, ctx={}, description=Non
 					if v_detail.get('cwe_id'):
 						cwes.append(f"CWE-{v_detail['cwe_id']}")
 					save_v_data['cwe_ids'] = cwes
-					
+
+					if subdomain:
+						save_v_data['subdomain'] = subdomain
+					if subscan:
+						save_v_data['subscan'] = subscan
+
 					save_vulnerability(**save_v_data)
 					
 		return True
@@ -7090,29 +7319,65 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 			continue
 
 		asset = vuln.subdomain.name if vuln.subdomain else (vuln.endpoint.http_url if vuln.endpoint else 'Unknown')
-		logger.warning(
-			"[TIER7][IMPACT] [%d/%d] Calling LLM | vuln_id=%s severity=%s asset=%s",
-			idx, total, vuln.id, vuln.severity, asset,
-		)
 
 		try:
-			context = "Vulnerability: %s\n" % vuln.name
-			context += "Description: %s\n" % vuln.description
-			context += "Asset: %s\n" % asset
-			if vuln.subdomain:
-				context += "Technologies: %s\n" % ', '.join([t.name for t in vuln.subdomain.technologies.all()])
+			# Step 1 — populate structured description/impact/remediation/references if not already done
+			if not vuln.is_gpt_used:
+				logger.warning(
+					"[TIER7][IMPACT] [%d/%d] Generating GPT vulnerability report | vuln_id=%s",
+					idx, total, vuln.id,
+				)
+				gpt_report = get_vulnerability_gpt_report(
+					(vuln.name, vuln.get_path()),
+					vulnerability_id=vuln.id,
+				)
+				if gpt_report.get('status'):
+					vuln.refresh_from_db()
+					logger.warning(
+						"[TIER7][IMPACT] [%d/%d] GPT report saved | vuln_id=%s",
+						idx, total, vuln.id,
+					)
+				else:
+					logger.warning(
+						"[TIER7][IMPACT] [%d/%d] GPT report failed | vuln_id=%s error=%s",
+						idx, total, vuln.id, gpt_report.get('error'),
+					)
 
-			t_start = time.time()
-			# Call LLM (PII protection is handled inside generator)
-			final_impact = generator.generate_impact_assessment(context)
-			elapsed = time.time() - t_start
+			# Step 2 — generate AI business-impact assessment (for ImpactAssessment record)
+			logger.warning(
+				"[TIER7][IMPACT] [%d/%d] Calling LLM impact generator | vuln_id=%s severity=%s asset=%s",
+				idx, total, vuln.id, vuln.severity, asset,
+			)
+
+			existing_assessment = ImpactAssessment.objects.filter(
+				vulnerability__name=vuln.name,
+				is_ai_generated=True
+			).first()
+
+			if existing_assessment and existing_assessment.potential_impact:
+				logger.warning(
+					"[TIER7][IMPACT] [%d/%d] Reusing existing target-agnostic impact assessment for %s | vuln_id=%s",
+					idx, total, vuln.name, vuln.id,
+				)
+				final_impact = existing_assessment.potential_impact
+				elapsed = 0.0
+			else:
+				# Omit Asset to make context target-agnostic (PII masking is handled by generator)
+				context = "Vulnerability: %s\n" % vuln.name
+				context += "Description: %s\n" % (vuln.description or '')
+				if vuln.subdomain:
+					context += "Technologies: %s\n" % ', '.join([t.name for t in vuln.subdomain.technologies.all()])
+
+				t_start = time.time()
+				final_impact = generator.generate_impact_assessment(context)
+				elapsed = time.time() - t_start
 
 			logger.warning(
 				"[TIER7][IMPACT] [%d/%d] LLM returned in %.1fs | vuln_id=%s impact_len=%d",
 				idx, total, elapsed, vuln.id, len(final_impact) if final_impact else 0,
 			)
 
-			# Persist to ImpactAssessment model
+			# Persist business-impact text to ImpactAssessment model
 			ImpactAssessment.objects.update_or_create(
 				vulnerability=vuln,
 				defaults={
@@ -7123,9 +7388,12 @@ def generate_impact_assessment(self, scan_history_id=None, vulnerability_id=None
 				}
 			)
 
-			# Also sync to Vulnerability model for reports
-			vuln.impact = final_impact
-			vuln.save()
+			# Only write back to Vulnerability.impact when the structured GPT report
+			# has not already set it (avoid overwriting the richer structured content).
+			if not vuln.is_gpt_used:
+				vuln.impact = final_impact
+				vuln.save()
+
 			assessed_count += 1
 			logger.warning("[TIER7][IMPACT] [%d/%d] Saved | vuln_id=%s", idx, total, vuln.id)
 
@@ -7387,6 +7655,8 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 		if os.path.exists(filepath):
 			return True, filepath # Already downloaded
 
+		logger.warning("[SEMGREP] Downloading file: %s", full_url)
+
 		# Try downloading the URL, with proxy cycling on failure (capped at max 5 to prevent stalls)
 		max_retries = min(5, len(available_proxies)) if use_proxy and available_proxies else 1
 		if max_retries < 1:
@@ -7418,6 +7688,7 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 					
 					with open(filepath, 'wb') as f:
 						f.write(content)
+					logger.warning("[SEMGREP] Download complete: %s", full_url)
 					return True, filepath
 				elif resp.status_code in [407, 502, 503, 504]:
 					# Proxy connection/auth issues, cycle and retry
@@ -7434,6 +7705,7 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 		return False, None
 
 	# Execute downloads in parallel using a ThreadPoolExecutor
+	file_to_url_map = {}
 	if unique_targets:
 		from concurrent.futures import ThreadPoolExecutor, as_completed
 		logger.warning("[SEMGREP] Downloading %d files in parallel (max_workers=10)...", len(unique_targets))
@@ -7441,9 +7713,10 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 			futures = {executor.submit(download_file, url): url for url in unique_targets}
 			for future in as_completed(futures):
 				try:
-					success, _ = future.result()
-					if success:
+					success, filepath = future.result()
+					if success and filepath:
 						downloaded_count += 1
+						file_to_url_map[os.path.basename(filepath)] = futures[future]
 				except Exception as e:
 					logger.error("[SEMGREP] Error in download thread: %s", e)
 		logger.warning("[SEMGREP] Download phase complete: %d / %d files downloaded successfully", downloaded_count, len(unique_targets))
@@ -7480,9 +7753,9 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 
 				for result in results:
 					if mode == 'secret':
-						save_semgrep_secret_finding(result, ctx, semgrep_dir)
+						save_semgrep_secret_finding(result, ctx, semgrep_dir, file_to_url_map)
 					else:
-						save_semgrep_vulnerability_finding(result, ctx, semgrep_dir)
+						save_semgrep_vulnerability_finding(result, ctx, semgrep_dir, file_to_url_map)
 
 			logger.warning("[SEMGREP] %s scan complete — %d matches found.", mode, len(results))
 		except Exception as e:
@@ -7496,13 +7769,14 @@ def semgrep_scan(self, ctx={}, mode='vulnerability', description=None):
 	return return_code
 
 
-def save_semgrep_vulnerability_finding(result, ctx, base_dir):
+def save_semgrep_vulnerability_finding(result, ctx, base_dir, file_to_url_map=None):
 	"""Saves a Semgrep finding as a Vulnerability.
 
 	Args:
 		result (dict): Semgrep finding match dictionary.
 		ctx (dict): Scan context containing history and domain IDs.
 		base_dir (str): Base directory path of the cloned repo.
+		file_to_url_map (dict): Optional map from downloaded file basename to original URL.
 	"""
 	extra = result.get('extra', {})
 	path = result.get('path', '')
@@ -7514,13 +7788,17 @@ def save_semgrep_vulnerability_finding(result, ctx, base_dir):
 		check_id = result.get('check_id', '')
 		cleaned_check_id = clean_semgrep_check_id(check_id)
 		
+		source_file = path.replace(base_dir, '').lstrip('/')
+		mapped_url = file_to_url_map.get(os.path.basename(source_file)) if file_to_url_map else None
+		final_url = mapped_url if mapped_url else source_file
+		
 		vuln_data = {
 			'name': f"Semgrep: {cleaned_check_id}",
 			'description': extra.get('message', ''),
 			'severity': SEMGREP_SEVERITY_MAP.get(extra.get('severity', 'INFO'), 0),
-			'http_url': path.replace(base_dir, '').lstrip('/'),
+			'http_url': final_url,
 			'type': 'SAST',
-			'request': f"File: {path}\nLine: {result.get('start', {}).get('line')}",
+			'request': f"File: {source_file}\nLine: {result.get('start', {}).get('line')}",
 			'response': extra.get('lines', ''),
 			'source': 'Semgrep',
 		}
@@ -7529,13 +7807,14 @@ def save_semgrep_vulnerability_finding(result, ctx, base_dir):
 		logger.error(f"Error saving Semgrep vulnerability: {e}")
 
 
-def save_semgrep_secret_finding(result, ctx, base_dir):
+def save_semgrep_secret_finding(result, ctx, base_dir, file_to_url_map=None):
 	"""Saves a Semgrep finding as a SecretLeak.
 
 	Args:
 		result (dict): Semgrep finding match dictionary.
 		ctx (dict): Scan context containing history and domain IDs.
 		base_dir (str): Base directory path of the cloned repo.
+		file_to_url_map (dict): Optional map from downloaded file basename to original URL.
 	"""
 	extra = result.get('extra', {})
 	path = result.get('path', '')
@@ -7546,11 +7825,15 @@ def save_semgrep_secret_finding(result, ctx, base_dir):
 		check_id = result.get('check_id', '')
 		cleaned_check_id = clean_semgrep_check_id(check_id)
 		
+		source_file = path.replace(base_dir, '').lstrip('/')
+		mapped_url = file_to_url_map.get(os.path.basename(source_file)) if file_to_url_map else None
+		final_url = mapped_url if mapped_url else source_file
+		
 		leak_data = {
 			'scan_history': scan,
 			'tool_name': 'Semgrep',
 			'secret_type': cleaned_check_id or 'Secret',
-			'source_url': path.replace(base_dir, '').lstrip('/'),
+			'source_url': final_url,
 			'match_content': extra.get('lines', '').strip(),
 			'status': 'unverified'
 		}
@@ -7835,4 +8118,3 @@ def recover_stuck_scans():
 			logger.error("[RECOVERY] Failed to auto-recover stuck running scan %d: %s", scan.id, e)
 
 	logger.info("[RECOVERY] recover_stuck_scans complete — active=%d recovered=%d", active, recovered)
-

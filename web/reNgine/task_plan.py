@@ -21,7 +21,9 @@ _TASK_TITLES = {
     'vigolium_discovery':         'Vigolium Discovery',
     # Tier 3
     'fetch_url':                  'URL Fetching',
+    'http_crawl_bridge':          'HTTP Crawl Bridge',
     'screenshot':                 'Screenshot Capture',
+    'param_discovery':            'Parameter Discovery (CPDE)',
     # Tier 4
     'dir_file_fuzz':              'Directory & File Fuzzing',
     # Tier 5
@@ -64,7 +66,9 @@ _TASK_TIER = {
     'port_scan':             2,
     'vigolium_discovery':    2,
     'fetch_url':             3,
+    'http_crawl_bridge':     3,
     'screenshot':            3,
+    'param_discovery':       3,
     'dir_file_fuzz':         4,
     'web_api_discovery':     5,
     'waf_detection':         5,
@@ -97,7 +101,8 @@ _TIER1_TO_5 = [
     'subdomain_discovery', 'amass_intel_discovery', 'firewall_vpn_scan',
     'dns_security', 'osint', 'spiderfoot_scan', 'baddns',
     'http_crawl', 'port_scan',
-    'fetch_url', 'screenshot',
+    'fetch_url', 'screenshot', 'param_discovery',
+    'http_crawl_bridge',
     'dir_file_fuzz',
     'web_api_discovery', 'waf_detection', 'secret_scanning',
     'waf_bypass',
@@ -135,6 +140,8 @@ def build_scan_task_plan(tasks: list, yaml_configuration: dict) -> list:
     # Tiers 1-5: conditional on top-level task names
     for t in _TIER1_TO_5:
         if t in tasks:
+            add(t)
+        elif t == 'http_crawl_bridge' and 'fetch_url' in tasks:
             add(t)
 
     # Vigolium discovery/analysis are sub-tasks inside vulnerability_scan
@@ -179,7 +186,8 @@ def build_scan_task_plan(tasks: list, yaml_configuration: dict) -> list:
     _graph_tasks = {
         'subdomain_discovery', 'amass_intel_discovery', 'firewall_vpn_scan',
         'osint', 'spiderfoot_scan', 'baddns', 'http_crawl', 'port_scan',
-        'fetch_url', 'dir_file_fuzz', 'web_api_discovery', 'vulnerability_scan'
+        'fetch_url', 'dir_file_fuzz', 'web_api_discovery', 'vulnerability_scan',
+        'param_discovery'
     }
     if any(t in _graph_tasks for t in tasks):
         add('sync_graph')

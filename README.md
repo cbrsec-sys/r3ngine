@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="https://github.com/whiterabb17/r3ngine/releases" target="_blank">
-    <img src="https://img.shields.io/badge/version-v3.5.0-informational?&logo=none" alt="r3ngine Latest Version" />
+    <img src="https://img.shields.io/badge/version-v3.6.0-informational?&logo=none" alt="r3ngine Latest Version" />
   </a>
   &nbsp;
   <a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank">
@@ -24,11 +24,14 @@
   <a href="#" target="_blank">
     <img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" />
   </a>
+  <a href="https://github.com/Security-Tools-Alliance/rengine-ng" target="_blank">
+    <img src="https://img.shields.io/badge/inspired-by--rengine-ng--red.svg?&logo=none" alt="Inspired by rengine-ng" />
+  </a>
 </p>
 
-<h3 align="center">r3ngine 3.5.0: The Phoenix Rebirth</h3>
+<h3 align="center">r3ngine 3.6.0: The Phoenix Rebirth</h3>
 <p>
-  r3ngine v3.5.0 is the production-stabilized, enterprise-grade evolution of the platform. This release delivers a complete <b>CVE Enrichment System</b> (NVD, EPSS, CISA KEV), a <b>Burp Suite Professional Integration Plugin</b>, and deep <b>Neo4j graph sync</b> with CVE metadata. The infrastructure has been hardened with <b>Django 5.2.3 LTS</b>, <b>PostgreSQL 16</b>, and <b>Gunicorn + Uvicorn ASGI</b> production serving. Building on the v3.2.0 Celery → Temporal migration — which replaced the legacy at-most-once task broker with a durable workflow engine providing crash-safe execution, full replay history, and pause/resume signaling — v3.5.0 focuses on intelligence enrichment, operational security, and production reliability at scale.
+  r3ngine v3.6.0 is the production-stabilized, enterprise-grade evolution of the platform. Building off the original reNgine and further inspired by rengine-ng (Check out <a href="https://github.com/Security-Tools-Alliance/rengine-ng" target="_blank">rengine-ng v3</a> if you haven't!) This release delivers a massively expanded <b>Attack Path Modeling Engine</b> (179 rules, MITRE ATT&CK, 10-factor scoring), <b>WPScan/WPTaint SAST integration</b>, <b>Nuclei proxy rotation</b>, <b>session-based LinkedIn OSINT</b>, <b>Tier 7 LLM auto-enrichment</b>, <b>offline hash cracking</b>, <b>intelligent Tier 5 tool gating</b>, and a full <b>Target Editing</b> workflow. The infrastructure remains hardened with <b>Django 5.2.3 LTS</b>, <b>PostgreSQL 16</b>, and <b>Gunicorn + Uvicorn ASGI</b> production serving. Building on the v3.2.0 Celery → Temporal migration — which replaced the legacy at-most-once task broker with a durable workflow engine providing crash-safe execution, full replay history, and pause/resume signaling — v3.6.0 focuses on attack intelligence depth, operational security, and production reliability at scale.
 </p>
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
@@ -111,6 +114,7 @@ The plugin system supports dynamic installation, signed `.r3n` packages with Ed2
 
 * [About r3ngine](#about-r3ngine)
 * [Workflow](#workflow)
+* [Project Schema](#project-schema)
 * [Features](#features)
 * [Quick Installation](#quick-installation)
 * [Administration & Recovery](#-administration--recovery)
@@ -133,6 +137,8 @@ r3ngine is a production-grade web reconnaissance and vulnerability scanning plat
 💎&nbsp;&nbsp; **Subscans**: respond immediately to in-progress discoveries. Launch a targeted port scan or vulnerability assessment against any subdomain without waiting for the full pipeline.
 
 🧠&nbsp;&nbsp; **CVE Intelligence**: automatic CVSS v3.1 scoring from NVD, EPSS exploitation probability from FIRST, and CISA KEV marking — enriched on every startup and queryable via the API.
+
+🤖&nbsp;&nbsp; **Local LLM Orchestration**: Manage your own localized Ollama Docker containers natively from the LLM Toolkit dashboard to power offline vulnerability risk assessments, mitigation strategy generation, and intelligent reporting without leaving your infrastructure.
 
 📃&nbsp;&nbsp; **PDF Reports**: Full Scan, Vulnerability, and OSINT report types with customizable templates, executive summaries, LLM-generated impact narratives, and remediation priorities.
 
@@ -158,39 +164,48 @@ flowchart TD
     end
 
     LC --> F1(( ))
-    F1 --> SD & AI & FW & OS & SF
+    F1 --> SD & AI & FW & DNS & OS & SF & BD
 
     subgraph T1["🔍 Tier 1 — Discovery  ·  all parallel"]
         direction TB
         SD[RunSubdomainDiscoveryActivity]
         AI[RunAmassIntelDiscoveryActivity]
         FW[RunFirewallVPNScanActivity]
+        DNS[RunDNSSecurityActivity]
         OS["RunGenericTaskActivity · osint"]
-        SF["RunGenericTaskActivity · spiderfoot_scan\n─ requires yaml spiderfoot_scan block"]
+        SF["RunGenericTaskActivity · spiderfoot_scan
+─ requires yaml spiderfoot_scan block"]
+        BD["RunGenericTaskActivity · subdomain_discovery
+uses_tools: [baddns]"]
     end
 
-    SD & AI & FW & OS & SF --> J1(( ))
+    SD & AI & FW & DNS & OS & SF & BD --> J1(( ))
     J1 --> PDR[ParseDiscoveryResultsActivity]
     PDR --> CP1{{"⏸ Pause Checkpoint"}}
 
     CP1 --> F2(( ))
-    F2 --> HC & PS
+    F2 --> HC & PS & VD
 
-    subgraph T2["🌐 Tier 2 — HTTP Crawl · Port Scan ·  all parallel"]
+    subgraph T2["🌐 Tier 2 — Endpoint Discovery  ·  all parallel"]
         direction TB
-        HC["RunHTTPCrawlActivity\n─ global config · feeds Tiers 3 & 4"] --> PHC[ParseHTTPCrawlResultsActivity]
+        HC["RunHTTPCrawlActivity
+via SeedEndpointsForCrawlActivity"] --> PHC[ParseHTTPCrawlResultsActivity]
         PS[RunPortScanActivity]
+        VD["RunVigoliumDiscoveryActivity
+─ requires vigolium_discovery.run_vigolium_discovery"]
     end
 
-    PHC & PS --> J2(( ))
-    J2 --> FU
+    PHC & PS & VD --> PT2[Dispatch tier_2 plugins]
+    PT2 --> F3(( ))
+    F3 --> FU & SS
 
-    subgraph T3["🔗 Tier 3 — URL Fetching  ·  sequential"]
+    subgraph T3["🔗 Tier 3 — URL Fetching + Screenshot  ·  parallel"]
         direction TB
         FU[RunFetchURLActivity]
+        SS[RunScreenshotActivity]
     end
 
-    FU --> DFF
+    FU & SS --> DFF
 
     subgraph T4["📁 Tier 4 — Directory & File Fuzzing  ·  sequential"]
         direction TB
@@ -200,61 +215,75 @@ flowchart TD
     PFF --> PER[ParseEnumerationResultsActivity]
     PER --> CP2{{"⏸ Pause Checkpoint"}}
 
-    CP2 --> F3(( ))
-    F3 --> WAD & WD & SEC
+    CP2 --> F4(( ))
+    F4 --> WAD & WD & SEC & VA
 
     subgraph T5["🔬 Tier 5 — Analysis  ·  all parallel"]
         direction TB
         WAD[RunWebAPIDiscoveryActivity]
         WD[RunWAFDetectionActivity]
         SEC[RunSecretScanningActivity]
+        VA["RunVigoliumAnalysisActivity
+─ requires vigolium_analysis.run_vigolium_analysis"]
     end
 
-    WAD & WD & SEC --> J3(( ))
+    WAD & WD & SEC & VA --> J3(( ))
     J3 --> PAR[ParseAnalysisResultsActivity]
     PAR --> CP3{{"⏸ Pause Checkpoint"}}
 
-    CP3 --> F4(( ))
-    F4 --> NUC & WB & BF & SS
+    CP3 --> NUC
 
-    subgraph T6["🎯 Tier 6 — Assessment · BruteForcing · WAFBypass · Nuclei · Screenshot   ·  all parallel"]
+    subgraph T6["🎯 Tier 6 — Security Assessment"]
         direction TB
-        subgraph NP["NucleiPlannerWorkflow · child workflow"]
+        subgraph NP["NucleiPlannerWorkflow · child workflow · runs first"]
             direction TB
-            NUC[RunVulnerabilityScanActivity]
+            NUC[RunNucleiActivity / vuln stage chain]
         end
+        NUC --> G6(( ))
+        G6 --> WB & VS
         WB[RunWAFBypassActivity]
-        BF[RunBruteForceScanActivity]
-        SS[RunScreenshotActivity]
+        VS["RunVigoliumScanActivity
+─ requires vulnerability_scan.run_vigolium"]
     end
 
-    SS & NUC & WB & BF --> J4(( ))
-    J4 --> PASM[ParseAssessmentResultsActivity]
+    WB & VS --> PASM[ParseAssessmentResultsActivity]
     PASM --> CP4{{"⏸ Pause Checkpoint"}}
 
     CP4 --> CV
 
     subgraph T7["🧠 Tier 7 — Intelligence  ·  sequential"]
         direction TB
-        CV[CorrelateVulnerabilitiesActivity] --> CR[CalculateRiskScoresActivity]
-        CR --> GI["GenerateImpactAssessmentActivity\n─ requires enable_ai_impact_analysis: true"]
-        GI --> SG["SyncGraphActivity  ·  APME + Neo4j\n─ requires attack_path_modeling.enabled: true"]
+        CV[CorrelateVulnerabilitiesActivity]
+        EC[EnrichScanCVEsActivity]
+        CR[CalculateRiskScoresActivity]
+        GI[GenerateImpactAssessmentActivity]
+        SG[SyncGraphActivity]
+        APME["RunGenericTaskActivity · run_apme"]
+        CV --> EC --> CR --> GI --> SG --> APME
     end
 
-    SG --> SN[SendScanNotificationActivity]
+    APME --> SN[SendScanNotificationActivity]
     SN --> DONE([✓ Scan Complete])
 ```
 
 > `(( ))` = fork/join (parallel branch split/rejoin) &nbsp;·&nbsp; `{{"⏸"}}` = pause checkpoint (workflow waits for `resume` signal) &nbsp;·&nbsp; `─ requires` = only runs when the noted YAML flag is set
 >
 > Full tier reference and execution notes: [`.github/workflows/temporal-scan-flow.md`](.github/workflows/temporal-scan-flow.md)
+>
+> Project-wide code navigation map for contributors and AI agents: [`documents/PROJECT_SCHEMA.md`](documents/PROJECT_SCHEMA.md)
+
+## Project Schema
+
+`documents/PROJECT_SCHEMA.md` is a living architecture map that explains ownership boundaries, workflow inventory, request paths, and which folders usually matter for a given change.
+
+AI-specific onboarding entrypoints are also available in `AGENTS.md`, `CLAUDE.md`, and `.cursorrules` for low-token handoff into other assistants.
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
 ## Features
 
 ### 🔬 CVE Intelligence & Enrichment (v3.5.0)
-*   **CVE Enrichment Service**: Fetches CVSS v3.1 metrics from **NVD API v2.0**, exploitation probability scores from **FIRST EPSS**, and syncs the **CISA KEV** (Known Exploited Vulnerabilities) catalog. Enriched data is cached (7-day TTL for CVEs, 1-hour for KEV) and gracefully degrades when external APIs are unavailable.
+*   **CVE Enrichment Service**: Fetches CVSS v3.1 metrics from **NVD API v2.0**, exploitation probability scores from **FIRST EPSS** (synced daily via local feed), and syncs the **CISA KEV** (Known Exploited Vulnerabilities) catalog. Enriched data is cached (7-day TTL for CVEs, 1-hour for KEV) and gracefully degrades when external APIs are unavailable.
 *   **Vulnerability History Tracking**: `VulnerabilityHistory` model traces vulnerabilities across historical scans, automatically classifying findings as new, persistent, or remediated.
 *   **Multi-Criteria Correlation Scoring**: Composite scores using configurable tool weights, asset criticality, CISA KEV/EPSS exploitability factors, and temporal modifiers. In-scan duplicate suppression groups findings under a `group_key` before writing.
 *   **Neo4j ID-Based Graph Sync**: CVE nodes in Neo4j are linked by precise CVE ID with CVSS base score and EPSS score ingested as node properties for attack path enrichment.
@@ -271,7 +300,7 @@ flowchart TD
 ### 🛠️ Advanced Scan & Execution Engines
 *   **Burp Suite Professional Integration** (v3.4.0 plugin): Two-phase Temporal sync (import → correlate), bidirectional scope push, filterable issues grid, and live connection health badge.
 *   **Active Directory Intelligence Plugin**: Full AD attack surface analysis — Cytoscape.js graph with 5 layout presets, real-time WebSocket streaming (150 ms batching), paginated findings API, 7-section PDF reports (`ad_modern`, `cyber_pro` templates), and RBAC evidence logs.
-*   **Attack Path Modeling Engine (APME)**: Neo4j-based graph discovery of feasible attack routes (e.g., SQLi → DB Access → Pivot) with 20+ security patterns and automated "Goal Injection".
+*   **Attack Path Modeling Engine (APME)**: Neo4j-based graph discovery of feasible attack routes (e.g., SQLi → DB Access → Pivot) with **179 attack rules** across 13 YAML category files, MITRE ATT&CK attribution, 10-factor confidence scoring, Dijkstra pathfinding with semantic deduplication, constraint-gated (22 gates) feasibility filtering, and automated "Goal Injection".
 *   **Adaptive Stress & Resilience Engine (ASRE)**: `k6`, `wrk`, `hping3`, and `Locust` orchestration with real-time ECharts telemetry via Redis Streams and WebSockets, safety kill-switches, and LLM-powered bottleneck PDF reports.
 *   **Exploit Readiness Layer (ERL)**: Containerized, non-destructive vulnerability validation with native proxy rotation and OpSec compliance built into the adapter layer.
 *   **Autonomous Recon Orchestration**: Temporal durable workflows with crash-safe execution, 10-attempt retry cap, full history replay at `localhost:8080`, and UI-based resume.
@@ -282,9 +311,10 @@ flowchart TD
 
 ### 🕵️ Surgical Reconnaissance & OSINT
 *   **Advanced Web API Discovery**: Kiterunner, Arjun, ParamSpider, LinkFinder, and InQL pipeline.
-*   **Deep Pursuit OSINT Engine**: Email pivoting (**holehe**), cross-platform social profile mapping (**maigret**), social presence discovery (**gosearch**), tactical identity permutation (**username-anarchy**), and a **Playwright-driven Social Intelligence Engine**.
+*   **Deep Pursuit OSINT Engine**: Email pivoting (**holehe**), cross-platform social profile mapping (**maigret**), social presence discovery (**gosearch**), tactical identity permutation (**username-anarchy**), and a **Playwright-driven LinkedIn Intelligence Engine** with session-state + cookie-vault authentication — MFA-compatible, no stored passwords, graceful scan continuation on session expiry.
 *   **URL Deduplication**: Two-pass dedup after `fetch_url` — URL signature dedup (pre-save) collapses parametric variants, content-based dedup (post-save) removes duplicate HTTP responses — reducing Tier 4–6 load.
 *   **Vulnerability Scanning**: Nuclei (sequential severity, auto-template updates), Semgrep (parallel downloads, 500-file cap, 5 MB per-file limit), WPScan, Dalfox (deep scan, WAF bypass, remote payloads), CRLFuzzer, S3Scanner, Gitleaks, Retire.js.
+*   **Custom Parameter Discovery Engine (CPDE)**: Define custom regex and string matchers with severity levels to automatically flag undocumented or high-value parameters during crawling.
 *   **WHOIS, WAF Detection, and IP Geolocation**.
 
 ### 🥷 Stealth & Operational Security (OpSec)

@@ -1,5 +1,162 @@
 # Changelog
 
+### [v3.6.0] - Unreleased
+
+- **Docker Build Image Size Optimization**:
+  - Relocated the Exploit-DB/Searchsploit database (~359MB) from build-time to container runtime. It is now dynamically cloned at startup inside the `temporal-python-orchestrator` container and shared with other containers via a new named Docker volume `exploitdb`.
+  - Added dynamic check-and-copy of the `.searchsploit_rc` configuration file within `RunSearchsploitAction` as a runtime safeguard.
+  - Cleared intermediate build caches in the Dockerfile, including cleaning Python `uv` package cache (`uv cache clean`), cleaning Ruby gem cache (`rm -rf /var/lib/gems/*/cache/*.gem`), and cleaning the Playwright `apt` lists (`rm -rf /var/lib/apt/lists/*`), saving an additional ~1.34GB.
+
+- **APME Task Errors & Neo4j Compatibility Fixes**:
+  - Refactored `_dijkstra_query` in `pathfinder.py` to replace `apoc.algo.dijkstra` with a native Cypher variable-length path matching query. It dynamically filters relationships by confidence and calculates cost weights via `REDUCE`, avoiding procedure exceptions (like `NotFoundException` or `BufferError` resizing crashes) while properly supporting custom path weights.
+  - Replaced the deprecated/illegal `size((n)--())` Cypher pattern function with modern `COUNT { (n)--() }` in `query_node_degree` to prevent syntax errors in Neo4j 5.x+.
+  - Updated the relationship merging transaction helper to map and store all 18 constraint flags (e.g. `requires_docker`, `requires_drupal`) as relationship properties in Neo4j, eliminating DBMS `UnknownPropertyKeyWarning` messages during path queries.
+  - Enhanced `Scorer._compute_recency` to robustly handle CVE published dates formatted as strings, datetimes, or dates (with safe fallbacks), preventing a Temporal recalculate_apme task crash (`TypeError: unsupported operand type(s) for -: 'datetime.date' and 'str'`).
+  - Added comprehensive test coverage in `test_apme_enhancement2.py` validating string-formatted date scoring scenarios and fallbacks.
+
+- **WPScan Parser & WPTaint Integration (Security & LLM Enrichment)**:
+  - Refactored `parse_wpscan_results` to split the logic into 5 private helper functions: `_parse_interesting_findings`, `_parse_version`, `_parse_plugins`, `_parse_themes`, and `_parse_users`.
+  - Added a dynamic catchall block in `_parse_interesting_findings` that extracts all unrecognized finding fields and formats them into a clean markdown description.
+  - Rewrote `save_finding` to accept an explicit `severity` string argument and map it correctly to Django model `severity` integers via `NUCLEI_SEVERITY_MAP`.
+  - Fixed three invocations of `stream_command` in `wptaint_tasks.py` to correctly consume the generator iterator and pass correct arguments instead of `self`.
+  - Extended wp-taint plugin discovery to support three sources of WordPress plugin slugs (legacy `WordPress Plugin: {slug}`, `WordPress Plugin: {slug} - {vuln title}`, and `WordPress Plugin Detected: {slug}`) and HTTP URLs matching the pattern `/wp-content/plugins/([^/?#]+)/` from crawled or fuzz-discovered endpoints.
+  - Ensured that new findings from both WPScan and WPTaint are dynamically passed through the LLM description generator (`get_vulnerability_gpt_report`) with full PII anonymization layer. Added checks to verify if a description/GPT has already been generated (`is_gpt_used=False`) before triggering the LLM call.
+  - Added comprehensive tests in `test_wpscan.py` and `test_wptaint.py`.
+
+- **WPScan Execution Reliability**:
+  - Automatically runs `wpscan --update --no-banner` (with rotation proxies if configured) before starting the scan loop to ensure up-to-date vulnerability definition databases.
+  - Strips the trailing slash of each target URL to normalize inputs.
+  - Implements a retry mechanism (up to 3 retries, 4 total attempts) if WPScan aborts with an SSL certificate/metadata verification error (`SSL peer certificate or SSH remote key was not OK`).
+  - Automatically executes the final retry attempt without the `--proxy` option to bypass potential proxy-induced SSL negotiation issues.
+
+- **Offline Hash Cracking & Wordlist Customization (Credential Intelligence Plugin)**:
+  - **Offline Cracking Engine**: Implemented containerized Hashcat support inside `credential_intelligence` viewset utilizing host Docker socket (`/var/run/docker.sock`).
+  - **Dynamic Device Detection**: Container automatically requests NVIDIA GPU runtimes if present, and seamlessly falls back to CPU execution if no GPU drivers are detected.
+  - **Flexible Parameter Customization**: Allowed users to fully customize cracking tasks with support for arbitrary integer hash types (`-m`), attack modes (`-a`), custom rules (`-r`), brute-force/mask patterns, custom charsets (`-1`, `-2`, `-3`, `-4`), increment modes, optimized kernels, and force runtimes.
+  - **Database & Model Schema**: Refactored the plugin app config label to `credential_intelligence_backend` and updated meta labels to resolve dynamic migration issues. Added `HashCrackingTask` and `CrackedHash` (encrypted passphrases at rest) models.
+  - **UI Interface Dashboard**: Created a tabbed glassmorphism offline cracking dashboard in the plugin UI with a log terminal window showing live container stdout and a cracked plaintexts table.
+  - **Wordlist Management**: Developed a Custom Wordlists management tab to upload, list, and delete custom `.txt` wordlist files in the shared system volume.
+
+- **Nuclei Proxy Rotation Support**:
+  - Implemented dynamic creation of a `proxies.txt` file (populated with valid system proxies, excluding Tor/SOCKS routing endpoints) via `CreateProxyListActivity`.
+  - Configured `NucleiPlannerWorkflow` to use this proxy list via the `-proxy` flag in Nuclei command execution, allowing Nuclei to rotate through available HTTP/S proxies when conducting vulnerability templates.
+  - Added safe cleanup of the temporary proxy list via a `finally` block executing `CleanupProxyListActivity` regardless of scan success or failure.
+
+- **Intelligent Tool Gating (Tier 5)**:
+  - **JWT tool gate**: `jwt_tool` now only runs when JWT tokens have been detected in the current scan. Detection checks `Parameter` records with `is_auth_related=True` whose name matches known JWT patterns (`jwt`, `bearer`, `authorization`, `access_token`, `refresh_token`, `id_token`, `auth_token`), and `SecretLeak` records whose `secret_type` indicates a JWT or Bearer token. Scans against non-authenticated endpoints no longer waste time running JWT algorithm-confusion attacks.
+  - **GraphQL tool gate**: Both `InQL` and `graphql-cop` now gate on confirmed GraphQL endpoint presence. The gate first checks existing `EndPoint` database records for URLs matching `/graphql` or `/graphiql` (zero network cost), then falls back to HEAD-probing 6 common GraphQL paths if the DB has no evidence. Tools are skipped with a clear log entry on non-GraphQL targets.
+  - **OpenAPI discovery gate**: The CPDE OpenAPI discoverer now gates on `has_openapi_spec()` before calling the full `discover()` pipeline. The gate uses lightweight HEAD requests against the same 14 probe paths used by the discoverer itself, avoiding up to 14 full GET requests per host on targets that serve no API documentation.
+  - Added `has_jwt_tokens()`, `has_graphql_endpoint()`, and `has_openapi_spec()` helper functions to `common_func.py` for reuse across the scan pipeline.
+
+- **CPDE (Custom Parameter Discovery Engine) — End-to-End Fixes**:
+  - **URL derivation fix**: The `RunParamDiscoveryActivity` no longer silently no-ops when `urls` is absent from the scan context. It now queries `EndPoint` records for the scan, falls back to domain name construction, and logs a warning with early return if still empty.
+  - **Missing dependency**: Added `esprima==4.0.1` to `requirements.txt`; the JS AST analyzer was silently skipping all JavaScript analysis due to the missing import.
+  - **Neo4j property mismatch**: Fixed 3 Cypher `MATCH` clauses in `graph_writer.py` that referenced `http_url` on `Endpoint` nodes — the graph stores `url`, causing all graph enrichment writes to silently match zero nodes.
+  - **`get_neo4j_driver()` helper**: Added to `reNgine/utils/graph.py` so `cpde_tasks.py` can obtain a driver without re-implementing manager instantiation.
+  - **Proxy sourcing**: Replaced direct `Proxy.objects.first()` access with `get_random_proxy()` from `common_func.py`, respecting TOR mode and the `use_proxy` scan flag.
+  - **ParameterSerializer**: Replaced broken serializer (referenced non-existent `is_reflected`/`is_source`/`is_sink` fields) with correct CPDE fields and a nested `ParameterEndpointSerializer` so `endpoint.http_url` is returned instead of a bare PK integer.
+  - **Parameters tab filtering**: Added 7 server-side filter parameters to `ParameterViewSet` (`param_location`, `is_auth_related`, `observed_in_js`, `observed_in_openapi`, `observed_in_graphql`, `confidence_min`, `data_type`) and a collapsible filter panel in the frontend `ParametersTab` component.
+  - **Report integration**: `generate_report_task` now queries and passes `Parameter` records to all four report templates (`modern`, `enterprise`, `cyber_pro`, `default`), each with a gated Discovered Parameters table.
+
+- **Vigolium Scanning Enhancement**:
+  - Removed incorrect inline parsing of the `--known-issue-scan-severities` argument inside `vigolium_tasks.py`.
+  - Configured vigolium globally at the container level (in both Python and Go temporal entrypoints) using `vigolium config set known_issue_scan.severities "critical,high,medium,low,info"` to ensure all severity levels are scanned by default.
+
+- **HTTP Crawl Bridge & Technology Mapping Propagation**:
+  - Added a second HTTP crawl task, `HTTP Crawl Bridge` (`http_crawl_bridge`), executed in between URL fetching and directory fuzzing.
+  - Dynamically checks any endpoints that are dead or not alive, as well as all new/uncrawled endpoints, updating their status and mapping their technologies.
+  - Removed the `endpoint.is_default` constraint when saving technology objects, enabling technologies discovered on *any* endpoint to propagate to `subdomain.technologies`.
+  - Integrated the bridge task in both `MasterScanWorkflow` and `SubScanWorkflow` (Tier 3a).
+
+- **Target Editing**:
+  - Added a comprehensive **Edit Target** modal accessible directly from the Targets page, allowing full post-creation customization of every target parameter without deleting and recreating the entry.
+  - **Edit button in each row**: A dedicated amber pencil (`✏`) icon button is now rendered inline per target row, alongside the existing Initiate Scan and 3-dot menu controls. "EDIT TARGET" also appears as the first item in the row's context menu.
+  - **Comprehensive modal form**: The `EditTargetModal` exposes all editable `Domain` fields organized into sections — Identity (target name shown read-only, target type selector), Metadata (description, organization reassignment, HackerOne team handle), Scope Configuration (in-scope IPs/CIDRs, secondary domains), Advanced Scan Configuration (starting point path, excluded paths), and Continuous Monitoring (frequency, scan scope, engine).
+  - **Backend REST endpoint**: New `POST /api/update/target/` endpoint (`UpdateTarget` APIView, `PERM_MODIFY_TARGETS` gated). Accepts all editable fields and correctly handles `excluded_paths` as either a JSON list or newline-delimited string. Organization reassignment is handled via the `Organization.domains` M2M relationship. Monitoring field changes automatically trigger `manage_monitoring_task()` to upsert or delete the corresponding Temporal schedule.
+  - **React Query integration**: Added `useUpdateTarget` mutation hook that posts to the new endpoint and invalidates the `['domains', projectSlug]` query key on success, keeping the targets list in sync without a page refresh.
+
+- **API Security Hardening**:
+  - **Swagger/OpenAPI docs now require authentication**: Changed `permission_classes` from `AllowAny` to `IsAuthenticated` and set `public=False` on the schema view. Removed `/swagger/` and `/redoc/` from `LOGIN_REQUIRED_IGNORE_PATHS` — API docs are no longer publicly accessible to unauthenticated users.
+  - **JWT refresh token blacklisting**: Enabled `rest_framework_simplejwt.token_blacklist` app and set `BLACKLIST_AFTER_ROTATION=True`. Rotated refresh tokens are now immediately invalidated in the database, preventing replay attacks with leaked refresh tokens.
+  - **Swagger security scheme**: Added Bearer token security definition and session login/logout links to `SWAGGER_SETTINGS` so authenticated users can authorize and test API endpoints directly from the explorer.
+  - **Dead ignore-path cleanup**: Removed the never-registered `/redoc/` entry from `LOGIN_REQUIRED_IGNORE_PATHS`.
+
+- **SearchSploit & CVE LLM Target Attribution**: 
+  - Added `host` and `port` assignment to `searchsploit_scan` to correctly attribute findings with an `http_url`. 
+  - Integrated `LLMVulnerabilityReportGenerator` into `search_vulns_scan` and `searchsploit_scan`. Findings dynamically hit the LLM (if enabled) for risk assessments, map descriptions and mitigations, and cache results in the local `CveId` database.
+
+- **Attack Path Modeling Engine (APME) UI & Rules Enhancement**:
+  - **Tactical AI Path Explanations ("Explain This")**: Implemented an AI-powered tactical explainer that generates step-by-step intelligence breakdowns of attack vectors for both the React Web App and React Native Mobile App.
+  - **Two-Way PII Protection**: Masked all private data (IP addresses, emails, hostnames) via the backend `PIIGate` wrapper before invoking the active LLM, restoring original values prior to client delivery.
+  - **Caching & Persistence**: Stored the generated explanations directly inside the `potential_attack_chain` JSON database field under the `explanation` key to allow immediate retrieval on subsequent views without regeneration.
+  - **Rules Engine Gaps**: Fixed a mismatch in the APME rules engine where `pivot_to_internal_discovery` targeted a capability subtype `"internal_discovery"` that was not declared in `NODE_TYPES["Capability"]` in `schema.py`. Added `"internal_discovery"` to the capability schema.
+  - **Attack Rules Expansion**: Added rules for SSRF (`ssrf_to_cloud_access`, `ssrf_to_pivot`), LFI (`lfi_to_rce`, `lfi_to_data_exfil`), XXE (`xxe_to_data_exfil`, `xxe_to_ssrf`), XSS (`xss_to_auth_access`), and Open Redirect (`redirect_to_auth_access`).
+  - **Enriched Step Nodes API**: Updated the backend path serialization (`serializer.py`) and orchestrator persistence flow (`orchestrator.py`) to resolve and serialize full node properties (type, subtype, name, cvss_score, severity, vuln_id) as `from_node` and `to_node` objects instead of only transmitting raw string IDs.
+  - **Interactive Visual Timeline UI**: Replaced the simple vertical text row list of raw IDs with a visually stunning, responsive compromise chain timeline in `AttackPathsTab.tsx` and the React Native Mobile app. Features colors and icons matching node types (Asset, Vulnerability, Capability, Privilege, Credential), CVSS scores, step-by-step actions, and direct links to verify details.
+  - **Description Truncation Fix**: Replaced the severe truncation (`noWrap`) on the finding descriptions with a clamped two-line preview in the collapsed card header and a full, multi-paragraph Executive Narrative display inside the expanded drill-down details view.
+  - **On-Demand Recalculation**: Added a "RE-CALCULATE PATHS" button in the Web Attack Paths tab header and mobile Summary tab. It invokes the newly registered `RecalculateApmeWorkflow` Temporal workflow to rebuild the attack path modeling graph asynchronously and update local database entries.
+  - **Schema Expansion (Enhancement 2)**: Extended node taxonomy with 23 new technology subtypes, 48 new vulnerability subtypes, and 13 new capability subtypes. Added `Technology` nodes with `USES_TECH` relationship edges to model software stack composition within the attack graph. Extended `TAXONOMY_MAP` with 50 new keyword mappings and 4 new vulnerability node properties for richer semantic resolution.
+  - **Constraint Engine (11→22 gates)**: Doubled the constraint gate count from 11 to 22, adding 12 new technology-gate flags (`requires_docker`, `requires_drupal`, `requires_windows`, `requires_kubernetes`, `requires_active_directory`, etc.) that prevent infeasible attack steps from appearing in paths, reducing false-positive attack chains.
+  - **Rules Library (76→179 rules)**: Expanded from 76 to 179 rules. Added 29 new rules to 5 existing category files (injection, server-side, auth, client-side, info-disclosure) and 8 entirely new category files: `network.yaml` (pivoting/lateral movement), `container.yaml` (container escapes/supply-chain), `active_directory.yaml` (AD attacks), `api.yaml` (API exploit chains), `email.yaml` (email-based pivots), `supply_chain.yaml` (dependency compromise), `dotnet.yaml` (.NET deserialization), `persistence.yaml` (persistence mechanisms).
+  - **Scoring Overhaul (10-Factor Weights)**: Rebuilt the vulnerability scorer with 10 independently tunable factor weights (up from 6): EPSS probability weight (0.15), tiered KEV severity boost (1.2×/1.5×/2.0× by severity), confidence product multiplier, speculative path tier adjustment, ERL validation step guard, and constraint-22 cap enforcement.
+  - **Pathfinder Improvements**: Implemented semantic path deduplication to eliminate structurally equivalent paths with different node orderings. Reduced DFS maximum depth from 8 to 6 hops. Added 2-step minimum hop filter to remove trivially short chains. Enforced fan-out cap at 12 successor nodes per step. Added DFS fallback when Dijkstra returns zero results on sparse graphs.
+
+- **APME Resilience & Temporal Stability**:
+  - **Pathfinder Entry Point Cap**: Capped pathfinder entry-point selection at 50 nodes per graph to prevent Cypher query explosion on large Neo4j installations.
+  - **Neo4j Per-Query Timeout**: Added a 30-second timeout to all Neo4j path queries to prevent hung Temporal activity threads.
+  - **Temporal Heartbeats in APME Pipeline**: Wired Temporal activity heartbeats through all 7 APME orchestrator pipeline steps, enabling heartbeat-based timeout detection and proper Temporal failure reporting.
+  - **RecalculateApmeWorkflow Resilience**: Set 30-minute execution timeout and maximum 3 retries on `RecalculateApmeWorkflow` to prevent infinite retry loops on persistently failing graphs.
+  - **Neo4j Heap Configuration**: Tuned Neo4j JVM heap to 768 MB initial / 1536 MB maximum (`NEO4J_server_memory_heap_initial__size=768m`, `NEO4J_server_memory_heap_max__size=1536m`) to fit safely within the 3 GB container memory limit.
+  - **LLM Orchestrator M2M Fix**: Fixed `AttributeError: 'Subdomain' object has no attribute 'ip_address'` in `llm_orchestrator.py` — updated to use the M2M `ip_addresses` relationship with `prefetch_related` to correctly gather open ports for LLM context enrichment.
+
+
+- **Custom Parameter Discovery Engine (CPDE)**:
+  - Added the Custom Parameter Discovery Engine (CPDE) to allow users to define custom regular expressions and keyword matchers to extract sensitive or high-value parameters across scan results.
+  - **Backend**: Added the `Parameter` model with `type` (`regex`/`string`), `severity`, and `description` fields. Implemented REST API endpoints (`/api/settings/parameters/`) for full CRUD management.
+  - **Frontend Configuration**: Built a dedicated "Custom Parameters" panel in the Settings page for managing parameters.
+  - **Scan Integration**: Scan results now include a "Parameters" tab detailing all discovered custom parameters, their occurrence counts, severity levels, and the specific endpoint URLs where they were found.
+
+- **WP Taint Scan Integration**:
+  - Integrated `wp-taint-scan` to automatically perform Static Application Security Testing (SAST) on discovered WordPress plugins.
+  - The tool downloads plugin source code from the WordPress repository and runs taint analysis, parsing the results directly into the `Vulnerability` database.
+  - Configured Temporal workflows to execute `wp-taint-scan` sequentially as the final tool against WordPress targets, ensuring maximum plugin discovery coverage.
+
+- **CVE Enrichment Expansion (SploitScan & LLM Integration)**:
+  - **SploitScan Integration**: Integrated the `sploitscan` CLI to pull real-world exploit evidence directly into the CVE pipeline. Automatically extracts ExploitDB, Metasploit, and GitHub Proof-of-Concept links, along with HackerOne Hacktivity statistics and overarching patching priority.
+  - **Automated AI Risk Assessment**: Integrated the native `LLMVulnerabilityReportGenerator` into the enrichment flow. The system automatically prompts the active LLM (OpenAI, Anthropic, Gemini, or Ollama) with CVSS metrics and public exploit counts to generate a structured, context-rich risk assessment and mitigation strategy.
+  - **Persistent Intelligence Cache**: Expanded the `CveId` model (Migration 0042) to permanently store `ai_risk_assessment`, `mitigation_ideas`, `public_exploits`, `hackerone_data`, and `patching_priority`, drastically reducing API calls and LLM token usage on subsequent scans.
+  - **Daily EPSS Feed Synchronization**: Implemented a local `EpssFeedData` database table and a scheduled Temporal task (`sync_epss_data`) that fetches the daily EPSS CSV feed from FIRST/Cyentia at 8:00 AM. Local EPSS querying completely eliminates rate-limiting and 429 errors from the external EPSS API, resulting in near-instant enrichment during scans.
+
+- **LLM Vulnerability Analysis & Tier 7 Enrichment**:
+  - Fixed `parse_llm_vulnerability_report` to handle all LLM output styles (`Header:\ncontent`, `Header:\n\ncontent`, `Header: inline content`) — the previous `re.split(r':\n')` silently returned an empty dict on any response that did not place content on a new line immediately after the colon, causing an HTTP 500 "Failed to parse LLM response" error on the vulnerability analysis endpoint.
+  - Fixed `get_vulnerability_gpt_report` to always update the specific requested vulnerability by ID before running the name/path bulk-update query. The previous `http_url__icontains=path` filter silently skipped findings with a `NULL` http_url because Django's `icontains` lookup does not match NULL columns.
+  - Tier 7 Impact Assessment (`generate_impact_assessment`) now automatically calls `get_vulnerability_gpt_report` for every vulnerability that has not yet been LLM-enriched (`is_gpt_used=False`), populating `description`, `impact`, `remediation`, and `references` on the `Vulnerability` record during every full scan without manual intervention. The `LLMImpactGenerator` business-impact narrative is stored in `ImpactAssessment.potential_impact` only and no longer overwrites the richer structured GPT content on `Vulnerability.impact`.
+  - Fixed naive `datetime.now()` usage in `test_stress_phase2.py` (replaced with `timezone.now()`) that generated Django `RuntimeWarning` on `ScanHistory.start_scan_date`, `StressTestResult.start_time`/`end_time`, and `StressTelemetryPoint.timestamp` fields when `USE_TZ=True` is active.
+
+- **Temporal Activity Stabilizations**:
+  - Fixed a `TypeError` signature mismatch in `_run_task` that crashed reconnaissance activities (such as `searchsploit_scan` and `wafw00f_scan`). The workflow engine now uses `inspect.signature` to intelligently inject Context (`ctx`) and descriptions only when supported by the underlying scanner function.
+
+- **Ollama Orchestration UI & Backend Integration**:
+  - Implemented dynamic Docker orchestration for the local Ollama LLM provider. The LLM Toolkit settings page now includes a built-in Docker container lifecycle manager, allowing users to start and stop the `ollama` container directly from the UI.
+  - Developed `OllamaManager` using `docker.from_env()` to automatically pull, start, and manage the `ollama/ollama:latest` image inside the dynamically discovered `r3ngine` Docker network.
+  - Added REST endpoints (`/ollama/service_status`, `/ollama/service_start`, `/ollama/service_stop`) and React Query hooks to seamlessly coordinate container state with the UI.
+  - Designed the UI to prevent interactions like "Test Connection" or model selection when the service is stopped.
+
+- **Metasploit Integration Terminal Stabilization (Plugin)**:
+  - Fixed interactive console text formatting and squishing issues by ensuring properly structured PTY WebSockets handling in the Django Channels consumer.
+  - Implemented a "Kill Instance" switch to quickly terminate and clean up hanging Metasploit container processes.
+  - Migrated `msf_console` to the Docker SDK, ensuring spawned containers are properly labeled (`com.docker.compose.project: 'r3ngine'`) and attached to the project's native network.
+
+- **LinkedIn Intelligence — Session-Based Authentication**:
+  - Replaced the password-based `launch_persistent_context()` approach with a two-tier session model: Playwright `storage_state.json` tried first, LinkedIn session cookies injected from the API vault as fallback.
+  - No password is ever stored in the database. The `password` field has been removed from `LinkedInCredentials` via migration `0017`. The model gains `cookies_json`, `state_file_path`, `last_validated_at`, and `is_valid` fields.
+  - Authentication failures (expired state file, invalid cookies, LinkedIn bot challenges, MFA prompts) log a structured operator note and gracefully skip LinkedIn OSINT — the scan continues without interruption.
+  - Added four REST API endpoints under `/api/linkedin/session/`: `upload/` (accepts `storage_state.json` multipart or raw `cookies_json` payload), `status/` (reports `is_valid`, `last_validated_at`, `has_state_file`, `has_cookies`), root `DELETE` (clears state file from disk and resets all session fields), and `helper/` (serves a downloadable standalone Python capture script).
+  - The downloadable `linkedin_capture.py` helper script launches a headed Chromium browser on the user's local machine, waits for manual login (including MFA), and saves `storage_state.json` for upload. No credentials ever leave the user's machine.
+  - All file-system operations on `state_file_path` enforce path-traversal protection (`_validate_state_path`) — both reads and writes are bounded to `{RENGINE_RESULTS}/context/linkedin/`.
+  - Added `LinkedInSessionCard` React component: live status indicator (green/amber/red), file upload, session revocation, and helper script download — all via the API vault settings page.
+  - 24 tests covering model fields, scraper authentication paths (storage_state, cookie injection, graceful fallback), all four API endpoints, and `run_linkedint` caller resilience.
+
 ### [v3.5.0] - 2026-06-04
 
 - **Python 3.12 Runtime Upgrade**:
@@ -24,8 +181,6 @@
   - Resolves five pip dependency incompatibility warnings at build time: `requests` (2.25.1 vs ≥2.27.0 / ≥2.32.4), `chardet` (4.0.0 vs ≥5), `idna` (2.10 vs ≥3.4), and `urllib3` (1.26.x vs ~2.0).
   - Each tool's transitive dependencies are now fully isolated and cannot conflict with the Django application's pinned `requirements.txt` packages or with each other.
   - Follows the same `pipx` pattern already established for `baddns`. `/root/.local/bin` is on `PATH`, so all shims remain accessible at runtime without any additional configuration.
-
-
 
 - **CVE Enrichment System**:
   - **CVE Enrichment Service**: `web/reNgine/cve_enrichment.py` fully operational - fetches CVSS v3.1 metrics from NVD API v2.0, EPSS probability scores from FIRST, and syncs the CISA KEV catalog. Enriched data is cached (7-day TTL for CVEs, 1-hour for KEV) and gracefully degrades on API unavailability.

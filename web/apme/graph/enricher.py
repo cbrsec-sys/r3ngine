@@ -16,6 +16,8 @@ from apme.models.node import Node
 
 logger = logging.getLogger(__name__)
 
+MAX_EDGES_PER_NODE = 12
+
 
 class GraphEnricher:
     """
@@ -31,15 +33,27 @@ class GraphEnricher:
         """
         Apply rules to all nodes and return newly derived edges.
         Edges are also persisted to the graph.
+        Per-node fan-out is capped at MAX_EDGES_PER_NODE to prevent graph explosion.
         """
         derived_edges: List[Edge] = []
 
         for node in nodes:
-            new_edges = self._rules_engine.apply(node, existing_nodes=nodes)
-            derived_edges.extend(new_edges)
+            node_edges = self._rules_engine.apply(node, existing_nodes=nodes)
+            if len(node_edges) > MAX_EDGES_PER_NODE:
+                node_edges = sorted(
+                    node_edges, key=lambda e: e.confidence, reverse=True
+                )[:MAX_EDGES_PER_NODE]
+                logger.debug(
+                    "APME Enricher: Node %s fan-out capped at %d edges.",
+                    node.id, MAX_EDGES_PER_NODE,
+                )
+            derived_edges.extend(node_edges)
 
         if derived_edges:
-            logger.info(f"APME Enricher: Derived {len(derived_edges)} new edges from rules.")
+            logger.info(
+                "APME Enricher: Derived %d new edges from rules (fan-out cap: %d).",
+                len(derived_edges), MAX_EDGES_PER_NODE,
+            )
             self._builder.add_edges(derived_edges, scan_id)
 
         return derived_edges

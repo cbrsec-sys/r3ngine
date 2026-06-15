@@ -53,13 +53,13 @@ class TestRunGenericTaskAllowlist(TestCase):
         from unittest.mock import patch, MagicMock
         from reNgine.temporal_activities import run_generic_task_activity
         fake_ctx = {"scan_history_id": 1, "domain_id": 1, "engine_id": 1}
-        with patch("importlib.import_module") as mock_import:
-            with patch("temporalio.activity.logger"):
+        with patch("temporalio.activity.logger"):
+            with patch("importlib.import_module") as mock_import:
                 try:
                     run_generic_task_activity(fake_ctx, "not_in_allowlist")
                 except ValueError:
                     pass
-        mock_import.assert_not_called()
+            mock_import.assert_not_called()
 
 
 class TestScanContext(TestCase):
@@ -131,3 +131,52 @@ class TestCheckpointStubRemoval(TestCase):
         )
         result = temporal_activities.save_checkpoint_activity({})
         self.assertIsNone(result)
+
+class TestCreateProxyListActivity(TestCase):
+    def setUp(self):
+        from scanEngine.models import Proxy
+        Proxy.objects.all().delete()
+        
+    def test_create_proxy_list_enabled_http(self):
+        """If mocked proxies are enabled and HTTP, it creates the list."""
+        from scanEngine.models import Proxy
+        from reNgine.temporal_activities import create_proxy_list_activity
+        import os
+        
+        Proxy.objects.create(use_proxy=True, proxies="127.0.0.1:8080")
+        
+        ctx = {'scan_history_id': 9999}
+        file_path = create_proxy_list_activity(ctx)
+        
+        self.assertIsNotNone(file_path)
+        self.assertTrue(os.path.exists(file_path))
+        with open(file_path, 'r') as f:
+            self.assertEqual(f.read().strip(), 'http://127.0.0.1:8080')
+            
+        os.remove(file_path)
+
+    def test_create_proxy_list_socks_proxy(self):
+        """If it returns a socks proxy, then it's Tor and should not create the list."""
+        from scanEngine.models import Proxy
+        from reNgine.temporal_activities import create_proxy_list_activity
+        
+        # Test case where socks proxy is explicitly given or tor is enabled
+        Proxy.objects.create(use_proxy=True, proxies="socks5://127.0.0.1:9050")
+        
+        ctx = {'scan_history_id': 9999}
+        file_path = create_proxy_list_activity(ctx)
+        
+        self.assertIsNone(file_path)
+
+    def test_create_proxy_list_not_enabled(self):
+        """If not enabled (returns empty list), skip."""
+        from scanEngine.models import Proxy
+        from reNgine.temporal_activities import create_proxy_list_activity
+        
+        Proxy.objects.create(use_proxy=False, proxies="http://127.0.0.1:8080")
+        
+        ctx = {'scan_history_id': 9999}
+        file_path = create_proxy_list_activity(ctx)
+        
+        self.assertIsNone(file_path)
+

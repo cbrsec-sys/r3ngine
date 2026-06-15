@@ -12,62 +12,83 @@ os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
 logger = logging.getLogger(__name__)
 
-def take_screenshot_and_save(subdomain_id, scan_id, results_dir=None, activity_id=None):
+def take_screenshot_and_save(subdomain_id, scan_id, results_dir=None, activity_id=None, url_override=None):
     """
     Orchestrates the capture and database persistence of screenshots for a subdomain.
-    Queries all unique endpoints for the subdomain and captures a screenshot for each base URL.
+
+    When url_override is provided (recommended), that exact URL is captured without
+    any path stripping — mirrors the rengine-ng pattern of passing full endpoint URLs.
+
+    When url_override is None, falls back to the legacy behaviour: queries all
+    endpoints for the subdomain, collapses them to base URLs (scheme://netloc),
+    and caps at MAX_SCREENSHOTS_PER_SUBDOMAIN.
 
     Args:
-        subdomain_id (int): The ID of the Subdomain object in the database.
-        scan_id (int): The ID of the ScanHistory object in the database.
-        results_dir (str, optional): The directory where results are stored. Defaults to settings.RENGINE_RESULTS.
-        activity_id (int, optional): The ID of the ScanActivity executing this task. Defaults to None.
+        subdomain_id (int): ID of the Subdomain object.
+        scan_id (int): ID of the ScanHistory object.
+        results_dir (str, optional): Directory for results. Defaults to settings.RENGINE_RESULTS.
+        activity_id (int, optional): ID of the ScanActivity executing this task.
+        url_override (str, optional): Full URL to capture. Skips endpoint querying when set.
 
     Returns:
-        bool: True if at least one screenshot was successfully captured and saved, False otherwise.
+        bool: True if at least one screenshot was successfully captured and saved.
     """
     if not results_dir:
         results_dir = settings.RENGINE_RESULTS
     try:
         subdomain = Subdomain.objects.get(id=subdomain_id)
         scan = ScanHistory.objects.get(id=scan_id)
-        
-        # 1. Gather all endpoints for this subdomain in this scan
-        endpoints = EndPoint.objects.filter(subdomain=subdomain, scan_history=scan)
-        
-        # 2. Extract unique base URLs (scheme://netloc)
-        urls_to_capture = set()
-        for ep in endpoints:
-            if ep.http_url:
+
+        if url_override is not None:
+            parsed_override = urlparse(url_override)
+            if parsed_override.scheme not in ('http', 'https'):
+                logger.error(
+                    "url_override rejected — invalid scheme: %s",
+                    parsed_override.scheme or '(empty)'
+                )
+                return False
+            # Use the caller-provided URL directly — no path stripping.
+            target_urls = [url_override]
+        else:
+            # Legacy: gather all endpoints for this subdomain and collapse to base URLs.
+            endpoints = EndPoint.objects.filter(subdomain=subdomain, scan_history=scan)
+
+            # 2. Extract unique base URLs (scheme://netloc)
+            urls_to_capture = set()
+            for ep in endpoints:
+                if ep.http_url:
+                    try:
+                        parsed = urlparse(ep.http_url)
+                        if parsed.scheme and parsed.netloc:
+                            base_url = f"{parsed.scheme}://{parsed.netloc}"
+                            urls_to_capture.add(base_url)
+                    except Exception as parse_err:
+                        logger.debug(f"Failed to parse endpoint URL {ep.http_url}: {parse_err}")
+
+            # 3. Add subdomain's main http_url if present
+            if subdomain.http_url:
                 try:
-                    parsed = urlparse(ep.http_url)
+                    parsed = urlparse(subdomain.http_url)
                     if parsed.scheme and parsed.netloc:
-                        base_url = f"{parsed.scheme}://{parsed.netloc}"
-                        urls_to_capture.add(base_url)
-                except Exception as parse_err:
-                    logger.debug(f"Failed to parse endpoint URL {ep.http_url}: {parse_err}")
-
-        # 3. Add subdomain's main http_url if present
-        if subdomain.http_url:
-            try:
-                parsed = urlparse(subdomain.http_url)
-                if parsed.scheme and parsed.netloc:
-                    urls_to_capture.add(f"{parsed.scheme}://{parsed.netloc}")
-                else:
+                        urls_to_capture.add(f"{parsed.scheme}://{parsed.netloc}")
+                    else:
+                        urls_to_capture.add(subdomain.http_url)
+                except Exception:
                     urls_to_capture.add(subdomain.http_url)
-            except Exception:
-                urls_to_capture.add(subdomain.http_url)
 
-        # 4. Fallback to guessing if no URLs discovered
-        if not urls_to_capture:
-            urls_to_capture.add(f"http://{subdomain.name}")
-            urls_to_capture.add(f"https://{subdomain.name}")
+            # 4. Fallback to guessing if no URLs discovered
+            if not urls_to_capture:
+                urls_to_capture.add(f"http://{subdomain.name}")
+                urls_to_capture.add(f"https://{subdomain.name}")
 
-        # 5. Cap to a maximum of 10 unique base URLs to prevent resource thrashing
-        max_screenshots = int(os.getenv("MAX_SCREENSHOTS_PER_SUBDOMAIN", 10))
-        target_urls = sorted(list(urls_to_capture))[:max_screenshots]
-        
-        logger.info(f"Processing {len(target_urls)} screenshot(s) for subdomain {subdomain.name} (ID: {subdomain_id})")
+            # 5. Cap to a maximum of 10 unique base URLs to prevent resource thrashing
+            max_screenshots = int(os.getenv("MAX_SCREENSHOTS_PER_SUBDOMAIN", 10))
+            target_urls = sorted(list(urls_to_capture))[:max_screenshots]
+
+        logger.info(
+            f"Processing {len(target_urls)} screenshot(s) for subdomain "
+            f"{subdomain.name} (ID: {subdomain_id})"
+        )
         
         success_count = 0
         first_successful_path = None

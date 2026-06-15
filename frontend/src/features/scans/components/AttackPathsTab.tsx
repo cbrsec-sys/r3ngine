@@ -12,6 +12,7 @@ import {
   Button,
   Snackbar,
   Alert,
+  useTheme,
 } from '@mui/material';
 import {
   ChevronDown,
@@ -23,15 +24,22 @@ import {
   Zap,
   AlertTriangle,
   ArrowRight,
+  Server,
+  Key,
+  Lock,
 } from 'lucide-react';
+import { useParams, Link } from '@tanstack/react-router';
 import { 
   useAttackPaths, 
   useTriggerAttackPathModeling,
+  useRecalculateAttackPaths,
+  useExplainAttackPath,
   type AttackPath, 
-  type AttackStep 
+  type AttackStep,
+  type EnrichedNode
 } from '../api/useAttackPaths';
 import { TacticalPanel } from '../../../components/TacticalPanel';
-import { Bot } from 'lucide-react';
+import { Bot, Brain } from 'lucide-react';
 
 // ─── Risk → color mapping ────────────────────────────────────────────────────
 const RISK_COLOR: Record<string, string> = {
@@ -75,102 +83,340 @@ const RiskBadge: React.FC<{ risk: string }> = ({ risk }) => {
   );
 };
 
-// ─── Individual step row ──────────────────────────────────────────────────────
-const StepRow: React.FC<{ step: AttackStep; index: number }> = ({ step, index }) => {
-  const isValidated = step.validated;
-  const color = isValidated ? '#00ff62' : '#ff9f00';
-  const StatusIcon = isValidated ? CheckCircle2 : HelpCircle;
+// ─── MITRE Tactic color palette ──────────────────────────────────────────────
+const TACTIC_COLORS: Record<string, string> = {
+  'initial-access':       '#ff4444',
+  'execution':            '#ff8800',
+  'persistence':          '#ffcc00',
+  'privilege-escalation': '#aa00ff',
+  'defense-evasion':      '#0088ff',
+  'credential-access':    '#00aaff',
+  'discovery':            '#00ff88',
+  'lateral-movement':     '#ff00aa',
+  'collection':           '#ff6600',
+  'command-and-control':  '#9944ff',
+  'exfiltration':         '#ff0066',
+  'impact':               '#ff0000',
+  'resource-development': '#888888',
+  'reconnaissance':       '#44aaff',
+};
+
+// ─── MITRE ATT&CK badge ───────────────────────────────────────────────────────
+interface MitreBadgeProps {
+  technique?: string;
+  techniqueName?: string;
+  tactic?: string;
+  tacticDisplay?: string;
+  tacticColor?: string;
+}
+
+const MitreBadge: React.FC<MitreBadgeProps> = ({
+  technique,
+  techniqueName,
+  tactic,
+  tacticDisplay,
+  tacticColor,
+}) => {
+  if (!technique) return null;
+  const color = tacticColor ?? TACTIC_COLORS[tactic ?? ''] ?? '#888888';
+  const tooltip = `${techniqueName ?? technique}${tacticDisplay ? ` · ${tacticDisplay}` : ''}`;
+  return (
+    <Tooltip title={tooltip} arrow placement="top">
+      <Box
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          px: 0.75,
+          py: 0.15,
+          borderRadius: 0.5,
+          borderLeft: `3px solid ${color}`,
+          bgcolor: `${color}12`,
+          color,
+          fontSize: '0.48rem',
+          fontWeight: 900,
+          fontFamily: 'monospace',
+          letterSpacing: 0.5,
+          cursor: 'default',
+          userSelect: 'none',
+          whiteSpace: 'nowrap',
+          flexShrink: 0,
+        }}
+      >
+        ATT&amp;CK&nbsp;·&nbsp;{technique}
+      </Box>
+    </Tooltip>
+  );
+};
+
+// ─── Enriched Node Rendering ──────────────────────────────────────────────────
+const RenderNode: React.FC<{ node: EnrichedNode | undefined; rawId: string; projectSlug?: string }> = ({ node, rawId, projectSlug }) => {
+  const theme = useTheme();
+  const type = node?.type ?? (rawId.startsWith('vuln::') ? 'Vulnerability' : rawId.startsWith('goal::capability::') ? 'Capability' : rawId.startsWith('goal::privilege::') ? 'Privilege' : 'Asset');
+  const subtype = node?.subtype ?? rawId.split('::').pop() ?? '';
+  const name = node?.name ?? (type === 'Vulnerability' ? `Vulnerability #${subtype}` : subtype);
+  
+  let color = '#00f3ff';
+  let icon = <Server size={14} />;
+  let bgColor = 'rgba(0, 243, 255, 0.03)';
+  let borderColor = 'rgba(0, 243, 255, 0.1)';
+  
+  if (type === 'Vulnerability') {
+    const severity = node?.severity ?? 2;
+    const sevColors = ['#00ff62', '#00ff62', '#fffc00', '#ff9f00', '#ff003c'];
+    color = sevColors[severity] ?? '#ff9f00';
+    icon = <ShieldAlert size={14} />;
+    bgColor = `${color}08`;
+    borderColor = `${color}20`;
+  } else if (type === 'Capability') {
+    color = '#d500f9';
+    icon = <Zap size={14} />;
+    bgColor = 'rgba(213, 0, 249, 0.03)';
+    borderColor = 'rgba(213, 0, 249, 0.1)';
+  } else if (type === 'Privilege') {
+    color = '#ffab00';
+    icon = <Key size={14} />;
+    bgColor = 'rgba(255, 171, 0, 0.03)';
+    borderColor = 'rgba(255, 171, 0, 0.1)';
+  } else if (type === 'Credential') {
+    color = '#ffab00';
+    icon = <Lock size={14} />;
+    bgColor = 'rgba(255, 171, 0, 0.03)';
+    borderColor = 'rgba(255, 171, 0, 0.1)';
+  }
 
   return (
     <Box
       sx={{
         display: 'flex',
-        alignItems: 'flex-start',
-        gap: 1.5,
-        py: 1,
-        px: 1.5,
+        alignItems: 'center',
+        gap: 2,
+        p: 1.5,
         borderRadius: 1,
-        bgcolor: isValidated ? 'rgba(0,255,98,0.03)' : 'rgba(255,159,0,0.03)',
-        border: `1px solid ${isValidated ? 'rgba(0,255,98,0.1)' : 'rgba(255,159,0,0.1)'}`,
+        bgcolor: bgColor,
+        border: `1px solid ${borderColor}`,
+        width: '100%',
+        boxShadow: `0 4px 12px rgba(0,0,0,0.15)`,
       }}
     >
-      {/* Step number */}
       <Box
         sx={{
-          minWidth: 22,
-          height: 22,
+          width: 28,
+          height: 28,
           borderRadius: '50%',
-          bgcolor: 'rgba(0,243,255,0.1)',
-          border: '1px solid rgba(0,243,255,0.2)',
+          bgcolor: `${color}15`,
+          border: `1px solid ${color}33`,
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#00f3ff',
-          fontSize: '0.6rem',
-          fontWeight: 900,
+          color: color,
           flexShrink: 0,
         }}
       >
-        {index + 1}
+        {icon}
       </Box>
-
-      {/* From → To */}
       <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexWrap: 'wrap', gap: 0.5 }}>
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.3 }}>
           <Typography
-            noWrap
-            sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', fontFamily: 'monospace', maxWidth: 160 }}
-          >
-            {step.from.split('::').pop()}
-          </Typography>
-          <ArrowRight size={12} color="#00f3ff" />
-          <Typography
-            noWrap
-            sx={{ fontSize: '0.7rem', color: '#00f3ff', fontFamily: 'monospace', fontWeight: 700, maxWidth: 160 }}
-          >
-            {step.to.split('::').pop()}
-          </Typography>
-        </Stack>
-        <Stack direction="row" spacing={0.5} sx={{ mt: 0.4, alignItems: 'center' }}>
-          <Box
             sx={{
-              px: 0.7,
-              py: 0.1,
-              bgcolor: 'rgba(112,0,255,0.1)',
-              border: '1px solid rgba(112,0,255,0.2)',
-              borderRadius: 0.4,
               fontSize: '0.55rem',
-              color: '#aa00ff',
-              fontWeight: 800,
+              fontWeight: 900,
+              fontFamily: 'Orbitron',
+              color: 'rgba(255,255,255,0.4)',
+              letterSpacing: 0.5,
             }}
           >
-            {step.edge_type}
-          </Box>
-          <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.35)' }}>
-            conf: {(step.confidence * 100).toFixed(0)}%
+            {type.toUpperCase()} ({subtype.toUpperCase()})
           </Typography>
+          {type === 'Vulnerability' && node?.cvss_score !== undefined && (
+            <Chip
+              label={`CVSS ${node.cvss_score}`}
+              size="small"
+              sx={{
+                height: 14,
+                fontSize: '0.5rem',
+                fontFamily: 'monospace',
+                bgcolor: 'rgba(255,255,255,0.05)',
+                color: '#fff',
+                border: '1px solid rgba(255,255,255,0.1)',
+                '& .MuiChip-label': { px: 0.5 }
+              }}
+            />
+          )}
+          {type === 'Vulnerability' && node?.cwe && (
+            <Chip
+              label={node.cwe}
+              size="small"
+              sx={{
+                height: 14,
+                fontSize: '0.5rem',
+                fontFamily: 'monospace',
+                bgcolor: 'rgba(255,159,0,0.08)',
+                color: '#ff9f00',
+                border: '1px solid rgba(255,159,0,0.15)',
+                '& .MuiChip-label': { px: 0.5 }
+              }}
+            />
+          )}
+          {type === 'Vulnerability' && node?.technique && (
+            <MitreBadge technique={node.technique} />
+          )}
         </Stack>
+        <Typography
+          noWrap
+          sx={{
+            fontSize: '0.74rem',
+            color: 'rgba(255, 255, 255, 0.95)',
+            fontWeight: 700,
+          }}
+        >
+          {name}
+        </Typography>
       </Box>
-
-      {/* Validated/Inferred badge */}
-      <Tooltip title={isValidated ? 'ERL-confirmed — evidence available' : 'Rule-derived — no direct evidence'}>
-        <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', flexShrink: 0 }}>
-          <StatusIcon size={12} color={color} />
-          <Typography sx={{ fontSize: '0.6rem', color, fontWeight: 800, letterSpacing: 0.5 }}>
-            {step?.status?.toUpperCase() ?? 'INFERRED'}
-          </Typography>
-        </Stack>
-      </Tooltip>
+      {type === 'Vulnerability' && node?.vuln_id && projectSlug && (
+        <Button
+          size="small"
+          component={Link}
+          to={`/${projectSlug}/vulns`}
+          sx={{
+            fontSize: '0.55rem',
+            color: color,
+            borderColor: `${color}44`,
+            border: '1px solid',
+            px: 1,
+            py: 0,
+            height: 20,
+            fontFamily: 'Orbitron',
+            minWidth: 'auto',
+            '&:hover': {
+              bgcolor: `${color}11`,
+              borderColor: color,
+            }
+          }}
+        >
+          VIEW
+        </Button>
+      )}
     </Box>
   );
 };
 
+// ─── Timeline Connector Edge ──────────────────────────────────────────────────
+const TimelineConnector: React.FC<{ step: AttackStep }> = ({ step }) => {
+  const isValidated = step.validated;
+  const edgeColor = isValidated ? '#00ff62' : '#ff9f00';
+  const Icon = isValidated ? CheckCircle2 : HelpCircle;
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'stretch', my: 0.5, pl: 1.5, position: 'relative', width: '100%' }}>
+      <Box
+        sx={{
+          position: 'absolute',
+          left: 14, // align with RenderNode circle center
+          top: -10,
+          bottom: -10,
+          width: 2,
+          borderLeft: `2px dashed ${edgeColor}44`,
+          zIndex: 0,
+        }}
+      />
+
+      <Box
+        sx={{
+          ml: 4,
+          p: 1.5,
+          borderRadius: 1,
+          bgcolor: 'rgba(255,255,255,0.01)',
+          border: '1px solid rgba(255,255,255,0.03)',
+          zIndex: 1,
+        }}
+      >
+        <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 0.8, flexWrap: 'wrap', gap: 0.5 }}>
+          <Chip
+            label={step.edge_type}
+            size="small"
+            sx={{
+              height: 16,
+              fontSize: '0.55rem',
+              fontWeight: 900,
+              bgcolor: 'rgba(112,0,255,0.1)',
+              border: '1px solid rgba(112,0,255,0.2)',
+              color: '#aa00ff',
+              fontFamily: 'Orbitron',
+            }}
+          />
+          <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>
+            CONF: <Box component="span" sx={{ color: '#00f3ff' }}>{(step.confidence * 100).toFixed(0)}%</Box>
+          </Typography>
+          <MitreBadge
+            technique={step.mitre_technique}
+            techniqueName={step.mitre_technique_name}
+            tactic={step.mitre_tactic}
+            tacticDisplay={step.mitre_tactic_display}
+            tacticColor={step.mitre_tactic_color}
+          />
+          <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', ml: 'auto' }}>
+            <Icon size={10} color={edgeColor} />
+            <Typography sx={{ fontSize: '0.55rem', color: edgeColor, fontWeight: 900, fontFamily: 'Orbitron', letterSpacing: 0.5 }}>
+              {step.status.toUpperCase()}
+            </Typography>
+          </Stack>
+        </Stack>
+
+        <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.7)', lineHeight: 1.4 }}>
+          {step.action}
+        </Typography>
+      </Box>
+    </Box>
+  );
+};
+
+// ─── Timeline Assembler ───────────────────────────────────────────────────────
+const AttackPathTimeline: React.FC<{ steps: AttackStep[]; projectSlug?: string }> = ({ steps, projectSlug }) => {
+  if (!steps || steps.length === 0) return null;
+
+  return (
+    <Stack spacing={0} sx={{ mt: 1, position: 'relative' }}>
+      {steps.map((step, i) => {
+        const isLast = i === steps.length - 1;
+        return (
+          <React.Fragment key={i}>
+            <RenderNode node={step.from_node} rawId={step.from} projectSlug={projectSlug} />
+            <TimelineConnector step={step} />
+            {isLast && (
+              <RenderNode node={step.to_node} rawId={step.to} projectSlug={projectSlug} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </Stack>
+  );
+};
+
 // ─── Single attack path card ──────────────────────────────────────────────────
-const AttackPathCard: React.FC<{ path: AttackPath; rank: number }> = ({ path, rank }) => {
-  const [expanded, setExpanded] = useState(rank === 0); // expand first by default
+interface AttackPathCardProps {
+  path: AttackPath;
+  rank: number;
+  projectSlug?: string;
+}
+
+const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug }) => {
+  const [expanded, setExpanded] = useState(rank === 0);
   const riskColor = RISK_COLOR[path.risk] ?? RISK_COLOR.unknown;
   const validatedCount = path.steps.filter((s) => s.validated).length;
   const inferredCount = path.steps.length - validatedCount;
+  const { scanId: scanIdStr } = useParams({ strict: false });
+  const scanId = Number(scanIdStr);
+  const explainMutation = useExplainAttackPath();
+
+  const handleExplain = async () => {
+    if (!scanId || !path.path_id) return;
+    try {
+      await explainMutation.mutateAsync({ pathId: path.path_id, scanId });
+    } catch (err) {
+      console.error('Failed to generate path explanation', err);
+    }
+  };
+
 
   return (
     <Box
@@ -227,7 +473,18 @@ const AttackPathCard: React.FC<{ path: AttackPath; rank: number }> = ({ path, ra
               {path.path_id}
             </Typography>
           </Stack>
-          <Typography noWrap sx={{ fontSize: '0.72rem', color: 'rgba(255,255,255,0.7)', fontWeight: 700 }}>
+          <Typography
+            sx={{
+              fontSize: '0.72rem',
+              color: 'rgba(255,255,255,0.7)',
+              fontWeight: 700,
+              display: '-webkit-box',
+              WebkitLineClamp: expanded ? 1 : 2,
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+            }}
+          >
             {path.potential_impact}
           </Typography>
         </Box>
@@ -286,20 +543,157 @@ const AttackPathCard: React.FC<{ path: AttackPath; rank: number }> = ({ path, ra
         </Stack>
       </Box>
 
+      {/* MITRE tactic strip */}
+      {path.mitre_tactics && path.mitre_tactics.length > 0 && (
+        <Box sx={{ px: 2, pb: expanded ? 0 : 1.5, pt: 0.5 }}>
+          <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+            {path.mitre_tactics.map((tactic) => {
+              const color = TACTIC_COLORS[tactic] ?? '#888888';
+              const label = tactic.replace(/-/g, ' ').toUpperCase();
+              return (
+                <Box
+                  key={tactic}
+                  sx={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    px: 0.75,
+                    py: 0.2,
+                    borderRadius: 4,
+                    bgcolor: `${color}10`,
+                    border: `1px solid ${color}30`,
+                    color,
+                    fontSize: '0.45rem',
+                    fontWeight: 900,
+                    fontFamily: 'Orbitron',
+                    letterSpacing: 0.5,
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {label}
+                </Box>
+              );
+            })}
+          </Stack>
+        </Box>
+      )}
+
       {/* Expanded steps */}
       <Collapse in={expanded}>
         <Divider sx={{ borderColor: `${riskColor}20`, my: 0.5 }} />
-        <Box sx={{ px: 2, pb: 2, pt: 1 }}>
-          <Typography
-            sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 800, mb: 1, letterSpacing: 1 }}
+        <Box sx={{ px: 2.5, pb: 2.5, pt: 1.5 }}>
+          {/* Executive Narrative */}
+          <Box
+            sx={{
+              mb: 3,
+              p: 2,
+              borderRadius: 1.5,
+              bgcolor: 'rgba(0, 0, 0, 0.25)',
+              border: '1px solid rgba(255, 255, 255, 0.03)',
+            }}
           >
-            COMPROMISE CHAIN
+            <Typography
+              sx={{
+                fontSize: '0.62rem',
+                color: riskColor,
+                fontWeight: 900,
+                fontFamily: 'Orbitron',
+                letterSpacing: 1,
+                mb: 1.5,
+              }}
+            >
+              EXECUTIVE NARRATIVE
+            </Typography>
+            <Typography
+              sx={{
+                fontSize: '0.76rem',
+                color: 'rgba(255,255,255,0.85)',
+                lineHeight: 1.6,
+                whiteSpace: 'pre-line',
+              }}
+            >
+              {path.potential_impact}
+            </Typography>
+          </Box>
+
+          {/* Explain Path Section */}
+          <Box
+            sx={{
+              mb: 3,
+              p: 2,
+              borderRadius: 1.5,
+              bgcolor: 'rgba(0, 243, 255, 0.02)',
+              border: '1px solid rgba(0, 243, 255, 0.08)',
+            }}
+          >
+            <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+              <Typography
+                sx={{
+                  fontSize: '0.62rem',
+                  color: '#00f3ff',
+                  fontWeight: 900,
+                  fontFamily: 'Orbitron',
+                  letterSpacing: 1,
+                }}
+              >
+                TACTICAL AI EXPLANATION
+              </Typography>
+              {!path.explanation && (
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={handleExplain}
+                  disabled={explainMutation.isPending}
+                  startIcon={explainMutation.isPending ? <CircularProgress size={10} color="inherit" /> : <Brain size={12} />}
+                  sx={{
+                    fontSize: '0.55rem',
+                    height: 20,
+                    borderColor: 'rgba(0,243,255,0.3)',
+                    color: '#00f3ff',
+                    fontFamily: 'Orbitron',
+                    '&:hover': {
+                      borderColor: '#00f3ff',
+                      bgcolor: 'rgba(0,243,255,0.05)',
+                    },
+                  }}
+                >
+                  {explainMutation.isPending ? 'GENERATING...' : 'EXPLAIN THIS'}
+                </Button>
+              )}
+            </Stack>
+            {path.explanation ? (
+              <Typography
+                sx={{
+                  fontSize: '0.74rem',
+                  color: 'rgba(255,255,255,0.8)',
+                  lineHeight: 1.6,
+                  whiteSpace: 'pre-line',
+                }}
+              >
+                {path.explanation}
+              </Typography>
+            ) : (
+              <Typography
+                sx={{
+                  fontSize: '0.7rem',
+                  color: 'rgba(255,255,255,0.4)',
+                  fontStyle: 'italic',
+                }}
+              >
+                {explainMutation.isPending
+                  ? 'Analyzing tactical vector patterns. This may take up to a minute...'
+                  : 'Click "EXPLAIN THIS" to generate an in-depth, step-by-step intelligence breakdown of this attack vector.'}
+              </Typography>
+            )}
+          </Box>
+
+
+          <Typography
+            sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 800, mb: 2, letterSpacing: 1 }}
+          >
+            COMPROMISE CHAIN TIMELINE
           </Typography>
-          <Stack spacing={0.75}>
-            {path.steps.map((step, i) => (
-              <StepRow key={i} step={step} index={i} />
-            ))}
-          </Stack>
+          
+          <AttackPathTimeline steps={path.steps} projectSlug={projectSlug} />
         </Box>
       </Collapse>
     </Box>
@@ -340,6 +734,8 @@ interface AttackPathsTabProps {
 export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
   const { data, isLoading, isError, refetch } = useAttackPaths(scanId);
   const triggerAi = useTriggerAttackPathModeling();
+  const recalculatePaths = useRecalculateAttackPaths();
+  const { projectSlug } = useParams({ strict: false });
 
   const [snackbar, setSnackbar] = useState<{ open: boolean; message: string; severity: 'success' | 'error' }>({
     open: false,
@@ -358,12 +754,43 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
     }
   };
 
+  const handleRecalculatePaths = async () => {
+    try {
+      await recalculatePaths.mutateAsync(scanId);
+      setSnackbar({ open: true, message: 'Recalculation initiated in background', severity: 'success' });
+      // Refresh after a delay
+      setTimeout(refetch, 5000);
+    } catch {
+      setSnackbar({ open: true, message: 'Failed to trigger recalculation', severity: 'error' });
+    }
+  };
+
   return (
     <TacticalPanel
       title="ATTACK PATH MODELING"
       icon={<ShieldAlert size={14} color="#ff003c" />}
       headerAction={
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} sx={{ alignItems: { xs: 'flex-start', sm: 'center' }, gap: 1 }}>
+          <Button
+            size="small"
+            variant="outlined"
+            onClick={handleRecalculatePaths}
+            disabled={recalculatePaths.isPending}
+            startIcon={recalculatePaths.isPending ? <CircularProgress size={12} /> : <GitBranch size={14} />}
+            sx={{
+              fontSize: '0.6rem',
+              height: 24,
+              borderColor: 'rgba(0,243,255,0.3)',
+              color: '#00f3ff',
+              fontFamily: 'Orbitron',
+              '&:hover': {
+                borderColor: '#00f3ff',
+                bgcolor: 'rgba(0,243,255,0.05)',
+              },
+            }}
+          >
+            {recalculatePaths.isPending ? 'RECALCULATING...' : 'RE-CALCULATE PATHS'}
+          </Button>
           <Button
             size="small"
             variant="outlined"
@@ -430,6 +857,19 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
               Paths sorted by risk score (highest first)
             </Typography>
           </Stack>
+          <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+            <Box sx={{
+              display: 'inline-flex', px: 0.5, py: 0.1, borderRadius: 0.5,
+              borderLeft: '3px solid #ff4444', bgcolor: 'rgba(255,68,68,0.08)',
+              color: '#ff4444', fontSize: '0.5rem', fontWeight: 900, fontFamily: 'monospace',
+            }}>
+              ATT&amp;CK · T1190
+            </Box>
+            <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.6)', fontWeight: 600 }}>
+              <Box component="span" sx={{ color: '#ff4444', fontWeight: 800 }}>MITRE ATT&amp;CK</Box>
+              {' — technique badge, colored by tactic'}
+            </Typography>
+          </Stack>
         </Stack>
 
         {/* Content */}
@@ -464,7 +904,7 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
           ) : (
             <Stack spacing={1.5}>
               {data.paths.map((path, i) => (
-                <AttackPathCard key={path.path_id} path={path} rank={i} />
+                <AttackPathCard key={path.path_id} path={path} rank={i} projectSlug={projectSlug} />
               ))}
             </Stack>
           )

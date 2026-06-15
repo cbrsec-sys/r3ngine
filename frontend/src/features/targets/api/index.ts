@@ -36,6 +36,7 @@ export const useAddTarget = (projectSlug: string) => {
       monitor_scan_scope?: string;
       starting_point_path?: string;
       excluded_paths?: string[];
+      target_type?: string;
     }) => {
       const response = await fetch('/api/add/target/', {
         method: 'POST',
@@ -141,6 +142,49 @@ export const useEngines = () => {
       if (Array.isArray(data)) return data as Engine[];
       if ('engines' in data && Array.isArray(data.engines)) return data.engines as Engine[];
       return [] as Engine[];
+    },
+  });
+};
+
+
+export const useUpdateTarget = (projectSlug: string) => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: {
+      id: number;
+      description?: string;
+      h1_team_handle?: string;
+      target_type?: string;
+      organization?: string;
+      is_monitored?: boolean;
+      monitor_frequency?: string;
+      monitor_engine_id?: number | null;
+      monitor_scan_scope?: string;
+      starting_point_path?: string;
+      excluded_paths?: string;
+      in_scope_ips?: string;
+      secondary_domains?: string;
+    }) => {
+      const response = await fetch('/api/update/target/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify(params),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to update target');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['domains', projectSlug] });
     },
   });
 };

@@ -336,7 +336,7 @@ class TestWorkflowStructuralInvariants(TestCase):
         """NucleiPlannerWorkflow must NOT be appended to assessment_futures.
 
         Placing the child workflow handle inside assessment_futures means it
-        would be gathered concurrently with waf_bypass / brute_force_scan.
+        would be gathered concurrently with waf_bypass.
         If those activities fail, asyncio.gather cannot cancel the Temporal
         child workflow, causing it to run unmanaged (orphaned).
         """

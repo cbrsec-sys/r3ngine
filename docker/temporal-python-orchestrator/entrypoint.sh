@@ -2,6 +2,15 @@
 # Entrypoint for the Temporal Python Orchestrator container.
 # Handles one-time setup (wordlists, templates, tools) then starts the Temporal worker.
 
+# ---------------------------------------------------------------------------
+# Start deferred tool installer in the background so normal setup tasks
+# (wordlists, nuclei templates, etc.) run in parallel. We wait for it to
+# finish just before the Temporal worker starts.
+# ---------------------------------------------------------------------------
+#echo "[entrypoint] Starting deferred tool installer in background..."
+#/usr/src/app/internal_tools.sh &
+#INTERNAL_TOOLS_PID=$!
+
 # Ensure OpenSSL compatibility
 pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
 
@@ -94,6 +103,18 @@ if [ ! -f '/usr/src/wordlist/cpanel_users.txt' ]; then
   sort -u /usr/src/wordlist/cpanel_users.txt -o /usr/src/wordlist/cpanel_users.txt
 fi
 
+# Clone Exploit-DB for Searchsploit if not already present
+if [ ! -d "/usr/src/exploitdb/.git" ]; then
+  echo "Cloning Exploit-DB for searchsploit..."
+  rm -rf /usr/src/exploitdb/* /usr/src/exploitdb/.* 2>/dev/null || true
+  git clone --depth 1 https://gitlab.com/exploit-database/exploitdb /usr/src/exploitdb
+fi
+
+# Ensure searchsploit RC file is copied to root home directory
+if [ -f "/usr/src/exploitdb/.searchsploit_rc" ]; then
+  cp /usr/src/exploitdb/.searchsploit_rc /root/.searchsploit_rc
+fi
+
 cd /usr/src/app
 
 # install gf patterns
@@ -169,5 +190,13 @@ echo 'alias httpx="/usr/local/bin/httpx"' >> ~/.bashrc
 pip install requests==2.32.3 "urllib3>=1.26.0,<3.0.0" "charset-normalizer>=3.0.0,<4.0.0" "chardet>=5.0.0,<6.0.0"
 pip3 install tenacity==8.2.2
 
-echo "Starting Temporal Python Orchestrator..."
+vulnx update
+
+# Configure vigolium to scan all severity levels for known issues
+vigolium config set known_issue_scan.severities "critical,high,medium,low,info" || true
+
+# Wait for the background tool installer to finish before starting the worker.
+echo "[entrypoint] Waiting for deferred tool installer to complete..."
+wait $INTERNAL_TOOLS_PID
+echo "[entrypoint] Deferred tool installer complete. Starting Temporal Python Orchestrator..."
 exec python3 /usr/src/app/manage.py run_temporal_orchestrator

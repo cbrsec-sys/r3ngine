@@ -40,13 +40,14 @@ class CVEEnrichmentService:
     NVD_API_BASE = "https://services.nvd.nist.gov/rest/json/cves/2.0"
     EPSS_API_BASE = "https://api.first.org/data/v1/epss"
     CISA_KEV_URL = "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+    EPSS_FEED_URL = "https://epss.cyentia.com/epss_scores-current.csv.gz"
     
     # Cache TTLs (seconds)
     CACHE_TTL_CVE = 86400 * 7  # 7 days for individual CVEs
     CACHE_TTL_KEV = 3600  # 1 hour for KEV catalog
     
     # Request settings
-    REQUEST_TIMEOUT = 15
+    REQUEST_TIMEOUT = 10
     MAX_RETRIES = 2
     
     def __init__(self):
@@ -78,16 +79,27 @@ class CVEEnrichmentService:
         """
         # Normalize CVE name
         cve_name = cve_name.upper().strip()
-        if not cve_name.startswith('CVE-'):
+        is_valid_cve = False
+        
+        if cve_name.startswith('CVE-'):
+            if re.match(r'^CVE-\d{4}-\d+$', cve_name):
+                is_valid_cve = True
+            else:
+                logger.debug("Non-CVE format detected: %s, skipping external database lookups", cve_name)
+        else:
             # Accept bare YYYY-NNNNN format and prepend the required prefix
             if re.match(r'^\d{4}-\d+$', cve_name):
                 cve_name = 'CVE-' + cve_name
+                is_valid_cve = True
             else:
-                logger.warning("Invalid CVE format: %s", cve_name)
-                return None
+                logger.debug("Non-CVE format detected: %s, skipping external database lookups", cve_name)
         
         # Get or create CVE record
         cve_obj, created = CveId.objects.get_or_create(name=cve_name)
+        
+        if not is_valid_cve:
+            # We don't perform external enrichment for non-CVE strings, just return
+            return cve_obj
         
         # Skip re-enrichment if recently updated (within 7 days)
         if not created and cve_obj.last_modified_date:
@@ -100,7 +112,10 @@ class CVEEnrichmentService:
         try:
             self._enrich_from_nvd(cve_obj)
         except Exception as e:
-            logger.warning(f"NVD enrichment failed for {cve_name}: {e}")
+            if "404" in str(e):
+                logger.debug(f"NVD enrichment not found for {cve_name}")
+            else:
+                logger.warning(f"NVD enrichment failed for {cve_name}: {e}")
         
         try:
             self._enrich_from_epss(cve_obj)
@@ -111,6 +126,16 @@ class CVEEnrichmentService:
             self._enrich_from_vulnx(cve_obj)
         except Exception as e:
             logger.warning(f"vulnx enrichment failed for {cve_name}: {e}")
+
+        try:
+            self._enrich_from_sploitscan(cve_obj)
+        except Exception as e:
+            logger.warning(f"SploitScan enrichment failed for {cve_name}: {e}")
+
+        try:
+            self._generate_cve_ai_analysis(cve_obj)
+        except Exception as e:
+            logger.warning(f"AI risk assessment failed for {cve_name}: {e}")
 
         # Save and return
         cve_obj.save()
@@ -206,6 +231,79 @@ class CVEEnrichmentService:
                 'total': 0,
                 'errors': 1
             }
+
+    def sync_epss_catalog(self) -> Dict[str, int]:
+        """
+        Synchronize local EpssFeedData records with the official EPSS data feed.
+        Downloads the gzipped CSV from FIRST/Cyentia, drops the old table, and inserts
+        the fresh batch.
+        """
+        logger.info("Synchronizing EPSS catalog...")
+        from startScan.models import EpssFeedData
+        import gzip
+        import csv
+        import io
+
+        try:
+            response = requests.get(self.EPSS_FEED_URL, timeout=30)
+            response.raise_for_status()
+
+            # Read and decompress
+            with gzip.GzipFile(fileobj=io.BytesIO(response.content)) as gz:
+                content = gz.read().decode('utf-8')
+
+            # The EPSS CSV has a few metadata lines starting with '#', so filter them out
+            lines = content.splitlines()
+            data_lines = [line for line in lines if not line.startswith('#')]
+
+            if not data_lines:
+                logger.error("EPSS CSV feed is empty or invalid.")
+                return {'inserted': 0, 'errors': 1}
+
+            # Typically the first non-comment line is the header: cve,epss,percentile
+            # Ensure we are skipping the header by checking the first line
+            if "cve" in data_lines[0].lower():
+                data_lines.pop(0)
+
+            # Parse rows
+            reader = csv.reader(data_lines)
+            batch = []
+            batch_size = 10000
+
+            # Truncate old data
+            EpssFeedData.objects.all().delete()
+            
+            inserted_count = 0
+
+            for row in reader:
+                if len(row) >= 3:
+                    cve_id = row[0].strip()
+                    try:
+                        epss_score = float(row[1])
+                        epss_percentile = float(row[2]) * 100.0  # Convert to percentage format like API
+                        batch.append(EpssFeedData(
+                            cve_id=cve_id,
+                            epss_score=epss_score,
+                            epss_percentile=epss_percentile
+                        ))
+                    except ValueError:
+                        continue
+
+                if len(batch) >= batch_size:
+                    EpssFeedData.objects.bulk_create(batch, ignore_conflicts=True)
+                    inserted_count += len(batch)
+                    batch = []
+
+            if batch:
+                EpssFeedData.objects.bulk_create(batch, ignore_conflicts=True)
+                inserted_count += len(batch)
+
+            logger.info(f"EPSS catalog sync complete: {inserted_count} records inserted.")
+            return {'inserted': inserted_count, 'errors': 0}
+
+        except Exception as e:
+            logger.error(f"Failed to synchronize EPSS catalog: {e}")
+            return {'inserted': 0, 'errors': 1}
     
     # ==================== Private Methods ====================
     
@@ -220,6 +318,11 @@ class CVEEnrichmentService:
             requests.RequestException: If API call fails
             ValueError: If response format is unexpected
         """
+        # Circuit breaker to prevent 429s from flooding
+        if cache.get('nvd_api_unavailable'):
+            logger.debug(f"NVD API paused, skipping enrichment for {cve_obj.name}")
+            return
+
         # Build request with API key if available
         headers = {}
         if self.nvd_api_key:
@@ -235,6 +338,11 @@ class CVEEnrichmentService:
             headers=headers,
             timeout=self.REQUEST_TIMEOUT
         )
+        
+        if response.status_code in [429, 502, 503, 504]:
+            logger.warning(f"NVD API unavailable ({response.status_code}), pausing requests for 15 minutes")
+            cache.set('nvd_api_unavailable', True, 900)
+            
         response.raise_for_status()
         
         data = response.json()
@@ -276,45 +384,24 @@ class CVEEnrichmentService:
     
     def _enrich_from_epss(self, cve_obj: CveId) -> None:
         """
-        Fetch EPSS (Exploit Prediction Scoring System) data from FIRST API.
+        Fetch EPSS (Exploit Prediction Scoring System) data from local EpssFeedData.
         
         EPSS provides a probability score of a vulnerability being exploited
         in the wild (0-1 scale, higher = more likely to be exploited).
         
         Args:
             cve_obj (CveId): CVE object to enrich in-place
-        
-        Raises:
-            requests.RequestException: If API call fails
         """
-        params = {'cve': cve_obj.name}
-        
-        logger.debug(f"Fetching EPSS data for {cve_obj.name}...")
-        
-        response = requests.get(
-            self.EPSS_API_BASE,
-            params=params,
-            timeout=self.REQUEST_TIMEOUT
-        )
-        response.raise_for_status()
-        
-        data = response.json()
-        epss_list = data.get("data", [])
-        
-        if not epss_list:
-            logger.debug(f"No EPSS data found for {cve_obj.name}")
+        from startScan.models import EpssFeedData
+
+        feed_data = EpssFeedData.objects.filter(cve_id=cve_obj.name).first()
+        if not feed_data:
+            logger.debug(f"No local EPSS data found for {cve_obj.name}")
             return
-        
-        epss_data = epss_list[0]
-        
-        # EPSS score is 0-1, percentile is already percentage
-        if epss_data.get("epss"):
-            cve_obj.epss_score = float(epss_data["epss"])
-        
-        if epss_data.get("percentile"):
-            # FIRST API returns percentile as 0-1, convert to 0-100
-            cve_obj.epss_percentile = float(epss_data["percentile"]) * 100.0
-        
+
+        cve_obj.epss_score = feed_data.epss_score
+        cve_obj.epss_percentile = feed_data.epss_percentile
+
         logger.debug(
             f"EPSS enrichment successful: {cve_obj.name} "
             f"EPSS={cve_obj.epss_score} percentile={cve_obj.epss_percentile}"
@@ -364,7 +451,11 @@ class CVEEnrichmentService:
             )
 
             if result.returncode != 0:
-                logger.warning("vulnx command failed with code %d: %s", result.returncode, result.stderr)
+                error_lines = [line.strip() for line in result.stderr.split('\n') if line.strip().startswith('[FTL]') or line.strip().startswith('[ERR]')]
+                if error_lines:
+                    logger.warning("%s", " | ".join(error_lines))
+                else:
+                    logger.debug("vulnx command failed with code %d", result.returncode)
                 return
 
             if not result.stdout.strip():
@@ -457,6 +548,120 @@ class CVEEnrichmentService:
         except (ValueError, TypeError) as e:
             logger.warning(f"Failed to parse datetime '{date_str}': {e}")
             return None
+
+    def _enrich_from_sploitscan(self, cve_obj: CveId) -> None:
+        """
+        Fetch exploits and hackerone metadata using sploitscan.
+        """
+        import subprocess
+        import json
+        import os
+        import tempfile
+        import glob
+        
+        logger.debug(f"Fetching SploitScan data for {cve_obj.name}...")
+        
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cmd = ["sploitscan", cve_obj.name, "-e", "json"]
+            try:
+                result = subprocess.run(
+                    cmd,
+                    cwd=tmpdir,
+                    capture_output=True,
+                    text=True,
+                    timeout=60
+                )
+                
+                json_files = glob.glob(os.path.join(tmpdir, "*.json"))
+                if not json_files:
+                    logger.debug(f"SploitScan failed to produce JSON for {cve_obj.name}")
+                    return
+                
+                with open(json_files[0], 'r') as f:
+                    data = json.load(f)
+                    
+                if not isinstance(data, list) or len(data) == 0:
+                    return
+                
+                cve_data = data[0]
+                
+                # Public exploits
+                public_exploits = []
+                # ExploitDB
+                edb_data = cve_data.get("ExploitDB Data", [])
+                for e in edb_data:
+                    public_exploits.append({"source": "ExploitDB", "exploit": e.get("id")})
+                
+                # Metasploit
+                msf_data = cve_data.get("Metasploit Data", {}).get("modules", [])
+                for m in msf_data:
+                    public_exploits.append({"source": "Metasploit", "exploit": m})
+                
+                # GitHub
+                github_data = cve_data.get("GitHub Data", {}).get("pocs", [])
+                for g in github_data:
+                    public_exploits.append({"source": "GitHub", "exploit": g})
+                    
+                if public_exploits:
+                    cve_obj.public_exploits = public_exploits
+                    
+                # HackerOne data
+                h1_data = cve_data.get("HackerOne Data", {}).get("data", {}).get("cve_entry", {})
+                if h1_data:
+                    cve_obj.hackerone_data = h1_data
+                    
+                # Priority
+                priority = cve_data.get("Priority", {}).get("Priority")
+                if priority:
+                    cve_obj.patching_priority = priority
+                    
+                logger.info(f"SploitScan enrichment successful for {cve_obj.name}")
+                
+            except subprocess.TimeoutExpired:
+                logger.warning(f"SploitScan request timed out for {cve_obj.name}")
+            except Exception as e:
+                logger.error(f"Error enriching {cve_obj.name} from SploitScan: {e}")
+
+    def _generate_cve_ai_analysis(self, cve_obj: CveId) -> None:
+        """
+        Generate AI risk assessment using the internal LLM module.
+        """
+        from reNgine.llm import LLMVulnerabilityReportGenerator
+        
+        # We only generate if we don't have it yet
+        if cve_obj.ai_risk_assessment:
+            return
+            
+        logger.debug(f"Generating AI risk assessment for {cve_obj.name}...")
+        try:
+            # We can use the existing report generator
+            report_gen = LLMVulnerabilityReportGenerator(logger=logger)
+            
+            # Create a simple description prompt
+            prompt = f"Analyze the CVE {cve_obj.name}. "
+            if cve_obj.cvss_v31_base_score:
+                prompt += f"It has a CVSS v3.1 base score of {cve_obj.cvss_v31_base_score}. "
+            if cve_obj.public_exploits:
+                prompt += f"Public exploits exist in {len(cve_obj.public_exploits)} sources. "
+            if cve_obj.patching_priority:
+                prompt += f"Patching priority is {cve_obj.patching_priority}. "
+                
+            prompt += "Provide a detailed risk assessment, potential impact, and mitigation ideas."
+            
+            response = report_gen.get_vulnerability_description(prompt)
+            if response and response.get('status'):
+                desc = response.get('description', '')
+                impact = response.get('impact', '')
+                remediation = response.get('remediation', '')
+                
+                assessment = f"**Description**:\n{desc}\n\n**Impact**:\n{impact}\n\n**Mitigation**:\n{remediation}"
+                cve_obj.ai_risk_assessment = assessment
+                cve_obj.mitigation_ideas = remediation
+                logger.info(f"AI risk assessment generated for {cve_obj.name}")
+            else:
+                logger.warning(f"AI risk assessment failed for {cve_obj.name}: {response.get('error') if response else 'Unknown'}")
+        except Exception as e:
+            logger.error(f"Error generating AI risk assessment for {cve_obj.name}: {e}")
 
 
 class CVEBatchEnricher:

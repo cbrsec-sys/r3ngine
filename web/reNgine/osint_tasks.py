@@ -106,47 +106,42 @@ def run_maigret(username, scan_history_id):
 
 def run_linkedint(company_name, scan_history_id):
     """
-    Run LinkedIn Scraper (Playwright) to scrape LinkedIn for employees of a company.
+    Run LinkedIn Scraper (Playwright) to scrape employees for a company.
+    Returns a list of result strings. Never raises — logs notes on auth failure.
     """
     try:
         scan_history = ScanHistory.objects.get(pk=scan_history_id)
         domain = scan_history.domain.name
-        
-        # 1. Check for credentials
-        linkedin_creds = LinkedInCredentials.objects.first()
+
+        session = LinkedInCredentials.objects.first()
         hunter_key = HunterIOAPIKey.objects.first()
-        
-        if not linkedin_creds or not linkedin_creds.username or not linkedin_creds.password:
-            logger.warning(f"LinkedIn credentials not configured for {company_name}. Skipping.")
-            return []
-            
-        if not hunter_key or not hunter_key.key:
-            logger.warning(f"Hunter.io API key not configured for {company_name}. Skipping.")
+
+        if not session:
+            logger.warning("LinkedIn session not configured for %s. Skipping.", company_name)
             return []
 
-        # 2. Execute using Playwright-based LinkedInScraper
-        with LinkedInScraper(
-            username=linkedin_creds.username,
-            password=linkedin_creds.password,
-            hunter_key=hunter_key.key
-        ) as scraper:
+        if not hunter_key or not hunter_key.key:
+            logger.warning("Hunter.io API key not configured for %s. Skipping.", company_name)
+            return []
+
+        with LinkedInScraper(session=session, hunter_key=hunter_key.key) as scraper:
             employees = scraper.discover_employees(company_name, domain, scan_history)
-            
+
+            for note in scraper.notes:
+                logger.warning("%s", note)
+
             if employees:
                 for emp_data in employees:
-                    # Save employee and update designation
                     emp, _ = save_employee(emp_data['name'], scan_history=scan_history)
                     emp.designation = emp_data['designation']
                     emp.save()
-                    
-                    # Save email if present
                     if 'email' in emp_data:
-                        save_email(emp_data['email'], scan_history=scan_history, employee=emp)
-            
+                        save_email(emp_data['email'], scan_history=scan_history)
+
             return [f"LinkedIn Intelligence processed {len(employees)} employees for {company_name}"]
-            
-    except Exception as e:
-        logger.error(f"Error running LinkedIn Intelligence for {company_name}: {str(e)}")
+
+    except Exception as exc:
+        logger.error("Error running LinkedIn Intelligence for %s: %s", company_name, type(exc).__name__)
         return []
 
 

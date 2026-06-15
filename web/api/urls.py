@@ -24,9 +24,9 @@ from .subscans import SubScanViewSet
 from .scan_history import ScanHistoryViewSet
 from .users import UserManageViewSet
 from .stress_testing_views import StressTestingAPIView, StressTestingHistoryAPIView
-from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView
+from .apme_views import AttackPathsAPIView, TriggerLLMAPMEAPIView, RecalculateAttackPathsAPIView, AttackPathExplanationAPIView
 from .scan_configuration import ScanConfigurationAPI
-from .config_migration_views import ExportConfig, ImportConfig
+from .config_migration_views import ExportConfig, ImportConfig, ExportScanResults
 
 
 app_name = 'api'
@@ -39,6 +39,7 @@ router.register(r'listDirectories', DirectoryViewSet, basename='directory')
 router.register(r'listVulnerability', VulnerabilityViewSet, basename='vulnerability-list')
 router.register(r'listInterestingSubdomains', InterestingSubdomainViewSet, basename='interesting-subdomain')
 router.register(r'listInterestingEndpoints', InterestingEndpointViewSet, basename='interesting-endpoint')
+router.register(r'listParameters', ParameterViewSet, basename='parameters-list')
 router.register(r'listSubdomainChanges', SubdomainChangesViewSet, basename='subdomain-changes')
 router.register(r'listEndPointChanges', EndPointChangesViewSet, basename='endpoint-changes')
 router.register(r'listIps', IpAddressViewSet, basename='ip-address')
@@ -50,6 +51,7 @@ router.register(r'monitoring', MonitoringDiscoveryViewSet, basename='monitoring'
 router.register(r'projects', ProjectViewSet, basename='projects')
 router.register(r'secretLeaks', SecretLeakViewSet, basename='secret-leaks')
 router.register(r'hardwareProfiles', HardwareProfileViewSet, basename='hardware-profiles')
+router.register(r'scanProfiles', ScanProfileViewSet, basename='scan-profiles')
 
 router.register(r'screenshots', ScreenshotViewSet, basename='screenshots')
 router.register(r'osintStaging', OsintStagingViewSet, basename='osint-staging')
@@ -66,6 +68,10 @@ urlpatterns = [
         'add/target/',
         AddTarget.as_view(),
         name='addTarget'),
+    path(
+        'update/target/',
+        UpdateTarget.as_view(),
+        name='updateTarget'),
     path(
         'add/recon_note/',
         AddReconNote.as_view(),
@@ -283,6 +289,10 @@ urlpatterns = [
         DeleteSubdomain.as_view(),
         name='delete_subdomain'),
     path(
+        'action/subdomain/<int:pk>/searchsploit/',
+        RunSearchsploitAction.as_view(),
+        name='run_searchsploit'),
+    path(
         'action/vulnerability/delete/',
         DeleteVulnerability.as_view(),
         name='delete_vulnerability'),
@@ -389,6 +399,11 @@ urlpatterns = [
         name='settings_export'
     ),
     path(
+        'settings/export/scan-results/',
+        ExportScanResults.as_view(),
+        name='settings_export_scan_results'
+    ),
+    path(
         'settings/import/',
         ImportConfig.as_view(),
         name='settings_import'
@@ -439,6 +454,11 @@ urlpatterns = [
         name='stress_testing_api'
     ),
     path(
+        'parameters/summary/',
+        ParameterSummaryView.as_view(),
+        name='parameters_summary'
+    ),
+    path(
         'apme/paths/',
         AttackPathsAPIView.as_view(),
         name='apme_attack_paths'
@@ -447,6 +467,16 @@ urlpatterns = [
         'apme/trigger/',
         TriggerLLMAPMEAPIView.as_view(),
         name='apme_trigger'
+    ),
+    path(
+        'apme/recalculate/',
+        RecalculateAttackPathsAPIView.as_view(),
+        name='apme_recalculate'
+    ),
+    path(
+        'apme/explain/',
+        AttackPathExplanationAPIView.as_view(),
+        name='apme_explain'
     ),
     path(
         'action/ad-assessment/from-subdomain/',
@@ -495,6 +525,28 @@ urlpatterns = [
         RegisterPushTokenView.as_view(),
         name='register_push_token',
     ),
+    # Phase 2 — standalone workflow launcher
+    path(
+        'workflows/<str:workflow_slug>/start/',
+        StartWorkflowView.as_view(),
+        name='start-workflow',
+    ),
+    path(
+        'linkedin/session/upload/',
+        LinkedInSessionUploadView.as_view(),
+        name='linkedin-session-upload'),
+    path(
+        'linkedin/session/status/',
+        LinkedInSessionStatusView.as_view(),
+        name='linkedin-session-status'),
+    path(
+        'linkedin/session/',
+        LinkedInSessionDeleteView.as_view(),
+        name='linkedin-session-delete'),
+    path(
+        'linkedin/session/helper/',
+        LinkedInHelperScriptView.as_view(),
+        name='linkedin-session-helper'),
 ]
 
 

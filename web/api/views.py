@@ -1,3 +1,4 @@
+import json
 import re
 import socket
 import logging
@@ -14,14 +15,14 @@ from django.utils import timezone
 from packaging import version
 from django.template.defaultfilters import slugify
 from datetime import datetime
-from rest_framework import viewsets, status
+from rest_framework import viewsets, serializers, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework_datatables.pagination import DatatablesPageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.renderers import JSONRenderer
-from django.http import FileResponse, Http404
+from django.http import FileResponse, Http404, HttpResponse
 import mimetypes
 import os
 
@@ -1233,57 +1234,79 @@ class CVEDetails(APIView):
 		Args:
 			request: DRF request object containing query parameters.
 				- query_params.cve_id (str): The CVE identifier, e.g., 'CVE-2024-1234'
+				  Also accepts bare YYYY-NNNNN format (e.g., '2024-1234').
 
 		Returns:
 			Response: A DRF Response object with either the CVE details or an error message.
 		"""
+		import re as _re
+
 		req = self.request
 		cve_id = req.query_params.get('cve_id')
 
 		if not cve_id:
 			return Response({
-				'status': False, 
+				'status': False,
 				'message': 'CVE ID not provided'
 			})
 
 		from reNgine.cve_enrichment import CVEEnrichmentService
 		from startScan.models import CveId
-		
+
+		# Normalize: bare YYYY-NNNNN → CVE-YYYY-NNNNN so DB lookups and
+		# external API calls always use the canonical format.
 		formatted_cve_id = cve_id.upper().strip()
-		
+		if _re.match(r'^\d{4}-\d+$', formatted_cve_id):
+			formatted_cve_id = 'CVE-' + formatted_cve_id
+
 		# 1. Check if the CVE exists in the local database
 		try:
 			cve_obj = CveId.objects.get(name__iexact=formatted_cve_id)
-			logger.info(f"Found {formatted_cve_id} in local database")
+			logger.info("Found %s in local database", formatted_cve_id)
+
+			# Lazy re-enrichment: if the record exists but CVSS data is missing,
+			# attempt to fill it in now (e.g. first created during scanning before
+			# NVD data was available).
+			if cve_obj.cvss_v31_base_score is None:
+				logger.info("CVE %s has no CVSS data, attempting re-enrichment", formatted_cve_id)
+				try:
+					service = CVEEnrichmentService()
+					refreshed = service.enrich_cve(formatted_cve_id)
+					if refreshed:
+						cve_obj = refreshed
+				except Exception as e:
+					logger.warning("Re-enrichment failed for %s: %s", formatted_cve_id, e)
+
 		except CveId.DoesNotExist:
 			# 2. Attempt live enrichment from NVD and EPSS APIs
-			logger.info(f"CVE {formatted_cve_id} not in database, attempting enrichment...")
+			logger.info("CVE %s not in database, attempting enrichment...", formatted_cve_id)
 			try:
 				service = CVEEnrichmentService()
 				cve_obj = service.enrich_cve(formatted_cve_id)
-				
+
 				if not cve_obj:
 					return Response({
-						'status': False, 
+						'status': False,
 						'message': f'CVE {formatted_cve_id} not found in official sources'
 					})
-				
-				logger.info(f"Successfully enriched {formatted_cve_id}")
+
+				logger.info("Successfully enriched %s", formatted_cve_id)
 			except Exception as e:
-				logger.error(f"Enrichment failed for {formatted_cve_id}: {e}")
+				logger.error("Enrichment failed for %s: %s", formatted_cve_id, e)
 				return Response({
-					'status': False, 
+					'status': False,
 					'message': f'Failed to enrich CVE data: {str(e)}'
 				})
 
 		# 3. Fetch additional context and references from CIRCL.LU API
+		# Always use the normalized CVE-YYYY-NNNNN format.
 		circl_data = {}
 		try:
 			response = requests.get(f'https://cve.circl.lu/api/cve/{formatted_cve_id}', timeout=10)
 			if response.status_code == 200:
 				circl_data = response.json() or {}
 		except Exception as e:
-			logger.warning(f"CIRCL.LU lookup failed for {formatted_cve_id}: {e}")
+			logger.warning("CIRCL.LU lookup failed for %s: %s", formatted_cve_id, e)
 
 		# 4. Compile the full enriched data dictionary
 		result = {
@@ -1398,6 +1421,7 @@ class AddTarget(APIView):
 		domain_name_input = data.get('domain_name', '')
 		organization_name = data.get('organization')
 		slug = data.get('slug')
+		explicit_target_type = data.get('target_type') or None
 
 		# Monitoring settings
 		is_monitored = data.get('is_monitored', False)
@@ -1413,7 +1437,7 @@ class AddTarget(APIView):
 		# The user wants to add multiple domains/IPs to a target when creating a new target.
 		# This should create them as a SINGLE entry with secondary domains and in-scope IPs grouped.
 		target_names = [t.strip().replace('*', '') for t in domain_name_input.split('\n') if t.strip()]
-		
+
 		# Clean up targets (remove leading dots)
 		cleaned_targets = []
 		for name in target_names:
@@ -1428,6 +1452,47 @@ class AddTarget(APIView):
 		primary_target = cleaned_targets[0]
 		secondary_domains_list = []
 		in_scope_ips_list = []
+
+		# Handle extended target types that bulk_import_targets cannot auto-detect
+		# (email, username, phone, cidr, crypto_address, code_path).
+		from reNgine.target_router import infer_target_type
+		from reNgine.definitions import (
+			TARGET_TYPE_EMAIL, TARGET_TYPE_USERNAME, TARGET_TYPE_PHONE,
+			TARGET_TYPE_CIDR, TARGET_TYPE_CRYPTO_ADDRESS, TARGET_TYPE_CODE_PATH,
+		)
+		from targetApp.models import Domain as _Domain
+		from dashboard.models import Project as _Project
+
+		_EXTENDED_TYPES = {
+			TARGET_TYPE_EMAIL, TARGET_TYPE_USERNAME, TARGET_TYPE_PHONE,
+			TARGET_TYPE_CIDR, TARGET_TYPE_CRYPTO_ADDRESS, TARGET_TYPE_CODE_PATH,
+		}
+		effective_type = explicit_target_type or infer_target_type(primary_target)
+
+		if effective_type in _EXTENDED_TYPES:
+			try:
+				project = _Project.objects.get(slug=slug)
+			except _Project.DoesNotExist:
+				return Response({'status': False, 'message': 'Project not found'}, status=status.HTTP_400_BAD_REQUEST)
+			from django.utils import timezone as _tz
+			target_obj, _ = _Domain.objects.get_or_create(
+				name=primary_target,
+				defaults={
+					'description': description or '',
+					'project': project,
+					'insert_date': _tz.now(),
+					'target_type': effective_type,
+				}
+			)
+			if not _:
+				# Existed already — update target_type if changed
+				if target_obj.target_type != effective_type:
+					target_obj.target_type = effective_type
+					target_obj.save(update_fields=['target_type'])
+			return Response({
+				'status': True,
+				'message': f'Target {primary_target} ({effective_type}) created successfully.',
+			})
 
 		# Loop through subsequent items and classify them as In-Scope IPs or Secondary Domains
 		# IP checks are done via simple validator logic or typical patterns (checking for digits, colons, CIDRs)
@@ -1488,6 +1553,102 @@ class AddTarget(APIView):
 			'status': False,
 			'message': 'Failed to add target! It may already exist or is invalid.'
 		})
+
+
+class UpdateTarget(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		from targetApp.views import manage_monitoring_task
+
+		data = request.data
+		target_id = data.get('id')
+		if not target_id:
+			return Response({'status': False, 'message': 'Target ID is required'}, status=HTTP_400_BAD_REQUEST)
+
+		try:
+			domain = Domain.objects.get(id=target_id)
+		except Domain.DoesNotExist:
+			return Response({'status': False, 'message': 'Target not found'}, status=HTTP_400_BAD_REQUEST)
+
+		try:
+			# Scalar fields
+			if 'description' in data:
+				domain.description = data.get('description') or ''
+			if 'h1_team_handle' in data:
+				domain.h1_team_handle = data.get('h1_team_handle') or ''
+			if 'target_type' in data:
+				domain.target_type = data.get('target_type') or 'domain'
+			if 'starting_point_path' in data:
+				domain.starting_point_path = data.get('starting_point_path') or ''
+			if 'in_scope_ips' in data:
+				domain.in_scope_ips = data.get('in_scope_ips') or ''
+			if 'secondary_domains' in data:
+				domain.secondary_domains = data.get('secondary_domains') or ''
+
+			# excluded_paths is a JSONField — accept list or newline-separated string
+			if 'excluded_paths' in data:
+				excluded_paths = data.get('excluded_paths')
+				if isinstance(excluded_paths, list):
+					domain.excluded_paths = excluded_paths
+				elif isinstance(excluded_paths, str):
+					domain.excluded_paths = [p.strip() for p in excluded_paths.split('\n') if p.strip()]
+				else:
+					domain.excluded_paths = []
+
+			# Monitoring fields — track whether they changed so we can update the schedule
+			monitoring_changed = False
+			if 'is_monitored' in data:
+				new_val = bool(data.get('is_monitored'))
+				if domain.is_monitored != new_val:
+					monitoring_changed = True
+				domain.is_monitored = new_val
+			if 'monitor_frequency' in data:
+				new_val = data.get('monitor_frequency') or 'daily'
+				if domain.monitor_frequency != new_val:
+					monitoring_changed = True
+				domain.monitor_frequency = new_val
+			if 'monitor_scan_scope' in data:
+				new_val = data.get('monitor_scan_scope') or 'targeted'
+				if domain.monitor_scan_scope != new_val:
+					monitoring_changed = True
+				domain.monitor_scan_scope = new_val
+			if 'monitor_engine_id' in data:
+				engine_id = data.get('monitor_engine_id')
+				try:
+					from scanEngine.models import EngineType
+					new_engine = EngineType.objects.get(id=engine_id) if engine_id else None
+				except EngineType.DoesNotExist:
+					new_engine = None
+				if domain.monitor_engine_id != (engine_id if engine_id else None):
+					monitoring_changed = True
+				domain.monitor_engine = new_engine
+
+			if monitoring_changed or 'is_monitored' in data:
+				domain.save()
+				manage_monitoring_task(domain)
+			else:
+				domain.save()
+
+			# Organization reassignment via M2M (Organization.domains)
+			if 'organization' in data:
+				organization_name = data.get('organization')
+				# Remove domain from all current organizations in this project
+				for org in Organization.objects.filter(domains=domain, project=domain.project):
+					org.domains.remove(domain)
+				# Add to new organization if specified
+				if organization_name:
+					try:
+						org = Organization.objects.get(name=organization_name, project=domain.project)
+						org.domains.add(domain)
+					except Organization.DoesNotExist:
+						pass
+
+			return Response({'status': True, 'message': f'Target {domain.name} updated successfully'})
+		except Exception as e:
+			logger.error("UpdateTarget failed for id=%s: %s", target_id, e)
+			return Response({'status': False, 'message': 'An error occurred while updating the target'}, status=HTTP_400_BAD_REQUEST)
 
 
 class FetchSubscanResults(APIView):
@@ -1907,6 +2068,23 @@ class InitiateScan(APIView):
 						scan.cfg_custom_dorks = custom_dorks
 						scan.save()
 
+					# Resolve optional ScanProfile and embed its context
+					_profile_ctx = {}
+					_profile_name = data.get('profile_name')
+					_profile_id = data.get('profile_id')
+					if _profile_name or _profile_id:
+						try:
+							from scanEngine.models import ScanProfile as _ScanProfile
+							if _profile_name:
+								_profile = _ScanProfile.objects.get(name=_profile_name)
+							else:
+								_profile = _ScanProfile.objects.get(pk=_profile_id)
+							_profile_ctx = _profile.to_ctx_dict()
+						except ScanProfile.DoesNotExist:
+							pass  # Unknown profile — proceed with empty profile ctx
+						except Exception as exc:
+							logger.warning("[SCAN] Failed to load scan profile %s: %s", _profile_name or _profile_id, exc)
+
 					# Start the scan via Temporal durable workflow orchestration
 					kwargs = {
 						'scan_history_id': scan.id,
@@ -1922,6 +2100,7 @@ class InitiateScan(APIView):
 						'enable_spiderfoot_scan': spiderfoot_scan,
 						'initiated_by_id': request.user.id,
 						'selected_plugin_slugs': selected_plugins,
+						'profile_ctx': _profile_ctx,
 					}
 					initiate_scan_temporal(**kwargs)
 					results.append({'domain': domain.name, 'scan_id': scan.id})
@@ -3573,6 +3752,7 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 		is_important = req.query_params.get('is_important')
 		has_vulnerabilities = req.query_params.get('has_vulnerabilities')
 		ports = req.query_params.get('ports')
+		has_ip = req.query_params.get('has_ip')
 
 		subdomains = Subdomain.objects.filter(target_domain__project__slug=project)
 
@@ -3631,6 +3811,12 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 			port_list = [p.strip() for p in ports.split(',') if p.strip()]
 			if port_list:
 				self.queryset = self.queryset.filter(ip_addresses__ports__number__in=port_list).distinct()
+
+		if has_ip is not None:
+			if has_ip.lower() in ('true', '1', 't', 'y', 'yes'):
+				self.queryset = self.queryset.filter(ip_addresses__isnull=False).distinct()
+			elif has_ip.lower() in ('false', '0', 'f', 'n', 'no'):
+				self.queryset = self.queryset.filter(ip_addresses__isnull=True).distinct()
 
 		return self.queryset
 
@@ -4150,6 +4336,77 @@ class EndPointViewSet(viewsets.ModelViewSet):
 				except Exception as e:
 					logger.exception("Unexpected error: %s", e)
 		return qs
+
+class ParameterViewSet(viewsets.ModelViewSet):
+	permission_classes = [IsPenetrationTester]
+	queryset = Parameter.objects.none()
+	serializer_class = ParameterSerializer
+
+	def get_queryset(self):
+		req = self.request
+		scan_id = req.query_params.get('scan_history')
+		target_id = req.query_params.get('target_id')
+		endpoint_id = req.query_params.get('endpoint_id')
+
+		if scan_id:
+			queryset = Parameter.objects.filter(endpoint__scan_history__id=scan_id)
+		elif target_id:
+			queryset = Parameter.objects.filter(endpoint__target_domain__id=target_id)
+		else:
+			queryset = Parameter.objects.all()
+
+		if endpoint_id:
+			queryset = queryset.filter(endpoint__id=endpoint_id)
+
+		# CPDE intelligence filters
+		if req.query_params.get('param_location'):
+			queryset = queryset.filter(param_location=req.query_params['param_location'])
+		is_auth = req.query_params.get('is_auth_related', '').lower()
+		if is_auth == 'true':
+			queryset = queryset.filter(is_auth_related=True)
+		elif is_auth == 'false':
+			queryset = queryset.filter(is_auth_related=False)
+		if req.query_params.get('observed_in_js', '').lower() == 'true':
+			queryset = queryset.filter(observed_in_js=True)
+		if req.query_params.get('observed_in_openapi', '').lower() == 'true':
+			queryset = queryset.filter(observed_in_openapi=True)
+		if req.query_params.get('observed_in_graphql', '').lower() == 'true':
+			queryset = queryset.filter(observed_in_graphql=True)
+		confidence_min = req.query_params.get('confidence_min')
+		if confidence_min is not None:
+			try:
+				queryset = queryset.filter(confidence__gte=int(confidence_min))
+			except (ValueError, TypeError):
+				pass
+		if req.query_params.get('data_type'):
+			queryset = queryset.filter(data_type=req.query_params['data_type'])
+
+		return queryset.distinct()
+
+
+class ParameterSummaryView(APIView):
+	permission_classes = [IsPenetrationTester]
+
+	def get(self, request, *args, **kwargs):
+		req = self.request
+		scan_id = req.query_params.get('scan_history')
+		target_id = req.query_params.get('target_id')
+
+		if scan_id:
+			base_qs = Parameter.objects.filter(endpoint__scan_history__id=scan_id)
+		elif target_id:
+			base_qs = Parameter.objects.filter(endpoint__target_domain__id=target_id)
+		else:
+			return Response({"error": "scan_history or target_id is required"}, status=400)
+
+		summary = {
+			'total': base_qs.count(),
+			'high_confidence': base_qs.filter(confidence__gte=80).count(),
+			'reflected': base_qs.filter(is_reflected=True).count(),
+			'source': base_qs.filter(is_source=True).count(),
+			'sink': base_qs.filter(is_sink=True).count(),
+		}
+		return Response(summary)
 
 
 class SecretLeakViewSet(viewsets.ModelViewSet):
@@ -4871,3 +5128,285 @@ class LaunchADAssessmentFromSubdomain(APIView):
 			'target_domain': target_domain,
 			'status': 'created',
 		}, status=status.HTTP_201_CREATED)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2 — Standalone workflow launcher API
+# ---------------------------------------------------------------------------
+
+_WORKFLOW_REGISTRY = {
+    'user-hunt':       ('UserHuntWorkflow',       ['target', 'target_type']),
+    'url-bypass':      ('URLBypassWorkflow',       ['urls']),
+    'wordpress':       ('WordPressWorkflow',       ['urls']),
+    'host-recon':      ('HostReconWorkflow',       ['target', 'target_type']),
+    'cidr-recon':      ('CIDRReconWorkflow',       ['cidr']),
+    'code-scan':       ('CodeScanWorkflow',        ['target', 'target_type']),
+    'domain-recon':    ('DomainReconWorkflow',     ['domain']),
+    'subdomain-recon': ('SubdomainReconWorkflow',  ['domain']),
+    'url-crawl':       ('URLCrawlWorkflow',        ['urls']),
+    'url-dirsearch':   ('URLDirSearchWorkflow',    ['urls']),
+    'url-fuzz':        ('URLFuzzWorkflow',         ['urls']),
+    'url-params-fuzz': ('URLParamsFuzzWorkflow',   ['urls']),
+    'url-vuln':        ('URLVulnWorkflow',         ['urls']),
+}
+
+
+class StartWorkflowView(APIView):
+    """Start any of the 13 rengine-ng standalone workflow types via a single endpoint.
+
+    POST /api/v1/workflows/<workflow_slug>/start/
+    Body: JSON dict with required fields per workflow type (see _WORKFLOW_REGISTRY).
+    Returns: {workflow_id, status}
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, workflow_slug: str):
+        if workflow_slug not in _WORKFLOW_REGISTRY:
+            return Response(
+                {'error': f'Unknown workflow slug: {workflow_slug}'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        workflow_name, required_fields = _WORKFLOW_REGISTRY[workflow_slug]
+        data = request.data
+
+        ctx: dict = {
+            'yaml_configuration': data.get('yaml_configuration') or {},
+            'scan_history_id': data.get('scan_history_id'),
+        }
+        for field in required_fields:
+            if field in data:
+                ctx[field] = data[field]
+
+        import asyncio
+        from datetime import timedelta
+        from reNgine import temporal_client as _tc
+        from django.utils import timezone
+
+        try:
+            wf_id = f"{workflow_slug}-{request.user.id}-{int(timezone.now().timestamp())}"
+
+            async def _start():
+                client = await _tc.TemporalClientProvider.get_client()
+                handle = await client.start_workflow(
+                    workflow_name,
+                    ctx,
+                    id=wf_id,
+                    task_queue="python-orchestrator-queue",
+                    execution_timeout=timedelta(hours=24),
+                )
+                return handle.id
+
+            loop = asyncio.new_event_loop()
+            started_id = _tc.run_and_close(loop, _start())
+            return Response(
+                {'workflow_id': started_id or wf_id, 'status': 'started'},
+                status=status.HTTP_200_OK,
+            )
+        except Exception as exc:
+            logger.error(
+                "[StartWorkflowView] failed to start %s: %s",
+                workflow_name, str(exc),
+            )
+            return Response(
+                {'error': 'Failed to start workflow'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 — ScanProfile CRUD API
+# ---------------------------------------------------------------------------
+
+class ScanProfileViewSet(viewsets.ModelViewSet):
+    queryset = ScanProfile.objects.all().order_by('category', 'name')
+    serializer_class = ScanProfileSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'name'
+
+    def destroy(self, request, *args, **kwargs):
+        profile = self.get_object()
+        if profile.is_builtin:
+            return Response(
+                {'error': 'Cannot delete built-in profiles.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        return super().destroy(request, *args, **kwargs)
+
+
+# ---------------------------------------------------------------------------
+# LinkedIn session management endpoints
+# ---------------------------------------------------------------------------
+
+_LINKEDIN_CAPTURE_SCRIPT = '''\
+#!/usr/bin/env python3
+"""
+LinkedIn Session Capture Helper -- r3ngine
+==========================================
+Run this script on your LOCAL machine (not inside Docker) to capture a LinkedIn
+authenticated session state file for upload to r3ngine.
+
+Requirements (local machine):
+    pip install playwright playwright-stealth
+    playwright install chromium
+
+Usage:
+    python linkedin_capture.py
+    # A browser window opens. Log in to LinkedIn (including any MFA steps).
+    # The script saves storage_state.json once you reach the feed.
+    # Upload that file in r3ngine: Settings -> API Keys -> LinkedIn.
+"""
+from playwright.sync_api import sync_playwright
+
+OUTPUT_FILE = "storage_state.json"
+
+def main():
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=False)
+        context = browser.new_context()
+        page = context.new_page()
+        print("Opening LinkedIn login...")
+        page.goto("https://www.linkedin.com/login")
+        print("Complete login in the browser (including MFA if prompted).")
+        print("Waiting for feed page...")
+        page.wait_for_url("**/feed/**", timeout=0)
+        print("Login confirmed. Saving session...")
+        context.storage_state(path=OUTPUT_FILE)
+        browser.close()
+        print(f"Done. Upload \'{OUTPUT_FILE}\' to r3ngine via Settings -> API Keys -> LinkedIn.")
+
+if __name__ == "__main__":
+    main()
+'''
+
+
+class LinkedInSessionUploadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from dashboard.models import LinkedInCredentials
+
+        cookies_json = request.data.get('cookies_json')
+        if cookies_json:
+            try:
+                json.loads(cookies_json)
+            except (json.JSONDecodeError, TypeError, ValueError):
+                return Response({'error': 'Invalid cookies_json -- must be a valid JSON array.'}, status=400)
+            session, _ = LinkedInCredentials.objects.get_or_create(id=1)
+            session.cookies_json = cookies_json
+            session.is_valid = False
+            session.save(update_fields=['cookies_json', 'is_valid'])
+            return Response({'status': 'cookies saved'})
+
+        state_file = request.FILES.get('state_file')
+        if not state_file:
+            return Response({'error': 'Provide state_file (multipart) or cookies_json (JSON).'}, status=400)
+
+        try:
+            content = state_file.read()
+            json.loads(content)
+        except (json.JSONDecodeError, Exception):
+            return Response({'error': 'Uploaded file is not valid JSON.'}, status=400)
+
+        state_dir = os.path.join(settings.RENGINE_RESULTS, 'context', 'linkedin')
+        os.makedirs(state_dir, exist_ok=True)
+        state_path = os.path.join(state_dir, 'storage_state.json')
+        with open(state_path, 'wb') as fh:
+            fh.write(content)
+
+        session, _ = LinkedInCredentials.objects.get_or_create(id=1)
+        session.state_file_path = state_path
+        session.is_valid = False
+        session.save(update_fields=['state_file_path', 'is_valid'])
+        return Response({'status': 'state file saved'})
+
+
+class LinkedInSessionStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from dashboard.models import LinkedInCredentials
+        session = LinkedInCredentials.objects.first()
+        if not session:
+            return Response({
+                'is_valid': False,
+                'last_validated_at': None,
+                'username': '',
+                'has_state_file': False,
+                'has_cookies': False,
+            })
+        return Response({
+            'is_valid': session.is_valid,
+            'last_validated_at': session.last_validated_at,
+            'username': session.username,
+            'has_state_file': bool(
+                session.state_file_path and os.path.isfile(session.state_file_path)
+            ),
+            'has_cookies': bool(session.cookies_json),
+        })
+
+
+class LinkedInSessionDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def delete(self, request):
+        import logging as _logging
+        from dashboard.models import LinkedInCredentials
+        _logger = _logging.getLogger(__name__)
+        session = LinkedInCredentials.objects.first()
+        if session:
+            if session.state_file_path and os.path.isfile(session.state_file_path):
+                try:
+                    os.remove(session.state_file_path)
+                except OSError as exc:
+                    _logger.warning("Could not delete LinkedIn state file: %s", exc)
+            session.cookies_json = ''
+            session.state_file_path = ''
+            session.is_valid = False
+            session.last_validated_at = None
+            session.save()
+        return Response({'status': 'session cleared'})
+
+
+class LinkedInHelperScriptView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        response = HttpResponse(_LINKEDIN_CAPTURE_SCRIPT, content_type='text/x-python')
+        response['Content-Disposition'] = 'attachment; filename="linkedin_capture.py"'
+        return response
+
+
+class RunSearchsploitAction(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        from startScan.models import Subdomain
+        import subprocess
+        import json
+        try:
+            subdomain = Subdomain.objects.get(id=pk)
+        except Subdomain.DoesNotExist:
+            return Response({'status': False, 'message': 'Subdomain not found'}, status=status.HTTP_404_NOT_FOUND)
+
+        query = request.data.get('query')
+        if not query:
+            return Response({'status': False, 'message': 'query parameter is required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        import os
+        import shutil
+        if not os.path.exists('/root/.searchsploit_rc') and os.path.exists('/usr/src/exploitdb/.searchsploit_rc'):
+            try:
+                shutil.copy('/usr/src/exploitdb/.searchsploit_rc', '/root/.searchsploit_rc')
+            except Exception as e:
+                logger.error(f"Failed to copy searchsploit_rc dynamically: {e}")
+
+        cmd = ['searchsploit', '--json', query]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            data = json.loads(result.stdout)
+            exploits = data.get('RESULTS_EXPLOIT', [])
+            return Response({'status': True, 'results': exploits})
+        except Exception as e:
+            return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+

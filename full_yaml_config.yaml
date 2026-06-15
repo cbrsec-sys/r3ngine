@@ -1,7 +1,8 @@
 # r3ngine Full YAML Configuration Reference
 #
-# This file documents every available configuration key for all scan engines.
-# Copy relevant sections into a scan engine's yaml_configuration field.
+# This file documents every available configuration key for all scan engines
+# and standalone workflows. Copy relevant sections into a scan engine's
+# yaml_configuration field or use as a reference when configuring via the UI.
 #
 # Global keys (apply to all tasks unless overridden at the task level):
 #   custom_headers: ['X-Custom: value', 'User-Agent: MyAgent']
@@ -12,6 +13,34 @@
 #   intensity: 'normal'       # 'normal' | 'deep'
 #   retries: 1
 #   user_agent: ''            # Custom User-Agent string
+#
+# Tools installed in the Docker image (reference):
+#   Subdomain/DNS   : subfinder, dnsx, tlsx, ctfr, sublist3r, oneforall, netlas, baddns, chaos
+#   ASN/WHOIS       : getasn, jswhois, whoisdomain
+#   OSINT           : bbot, maigret, h8mail, holehe, spiderfoot
+#   HTTP/Crawl      : httpx, katana, gospider, hakrawler, cariddi, gau, waybackurls,
+#                     xurlfind3r, urlfinder, unfurl (urlparser)
+#   Port/Network    : naabu, nmap, fping, arp-scan, mapcidr, arpscan (psutil netdetect)
+#   Fuzzing         : ffuf, dirsearch, feroxbuster, arjun
+#   Params          : paramspider, linkfinder
+#   WAF             : wafw00f, nuclei bypass templates
+#   Vuln            : nuclei, dalfox, crlfuzz, s3scanner, wpscan, wpprobe, vigolium,
+#                     grype (CVE), trivy (secrets)
+#   Secrets         : gitleaks, trufflehog, cariddi, bbot
+#   API             : kiterunner, jwt_tool, graphql-cop, semgrep, retire
+#   Network sec     : sshaudit, testssl, sslscan, ike-scan, nmap
+#   Code scan       : grype (CVE), trivy (secrets v0.69.3 pinned), gitleaks, trufflehog, semgrep
+#   Net enum        : enum4linux-ng (SMB), onesixtyone+snmpwalk (SNMP), ldapsearch (LDAP), rdp-sec-check
+#   Brute force     : hydra
+#   Bypass          : bup (bypass-url-parser)
+#   Exploit         : searchsploit, search_vulns
+#   OSINT identity  : maigret (username), h8mail (email)
+#   Stress          : k6, wrk, hping3, locust
+
+# ===========================================================================
+# MASTER SCAN WORKFLOW — 7-Tier Pipeline
+# (Used by MasterScanWorkflow via scan engine yaml_configuration)
+# ===========================================================================
 
 # ---------------------------------------------------------------------------
 # TIER 1 — Subdomain Discovery
@@ -31,8 +60,9 @@ subdomain_discovery:
   enable_http_crawl: true
   threads: 30
   timeout: 5
-  use_subfinder_config: false  # Use /root/.config/subfinder/config.yaml
-  use_amass_config: false      # Use /root/.config/amass.ini
+  bbot: false                   # bbot passive OSINT framework (slow but thorough; runs in SubdomainReconWorkflow)
+  use_subfinder_config: false   # Use /root/.config/subfinder/config.yaml
+  use_amass_config: false       # Use /root/.config/amass.ini
   amass_wordlist: deepmagic.com-prefixes-top50000  # Active brute-force wordlist
 
 # ---------------------------------------------------------------------------
@@ -70,6 +100,7 @@ osint:
   custom_dorks:
     - 'site:_target_ ext:php'
     - 'site:_target_ intitle:"index of"'
+    # - { lookup_site: '_target_', lookup_extensions: 'php,asp,aspx' }
   intensity: normal
   documents_limit: 50
   leaks_and_secrets:
@@ -89,13 +120,16 @@ spiderfoot_scan:
 # TIER 2 — HTTP Crawl
 # ---------------------------------------------------------------------------
 http_crawl: {}
+  # threads: 30
+  # follow_redirect: true
 
 # ---------------------------------------------------------------------------
 # TIER 2 — Port Scan
 #   Network enumeration (SMB/SNMP/LDAP/RDP) runs automatically when
 #   enable_network_enum: true and the relevant port is discovered.
-#   Port 445 → enum4linux-ng (SMB)
-#   Port 161  → onesixtyone + snmpwalk (SNMP)
+#   Port 22   → sshaudit (SSH configuration audit)
+#   Port 445  → enum4linux-ng (SMB enumeration)
+#   Port 161  → onesixtyone + snmpwalk (SNMP enumeration)
 #   Port 389  → ldapsearch (LDAP anonymous bind)
 #   Port 3389 → rdp-sec-check (RDP algorithm audit)
 # ---------------------------------------------------------------------------
@@ -107,17 +141,17 @@ port_scan:
   rate_limit: 150
   threads: 30
   passive: false
-  use_naabu_config: false          # Use /root/.config/naabu/config.yaml
-  exclude_ports: []                # Ports to exclude
-  exclude_subdomains: false        # Exclude subdomains from scan
-  enable_nmap: true                # Run nmap post-scan for service/vuln detection
-  nmap_cmd: -sV --script vuln      # Raw nmap arguments appended to base command
-  nmap_script: ''                  # NSE script(s) e.g. 'http-headers,ssl-cert'
-  nmap_script_args: ''             # Arguments for NSE scripts
-  enable_network_enum: true        # Enable SMB/SNMP/LDAP/RDP protocol enumeration
+  use_naabu_config: false                           # Use /root/.config/naabu/config.yaml
+  exclude_ports: []                                 # Ports to exclude
+  exclude_subdomains: false                         # Exclude subdomains from scan
+  enable_nmap: true                                 # Run nmap post-scan for service/vuln detection
+  nmap_cmd: 'nmap -vv -Pn '                         # Raw nmap arguments appended to base command
+  nmap_script: '/usr/share/nmap/scripts/vulners.nse'  # NSE script(s) e.g. 'http-headers,ssl-cert'
+  nmap_script_args: ''                              # Arguments for NSE scripts
+  enable_network_enum: true                         # Enable SMB/SNMP/LDAP/RDP/SSH protocol enumeration
 
 # ---------------------------------------------------------------------------
-# TIER 2 — Vigolium Discovery
+# TIER 2 — Vigolium Discovery (passive)
 # ---------------------------------------------------------------------------
 vigolium_discovery:
   run_vigolium_discovery: true
@@ -217,7 +251,7 @@ dir_file_fuzz:
   use_api_wordlist: false     # Use API-specific wordlist instead of dicc
 
 # ---------------------------------------------------------------------------
-# TIER 5 — Web API & Secret Discovery
+# TIER 5 — Web API & Parameter Discovery
 # ---------------------------------------------------------------------------
 web_api_discovery:
   uses_tools:
@@ -238,7 +272,7 @@ web_api_discovery:
   use_api_wordlist: false     # Use API wordlist for dir_file_fuzz integration
 
 # ---------------------------------------------------------------------------
-# TIER 5 — Vigolium Analysis
+# TIER 5 — Vigolium Analysis (active)
 # ---------------------------------------------------------------------------
 vigolium_analysis:
   run_vigolium_analysis: true
@@ -256,14 +290,25 @@ waf_detection:
   use_censys: true            # Use Censys for origin IP discovery
 
 # ---------------------------------------------------------------------------
+# TIER 5 — Secret Scanning
+#   Runs trufflehog, gitleaks, and leak-lookup against discovered JS files
+#   and crawled content. Also called by CodeScanWorkflow for full repo scans.
+# ---------------------------------------------------------------------------
+secret_scanning:
+  trufflehog: true            # Trufflehog v3 filesystem / JS secret scan
+  gitleaks: true              # Gitleaks v8 detect mode on JS files
+  leaklookup: true            # Query leak-lookup.com API
+
+# ---------------------------------------------------------------------------
 # TIER 6 — Vulnerability Scan
 # ---------------------------------------------------------------------------
 vulnerability_scan:
   run_nuclei: true
   run_dalfox: true
   run_crlfuzz: true
-  run_acunetix: true
+  run_acunetix: true                 # Requires AcunetixAPIKey configured in Django admin
   run_wpscan: true
+  run_wptaint_scan: true
   run_s3scanner: true
   run_vigolium: true
   enable_http_crawl: true
@@ -273,6 +318,26 @@ vulnerability_scan:
   retries: 1
   timeout: 5
   fetch_gpt_report: true
+
+  # Acunetix (AWVS) Configuration
+  # These settings control how vulnerability scans interact with Acunetix
+  acunetix:
+    # Maximum time to wait for a scan to complete (in seconds)
+    # Default: 43200 (12 hours)
+    # Env var: ACUNETIX_MAX_RETRIES (value is number of 30-second intervals)
+    max_retries: 720
+
+    # Interval between scan status polls (in seconds)
+    # Default: 30 seconds
+    # Increase this if your Acunetix instance is slow or has rate limits
+    # Env var: ACUNETIX_POLL_INTERVAL
+    poll_interval: 30
+
+    # Timeout for individual Acunetix API requests (in seconds)
+    # Default: 30 seconds
+    # Increase for slow networks or large scans
+    # Env var: ACUNETIX_REQUEST_TIMEOUT
+    request_timeout: 30
 
   nuclei:
     use_nuclei_config: false
@@ -378,9 +443,187 @@ attack_path_modeling:
   enabled: true
   top_n: 10
 
+# ===========================================================================
+# STANDALONE WORKFLOWS
+# (Triggered via StartWorkflowView API or Workflow Launcher UI)
+# These keys are only read when the corresponding standalone workflow runs.
+# ===========================================================================
+
 # ---------------------------------------------------------------------------
-# Stress Testing (standalone, triggered separately)
+# SubdomainReconWorkflow
+#   Passive/brute-force subdomain discovery + HTTP probe + takeover check.
+#   Tools: subfinder, gau (passive), dnsx (brute), httpx, nuclei[takeover]
 # ---------------------------------------------------------------------------
+subdomain_recon:
+  passive: false                # Passive sources only — skip DNS brute force
+  brute_dns: false              # DNS brute force via dnsx wordlist
+  bbot: false                   # bbot OSINT framework for additional discovery (slow)
+
+# ---------------------------------------------------------------------------
+# DomainReconWorkflow
+#   WHOIS + ASN + DNS + passive URL collection, then HTTP probe + WAF + testssl.
+#   Tools: getasn, jswhois, whoisdomain, dnsx, xurlfind3r, httpx, wafw00f, testssl
+# ---------------------------------------------------------------------------
+domain_recon:
+  passive: false                # WHOIS/DNS/ASN only; skip HTTP probe, testssl, WAF detection
+
+# ---------------------------------------------------------------------------
+# HostReconWorkflow
+#   Port scan (naabu + nmap) → service CVE lookup → SSH audit → HTTP probe.
+#   getasn enriches discovered IPs with ASN/CIDR/org data.
+# ---------------------------------------------------------------------------
+host_recon:
+  run_nuclei: false             # Run nuclei [network,ssl] scan after port scan (slow)
+
+# ---------------------------------------------------------------------------
+# CIDRReconWorkflow
+#   Network range discovery → alive host detection → port scan → HTTP probe.
+#   When no cidr target is provided, netdetect auto-discovers local network CIDR ranges
+#   via psutil interface enumeration.
+# ---------------------------------------------------------------------------
+cidr_recon:
+  use_arp: false                # Use ARP scan for host discovery (requires NET_RAW capability)
+  # When no cidr target is given and use_arp is false:
+  #   → netdetect enumerates local network interfaces to determine CIDR automatically
+  #   → then fping sweeps the detected CIDR for alive hosts
+  #   → mapcidr expands the CIDR to individual IPs for port scanning
+
+# ---------------------------------------------------------------------------
+# CodeScanWorkflow
+#   Source code / filesystem vulnerability and secrets scanning.
+#   Tools: gitleaks, trufflehog (via secret_scanning), semgrep, grype, trivy
+#   Note: grype and trivy always run when this workflow is triggered.
+# ---------------------------------------------------------------------------
+code_scan:
+  grype: true                   # Anchore Grype — CVE scanner for installed packages/dependencies
+  trivy: true                   # Aqua Trivy v0.69.3 — filesystem secrets scanner
+                                # (pinned pre-compromise; v0.69.4 had supply chain attack Mar 2026)
+
+# ---------------------------------------------------------------------------
+# URLCrawlWorkflow
+#   Passive URL discovery (xurlfind3r, urlfinder, gau) + active crawl
+#   (katana, cariddi) + HTTP probe + optional secret hunt + urlparser.
+#   urlparser (unfurl) extracts unique query-string parameters from crawled URLs.
+# ---------------------------------------------------------------------------
+url_crawl:
+  passive: false                # Passive discovery only (skip katana/cariddi active crawl)
+  active: false                 # Active crawl only (skip passive xurlfind3r/urlfinder/gau)
+  hunt_secrets: false           # Run trufflehog + maigret OSINT after active crawl
+
+# ---------------------------------------------------------------------------
+# URLDirSearchWorkflow
+#   HTTP probe → ffuf directory mode → optional secret scan.
+# ---------------------------------------------------------------------------
+url_dirsearch:
+  hunt_secrets: false           # Run trufflehog after directory discovery
+
+# ---------------------------------------------------------------------------
+# URLFuzzWorkflow
+#   Comprehensive URL fuzzing with feroxbuster and/or ffuf.
+#   urlparser (unfurl) is NOT called in this workflow (params come pre-discovered).
+# ---------------------------------------------------------------------------
+url_fuzz:
+  fuzzers:
+    - ffuf                      # ffuf directory/file fuzzing
+    - feroxbuster               # feroxbuster recursive content discovery
+  hunt_secrets: false           # Run trufflehog after fuzzing
+
+# ---------------------------------------------------------------------------
+# URLParamsFuzzWorkflow
+#   HTTP probe → urlparser (unfurl, passive harvest) → arjun (active discovery)
+#   → optional ffuf value fuzzing.
+#   urlparser runs first to quickly harvest params from already-crawled URLs
+#   before arjun actively probes for additional parameters.
+# ---------------------------------------------------------------------------
+url_params_fuzz:
+  fuzz_values: false            # Fuzz discovered parameter values with ffuf
+  hunt_secrets: false           # Run trufflehog after parameter fuzzing
+
+# ---------------------------------------------------------------------------
+# URLVulnWorkflow
+#   gf pattern matching (xss/lfi/ssrf/rce/idor/debug_logic) → dalfox XSS
+#   attack on matched URLs → optional nuclei HTTP scan.
+# ---------------------------------------------------------------------------
+url_vuln:
+  nuclei: false                 # Run nuclei HTTP scan (exclude network/ssl/file/dns/osint tags)
+
+# ---------------------------------------------------------------------------
+# URLBypassWorkflow
+#   Attempt 4xx bypass on a list of URLs using bup (bypass-url-parser).
+# ---------------------------------------------------------------------------
+url_bypass: {}
+  # No additional configuration keys at this time.
+  # Provide target URLs via the workflow context.
+
+# ---------------------------------------------------------------------------
+# WordPressWorkflow
+#   HTTP probe → wpscan + wpprobe (parallel) → nuclei[wordpress].
+# ---------------------------------------------------------------------------
+wordpress: {}
+  # No additional configuration keys at this time.
+  # wpscan_enumeration and wpscan_detection_mode can be set here in future.
+
+# ---------------------------------------------------------------------------
+# UserHuntWorkflow
+#   Username OSINT via maigret OR email breach search via h8mail.
+#   Dispatches based on target_type: 'username' | 'email'.
+# ---------------------------------------------------------------------------
+user_hunt: {}
+  # No additional configuration keys at this time.
+  # Triggered by setting target_type='username' or target_type='email' in context.
+
+# ===========================================================================
+# STANDALONE TOOLS (informational reference)
+# These tools are called automatically by workflows and do not require
+# explicit configuration keys unless noted above.
+# ===========================================================================
+
+# getasn       — Enriches discovered IPs with ASN number, CIDR, and organization.
+#                Called after port scan in DomainReconWorkflow + HostReconWorkflow.
+#                No configuration required.
+
+# jswhois      — JSON WHOIS lookup (Go binary). Runs in DomainReconWorkflow.
+#                Output stored in DomainInfo.whois_raw. No configuration required.
+
+# whoisdomain  — Python WHOIS lookup. Runs in DomainReconWorkflow.
+#                Output stored in DomainInfo.whois_raw. No configuration required.
+
+# netdetect    — Local network CIDR auto-discovery via psutil interface enumeration.
+#                Runs in CIDRReconWorkflow when no CIDR target is provided.
+#                No configuration required (controlled by cidr_recon.use_arp above).
+
+# urlparser    — URL parameter extraction using unfurl (/usr/local/bin/unfurl).
+#                Runs in URLParamsFuzzWorkflow (before arjun) and URLCrawlWorkflow.
+#                Outputs unique key=value pairs stored as Parameter records.
+#                No configuration required.
+
+# feroxbuster  — Recursive content discovery. Runs in URLFuzzWorkflow when
+#                'feroxbuster' is in url_fuzz.fuzzers (see above).
+
+# grype        — Anchore Grype CVE scanner. Runs in CodeScanWorkflow.
+#                Pinned to v0.114.0. Stores findings as Vulnerability records.
+#                Controlled by code_scan.grype above.
+
+# trivy        — Aqua Trivy secrets scanner. Runs in CodeScanWorkflow.
+#                Pinned to v0.69.3 (v0.69.4 was compromised March 2026).
+#                Stores findings as SecretLeak records.
+#                Controlled by code_scan.trivy above.
+
+# bbot         — Bit Bounce OSINT Tool. Runs in SubdomainReconWorkflow
+#                when subdomain_recon.bbot: true. Discovers additional subdomains
+#                via passive OSINT; stores as Subdomain records.
+
+# sshaudit     — SSH configuration audit. Runs automatically in HostReconWorkflow
+#                and MasterScanWorkflow when port 22 is discovered.
+
+# search_vulns — CVE lookup per discovered service/version. Fans out from
+#                HostReconWorkflow and MasterScanWorkflow after port scan.
+
+# searchsploit — Exploit-DB lookup per service. Same fan-out as search_vulns.
+
+# ===========================================================================
+# STRESS TESTING (standalone, triggered separately)
+# ===========================================================================
 stress_test:
   uses_tools:
     - k6

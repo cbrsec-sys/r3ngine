@@ -35,14 +35,33 @@ class MarketplaceManager:
                 return cached_data
 
         try:
+            import packaging.version
             response = requests.get(cls.MARKETPLACE_YAML_URL, timeout=10)
             if response.status_code == 200:
                 data = yaml.safe_load(response.text)
                 plugins = data.get('marketplace', [])
-                # Add installation status
-                installed_slugs = list(Plugin.objects.values_list('slug', flat=True))
+                
+                # Fetch all installed plugins to compare versions
+                installed_plugins = {p.slug: p for p in Plugin.objects.all()}
+                
                 for plugin in plugins:
-                    plugin['is_installed'] = plugin['slug'] in installed_slugs
+                    slug = plugin.get('slug')
+                    if slug in installed_plugins:
+                        plugin['is_installed'] = True
+                        installed_ver = installed_plugins[slug].version
+                        plugin['installed_version'] = installed_ver
+                        
+                        try:
+                            m_ver = packaging.version.parse(str(plugin.get('version', '0.0.0')))
+                            i_ver = packaging.version.parse(str(installed_ver))
+                            plugin['update_available'] = m_ver > i_ver
+                        except Exception as e:
+                            logger.error(f"Version parsing error for plugin {slug}: {e}")
+                            plugin['update_available'] = False
+                    else:
+                        plugin['is_installed'] = False
+                        plugin['installed_version'] = None
+                        plugin['update_available'] = False
                 
                 cache.set(cls.CACHE_KEY, plugins, cls.CACHE_TIMEOUT)
                 return plugins
@@ -370,169 +389,197 @@ class AtomicInstaller:
                     shutil.rmtree(final_dir)
                 shutil.move(temp_dir, final_dir)
                 
-                # 5. Ingest Engine Fixtures and Run Migrations
-                # Run dynamic migrations if the plugin has models
-                backend_dir = os.path.join(final_dir, 'backend')
-                if os.path.exists(os.path.join(backend_dir, 'models.py')):
-                    # Ensure package directories have __init__.py files present
-                    for d in [final_dir, backend_dir]:
-                        init_f = os.path.join(d, '__init__.py')
-                        if not os.path.exists(init_f):
-                            try:
-                                with open(init_f, 'w') as f:
-                                    pass
-                            except Exception:
-                                pass
+            # --- End of transaction.atomic() block ---
+            # Migration and fixture steps are performed OUTSIDE the long transaction so that
+            # we do not trigger 'server closed the connection unexpectedly' errors caused by
+            # PostgreSQL dropping idle connections inside a long transaction (idle-in-transaction timeout).
+            from django.db import connection as _db_conn
+            _db_conn.close()
 
-                    app_label = f"{plugin_slug}_backend"
-                    logger.info(f"Running migrations for plugin app: {app_label}")
-                    cls._emit(install_id, 'migrations', 'in_progress')
-                    try:
-                        import sys
-                        # Run makemigrations in a clean subprocess to auto-load the new app config
-                        makemigrate_res = subprocess.run(
-                            [sys.executable, "manage.py", "makemigrations", app_label],
-                            cwd=settings.BASE_DIR,
-                            capture_output=True,
-                            text=True,
-                            check=True
-                        )
-                        logger.info(f"Subprocess makemigrations stdout: {makemigrate_res.stdout}")
-                        
-                        # Run migrate in a clean subprocess
-                        migrate_res = subprocess.run(
-                            [sys.executable, "manage.py", "migrate", app_label],
-                            cwd=settings.BASE_DIR,
-                            capture_output=True,
-                            text=True,
-                            check=True
-                        )
-                        logger.info(f"Subprocess migrate stdout: {migrate_res.stdout}")
-                        logger.info(f"Successfully migrated plugin: {plugin_slug}")
-                        cls._emit(install_id, 'migrations', 'completed')
-                    except subprocess.CalledProcessError as e:
-                        logger.error(f"Failed to run migrations for {plugin_slug} (exit {e.returncode}):\nStdout: {e.stdout}\nStderr: {e.stderr}")
-                        raise Exception(f"Migration subprocess failed for {app_label}: {e.stderr or e.stdout}")
-                    except Exception as e:
-                        logger.error(f"Unexpected error running migrations for {plugin_slug}: {str(e)}")
-                        raise e
-                else:
-                    # Plugin has no models — migrations not needed
-                    cls._emit(install_id, 'migrations', 'skipped')
-
-                cls._emit(install_id, 'assets', 'in_progress')
-                from scanEngine.models import EngineType
-                for file in os.listdir(final_dir):
-                    if file.endswith('_engine.yaml'):
-                        fixture_path = os.path.join(final_dir, file)
-                        logger.info(f"Ingesting engine fixture: {fixture_path}")
+            # 5. Ingest Engine Fixtures and Run Migrations
+            # Run dynamic migrations if the plugin has models
+            backend_dir = os.path.join(final_dir, 'backend')
+            if os.path.exists(os.path.join(backend_dir, 'models.py')):
+                # Ensure package directories have __init__.py files present
+                for d in [final_dir, backend_dir]:
+                    init_f = os.path.join(d, '__init__.py')
+                    if not os.path.exists(init_f):
                         try:
-                            with open(fixture_path, 'r') as f:
-                                fixture_data = yaml.safe_load(f)
-                                if isinstance(fixture_data, list):
-                                    for item in fixture_data:
-                                        if item.get('model') == 'scanEngine.enginetype':
-                                            fields = item.get('fields', {})
-                                            name = fields.get('engine_name')
-                                            if name:
-                                                obj, created = EngineType.objects.update_or_create(
-                                                    engine_name=name,
-                                                    defaults=fields
-                                                )
-                                                logger.info(f"{'Created' if created else 'Updated'} engine: {name}")
-                                            else:
-                                                logger.warning(f"Engine fixture item missing engine_name: {item}")
-                                        else:
-                                            # Fallback for other models (e.g. Wordlist, etc.)
-                                            call_command('loaddata', fixture_path, format='yaml')
-                                            logger.info(f"Fallback loaddata used for: {file}")
-                                else:
-                                    logger.error(f"Invalid fixture format in {file}")
-                        except Exception as e:
-                            logger.error(f"CRITICAL: Failed to ingest engine fixture {file}: {str(e)}")
+                            with open(init_f, 'w') as f:
+                                pass
+                        except Exception:
+                            pass
 
-                # 6. Parse tools.yaml
-                tools_path = os.path.join(final_dir, 'tools.yaml')
-                if os.path.exists(tools_path):
+                app_label = f"{plugin_slug}_backend"
+                logger.info(f"Running migrations for plugin app: {app_label}")
+                cls._emit(install_id, 'migrations', 'in_progress')
+                try:
+                    import sys
+                    # Run makemigrations in a clean subprocess to auto-load the new app config
+                    makemigrate_res = subprocess.run(
+                        [sys.executable, "manage.py", "makemigrations", app_label],
+                        cwd=settings.BASE_DIR,
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    logger.info(f"Subprocess makemigrations stdout: {makemigrate_res.stdout}")
+                    
+                    # Run migrate in a clean subprocess
+                    migrate_res = subprocess.run(
+                        [sys.executable, "manage.py", "migrate", app_label],
+                        cwd=settings.BASE_DIR,
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    logger.info(f"Subprocess migrate stdout: {migrate_res.stdout}")
+                    logger.info(f"Successfully migrated plugin: {plugin_slug}")
+                    cls._emit(install_id, 'migrations', 'completed')
+                except subprocess.CalledProcessError as e:
+                    logger.error(f"Failed to run migrations for {plugin_slug} (exit {e.returncode}):\nStdout: {e.stdout}\nStderr: {e.stderr}")
+                    raise Exception(f"Migration subprocess failed for {app_label}: {e.stderr or e.stdout}")
+                except Exception as e:
+                    logger.error(f"Unexpected error running migrations for {plugin_slug}: {str(e)}")
+                    raise e
+            else:
+                # Plugin has no models — migrations not needed
+                cls._emit(install_id, 'migrations', 'skipped')
+
+            cls._emit(install_id, 'assets', 'in_progress')
+            from scanEngine.models import EngineType
+            for file in os.listdir(final_dir):
+                if file.endswith('_engine.yaml'):
+                    fixture_path = os.path.join(final_dir, file)
+                    logger.info(f"Ingesting engine fixture: {fixture_path}")
                     try:
-                        with open(tools_path, 'r') as f:
-                            tools_config = yaml.safe_load(f)
-                            plugin.tools_config = tools_config
-                            plugin.save()
-
-                        # Invalidate per-tool verification cache so the orchestrator
-                        # re-installs tools on its next startup rather than skipping them.
-                        for _tool in tools_config.get('tools', []):
-                            _tool_name = _tool.get('name')
-                            if _tool_name:
-                                cache.delete(f"plugin_{plugin_slug}_tool_{_tool_name}_verified")
-
-                        # Trigger orchestrator restart via Redis so it picks up the new plugin
-                        # and installs any required tools in its own container on startup.
-                        def _restart_orchestrator():
-                            try:
-                                import redis as _redis
-                                from django.conf import settings as _settings
-                                rdb = _redis.StrictRedis(
-                                    host=_settings.REDIS_HOST,
-                                    port=_settings.REDIS_PORT,
-                                    db=0,
-                                )
-                                rdb.publish('orchestrator_control', 'restart')
-                                logger.info(f"[{plugin_slug}] Orchestrator restart triggered for tool installation.")
-                            except Exception as _e:
-                                logger.error(f"[{plugin_slug}] Failed to trigger orchestrator restart: {_e}")
-
-                        transaction.on_commit(
-                            lambda: threading.Thread(target=_restart_orchestrator, daemon=True).start()
-                        )
-                    except Exception as e:
-                        logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
-
-                # Set needs_restart to True in cache
-                cache.set(f"plugin_{plugin_slug}_needs_restart", True, timeout=None)
-
-                # 7. Promote ui/dist/ contents into ui/ so PluginUIView can serve them.
-                # PluginUIView serves directly from plugins_data/{slug}/ui/, so built
-                # assets must live there (not in a dist/ subdirectory).
-                ui_dist_src = os.path.join(final_dir, 'ui', 'dist')
-                if os.path.exists(ui_dist_src):
-                    ui_dir = os.path.join(final_dir, 'ui')
-                    for item in os.listdir(ui_dist_src):
-                        src_item = os.path.join(ui_dist_src, item)
-                        dst_item = os.path.join(ui_dir, item)
-                        if os.path.exists(dst_item):
-                            if os.path.isdir(dst_item):
-                                shutil.rmtree(dst_item)
+                        with open(fixture_path, 'r') as f:
+                            fixture_data = yaml.safe_load(f)
+                            if isinstance(fixture_data, list):
+                                for item in fixture_data:
+                                    if item.get('model') == 'scanEngine.enginetype':
+                                        fields = item.get('fields', {})
+                                        name = fields.get('engine_name')
+                                        if name:
+                                            obj, created = EngineType.objects.update_or_create(
+                                                engine_name=name,
+                                                defaults=fields
+                                            )
+                                            logger.info(f"{'Created' if created else 'Updated'} engine: {name}")
+                                        else:
+                                            logger.warning(f"Engine fixture item missing engine_name: {item}")
+                                    else:
+                                        # Fallback for other models (e.g. Wordlist, etc.)
+                                        call_command('loaddata', fixture_path, format='yaml')
+                                        logger.info(f"Fallback loaddata used for: {file}")
                             else:
-                                os.remove(dst_item)
-                        shutil.move(src_item, dst_item)
-                    shutil.rmtree(ui_dist_src)
-                
-                cls._emit(install_id, 'assets', 'completed')
+                                logger.error(f"Invalid fixture format in {file}")
+                    except Exception as e:
+                        logger.error(f"CRITICAL: Failed to ingest engine fixture {file}: {str(e)}")
 
-                # 8. Cleanup backups on success
-                if backup_fs_dir and os.path.exists(backup_fs_dir):
-                    shutil.rmtree(backup_fs_dir)
-                if backup_db_file and os.path.exists(backup_db_file):
-                    os.remove(backup_db_file)
-                if inner_zip_path and os.path.exists(inner_zip_path):
-                    os.remove(inner_zip_path)
+            # 6. Parse tools.yaml — save in its own short transaction with a fresh connection.
+            tools_path = os.path.join(final_dir, 'tools.yaml')
+            if os.path.exists(tools_path):
+                try:
+                    from django.db import connection as _db_conn
+                    _db_conn.ensure_connection()
+                    with open(tools_path, 'r') as f:
+                        tools_config = yaml.safe_load(f)
 
-                cls._emit(install_id, 'complete', 'completed')
-                if install_id:
-                    data = cache.get(f'plugin:install:{install_id}') or {}
-                    data['status'] = 'success'
-                    _warning_messages = {
-                        'unsigned': 'This plugin is unsigned. Install at your own risk.',
-                        'signed_unknown': 'This plugin is signed by an unrecognized publisher.',
-                        'legacy': 'This is a legacy .zip plugin with no integrity verification.',
-                    }
-                    if verification_result in _warning_messages:
-                        data['warning'] = _warning_messages[verification_result]
-                    cache.set(f'plugin:install:{install_id}', data, timeout=300)
+                    with transaction.atomic():
+                        # Re-fetch the plugin record to get a live ORM instance.
+                        _plugin = Plugin.objects.get(slug=plugin_slug)
+                        _plugin.tools_config = tools_config
+                        _plugin.save(update_fields=['tools_config'])
 
-                return plugin
+                    # Invalidate per-tool verification cache so the orchestrator
+                    # re-installs tools on its next startup rather than skipping them.
+                    for _tool in tools_config.get('tools', []):
+                        _tool_name = _tool.get('name')
+                        if _tool_name:
+                            cache.delete(f"plugin_{plugin_slug}_tool_{_tool_name}_verified")
+
+                    # Trigger orchestrator restart via Redis so it picks up the new plugin
+                    # and installs any required tools in its own container on startup.
+                    def _restart_orchestrator():
+                        try:
+                            import redis as _redis
+                            from django.conf import settings as _settings
+                            rdb = _redis.StrictRedis(
+                                host=_settings.REDIS_HOST,
+                                port=_settings.REDIS_PORT,
+                                password=_settings.REDIS_PASSWORD,
+                                db=0,
+                            )
+                            rdb.publish('orchestrator_control', 'restart')
+                            logger.info(f"[{plugin_slug}] Orchestrator restart triggered for tool installation.")
+                        except Exception as _e:
+                            logger.error(f"[{plugin_slug}] Failed to trigger orchestrator restart: {_e}")
+
+                    threading.Thread(target=_restart_orchestrator, daemon=True).start()
+                except Exception as e:
+                    logger.error(f"Failed to parse tools.yaml for {plugin_slug}: {str(e)}")
+
+            # Trigger a graceful delayed restart of the web container so it picks up
+            # the new plugin API URLs without instantly severing this HTTP response.
+            def _restart_web_container():
+                import time
+                time.sleep(2)  # Give the current JSON response time to reach the client
+                try:
+                    import docker
+                    client = docker.from_env()
+                    web_container = client.containers.get('r3ngine-web-1')
+                    logger.info(f"[{plugin_slug}] Restarting web container to load new API routes.")
+                    web_container.restart()
+                except Exception as _e:
+                    logger.error(f"[{plugin_slug}] Failed to restart web container: {_e}")
+
+            threading.Thread(target=_restart_web_container, daemon=True).start()
+
+            # Set needs_restart to True in cache
+            cache.set(f"plugin_{plugin_slug}_needs_restart", True, timeout=None)
+
+            # 7. Promote ui/dist/ contents into ui/ so PluginUIView can serve them.
+            # PluginUIView serves directly from plugins_data/{slug}/ui/, so built
+            # assets must live there (not in a dist/ subdirectory).
+            ui_dist_src = os.path.join(final_dir, 'ui', 'dist')
+            if os.path.exists(ui_dist_src):
+                ui_dir = os.path.join(final_dir, 'ui')
+                for item in os.listdir(ui_dist_src):
+                    src_item = os.path.join(ui_dist_src, item)
+                    dst_item = os.path.join(ui_dir, item)
+                    if os.path.exists(dst_item):
+                        if os.path.isdir(dst_item):
+                            shutil.rmtree(dst_item)
+                        else:
+                            os.remove(dst_item)
+                    shutil.move(src_item, dst_item)
+                shutil.rmtree(ui_dist_src)
+
+            cls._emit(install_id, 'assets', 'completed')
+
+            # 8. Cleanup backups on success
+            if backup_fs_dir and os.path.exists(backup_fs_dir):
+                shutil.rmtree(backup_fs_dir)
+            if backup_db_file and os.path.exists(backup_db_file):
+                os.remove(backup_db_file)
+            if inner_zip_path and os.path.exists(inner_zip_path):
+                os.remove(inner_zip_path)
+
+            cls._emit(install_id, 'complete', 'completed')
+            if install_id:
+                data = cache.get(f'plugin:install:{install_id}') or {}
+                data['status'] = 'success'
+                _warning_messages = {
+                    'unsigned': 'This plugin is unsigned. Install at your own risk.',
+                    'signed_unknown': 'This plugin is signed by an unrecognized publisher.',
+                    'legacy': 'This is a legacy .zip plugin with no integrity verification.',
+                }
+                if verification_result in _warning_messages:
+                    data['warning'] = _warning_messages[verification_result]
+                cache.set(f'plugin:install:{install_id}', data, timeout=300)
+
+            return Plugin.objects.get(slug=plugin_slug)
                 
         except Exception as e:
             logger.error(f"Installation failed for {plugin_slug}: {str(e)}")

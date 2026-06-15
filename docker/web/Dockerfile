@@ -29,7 +29,7 @@ RUN apt-get update && \
 ENV GO111MODULE=on
 
 # All tools in one RUN: single cache-invalidation point, no intermediate layers
-# retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols. 
+# retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols.
 RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && \
     go install -ldflags="-s -w" -v github.com/jaeles-project/gospider@latest && \
     go install -ldflags="-s -w" -v github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006 && \
@@ -51,6 +51,15 @@ RUN go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && 
     go install -ldflags="-s -w" -v github.com/zricethezav/gitleaks/v8@latest && \
     go install -ldflags="-s -w" -v github.com/xalgord/reconx/cmd/reconx@latest && \
     go install -ldflags="-s -w" -v github.com/projectdiscovery/vulnx/v2/cmd/vulnx@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
+    go install -ldflags="-s -w" -v github.com/Vulnpire/getasn@latest && \
+    go install -ldflags="-s -w" -v github.com/jschauma/jswhois@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/mapcidr/cmd/mapcidr@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest && \
+    go install -ldflags="-s -w" -v github.com/Chocapikk/wpprobe@latest && \
+    go install -ldflags="-s -w" -v github.com/hueristiq/xurlfind3r/cmd/xurlfind3r@latest && \
+    go install -ldflags="-s -w" -v github.com/edoardottt/cariddi/cmd/cariddi@latest && \
+    go install -ldflags="-s -w" -v github.com/dimasma0305/wp-taint-scan/cmd/taint-scan@latest && \
     rm -rf /go/pkg /root/.cache/go-build
 
 # betterleaks has no published go install path — clone and build directly.
@@ -75,7 +84,6 @@ RUN go mod download
 COPY web/executor/ ./
 RUN CGO_ENABLED=0 GO111MODULE=on go build -ldflags="-s -w" -o /usr/local/bin/r3ngine-executor . && \
     rm -rf /root/.cache/go-build /go/pkg
-
 
 # ===========================================================================
 # Stage: Vigolium Builder
@@ -129,8 +137,8 @@ RUN git clone --depth 1 https://github.com/hahwul/dalfox /tmp/dalfox
 
 WORKDIR /tmp/dalfox
 
-RUN cargo build --release --target x86_64-unknown-linux-musl && \
-    cp target/x86_64-unknown-linux-musl/release/dalfox /usr/local/bin/dalfox
+RUN cargo build --release && \
+    cp target/release/dalfox /usr/local/bin/dalfox
 
 
 # ===========================================================================
@@ -138,17 +146,27 @@ RUN cargo build --release --target x86_64-unknown-linux-musl && \
 #
 # Ubuntu 22.04 base. Contains ONLY what r3ngine needs to run:
 #   - Python + pip + runtime shared libs
-#   - Ruby (WPScan)
+#   - Ruby (runtime for WPScan — gem installed at container start via internal_tools.sh)
 #   - Node.js (Retire.js)
 #   - Pre-compiled Go tool binaries (copied from go-tools-builder)
 #   - r3ngine-executor binary (copied from executor-builder)
 #   - Dalfox binary (copied from dalfox-builder)
 #   - Built frontend dist (copied from frontend-builder)
-#   - Python-based tools (shallow-cloned, .git stripped)
-#   - Playwright Chromium
 #
-# NOT present: Go SDK, Rust toolchain, build caches, full git histories,
-#              nuclei-templates (volume), wordlists (volume).
+# NOT present in image (installed at first container start via internal_tools.sh):
+#   - Playwright Chromium
+#   - WPScan gem
+#   - Binary tools: Trufflehog, k6, brutus, Aquatone, Feroxbuster, GooFuzz
+#   - CVE tools: grype, trivy
+#   - Python repos: SpiderFoot, theHarvester, OneForAll, Sublist3r, ParamSpider,
+#     LinkFinder, CMSeeK, ctfr, jwt_tool, graphql-cop, enum4linux-ng, rdp-sec-check,
+#     acunetix-python, cpanel2shell-scanner, react2shell-scanner, testssl.sh, username-anarchy
+#   - pip3 tools: fierce, dirsearch, arjun, inql, netlas, holehe
+#   - pipx tools: maigret, semgrep, dnsrecon, ssh-audit, wafw00f, whoisdomain,
+#     bypass-url-parser, bbot, sploitscan, baddns
+#
+# NOT present anywhere: Go SDK, Rust toolchain, build caches, full git histories,
+#                        nuclei-templates (volume), wordlists (volume).
 # ===========================================================================
 FROM ubuntu:22.04
 
@@ -161,7 +179,7 @@ ENV DEBIAN_FRONTEND="noninteractive" \
 LABEL \
     name="reNgine" \
     author="Reboot Dev: MistrHyd3 (https://github.com/whiterabb17) \
-    Original By: Yogesh Ojha <yogesh.ojha11@gmail.com>" \
+    Original By: Yogesh Ojha" \
     description="reNgine is an automated recon pipeline for web application penetration testing."
 
 # ---------------------------------------------------------------------------
@@ -184,8 +202,10 @@ RUN apt-get update -y && \
 
 # ---------------------------------------------------------------------------
 # System packages — single combined RUN to keep the layer count low.
-# build-essential is kept because pip installs some packages that compile
-# C extensions (cryptography, pycairo, etc.) and gems (wpscan) need gcc.
+# build-essential is kept because:
+#   - pip installs some packages that compile C extensions (cryptography, pycairo)
+#   - gem installs (wpscan) need gcc
+#   - internal_tools.sh pip3/gem installs run at container start
 # ---------------------------------------------------------------------------
 RUN apt-get update -y && \
     apt-get install -y --no-install-recommends \
@@ -193,7 +213,7 @@ RUN apt-get update -y && \
     python3.12 \
     python3.12-dev \
     python3.12-venv \
-    # Ruby (WPScan)
+    # Ruby — runtime for WPScan (gem installed via internal_tools.sh at startup)
     ruby-full \
     ruby-dev \
     # Shared libraries required by Python C-extension packages
@@ -220,7 +240,7 @@ RUN apt-get update -y && \
     # Capability bits for naabu raw sockets
     libcap2-bin \
     libcap2 \
-    # EGL/PCI — required by Playwright/Chromium GPU path
+    # EGL/PCI — required by Playwright/Chromium GPU path (installed via internal_tools.sh)
     libpci-dev \
     libpciaccess-dev \
     libegl-dev \
@@ -249,11 +269,13 @@ RUN apt-get update -y && \
     geoip-database \
     patch \
     bsdmainutils \
-    # Build tools — required by pip (C extensions) and gem installs
+    # Build tools — required by pip (C extensions) and gem installs at runtime
     build-essential \
     cmake \
     ninja-build \
     gcc \
+    fping \
+    arp-scan \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
@@ -297,180 +319,58 @@ COPY --from=executor-builder /usr/local/bin/r3ngine-executor /usr/local/bin/r3ng
 # Vigolium — web vulnerability scanner (built separately due to Go 1.26 + bun requirement)
 COPY --from=vigolium-builder /usr/local/bin/vigolium /usr/local/bin/vigolium
 
-# ---------------------------------------------------------------------------
-# Install pre-built binary tools (no compilation needed at runtime)
-# ---------------------------------------------------------------------------
-
-# Trufflehog — secret scanning binary
-RUN ARCH=$(dpkg --print-architecture) && \
-    TRUFFLEHOG_VERSION=$(curl -s https://api.github.com/repos/trufflesecurity/trufflehog/releases/latest | jq -r .tag_name | sed 's/v//') && \
-    wget -q "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH}.tar.gz" && \
-    tar -xf "trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH}.tar.gz" trufflehog && \
-    mv trufflehog /usr/local/bin/ && \
-    rm -f "trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH}.tar.gz"
-
-# k6 — load/stress testing tool
-RUN ARCH=$(dpkg --print-architecture) && \
-    K6_VERSION="0.50.0" && \
-    if [ "${ARCH}" = "arm64" ]; then K6_ARCH="arm64"; else K6_ARCH="amd64"; fi && \
-    wget -q "https://github.com/grafana/k6/releases/download/v${K6_VERSION}/k6-v${K6_VERSION}-linux-${K6_ARCH}.tar.gz" && \
-    tar -xf "k6-v${K6_VERSION}-linux-${K6_ARCH}.tar.gz" "k6-v${K6_VERSION}-linux-${K6_ARCH}/k6" && \
-    mv "k6-v${K6_VERSION}-linux-${K6_ARCH}/k6" /usr/local/bin/ && \
-    rm -rf "k6-v${K6_VERSION}-linux-${K6_ARCH}"*
-
-# Brutus — HTTP brute force tool
-RUN curl -L https://github.com/praetorian-inc/brutus/releases/latest/download/brutus-linux-amd64.tar.gz | \
-    tar xz && mv brutus /usr/local/bin/
-
 # Dalfox v3 — XSS scanner (Rust rewrite; built from source in dalfox-builder stage)
 COPY --from=dalfox-builder /usr/local/bin/dalfox /usr/local/bin/dalfox
 
-# Aquatone — visual recon / screenshot tool (needs Chromium at runtime)
-RUN ARCH=$(dpkg --print-architecture) && \
-    wget -q "https://github.com/michenriksen/aquatone/releases/download/v1.7.0/aquatone_linux_${ARCH}_1.7.0.zip" && \
-    unzip -o "aquatone_linux_${ARCH}_1.7.0.zip" aquatone && \
-    mv aquatone /usr/local/bin/ && \
-    rm -f "aquatone_linux_${ARCH}_1.7.0.zip"
-
-# WPScan — WordPress vulnerability scanner
-RUN gem install wpscan --no-document
-
-# GooFuzz — Google-dork based fuzzer (shell script, no compilation)
-RUN mkdir -p /usr/src/github && \
-    wget -q -O /tmp/GooFuzz.zip "https://github.com/m3n0sd0n4ld/GooFuzz/releases/download/1.2.6/GooFuzz.v.1.2.6.zip" && \
-    unzip -q /tmp/GooFuzz.zip -d /tmp/goofuzz_extract && \
-    mv /tmp/goofuzz_extract/GooFuzz.v.1.2.6 /usr/src/github/goofuzz && \
-    chmod +x /usr/src/github/goofuzz/GooFuzz && \
-    rm -rf /tmp/GooFuzz.zip /tmp/goofuzz_extract
+# ---------------------------------------------------------------------------
+# Searchsploit — offline Exploit-DB CLI search
+# The exploit-db repo is cloned into the exploitdb volume at container start
+# (by the temporal-python-orchestrator entrypoint). We just pre-create the
+# mount point and symlink so the CLI is on PATH when the volume is populated.
+# ---------------------------------------------------------------------------
+RUN mkdir -p /usr/src/exploitdb && \
+    ln -sf /usr/src/exploitdb/searchsploit /usr/local/bin/searchsploit
 
 WORKDIR /usr/src/app
 
 # ---------------------------------------------------------------------------
-# Clone Python-based security tools
-# All clones are shallow (--depth 1) and .git directories are removed after
-# installation to eliminate full git history from the image.
+# Core pip3 bootstrap — must come BEFORE requirements.txt so that
+# pkg_resources (part of setuptools) is available when packages like
+# playwright_stealth are installed and later imported at Django startup.
 # ---------------------------------------------------------------------------
-RUN git clone --depth 1 https://github.com/smicallef/spiderfoot /usr/src/github/spiderfoot && \
-    pip3 install --no-cache-dir -r /usr/src/github/spiderfoot/requirements.txt && \
-    rm -rf /usr/src/github/spiderfoot/.git
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install --upgrade pip setuptools wheel pyOpenSSL h8mail
 
-RUN git clone --depth 1 https://github.com/assetnote/cpanel2shell-scanner /usr/src/github/cpanel2shell-scanner && \
-    pip3 install --no-cache-dir -r /usr/src/github/cpanel2shell-scanner/requirements.txt && \
-    rm -rf /usr/src/github/cpanel2shell-scanner/.git
-
-RUN git clone --depth 1 https://github.com/assetnote/react2shell-scanner /usr/src/github/react2shell-scanner && \
-    pip3 install --no-cache-dir -r /usr/src/github/react2shell-scanner/requirements.txt && \
-    rm -rf /usr/src/github/react2shell-scanner/.git
-
-RUN git clone --depth 1 https://github.com/UnaPibaGeek/ctfr /usr/src/github/ctfr && \
-    pip3 install --no-cache-dir -r /usr/src/github/ctfr/requirements.txt && \
-    rm -rf /usr/src/github/ctfr/.git
-
-RUN git clone --depth 1 https://github.com/urbanadventurer/username-anarchy /usr/src/github/username-anarchy && \
-    ln -sf /usr/src/github/username-anarchy/username-anarchy /usr/local/bin/username-anarchy
-
-RUN git clone --depth 1 https://github.com/WazeHell/acunetix-python /usr/src/github/acunetix-python && \
-    pip3 install --no-cache-dir /usr/src/github/acunetix-python && \
-    rm -rf /usr/src/github/acunetix-python/.git
-
-RUN git clone --depth 1 https://github.com/shmilylty/OneForAll /usr/src/github/OneForAll && \
-    pip3 install --no-cache-dir -r /usr/src/github/OneForAll/requirements.txt && \
-    rm -rf /usr/src/github/OneForAll/.git
-
-RUN git clone --depth 1 https://github.com/aboul3la/Sublist3r /usr/src/github/Sublist3r && \
-    pip3 install --no-cache-dir -r /usr/src/github/Sublist3r/requirements.txt && \
-    rm -rf /usr/src/github/Sublist3r/.git
-
-RUN git clone --depth 1 https://github.com/laramies/theHarvester /usr/src/github/theHarvester && \
-    cd /usr/src/github/theHarvester && uv sync && \
-    rm -rf /usr/src/github/theHarvester/.git
-
-RUN git clone --depth 1 https://github.com/devanshbatham/ParamSpider /usr/src/github/ParamSpider && \
-    cd /usr/src/github/ParamSpider && pip3 install --no-cache-dir . && \
-    rm -rf /usr/src/github/ParamSpider/.git
-
-RUN git clone --depth 1 https://github.com/GerbenJavado/LinkFinder.git /usr/src/github/LinkFinder && \
-    pip3 install --no-cache-dir -r /usr/src/github/LinkFinder/requirements.txt && \
-    cd /usr/src/github/LinkFinder && python3 setup.py install && \
-    rm -rf /usr/src/github/LinkFinder/.git
-
-RUN git clone --depth 1 https://github.com/Tuhinshubhra/CMSeeK /usr/src/github/CMSeeK && \
-    pip3 install --no-cache-dir -r /usr/src/github/CMSeeK/requirements.txt && \
-    rm -rf /usr/src/github/CMSeeK/.git
-
-RUN git clone --depth 1 https://github.com/drwetter/testssl.sh /usr/src/github/testssl.sh && \
-    chmod +x /usr/src/github/testssl.sh/testssl.sh && \
-    ln -sf /usr/src/github/testssl.sh/testssl.sh /usr/local/bin/testssl.sh
-
-RUN git clone --depth 1 https://github.com/ticarpi/jwt_tool /usr/src/github/jwt_tool && \
-    pip3 install --no-cache-dir -r /usr/src/github/jwt_tool/requirements.txt && \
-    rm -rf /usr/src/github/jwt_tool/.git
+# pipx is installed here so it is available inside internal_tools.sh at runtime.
+RUN python3 -m pip install pipx
 
 # ---------------------------------------------------------------------------
-# Install Python security tools via pip (no source clone needed)
-#
-# Tools with no version conflicts are installed into system site-packages.
-# Tools that conflict with each other or with the Django app's requirements
-# (dirsearch, maigret, semgrep) are isolated in their own pipx virtual
-# environments so their transitive dependencies cannot clash.
-#
-# Conflicts resolved by pipx isolation:
-#   dirsearch 0.4.3.post1 — requires requests>=2.27.0  (system: 2.25.1)
-#   maigret   0.6.1       — requires requests>=2.32.4, chardet>=5, idna>=3.4
-#   semgrep   1.165.0     — requires urllib3~=2.0       (system: 1.26.x)
-#
-# /root/.local/bin is already on PATH (set earlier in this Dockerfile), so
-# all pipx shims are immediately available to subsequent RUN steps and at
-# container runtime without any additional PATH configuration.
-# ---------------------------------------------------------------------------
-RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel pyOpenSSL h8mail && \
-    pip3 install --no-cache-dir --upgrade fierce dirsearch meson ninja arjun inql netlas holehe
-
-# Ensure pipx is available and install baddns
-RUN python3 -m pip install --no-cache-dir pipx && \
-    pipx install git+https://github.com/blacklanternsecurity/baddns
-
-# Install conflicting tools in isolated pipx environments.
-# Each venv gets setuptools installed via its own pip to guarantee pkg_resources
-# is available under Python 3.12 (pipx inject can be silently skipped by layer cache).
-RUN pipx install maigret && \
-    pipx inject maigret setuptools && \
-    pipx install semgrep && \
-    pipx inject semgrep setuptools && \
-    pipx install dnsrecon && \
-    pipx inject dnsrecon setuptools
-
-RUN git clone --depth 1 https://github.com/dolevf/graphql-cop.git /usr/src/github/graphql-cop \
-    && pip3 install --no-cache-dir -r /usr/src/github/graphql-cop/requirements.txt \
-    && rm -rf /usr/src/github/graphql-cop/.git
-
-RUN git clone --depth 1 https://github.com/cddmp/enum4linux-ng /usr/src/github/enum4linux-ng \
-    && pip3 install --no-cache-dir -r /usr/src/github/enum4linux-ng/requirements.txt \
-    && ln -sf /usr/src/github/enum4linux-ng/enum4linux-ng.py /usr/local/bin/enum4linux-ng \
-    && rm -rf /usr/src/github/enum4linux-ng/.git
-
-RUN git clone --depth 1 https://github.com/CiscoCXSecurity/rdp-sec-check /usr/src/github/rdp-sec-check \
-    && cpan install Encoding::BER \
-    && ln -sf /usr/src/github/rdp-sec-check/rdp-sec-check.pl /usr/local/bin/rdp-sec-check
-
-# ---------------------------------------------------------------------------
-# Copy and install the application's Python requirements
-# This layer is intentionally placed after tool installs so requirements.txt
-# changes don't invalidate the tool-install cache layers above.
+# Copy and install the application's Python requirements.
 # ---------------------------------------------------------------------------
 COPY web/requirements.txt /tmp/requirements.txt
-RUN pip3 install --no-cache-dir -r /tmp/requirements.txt --ignore-installed blinker
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install -r /tmp/requirements.txt --ignore-installed blinker
 
 # pip's httpx Python package installs a CLI wrapper at /usr/local/bin/httpx that
 # overwrites the ProjectDiscovery Go tool copied earlier. Restore the Go binary.
 COPY --from=go-tools-builder /go/bin/httpx /usr/local/bin/httpx
 
 # ---------------------------------------------------------------------------
-# Install Playwright Chromium (required for Aquatone screenshot capability)
+# Install Playwright Chromium — required at startup by opsec/LinkedIn
+# modules (playwright_stealth is imported when Django loads osint_tasks.py).
 # ---------------------------------------------------------------------------
 RUN playwright install-deps chromium && \
     playwright install chromium && \
-    ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome /usr/bin/chromium
+    ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome /usr/bin/chromium && \
+    rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
+# Copy internal_tools.sh — deferred installer for non-critical tools.
+# Called blocking from temporal-python-orchestrator and temporal-go-executor
+# entrypoints. NOT called from the web entrypoint.
+# ---------------------------------------------------------------------------
+COPY docker/web/internal_tools.sh /usr/src/app/internal_tools.sh
+RUN chmod +x /usr/src/app/internal_tools.sh
 
 # ---------------------------------------------------------------------------
 # Copy application source (placed last — changes most frequently, so layers
@@ -478,15 +378,10 @@ RUN playwright install-deps chromium && \
 # ---------------------------------------------------------------------------
 COPY web/ /usr/src/app/
 COPY docker/web/entrypoint.sh /usr/src/app/entrypoint.sh
+COPY docker/web/internal_tools.sh /usr/src/app/internal_tools.sh
 COPY docker/temporal-python-orchestrator/entrypoint.sh /usr/src/app/temporal-entrypoint.sh
 COPY docker/temporal-go-executor/entrypoint.sh /usr/src/app/executor-entrypoint.sh
-RUN chmod +x /usr/src/app/entrypoint.sh /usr/src/app/temporal-entrypoint.sh /usr/src/app/executor-entrypoint.sh
-
-#RUN mkdir -p /usr/src/app/frontend
-#COPY frontend/ /usr/src/app/frontend/
-#WORKDIR /usr/src/app/frontend
-#RUN npm install
-#WORKDIR /usr/src/app
+RUN chmod +x /usr/src/app/internal_tools.sh /usr/src/app/entrypoint.sh /usr/src/app/temporal-entrypoint.sh /usr/src/app/executor-entrypoint.sh
 
 # ---------------------------------------------------------------------------
 # Copy built frontend from frontend-builder

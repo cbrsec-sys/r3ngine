@@ -40,6 +40,7 @@ services:
     build:
       context: ./redis
     image: "redis:alpine"
+    command: redis-server --requirepass "${REDIS_PASSWORD}"
     hostname: redis
     networks:
       - r3ngine_network
@@ -61,7 +62,7 @@ services:
     environment:
       - DEBUG=${DEBUG:-0}
       - ALLOWED_HOSTS=${ALLOWED_HOSTS:-localhost,127.0.0.1}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - DOMAIN_NAME=${DOMAIN_NAME}
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
@@ -92,6 +93,7 @@ services:
       - ../secrets/certs/ca.crt:/usr/src/app/ca.crt:ro
       - /var/run/docker.sock:/var/run/docker.sock
       - ./web/entrypoint.sh:/usr/src/app/entrypoint.sh:ro
+      - exploitdb:/usr/src/exploitdb
     ports:
       - "8000:8000"
       - "5173:5173"
@@ -142,22 +144,6 @@ services:
         reservations:
           memory: 256M
 
-  # ollama:
-  #   image: ollama/ollama
-  #   container_name: ollama
-  #   volumes:
-  #     - ollama_data:/root/.ollama
-  #   ports:
-  #     - "11434:11434"
-  #   networks:
-  #     - r3ngine_network
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 4G
-  #       reservations:
-  #         memory: 2G
-
   neo4j:
     image: neo4j:5.12.0
     restart: always
@@ -167,6 +153,9 @@ services:
     environment:
       - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD}
       - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_server_memory_heap_initial__size=768M
+      - NEO4J_server_memory_heap_max__size=1536M
+      - NEO4J_server_memory_pagecache_size=512M
     volumes:
       - neo4j_data:/data
     networks:
@@ -205,7 +194,6 @@ services:
     restart: always
     ports:
       - "127.0.0.1:7233:7233"
-      - "127.0.0.1:8233:8233"
     environment:
       - DB=postgresql
       - DB_PORT=5432
@@ -231,6 +219,7 @@ services:
         reservations:
           memory: 1G
 
+
   temporal-python-orchestrator:
     image: docker.pkg.github.com/whiterabb17/r3ngine/r3ngine:latest
     restart: always
@@ -247,7 +236,7 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_SSLMODE=${POSTGRES_SSLMODE}
       - DOMAIN_NAME=${DOMAIN_NAME}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - NEO4J_URI=${NEO4J_URI}
       - NEO4J_USER=${NEO4J_USER}
       - NEO4J_PASSWORD=${NEO4J_PASSWORD}
@@ -268,6 +257,7 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       - ./temporal-python-orchestrator/entrypoint.sh:/usr/src/app/temporal-entrypoint.sh:ro
+      - exploitdb:/usr/src/exploitdb
     networks:
       - r3ngine_network
     healthcheck:
@@ -291,7 +281,7 @@ services:
     environment:
       - TEMPORAL_HOST=temporal:7233
       - TEMPORAL_NAMESPACE=default
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@redis:6379/0
       - POSTGRES_DB=${POSTGRES_DB}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
@@ -312,6 +302,7 @@ services:
       - tool_config:/root/.config
       - static_volume:/usr/src/app/staticfiles/
       - ./temporal-go-executor/entrypoint.sh:/usr/src/app/executor-entrypoint.sh:ro
+      - exploitdb:/usr/src/exploitdb
     networks:
       - r3ngine_network
     healthcheck:
@@ -323,7 +314,7 @@ services:
     deploy:
       resources:
         limits:
-          memory: 20G
+          memory: 12G
         reservations:
           memory: 5G
     #memswap_limit: 9G
@@ -354,6 +345,8 @@ volumes:
     name: r3ngine_neo4j_data
   plugins_data:
     name: r3ngine_plugins_data
+  exploitdb:
+    name: r3ngine_exploitdb
 
 secrets:
   proxy.ca:

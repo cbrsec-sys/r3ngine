@@ -1,0 +1,94 @@
+# Category R — Email Security (8 rules)
+rules:
+
+  - name: spf_dmarc_bypass_to_email_spoofing
+    mitre_id: "T1566.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: spf_dmarc_bypass
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: email_spoofing
+        confidence: 0.80
+
+  - name: spf_dmarc_bypass_to_phishing_amplification
+    mitre_id: "T1566.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: spf_dmarc_bypass
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: phishing_amplification
+        confidence: 0.75
+
+  - name: email_header_injection_to_phishing
+    mitre_id: "T1566.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: email_header_injection
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: phishing_amplification
+        confidence: 0.70
+
+  - name: email_header_injection_to_account_takeover
+    mitre_id: "T1566.001"
+    if:
+      node.type: Vulnerability
+      node.subtype: email_header_injection
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: account_takeover
+        confidence: 0.65
+        requires_victim: true
+
+  - name: email_account_compromise_to_lateral_movement
+    mitre_id: "T1078.003"
+    if:
+      node.type: Capability
+      node.subtype: email_account_compromise
+      node.property: "validated:True"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: lateral_movement
+        confidence: 0.85
+
+  - name: email_account_compromise_to_credential_harvesting
+    mitre_id: "T1078.003"
+    if:
+      node.type: Capability
+      node.subtype: email_account_compromise
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: credential_harvesting
+        confidence: 0.80
+
+  - name: email_spoofing_to_hvt_compromise
+    mitre_id: "T1566.001"
+    if:
+      node.type: Capability
+      node.subtype: email_spoofing
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: hvt_compromise
+        confidence: 0.70
+        requires_victim: true
+
+  - name: mx_misconfig_to_email_spoofing
+    mitre_id: "T1584.002"
+    if:
+      node.type: Vulnerability
+      node.subtype: misconfig
+      node.property: "severity:>=2"
+    then:
+      create_edge:
+        type: LEADS_TO
+        target_subtype: email_spoofing
+        confidence: 0.65

@@ -242,8 +242,7 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
 
     if modules:
         cmd += f" -m {','.join(modules)}"
-    #if severity_filter:
-        cmd += f" --known-issue-scan-severities critical,high,medium,low,info " #{','.join(severity_filter)}"
+
 
     proxy = get_random_proxy()
     if proxy:
@@ -254,11 +253,11 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
 
 
 def vigolium_discovery(self, ctx={}, description=None):
-    """Run vigolium endpoint discovery for each subdomain at Tier 2.
+    """Run vigolium endpoint discovery for all subdomains in a single tool call.
 
-    Runs the ingestion + discovery phases to find paths and endpoints that
-    feed the endpoint DB before Tier 3-6 processing. Saves http_records as
-    EndPoint entries for downstream pipeline stages to consume.
+    Passes all subdomain targets via -T (targets file) so vigolium handles
+    concurrency internally rather than spawning one process per subdomain.
+    Saves http_records as EndPoint entries for downstream pipeline stages.
     """
     logger.info("Starting Vigolium Discovery")
 
@@ -273,49 +272,52 @@ def vigolium_discovery(self, ctx={}, description=None):
     timeout = _ensure_duration(discovery_config.get(VIGOLIUM_TIMEOUT, '10s'))
 
     if self.subscan and self.subdomain:
-        subdomains = Subdomain.objects.filter(pk=self.subdomain.id)
+        subdomains = list(Subdomain.objects.filter(pk=self.subdomain.id))
     else:
-        subdomains = Subdomain.objects.filter(scan_history=self.scan)
+        subdomains = list(Subdomain.objects.filter(scan_history=self.scan))
 
-    if not subdomains.exists():
+    if not subdomains:
         logger.info("No subdomains found for Vigolium discovery.")
         return
 
     results_dir = f"{self.scan.results_dir}/vigolium/discovery"
     os.makedirs(results_dir, exist_ok=True)
 
-    for subdomain in subdomains:
-        target = f"https://{subdomain.name}"
-        output_file = f"{results_dir}/{subdomain.name}_discovery.jsonl"
+    targets_file = f"{results_dir}/targets.txt"
+    with open(targets_file, 'w') as f:
+        for subdomain in subdomains:
+            f.write(f"https://{subdomain.name}\n")
 
-        cmd = (
-            f"vigolium scan"
-            f" -t {target}"
-            f" --stateless"
-            f" --format jsonl"
-            f" -o {output_file}"
-            f" --only ingestion,discovery"
-            f" -c {concurrency}"
-            f" -r {rate_limit}"
-            f" --timeout {timeout}"
-            f" --strategy {strategy}"
-            f" --skip-dependency-check"
-        )
+    output_file = f"{results_dir}/discovery.jsonl"
 
-        proxy = get_random_proxy()
-        if proxy:
-            cmd += f" --proxy {proxy}"
+    cmd = (
+        f"vigolium scan"
+        f" -T {targets_file}"
+        f" --stateless"
+        f" --format jsonl"
+        f" -o {output_file}"
+        f" --only ingestion,discovery"
+        f" -c {concurrency}"
+        f" -r {rate_limit}"
+        f" --timeout {timeout}"
+        f" --strategy {strategy}"
+        f" --skip-dependency-check"
+    )
 
-        _run_vigolium_phase(self, cmd, output_file, f"Discovery ({subdomain.name})", save_http_records=True)
+    proxy = get_random_proxy()
+    if proxy:
+        cmd += f" --proxy {proxy}"
+
+    _run_vigolium_phase(self, cmd, output_file, f"Discovery ({len(subdomains)} targets)", save_http_records=True)
 
     return "Vigolium discovery completed"
 
 
 def vigolium_analysis(self, ctx={}, description=None):
-    """Run vigolium dynamic assessment for each subdomain at Tier 5.
+    """Run vigolium dynamic assessment for all subdomains in a single tool call.
 
-    Runs the dynamic-assessment phase (passive + active module scanning)
-    in parallel with web_api_discovery to find security weaknesses.
+    Passes all subdomain targets via -T (targets file) so vigolium handles
+    concurrency internally rather than spawning one process per subdomain.
     Saves findings as Vulnerability records and discovered URLs as EndPoints.
     """
     logger.info("Starting Vigolium Dynamic Analysis")
@@ -331,40 +333,43 @@ def vigolium_analysis(self, ctx={}, description=None):
     timeout = _ensure_duration(analysis_config.get(VIGOLIUM_TIMEOUT, '10s'))
 
     if self.subscan and self.subdomain:
-        subdomains = Subdomain.objects.filter(pk=self.subdomain.id)
+        subdomains = list(Subdomain.objects.filter(pk=self.subdomain.id))
     else:
-        subdomains = Subdomain.objects.filter(scan_history=self.scan)
+        subdomains = list(Subdomain.objects.filter(scan_history=self.scan))
 
-    if not subdomains.exists():
+    if not subdomains:
         logger.info("No subdomains found for Vigolium analysis.")
         return
 
     results_dir = f"{self.scan.results_dir}/vigolium/analysis"
     os.makedirs(results_dir, exist_ok=True)
 
-    for subdomain in subdomains:
-        target = f"https://{subdomain.name}"
-        output_file = f"{results_dir}/{subdomain.name}_analysis.jsonl"
+    targets_file = f"{results_dir}/targets.txt"
+    with open(targets_file, 'w') as f:
+        for subdomain in subdomains:
+            f.write(f"https://{subdomain.name}\n")
 
-        cmd = (
-            f"vigolium scan"
-            f" -t {target}"
-            f" --stateless"
-            f" --format jsonl"
-            f" -o {output_file}"
-            f" --only dynamic-assessment"
-            f" -c {concurrency}"
-            f" -r {rate_limit}"
-            f" --timeout {timeout}"
-            f" --strategy {strategy}"
-            f" --skip-dependency-check"
-            f" --omit-response"
-        )
+    output_file = f"{results_dir}/analysis.jsonl"
 
-        proxy = get_random_proxy()
-        if proxy:
-            cmd += f" --proxy {proxy}"
+    cmd = (
+        f"vigolium scan"
+        f" -T {targets_file}"
+        f" --stateless"
+        f" --format jsonl"
+        f" -o {output_file}"
+        f" --only dynamic-assessment"
+        f" -c {concurrency}"
+        f" -r {rate_limit}"
+        f" --timeout {timeout}"
+        f" --strategy {strategy}"
+        f" --skip-dependency-check"
+        f" --omit-response"
+    )
 
-        _run_vigolium_phase(self, cmd, output_file, f"Analysis ({subdomain.name})", save_http_records=True)
+    proxy = get_random_proxy()
+    if proxy:
+        cmd += f" --proxy {proxy}"
+
+    _run_vigolium_phase(self, cmd, output_file, f"Analysis ({len(subdomains)} targets)", save_http_records=True)
 
     return "Vigolium analysis completed"

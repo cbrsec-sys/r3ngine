@@ -17,6 +17,7 @@
         enable_http_crawl: true
         threads: 30
         timeout: 90
+        bbot: true
       firewall_vpn_scan:
         run_ike_scan: true
         run_sslscan: true
@@ -33,12 +34,12 @@
         enable_http_crawl: true
         timeout: 5
         ports:
-          - top-1000
+          - top-100
         rate_limit: 150
         threads: 20
         passive: false
         enable_nmap: true
-        nmap_cmd: nmap -vv -Pn -sV
+        nmap_cmd: nmap -vv -Pn -sC 
         nmap_script: /usr/share/nmap/scripts/vulners.nse
         enable_network_enum: true
       osint:
@@ -95,13 +96,13 @@
           - yml
           - pdf
         follow_redirect: true
-        max_time: 750
+        max_time: 300
         match_http_status:
           - 200
           - 204
         recursive_level: 2
         stop_on_error: false
-        timeout: 600
+        timeout: 30
         threads: 20
         wordlist_name: dicc
         use_api_wordlist: false
@@ -142,6 +143,7 @@
         threads: 20
       web_api_discovery:
         uses_tools:
+          - kiterunner
           - arjun
           - linkfinder
           - paramspider
@@ -151,14 +153,15 @@
           - graphql-cop
         scan_only_active: true
         threads: 30
-        kiterunner_wordlist: routes-small.kr
+        kr_wordlist: routes-small.kite
         arjun_methods: GET,POST,JSON,XML,FETCH,PUT,DELETE,PATCH
       vulnerability_scan:
         run_nuclei: true
         run_dalfox: true
-        run_crlfuzz: true
+        run_crlfuzz: false
         run_acunetix: false
         run_wpscan: true
+        run_wptaint_scan: true
         run_s3scanner: true
         enable_http_crawl: true
         concurrency: 30
@@ -216,3 +219,30 @@
         trufflehog: true
         gitleaks: true
         leaklookup: true
+      code_scan:
+        grype: true
+        trivy: true
+      cidr_recon:
+        use_arp: false
+      host_recon:
+        run_nuclei: true
+      url_fuzz:
+        fuzzers:
+          - ffuf
+          - feroxbuster
+        hunt_secrets: true
+      url_crawl:
+        passive: false
+        active: false
+        hunt_secrets: true
+      url_params_fuzz:
+        fuzz_values: true
+        hunt_secrets: true
+      url_vuln:
+        nuclei: true
+      subdomain_recon:
+        passive: false
+        brute_dns: true
+        bbot: true
+      domain_recon:
+        passive: false

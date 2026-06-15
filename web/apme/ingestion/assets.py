@@ -197,3 +197,90 @@ def ingest_endpoints(target_id: int) -> Tuple[List[Node], List[Edge]]:
         f"APME Ingestion [endpoints]: {len(nodes)} nodes, {len(edges)} edges"
     )
     return nodes, edges
+
+
+# Technology subtype detection: keyword → APME subtype
+_TECH_SUBTYPE_MAP = {
+    "wordpress": "wordpress",
+    "wp-": "wordpress",
+    "drupal": "generic",
+    "joomla": "generic",
+    "php": "php",
+    "java": "java",
+    "spring": "spring",
+    "jenkins": "jenkins",
+    "python": "python",
+    "django": "python",
+    "flask": "python",
+    "node": "nodejs",
+    "express": "nodejs",
+    "nginx": "nginx",
+    "apache": "apache",
+}
+
+
+def _infer_tech_subtype(tech_name: str) -> str:
+    name_lower = tech_name.lower()
+    for keyword, subtype in _TECH_SUBTYPE_MAP.items():
+        if keyword in name_lower:
+            return subtype
+    return "generic"
+
+
+def ingest_technologies(target_id: int) -> Tuple[List[Node], List[Edge]]:
+    """
+    Ingests detected Technology records for a given target domain.
+
+    Creates Technology APME nodes and USES_TECH edges from Asset nodes.
+    Technology nodes enable tech-specific attack rules (e.g. WordPress → RCE,
+    Java → deserialization) via constraint engine context flags.
+    """
+    from startScan.models import Subdomain
+
+    nodes: List[Node] = []
+    edges: List[Edge] = []
+
+    subdomains = Subdomain.objects.filter(
+        target_domain_id=target_id
+    ).prefetch_related("technologies")
+
+    seen_tech_ids: set = set()
+
+    for sub in subdomains:
+        asset_node_id = _make_id("domain", sub.name)
+
+        for tech in sub.technologies.all():
+            tech_node_id = _make_id("tech", str(tech.id))
+            subtype = _infer_tech_subtype(tech.name)
+
+            if tech_node_id not in seen_tech_ids:
+                nodes.append(Node(
+                    id=tech_node_id,
+                    type="Technology",
+                    subtype=subtype,
+                    confidence=1.0,
+                    source="reNgine:technology_detection",
+                    properties={
+                        "name": tech.name,
+                        "version": getattr(tech, "version", "") or "",
+                        "target_id": target_id,
+                    },
+                ))
+                seen_tech_ids.add(tech_node_id)
+
+            try:
+                edges.append(Edge(
+                    from_id=asset_node_id,
+                    to_id=tech_node_id,
+                    type="USES_TECH",
+                    confidence=1.0,
+                    properties={"tech_name": tech.name},
+                ))
+            except ValueError as exc:
+                logger.warning("APME Ingestion [tech]: %s", exc)
+
+    logger.info(
+        "APME Ingestion [technologies]: %d nodes, %d edges (target_id=%s)",
+        len(nodes), len(edges), target_id,
+    )
+    return nodes, edges

@@ -46,6 +46,9 @@ import {
   useUpdateLlmSettings,
   useOllamaPullStatus,
   useTestLlmConnection,
+  useOllamaServiceStatus,
+  useStartOllamaService,
+  useStopOllamaService,
 } from '../api';
 import type { LLMConfig, LLMModel, TestLlmConnectionResult } from '../api';
 
@@ -56,6 +59,9 @@ export const LlmToolkitPage: React.FC = () => {
   const { data: toolkit, isLoading: isToolkitLoading } = useLlmToolkit(projectSlug);
   const updateSettings = useUpdateLlmSettings(projectSlug);
   const testConnection = useTestLlmConnection(projectSlug);
+  const { data: ollamaStatus } = useOllamaServiceStatus(projectSlug);
+  const startOllama = useStartOllamaService(projectSlug);
+  const stopOllama = useStopOllamaService(projectSlug);
 
   const [selectedProvider, setSelectedProvider] = useState<string>('ollama');
   const [showKey, setShowKey] = useState(false);
@@ -193,6 +199,44 @@ export const LlmToolkitPage: React.FC = () => {
     });
   };
 
+  const handleStartOllama = () => {
+    startOllama.mutate(undefined, {
+      onSuccess: (data) => {
+        setSnackbar({
+          open: true,
+          message: data.message || 'Ollama service starting...',
+          severity: 'success',
+        });
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: `Failed to start Ollama: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          severity: 'error',
+        });
+      }
+    });
+  };
+
+  const handleStopOllama = () => {
+    stopOllama.mutate(undefined, {
+      onSuccess: (data) => {
+        setSnackbar({
+          open: true,
+          message: data.message || 'Ollama service stopped.',
+          severity: 'info',
+        });
+      },
+      onError: (error: any) => {
+        setSnackbar({
+          open: true,
+          message: `Failed to stop Ollama: ${error?.response?.data?.message || error.message || 'Unknown error'}`,
+          severity: 'error',
+        });
+      }
+    });
+  };
+
   const currentModel = models?.find(m => m.name === form.selected_model);
   const providers = [
     { id: 'ollama', name: 'Ollama (Local)', icon: <Database size={18} /> },
@@ -295,6 +339,77 @@ export const LlmToolkitPage: React.FC = () => {
             }
           >
             <Stack spacing={4}>
+              {/* Ollama Service Controls */}
+              {selectedProvider === 'ollama' && (
+                <Box sx={{ 
+                  p: 2, 
+                  borderRadius: '12px', 
+                  bgcolor: 'rgba(0,0,0,0.2)', 
+                  border: '1px solid rgba(255,255,255,0.05)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  flexWrap: 'wrap',
+                  gap: 2
+                }}>
+                  <Box>
+                    <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 0.5, fontFamily: 'Orbitron' }}>
+                      OLLAMA SERVICE STATUS
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      {ollamaStatus?.running ? (
+                        <CheckCircle2 size={16} color="#00f3ff" />
+                      ) : (
+                        <AlertCircle size={16} color="#ff3131" />
+                      )}
+                      <Typography sx={{ 
+                        fontSize: '0.85rem', 
+                        fontWeight: 600,
+                        color: ollamaStatus?.running ? '#00f3ff' : '#ff3131' 
+                      }}>
+                        {ollamaStatus?.running ? 'RUNNING' : 'STOPPED'}
+                      </Typography>
+                    </Box>
+                  </Box>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    {!ollamaStatus?.running ? (
+                      <Button
+                        variant="contained"
+                        onClick={handleStartOllama}
+                        disabled={startOllama.isPending}
+                        startIcon={startOllama.isPending ? <CircularProgress size={14} color="inherit" /> : <Database size={16} />}
+                        sx={{
+                          bgcolor: 'rgba(0, 243, 255, 0.1)',
+                          color: '#00f3ff',
+                          border: '1px solid rgba(0, 243, 255, 0.3)',
+                          fontFamily: 'Orbitron',
+                          fontSize: '0.75rem',
+                          '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                        }}
+                      >
+                        {startOllama.isPending ? 'STARTING...' : 'START LOCAL SERVICE'}
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="outlined"
+                        onClick={handleStopOllama}
+                        disabled={stopOllama.isPending}
+                        startIcon={stopOllama.isPending ? <CircularProgress size={14} color="inherit" /> : <XCircle size={16} />}
+                        sx={{
+                          borderColor: 'rgba(255, 49, 49, 0.3)',
+                          color: '#ff3131',
+                          fontFamily: 'Orbitron',
+                          fontSize: '0.75rem',
+                          '&:hover': { borderColor: '#ff3131', bgcolor: 'rgba(255, 49, 49, 0.05)' }
+                        }}
+                      >
+                        {stopOllama.isPending ? 'STOPPING...' : 'STOP LOCAL SERVICE'}
+                      </Button>
+                    )}
+                  </Box>
+                </Box>
+              )}
+
               {/* API Key / Host URL */}
               <Box>
                 <Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.75rem', mb: 1, fontFamily: 'Orbitron' }}>
@@ -352,7 +467,7 @@ export const LlmToolkitPage: React.FC = () => {
                   fullWidth
                   value={form.selected_model}
                   onChange={(e) => setForm({ ...form, selected_model: e.target.value })}
-                  disabled={isModelsLoading}
+                  disabled={isModelsLoading || (selectedProvider === 'ollama' && !ollamaStatus?.running)}
                   sx={{
                     '& .MuiOutlinedInput-root': {
                       color: '#fff',
@@ -430,7 +545,7 @@ export const LlmToolkitPage: React.FC = () => {
                   variant="outlined"
                   startIcon={testConnection.isPending ? <CircularProgress size={16} sx={{ color: '#a78bfa' }} /> : <Wifi size={20} />}
                   onClick={handleTest}
-                  disabled={testConnection.isPending}
+                  disabled={testConnection.isPending || (selectedProvider === 'ollama' && !ollamaStatus?.running)}
                   sx={{
                     borderColor: 'rgba(167, 139, 250, 0.3)',
                     color: '#a78bfa',

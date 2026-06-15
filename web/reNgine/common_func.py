@@ -145,7 +145,7 @@ def get_subdomains(write_filepath=None, exclude_subdomains=False, ctx={}):
 		if subdomain.name
 	]
 	if not subdomains:
-		logger.error('No subdomains were found in query !')
+		logger.error('No subdomains were found in query')
 
 	if url_filter:
 		subdomains = [f'{subdomain}/{url_filter}' for subdomain in subdomains]
@@ -357,7 +357,7 @@ def get_http_urls(
 		endpoints = [e for e in endpoints if not urlparse(e).path.endswith(extensions)]
 
 	if not endpoints:
-		logger.error(f'No endpoints were found in query !')
+		logger.error('No endpoints were found in query')
 
 	if write_filepath:
 		with open(write_filepath, 'w') as f:
@@ -723,7 +723,7 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 				is_suppressed = True
 				break
 	except Exception as e:
-		logger.error(f"Error checking FP rules: {e}")
+		logger.error("Error checking FP rules: %s", e)
 
 	if is_suppressed:
 		vuln_data['is_suppressed'] = True
@@ -772,7 +772,7 @@ def save_vulnerability(vuln_data=None, scan_history=None, target_domain=None, de
 						tech_hint=name
 					)
 			except Exception as e:
-				logger.error(f"Error registering AuthCandidate from vulnerability {name}: {e}")
+				logger.error("Error registering AuthCandidate from vulnerability %s: %s", name, e)
 	elif exploit_url and not vuln.exploit_url:
 		vuln.exploit_url = exploit_url
 		vuln.save()
@@ -929,7 +929,7 @@ def validate_proxies(proxy_text):
 	valid_proxies = []
 	max_workers = min(1000, max(1, len(raw_proxies)))
 	with ThreadPoolExecutor(max_workers=max_workers) as executor:
-		future_to_proxy = {executor.submit(check_proxy_robust, p, 10): p for p in raw_proxies}
+		future_to_proxy = {executor.submit(check_proxy_robust, p, 15): p for p in raw_proxies}
 		for future in as_completed(future_to_proxy):
 			proxy_name = future_to_proxy[future]
 			try:
@@ -976,7 +976,7 @@ def get_random_user_agent():
 		if opsec and opsec.enable_random_ua:
 			return random.choice(_USER_AGENT_POOL)
 	except Exception as e:
-		logger.warning(f'get_random_user_agent: could not read OpSec settings: {e}')
+		logger.warning('get_random_user_agent: could not read OpSec settings: %s', e)
 	return _DEFAULT_USER_AGENT
 
 
@@ -1034,6 +1034,27 @@ def get_random_proxy():
 	logger.error('No valid proxies found in the list!')
 	return ''
 
+def get_proxy_list():
+	"""Get a list of all proxies input by the user in the UI.
+	Does not validate if they are alive.
+	
+	Returns:
+		list: List of proxy names or [] if no proxy defined or use_proxy is False,
+			  or if use_tor is True (since Tor uses proxychains).
+	"""
+	proxy = Proxy.objects.first()
+	if not proxy or not proxy.use_proxy or proxy.use_tor:
+		return []
+
+	proxies = [p.strip() for p in proxy.proxies.splitlines() if p.strip()]
+	cleaned_proxies = []
+	for p in proxies:
+		if not p.startswith('http') and not p.startswith('socks'):
+			p = f"http://{p}"
+		cleaned_proxies.append(p)
+
+	return cleaned_proxies
+
 def remove_ansi_escape_sequences(text):
 	# Regular expression to match ANSI escape sequences
 	ansi_escape_pattern = r'\x1b\[.*?m'
@@ -1088,7 +1109,7 @@ def get_cms_details(url):
 		try:
 			shutil.rmtree(cms_dir_path)
 		except Exception as e:
-			logger.error(e)
+			logger.error("Failed to remove CMS scan directory %s: %s", cms_dir_path, e)
 
 	return response
 
@@ -1320,9 +1341,9 @@ def send_discord_message(
 				fields_append)
 	elif response.status_code != 200:
 		logger.error(
-			f'Error while sending webhook data to Discord.'
-			f'\n\tHTTP code: {response.status_code}.'
-			f'\n\tDetails: {response.content}')
+			'Error while sending webhook data to Discord. HTTP code: %s. Details: %s',
+			response.status_code,
+			response.content)
 
 
 def enrich_notification(message, scan_history_id, subscan_id):
@@ -1493,7 +1514,7 @@ def get_nmap_cmd(
 
 	is_nmap_valid = is_valid_nmap_command(cmd)
 	if not is_nmap_valid:
-		logger.error(f'Invalid nmap command or potentially dangerous: {cmd}')
+		logger.error('Invalid nmap command or potentially dangerous: %s', cmd)
 		return None
 
 	if not input_file:
@@ -1517,7 +1538,7 @@ def reverse_whois(lookup_keyword):
 		Input: lookup keyword like email or registrar name
 		Returns a list of domains as string.
 	'''
-	logger.info(f'Querying reverse whois for {lookup_keyword}')
+	logger.info('Querying reverse whois for %s', lookup_keyword)
 	url = f"https://viewdns.info:443/reversewhois/?q={lookup_keyword}"
 	headers = {
 		"Sec-Ch-Ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"104\"",
@@ -1545,7 +1566,7 @@ def reverse_whois(lookup_keyword):
 				continue
 			domains.append(dom)
 	except Exception as e:
-		logger.error(f'Error while fetching reverse whois info: {e}')
+		logger.error('Error while fetching reverse whois info: %s', e)
 	return domains
 
 
@@ -1555,7 +1576,7 @@ def get_domain_historical_ip_address(domain):
 		This function will use viewdns to fetch historical IP address
 		for a domain
 	'''
-	logger.info(f'Fetching historical IP address for domain {domain}')
+	logger.info('Fetching historical IP address for domain %s', domain)
 	url = f"https://viewdns.info/iphistory/?domain={domain}"
 	headers = {
 		"Sec-Ch-Ua": "\" Not A;Brand\";v=\"99\", \"Chromium\";v=\"104\"",
@@ -1621,25 +1642,32 @@ def parse_llm_vulnerability_report(report):
 	report = report.replace('**', '')
 	data = {}
 	sections = re.split(r'\n(?=(?:Description|Impact|Remediation|References):)', report.strip())
-	
-	try:
-		for section in sections:
-			if not section.strip():
-				continue
-			
-			section_title, content = re.split(r':\n', section.strip(), maxsplit=1)
-			
-			if section_title == 'Description':
-				data['description'] = content.strip()
-			elif section_title == 'Impact':
-				data['impact'] = content.strip()
-			elif section_title == 'Remediation':
-				data['remediation'] = content.strip()
-			elif section_title == 'References':
-				data['references'] = [ref.strip() for ref in content.split('\n') if ref.strip()]
-	except Exception as e:
-		return data
-	
+
+	for section in sections:
+		if not section.strip():
+			continue
+
+		# Accept "Header:\ncontent", "Header:\n\ncontent", or "Header: content on same line"
+		match = re.match(
+			r'^(Description|Impact|Remediation|References):\s*(.*)',
+			section.strip(),
+			re.DOTALL,
+		)
+		if not match:
+			continue
+
+		section_title = match.group(1)
+		content = match.group(2).strip()
+
+		if section_title == 'Description':
+			data['description'] = content
+		elif section_title == 'Impact':
+			data['impact'] = content
+		elif section_title == 'Remediation':
+			data['remediation'] = content
+		elif section_title == 'References':
+			data['references'] = [ref.strip() for ref in content.split('\n') if ref.strip()]
+
 	return data
 
 
@@ -1691,7 +1719,7 @@ def get_port_service_description(port):
 		Returns:
 			dict: A dictionary containing the service name and description for the port number.
 	"""
-	logger.info('Fetching Port Service Name and Description')
+	logger.info('Fetching port service name and description for port %s', port)
 	try:
 		port = int(port)
 		whatportis_result = whatportis.get_ports(str(port))
@@ -1769,7 +1797,7 @@ def exclude_urls_by_patterns(exclude_paths, urls):
 		Returns:
 			list of str: A new list containing URLs that don't match any exclusion pattern.
 	"""
-	logger.info('exclude_urls_by_patterns')
+	logger.info('Filtering %d URLs by %d exclusion patterns', len(urls), len(exclude_paths))
 	if not exclude_paths:
 		# if no exclude paths are passed and is empty list return all urls as it is
 		return urls
@@ -1895,7 +1923,7 @@ def extract_domain_info(domain):
 
 		domain_info['target'] = domain_name
 	except Exception as e:
-		logger.error(f'Error while extracting domain info: {e}')
+		logger.error('Error while extracting domain info: %s', e)
 		domain_info = DottedDict()
 
 	return domain_info
@@ -2300,7 +2328,7 @@ def get_ips_from_cidr_range(target):
 	try:
 		return [str(ip) for ip in ipaddress.IPv4Network(target, False)]
 	except Exception as e:
-		logger.error(f'{target} is not a valid CIDR range. Skipping.')
+		logger.error('%s is not a valid CIDR range. Skipping.', target)
 
 
 def is_valid_nmap_command(cmd):
@@ -2316,7 +2344,7 @@ def is_valid_nmap_command(cmd):
 	try:
 		parts = shlex.split(cmd)
 	except ValueError as e:
-		logger.error(f'Nmap command shlex split failed: {e}')
+		logger.error('Nmap command shlex split failed: %s', e)
 		return False
 
 	if not parts:
@@ -2324,26 +2352,26 @@ def is_valid_nmap_command(cmd):
 		return False
 
 	if not (parts[0] == 'nmap' or parts[0].endswith('/nmap') or parts[0].endswith('\\nmap') or parts[0].endswith('\\nmap.exe')):
-		logger.error(f'Nmap command does not start with nmap: {parts[0]}')
+		logger.error('Nmap command does not start with nmap: %s', parts[0])
 		return False
-	
+
 	# Block dangerous shell characters (potentially used with shell=True)
 	dangerous_chars = {';', '&', '|', '>', '<', '`', '$', '(', ')'}
 	if any(char in cmd for char in dangerous_chars):
-		logger.error(f'Nmap command contains dangerous characters: {cmd}')
+		logger.error('Nmap command contains dangerous characters: %s', cmd)
 		return False
-		
+
 	for part in parts[1:]: # ignoring nmap the first part of command
 		if part.startswith('-') or part.startswith('--'):
 			continue
-		
+
 		# check for valid characters, . - etc are allowed in valid nmap command
 		# adding : and = to support script args, port specifications and Windows paths
 		# adding [] for IPv6, @ for script-args, +!*# for general nmap flexibility
 		# adding space to support quoted arguments from shlex.split
 		if all(c.isalnum() or c in '.,/-_:=\\ []@+!*#' for c in part):
 			continue
-		logger.error(f'Nmap command part rejected by whitelist: {part}')
+		logger.error('Nmap command part rejected by whitelist: %s', part)
 		return False
 		
 	return True
@@ -2476,5 +2504,162 @@ def extract_params_from_url(url):
 					'type': 'URL Query'
 				})
 	except Exception as e:
-		logger.error(f"Error extracting parameters from URL {url}: {e}")
+		logger.error("Error extracting parameters from URL %s: %s", url, e)
 	return params
+
+
+_JWT_PARAM_RE = re.compile(
+	r'\b(jwt|bearer|authorization|access_token|refresh_token|id_token|auth_token)\b',
+	re.IGNORECASE,
+)
+_JWT_SECRET_TYPE_RE = re.compile(
+	r'jwt|json[\s_-]?web[\s_-]?token|bearer[\s_-]?token',
+	re.IGNORECASE,
+)
+
+# Paths probed to detect a GraphQL endpoint before running InQL / graphql-cop.
+_GRAPHQL_PROBE_PATHS = [
+	'/graphql',
+	'/api/graphql',
+	'/__graphql',
+	'/graphiql',
+	'/api/graphiql',
+	'/v1/graphql',
+]
+
+# Paths probed to detect an OpenAPI spec — mirrors openapi_discoverer._SPEC_PROBE_PATHS
+# so has_openapi_spec() and discover() cover the same set of paths.
+_OPENAPI_PROBE_PATHS = [
+	'/openapi.json',
+	'/openapi.yaml',
+	'/swagger.json',
+	'/swagger.yaml',
+	'/api-docs',
+	'/api-docs.json',
+	'/api/docs',
+	'/api/openapi.json',
+	'/api/swagger.json',
+	'/v1/api-docs',
+	'/v2/api-docs',
+	'/v3/api-docs',
+	'/docs/openapi.json',
+	'/.well-known/openapi.json',
+]
+
+_PROBE_HEADERS = {'User-Agent': 'r3ngine-probe/1.0'}
+_PROBE_TIMEOUT = 5  # seconds per HEAD request
+
+
+def has_graphql_endpoint(scan_id, url, proxy=None):
+	"""Return True if a GraphQL endpoint has been detected for this scan.
+
+	Checks existing EndPoint records first (zero network cost). Falls back to
+	HEAD-probing common GraphQL paths if the DB has no evidence.
+	"""
+	if EndPoint.objects.filter(
+		scan_history_id=scan_id,
+		http_url__iregex=r'/graphi?ql',
+	).exists():
+		return True
+
+	from urllib.parse import urlparse as _urlparse
+	parsed = _urlparse(url)
+	base = '%s://%s' % (parsed.scheme, parsed.netloc)
+	proxies = {'http': proxy, 'https': proxy} if proxy else None
+
+	for path in _GRAPHQL_PROBE_PATHS:
+		probe_url = base + path
+		try:
+			resp = requests.head(
+				probe_url,
+				timeout=_PROBE_TIMEOUT,
+				proxies=proxies,
+				allow_redirects=True,
+				headers=_PROBE_HEADERS,
+			)
+			if resp.status_code not in (400, 404, 410):
+				logger.info('[GATE] GraphQL endpoint candidate at %s (HTTP %d)', probe_url, resp.status_code)
+				return True
+		except requests.RequestException:
+			continue
+
+	return False
+
+
+def has_openapi_spec(url, proxy=None):
+	"""Return True if an OpenAPI/Swagger spec is reachable at the given base URL.
+
+	Uses HEAD requests only (fast existence check). For 200 responses the
+	Content-Type header is inspected; if ambiguous a minimal GET confirms the
+	body contains OpenAPI/Swagger keys. Using HEAD avoids downloading full spec
+	bodies for probe paths that return 404 or connection-refused.
+	"""
+	from urllib.parse import urlparse as _urlparse
+	parsed = _urlparse(url)
+	base = '%s://%s' % (parsed.scheme, parsed.netloc)
+	proxies = {'http': proxy, 'https': proxy} if proxy else None
+
+	for path in _OPENAPI_PROBE_PATHS:
+		probe_url = base + path
+		try:
+			resp = requests.head(
+				probe_url,
+				timeout=_PROBE_TIMEOUT,
+				proxies=proxies,
+				allow_redirects=True,
+				headers=_PROBE_HEADERS,
+			)
+			if resp.status_code != 200:
+				continue
+			# HEAD returned 200 — accept json/yaml content types directly
+			ct = resp.headers.get('Content-Type', '')
+			if 'json' in ct or 'yaml' in ct:
+				logger.info('[GATE] OpenAPI spec found at %s (Content-Type: %s)', probe_url, ct)
+				return True
+			# For ambiguous content types confirm with a lightweight GET
+			get_resp = requests.get(
+				probe_url,
+				timeout=_PROBE_TIMEOUT * 2,
+				proxies=proxies,
+				allow_redirects=True,
+				headers=_PROBE_HEADERS,
+			)
+			if get_resp.status_code != 200:
+				continue
+			try:
+				data = get_resp.json()
+				if isinstance(data, dict) and ('paths' in data or 'openapi' in data or 'swagger' in data):
+					logger.info('[GATE] OpenAPI spec confirmed at %s', probe_url)
+					return True
+			except Exception:
+				continue
+		except requests.RequestException:
+			continue
+
+	return False
+
+
+def has_jwt_tokens(scan_id, subdomain=None):
+	"""Return True if JWT tokens have been detected in the given scan.
+
+	Checks Parameter records with is_auth_related=True whose name matches
+	JWT patterns, and SecretLeak records whose secret_type indicates a JWT
+	or Bearer token. When subdomain is provided the Parameter check is
+	scoped to that subdomain; SecretLeak always covers the full scan so
+	that scan-wide secret discoveries gate per-subdomain runs correctly.
+	"""
+	param_qs = Parameter.objects.filter(
+		endpoint__scan_history_id=scan_id,
+		is_auth_related=True,
+	)
+	if subdomain is not None:
+		param_qs = param_qs.filter(endpoint__subdomain=subdomain)
+	for name in param_qs.values_list('name', flat=True):
+		if _JWT_PARAM_RE.search(name):
+			return True
+
+	for secret_type in SecretLeak.objects.filter(scan_history_id=scan_id).values_list('secret_type', flat=True):
+		if _JWT_SECRET_TYPE_RE.search(secret_type):
+			return True
+
+	return False

@@ -1,5 +1,6 @@
 import yaml
 import logging
+from typing import Any
 from django.db import models
 
 logger = logging.getLogger('django')
@@ -219,3 +220,83 @@ class HardwareProfile(models.Model):
 
     def __str__(self):
         return f"{self.name} ({self.profile_type})"
+
+
+class ScanProfile(models.Model):
+    """Comprehensive scan profile combining throttle settings and scanning mode flags.
+
+    Distinct from HardwareProfile (hardware capability limits). ScanProfile controls
+    WHAT scanning behavior is active (passive-only, stealth, headless, etc.) alongside
+    optional rate throttling. Ported from rengine-ng's Secator profile system.
+
+    Applied to every tool activity via ctx['profile'] in the workflow context.
+    """
+
+    CATEGORY_CHOICES = [
+        ('speed', 'Speed / Throttle'),
+        ('evasion', 'Evasion'),
+        ('content', 'Content'),
+        ('network', 'Network'),
+        ('general', 'General'),
+        ('hardware', 'Hardware'),
+    ]
+
+    name = models.CharField(max_length=64, unique=True)
+    description = models.TextField(blank=True, default='')
+    category = models.CharField(max_length=32, choices=CATEGORY_CHOICES, default='general')
+    is_builtin = models.BooleanField(default=False)
+
+    # Throttle settings (null = use tool default)
+    rate_limit = models.PositiveIntegerField(null=True, blank=True)
+    delay = models.FloatField(null=True, blank=True)
+    threads = models.PositiveIntegerField(null=True, blank=True)
+    timeout = models.PositiveIntegerField(null=True, blank=True)
+    retries = models.PositiveIntegerField(null=True, blank=True)
+
+    # Mode flags
+    passive = models.BooleanField(default=False)
+    active = models.BooleanField(default=False)
+    stealth = models.BooleanField(default=False)
+    headless = models.BooleanField(default=False)
+    screenshot = models.BooleanField(default=False)
+    hunt_secrets = models.BooleanField(default=False)
+    nuclei_full = models.BooleanField(default=False)
+    brute_dns = models.BooleanField(default=False)
+    brute_http = models.BooleanField(default=False)
+    test_ssl = models.BooleanField(default=False)
+    all_ports = models.BooleanField(default=False)
+    tor = models.BooleanField(default=False)
+    fragment = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['category', 'name']
+
+    def __str__(self):
+        return self.name
+
+    def to_ctx_dict(self) -> dict[str, Any]:
+        """Return throttle + flag settings as a dict for merging into a workflow ctx.
+
+        Only non-None throttle values are included. Mode flags are only included when
+        True — absent keys mean False. Consumers must use ctx.get('flag', False).
+        """
+        d = {}
+        if self.rate_limit is not None:
+            d['rate_limit'] = self.rate_limit
+        if self.delay is not None:
+            d['delay'] = self.delay
+        if self.threads is not None:
+            d['threads'] = self.threads
+        if self.timeout is not None:
+            d['timeout'] = self.timeout
+        if self.retries is not None:
+            d['retries'] = self.retries
+        for flag in ('passive', 'active', 'stealth', 'headless', 'screenshot',
+                     'hunt_secrets', 'nuclei_full', 'brute_dns', 'brute_http',
+                     'test_ssl', 'all_ports', 'tor', 'fragment'):
+            if getattr(self, flag):
+                d[flag] = True
+        return d

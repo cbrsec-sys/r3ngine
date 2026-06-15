@@ -20,7 +20,7 @@ from reNgine.charts import (
 from reNgine.utils.graph import Neo4jManager
 from reNgine.common_func import get_interesting_subdomains
 from reNgine.stress.report_builder import StressReportBuilder
-from startScan.models import ScanHistory, Subdomain, Vulnerability, IpAddress, ScanReport, StressTestResult
+from startScan.models import ScanHistory, Subdomain, Vulnerability, IpAddress, ScanReport, StressTestResult, Parameter
 from scanEngine.models import VulnerabilityReportSetting
 
 logger = logging.getLogger('reNgine.tasks')
@@ -90,6 +90,8 @@ def generate_report_task(report_id):
         params = report_obj.params
         is_ignore_info_vuln = params.get('ignore_info_vuln', False)
         include_attack_surface_map = params.get('include_attack_surface_map', False)
+        include_attack_paths = params.get('include_attack_paths', False)
+        comments = params.get('comments', '')
 
         show_recon = True
         show_vuln = True
@@ -164,6 +166,16 @@ def generate_report_task(report_id):
             .distinct()
         )
 
+        # CPDE parameters — omit for stress-test-only reports
+        parameters = Parameter.objects.none()
+        if report_type != 'stress_test':
+            parameters = (
+                Parameter.objects
+                .filter(scan_history=scan)
+                .select_related('endpoint')
+                .order_by('-confidence', 'name')
+            )
+
         attack_surface_map_image = None
         if report_template == 'enterprise' and include_attack_surface_map:
             try:
@@ -173,7 +185,30 @@ def generate_report_task(report_id):
                     attack_surface_map_image = generate_attack_surface_map(graph_data)
                 neo4j_manager.close()
             except Exception as e:
-                logger.error(f"Error generating Attack Surface Map for report: {e}")
+                logger.error("Error generating Attack Surface Map for report: %s", e)
+
+        attack_paths = []
+        if report_template in ['enterprise', 'cyber_pro'] and include_attack_paths:
+            from startScan.models import ImpactAssessment
+            assessments = (
+                ImpactAssessment.objects.filter(scan_history_id=scan.id)
+                .exclude(potential_attack_chain__isnull=True)
+                .exclude(potential_attack_chain={})
+                .order_by('-remediation_priority')
+            )
+            for a in assessments:
+                chain = a.potential_attack_chain or {}
+                if not chain.get('apme_path_id'):
+                    continue
+                attack_paths.append({
+                    'path_id': chain.get('apme_path_id'),
+                    'risk': chain.get('risk', 'unknown'),
+                    'score': chain.get('score', 0.0),
+                    'steps': chain.get('steps', []),
+                    'explanation': chain.get('explanation', ''),
+                    'potential_impact': a.potential_impact,
+                    'remediation_priority': a.remediation_priority,
+                })
 
         data = {
             'scan_object': scan,
@@ -187,7 +222,10 @@ def generate_report_task(report_id):
             'report_name': report_name,
             'is_ignore_info_vuln': is_ignore_info_vuln,
             'attack_surface_map_image': attack_surface_map_image,
+            'attack_paths': attack_paths,
             'stress_results': stress_results,
+            'parameters': parameters,
+            'parameters_count': parameters.count(),
         }
 
         # Stress Test Aggregation for context
@@ -233,6 +271,7 @@ def generate_report_task(report_id):
             description = description.replace('{low_count}', str(vulns.filter(severity=1).count()))
             description = description.replace('{info_count}', str(vulns.filter(severity=0).count()))
             description = description.replace('{unknown_count}', str(vulns.filter(severity=-1).count()))
+            description = description.replace('{comments}', str(comments or ''))
             
             if report_type == 'stress_test' and stress_results.exists():
                 description += f"\n\n**Stress Test Performance Summary:**\n"

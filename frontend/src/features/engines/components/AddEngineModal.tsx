@@ -8,10 +8,12 @@ import {
   TextField,
   Box,
   Typography,
-  IconButton
+  IconButton,
+  Tooltip,
 } from '@mui/material';
-import { X, Cpu } from 'lucide-react';
+import { X, Cpu, BookOpen } from 'lucide-react';
 import { useCreateEngine, useFullYamlConfig } from '../api';
+import { EngineConfigReferenceModal } from './EngineConfigReferenceModal';
 
 interface AddEngineModalProps {
   open: boolean;
@@ -21,6 +23,7 @@ interface AddEngineModalProps {
 export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose }) => {
   const [name, setName] = useState('');
   const [yaml, setYaml] = useState('');
+  const [refOpen, setRefOpen] = useState(false);
   const createEngine = useCreateEngine();
   const { data: fullConfig } = useFullYamlConfig();
 
@@ -99,27 +102,45 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
             }}
           />
 
-          <TextField
-            label="YAML CONFIGURATION BLUEPRINT"
-            placeholder="# Enter your engine configuration here"
-            fullWidth
-            multiline
-            rows={15}
-            value={yaml}
-            onChange={(e) => setYaml(e.target.value)}
-            variant="filled"
-            sx={{
-              '& .MuiFilledInput-root': {
-                bgcolor: 'rgba(255,255,255,0.03)',
-                '&:before, &:after': { display: 'none' },
-                border: '1px solid rgba(255,255,255,0.1)',
-                color: '#00f3ff',
-                fontFamily: 'monospace',
-                fontSize: '0.85rem'
-              },
-              '& .MuiInputLabel-root': { color: 'rgba(0, 243, 255, 0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }
-            }}
-          />
+          <Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 0.5 }}>
+              <Typography sx={{ color: 'rgba(0,243,255,0.5)', fontFamily: 'Orbitron', fontSize: '0.7rem' }}>
+                YAML CONFIGURATION BLUEPRINT
+              </Typography>
+              <Tooltip title="View configuration reference">
+                <IconButton
+                  size="small"
+                  onClick={() => setRefOpen(true)}
+                  sx={{
+                    color: 'rgba(0,243,255,0.6)',
+                    p: 0.5,
+                    '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0,243,255,0.08)' },
+                  }}
+                >
+                  <BookOpen size={14} />
+                </IconButton>
+              </Tooltip>
+            </Box>
+            <TextField
+              placeholder="# Enter your engine configuration here"
+              fullWidth
+              multiline
+              rows={15}
+              value={yaml}
+              onChange={(e) => setYaml(e.target.value)}
+              variant="filled"
+              sx={{
+                '& .MuiFilledInput-root': {
+                  bgcolor: 'rgba(255,255,255,0.03)',
+                  '&:before, &:after': { display: 'none' },
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  color: '#00f3ff',
+                  fontFamily: 'monospace',
+                  fontSize: '0.85rem',
+                },
+              }}
+            />
+          </Box>
         </Box>
       </DialogContent>
 
@@ -148,6 +169,7 @@ export const AddEngineModal: React.FC<AddEngineModalProps> = ({ open, onClose })
           {createEngine.isPending ? 'PROVISIONING...' : 'INITIALIZE ENGINE'}
         </Button>
       </DialogActions>
+      <EngineConfigReferenceModal open={refOpen} onClose={() => setRefOpen(false)} />
     </Dialog>
   );
 };

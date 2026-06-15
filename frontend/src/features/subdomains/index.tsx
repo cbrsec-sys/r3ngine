@@ -38,11 +38,13 @@ import {
   AlertTriangle,
   Trash2,
   Copy,
-  FileText
+  FileText,
+  Bug
 } from 'lucide-react';
 
 import { useSubdomains } from './api';
 import { TacticalPanel } from '../../components/TacticalPanel';
+import { SearchsploitModal } from './SearchsploitModal';
 
 export const SubdomainsPage: React.FC = () => {
   const { projectSlug } = useParams({ from: '/$projectSlug/subdomains' });
@@ -53,6 +55,7 @@ export const SubdomainsPage: React.FC = () => {
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [selectedAssets, setSelectedAssets] = useState<number[]>([]);
+  const [isSearchsploitModalOpen, setIsSearchsploitModalOpen] = useState(false);
 
   const { data, isLoading } = useSubdomains(projectSlug, page, activeSearch, undefined, false, undefined, undefined, pageSize);
   const [isReady, setIsReady] = useState(false);
@@ -94,6 +97,11 @@ export const SubdomainsPage: React.FC = () => {
   const handleActionClose = () => {
     setAnchorEl(null);
     setSelectedId(null);
+  };
+
+  const handleSearchsploitOpen = () => {
+    setIsSearchsploitModalOpen(true);
+    handleActionClose();
   };
 
   const getStatusColor = (status: number) => {
@@ -518,6 +526,10 @@ export const SubdomainsPage: React.FC = () => {
           <ListItemIcon><FilePlus size={16} color="#00f3ff" /></ListItemIcon>
           <ListItemText primary="ADD NOTE" />
         </MenuItem>
+        <MenuItem onClick={handleSearchsploitOpen}>
+          <ListItemIcon><Bug size={16} color="#00f3ff" /></ListItemIcon>
+          <ListItemText primary="SEARCHSPLOIT" />
+        </MenuItem>
         <MenuItem onClick={handleActionClose} sx={{ color: '#ffae00' }}>
           <ListItemIcon><Shield size={16} color="#ffae00" /></ListItemIcon>
           <ListItemText primary="MARK IMPORTANT" />
@@ -535,6 +547,11 @@ export const SubdomainsPage: React.FC = () => {
           100% { transform: scale(1); opacity: 1; }
         }
       `}</style> */}
+      <SearchsploitModal 
+        open={isSearchsploitModalOpen} 
+        onClose={() => setIsSearchsploitModalOpen(false)} 
+        subdomain={data?.results.find((s) => s.id === selectedId) || null} 
+      />
     </Container>
   );
 };

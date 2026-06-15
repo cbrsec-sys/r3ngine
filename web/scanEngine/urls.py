@@ -77,6 +77,18 @@ urlpatterns = [
         views.test_llm_connection,
         name='test_llm_connection'),
     path(
+        '<slug:slug>/ollama/service_status',
+        views.get_ollama_service_status,
+        name='get_ollama_service_status'),
+    path(
+        '<slug:slug>/ollama/service_start',
+        views.start_ollama_service,
+        name='start_ollama_service'),
+    path(
+        '<slug:slug>/ollama/service_stop',
+        views.stop_ollama_service,
+        name='stop_ollama_service'),
+    path(
         '<slug:slug>/rengine_settings',
         views.rengine_settings,
         name='rengine_settings'),
@@ -113,6 +125,10 @@ urlpatterns = [
         '<slug:slug>/get_full_yaml_config/',
         views.get_full_yaml_config,
         name='get_full_yaml_config'),
+    path(
+        '<slug:slug>/yaml_config_reference/',
+        views.yaml_config_reference,
+        name='yaml_config_reference'),
     path(
         '<slug:slug>/task_status/<str:task_id>',
         views.get_proxy_task_status,

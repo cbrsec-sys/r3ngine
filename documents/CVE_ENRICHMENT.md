@@ -7,9 +7,12 @@ The CVE enrichment system automatically fetches and updates vulnerability metada
 - **NVD API v2.0**: CVSS v3.1 scores, attack vectors, impact metrics
 - **FIRST EPSS API**: Exploit prediction scores
 - **CISA KEV Catalog**: Known exploited vulnerabilities
+- **SploitScan**: Public exploit evidence (ExploitDB, Metasploit, GitHub PoCs), HackerOne stats, and Patching Priority
+- **SearchSploit**: ExploitDB searches now automatically attribute to their targets (`http_url`) and fetch LLM summaries.
+- **Internal LLM Engine**: Automated, context-aware risk assessments and mitigation strategies
 
 The enriched metadata is stored in the `CveId` model and is consumed by the
-`VulnerabilityCorrelationEngine` to produce more accurate correlation and risk scores.
+`VulnerabilityCorrelationEngine` to produce more accurate correlation and risk scores. For non-CVE searchsploit exploits, the exploit Title acts as the cached `CveId` key.
 
 ---
 
@@ -220,3 +223,8 @@ The `CveId` model (`startScan/models.py`) stores the following enrichment fields
 | `last_modified_date` | NVD | Last NVD update date |
 | `vulnerability_type` | Internal | SCA / DAST / SAST / Config |
 | `is_cisa_kev` | CISA | True if in Known Exploited Vulnerabilities catalog |
+| `public_exploits` | SploitScan | JSON array of ExploitDB, Metasploit, and GitHub PoCs |
+| `hackerone_data` | SploitScan | JSON object containing Hacktivity stats and rank |
+| `patching_priority` | SploitScan | String priority level |
+| `ai_risk_assessment` | Internal LLM | Text containing LLM-generated risk assessment |
+| `mitigation_ideas` | Internal LLM | Text containing LLM-generated mitigation strategy |

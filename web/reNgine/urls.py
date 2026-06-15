@@ -16,8 +16,8 @@ from .openapi_info import info
 
 schema_view = get_schema_view(
    info,
-   public=True,
-   permission_classes=[permissions.AllowAny],
+   public=False,
+   permission_classes=[permissions.IsAuthenticated],
 )
 
 urlpatterns = [

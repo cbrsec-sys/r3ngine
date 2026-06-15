@@ -164,8 +164,11 @@ class AcunetixAPIKey(models.Model):
 
 class LinkedInCredentials(models.Model):
 	id = models.AutoField(primary_key=True)
-	username = models.CharField(max_length=500)
-	password = models.CharField(max_length=500)
+	username = models.CharField(max_length=500, blank=True, default='')
+	cookies_json = models.TextField(blank=True, default='')
+	state_file_path = models.CharField(max_length=1000, blank=True, default='')
+	last_validated_at = models.DateTimeField(null=True, blank=True)
+	is_valid = models.BooleanField(default=False)
 
 	def __str__(self):
 		return self.username

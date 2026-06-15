@@ -44,7 +44,7 @@ try:
     
     for i, path in enumerate(paths[:3]):  # Just first 3
         # Recalculate score with metadata
-        meta = orch._build_path_metadata(path, node_index)
+        meta = orch._build_path_metadata(path, node_index, scan_id=scan_id)
         score = scorer.score(path, meta)
         
         print(f"\n--- Path {i} (ID: {path.id}) ---")

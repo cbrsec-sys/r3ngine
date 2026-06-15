@@ -4,8 +4,9 @@ Tests report builder, chart generation, and full PDF report pipeline.
 """
 import os
 import json
-from datetime import datetime, timedelta
+from datetime import timedelta
 from django.test import TestCase, Client
+from django.utils import timezone
 from django.contrib.auth.models import User
 from startScan.models import (
     ScanHistory, Domain, StressTestResult, StressTelemetryPoint,
@@ -37,7 +38,7 @@ class StressReportBuilderTestCase(TestCase):
         self.scan = ScanHistory.objects.create(
             domain=self.domain,
             scan_type=self.engine,
-            start_scan_date=datetime.now(),
+            start_scan_date=timezone.now(),
             scan_status=2,
             initiated_by=self.user
         )
@@ -60,8 +61,8 @@ class StressReportBuilderTestCase(TestCase):
             p999_latency_ms=750.0,
             max_requests_per_second=500.0,
             peak_throughput_rps=450.0,
-            start_time=datetime.now(),
-            end_time=datetime.now() + timedelta(seconds=30),
+            start_time=timezone.now(),
+            end_time=timezone.now() + timedelta(seconds=30),
             endpoints_tested=['http://example.com/', 'http://example.com/api'],
             response_code_distribution={
                 '200': 8000,
@@ -97,7 +98,7 @@ class StressReportBuilderTestCase(TestCase):
             StressTelemetryPoint.objects.create(
                 stress_result=self.stress_result,
                 tool='k6',
-                timestamp=datetime.now() + timedelta(seconds=i*3),
+                timestamp=timezone.now() + timedelta(seconds=i*3),
                 latency_ms=150.0 + (i * 10),
                 throughput=450.0 - (i * 5),
                 error_rate=0.02,
@@ -200,7 +201,7 @@ class StressChartGenerationTestCase(TestCase):
         self.scan = ScanHistory.objects.create(
             domain=self.domain,
             scan_type=self.engine,
-            start_scan_date=datetime.now()
+            start_scan_date=timezone.now()
         )
 
         self.stress_result = StressTestResult.objects.create(
@@ -290,7 +291,7 @@ class StressReportGenerationAPITestCase(TestCase):
         self.scan = ScanHistory.objects.create(
             domain=self.domain,
             scan_type=self.engine,
-            start_scan_date=datetime.now(),
+            start_scan_date=timezone.now(),
             initiated_by=self.user
         )
 
@@ -371,7 +372,7 @@ class StressReportTemplateTestCase(TestCase):
         scan = ScanHistory.objects.create(
             domain=domain,
             scan_type=engine,
-            start_scan_date=datetime.now()
+            start_scan_date=timezone.now()
         )
 
         stress_result = StressTestResult.objects.create(
@@ -404,7 +405,7 @@ class StressReportTemplateTestCase(TestCase):
         scan = ScanHistory.objects.create(
             domain=domain,
             scan_type=engine,
-            start_scan_date=datetime.now()
+            start_scan_date=timezone.now()
         )
 
         stress_result = StressTestResult.objects.create(
