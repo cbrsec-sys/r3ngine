@@ -390,7 +390,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       {item.children?.map((child) => {
                         const isChildActive = activePath === child.path;
                         const subActiveColor = isEnterprise ? theme.palette.primary.main : '#7000ff';
-                        const subInactiveColor = isEnterprise ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)';
+                        const subInactiveColor = (isEnterprise || themeName === 'v3_light') ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)';
                         return (
                           <ListItemButton
                             key={child.title}
