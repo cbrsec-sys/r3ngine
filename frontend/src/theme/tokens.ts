@@ -104,9 +104,9 @@ export const themeTokens: Record<string, ThemeSemanticTokens | any> = {
   },
   v3_light: {
     bg: {
-      primary: '#e2e8f0',
-      secondary: '#f1f5f9',
-      glass: 'rgba(241, 245, 249, 0.7)',
+      primary: '#cbd5e1',
+      secondary: '#e2e8f0',
+      glass: 'rgba(226, 232, 240, 0.7)',
     },
     neon: {
       cyan: '#0ea5e9',

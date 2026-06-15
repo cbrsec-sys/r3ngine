@@ -479,7 +479,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           disabled={isLoading}
           sx={{
             bgcolor: hasIpFilter ? `${tokens.accent.primary}33` : 'transparent',
-            color: hasIpFilter ? tokens.accent.primary : (isLight ? 'text.secondary' : 'rgba(255, 255, 255, 0.6)'),
+            color: hasIpFilter ? tokens.accent.primary : (isLight ? 'text.primary' : 'rgba(255, 255, 255, 0.6)'),
             opacity: isLoading ? 0.6 : 1,
             px: 3,
             borderRadius: 0,

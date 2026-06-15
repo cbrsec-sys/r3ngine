@@ -158,7 +158,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
 
   const donutOptions: any = {
     chart: { type: 'donut' as any, background: 'transparent' },
-    theme: { mode: 'dark' as any },
+    theme: { mode: isLight ? 'light' : 'dark' as any },
     stroke: { show: true, width: 2, colors: ['#05050f'] },
     dataLabels: { enabled: false },
     legend: { position: 'bottom', labels: { colors: theme.palette.text.secondary }, fontSize: '10px' },
@@ -398,7 +398,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                       },
                       dataLabels: {
                         enabled: true,
-                        style: { fontSize: '10px', fontFamily: 'Inter, sans-serif', colors: ['#ffffffcc'] },
+                        style: { fontSize: '10px', fontFamily: 'Inter, sans-serif', colors: [isLight ? 'rgba(0,0,0,0.6)' : '#ffffffcc'] },
                         formatter: (text: string, op: any) => [text, `×${op.value}`],
                       },
                       plotOptions: {
@@ -419,7 +419,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                         y: { formatter: (v: number) => `${v} occurrence${v !== 1 ? 's' : ''}` },
                       },
                       legend: { show: false },
-                      theme: { mode: 'dark' as any },
+                      theme: { mode: isLight ? 'light' : 'dark' as any },
                     }}
                     series={[{
                       data: data.most_common_cwe.slice(0, 8).map((c, i) => ({
@@ -482,7 +482,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                       },
                       dataLabels: {
                         enabled: true,
-                        style: { fontSize: '10px', fontFamily: 'Inter, sans-serif', colors: ['#ffffffcc'] },
+                        style: { fontSize: '10px', fontFamily: 'Inter, sans-serif', colors: [isLight ? 'rgba(0,0,0,0.6)' : '#ffffffcc'] },
                         formatter: (text: string, op: any) => [text, `×${op.value}`],
                       },
                       plotOptions: {
@@ -503,7 +503,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                         y: { formatter: (v: number) => `${v} occurrence${v !== 1 ? 's' : ''}` },
                       },
                       legend: { show: false },
-                      theme: { mode: 'dark' as any },
+                      theme: { mode: isLight ? 'light' : 'dark' as any },
                     }}
                     series={[{
                       data: data.most_common_cve.slice(0, 8).map((c, i) => ({
@@ -777,7 +777,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                     </Typography>
                   </Box>
                   <Box sx={{ width: '100%', height: 6, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    <Box sx={{ width: `${Math.min(cveInfo.epss_score * 100, 100).toFixed(1)}%`, height: '100%', bgcolor: tokens.accent.primary, boxShadow: '0 0 8px #00f3ff' }} />
+                    <Box sx={{ width: `${Math.min(cveInfo.epss_score * 100, 100).toFixed(1)}%`, height: '100%', bgcolor: tokens.accent.primary, boxShadow: isLight ? 'none' : '0 0 8px #00f3ff' }} />
                   </Box>
                 </Box>
               )}
@@ -901,5 +901,5 @@ const getCvssColor = (score: number) => {
   if (score >= 7.0) return '#ff9f00';
   if (score >= 4.0) return '#fffc00';
   if (score > 0.0) return '#00ff62';
-  return '#00f3ff';
+  return isLight ? theme.palette.primary.main : '#00f3ff';
 };

@@ -12,6 +12,8 @@ import {
   InputAdornment,
   IconButton,
   Tooltip,
+  useTheme,
+  alpha,
 } from '@mui/material';
 import { BookOpen, X, Search, Copy, Check } from 'lucide-react';
 import { useYamlConfigReference } from '../api';
@@ -21,12 +23,12 @@ interface EngineConfigReferenceModalProps {
   onClose: () => void;
 }
 
-function colorForLine(line: string): string {
+function colorForLine(line: string, isLight: boolean): string {
   const trimmed = line.trimStart();
-  if (trimmed.startsWith('#')) return 'rgba(255,255,255,0.4)';
-  if (/^[a-zA-Z_]/.test(line)) return '#ff3333';
-  if (/^ {2}[a-zA-Z_]/.test(line)) return '#e5c07b';
-  return '#ffffff';
+  if (trimmed.startsWith('#')) return isLight ? 'rgba(0,0,0,0.45)' : 'rgba(255,255,255,0.4)';
+  if (/^[a-zA-Z_]/.test(line)) return isLight ? '#c2410c' : '#ff3333';
+  if (/^ {2}[a-zA-Z_]/.test(line)) return isLight ? '#b45309' : '#e5c07b';
+  return isLight ? '#0f172a' : '#ffffff';
 }
 
 export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProps> = ({
@@ -37,6 +39,8 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
   const [copied, setCopied] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const { data: content, isLoading } = useYamlConfigReference();
+  const theme = useTheme();
+  const isLight = theme.palette.mode === 'light';
 
   const lines = content ? content.split('\n') : [];
   const lowerSearch = search.toLowerCase();
@@ -75,12 +79,13 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
       slotProps={{
         paper: {
           sx: {
-            bgcolor: '#0a0a0c',
-            border: '1px solid rgba(0,243,255,0.2)',
-            boxShadow: '0 0 30px rgba(0,243,255,0.1)',
-            backgroundImage:
-              'linear-gradient(rgba(0,243,255,0.05) 1px, transparent 1px), ' +
-              'linear-gradient(90deg, rgba(0,243,255,0.05) 1px, transparent 1px)',
+            bgcolor: isLight ? 'background.paper' : '#0a0a0c',
+            border: isLight ? '1px solid rgba(0,0,0,0.1)' : '1px solid rgba(0,243,255,0.2)',
+            boxShadow: isLight ? 'none' : '0 0 30px rgba(0,243,255,0.1)',
+            backgroundImage: isLight
+              ? 'none'
+              : 'linear-gradient(rgba(0,243,255,0.05) 1px, transparent 1px), ' +
+                'linear-gradient(90deg, rgba(0,243,255,0.05) 1px, transparent 1px)',
             backgroundSize: '20px 20px',
             maxHeight: '88vh',
           },
@@ -92,19 +97,20 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(0,243,255,0.1)',
+          borderBottom: '1px solid',
+          borderColor: 'divider',
           pb: 2,
         }}
       >
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <BookOpen size={20} style={{ color: '#00f3ff' }} />
+          <BookOpen size={20} style={{ color: isLight ? theme.palette.primary.main : '#00f3ff' }} />
           <Typography
-            sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: '#fff', letterSpacing: 1 }}
+            sx={{ fontFamily: 'Orbitron', fontWeight: 800, color: 'text.primary', letterSpacing: 1 }}
           >
             CONFIGURATION REFERENCE
           </Typography>
         </Box>
-        <IconButton onClick={onClose} size="small" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+        <IconButton onClick={onClose} size="small" sx={{ color: 'text.secondary' }}>
           <X size={20} />
         </IconButton>
       </DialogTitle>
@@ -120,7 +126,7 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search size={14} style={{ color: 'rgba(0,243,255,0.5)' }} />
+                  <Search size={14} style={{ color: isLight ? 'text.secondary' : 'rgba(0,243,255,0.5)' }} />
                 </InputAdornment>
               ),
             },
@@ -129,18 +135,19 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
             '& .MuiOutlinedInput-root': {
               fontFamily: 'monospace',
               fontSize: '0.75rem',
-              color: '#fff',
-              '& fieldset': { borderColor: 'rgba(0,243,255,0.3)' },
-              '&:hover fieldset': { borderColor: 'rgba(0,243,255,0.5)' },
-              '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
+              color: 'text.primary',
+              '& fieldset': { borderColor: isLight ? 'rgba(0,0,0,0.15)' : 'rgba(0,243,255,0.3)' },
+              '&:hover fieldset': { borderColor: isLight ? theme.palette.primary.main : 'rgba(0,243,255,0.5)' },
+              '&.Mui-focused fieldset': { borderColor: isLight ? theme.palette.primary.main : '#00f3ff' },
+              bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'transparent',
             },
-            '& input::placeholder': { color: 'rgba(255,255,255,0.3)', opacity: 1 },
+            '& input::placeholder': { color: 'text.secondary', opacity: 1 },
           }}
         />
 
         {isLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-            <CircularProgress size={28} sx={{ color: '#00f3ff' }} />
+            <CircularProgress size={28} sx={{ color: isLight ? 'primary.main' : '#00f3ff' }} />
           </Box>
         ) : (
           <Box
@@ -151,8 +158,8 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
               lineHeight: 1.65,
               overflowY: 'auto',
               maxHeight: '62vh',
-              bgcolor: 'rgba(0,0,0,0.35)',
-              border: '1px solid rgba(0,243,255,0.1)',
+              bgcolor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(0,0,0,0.35)',
+              border: isLight ? '1px solid rgba(0,0,0,0.15)' : '1px solid rgba(0,243,255,0.1)',
               borderRadius: 1,
               p: 1.5,
             }}
@@ -160,7 +167,7 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
             {lines.map((line, i) => {
               const isMatch =
                 search.length > 0 && line.toLowerCase().includes(lowerSearch);
-              const color = colorForLine(line);
+              const color = colorForLine(line, isLight);
               const matchStart = isMatch ? line.toLowerCase().indexOf(lowerSearch) : -1;
 
               return (
@@ -170,7 +177,7 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
                   component="div"
                   sx={{
                     display: 'flex',
-                    bgcolor: isMatch ? 'rgba(0,243,255,0.07)' : 'transparent',
+                    bgcolor: isMatch ? (isLight ? 'rgba(14,165,233,0.1)' : 'rgba(0,243,255,0.07)') : 'transparent',
                     borderRadius: 0.25,
                     px: 0.5,
                   }}
@@ -178,7 +185,7 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
                   <Box
                     component="span"
                     sx={{
-                      color: 'rgba(0,243,255,0.2)',
+                      color: isLight ? 'text.secondary' : 'rgba(0,243,255,0.2)',
                       userSelect: 'none',
                       minWidth: '3ch',
                       mr: 1.5,
@@ -196,8 +203,8 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
                         {line.slice(0, matchStart)}
                         <mark
                           style={{
-                            background: 'rgba(0,243,255,0.3)',
-                            color: '#fff',
+                            background: isLight ? 'rgba(14,165,233,0.25)' : 'rgba(0,243,255,0.3)',
+                            color: isLight ? 'inherit' : '#fff',
                             borderRadius: '2px',
                           }}
                         >
@@ -217,11 +224,11 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
       </DialogContent>
 
       <DialogActions
-        sx={{ borderTop: '1px solid rgba(0,243,255,0.1)', px: 2, py: 1.5, gap: 1 }}
+        sx={{ borderTop: '1px solid', borderColor: 'divider', px: 2, py: 1.5, gap: 1 }}
       >
         <Typography
           sx={{
-            color: 'rgba(255,255,255,0.3)',
+            color: 'text.secondary',
             fontSize: '0.65rem',
             fontFamily: 'Orbitron',
             flexGrow: 1,
@@ -243,10 +250,20 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
               fontFamily: 'Orbitron',
               fontSize: '0.65rem',
               letterSpacing: 1,
-              color: copied ? '#00ff88' : '#00f3ff',
-              border: `1px solid ${copied ? 'rgba(0,255,136,0.3)' : 'rgba(0,243,255,0.3)'}`,
+              color: copied ? '#00ff88' : (isLight ? 'primary.main' : '#00f3ff'),
+              border: `1px solid ${
+                copied
+                  ? 'rgba(0,255,136,0.3)'
+                  : isLight
+                  ? alpha(theme.palette.primary.main, 0.3)
+                  : 'rgba(0,243,255,0.3)'
+              }`,
               '&:hover': {
-                borderColor: copied ? 'rgba(0,255,136,0.6)' : 'rgba(0,243,255,0.6)',
+                borderColor: copied
+                  ? 'rgba(0,255,136,0.6)'
+                  : isLight
+                  ? theme.palette.primary.main
+                  : 'rgba(0,243,255,0.6)',
               },
             }}
           >
@@ -260,9 +277,10 @@ export const EngineConfigReferenceModal: React.FC<EngineConfigReferenceModalProp
             fontFamily: 'Orbitron',
             fontSize: '0.65rem',
             letterSpacing: 1,
-            color: 'rgba(255,255,255,0.5)',
-            border: '1px solid rgba(255,255,255,0.1)',
-            '&:hover': { borderColor: 'rgba(255,255,255,0.3)' },
+            color: 'text.secondary',
+            border: '1px solid',
+            borderColor: 'divider',
+            '&:hover': { borderColor: 'text.primary' },
           }}
         >
           CLOSE
