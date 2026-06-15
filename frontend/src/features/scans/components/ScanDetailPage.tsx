@@ -105,6 +105,7 @@ import { AttackPathsTab } from './AttackPathsTab';
 import { usePlugins } from '../../plugins/api/pluginsApi';
 import PluginComponent from '../../plugins/components/PluginComponent';
 import PluginComponentLoader from '../../plugins/components/PluginComponentLoader';
+import PluginCardSlot from '../../plugins/components/PluginCardSlot';
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
   const configs: any = {
@@ -2043,6 +2044,7 @@ export const ScanDetailPage = () => {
         </Stack>
       </Box>
 
+      <PluginCardSlot context={{ type: 'scan', scanId: parseInt(scanId) }} />
 
       {/* Tab Bar Integration - Now spanning full width at the top */}
       <Box sx={{ mb: 3, borderBottom: '1px solid rgba(255,255,255,0.05)', position: 'sticky', top: 0, bgcolor: 'rgba(10,10,15,0.9)', zIndex: 10, backdropFilter: 'blur(10px)', borderRadius: '0 0 12px 12px' }}>

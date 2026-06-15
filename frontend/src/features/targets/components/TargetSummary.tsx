@@ -74,6 +74,7 @@ import { VulnerabilityTable } from '../../vulnerabilities/components/Vulnerabili
 import PluginComponent from '../../plugins/components/PluginComponent';
 import VisualizationTab from '../../scans/components/VisualizationTab';
 import { AttackSurfaceTab } from '../../scans/components/AttackSurfaceTab';
+import PluginCardSlot from '../../plugins/components/PluginCardSlot';
 
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
@@ -548,6 +549,7 @@ export const TargetSummary = () => {
                 )}
               </Box>
             </TacticalPanel>
+             <PluginCardSlot context={{ type: 'target', targetId: data.target_info.id }} />
           </Box>
 
           {/* Footer Info Cards */}
