@@ -172,6 +172,8 @@ from reNgine.temporal_activities import (
     import_hackerone_programs_activity,
     sync_bookmarked_programs_activity,
     fetch_proxies_activity,
+    create_proxy_list_activity,
+    cleanup_proxy_list_activity,
 
     # Phase 1 — rengine-ng workflow tool activities
     get_discovered_services_activity,
@@ -500,6 +502,8 @@ class Command(BaseCommand):
                 import_hackerone_programs_activity,
                 sync_bookmarked_programs_activity,
                 fetch_proxies_activity,
+                create_proxy_list_activity,
+                cleanup_proxy_list_activity,
 
                 # Phase 1 — rengine-ng workflow tool activities
                 get_discovered_services_activity,

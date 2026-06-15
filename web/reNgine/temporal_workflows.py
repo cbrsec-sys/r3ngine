@@ -329,6 +329,7 @@ class MasterScanWorkflow:
             # Post-Tier-1: dispatch any enabled "run after tier_1" plugins
             await _dispatch_tier_plugins(ctx, "tier_1", str(ctx.get('scan_history_id', 'scan')))
 
+            await self._check_paused()
             # ------------------------------------------------------------------
             # TIER 2: HTTP Crawl + Port Scan + Screenshot (all parallel)
             #
@@ -404,11 +405,11 @@ class MasterScanWorkflow:
                 )
                 await _fan_out_search_vulns(ctx, services or [])
 
+            await self._check_paused()
             # Post-Tier-2: dispatch any enabled "run after tier_2" plugins
             await _dispatch_tier_plugins(ctx, "tier_2", str(ctx.get('scan_history_id', 'scan')))
 
             await self._check_paused()
-
             # ------------------------------------------------------------------
             # TIER 3: URL Fetching + Screenshot (parallel — both depend only on
             # Tier 2 http_crawl; screenshot does NOT depend on fetch_url output)
@@ -480,7 +481,6 @@ class MasterScanWorkflow:
             await _dispatch_tier_plugins(ctx, "tier_3", str(ctx.get('scan_history_id', 'scan')))
 
             await self._check_paused()
-
             # ------------------------------------------------------------------
             # TIER 4: Directory & File Fuzzing (sequential — needs Tier 3 URLs)
             # ------------------------------------------------------------------
@@ -518,7 +518,6 @@ class MasterScanWorkflow:
             await _dispatch_tier_plugins(ctx, "tier_4", str(ctx.get('scan_history_id', 'scan')))
 
             await self._check_paused()
-
             # ------------------------------------------------------------------
             # TIER 5: Analysis (parallel — API discovery, WAF detection, secrets)
             # ------------------------------------------------------------------
@@ -643,6 +642,7 @@ class MasterScanWorkflow:
             await _dispatch_tier_plugins(ctx, "tier_6", str(ctx.get('scan_history_id', 'scan')))
 
             await self._check_paused()
+            
             # Tier 7, notification, and finalization have moved to the finally
             # block below — guarded by `if success:` to match SubScanWorkflow.
             success = True
