@@ -378,10 +378,11 @@ RUN chmod +x /usr/src/app/internal_tools.sh
 # ---------------------------------------------------------------------------
 COPY web/ /usr/src/app/
 COPY docker/web/entrypoint.sh /usr/src/app/entrypoint.sh
-COPY docker/web/internal_tools.sh /usr/src/app/internal_tools.sh
 COPY docker/temporal-python-orchestrator/entrypoint.sh /usr/src/app/temporal-entrypoint.sh
 COPY docker/temporal-go-executor/entrypoint.sh /usr/src/app/executor-entrypoint.sh
-RUN chmod +x /usr/src/app/internal_tools.sh /usr/src/app/entrypoint.sh /usr/src/app/temporal-entrypoint.sh /usr/src/app/executor-entrypoint.sh
+RUN chmod +x /usr/src/app/entrypoint.sh /usr/src/app/temporal-entrypoint.sh /usr/src/app/executor-entrypoint.sh
+COPY docker/web/internal_tools.sh /usr/src/internal_tools.sh
+RUN chmod +x /usr/src/internal_tools.sh
 
 # ---------------------------------------------------------------------------
 # Copy built frontend from frontend-builder

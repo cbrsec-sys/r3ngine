@@ -12,6 +12,7 @@ import {
   Chip,
   Divider,
 } from '@mui/material';
+import { useTheme, alpha } from '@mui/material/styles';
 import {
   DndContext,
   closestCenter,
@@ -57,53 +58,53 @@ interface PipelineStage {
 
 const PIPELINE_STAGES: PipelineStage[] = [
   {
-    key: 'subdomain_discovery',
+    key: 'tier_1',
     label: 'Subdomain Discovery',
     tier: 1,
     description: 'amass, subfinder, DNS, OSINT, firewall detection',
-    anchors: ['subdomain_discovery', 'amass_intel_discovery', 'dns_security', 'baddns', 'osint', 'firewall_vpn_scan'],
+    anchors: ['tier_1'],
   },
   {
     key: 'tier_2',
     label: 'Port Scan & HTTP Crawl',
     tier: 2,
     description: 'naabu, httpx, vigolium discovery',
-    anchors: ['tier_2', 'http_crawl', 'port_scan', 'vigolium_discovery'],
+    anchors: ['tier_2'],
   },
   {
-    key: 'fetch_url',
+    key: 'tier_3',
     label: 'URL Fetching & Screenshot',
     tier: 3,
     description: 'gau, waybackurls, gowitness',
-    anchors: ['fetch_url', 'screenshot'],
+    anchors: ['tier_3'],
   },
   {
-    key: 'dir_file_fuzz',
+    key: 'tier_4',
     label: 'Directory & Param Fuzzing',
     tier: 4,
     description: 'ffuf, katana, ParamSpider, LinkFinder',
-    anchors: ['dir_file_fuzz', 'endpoint_analysis', 'fuzzing'],
+    anchors: ['tier_4'],
   },
   {
-    key: 'web_api_discovery',
+    key: 'tier_5',
     label: 'Web API & Secret Scan',
     tier: 5,
     description: 'kiterunner, arjun, gitleaks, WAF detection',
-    anchors: ['web_api_discovery', 'api_discovery', 'secret_scan', 'waf_detection', 'vigolium_analysis'],
+    anchors: ['tier_5'],
   },
   {
-    key: 'vulnerability_scan',
+    key: 'tier_6',
     label: 'Vulnerability Scan',
     tier: 6,
     description: 'nuclei, vigolium scan, WAF bypass, brute force',
-    anchors: ['vulnerability_scan', 'nuclei_scan', 'vigolium_scan'],
+    anchors: ['tier_6'],
   },
   {
-    key: 'vulnerability_correlation',
+    key: 'tier_7',
     label: 'Correlation & Reporting',
     tier: 7,
     description: 'Neo4j APME, risk scoring, CVE correlation',
-    anchors: ['vulnerability_correlation', 'reporting', 'neo4j_sync'],
+    anchors: ['tier_7'],
   },
 ];
 
@@ -133,6 +134,7 @@ function categorise(plugin: Plugin): PluginCategory {
 // ── Positioned plugin card (draggable, shown inline on the timeline) ─────────
 
 const PositionedPluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
+  const theme = useTheme();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: plugin.slug });
 
@@ -148,21 +150,21 @@ const PositionedPluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
         gap: 1.5,
         px: 1.5,
         py: 1,
-        bgcolor: isDragging ? 'rgba(0,255,170,0.12)' : 'rgba(0,255,170,0.04)',
+        bgcolor: isDragging ? alpha(theme.palette.primary.main, 0.12) : alpha(theme.palette.primary.main, 0.04),
         border: '1px solid',
-        borderColor: isDragging ? '#00ffaa' : 'rgba(0,255,170,0.15)',
+        borderColor: isDragging ? theme.palette.primary.main : alpha(theme.palette.primary.main, 0.15),
         borderRadius: '4px',
         mb: 0.75,
         opacity: plugin.is_enabled ? 1 : 0.45,
         transition: 'all 0.15s',
-        '&:hover': { borderColor: 'rgba(0,255,170,0.35)', bgcolor: 'rgba(0,255,170,0.08)' },
+        '&:hover': { borderColor: alpha(theme.palette.primary.main, 0.35), bgcolor: alpha(theme.palette.primary.main, 0.08) },
       }}
     >
       <Box {...attributes} {...listeners} sx={{ cursor: 'grab', color: 'rgba(255,255,255,0.2)', display: 'flex', flexShrink: 0 }}>
         <GripVertical size={14} />
       </Box>
 
-      <Box sx={{ color: isAfter ? '#00ffaa' : '#ffb300', flexShrink: 0 }}>
+      <Box sx={{ color: isAfter ? theme.palette.primary.main : theme.palette.warning.main, flexShrink: 0 }}>
         {isAfter ? <ArrowDownToLine size={13} /> : <ArrowUpToLine size={13} />}
       </Box>
 
@@ -187,9 +189,9 @@ const PositionedPluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
           fontFamily: 'Orbitron',
           fontWeight: 900,
           letterSpacing: 0.5,
-          bgcolor: isAfter ? 'rgba(0,255,170,0.1)' : 'rgba(255,179,0,0.1)',
-          color: isAfter ? '#00ffaa' : '#ffb300',
-          border: `1px solid ${isAfter ? 'rgba(0,255,170,0.3)' : 'rgba(255,179,0,0.3)'}`,
+          bgcolor: alpha(isAfter ? theme.palette.primary.main : theme.palette.warning.main, 0.1),
+          color: isAfter ? theme.palette.primary.main : theme.palette.warning.main,
+          border: `1px solid ${alpha(isAfter ? theme.palette.primary.main : theme.palette.warning.main, 0.3)}`,
           '& .MuiChip-label': { px: 0.75 },
         }}
       />
