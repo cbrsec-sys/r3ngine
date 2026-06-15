@@ -41,10 +41,12 @@ import {
   FileText
 } from 'lucide-react';
 
+import { useThemeTokens } from '../../theme/useThemeTokens';
 import { useSubdomains } from './api';
 import { TacticalPanel } from '../../components/TacticalPanel';
 
 export const SubdomainsPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug } = useParams({ from: '/$projectSlug/subdomains' });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -113,37 +115,38 @@ export const SubdomainsPage: React.FC = () => {
             fontWeight: 900,
             fontFamily: 'Orbitron',
             letterSpacing: 3,
-            color: '#fff',
+            color: 'text.primary',
             textTransform: 'uppercase'
           }}>
             Subdomain Inventory
           </Typography>
-          <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
+          <Typography sx={{ fontSize: '12px', color: 'text.secondary', mt: 0.5, letterSpacing: 1 }}>
             V3.0 PROJECT ASSET RECON ACTIVE
           </Typography>
         </Box>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           <Typography sx={{ fontSize: '10px', fontWeight: 800, color: 'text.secondary', letterSpacing: 2 }}>DASHBOARD</Typography>
-          <ChevronRight size={12} style={{ color: '#ff00f7' }} />
-          <Typography sx={{ fontSize: '10px', fontWeight: 800, color: '#fff', letterSpacing: 2 }}>SUBDOMAINS</Typography>
+          <ChevronRight size={12} style={{ color: tokens.accent.secondary }} />
+          <Typography sx={{ fontSize: '10px', fontWeight: 800, color: 'text.primary', letterSpacing: 2 }}>SUBDOMAINS</Typography>
         </Box>
       </Box>
 
       {/* Enterprise-Grade Search Bar */}
       <Box sx={{
         display: 'flex',
-        bgcolor: 'rgba(255,255,255,0.03)',
+        bgcolor: 'action.hover',
         borderRadius: '4px',
         overflow: 'hidden',
         mb: 3,
-        border: '1px solid rgba(0, 243, 255, 0.1)',
+        border: 1,
+        borderColor: 'divider',
         '&:focus-within': {
           borderColor: 'rgba(0, 243, 255, 0.4)',
           boxShadow: '0 0 15px rgba(0, 243, 255, 0.1)'
         },
         transition: 'all 0.2s'
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', pl: 2, color: 'rgba(255,255,255,0.3)' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', pl: 2, color: 'text.disabled' }}>
           <Search size={18} />
         </Box>
         <InputBase
@@ -156,15 +159,15 @@ export const SubdomainsPage: React.FC = () => {
             px: 2,
             py: 1,
             fontSize: '0.9rem',
-            color: '#fff',
-            '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 }
+            color: 'text.primary',
+            '&::placeholder': { color: 'text.disabled', opacity: 1 }
           }}
         />
         <Button
           onClick={handleSearch}
           sx={{
-            bgcolor: 'rgba(0, 243, 255, 0.1)',
-            color: '#00f3ff',
+            bgcolor: `${tokens.accent.primary}15`,
+            color: tokens.accent.primary,
             px: 4,
             borderRadius: 0,
             fontWeight: 700,

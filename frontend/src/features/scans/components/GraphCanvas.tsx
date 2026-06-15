@@ -12,6 +12,7 @@ import 'cytoscape-context-menus/cytoscape-context-menus.css';
 
 import type { GraphData } from '../api/graphApi';
 import { useGraphStore } from '../../../store/useGraphStore';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 cytoscape.use(fcose);
 cytoscape.use(klay);
@@ -25,12 +26,14 @@ interface GraphCanvasProps {
   onInit?: (cy: cytoscape.Core) => void;
 }
 
+import { themeTokens } from '../../../theme/tokens';
 const SCAN_COLORS = [
-  '#00f3ff', '#7000ff', '#ff00f7', '#ff003c', '#ff9f00', 
+  themeTokens.hacker.accent.primary, '#7000ff', '#ff00f7', '#ff003c', '#ff9f00', 
   '#fffc00', '#00ff62', '#2196f3', '#ec4899', '#8b5cf6'
 ];
 
 export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, searchQuery, onInit }) => {
+  const { tokens } = useThemeTokens();
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<cytoscape.Core | null>(null);
   const { setSelectedNode } = useGraphStore();
@@ -104,10 +107,10 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
           selector: 'node:parent',
           style: {
             'background-opacity': 0.03,
-            'background-color': '#00f3ff',
+            'background-color': tokens.accent.primary,
             'border-width': 1,
             'border-style': 'solid',
-            'border-color': 'rgba(0, 243, 255, 0.2)',
+            'border-color': `${tokens.accent.primary}33`,
             'padding': 30,
             'text-valign': 'top',
             'text-margin-y': -10,
@@ -150,7 +153,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
             'background-color': '#1e293b',
             'background-opacity': 0.8,
             'border-width': 2,
-            'border-color': '#00f3ff',
+            'border-color': tokens.accent.primary,
             'shape': 'roundrectangle',
             'text-opacity': 1,
             'label': (ele: any) => `${ele.data('label')} (${ele.data('collapsedChildren')?.length || 0})`
@@ -194,7 +197,7 @@ export const GraphCanvas: React.FC<GraphCanvasProps> = ({ data, layoutName, sear
         },
         {
             selector: 'edge.highlighted',
-            style: { 'line-color': '#00f3ff', 'target-arrow-color': '#00f3ff', 'width': 2, 'opacity': 1, 'z-index': 50 } as any
+            style: { 'line-color': tokens.accent.primary, 'target-arrow-color': tokens.accent.primary, 'width': 2, 'opacity': 1, 'z-index': 50 } as any
         },
         {
             selector: 'edge.faded',

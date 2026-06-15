@@ -29,6 +29,7 @@ import {
   Bug
 } from 'lucide-react';
 import { useScanStatus, useStopScanAction, useDeleteScanAction } from '../api';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 interface ScanHistoryDrawerProps {
   open: boolean;
@@ -56,19 +57,21 @@ const getStatusText = (status: number) => {
   }
 };
 
-const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) => void, onDelete: (id: number) => void }) => (
+const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) => void, onDelete: (id: number) => void }) => {
+  const { tokens } = useThemeTokens();
+  return (
   <Paper sx={{
     p: 2,
     mb: 2,
     bgcolor: 'rgba(20, 20, 25, 0.5)',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: 1, borderColor: 'divider',
     borderRadius: 2,
     position: 'relative',
     overflow: 'hidden',
     transition: 'all 0.2s',
     '&:hover': {
       bgcolor: 'rgba(255,255,255,0.08)',
-      borderColor: 'rgba(0, 243, 255, 0.3)',
+      borderColor: `${tokens.accent.primary}4D`,
       transform: 'translateX(-4px)'
     }
   }}>
@@ -87,7 +90,7 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
         }}>
           {scan.scan_type?.engine_name || 'GENERAL SCAN'} ON {scan.domain?.name || 'UNKNOWN'}
         </Typography>
-        <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>
+        <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', mt: 0.5 }}>
           {scan.scan_status === 1 ? 'Running Since ' : 'Scan Completed '} {scan.completed_ago || 'just now'}
         </Typography>
       </Box>
@@ -107,8 +110,8 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
     </Stack>
 
     <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
-      <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(0, 243, 255, 0.1)', borderRadius: 1, border: '1px solid rgba(0, 243, 255, 0.2)' }}>
-        <Typography sx={{ fontSize: '0.7rem', fontWeight: 900, color: '#00f3ff' }}>{scan.subdomain_count || 0}</Typography>
+      <Box sx={{ px: 1, py: 0.5, bgcolor: `${tokens.accent.primary}15`, borderRadius: 1, border: `1px solid ${tokens.accent.primary}33` }}>
+        <Typography sx={{ fontSize: '0.7rem', fontWeight: 900, color: tokens.accent.primary }}>{scan.subdomain_count || 0}</Typography>
       </Box>
       <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(112, 0, 255, 0.1)', borderRadius: 1, border: '1px solid rgba(112, 0, 255, 0.2)' }}>
         <Typography sx={{ fontSize: '0.7rem', fontWeight: 900, color: '#7000ff' }}>{scan.endpoint_count || 0}</Typography>
@@ -132,20 +135,23 @@ const ScanItem = ({ scan, onStop, onDelete }: { scan: any, onStop: (id: number) 
       <IconButton
         size="small"
         onClick={() => onDelete(scan.id)}
-        sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#ff003c' } }}
+        sx={{ color: 'text.disabled', '&:hover': { color: '#ff003c' } }}
       >
         <Trash2 size={14} />
       </IconButton>
     </Stack>
   </Paper>
 );
+};
 
-const TaskItem = ({ task, onStop }: { task: any, onStop?: (id: number) => void }) => (
+const TaskItem = ({ task, onStop }: { task: any, onStop?: (id: number) => void }) => {
+  const { tokens } = useThemeTokens();
+  return (
   <Paper sx={{
     p: 2,
     mb: 2,
     bgcolor: 'rgba(20, 20, 25, 0.5)',
-    border: '1px solid rgba(255,255,255,0.05)',
+    border: 1, borderColor: 'divider',
     borderRadius: 2,
     position: 'relative',
     transition: 'all 0.2s',
@@ -166,7 +172,7 @@ const TaskItem = ({ task, onStop }: { task: any, onStop?: (id: number) => void }
         }}>
           {task.subdomain_name || 'UNKNOWN'} USING ENGINE {task.engine_name || task.engine?.engine_name || 'DEFAULT'}
         </Typography>
-        <Typography sx={{ fontSize: '0.65rem', color: 'rgba(255,255,255,0.4)', mt: 0.5 }}>
+        <Typography sx={{ fontSize: '0.65rem', color: 'text.secondary', mt: 0.5 }}>
           Running Since {task.elapsed_time || 'just now'}
         </Typography>
       </Box>
@@ -177,9 +183,9 @@ const TaskItem = ({ task, onStop }: { task: any, onStop?: (id: number) => void }
           height: 20,
           fontSize: '0.6rem',
           fontWeight: 900,
-          bgcolor: 'rgba(0, 243, 255, 0.1)',
-          color: '#00f3ff',
-          border: '1px solid rgba(0, 243, 255, 0.3)',
+          bgcolor: `${tokens.accent.primary}15`,
+          color: tokens.accent.primary,
+          border: `1px solid ${tokens.accent.primary}4D`,
           fontFamily: 'Orbitron'
         }}
       />
@@ -204,14 +210,17 @@ const TaskItem = ({ task, onStop }: { task: any, onStop?: (id: number) => void }
     )}
   </Paper>
 );
+};
 
-const SectionHeader = ({ title, count }: { title: string, count?: number }) => (
+const SectionHeader = ({ title, count }: { title: string, count?: number }) => {
+  const { tokens } = useThemeTokens();
+  return (
   <Box sx={{ mb: 2, mt: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
     <Typography sx={{
       fontFamily: 'Orbitron',
       fontSize: '0.65rem',
       fontWeight: 900,
-      color: 'rgba(255,255,255,0.5)',
+      color: 'text.secondary',
       letterSpacing: 2
     }}>
       {title}
@@ -220,13 +229,15 @@ const SectionHeader = ({ title, count }: { title: string, count?: number }) => (
       <Chip
         label={`${count} ACTIVE`}
         size="small"
-        sx={{ height: 18, fontSize: '0.55rem', fontWeight: 900, bgcolor: '#00f3ff', color: '#000', fontFamily: 'Orbitron' }}
+        sx={{ height: 18, fontSize: '0.55rem', fontWeight: 900, bgcolor: tokens.accent.primary, color: '#000', fontFamily: 'Orbitron' }}
       />
     )}
   </Box>
 );
+};
 
 export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onClose, projectSlug }) => {
+  const { tokens } = useThemeTokens();
   const [activeTab, setActiveTab] = useState(0);
   const { data: status, isLoading, refetch } = useScanStatus(projectSlug);
   const stopScan = useStopScanAction(projectSlug);
@@ -243,42 +254,42 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
             width: 450,
             bgcolor: 'rgba(5, 5, 10, 0.98)',
             backdropFilter: 'blur(25px)',
-            borderLeft: '1px solid rgba(0, 243, 255, 0.2)',
-            color: '#fff',
+            borderLeft: `1px solid ${tokens.accent.primary}33`,
+            color: 'text.primary',
             boxShadow: '-10px 0 40px rgba(0,0,0,0.9)'
           }
         }
       }}
     >
       {/* Header */}
-      <Box sx={{ p: 2.5, borderBottom: '1px solid rgba(0, 243, 255, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <Box sx={{ p: 2.5, borderBottom: `1px solid ${tokens.accent.primary}15`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
           <Box sx={{
             width: 32,
             height: 32,
             borderRadius: 1,
-            bgcolor: 'rgba(0, 243, 255, 0.1)',
+            bgcolor: `${tokens.accent.primary}15`,
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            border: '1px solid rgba(0, 243, 255, 0.2)'
+            border: `1px solid ${tokens.accent.primary}33`
           }}>
-            <Activity size={18} color="#00f3ff" />
+            <Activity size={18} color={tokens.accent.primary} />
           </Box>
           <Box>
             <Typography variant="h6" sx={{ fontFamily: 'Orbitron', fontSize: '0.9rem', fontWeight: 900, letterSpacing: 1 }}>
               SCAN CENTER
             </Typography>
-            <Typography sx={{ fontSize: '0.6rem', color: 'rgba(0, 243, 255, 0.6)', fontWeight: 600, letterSpacing: 0.5 }}>
+            <Typography sx={{ fontSize: '0.6rem', color: `${tokens.accent.primary}99`, fontWeight: 600, letterSpacing: 0.5 }}>
               REAL-TIME STATUS MONITOR
             </Typography>
           </Box>
         </Box>
         <Stack direction="row" spacing={1}>
-          <IconButton size="small" onClick={() => refetch()} sx={{ color: 'rgba(255,255,255,0.4)', '&:hover': { color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)' } }}>
+          <IconButton size="small" onClick={() => refetch()} sx={{ color: 'text.secondary', '&:hover': { color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}15` } }}>
             <RefreshCw size={16} />
           </IconButton>
-          <IconButton size="small" onClick={onClose} sx={{ color: 'rgba(255,255,255,0.4)', '&:hover': { color: '#ff003c', bgcolor: 'rgba(255, 0, 60, 0.1)' } }}>
+          <IconButton size="small" onClick={onClose} sx={{ color: 'text.secondary', '&:hover': { color: '#ff003c', bgcolor: 'rgba(255, 0, 60, 0.1)' } }}>
             <X size={20} />
           </IconButton>
         </Stack>
@@ -289,10 +300,10 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
         value={activeTab}
         onChange={(_, v) => setActiveTab(v)}
         sx={{
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
+          borderBottom: 1, borderColor: 'divider',
           px: 2,
           '& .MuiTab-root': {
-            color: 'rgba(255,255,255,0.4)',
+            color: 'text.secondary',
             fontFamily: 'Orbitron',
             fontSize: '0.65rem',
             fontWeight: 800,
@@ -300,9 +311,9 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
             py: 2.5,
             minWidth: 120,
             transition: 'all 0.3s',
-            '&.Mui-selected': { color: '#00f3ff', textShadow: '0 0 10px rgba(0, 243, 255, 0.5)' }
+            '&.Mui-selected': { color: tokens.accent.primary, textShadow: `0 0 10px ${tokens.accent.primary}80` }
           },
-          '& .MuiTabs-indicator': { bgcolor: '#00f3ff', height: 2, boxShadow: '0 0 10px #00f3ff' }
+          '& .MuiTabs-indicator': { bgcolor: tokens.accent.primary, height: 2, boxShadow: `0 0 10px ${tokens.accent.primary}` }
         }}
       >
         <Tab label="SCAN HISTORY" />
@@ -333,8 +344,8 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
                 <ScanItem key={scan.id} scan={scan} onStop={stopScan.mutate} onDelete={deleteScan.mutate} />
               ))
             ) : (
-              <Box sx={{ p: 4, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 2, border: '1px dashed rgba(255,255,255,0.1)' }}>
-                <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)' }}>No recent scans found.</Typography>
+              <Box sx={{ p: 4, textAlign: 'center', bgcolor: 'action.hover', borderRadius: 2, border: '1px dashed rgba(255,255,255,0.1)' }}>
+                <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled' }}>No recent scans found.</Typography>
               </Box>
             )}
           </Box>
@@ -345,12 +356,12 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
                 <Box sx={{
                   mb: 3,
                   p: 1.5,
-                  bgcolor: '#00f3ff22',
+                  bgcolor: `${tokens.accent.primary}22`,
                   borderRadius: 1,
-                  border: '1px solid #00f3ff44',
+                  border: `1px solid ${tokens.accent.primary}44`,
                   textAlign: 'center'
                 }}>
-                  <Typography sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 900, color: '#00f3ff', letterSpacing: 1 }}>
+                  <Typography sx={{ fontFamily: 'Orbitron', fontSize: '0.65rem', fontWeight: 900, color: tokens.accent.primary, letterSpacing: 1 }}>
                     {status.tasks.running.length} TASKS ARE CURRENTLY RUNNING
                   </Typography>
                 </Box>
@@ -360,8 +371,8 @@ export const ScanHistoryDrawer: React.FC<ScanHistoryDrawerProps> = ({ open, onCl
                 ))}
               </>
             ) : (
-              <Box sx={{ p: 4, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 2, border: '1px dashed rgba(255,255,255,0.1)' }}>
-                <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)' }}>No active tasks.</Typography>
+              <Box sx={{ p: 4, textAlign: 'center', bgcolor: 'action.hover', borderRadius: 2, border: '1px dashed rgba(255,255,255,0.1)' }}>
+                <Typography sx={{ fontSize: '0.75rem', color: 'text.disabled' }}>No active tasks.</Typography>
               </Box>
             )}
 

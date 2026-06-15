@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../theme/useThemeTokens';
 import React, { useState } from 'react';
 import { Box, Chip, IconButton, Popover, Typography, TextField, List, ListItem, ListItemText, ListItemIcon, Button, useTheme, MenuItem } from '@mui/material';
 import FilterListIcon from '@mui/icons-material/FilterList';
@@ -32,6 +33,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
   onSearchChange,
   placeholder = 'Filter or command...',
 }) => {
+  const { tokens } = useThemeTokens();
   const theme = useTheme();
   const [anchorEl, setAnchorEl] = useState<HTMLButtonElement | null>(null);
   const [activeFacetId, setActiveFacetId] = useState<string | null>(null);
@@ -119,7 +121,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
               '& .MuiChip-deleteIcon': {
                 color: getFacetColor(facetId, value),
                 '&:hover': {
-                  color: '#fff',
+                  color: 'text.primary',
                 }
               }
             }}
@@ -138,7 +140,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
           '& .MuiInput-underline:hover:not(.Mui-disabled):before': { borderBottom: 'none' },
           '& .MuiInput-underline:after': { borderBottom: 'none' },
           input: {
-            color: '#fff',
+            color: 'text.primary',
             fontFamily: 'monospace',
             '&::placeholder': {
               color: 'rgba(255, 255, 255, 0.5)',
@@ -170,7 +172,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
             borderRadius: '8px',
             minWidth: 250,
             maxHeight: 400,
-            color: '#fff',
+            color: 'text.primary',
             boxShadow: '0 4px 20px rgba(0,0,0,0.5)',
           }
         }}
@@ -208,7 +210,7 @@ export const FilterCommandCenter: React.FC<FilterCommandCenterProps> = ({
               >
                 ←
               </Button>
-              <Typography variant="body2" sx={{ fontFamily: 'monospace', color: '#fff', flex: 1 }}>
+              <Typography variant="body2" sx={{ fontFamily: 'monospace', color: 'text.primary', flex: 1 }}>
                 Select {facets.find(f => f.id === activeFacetId)?.label}
               </Typography>
             </Box>

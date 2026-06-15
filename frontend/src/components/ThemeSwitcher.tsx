@@ -1,16 +1,18 @@
+import { useThemeTokens } from '../theme/useThemeTokens';
 import React from 'react';
 import { MenuItem, Typography, Box, Divider } from '@mui/material';
 import { Palette, Check } from 'lucide-react';
 import { useAppTheme } from '../context/ThemeContext';
 
 export const ThemeSwitcher: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { themeName, setTheme } = useAppTheme();
 
 
   const themes = [
-    { id: 'hacker', label: 'V3 Hacker', color: '#00f3ff' },
+    { id: 'hacker', label: 'V3 Hacker', color: tokens.accent.primary },
     { id: 'clean', label: 'V3 Clean', color: '#00d2ff' },
-    { id: 'script_kiddie', label: 'V3 Script Kiddie', color: '#ff00ff' },
+    { id: 'script_kiddie', label: 'V3 Script Kiddie', color: tokens.accent.secondary },
   ] as const;
 
   return (

@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../../theme/useThemeTokens';
 import React, { useState } from 'react';
 import {
   Box,
@@ -90,6 +91,7 @@ interface NavItem {
 }
 
 export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { tokens } = useThemeTokens();
   const theme = useTheme();
   const { themeName } = useAppTheme();
   const isEnterprise = themeName === 'enterprise';
@@ -253,9 +255,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
   ];
 
   const toolboxItems = [
-    { id: 'whois', title: 'Whois', icon: <Globe size={28} />, color: '#00f3ff' },
-    { id: 'cms', title: 'CMS Detector', icon: <Search size={28} />, color: '#00f3ff' },
-    { id: 'cve', title: 'CVE Lookup', icon: <Bug size={28} />, color: '#ff00ff' },
+    { id: 'whois', title: 'Whois', icon: <Globe size={28} />, color: tokens.accent.primary },
+    { id: 'cms', title: 'CMS Detector', icon: <Search size={28} />, color: tokens.accent.primary },
+    { id: 'cve', title: 'CVE Lookup', icon: <Bug size={28} />, color: tokens.accent.secondary },
     { id: 'waf', title: 'WAF Detector', icon: <ShieldAlert size={28} />, color: '#ff9800' },
   ];
 
@@ -327,7 +329,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             const isEnterprise = themeName === 'enterprise';
             const itemColor = isEnterprise
               ? (isActive ? theme.palette.primary.main : theme.palette.text.secondary)
-              : (isActive ? '#ec00ff' : '#00f3ff');
+              : (isActive ? '#ec00ff' : tokens.accent.primary);
 
             return (
               <React.Fragment key={item.title}>
@@ -646,7 +648,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       letterSpacing: '1px',
                       '&:hover': {
                         bgcolor: isEnterprise ? alpha(theme.palette.primary.main, 0.08) : 'rgba(0, 243, 255, 0.1)',
-                        color: isEnterprise ? theme.palette.primary.main : '#00f3ff',
+                        color: isEnterprise ? theme.palette.primary.main : tokens.accent.primary,
                       }
                     }
                   }
@@ -707,7 +709,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
             >
               <Box sx={{ px: 2, py: 1, mb: 1.5, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Typography sx={{
-                  color: isEnterprise ? theme.palette.primary.main : '#ff00ff',
+                  color: isEnterprise ? theme.palette.primary.main : tokens.accent.secondary,
                   fontFamily: 'var(--r3-heading-font)',
                   fontSize: '0.75rem',
                   fontWeight: 900,
@@ -993,9 +995,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       transition: 'all 0.2s',
                       '&:hover': {
                         bgcolor: 'rgba(0, 243, 255, 0.1)',
-                        color: '#00f3ff',
+                        color: tokens.accent.primary,
                         '& .menu-icon': {
-                          color: '#00f3ff',
+                          color: tokens.accent.primary,
                           filter: 'drop-shadow(0 0 5px #00f3ffaa)'
                         }
                       }

@@ -3,12 +3,14 @@ import { Box, Typography, Stack, CircularProgress, Chip, Button } from '@mui/mat
 import { useGraphStore } from '../../../store/useGraphStore';
 import { ShieldAlert, Activity } from 'lucide-react';
 import { useGraphNodeDetails, useCreateTicket } from '../api/graphApi';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 interface Props {
   projectSlug: string;
 }
 
 export const GraphNodeDetailPanel: React.FC<Props> = ({ projectSlug }) => {
+  const { tokens } = useThemeTokens();
   const { selectedNodeId, selectedNodeData, activePanel, setActivePanel } = useGraphStore();
   
   const { data: details, isLoading } = useGraphNodeDetails(
@@ -32,7 +34,7 @@ export const GraphNodeDetailPanel: React.FC<Props> = ({ projectSlug }) => {
     <Box sx={{
       width: 350,
       bgcolor: 'rgba(15, 23, 42, 0.95)',
-      borderLeft: '1px solid rgba(0,243,255,0.2)',
+      borderLeft: `1px solid ${tokens.accent.primary}33`,
       p: 2,
       display: 'flex',
       flexDirection: 'column',
@@ -41,29 +43,29 @@ export const GraphNodeDetailPanel: React.FC<Props> = ({ projectSlug }) => {
       overflowY: 'auto'
     }}>
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography sx={{ color: '#00f3ff', fontWeight: 800, fontSize: '14px', fontFamily: 'Orbitron' }}>
+        <Typography sx={{ color: tokens.accent.primary, fontWeight: 800, fontSize: '14px', fontFamily: 'Orbitron' }}>
           NODE DETAILS
         </Typography>
-        <Chip label={selectedNodeData?.type} size="small" sx={{ bgcolor: 'rgba(0,243,255,0.1)', color: '#00f3ff', fontSize: '10px' }} />
+        <Chip label={selectedNodeData?.type} size="small" sx={{ bgcolor: `${tokens.accent.primary}15`, color: tokens.accent.primary, fontSize: '10px' }} />
       </Box>
 
       {isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
-          <CircularProgress size={24} sx={{ color: '#00f3ff' }} />
+          <CircularProgress size={24} sx={{ color: tokens.accent.primary }} />
         </Box>
       ) : details ? (
         <Stack spacing={2}>
-          <Typography sx={{ color: '#fff', fontSize: '16px', fontWeight: 600, wordBreak: 'break-all' }}>
+          <Typography sx={{ color: 'text.primary', fontSize: '16px', fontWeight: 600, wordBreak: 'break-all' }}>
             {selectedNodeData?.label}
           </Typography>
 
-          <Box sx={{ bgcolor: 'rgba(255,255,255,0.02)', p: 1.5, borderRadius: 1, border: '1px solid rgba(255,255,255,0.05)' }}>
-            <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.5)', mb: 1, fontWeight: 700 }}>PROPERTIES</Typography>
+          <Box sx={{ bgcolor: 'action.hover', p: 1.5, borderRadius: 1, border: 1, borderColor: 'divider' }}>
+            <Typography sx={{ fontSize: '10px', color: 'text.secondary', mb: 1, fontWeight: 700 }}>PROPERTIES</Typography>
             <Stack spacing={1}>
               {Object.entries(details.properties || {}).map(([k, v]) => (
                 <Box key={k} sx={{ display: 'flex', justifyContent: 'space-between' }}>
                   <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.6)' }}>{k}</Typography>
-                  <Typography sx={{ fontSize: '11px', color: '#fff', fontWeight: 500, maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all' }}>
+                  <Typography sx={{ fontSize: '11px', color: 'text.primary', fontWeight: 500, maxWidth: '60%', textAlign: 'right', wordBreak: 'break-all' }}>
                     {String(v)}
                   </Typography>
                 </Box>
@@ -80,9 +82,9 @@ export const GraphNodeDetailPanel: React.FC<Props> = ({ projectSlug }) => {
               <Typography sx={{ fontSize: '18px', color: '#f97316', fontWeight: 800 }}>{selectedNodeData?.highVulnCount || 0}</Typography>
               <Typography sx={{ fontSize: '9px', color: 'rgba(249, 115, 22, 0.8)', fontWeight: 700 }}>HIGH</Typography>
             </Box>
-            <Box sx={{ flex: 1, bgcolor: 'rgba(0, 243, 255, 0.1)', p: 1, borderRadius: 1, border: '1px solid rgba(0, 243, 255, 0.2)', textAlign: 'center' }}>
-              <Typography sx={{ fontSize: '18px', color: '#00f3ff', fontWeight: 800 }}>{selectedNodeData?.degree_centrality || 0}</Typography>
-              <Typography sx={{ fontSize: '9px', color: 'rgba(0, 243, 255, 0.8)', fontWeight: 700 }}>EDGES</Typography>
+            <Box sx={{ flex: 1, bgcolor: `${tokens.accent.primary}15`, p: 1, borderRadius: 1, border: `1px solid ${tokens.accent.primary}33`, textAlign: 'center' }}>
+              <Typography sx={{ fontSize: '18px', color: tokens.accent.primary, fontWeight: 800 }}>{selectedNodeData?.degree_centrality || 0}</Typography>
+              <Typography sx={{ fontSize: '9px', color: `${tokens.accent.primary}CC`, fontWeight: 700 }}>EDGES</Typography>
             </Box>
           </Box>
 
@@ -92,7 +94,7 @@ export const GraphNodeDetailPanel: React.FC<Props> = ({ projectSlug }) => {
               variant="outlined" 
               startIcon={<Activity size={14} />}
               onClick={() => setActivePanel('blastRadius')}
-              sx={{ borderColor: 'rgba(0,243,255,0.3)', color: '#00f3ff', fontSize: '11px', fontWeight: 700 }}
+              sx={{ borderColor: `${tokens.accent.primary}4D`, color: tokens.accent.primary, fontSize: '11px', fontWeight: 700 }}
             >
               COMPUTE BLAST RADIUS
             </Button>
@@ -101,14 +103,14 @@ export const GraphNodeDetailPanel: React.FC<Props> = ({ projectSlug }) => {
               variant="contained" 
               startIcon={<ShieldAlert size={14} />}
               onClick={handleCreateTicket}
-              sx={{ bgcolor: '#ef4444', color: '#fff', fontSize: '11px', fontWeight: 700, '&:hover': { bgcolor: '#dc2626' } }}
+              sx={{ bgcolor: '#ef4444', color: 'text.primary', fontSize: '11px', fontWeight: 700, '&:hover': { bgcolor: '#dc2626' } }}
             >
               CREATE TICKET
             </Button>
           </Stack>
         </Stack>
       ) : (
-        <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px' }}>Failed to load details.</Typography>
+        <Typography sx={{ color: 'text.secondary', fontSize: '12px' }}>Failed to load details.</Typography>
       )}
     </Box>
   );

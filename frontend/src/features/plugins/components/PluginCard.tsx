@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 import React, { useState, useEffect } from 'react';
 import {
   Card,
@@ -70,6 +71,7 @@ const TRUST_CONFIG = {
 };
 
 const TrustBadge: React.FC<{ trustLevel: Plugin['trust_level'] }> = ({ trustLevel }) => {
+  const { tokens } = useThemeTokens();
   const cfg = TRUST_CONFIG[trustLevel] ?? TRUST_CONFIG.unsigned;
   return (
     <Chip
@@ -91,20 +93,26 @@ const TrustBadge: React.FC<{ trustLevel: Plugin['trust_level'] }> = ({ trustLeve
 
 // ── Details modal ─────────────────────────────────────────────────────────────
 
-const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-  <Typography sx={{ fontFamily: 'Orbitron', fontSize: '0.6rem', fontWeight: 900, letterSpacing: 2, color: '#00f3ff', mb: 0.75, textTransform: 'uppercase' }}>
+const SectionLabel: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { tokens } = useThemeTokens();
+  return (
+  <Typography sx={{ fontFamily: 'Orbitron', fontSize: '0.6rem', fontWeight: 900, letterSpacing: 2, color: tokens.accent.primary, mb: 0.75, textTransform: 'uppercase' }}>
     {children}
   </Typography>
-);
+  );
+};
 
-const KV: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) => (
+const KV: React.FC<{ label: string; value?: React.ReactNode }> = ({ label, value }) => {
+  const { tokens } = useThemeTokens();
+  return (
   value != null && value !== '' ? (
     <Box sx={{ display: 'flex', gap: 1.5, mb: 0.5 }}>
       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: 'rgba(255,255,255,0.35)', minWidth: 100, flexShrink: 0 }}>{label}</Typography>
       <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', color: 'rgba(255,255,255,0.75)', wordBreak: 'break-all' }}>{value}</Typography>
     </Box>
   ) : null
-);
+  );
+};
 
 interface DetailsModalProps {
   open: boolean;
@@ -113,6 +121,7 @@ interface DetailsModalProps {
 }
 
 const PluginDetailsModal: React.FC<DetailsModalProps> = ({ open, onClose, plugin }) => {
+  const { tokens } = useThemeTokens();
   const trustCfg = TRUST_CONFIG[plugin.trust_level] ?? TRUST_CONFIG.unsigned;
   const tools: Record<string, any> = plugin.tools_config ?? {};
   const manifest: Record<string, any> = plugin.manifest ?? {};
@@ -130,7 +139,7 @@ const PluginDetailsModal: React.FC<DetailsModalProps> = ({ open, onClose, plugin
             background: 'linear-gradient(145deg, rgba(8,8,18,0.98) 0%, rgba(12,12,22,0.99) 100%)',
             border: '1px solid rgba(0,243,255,0.15)',
             borderRadius: '16px',
-            color: '#fff',
+            color: 'text.primary',
           }
         }
       }}
@@ -142,7 +151,7 @@ const PluginDetailsModal: React.FC<DetailsModalProps> = ({ open, onClose, plugin
               {plugin.name[0]}
             </Avatar>
             <Box>
-              <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.85rem', color: '#fff' }}>
+              <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.85rem', color: 'text.primary' }}>
                 {plugin.name}
               </Typography>
               <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.35)', fontFamily: 'monospace' }}>
@@ -195,7 +204,7 @@ const PluginDetailsModal: React.FC<DetailsModalProps> = ({ open, onClose, plugin
             {Array.isArray(tools.tools) ? (
               tools.tools.map((t: any, i: number) => (
                 <Box key={i} sx={{ mb: 1, p: 1, bgcolor: 'rgba(0,243,255,0.04)', border: '1px solid rgba(0,243,255,0.08)', borderRadius: 1 }}>
-                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', fontWeight: 700, color: '#00f3ff' }}>
+                  <Typography sx={{ fontFamily: 'monospace', fontSize: '0.68rem', fontWeight: 700, color: tokens.accent.primary }}>
                     {t.name ?? `Tool ${i + 1}`}
                   </Typography>
                   {t.version && <KV label="version" value={t.version} />}
@@ -259,6 +268,7 @@ const PluginDetailsModal: React.FC<DetailsModalProps> = ({ open, onClose, plugin
 // ── Health dot status indicator ───────────────────────────────────────────────
 
 const HealthDot: React.FC<{ active: boolean }> = ({ active }) => {
+  const { tokens } = useThemeTokens();
   const { data, isError, isLoading } = useBurpHealth(active);
   if (!active) return null;
 
@@ -305,6 +315,7 @@ interface DocsModalProps {
 }
 
 const PluginDocsModal: React.FC<DocsModalProps> = ({ open, onClose, plugin }) => {
+  const { tokens } = useThemeTokens();
   const { data: docs, isLoading, isError } = usePluginDocs(plugin.slug, open);
 
   return (
@@ -319,13 +330,13 @@ const PluginDocsModal: React.FC<DocsModalProps> = ({ open, onClose, plugin }) =>
             background: 'linear-gradient(145deg, rgba(8,8,18,0.98) 0%, rgba(12,12,22,0.99) 100%)',
             border: '1px solid rgba(255, 102, 51, 0.2)', // Orange border for docs
             borderRadius: '16px',
-            color: '#fff',
+            color: 'text.primary',
           }
         }
       }}
     >
       <DialogTitle sx={{ pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.9rem', color: '#fff', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.9rem', color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1 }}>
           <DocIcon sx={{ color: '#FF6633' }} />
           {plugin.name} Documentation
         </Typography>
@@ -345,9 +356,9 @@ const PluginDocsModal: React.FC<DocsModalProps> = ({ open, onClose, plugin }) =>
           </Typography>
         ) : (
           <Box sx={{
-            '& h1, & h2, & h3, & h4': { fontFamily: 'Orbitron', fontWeight: 900, color: '#fff', mt: 2.5, mb: 1.5 },
+            '& h1, & h2, & h3, & h4': { fontFamily: 'Orbitron', fontWeight: 900, color: 'text.primary', mt: 2.5, mb: 1.5 },
             '& h1': { fontSize: '1.2rem', color: '#FF6633', borderBottom: '1px solid rgba(255,255,255,0.05)', pb: 0.5 },
-            '& h2': { fontSize: '1.05rem', color: '#00f3ff' },
+            '& h2': { fontSize: '1.05rem', color: tokens.accent.primary },
             '& h3': { fontSize: '0.9rem', color: 'rgba(255,255,255,0.85)' },
             '& p': { color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', lineHeight: 1.6, mb: 2 },
             '& li': { color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', lineHeight: 1.6 },
@@ -383,6 +394,7 @@ interface BurpConfigModalProps {
 }
 
 const BurpConfigModal: React.FC<BurpConfigModalProps> = ({ open, onClose }) => {
+  const { tokens } = useThemeTokens();
   const { data: config, isLoading } = useBurpConfig(open);
   const updateMutation = useUpdateBurpConfig();
 
@@ -420,6 +432,7 @@ const BurpConfigModal: React.FC<BurpConfigModalProps> = ({ open, onClose }) => {
   }, [config, open]);
 
   const handleSeverityChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const { tokens } = useThemeTokens();
     setSeverities({
       ...severities,
       [event.target.name]: event.target.checked,
@@ -463,13 +476,13 @@ const BurpConfigModal: React.FC<BurpConfigModalProps> = ({ open, onClose }) => {
             background: 'linear-gradient(145deg, rgba(8,8,18,0.98) 0%, rgba(12,12,22,0.99) 100%)',
             border: '1px solid rgba(255, 102, 51, 0.2)', // Orange border for Burp Pro
             borderRadius: '16px',
-            color: '#fff',
+            color: 'text.primary',
           }
         }
       }}
     >
       <DialogTitle sx={{ pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.9rem', color: '#fff', display: 'flex', alignItems: 'center', gap: 1 }}>
+        <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.9rem', color: 'text.primary', display: 'flex', alignItems: 'center', gap: 1 }}>
           <SettingsIcon sx={{ color: '#FF6633' }} />
           Burp Connection Config
         </Typography>
@@ -493,7 +506,7 @@ const BurpConfigModal: React.FC<BurpConfigModalProps> = ({ open, onClose }) => {
               onChange={(e) => setApiUrl(e.target.value)}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: '#fff',
+                  color: 'text.primary',
                   fontSize: '0.8rem',
                   '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
                   '&:hover fieldset': { borderColor: 'rgba(255,102,51,0.4)' },
@@ -524,7 +537,7 @@ const BurpConfigModal: React.FC<BurpConfigModalProps> = ({ open, onClose }) => {
               }}
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: '#fff',
+                  color: 'text.primary',
                   fontSize: '0.8rem',
                   '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
                   '&:hover fieldset': { borderColor: 'rgba(255,102,51,0.4)' },
@@ -549,7 +562,7 @@ const BurpConfigModal: React.FC<BurpConfigModalProps> = ({ open, onClose }) => {
                 />
               }
               label={
-                <Typography sx={{ color: '#fff', fontSize: '0.72rem' }}>
+                <Typography sx={{ color: 'text.primary', fontSize: '0.72rem' }}>
                   Auto-Import scan findings
                 </Typography>
               }
@@ -570,7 +583,7 @@ const BurpConfigModal: React.FC<BurpConfigModalProps> = ({ open, onClose }) => {
                 />
               }
               label={
-                <Typography sx={{ color: '#fff', fontSize: '0.72rem' }}>
+                <Typography sx={{ color: 'text.primary', fontSize: '0.72rem' }}>
                   Auto-Push targets to scope
                 </Typography>
               }
@@ -598,7 +611,7 @@ const BurpConfigModal: React.FC<BurpConfigModalProps> = ({ open, onClose }) => {
                       />
                     }
                     label={
-                      <Typography sx={{ color: '#fff', fontSize: '0.62rem', fontWeight: 700, fontFamily: 'Orbitron', textTransform: 'uppercase' }}>
+                      <Typography sx={{ color: 'text.primary', fontSize: '0.62rem', fontWeight: 700, fontFamily: 'Orbitron', textTransform: 'uppercase' }}>
                         {name}
                       </Typography>
                     }
@@ -639,6 +652,7 @@ const BurpConfigModal: React.FC<BurpConfigModalProps> = ({ open, onClose }) => {
 // ── Main card ─────────────────────────────────────────────────────────────────
 
 const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin, onInstallStarted }) => {
+  const { tokens } = useThemeTokens();
   const toggleMutation = useTogglePlugin();
   const deleteMutation = useDeletePlugin();
   const installMutation = useInstallMarketplacePlugin();
@@ -715,7 +729,7 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin, onInstallStart
                 {data.name[0]}
               </Avatar>
               <Box>
-                <Typography variant="h6" sx={{ fontWeight: "bold", color: '#fff', minHeight: '3.1em', lineHeight: 1.235, display: 'flex', alignItems: 'flex-start' }}>
+                <Typography variant="h6" sx={{ fontWeight: "bold", color: 'text.primary', minHeight: '3.1em', lineHeight: 1.235, display: 'flex', alignItems: 'flex-start' }}>
                   {data.name}
                   {plugin && plugin.slug === 'burpsuite_integration' && (
                     <HealthDot active={plugin.is_enabled} />
@@ -849,7 +863,7 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin, onInstallStart
                 </IconButton>
                 <IconButton
                   size="small"
-                  sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff' } }}
+                  sx={{ color: 'rgba(255,255,255,0.3)', '&:hover': { color: tokens.accent.primary } }}
                   onClick={() => {
                     if (plugin?.slug === 'burpsuite_integration') {
                       setIsBurpConfigOpen(true);
@@ -934,7 +948,7 @@ const PluginCard: React.FC<Props> = ({ plugin, marketplacePlugin, onInstallStart
           sx={{
             fontFamily: 'Orbitron',
             fontWeight: 800,
-            bgcolor: '#00f3ff',
+            bgcolor: tokens.accent.primary,
             color: '#000',
             borderRadius: 0
           }}

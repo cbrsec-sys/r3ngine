@@ -40,6 +40,7 @@ import {
 } from '../api/useAttackPaths';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { Bot, Brain } from 'lucide-react';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 // ─── Risk → color mapping ────────────────────────────────────────────────────
 const RISK_COLOR: Record<string, string> = {
@@ -60,6 +61,7 @@ const RISK_LABEL: Record<string, string> = {
 
 // ─── Risk badge ───────────────────────────────────────────────────────────────
 const RiskBadge: React.FC<{ risk: string }> = ({ risk }) => {
+  const { tokens } = useThemeTokens();
   const color = RISK_COLOR[risk] ?? RISK_COLOR.unknown;
   const label = RISK_LABEL[risk] ?? risk?.toUpperCase() ?? 'UNKNOWN';
   return (
@@ -85,15 +87,16 @@ const RiskBadge: React.FC<{ risk: string }> = ({ risk }) => {
 
 // ─── Enriched Node Rendering ──────────────────────────────────────────────────
 const RenderNode: React.FC<{ node: EnrichedNode | undefined; rawId: string; projectSlug?: string }> = ({ node, rawId, projectSlug }) => {
+  const { tokens } = useThemeTokens();
   const theme = useTheme();
   const type = node?.type ?? (rawId.startsWith('vuln::') ? 'Vulnerability' : rawId.startsWith('goal::capability::') ? 'Capability' : rawId.startsWith('goal::privilege::') ? 'Privilege' : 'Asset');
   const subtype = node?.subtype ?? rawId.split('::').pop() ?? '';
   const name = node?.name ?? (type === 'Vulnerability' ? `Vulnerability #${subtype}` : subtype);
   
-  let color = '#00f3ff';
+  let color = tokens.accent.primary;
   let icon = <Server size={14} />;
   let bgColor = 'rgba(0, 243, 255, 0.03)';
-  let borderColor = 'rgba(0, 243, 255, 0.1)';
+  let borderColor = `${tokens.accent.primary}15`;
   
   if (type === 'Vulnerability') {
     const severity = node?.severity ?? 2;
@@ -156,7 +159,7 @@ const RenderNode: React.FC<{ node: EnrichedNode | undefined; rawId: string; proj
               fontSize: '0.55rem',
               fontWeight: 900,
               fontFamily: 'Orbitron',
-              color: 'rgba(255,255,255,0.4)',
+              color: 'text.secondary',
               letterSpacing: 0.5,
             }}
           >
@@ -170,8 +173,8 @@ const RenderNode: React.FC<{ node: EnrichedNode | undefined; rawId: string; proj
                 height: 14,
                 fontSize: '0.5rem',
                 fontFamily: 'monospace',
-                bgcolor: 'rgba(255,255,255,0.05)',
-                color: '#fff',
+                bgcolor: 'action.hover',
+                color: 'text.primary',
                 border: '1px solid rgba(255,255,255,0.1)',
                 '& .MuiChip-label': { px: 0.5 }
               }}
@@ -219,6 +222,7 @@ const RenderNode: React.FC<{ node: EnrichedNode | undefined; rawId: string; proj
 
 // ─── Timeline Connector Edge ──────────────────────────────────────────────────
 const TimelineConnector: React.FC<{ step: AttackStep }> = ({ step }) => {
+  const { tokens } = useThemeTokens();
   const isValidated = step.validated;
   const edgeColor = isValidated ? '#00ff62' : '#ff9f00';
   const Icon = isValidated ? CheckCircle2 : HelpCircle;
@@ -242,7 +246,7 @@ const TimelineConnector: React.FC<{ step: AttackStep }> = ({ step }) => {
           ml: 4,
           p: 1.5,
           borderRadius: 1,
-          bgcolor: 'rgba(255,255,255,0.01)',
+          bgcolor: 'action.hover',
           border: '1px solid rgba(255,255,255,0.03)',
           zIndex: 1,
         }}
@@ -261,8 +265,8 @@ const TimelineConnector: React.FC<{ step: AttackStep }> = ({ step }) => {
               fontFamily: 'Orbitron',
             }}
           />
-          <Typography sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>
-            CONF: <Box component="span" sx={{ color: '#00f3ff' }}>{(step.confidence * 100).toFixed(0)}%</Box>
+          <Typography sx={{ fontSize: '0.6rem', color: 'text.disabled', fontWeight: 700 }}>
+            CONF: <Box component="span" sx={{ color: tokens.accent.primary }}>{(step.confidence * 100).toFixed(0)}%</Box>
           </Typography>
           <Stack direction="row" spacing={0.5} sx={{ alignItems: 'center', ml: 'auto' }}>
             <Icon size={10} color={edgeColor} />
@@ -282,6 +286,7 @@ const TimelineConnector: React.FC<{ step: AttackStep }> = ({ step }) => {
 
 // ─── Timeline Assembler ───────────────────────────────────────────────────────
 const AttackPathTimeline: React.FC<{ steps: AttackStep[]; projectSlug?: string }> = ({ steps, projectSlug }) => {
+  const { tokens } = useThemeTokens();
   if (!steps || steps.length === 0) return null;
 
   return (
@@ -310,6 +315,7 @@ interface AttackPathCardProps {
 }
 
 const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug }) => {
+  const { tokens } = useThemeTokens();
   const [expanded, setExpanded] = useState(rank === 0);
   const riskColor = RISK_COLOR[path.risk] ?? RISK_COLOR.unknown;
   const validatedCount = path.steps.filter((s) => s.validated).length;
@@ -348,7 +354,7 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
           px: 2,
           py: 1.5,
           cursor: 'pointer',
-          '&:hover': { bgcolor: 'rgba(255,255,255,0.02)' },
+          '&:hover': { bgcolor: 'action.hover' },
         }}
         onClick={() => setExpanded((p) => !p)}
       >
@@ -378,7 +384,7 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
             <RiskBadge risk={path.risk} />
             <Typography
               noWrap
-              sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', fontFamily: 'monospace', fontStyle: 'italic' }}
+              sx={{ fontSize: '0.7rem', color: 'text.secondary', fontFamily: 'monospace', fontStyle: 'italic' }}
             >
               {path.path_id}
             </Typography>
@@ -405,15 +411,15 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
             <Typography sx={{ fontSize: { xs: '0.8rem', sm: '1rem' }, fontWeight: 900, color: riskColor, fontFamily: 'Orbitron' }}>
               {path.score.toFixed(2)}
             </Typography>
-            <Typography sx={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>SCORE</Typography>
+            <Typography sx={{ fontSize: '0.55rem', color: 'text.disabled', fontWeight: 700 }}>SCORE</Typography>
           </Stack>
           <Stack sx={{ alignItems: 'center' }}>
-            <Typography sx={{ fontSize: { xs: '0.8rem', sm: '1rem' }, fontWeight: 900, color: '#00f3ff', fontFamily: 'Orbitron' }}>
+            <Typography sx={{ fontSize: { xs: '0.8rem', sm: '1rem' }, fontWeight: 900, color: tokens.accent.primary, fontFamily: 'Orbitron' }}>
               {path.step_count}
             </Typography>
-            <Typography sx={{ fontSize: '0.55rem', color: 'rgba(255,255,255,0.3)', fontWeight: 700 }}>STEPS</Typography>
+            <Typography sx={{ fontSize: '0.55rem', color: 'text.disabled', fontWeight: 700 }}>STEPS</Typography>
           </Stack>
-          <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.4)', display: { xs: 'none', sm: 'inline-flex' } }}>
+          <IconButton size="small" sx={{ color: 'text.secondary', display: { xs: 'none', sm: 'inline-flex' } }}>
             {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </IconButton>
         </Stack>
@@ -505,7 +511,7 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
               <Typography
                 sx={{
                   fontSize: '0.62rem',
-                  color: '#00f3ff',
+                  color: tokens.accent.primary,
                   fontWeight: 900,
                   fontFamily: 'Orbitron',
                   letterSpacing: 1,
@@ -523,12 +529,12 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
                   sx={{
                     fontSize: '0.55rem',
                     height: 20,
-                    borderColor: 'rgba(0,243,255,0.3)',
-                    color: '#00f3ff',
+                    borderColor: `${tokens.accent.primary}4D`,
+                    color: tokens.accent.primary,
                     fontFamily: 'Orbitron',
                     '&:hover': {
-                      borderColor: '#00f3ff',
-                      bgcolor: 'rgba(0,243,255,0.05)',
+                      borderColor: tokens.accent.primary,
+                      bgcolor: `${tokens.accent.primary}0D`,
                     },
                   }}
                 >
@@ -551,7 +557,7 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
               <Typography
                 sx={{
                   fontSize: '0.7rem',
-                  color: 'rgba(255,255,255,0.4)',
+                  color: 'text.secondary',
                   fontStyle: 'italic',
                 }}
               >
@@ -564,7 +570,7 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
 
 
           <Typography
-            sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.3)', fontWeight: 800, mb: 2, letterSpacing: 1 }}
+            sx={{ fontSize: '0.6rem', color: 'text.disabled', fontWeight: 800, mb: 2, letterSpacing: 1 }}
           >
             COMPROMISE CHAIN TIMELINE
           </Typography>
@@ -577,7 +583,9 @@ const AttackPathCard: React.FC<AttackPathCardProps> = ({ path, rank, projectSlug
 };
 
 // ─── Empty state ──────────────────────────────────────────────────────────────
-const EmptyState: React.FC = () => (
+const EmptyState: React.FC = () => {
+  const { tokens } = useThemeTokens();
+  return (
   <Box
     sx={{
       py: 8,
@@ -589,18 +597,19 @@ const EmptyState: React.FC = () => (
       opacity: 0.5,
     }}
   >
-    <GitBranch size={48} color="#00f3ff" />
+    <GitBranch size={48} color={tokens.accent.primary} />
     <Box>
-      <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: '#fff', mb: 0.5 }}>
+      <Typography sx={{ fontSize: '0.9rem', fontWeight: 800, color: 'text.primary', mb: 0.5 }}>
         No Attack Paths Found
       </Typography>
-      <Typography sx={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.5)', maxWidth: 320, mx: 'auto' }}>
+      <Typography sx={{ fontSize: '0.75rem', color: 'text.secondary', maxWidth: 320, mx: 'auto' }}>
         The Attack Path Modeling Engine (APME) runs automatically after vulnerability scanning.
         No exploitable paths were detected for this scan.
       </Typography>
     </Box>
   </Box>
 );
+};
 
 // ─── Main Tab ─────────────────────────────────────────────────────────────────
 interface AttackPathsTabProps {
@@ -608,6 +617,7 @@ interface AttackPathsTabProps {
 }
 
 export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
+  const { tokens } = useThemeTokens();
   const { data, isLoading, isError, refetch } = useAttackPaths(scanId);
   const triggerAi = useTriggerAttackPathModeling();
   const recalculatePaths = useRecalculateAttackPaths();
@@ -656,12 +666,12 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
             sx={{
               fontSize: '0.6rem',
               height: 24,
-              borderColor: 'rgba(0,243,255,0.3)',
-              color: '#00f3ff',
+              borderColor: `${tokens.accent.primary}4D`,
+              color: tokens.accent.primary,
               fontFamily: 'Orbitron',
               '&:hover': {
-                borderColor: '#00f3ff',
-                bgcolor: 'rgba(0,243,255,0.05)',
+                borderColor: tokens.accent.primary,
+                bgcolor: `${tokens.accent.primary}0D`,
               },
             }}
           >
@@ -676,12 +686,12 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
             sx={{
               fontSize: '0.6rem',
               height: 24,
-              borderColor: 'rgba(0,243,255,0.3)',
-              color: '#00f3ff',
+              borderColor: `${tokens.accent.primary}4D`,
+              color: tokens.accent.primary,
               fontFamily: 'Orbitron',
               '&:hover': {
-                borderColor: '#00f3ff',
-                bgcolor: 'rgba(0,243,255,0.05)',
+                borderColor: tokens.accent.primary,
+                bgcolor: `${tokens.accent.primary}0D`,
               },
             }}
           >
@@ -708,7 +718,7 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
             p: 1.5,
             borderRadius: 1,
             bgcolor: 'rgba(0,0,0,0.3)',
-            border: '1px solid rgba(255,255,255,0.05)',
+            border: 1, borderColor: 'divider',
             flexWrap: 'wrap',
             gap: 1,
           }}
@@ -738,8 +748,8 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
         {/* Content */}
         {isLoading && (
           <Box sx={{ py: 6, textAlign: 'center' }}>
-            <CircularProgress size={32} sx={{ color: '#00f3ff' }} />
-            <Typography sx={{ mt: 2, fontSize: '0.75rem', color: 'rgba(255,255,255,0.4)' }}>
+            <CircularProgress size={32} sx={{ color: tokens.accent.primary }} />
+            <Typography sx={{ mt: 2, fontSize: '0.75rem', color: 'text.secondary' }}>
               Loading attack paths...
             </Typography>
           </Box>
@@ -788,7 +798,7 @@ export const AttackPathsTab: React.FC<AttackPathsTabProps> = ({ scanId }) => {
             fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}E6` : 'rgba(255, 0, 85, 0.9)',
             color: '#000',
             border: '1px solid rgba(255,255,255,0.1)',
             '& .MuiAlert-icon': { color: '#000' }

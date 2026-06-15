@@ -36,6 +36,7 @@ import {
 import { useSearch, useSearchHistory } from '../api';
 import { escapeRegExp } from '../../../utils/securityUtils';
 import { useParams, useNavigate, useSearch as useUrlSearch } from '@tanstack/react-router';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 const SEVERITY_COLORS: Record<number, string> = {
   4: '#ff1744', // Critical
@@ -46,15 +47,16 @@ const SEVERITY_COLORS: Record<number, string> = {
   [-1]: '#9e9e9e' // Unknown
 };
 
-const TAB_STYLE = {
+const getTabStyle = (tokens: any) => ({
   fontFamily: 'Orbitron',
   fontWeight: 700,
   fontSize: '0.75rem',
   letterSpacing: 1,
-  '&.Mui-selected': { color: '#00f3ff' }
-};
+  '&.Mui-selected': { color: tokens.accent.primary }
+});
 
 export const SearchPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { projectSlug } = useParams({ strict: false });
   const urlSearch = useUrlSearch({ strict: false }) as { query?: string };
   const navigate = useNavigate();
@@ -80,7 +82,7 @@ export const SearchPage: React.FC = () => {
       <span>
         {parts.map((part, i) => 
           part.toLowerCase() === highlight.toLowerCase() ? (
-            <span key={i} style={{ color: '#00f3ff', textShadow: '0 0 10px rgba(0, 243, 255, 0.5)', fontWeight: 700 }}>{part}</span>
+            <span key={i} style={{ color: tokens.accent.primary, textShadow: `0 0 10px ${tokens.accent.primary}80`, fontWeight: 700 }}>{part}</span>
           ) : (
             part
           )
@@ -90,16 +92,16 @@ export const SearchPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 4, bgcolor: '#0a0a0a', minHeight: '100vh' }}>
+    <Box sx={{ p: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
       {/* Search Header */}
       <Box sx={{ maxWidth: 900, mx: 'auto', mb: 6 }}>
         <Typography variant="h4" sx={{ 
           fontFamily: 'Orbitron', 
           fontWeight: 900, 
-          color: '#fff',
+          color: 'text.primary',
           textAlign: 'center',
           mb: 4,
-          textShadow: '0 0 20px rgba(0, 243, 255, 0.3)'
+          textShadow: `0 0 20px ${tokens.accent.primary}4D`
         }}>
           UNIVERSAL SEARCH
         </Typography>
@@ -114,12 +116,12 @@ export const SearchPage: React.FC = () => {
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search size={24} style={{ color: '#00f3ff', marginRight: 8 }} />
+                    <Search size={24} style={{ color: tokens.accent.primary, marginRight: 8 }} />
                   </InputAdornment>
                 ),
                 endAdornment: (
                   <InputAdornment position="end">
-                    <IconButton onClick={() => handleSearch()} sx={{ color: '#00f3ff' }}>
+                    <IconButton onClick={() => handleSearch()} sx={{ color: tokens.accent.primary }}>
                       <ChevronRight size={24} />
                     </IconButton>
                   </InputAdornment>
@@ -128,18 +130,18 @@ export const SearchPage: React.FC = () => {
             }}
             sx={{
               '& .MuiOutlinedInput-root': {
-                bgcolor: 'rgba(255, 255, 255, 0.02)',
-                border: '1px solid rgba(0, 243, 255, 0.2)',
+                bgcolor: 'action.hover',
+                border: 1, borderColor: `${tokens.accent.primary}33`,
                 borderRadius: '12px',
                 fontSize: '1.2rem',
-                color: '#fff',
+                color: 'text.primary',
                 '&:hover': {
-                  borderColor: 'rgba(0, 243, 255, 0.5)',
-                  boxShadow: '0 0 15px rgba(0, 243, 255, 0.1)'
+                  borderColor: `${tokens.accent.primary}80`,
+                  boxShadow: `0 0 15px ${tokens.accent.primary}1A`
                 },
                 '&.Mui-focused': {
-                  borderColor: '#00f3ff',
-                  boxShadow: '0 0 20px rgba(0, 243, 255, 0.2)'
+                  borderColor: tokens.accent.primary,
+                  boxShadow: `0 0 20px ${tokens.accent.primary}33`
                 }
               }
             }}
@@ -149,7 +151,7 @@ export const SearchPage: React.FC = () => {
         {/* Search History Chips */}
         {searchHistory?.status && searchHistory.results.length > 0 && !urlSearch.query && (
           <Stack direction="row" spacing={1} sx={{ mt: 3, flexWrap: 'wrap', gap: 1 }}>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'rgba(255,255,255,0.4)', mr: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'text.disabled', mr: 1 }}>
               <History size={16} />
               <Typography variant="caption">RECENT:</Typography>
             </Box>
@@ -162,9 +164,9 @@ export const SearchPage: React.FC = () => {
                   navigate({ search: { query: item.query } as any });
                 }}
                 sx={{ 
-                  bgcolor: 'rgba(255,255,255,0.05)', 
-                  color: 'rgba(255,255,255,0.6)',
-                  '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff' }
+                  bgcolor: 'action.hover', 
+                  color: 'text.secondary',
+                  '&:hover': { bgcolor: `${tokens.accent.primary}1A`, color: tokens.accent.primary }
                 }}
               />
             ))}
@@ -176,8 +178,8 @@ export const SearchPage: React.FC = () => {
       <Box sx={{ maxWidth: 1100, mx: 'auto' }}>
         {isLoading ? (
           <Box sx={{ textAlign: 'center', py: 10 }}>
-            <CircularProgress sx={{ color: '#00f3ff' }} />
-            <Typography variant="body2" sx={{ mt: 2, color: 'rgba(255,255,255,0.4)', letterSpacing: 2 }}>
+            <CircularProgress sx={{ color: tokens.accent.primary }} />
+            <Typography variant="body2" sx={{ mt: 2, color: 'text.disabled', letterSpacing: 2 }}>
               SCANNING_DATABASES...
             </Typography>
           </Box>
@@ -190,12 +192,12 @@ export const SearchPage: React.FC = () => {
             <Tabs 
               value={activeTab} 
               onChange={(_, v) => setActiveTab(v)}
-              sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', mb: 4 }}
+              sx={{ borderBottom: 1, borderColor: 'divider', mb: 4 }}
             >
-              <Tab label={`SUBDOMAINS (${searchResults.results.subdomains.length})`} sx={TAB_STYLE} />
-              <Tab label={`ENDPOINTS (${searchResults.results.endpoints.length})`} sx={TAB_STYLE} />
-              <Tab label={`VULNERABILITIES (${searchResults.results.vulnerabilities.length})`} sx={TAB_STYLE} />
-              <Tab label={`OTHERS (${searchResults.results.others.length})`} sx={TAB_STYLE} />
+              <Tab label={`SUBDOMAINS (${searchResults.results.subdomains.length})`} sx={getTabStyle(tokens)} />
+              <Tab label={`ENDPOINTS (${searchResults.results.endpoints.length})`} sx={getTabStyle(tokens)} />
+              <Tab label={`VULNERABILITIES (${searchResults.results.vulnerabilities.length})`} sx={getTabStyle(tokens)} />
+              <Tab label={`OTHERS (${searchResults.results.others.length})`} sx={getTabStyle(tokens)} />
             </Tabs>
 
             <Box sx={{ minHeight: 400 }}>
@@ -203,12 +205,12 @@ export const SearchPage: React.FC = () => {
                 <Stack spacing={2}>
                   {searchResults.results.subdomains.length > 0 ? (
                     searchResults.results.subdomains.map((s, idx) => (
-                      <Card key={idx} sx={{ bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <Card key={idx} sx={{ bgcolor: 'action.hover', border: 1, borderColor: 'divider' }}>
                         <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Stack direction="row" spacing={3} sx={{ alignItems: "center" }}>
-                            <Box sx={{ color: '#00f3ff' }}><Globe size={20} /></Box>
+                            <Box sx={{ color: tokens.accent.primary }}><Globe size={20} /></Box>
                             <Box>
-                              <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 600 }}>
+                              <Typography variant="subtitle1" sx={{ color: 'text.primary', fontWeight: 600 }}>
                                 {highlightText(s.name, urlSearch.query || '')}
                                 <Chip 
                                   label={s.http_status} 
@@ -221,16 +223,16 @@ export const SearchPage: React.FC = () => {
                                 />
                               </Typography>
                               {s.page_title && (
-                                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)' }}>
+                                <Typography variant="body2" sx={{ color: 'text.disabled' }}>
                                   {highlightText(s.page_title, urlSearch.query || '')}
                                 </Typography>
                               )}
-                              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                              <Typography variant="caption" sx={{ color: 'text.disabled' }}>
                                 {s.http_url}
                               </Typography>
                             </Box>
                           </Stack>
-                          <IconButton component={Link} href={s.http_url} target="_blank" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                          <IconButton component={Link} href={s.http_url} target="_blank" sx={{ color: 'text.disabled' }}>
                             <ExternalLink size={18} />
                           </IconButton>
                         </CardContent>
@@ -246,21 +248,21 @@ export const SearchPage: React.FC = () => {
                 <Stack spacing={2}>
                   {searchResults.results.endpoints.length > 0 ? (
                     searchResults.results.endpoints.map((e, idx) => (
-                      <Card key={idx} sx={{ bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <Card key={idx} sx={{ bgcolor: 'action.hover', border: 1, borderColor: 'divider' }}>
                         <CardContent sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <Stack direction="row" spacing={3} sx={{ alignItems: "center" }}>
-                            <Box sx={{ color: '#ffd600' }}><LinkIcon size={20} /></Box>
+                            <Box sx={{ color: tokens.accent.secondary }}><LinkIcon size={20} /></Box>
                             <Box>
-                              <Typography variant="body2" sx={{ color: '#fff', wordBreak: 'break-all' }}>
+                              <Typography variant="body2" sx={{ color: 'text.primary', wordBreak: 'break-all' }}>
                                 {highlightText(e.http_url, urlSearch.query || '')}
                               </Typography>
-                              <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Typography variant="caption" sx={{ color: 'text.disabled', display: 'flex', alignItems: 'center', gap: 1 }}>
                                 STATUS: {e.http_status}
                                 {e.page_title && ` | TITLE: ${e.page_title}`}
                               </Typography>
                             </Box>
                           </Stack>
-                          <IconButton component={Link} href={e.http_url} target="_blank" sx={{ color: 'rgba(255,255,255,0.3)' }}>
+                          <IconButton component={Link} href={e.http_url} target="_blank" sx={{ color: 'text.disabled' }}>
                             <ExternalLink size={18} />
                           </IconButton>
                         </CardContent>
@@ -276,12 +278,12 @@ export const SearchPage: React.FC = () => {
                 <Stack spacing={2}>
                   {searchResults.results.vulnerabilities.length > 0 ? (
                     searchResults.results.vulnerabilities.map((v, idx) => (
-                      <Card key={idx} sx={{ bgcolor: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                      <Card key={idx} sx={{ bgcolor: 'action.hover', border: 1, borderColor: 'divider' }}>
                         <CardContent>
                           <Stack direction="row" spacing={3} sx={{ alignItems: "flex-start" }}>
                             <Box sx={{ color: SEVERITY_COLORS[v.severity] || '#fff', mt: 0.5 }}><ShieldAlert size={20} /></Box>
                             <Box sx={{ flexGrow: 1 }}>
-                              <Typography variant="subtitle1" sx={{ color: '#fff', fontWeight: 600 }}>
+                              <Typography variant="subtitle1" sx={{ color: 'text.primary', fontWeight: 600 }}>
                                 {highlightText(v.name, urlSearch.query || '')}
                                 <Chip 
                                   label={getSeverityName(v.severity)} 
@@ -295,12 +297,12 @@ export const SearchPage: React.FC = () => {
                                 />
                               </Typography>
                               {v.http_url && (
-                                <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.7)', display: 'block', mb: 1 }}>
+                                <Typography variant="caption" sx={{ color: tokens.accent.primary, opacity: 0.7, display: 'block', mb: 1 }}>
                                   {v.http_url}
                                 </Typography>
                               )}
                               {v.description && (
-                                <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.5)', mt: 1 }}>
+                                <Typography variant="body2" sx={{ color: 'text.disabled', mt: 1 }}>
                                   {highlightText(v.description, urlSearch.query || '')}
                                 </Typography>
                               )}
@@ -334,9 +336,9 @@ export const SearchPage: React.FC = () => {
 };
 
 const EmptyState = ({ message, icon }: { message: string; icon?: React.ReactNode }) => (
-  <Box sx={{ textAlign: 'center', py: 8, bgcolor: 'rgba(255,255,255,0.01)', borderRadius: 2, border: '1px dashed rgba(255,255,255,0.05)' }}>
-    <Box sx={{ color: 'rgba(255,255,255,0.2)', mb: 2 }}>{icon || <FileCode size={40} />}</Box>
-    <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.3)', letterSpacing: 2, fontFamily: 'Orbitron' }}>
+  <Box sx={{ textAlign: 'center', py: 8, bgcolor: 'action.hover', borderRadius: 2, border: 1, borderColor: 'divider', borderStyle: 'dashed' }}>
+    <Box sx={{ color: 'text.disabled', mb: 2 }}>{icon || <FileCode size={40} />}</Box>
+    <Typography variant="body2" sx={{ color: 'text.disabled', letterSpacing: 2, fontFamily: 'Orbitron' }}>
       {message}
     </Typography>
   </Box>

@@ -25,6 +25,7 @@ import {
 import { useEndpoints } from '../../endpoints/api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { copyToClipboard } from '../../endpoints/utils/copy';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 interface EndpointsTabProps {
   projectSlug: string;
@@ -34,6 +35,7 @@ interface EndpointsTabProps {
 }
 
 export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId, matchedGfCounts, targetId }) => {
+  const { tokens } = useThemeTokens();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
@@ -63,7 +65,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
 
   const getStatusColor = (status: number) => {
     if (status >= 200 && status < 300) return '#00ff62';
-    if (status >= 300 && status < 400) return '#00f3ff';
+    if (status >= 300 && status < 400) return tokens.accent.primary;
     if (status >= 400 && status < 500) return '#ffae00';
     if (status >= 500) return '#ff003c';
     return '#888';
@@ -79,8 +81,8 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
           borderRadius: '4px',
           overflow: 'hidden',
           flex: 1,
-          border: '1px solid rgba(0, 243, 255, 0.2)',
-          boxShadow: '0 0 20px rgba(0, 243, 255, 0.05)'
+          border: `1px solid ${tokens.accent.primary}33`,
+          boxShadow: `0 0 20px ${tokens.accent.primary}0D`
         }}>
           <InputBase
             placeholder={selectedGfPattern ? `Search within ${selectedGfPattern.toUpperCase()} endpoints...` : "Filter Endpoints..."}
@@ -92,23 +94,23 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
               px: 3,
               py: 1.5,
               fontSize: '0.9rem',
-              color: '#fff',
-              '&::placeholder': { color: 'rgba(255,255,255,0.3)', opacity: 1 }
+              color: 'text.primary',
+              '&::placeholder': { color: 'text.disabled', opacity: 1 }
             }}
           />
           <Button
             onClick={handleSearch}
             startIcon={<Search size={18} />}
             sx={{
-              bgcolor: 'rgba(0, 243, 255, 0.1)',
-              color: '#00f3ff',
+              bgcolor: `${tokens.accent.primary}15`,
+              color: tokens.accent.primary,
               px: 4,
               borderRadius: 0,
               fontWeight: 800,
               letterSpacing: 2,
               fontFamily: 'Orbitron',
-              borderLeft: '1px solid rgba(0, 243, 255, 0.2)',
-              '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+              borderLeft: `1px solid ${tokens.accent.primary}33`,
+              '&:hover': { bgcolor: `${tokens.accent.primary}33` }
             }}
           >
             SEARCH
@@ -125,13 +127,13 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
               sx={{
                 height: '100%',
                 px: 2,
-                borderColor: 'rgba(0, 243, 255, 0.2)',
+                borderColor: `${tokens.accent.primary}33`,
                 color: selectedGfPattern ? '#ff003c' : '#fff',
                 bgcolor: selectedGfPattern ? 'rgba(255, 0, 60, 0.05)' : 'rgba(255,255,255,0.03)',
                 fontWeight: 800,
                 fontSize: '0.75rem',
                 letterSpacing: 1,
-                '&:hover': { borderColor: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)' }
+                '&:hover': { borderColor: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D` }
               }}
             >
               {selectedGfPattern ? `PATTERN: ${selectedGfPattern.toUpperCase()}` : 'QUERY SPECIFIC ENDPOINTS'}
@@ -144,7 +146,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                 paper: {
                   sx: {
                     bgcolor: '#0a0a0f',
-                    border: '1px solid rgba(0, 243, 255, 0.2)',
+                    border: `1px solid ${tokens.accent.primary}33`,
                     boxShadow: '0 0 30px rgba(0,0,0,0.5)',
                     mt: 1,
                     '& .MuiMenuItem-root': {
@@ -153,7 +155,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                       color: 'rgba(255,255,255,0.7)',
                       px: 3,
                       py: 1,
-                      '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff' }
+                      '&:hover': { bgcolor: `${tokens.accent.primary}15`, color: tokens.accent.primary }
                     }
                   }
                 }
@@ -176,23 +178,23 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
       {/* Main Tactical Panel */}
       <TacticalPanel title={selectedGfPattern ? `ENDPOINTS: ${selectedGfPattern.toUpperCase()}` : "ALL ENDPOINTS"} icon={<LayoutGrid size={14} />}>
         {/* Table Controls */}
-        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: 1 }}>
-              RESULTS : <Box component="span" sx={{ color: '#00f3ff' }}>{data?.count || 0}</Box>
+            <Typography sx={{ fontSize: '11px', fontWeight: 700, color: 'text.secondary', letterSpacing: 1 }}>
+              RESULTS : <Box component="span" sx={{ color: tokens.accent.primary }}>{data?.count || 0}</Box>
             </Typography>
-            <Box sx={{ px: 2, py: 0.5, bgcolor: 'rgba(0, 243, 255, 0.05)', borderRadius: 0.5, border: '1px solid rgba(0, 243, 255, 0.1)' }}>
-              <Typography sx={{ fontSize: '10px', fontWeight: 800, color: '#00f3ff', fontFamily: 'Orbitron' }}>
+            <Box sx={{ px: 2, py: 0.5, bgcolor: `${tokens.accent.primary}0D`, borderRadius: 0.5, border: `1px solid ${tokens.accent.primary}15` }}>
+              <Typography sx={{ fontSize: '10px', fontWeight: 800, color: tokens.accent.primary, fontFamily: 'Orbitron' }}>
                 PAGE {page} OF {Math.ceil((data?.count || 0) / 100) || 1}
               </Typography>
             </Box>
           </Box>
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Tooltip title="Refresh">
-              <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.5)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1 }}><Filter size={16} /></IconButton>
+              <IconButton size="small" sx={{ color: 'text.secondary', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1 }}><Filter size={16} /></IconButton>
             </Tooltip>
             <Tooltip title="Export Data">
-              <IconButton size="small" sx={{ color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.1)', border: '1px solid rgba(0, 243, 255, 0.2)', borderRadius: 1 }}><Download size={16} /></IconButton>
+              <IconButton size="small" sx={{ color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}15`, border: `1px solid ${tokens.accent.primary}33`, borderRadius: 1 }}><Download size={16} /></IconButton>
             </Tooltip>
           </Box>
         </Box>
@@ -202,7 +204,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
           overflowX: 'auto',
           width: '100%',
           '&::-webkit-scrollbar': { height: '6px' },
-          '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderRadius: '3px' }
+          '&::-webkit-scrollbar-thumb': { bgcolor: `${tokens.accent.primary}33`, borderRadius: '3px' }
         }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead>
@@ -211,39 +213,39 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                 borderBottom: '1px solid rgba(255,255,255,0.1)',
                 backgroundColor: 'rgba(255,255,255,0.02)'
               }}>
-                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>HTTP URL</th>
-                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</th>
-                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PAGE TITLE</Box>
-                <Box component="th" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>TAGS</Box>
-                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>INFO</Box>
+                <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>HTTP URL</th>
+                <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</th>
+                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PAGE TITLE</Box>
+                <Box component="th" sx={{ display: { xs: 'none', sm: 'table-cell' }, padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>TAGS</Box>
+                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>INFO</Box>
               </tr>
             </thead>
             <tbody>
               {isLoading ? (
                 <tr>
                   <td colSpan={5} style={{ padding: '40px', textAlign: 'center' }}>
-                    <CircularProgress size={24} sx={{ color: '#00f3ff' }} />
+                    <CircularProgress size={24} sx={{ color: tokens.accent.primary }} />
                   </td>
                 </tr>
               ) : data?.results.map((endpoint) => (
-                <tr key={endpoint.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', transition: 'background 0.2s' }}>
+                <tr key={endpoint.id} style={{ borderBottom: 1, borderColor: 'divider', transition: 'background 0.2s' }}>
                   <td style={{ padding: '16px', verticalAlign: 'top' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Typography sx={{
                           fontSize: '12px',
                           fontWeight: 500,
-                          color: '#fff',
+                          color: 'text.primary',
                           textDecoration: 'none',
                           wordBreak: 'break-all',
-                          '&:hover': { color: '#00f3ff' }
+                          '&:hover': { color: tokens.accent.primary }
                         }} component="a" href={endpoint.http_url} target="_blank">
                           {endpoint.http_url}
                         </Typography>
                         <IconButton
                           size="small"
                           onClick={() => copyToClipboard(endpoint.http_url)}
-                          sx={{ color: 'rgba(255,255,255,0.2)', p: 0.5, '&:hover': { color: '#00f3ff' } }}
+                          sx={{ color: 'rgba(255,255,255,0.2)', p: 0.5, '&:hover': { color: tokens.accent.primary } }}
                         >
                           <Copy size={12} />
                         </IconButton>
@@ -257,8 +259,8 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                           </Box>
                         )}
                         {endpoint.techs?.map(tech => (
-                          <Box key={tech.id} sx={{ px: 0.8, py: 0.2, bgcolor: 'rgba(0, 243, 255, 0.1)', border: '1px solid rgba(0, 243, 255, 0.3)', borderRadius: 0.5 }}>
-                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: '#00f3ff' }}>{tech.name}</Typography>
+                          <Box key={tech.id} sx={{ px: 0.8, py: 0.2, bgcolor: `${tokens.accent.primary}15`, border: `1px solid ${tokens.accent.primary}4D`, borderRadius: 0.5 }}>
+                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: tokens.accent.primary }}>{tech.name}</Typography>
                           </Box>
                         ))}
                       </Box>
@@ -279,7 +281,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                     </Box>
                   </td>
                   <Box component="td" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '16px', verticalAlign: 'top' }}>
-                    <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontWeight: 500, fontStyle: endpoint.page_title ? 'normal' : 'italic' }}>
+                    <Typography sx={{ fontSize: '11px', color: 'text.secondary', fontWeight: 500, fontStyle: endpoint.page_title ? 'normal' : 'italic' }}>
                       {endpoint.page_title || 'No Title Available'}
                     </Typography>
                   </Box>
@@ -294,9 +296,9 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                             height: 16,
                             fontSize: '8px',
                             fontWeight: 900,
-                            bgcolor: 'rgba(0, 243, 255, 0.1)',
-                            color: '#00f3ff',
-                            border: '1px solid rgba(0, 243, 255, 0.2)',
+                            bgcolor: `${tokens.accent.primary}15`,
+                            color: tokens.accent.primary,
+                            border: `1px solid ${tokens.accent.primary}33`,
                             borderRadius: 0.5
                           }}
                         />
@@ -305,7 +307,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                   </Box>
                   <Box component="td" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '16px', verticalAlign: 'top' }}>
                     <Stack spacing={0.5}>
-                      <Typography sx={{ fontSize: '10px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                      <Typography sx={{ fontSize: '10px', color: 'text.secondary', fontFamily: 'monospace' }}>
                         TIME: {endpoint.response_time ? `${endpoint.response_time.toFixed(3)}s` : 'N/A'}
                       </Typography>
                     </Stack>
@@ -333,17 +335,17 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
             size="small"
             sx={{
               '& .MuiPaginationItem-root': {
-                color: 'rgba(255,255,255,0.4)',
+                color: 'text.secondary',
                 borderColor: 'rgba(255,255,255,0.1)',
                 fontFamily: 'Orbitron',
                 fontSize: '10px',
                 '&.Mui-selected': {
-                  bgcolor: 'rgba(0, 243, 255, 0.1)',
-                  color: '#00f3ff',
-                  borderColor: '#00f3ff'
+                  bgcolor: `${tokens.accent.primary}15`,
+                  color: tokens.accent.primary,
+                  borderColor: tokens.accent.primary
                 },
                 '&:hover': {
-                  bgcolor: 'rgba(255,255,255,0.05)'
+                  bgcolor: 'action.hover'
                 }
               }
             }}
