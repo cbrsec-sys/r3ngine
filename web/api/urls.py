@@ -229,6 +229,10 @@ urlpatterns = [
         CVEDetails.as_view(),
         name='cve_details'),
     path(
+        'tools/cve_description_generate/',
+        GenerateCveDescription.as_view(),
+        name='cve_description_generate'),
+    path(
         'tools/waf_detector/',
         WafDetector.as_view(),
         name='waf_detector'),
