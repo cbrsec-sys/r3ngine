@@ -213,58 +213,62 @@ const PositionedPluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
 
 // ── Standalone plugin card (right column, no pipeline position) ──────────────
 
-const StandalonePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => (
-  <Box
-    sx={{
-      p: 1.5,
-      mb: 1.25,
-      bgcolor: 'rgba(180,0,255,0.04)',
-      border: '1px solid rgba(180,0,255,0.15)',
-      borderRadius: '6px',
-      opacity: plugin.is_enabled ? 1 : 0.45,
-      '&:hover': { borderColor: 'rgba(180,0,255,0.35)', bgcolor: 'rgba(180,0,255,0.08)' },
-      transition: 'all 0.15s',
-    }}
-  >
-    <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start' }}>
-      <Box sx={{ color: '#b400ff', flexShrink: 0, mt: '2px' }}>
-        <PlugZap size={15} />
-      </Box>
-      <Box sx={{ flex: 1, minWidth: 0 }}>
-        <Typography
-          noWrap
-          sx={{ fontFamily: 'Orbitron', fontWeight: 800, fontSize: '0.7rem', color: '#fff', letterSpacing: 0.5 }}
-        >
-          {plugin.name.toUpperCase()}
-        </Typography>
-        <Typography sx={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}>
-          v{plugin.version} · {plugin.author}
-        </Typography>
-        {plugin.description && (
+const StandalonePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
+  const theme = useTheme();
+  return (
+    <Box
+      sx={{
+        p: 1.5,
+        mb: 1.25,
+        bgcolor: alpha(theme.palette.secondary.main, 0.04),
+        border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}`,
+        borderRadius: '6px',
+        opacity: plugin.is_enabled ? 1 : 0.45,
+        '&:hover': { borderColor: alpha(theme.palette.secondary.main, 0.35), bgcolor: alpha(theme.palette.secondary.main, 0.08) },
+        transition: 'all 0.15s',
+      }}
+    >
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'flex-start' }}>
+        <Box sx={{ color: theme.palette.secondary.main, flexShrink: 0, mt: '2px' }}>
+          <PlugZap size={15} />
+        </Box>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Typography
-            sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mt: 0.5, lineHeight: 1.4 }}
             noWrap
+            sx={{ fontFamily: 'Orbitron', fontWeight: 800, fontSize: '0.7rem', color: '#fff', letterSpacing: 0.5 }}
           >
-            {plugin.description}
+            {plugin.name.toUpperCase()}
           </Typography>
-        )}
-      </Box>
-      <Chip
-        label="STANDALONE"
-        size="small"
-        sx={{
-          height: 16, fontSize: '0.48rem', fontFamily: 'Orbitron', fontWeight: 900, flexShrink: 0,
-          bgcolor: 'rgba(180,0,255,0.1)', color: '#b400ff',
-          border: '1px solid rgba(180,0,255,0.3)', '& .MuiChip-label': { px: 0.75 },
-        }}
-      />
-    </Stack>
-  </Box>
-);
+          <Typography sx={{ fontSize: '0.58rem', color: 'rgba(255,255,255,0.35)', fontWeight: 500 }}>
+            v{plugin.version} · {plugin.author}
+          </Typography>
+          {plugin.description && (
+            <Typography
+              sx={{ fontSize: '0.6rem', color: 'rgba(255,255,255,0.4)', mt: 0.5, lineHeight: 1.4 }}
+              noWrap
+            >
+              {plugin.description}
+            </Typography>
+          )}
+        </Box>
+        <Chip
+          label="STANDALONE"
+          size="small"
+          sx={{
+            height: 16, fontSize: '0.48rem', fontFamily: 'Orbitron', fontWeight: 900, flexShrink: 0,
+            bgcolor: alpha(theme.palette.secondary.main, 0.1), color: theme.palette.secondary.main,
+            border: `1px solid ${alpha(theme.palette.secondary.main, 0.3)}`, '& .MuiChip-label': { px: 0.75 },
+          }}
+        />
+      </Stack>
+    </Box>
+  );
+};
 
 // ── Configurable plugin card (right column, user-settable position) ──────────
 
 const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
+  const theme = useTheme();
   const updatePosition = useUpdatePluginPosition();
 
   const [selectedStage, setSelectedStage] = useState(plugin.anchor_step || '');
@@ -374,9 +378,9 @@ const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
               color: 'rgba(255,255,255,0.4)',
               borderColor: 'rgba(255,255,255,0.08)',
               '&.Mui-selected': {
-                color: pos === 'AFTER' ? '#00ffaa' : '#ffb300',
-                bgcolor: pos === 'AFTER' ? 'rgba(0,255,170,0.1)' : 'rgba(255,179,0,0.1)',
-                borderColor: pos === 'AFTER' ? 'rgba(0,255,170,0.3)' : 'rgba(255,179,0,0.3)',
+                color: pos === 'AFTER' ? theme.palette.primary.main : theme.palette.warning.main,
+                bgcolor: pos === 'AFTER' ? alpha(theme.palette.primary.main, 0.1) : alpha(theme.palette.warning.main, 0.1),
+                borderColor: pos === 'AFTER' ? alpha(theme.palette.primary.main, 0.3) : alpha(theme.palette.warning.main, 0.3),
               },
             }}
           >
@@ -395,6 +399,7 @@ interface Props {
 }
 
 const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
+  const theme = useTheme();
   const updateWeightMutation = useUpdatePluginWeight();
 
   const sensors = useSensors(
@@ -456,6 +461,8 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
               .filter((p) => findStage(p)?.key === stage.key && p.runtime_position === 'AFTER')
               .sort((a, b) => a.order_weight - b.order_weight);
 
+            const hasPlugins = pluginsAfter.length > 0 || pluginsBefore.length > 0;
+
             return (
               <Box key={stage.key} sx={{ mb: 5, position: 'relative' }}>
                 {/* Tier number */}
@@ -481,33 +488,49 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
                   {/* Diamond node on line */}
                   <Box sx={{
                     width: 11, height: 11, borderRadius: 0,
-                    bgcolor: pluginsAfter.length > 0 || pluginsBefore.length > 0 ? '#00ffaa' : '#00f3ff',
-                    boxShadow: `0 0 8px ${pluginsAfter.length > 0 || pluginsBefore.length > 0 ? '#00ffaa' : '#00f3ff'}`,
+                    bgcolor: hasPlugins ? theme.palette.primary.main : alpha(theme.palette.primary.main, 0.7),
+                    boxShadow: `0 0 8px ${hasPlugins ? theme.palette.primary.main : alpha(theme.palette.primary.main, 0.7)}`,
                     position: 'absolute', left: '-28px', zIndex: 2, transform: 'rotate(45deg)',
                   }} />
 
                   <Paper sx={{
                     p: 2, flexGrow: 1,
-                    bgcolor: 'rgba(0,243,255,0.025)',
-                    border: '1px solid rgba(0,243,255,0.08)',
+                    bgcolor: alpha(theme.palette.primary.main, 0.025),
+                    border: `1px solid ${alpha(theme.palette.primary.main, 0.08)}`,
+                    borderLeft: `3px solid ${alpha(theme.palette.primary.main, 0.6)}`,
                     borderRadius: '2px',
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                     position: 'relative', overflow: 'hidden',
-                    '&::before': {
-                      content: '""', position: 'absolute', top: 0, left: 0,
-                      width: '3px', height: '100%', bgcolor: '#00f3ff',
-                    },
                   }}>
-                    <Box>
-                      <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: 1, color: '#fff', fontSize: '0.85rem' }}>
-                        {stage.label.toUpperCase()}
-                      </Typography>
-                      <Typography sx={{ fontSize: '0.6rem', color: 'rgba(0,243,255,0.45)', fontWeight: 700, letterSpacing: 0.4, mt: 0.25 }}>
-                        {stage.description}
-                      </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                      <Chip
+                        label={`TIER ${stage.tier}`}
+                        size="small"
+                        sx={{
+                          height: 16,
+                          fontSize: '0.5rem',
+                          fontFamily: 'Orbitron',
+                          fontWeight: 900,
+                          letterSpacing: 0.5,
+                          bgcolor: alpha(theme.palette.primary.main, 0.1),
+                          color: theme.palette.primary.main,
+                          border: `1px solid ${alpha(theme.palette.primary.main, 0.3)}`,
+                          '& .MuiChip-label': { px: 0.75 },
+                          mr: 1,
+                          flexShrink: 0,
+                        }}
+                      />
+                      <Box>
+                        <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, letterSpacing: 1, color: '#fff', fontSize: '0.85rem' }}>
+                          {stage.label.toUpperCase()}
+                        </Typography>
+                        <Typography sx={{ fontSize: '0.6rem', color: alpha(theme.palette.primary.main, 0.45), fontWeight: 700, letterSpacing: 0.4, mt: 0.25 }}>
+                          {stage.description}
+                        </Typography>
+                      </Box>
                     </Box>
                     <Tooltip title="System Core Engine">
-                      <Shield size={18} color="rgba(0,243,255,0.15)" />
+                      <Shield size={18} color={alpha(theme.palette.primary.main, 0.15)} />
                     </Tooltip>
                   </Paper>
                 </Box>
@@ -572,8 +595,8 @@ const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
           {standalonePlugins.length > 0 && (
             <>
               <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1.5 }}>
-                <Layers size={14} color="#b400ff" />
-                <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.62rem', letterSpacing: 1.5, color: 'rgba(180,0,255,0.7)' }}>
+                <Layers size={14} color={theme.palette.secondary.main} />
+                <Typography sx={{ fontFamily: 'Orbitron', fontWeight: 900, fontSize: '0.62rem', letterSpacing: 1.5, color: alpha(theme.palette.secondary.main, 0.7) }}>
                   STANDALONE PLUGINS
                 </Typography>
               </Stack>
