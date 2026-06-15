@@ -35,7 +35,7 @@ interface EndpointsTabProps {
 }
 
 export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId, matchedGfCounts, targetId }) => {
-  const { tokens } = useThemeTokens();
+  const { tokens, isLight } = useThemeTokens();
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeSearch, setActiveSearch] = useState('');
@@ -64,11 +64,11 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
   };
 
   const getStatusColor = (status: number) => {
-    if (status >= 200 && status < 300) return '#00ff62';
+    if (status >= 200 && status < 300) return isLight ? tokens.accent.success : '#00ff62';
     if (status >= 300 && status < 400) return tokens.accent.primary;
-    if (status >= 400 && status < 500) return '#ffae00';
-    if (status >= 500) return '#ff003c';
-    return '#888';
+    if (status >= 400 && status < 500) return isLight ? '#d97706' : '#ffae00';
+    if (status >= 500) return isLight ? tokens.accent.error : '#ff003c';
+    return isLight ? 'text.secondary' : '#888';
   };
 
   return (
@@ -145,14 +145,14 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
               slotProps={{
                 paper: {
                   sx: {
-                    bgcolor: '#0a0a0f',
-                    border: `1px solid ${tokens.accent.primary}33`,
-                    boxShadow: '0 0 30px rgba(0,0,0,0.5)',
+                    bgcolor: isLight ? 'background.paper' : '#0a0a0f',
+                    border: `1px solid ${isLight ? 'rgba(0,0,0,0.08)' : `${tokens.accent.primary}33`}`,
+                    boxShadow: isLight ? '0 4px 20px rgba(0,0,0,0.05)' : '0 0 30px rgba(0,0,0,0.5)',
                     mt: 1,
                     '& .MuiMenuItem-root': {
                       fontSize: '0.75rem',
                       fontWeight: 700,
-                      color: 'rgba(255,255,255,0.7)',
+                      color: isLight ? 'text.primary' : 'rgba(255,255,255,0.7)',
                       px: 3,
                       py: 1,
                       '&:hover': { bgcolor: `${tokens.accent.primary}15`, color: tokens.accent.primary }
@@ -210,8 +210,8 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
             <thead>
               <tr style={{
                 textAlign: 'left',
-                borderBottom: '1px solid rgba(255,255,255,0.1)',
-                backgroundColor: 'rgba(255,255,255,0.02)'
+                borderBottom: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255,255,255,0.1)',
+                backgroundColor: isLight ? 'rgba(0,0,0,0.02)' : 'rgba(255,255,255,0.02)'
               }}>
                 <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>HTTP URL</th>
                 <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>STATUS</th>
@@ -245,7 +245,7 @@ export const EndpointsTab: React.FC<EndpointsTabProps> = ({ projectSlug, scanId,
                         <IconButton
                           size="small"
                           onClick={() => copyToClipboard(endpoint.http_url)}
-                          sx={{ color: 'rgba(255,255,255,0.2)', p: 0.5, '&:hover': { color: tokens.accent.primary } }}
+                          sx={{ color: isLight ? 'text.disabled' : 'rgba(255,255,255,0.2)', p: 0.5, '&:hover': { color: tokens.accent.primary } }}
                         >
                           <Copy size={12} />
                         </IconButton>
