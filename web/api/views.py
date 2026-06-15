@@ -1309,16 +1309,18 @@ class CVEDetails(APIView):
 			logger.warning("CIRCL.LU lookup failed for %s: %s", formatted_cve_id, e)
 
 		# 4. Compile the full enriched data dictionary
+		circl_summary = circl_data.get('summary', '') or ''
 		result = {
 			'id': formatted_cve_id,
-			'summary': circl_data.get('summary', 'No summary available'),
+			'summary': circl_summary or cve_obj.ai_risk_assessment or 'No summary available',
 			'assigner': circl_data.get('assigner', 'N/A'),
-			
+			'ai_risk_assessment': cve_obj.ai_risk_assessment,
+
 			# NVD Data
 			'cvss': circl_data.get('cvss') or cve_obj.cvss_v31_base_score,
 			'cvss_v31_base_score': cve_obj.cvss_v31_base_score,
 			'cvss_vector': circl_data.get('cvss-vector', 'N/A'),
-			
+
 			# CVSS Impact Breakdown
 			'attack_vector': cve_obj.attack_vector,
 			'attack_complexity': cve_obj.attack_complexity,
@@ -1327,30 +1329,89 @@ class CVEDetails(APIView):
 			'confidentiality_impact': cve_obj.confidentiality_impact,
 			'integrity_impact': cve_obj.integrity_impact,
 			'availability_impact': cve_obj.availability_impact,
-			
+
 			# EPSS Data
 			'epss_score': cve_obj.epss_score,
 			'epss_percentile': cve_obj.epss_percentile,
-			
+
 			# Threat Data
 			'is_cisa_kev': cve_obj.is_cisa_kev,
 			'is_poc': getattr(cve_obj, 'is_poc', False),
 			'is_template': getattr(cve_obj, 'is_template', False),
 			'vulnerability_type': cve_obj.vulnerability_type,
-			
+
 			# Timeline
 			'published_date': cve_obj.published_date.isoformat() if cve_obj.published_date else None,
 			'last_modified_date': cve_obj.last_modified_date.isoformat() if cve_obj.last_modified_date else None,
-			
+
 			# References
 			'references': circl_data.get('references', []),
 		}
 
 		return Response({
-			'status': True, 
+			'status': True,
 			'result': result
 		})
 
+
+class GenerateCveDescription(APIView):
+	"""Generate and save an AI-written description for a CVE via the active LLM."""
+	permission_classes = [IsPenetrationTester]
+
+	def post(self, request):
+		import re as _re
+		from reNgine.llm import LLMVulnerabilityReportGenerator as LLMReportGen
+		from dashboard.models import LLMConfig
+		from startScan.models import CveId
+
+		cve_id = request.data.get('cve_id')
+		if not cve_id:
+			return Response({'status': False, 'message': 'cve_id is required'}, status=400)
+
+		formatted_cve_id = cve_id.upper().strip()
+		if _re.match(r'^\d{4}-\d+$', formatted_cve_id):
+			formatted_cve_id = 'CVE-' + formatted_cve_id
+
+		if not LLMConfig.objects.filter(is_active=True).exists():
+			return Response({'status': False, 'message': 'No active LLM configuration found'}, status=400)
+
+		try:
+			cve_obj = CveId.objects.get(name__iexact=formatted_cve_id)
+		except CveId.DoesNotExist:
+			return Response({'status': False, 'message': f'CVE {formatted_cve_id} not found in database'}, status=404)
+
+		prompt = f"Analyze the vulnerability {formatted_cve_id}."
+		if cve_obj.cvss_v31_base_score:
+			prompt += f" CVSS v3.1 base score: {cve_obj.cvss_v31_base_score}."
+		if cve_obj.attack_vector:
+			prompt += f" Attack vector: {cve_obj.attack_vector}."
+		prompt += " Provide a concise description of what this vulnerability is, its impact, and recommended mitigation steps."
+
+		report_gen = LLMReportGen(logger=logger)
+		response = report_gen.get_vulnerability_description(prompt)
+		if not response or not response.get('status'):
+			return Response({'status': False, 'message': response.get('error', 'LLM generation failed')}, status=500)
+
+		description = response.get('description', '')
+		impact = response.get('impact', '')
+		remediation = response.get('remediation', '')
+		assessment = f"**Description**:\n{description}\n\n**Impact**:\n{impact}\n\n**Mitigation**:\n{remediation}"
+
+		update_fields = ['ai_risk_assessment']
+		cve_obj.ai_risk_assessment = assessment
+		if remediation:
+			cve_obj.mitigation_ideas = remediation
+			update_fields.append('mitigation_ideas')
+		cve_obj.save(update_fields=update_fields)
+		logger.info("Generated AI description for %s", formatted_cve_id)
+
+		return Response({
+			'status': True,
+			'description': description,
+			'impact': impact,
+			'remediation': remediation,
+			'ai_risk_assessment': assessment,
+		})
 
 
 class AddReconNote(APIView):

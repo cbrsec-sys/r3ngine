@@ -21,6 +21,8 @@ import {
   Button,
   CircularProgress,
   Divider,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import Chart from 'react-apexcharts';
 import type { DashboardData } from '../api';
@@ -134,6 +136,8 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
   const [cveInfo, setCveInfo] = useState<any | null>(null);
   const [cveLoading, setCveLoading] = useState(false);
   const [cveError, setCveError] = useState<string | null>(null);
+  const [descGenerating, setDescGenerating] = useState(false);
+  const [descGenError, setDescGenError] = useState<string | null>(null);
 
   const handleCweClick = async (cweName: string) => {
     setSelectedCwe(cweName);
@@ -180,6 +184,35 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
       setCveError('Network error fetching CVE information.');
     } finally {
       setCveLoading(false);
+    }
+  };
+
+  const handleGenerateCveDescription = async () => {
+    if (!selectedCve) return;
+    setDescGenerating(true);
+    setDescGenError(null);
+    const csrfToken = document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
+    try {
+      const response = await fetch('/api/tools/cve_description_generate/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ cve_id: selectedCve }),
+      });
+      const json = await response.json();
+      if (json.status) {
+        setCveInfo((prev: any) => ({
+          ...prev,
+          summary: json.description || prev?.summary,
+          ai_risk_assessment: json.ai_risk_assessment,
+        }));
+      } else {
+        setDescGenError(json.message || 'Failed to generate description.');
+      }
+    } catch {
+      setDescGenError('Network error generating description.');
+    } finally {
+      setDescGenerating(false);
     }
   };
 
@@ -735,7 +768,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
       {/* CVE Detail Modal */}
       <Dialog
         open={cveDialogOpen}
-        onClose={() => setCveDialogOpen(false)}
+        onClose={() => { setCveDialogOpen(false); setDescGenError(null); }}
         maxWidth="sm"
         fullWidth
         sx={{
@@ -878,11 +911,39 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
 
               {/* Description */}
               <Box>
-                <Typography variant="subtitle2" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: isLight ? themeTokens.enterprise.severity.unknown : '#7000ff', mb: 0.5 }}>
-                  Description
-                </Typography>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: isLight ? themeTokens.enterprise.severity.unknown : '#7000ff' }}>
+                    Description
+                  </Typography>
+                  <Tooltip title={cveInfo.ai_risk_assessment ? 'Regenerate AI description' : 'Generate AI description'} placement="top">
+                    <IconButton
+                      size="small"
+                      onClick={handleGenerateCveDescription}
+                      disabled={descGenerating}
+                      sx={{
+                        width: 18,
+                        height: 18,
+                        fontSize: '0.6rem',
+                        fontWeight: 900,
+                        color: isLight ? themeTokens.enterprise.severity.unknown : '#7000ff',
+                        border: `1px solid ${isLight ? alpha(themeTokens.enterprise.severity.unknown as string, 0.4) : 'rgba(112, 0, 255, 0.4)'}`,
+                        borderRadius: '50%',
+                        p: 0,
+                        '&:hover': { bgcolor: isLight ? alpha(themeTokens.enterprise.severity.unknown as string, 0.1) : 'rgba(112, 0, 255, 0.1)' },
+                        '&:disabled': { opacity: 0.5 },
+                      }}
+                    >
+                      {descGenerating ? <CircularProgress size={10} sx={{ color: 'inherit' }} /> : '?'}
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                {descGenError && (
+                  <Typography variant="caption" sx={{ color: '#ff003c', fontFamily: 'Inter', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
+                    {descGenError}
+                  </Typography>
+                )}
                 <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.8)', lineHeight: 1.6 }}>
-                  {cveInfo.summary || 'No description summary available.'}
+                  {cveInfo.summary || 'No description summary available. Click ? to generate with AI.'}
                 </Typography>
               </Box>
 
