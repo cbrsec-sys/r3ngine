@@ -97,7 +97,7 @@ const TASK_TIER_ORDER: string[] = [
 ];
 
 export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId, targetId, onTabChange }) => {
-  const { tokens } = useThemeTokens();
+  const { tokens, isLight } = useThemeTokens();
 
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -396,11 +396,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   };
 
   const getStatusColor = (status: number) => {
-    if (status >= 200 && status < 300) return '#00ffaa';
+    if (status >= 200 && status < 300) return isLight ? tokens.accent.success : '#00ffaa';
     if (status >= 300 && status < 400) return tokens.accent.primary;
-    if (status >= 400 && status < 500) return '#ffae00';
-    if (status >= 500) return '#ff003c';
-    return '#888';
+    if (status >= 400 && status < 500) return isLight ? '#d97706' : '#ffae00';
+    if (status >= 500) return isLight ? tokens.accent.error : '#ff003c';
+    return isLight ? 'text.secondary' : '#888';
   };
 
   return (
@@ -819,7 +819,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                           key={`ip-${sub.id}-${ip.id}`}
                           sx={{
                             fontSize: '11px',
-                            color: ip.is_cdn ? '#ffae00' : 'rgba(255,255,255,0.5)',
+                            color: ip.is_cdn ? (isLight ? '#d97706' : '#ffae00') : (isLight ? 'text.primary' : 'rgba(255,255,255,0.5)'),
                             fontFamily: 'monospace',
                             fontWeight: 600
                           }}
@@ -838,11 +838,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                             px: 1,
                             py: 0.2,
                             borderRadius: 0.5,
-                            bgcolor: port.is_uncommon ? 'rgba(255, 0, 60, 0.1)' : 'rgba(255,255,255,0.05)',
-                            border: `1px solid ${port.is_uncommon ? 'rgba(255, 0, 60, 0.2)' : 'rgba(255,255,255,0.1)'}`,
+                            bgcolor: port.is_uncommon ? (isLight ? `${tokens.accent.error}15` : 'rgba(255, 0, 60, 0.1)') : (isLight ? 'action.hover' : 'rgba(255,255,255,0.05)'),
+                            border: `1px solid ${port.is_uncommon ? (isLight ? `${tokens.accent.error}4D` : 'rgba(255, 0, 60, 0.2)') : (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)')}`,
                           }}
                         >
-                          <Typography sx={{ fontSize: '9px', fontWeight: 800, color: port.is_uncommon ? '#ff003c' : 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
+                          <Typography sx={{ fontSize: '9px', fontWeight: 800, color: port.is_uncommon ? (isLight ? tokens.accent.error : '#ff003c') : (isLight ? 'text.secondary' : 'rgba(255,255,255,0.6)'), fontFamily: 'monospace' }}>
                             {port.number}
                           </Typography>
                         </Box>
