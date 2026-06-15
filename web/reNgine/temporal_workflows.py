@@ -1,4 +1,4 @@
-"""
+﻿"""
 Temporal Workflow definitions for the r3ngine scan pipeline.
 
 Workflows define the durable orchestration logic — the "what runs when" in the
@@ -1519,7 +1519,13 @@ class SubScanWorkflow:
                         task_queue="python-orchestrator-queue"
                     )
                     await self._check_paused()
+                    await _dispatch_tier_plugins(
+                        ctx, "tier_1",
+                        str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
+                    )
+                    await self._check_paused()
                 elif tier_index == 2:
+                    await self._check_paused()
                     # Post-Tier-2 plugin dispatch
                     await _dispatch_tier_plugins(
                         ctx, "tier_2",
@@ -1527,6 +1533,11 @@ class SubScanWorkflow:
                     )
                     await self._check_paused()
                 elif tier_index == 3:
+                    await self._check_paused()
+                    await _dispatch_tier_plugins(
+                        ctx, "tier_3",
+                        str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
+                    )
                     await self._check_paused()
                 elif tier_index == 4:
                     # ParseFuzzResultsActivity after dir_file_fuzz completes.
@@ -1540,6 +1551,12 @@ class SubScanWorkflow:
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
                     )
+                    await self._check_paused()
+                    await _dispatch_tier_plugins(
+                        ctx, "tier_4",
+                        str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
+                    )
+                    await self._check_paused()
                 elif tier_index == 5:
                     await workflow.execute_activity(
                         "ParseAnalysisResultsActivity",
@@ -1548,6 +1565,11 @@ class SubScanWorkflow:
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
+                    )
+                    await self._check_paused()
+                    await _dispatch_tier_plugins(
+                        ctx, "tier_5",
+                        str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
                     )
                     await self._check_paused()
                 elif tier_index == 6:
@@ -1560,6 +1582,10 @@ class SubScanWorkflow:
                         task_queue="python-orchestrator-queue"
                     )
                     await self._check_paused()
+                    await _dispatch_tier_plugins(
+                        ctx, "tier_6",
+                        str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
+                    )
 
             # Unconditional endpoint count consolidation after all enumeration tiers complete.
             # Bug fix: previously this only ran when dir_file_fuzz was selected (inside Tier 4
@@ -1642,6 +1668,10 @@ class SubScanWorkflow:
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue",
                             )
+                        await _dispatch_tier_plugins(
+                            ctx, "tier_7",
+                            str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
+                        )
                     except asyncio.CancelledError:
                         raise
                     except Exception as post_e:
