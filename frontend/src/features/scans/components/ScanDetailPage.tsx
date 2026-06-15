@@ -2030,26 +2030,29 @@ export const ScanDetailPage = () => {
               >
                 RESCAN
               </Button>
-              {!isTerminal && (
-                <Button
-                  variant="contained"
-                  startIcon={stopScanMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <AlertTriangle size={16} />}
-                  onClick={() => stopScanMutation.mutate(parseInt(scanId))}
-                  disabled={stopScanMutation.isPending}
-                  sx={{
-                    bgcolor: isLight ? `${tokens.accent.error}1A` : 'rgba(255, 0, 60, 0.1)',
-                    color: isLight ? tokens.accent.error : '#ff003c',
-                    border: isLight ? `1px solid ${tokens.accent.error}4D` : '1px solid rgba(255, 0, 60, 0.3)',
-                    fontFamily: 'Orbitron',
-                    fontSize: '0.65rem',
-                    fontWeight: 900,
-                    px: 2,
-                    '&:hover': { bgcolor: isLight ? `${tokens.accent.error}33` : 'rgba(255, 0, 60, 0.2)' }
-                  }}
-                >
-                  STOP
-                </Button>
-              )}
+              <Button
+                variant="contained"
+                startIcon={stopScanMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <AlertTriangle size={16} />}
+                onClick={() => stopScanMutation.mutate(parseInt(scanId))}
+                disabled={stopScanMutation.isPending || isTerminal}
+                sx={{
+                  bgcolor: isLight ? `${tokens.accent.error}1A` : 'rgba(255, 0, 60, 0.1)',
+                  color: isLight ? tokens.accent.error : '#ff003c',
+                  border: isLight ? `1px solid ${tokens.accent.error}4D` : '1px solid rgba(255, 0, 60, 0.3)',
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  fontWeight: 900,
+                  px: 2,
+                  '&:hover': { bgcolor: isLight ? `${tokens.accent.error}33` : 'rgba(255, 0, 60, 0.2)' },
+                  '&.Mui-disabled': {
+                    color: isLight ? 'rgba(220, 38, 38, 0.45)' : 'rgba(255, 0, 60, 0.45)',
+                    borderColor: isLight ? 'rgba(220, 38, 38, 0.18)' : 'rgba(255, 0, 60, 0.18)',
+                    bgcolor: isLight ? 'rgba(220, 38, 38, 0.06)' : 'rgba(255, 0, 60, 0.05)',
+                  }
+                }}
+              >
+                STOP
+              </Button>
               <Button
                 variant="contained"
                 startIcon={<Brain size={16} />}
