@@ -1482,7 +1482,7 @@ class AddManualSubdomain(APIView):
 		scan_id = data.get('scan_id')
 
 		if not subdomain_input:
-			return Response({'status': False, 'message': 'Subdomain name or list is required.'})
+			return Response({'status': False, 'message': 'Subdomain name or list is required.'}, status=400)
 
 		# Resolve target domain
 		domain = None
@@ -1494,7 +1494,7 @@ class AddManualSubdomain(APIView):
 				domain = scan.domain
 
 		if not domain:
-			return Response({'status': False, 'message': 'Target domain not found.'})
+			return Response({'status': False, 'message': 'Target domain not found.'}, status=404)
 
 		# Split input by newlines, commas, or spaces
 		raw_subdomains = re.split(r'[\s,]+', subdomain_input)
@@ -1505,7 +1505,7 @@ class AddManualSubdomain(APIView):
 				subdomains_to_process.append(name)
 
 		if not subdomains_to_process:
-			return Response({'status': False, 'message': 'No valid subdomain names found in input.'})
+			return Response({'status': False, 'message': 'No valid subdomain names found in input.'}, status=400)
 
 		# Filter out duplicates within the input itself
 		subdomains_to_process = list(dict.fromkeys(subdomains_to_process))
@@ -1557,7 +1557,7 @@ class AddManualSubdomain(APIView):
 			if not scan:
 				engine = EngineType.objects.order_by('id').first()
 				if not engine:
-					return Response({'status': False, 'message': 'No Engine Configuration exists to create a scan history.'})
+					return Response({'status': False, 'message': 'No Engine Configuration exists to create a scan history.'}, status=500)
 				scan = ScanHistory.objects.create(
 					domain=domain,
 					scan_type=engine,
