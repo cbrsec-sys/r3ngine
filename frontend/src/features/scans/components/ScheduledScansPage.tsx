@@ -10,8 +10,10 @@ import {
   Switch,
   Chip,
   CircularProgress,
-  TablePagination
+  TablePagination,
+  Card
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { 
   Search, 
   Trash2, 
@@ -28,7 +30,8 @@ import { useScheduledScans, useToggleScheduledScan, useBulkDeleteScheduledScans 
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ScheduledScansPage: React.FC = () => {
-  const { tokens } = useThemeTokens();
+  const theme = useTheme();
+  const { tokens, isLight } = useThemeTokens();
   const { data, isLoading, isError } = useScheduledScans();
   const toggleMutation = useToggleScheduledScan();
   const bulkDeleteMutation = useBulkDeleteScheduledScans();

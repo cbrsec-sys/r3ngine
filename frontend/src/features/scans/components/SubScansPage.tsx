@@ -10,8 +10,10 @@ import {
   Tooltip,
   Chip,
   CircularProgress,
-  TablePagination
+  TablePagination,
+  Card
 } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { 
   Search, 
   Trash2, 
@@ -28,7 +30,8 @@ import { useSubScans, useBulkStopSubScans, useBulkDeleteSubScans } from '../api'
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const SubScansPage: React.FC = () => {
-  const { tokens } = useThemeTokens();
+  const theme = useTheme();
+  const { tokens, isLight } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
   const { data, isLoading, isError } = useSubScans(projectSlug);
   const stopMutation = useBulkStopSubScans(projectSlug);
