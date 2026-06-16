@@ -48,7 +48,14 @@ class TemporalClientProvider:
     async def get_client(cls) -> Client:
         temporal_host = os.environ.get("TEMPORAL_HOST", "temporal:7233")
         namespace = os.environ.get("TEMPORAL_NAMESPACE", "default")
-        return await Client.connect(temporal_host, namespace=namespace)
+        try:
+            return await asyncio.wait_for(
+                Client.connect(temporal_host, namespace=namespace),
+                timeout=10.0
+            )
+        except asyncio.TimeoutError:
+            logger.error(f"Connection to Temporal host '{temporal_host}' timed out after 10 seconds.")
+            raise ConnectionError(f"Connection to Temporal host '{temporal_host}' timed out.")
 
     @classmethod
     def cancel_workflow(cls, workflow_id: str) -> None:
