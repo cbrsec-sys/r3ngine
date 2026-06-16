@@ -75,6 +75,7 @@ import PluginComponent from '../../plugins/components/PluginComponent';
 import VisualizationTab from '../../scans/components/VisualizationTab';
 import { AttackSurfaceTab } from '../../scans/components/AttackSurfaceTab';
 import PluginCardSlot from '../../plugins/components/PluginCardSlot';
+import { AiExportModal } from '../../scans/components/AiExportModal';
 
 
 const SeverityBadge: React.FC<{ severity: number }> = ({ severity }) => {
@@ -125,6 +126,7 @@ export const TargetSummary = () => {
   const { data, isLoading, error } = useTargetSummary(projectSlug || 'default', parseInt(targetId || '0'));
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
+  const [aiExportModalOpen, setAiExportModalOpen] = useState(false);
   const theme = useTheme();
   const isLight = theme.palette.mode === 'light';
 
@@ -164,6 +166,8 @@ export const TargetSummary = () => {
     { label: 'MONITORING', icon: Eye },
     { label: 'VISUALIZATION', icon: BarChart2 },
   ];
+
+  const latestScanId = data?.recent_scans?.[0]?.id;
 
   const renderHome = () => (
     <Box sx={{ flexGrow: 1 }}>
@@ -710,12 +714,51 @@ export const TargetSummary = () => {
         {tabs[activeTab]?.label === 'DIRECTORIES' && <DirectoriesTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
         {tabs[activeTab]?.label === 'URLS' && <EndpointsTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
         {tabs[activeTab]?.label === 'PARAMETERS' && <ParametersTab targetId={parseInt(targetId || '0')} />}
-        {tabs[activeTab]?.label === 'VULNERABILITIES' && <PluginComponent 
-      name="VulnerabilityTable" 
-      default={VulnerabilityTable} 
-      projectSlug={projectSlug || 'default'} 
-      targetId={parseInt(targetId || '0')} 
-    />}
+        {tabs[activeTab]?.label === 'VULNERABILITIES' && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button
+                variant="contained"
+                startIcon={<BarChartIcon size={16} />}
+                onClick={() => setAiExportModalOpen(true)}
+                disabled={!latestScanId}
+                sx={{
+                  bgcolor: alpha(cYellow, 0.12),
+                  color: cYellow,
+                  border: `1px solid ${alpha(cYellow, 0.4)}`,
+                  fontFamily: 'var(--r3-heading-font)',
+                  fontSize: '0.68rem',
+                  fontWeight: 900,
+                  letterSpacing: 1,
+                  px: 2,
+                  '&:hover': { bgcolor: alpha(cYellow, 0.22) },
+                  '&.Mui-disabled': {
+                    color: alpha(cYellow, 0.45),
+                    borderColor: alpha(cYellow, 0.18),
+                    bgcolor: alpha(cYellow, 0.05),
+                  }
+                }}
+              >
+                EXPORT FOR AI
+              </Button>
+            </Box>
+            <PluginComponent
+              name="VulnerabilityTable"
+              default={VulnerabilityTable}
+              projectSlug={projectSlug || 'default'}
+              targetId={parseInt(targetId || '0')}
+            />
+            {latestScanId && (
+              <AiExportModal
+                open={aiExportModalOpen}
+                onClose={() => setAiExportModalOpen(false)}
+                projectSlug={projectSlug || 'default'}
+                scanId={latestScanId}
+                targetName={data.target_info.name}
+              />
+            )}
+          </Box>
+        )}
         {tabs[activeTab]?.label === 'ATTACK SURFACE' && <AttackSurfaceTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
         {tabs[activeTab]?.label === 'MONITORING' && renderMonitoring()}
         {tabs[activeTab]?.label === 'VISUALIZATION' && <VisualizationTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
