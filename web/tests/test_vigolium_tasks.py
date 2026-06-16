@@ -541,3 +541,28 @@ class VigoliumAuditIntensityValidationTest(TestCase):
         idx = call_args.index('--intensity')
         self.assertEqual(call_args[idx + 1], 'balanced',
                          "Invalid intensity must be coerced to 'balanced'")
+
+
+class VigoliumAuditNoSourceTest(TestCase):
+    """When no source path is resolvable, must abort early — not fall back to /tmp/code."""
+
+    @patch('reNgine.vigolium_tasks.subprocess.run')
+    def test_no_source_returns_early(self, mock_run):
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+
+        task = MagicMock()
+        task.scan = MagicMock()
+        task.scan.results_dir = '/tmp/test_audit'
+        task.domain = MagicMock()
+        task.starting_point_path = None
+        task.yaml_configuration = {
+            'vigolium_audit': {
+                'run_vigolium_audit': True,
+                'intensity': 'balanced',
+                'use_ai': False,
+                'timeout': 10,
+            }
+        }
+        result = vigolium_audit_scan(task, code_path=None, ctx={})
+        mock_run.assert_not_called()
+        self.assertIsNone(result)
