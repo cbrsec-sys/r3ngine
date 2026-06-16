@@ -474,8 +474,10 @@ def vigolium_audit_scan(self, code_path=None, ctx={}, description=None):
         code_path
         or getattr(self, 'starting_point_path', None)
         or (ctx.get('target') if ctx else None)
-        or '/tmp/code'
     )
+    if not source:
+        logger.error("Vigolium audit: no source path available, skipping.")
+        return None
 
     _VALID_INTENSITIES = ('quick', 'balanced', 'deep')
     intensity = audit_config.get(VIGOLIUM_AUDIT_INTENSITY, 'balanced')
