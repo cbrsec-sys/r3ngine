@@ -406,3 +406,43 @@ class VigoliumAuditActivityTest(TestCase):
     def test_audit_activity_is_importable(self):
         from reNgine.temporal_activities import run_vigolium_audit_activity
         self.assertTrue(callable(run_vigolium_audit_activity))
+
+
+class VigoliumAuditApiKeyMaskTest(TestCase):
+    """API key must never appear in log output."""
+
+    @patch('reNgine.vigolium_tasks.subprocess.run')
+    @patch('reNgine.vigolium_tasks.LLMConfig')
+    def test_api_key_not_logged(self, mock_llm_cls, mock_run):
+        """Confirm the real API key does not appear in any log record."""
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+
+        mock_run.return_value = MagicMock(returncode=0, stderr='', stdout='')
+        mock_llm = MagicMock()
+        mock_llm.is_active = True
+        mock_llm.api_key = 'sk-SUPERSECRET'
+        mock_llm.provider = 'anthropic'
+        mock_llm_cls.objects.filter.return_value.first.return_value = mock_llm
+
+        task = MagicMock()
+        task.scan = MagicMock()
+        task.scan.results_dir = '/tmp/test_audit'
+        task.domain = MagicMock()
+        task.starting_point_path = None
+        task.yaml_configuration = {
+            'vigolium_audit': {
+                'run_vigolium_audit': True,
+                'intensity': 'balanced',
+                'use_ai': True,
+                'timeout': 10,
+            }
+        }
+
+        with self.assertLogs('reNgine.vigolium_tasks', level='DEBUG') as log_ctx:
+            try:
+                vigolium_audit_scan(task, code_path='/tmp/fakecode', ctx={})
+            except Exception:
+                pass
+
+        all_log_text = '\n'.join(log_ctx.output)
+        self.assertNotIn('sk-SUPERSECRET', all_log_text, "API key must not appear in logs")
