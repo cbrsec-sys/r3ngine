@@ -79,6 +79,7 @@ export function getElevatedSurfaceSx(isLight: boolean, theme: Theme, tokens: Res
     return {
       bgcolor: theme.palette.background.paper,
       border: `1px solid ${theme.palette.divider}`,
+      borderRadius: 1,
       boxShadow: theme.shadows[2],
     };
   }
@@ -86,6 +87,7 @@ export function getElevatedSurfaceSx(isLight: boolean, theme: Theme, tokens: Res
     bgcolor: alpha(tokens.surface.elevated, 0.82),
     backdropFilter: 'blur(14px)',
     border: `1px solid ${tokens.border.subtle}`,
+    borderRadius: 1,
     boxShadow: `0 12px 36px ${alpha('#000', 0.55)}`,
   };
 }
@@ -97,7 +99,7 @@ export function getMenuPaperSx(isLight: boolean, theme: Theme, tokens: ResolvedT
       bgcolor: theme.palette.background.paper,
       backdropFilter: 'blur(12px)',
       border: `1px solid ${theme.palette.divider}`,
-      borderRadius: 2,
+      borderRadius: 1,
       boxShadow: theme.shadows[4],
     };
   }
@@ -105,7 +107,7 @@ export function getMenuPaperSx(isLight: boolean, theme: Theme, tokens: ResolvedT
     bgcolor: alpha(tokens.surface.elevated, 0.95),
     backdropFilter: 'blur(12px)',
     border: `1px solid ${tokens.border.subtle}`,
-    borderRadius: 2,
+    borderRadius: 1,
     boxShadow: `0 8px 32px ${alpha('#000', 0.78)}`,
   };
 }
@@ -114,7 +116,7 @@ export function getDialogPaperSx(isLight: boolean, theme: Theme, tokens: Resolve
   return {
     ...getElevatedSurfaceSx(isLight, theme, tokens),
     color: theme.palette.text.primary,
-    borderRadius: isLight ? 2 : 3,
+    borderRadius: 1,
   };
 }
 
