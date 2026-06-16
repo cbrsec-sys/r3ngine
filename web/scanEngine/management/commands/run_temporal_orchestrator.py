@@ -82,6 +82,7 @@ from reNgine.temporal_workflows import (
     URLFuzzWorkflow,
     URLParamsFuzzWorkflow,
     URLVulnWorkflow,
+    URLAuthExtractWorkflow,
 )
 
 # Activities (all Python-side activities are registered here)
@@ -205,6 +206,7 @@ from reNgine.temporal_activities import (
     run_wptaint_scan_activity,
     run_param_discovery_activity,
     run_http_crawl_bridge_activity,
+    extract_auth_for_url_activity,
 )
 
 
@@ -533,6 +535,7 @@ class Command(BaseCommand):
                 run_trivy_secret_scan_activity,
                 run_vigolium_audit_activity,
                 run_urlparser_activity,
+                extract_auth_for_url_activity,
             ]
 
             # -------------------------------------------------------------------
@@ -550,7 +553,7 @@ class Command(BaseCommand):
                                  HostReconWorkflow, CIDRReconWorkflow, CodeScanWorkflow,
                                  DomainReconWorkflow, SubdomainReconWorkflow, URLCrawlWorkflow,
                                  URLDirSearchWorkflow, URLFuzzWorkflow, URLParamsFuzzWorkflow,
-                                 URLVulnWorkflow]
+                                 URLVulnWorkflow, URLAuthExtractWorkflow]
                 all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow] + _p2_workflows + plugin_workflows
                 all_activities.extend(plugin_activities)
             except Exception as e:
@@ -559,7 +562,7 @@ class Command(BaseCommand):
                                  HostReconWorkflow, CIDRReconWorkflow, CodeScanWorkflow,
                                  DomainReconWorkflow, SubdomainReconWorkflow, URLCrawlWorkflow,
                                  URLDirSearchWorkflow, URLFuzzWorkflow, URLParamsFuzzWorkflow,
-                                 URLVulnWorkflow]
+                                 URLVulnWorkflow, URLAuthExtractWorkflow]
                 all_workflows = [MasterScanWorkflow, NucleiPlannerWorkflow, SubScanWorkflow, StressTestWorkflow, StartupSyncWorkflow, ScheduledScanWorkflow, MonitoringWorkflow, GoExecutorTaskWorkflow, ApmeTaskWorkflow, RecalculateApmeWorkflow, IdentityEnrichmentWorkflow, GeoLocalizeWorkflow, HackerOneImportWorkflow, HackerOneSyncBookmarkedWorkflow, ProxyFetchWorkflow] + _p2_workflows
 
             # -------------------------------------------------------------------

@@ -2958,6 +2958,25 @@ class URLVulnWorkflow:
         return True
 
 
+@workflow.defn(name="URLAuthExtractWorkflow")
+class URLAuthExtractWorkflow:
+    """Extract authentication form candidates from a single URL.
+
+    Expects ctx: {'url': str, 'scan_id': int}.
+    Delegates to ExtractAuthForURLActivity with a 10-minute timeout.
+    """
+
+    @workflow.run
+    async def run(self, ctx: dict) -> dict:
+        return await workflow.execute_activity(
+            "ExtractAuthForURLActivity",
+            ctx,
+            start_to_close_timeout=timedelta(minutes=10),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+
+
 @workflow.defn(name="RecalculateApmeWorkflow")
 class RecalculateApmeWorkflow:
     """Workflow to execute algorithmic Attack Path modeling (non-LLM) recalculation."""
