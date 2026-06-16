@@ -444,6 +444,7 @@ export const TargetList: React.FC = () => {
                     <Box sx={{ display: 'flex', flexDirection: 'column' }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.primary' }}>{domain.name}</Typography>
+                      </Box>
                       {domain.most_recent_scan ? (
                         <Typography 
                           variant="caption" 
