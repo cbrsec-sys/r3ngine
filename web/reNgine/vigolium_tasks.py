@@ -468,7 +468,7 @@ def vigolium_audit_scan(self, code_path=None, ctx={}, description=None):
     audit_config = self.yaml_configuration.get(VIGOLIUM_AUDIT, {})
     if not audit_config.get(RUN_VIGOLIUM_AUDIT, True):
         logger.info("Vigolium audit disabled in configuration. Skipping.")
-        return
+        return "Vigolium audit skipped (disabled)"
 
     source = (
         code_path
@@ -543,7 +543,7 @@ def vigolium_audit_scan(self, code_path=None, ctx={}, description=None):
             logger.warning("Vigolium audit exited %s: %s", proc.returncode, proc.stderr[:500])
     except subprocess.TimeoutExpired:
         logger.warning("Vigolium audit timed out after %d seconds for scan_id=%s", timeout_seconds, scan_id)
-        return
+        return "Vigolium audit timed out"
     except Exception as exc:
         logger.error("Vigolium audit failed to run: %s", exc)
         raise
