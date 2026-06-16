@@ -259,3 +259,40 @@ class TestAUD003ScanActivityRetryBehaviour(DjangoTestCase):
             initiated_row.status, RUNNING_TASK,
             "Unclaimed INITIATED row should now be RUNNING (AUD-003)"
         )
+
+
+SETTINGS_FILE = os.path.join(
+    os.path.dirname(__file__), '..', 'reNgine', 'settings.py'
+)
+
+
+class TestAUD004NoDynamicAllowedHosts(unittest.TestCase):
+    """AUD-004: DynamicAllowedHosts must not exist in settings.py."""
+
+    def test_no_dynamic_allowed_hosts_class(self):
+        with open(SETTINGS_FILE, encoding='utf-8-sig') as f:
+            source = f.read()
+        self.assertNotIn(
+            'DynamicAllowedHosts',
+            source,
+            "DynamicAllowedHosts class must be removed from settings.py (AUD-004)"
+        )
+
+    def test_no_stack_frame_inspection_in_settings(self):
+        with open(SETTINGS_FILE, encoding='utf-8-sig') as f:
+            source = f.read()
+        self.assertNotIn(
+            'currentframe',
+            source,
+            "Stack frame inspection in ALLOWED_HOSTS must be removed (AUD-004)"
+        )
+
+    def test_allowed_hosts_not_dynamic_class_instance(self):
+        with open(SETTINGS_FILE, encoding='utf-8-sig') as f:
+            source = f.read()
+        import re
+        self.assertNotRegex(
+            source,
+            r'ALLOWED_HOSTS\s*=\s*DynamicAllowedHosts',
+            "ALLOWED_HOSTS must not be assigned to DynamicAllowedHosts instance (AUD-004)"
+        )
