@@ -477,7 +477,11 @@ def vigolium_audit_scan(self, code_path=None, ctx={}, description=None):
         or '/tmp/code'
     )
 
+    _VALID_INTENSITIES = ('quick', 'balanced', 'deep')
     intensity = audit_config.get(VIGOLIUM_AUDIT_INTENSITY, 'balanced')
+    if intensity not in _VALID_INTENSITIES:
+        logger.warning("vigolium audit: unknown intensity '%s', defaulting to 'balanced'", intensity)
+        intensity = 'balanced'
     use_ai = audit_config.get(VIGOLIUM_AUDIT_USE_AI, False)
     timeout_seconds = int(audit_config.get(VIGOLIUM_AUDIT_TIMEOUT, 3600))
 
