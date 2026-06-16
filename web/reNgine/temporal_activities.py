@@ -145,10 +145,10 @@ class TemporalTaskProxy:
         from reNgine.definitions import RUNNING_TASK
         from django.db import transaction
 
-        temporal_activity_id = activity.info().activity_id
-        now = timezone.now()
-        execution_id = "temporal-%s" % temporal_activity_id
         try:
+            temporal_activity_id = activity.info().activity_id
+            now = timezone.now()
+            execution_id = "temporal-%s" % temporal_activity_id
             with transaction.atomic():
                 # Claim only a row that has not been started yet (time_started is NULL).
                 # skip_locked=True ensures concurrent retries do not race on the same row.
