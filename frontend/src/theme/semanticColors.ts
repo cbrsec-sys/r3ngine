@@ -1,0 +1,109 @@
+import type { Theme } from '@mui/material/styles';
+import type { ResolvedThemeTokens, ThemeTokenSet } from './tokens';
+import { getResolvedTokens } from './tokens';
+
+export type SeverityLevel =
+  | 'critical'
+  | 'high'
+  | 'medium'
+  | 'low'
+  | 'info'
+  | 'unknown'
+  | number
+  | string;
+
+function normalizeSeverity(severity: SeverityLevel): keyof ThemeTokenSet['severity'] {
+  if (typeof severity === 'number') {
+    if (severity === 4) return 'critical';
+    if (severity === 3) return 'high';
+    if (severity === 2) return 'medium';
+    if (severity === 1) return 'low';
+    if (severity === 0) return 'info';
+    return 'unknown';
+  }
+  const s = String(severity).toLowerCase();
+  if (s === 'critical' || s === '4') return 'critical';
+  if (s === 'high' || s === '3') return 'high';
+  if (s === 'medium' || s === '2') return 'medium';
+  if (s === 'low' || s === '1') return 'low';
+  if (s === 'info' || s === '0') return 'info';
+  return 'unknown';
+}
+
+export function getSeverityColor(
+  severity: SeverityLevel,
+  tokens: Pick<ResolvedThemeTokens, 'severity'>
+): string {
+  return tokens.severity[normalizeSeverity(severity)];
+}
+
+export function getSeverityLabel(severity: SeverityLevel): string {
+  const key = normalizeSeverity(severity);
+  return key.toUpperCase();
+}
+
+export function getHttpStatusColor(
+  status: number,
+  tokens: Pick<ResolvedThemeTokens, 'accent' | 'severity' | 'text'>
+): string {
+  if (status >= 200 && status < 300) return tokens.accent.success;
+  if (status >= 300 && status < 400) return tokens.accent.info;
+  if (status >= 400 && status < 500) return tokens.accent.warning;
+  if (status >= 500) return tokens.accent.error;
+  return tokens.text.disabled;
+}
+
+export function getChartSeriesColors(tokens: Pick<ResolvedThemeTokens, 'chart'>): string[] {
+  return tokens.chart.series;
+}
+
+/** Surface styles for glass/elevated cards — theme-aware */
+export function getSurfaceSx(isLight: boolean, tokens: ResolvedThemeTokens) {
+  if (isLight) {
+    return {
+      bgcolor: tokens.surface.elevated,
+      border: `1px solid ${tokens.border.subtle}`,
+      boxShadow: '0 4px 20px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.6)',
+    };
+  }
+  return {
+    bgcolor: 'rgba(5, 5, 15, 0.6)',
+    backdropFilter: 'blur(10px)',
+    border: `1px solid ${tokens.border.subtle}`,
+  };
+}
+
+/** Menu/dropdown paper styles */
+export function getMenuPaperSx(isLight: boolean, theme: Theme, tokens: ResolvedThemeTokens) {
+  if (isLight) {
+    return {
+      bgcolor: theme.palette.background.paper,
+      backdropFilter: 'blur(12px)',
+      border: `1px solid ${theme.palette.divider}`,
+      borderRadius: 2,
+      boxShadow: theme.shadows[4],
+    };
+  }
+  return {
+    bgcolor: 'rgba(10, 10, 15, 0.95)',
+    backdropFilter: 'blur(12px)',
+    border: `1px solid ${tokens.border.subtle}`,
+    borderRadius: 2,
+    boxShadow: '0 8px 32px rgba(0,0,0,0.8)',
+  };
+}
+
+export function getSemanticColors(themeName: string) {
+  const tokens = getResolvedTokens(themeName);
+  const isLight = tokens.mode === 'light';
+  return {
+    tokens,
+    isLight,
+    isCyber: tokens.cyberEffects,
+    severity: (level: SeverityLevel) => getSeverityColor(level, tokens),
+    httpStatus: (status: number) => getHttpStatusColor(status, tokens),
+    chartSeries: () => getChartSeriesColors(tokens),
+    surface: () => getSurfaceSx(isLight, tokens),
+    menuPaper: (theme: Theme) => getMenuPaperSx(isLight, theme, tokens),
+  };
+}

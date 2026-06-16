@@ -14,20 +14,14 @@ import { WORKFLOW_REGISTRY } from '../types';
 import type { WorkflowSlug, WorkflowMeta, StartWorkflowPayload } from '../types';
 import { useStartWorkflow } from '../api';
 import { ProfileSelector } from '../../profiles/components/ProfileSelector';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 interface WorkflowLauncherProps {
   onSuccess?: (workflowId: string, slug: WorkflowSlug) => void;
   onError?: (error: string) => void;
 }
 
-const CATEGORY_COLORS: Record<WorkflowMeta['category'], string> = {
-  recon: '#00f3ff',
-  vuln: '#ff003c',
-  crawl: '#7c3aed',
-  osint: '#f59e0b',
-  code: '#10b981',
-  network: '#3b82f6',
-};
+// Colors will be generated dynamically using theme tokens
 
 const CATEGORY_LABELS: Record<WorkflowMeta['category'], string> = {
   recon: 'Recon',
@@ -82,29 +76,39 @@ function buildPayload(
   return payload;
 }
 
-const fieldStyles = {
+const getFieldStyles = (tokens: any) => ({
   '& .MuiOutlinedInput-root': {
-    color: '#fff',
-    '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-    '&:hover fieldset': { borderColor: 'rgba(0, 255, 98, 0.3)' },
-    '&.Mui-focused fieldset': { borderColor: '#00ff62' },
-    bgcolor: 'rgba(255,255,255,0.03)',
+    color: 'text.primary',
+    '& fieldset': { borderColor: 'divider' },
+    '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+    '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
+    bgcolor: 'action.hover',
   },
   '& .MuiInputLabel-root': {
-    color: 'rgba(255,255,255,0.4)',
-    '&.Mui-focused': { color: '#00ff62' },
+    color: 'text.disabled',
+    '&.Mui-focused': { color: tokens.accent.primary },
   },
-  '& .MuiFormHelperText-root': { color: 'rgba(255,255,255,0.3)' },
-};
+  '& .MuiFormHelperText-root': { color: 'text.disabled' },
+});
 
 export const WorkflowLauncher: React.FC<WorkflowLauncherProps> = ({
   onSuccess,
   onError,
 }) => {
+  const { tokens } = useThemeTokens();
   const [selectedSlug, setSelectedSlug] = useState<WorkflowSlug | null>(null);
   const [target, setTarget] = useState('');
   const [profileName, setProfileName] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const categoryColors: Record<WorkflowMeta['category'], string> = {
+    recon: tokens.accent.primary,
+    vuln: tokens.accent.error,
+    crawl: tokens.accent.secondary,
+    osint: tokens.accent.warning,
+    code: tokens.accent.success,
+    network: tokens.accent.info,
+  };
 
   const { mutate: startWorkflow, isPending } = useStartWorkflow();
 
@@ -159,7 +163,7 @@ export const WorkflowLauncher: React.FC<WorkflowLauncherProps> = ({
       {CATEGORY_ORDER.map((category) => {
         const group = grouped.get(category);
         if (!group || group.length === 0) return null;
-        const color = CATEGORY_COLORS[category];
+        const color = categoryColors[category];
         return (
           <Box key={category} sx={{ mb: 2 }}>
             <Typography
@@ -189,15 +193,15 @@ export const WorkflowLauncher: React.FC<WorkflowLauncherProps> = ({
                       fontWeight: isSelected ? 900 : 600,
                       fontSize: '0.72rem',
                       letterSpacing: 0.5,
-                      bgcolor: isSelected ? `${color}22` : 'rgba(255,255,255,0.04)',
-                      color: isSelected ? color : 'rgba(255,255,255,0.6)',
+                      bgcolor: isSelected ? `${color}22` : 'background.paper',
+                      color: isSelected ? color : 'text.secondary',
                       border: '1px solid',
-                      borderColor: isSelected ? `${color}66` : 'rgba(255,255,255,0.08)',
+                      borderColor: isSelected ? color : 'divider',
                       transition: 'all 0.15s',
                       '&:hover': {
                         bgcolor: `${color}18`,
                         color: color,
-                        borderColor: `${color}44`,
+                        borderColor: color,
                       },
                       '& .MuiChip-label': { px: 1.5 },
                     }}
@@ -212,15 +216,15 @@ export const WorkflowLauncher: React.FC<WorkflowLauncherProps> = ({
       {/* Launch form — only visible when a workflow is selected */}
       {selectedMeta && (
         <>
-          <Divider sx={{ borderColor: 'rgba(255,255,255,0.06)', my: 2 }} />
+          <Divider sx={{ borderColor: 'divider', my: 2 }} />
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
             <Box
               sx={{
                 p: 0.75,
                 borderRadius: 1.5,
-                bgcolor: `${CATEGORY_COLORS[selectedMeta.category]}18`,
-                color: CATEGORY_COLORS[selectedMeta.category],
+                bgcolor: `${categoryColors[selectedMeta.category]}18`,
+                color: categoryColors[selectedMeta.category],
                 display: 'flex',
               }}
             >
@@ -232,13 +236,13 @@ export const WorkflowLauncher: React.FC<WorkflowLauncherProps> = ({
                   fontFamily: 'Orbitron',
                   fontWeight: 800,
                   fontSize: '0.8rem',
-                  color: '#fff',
+                  color: 'text.primary',
                   lineHeight: 1.2,
                 }}
               >
                 {selectedMeta.label.toUpperCase()}
               </Typography>
-              <Typography sx={{ color: 'rgba(255,255,255,0.35)', fontSize: '0.7rem' }}>
+              <Typography sx={{ color: 'text.disabled', fontSize: '0.7rem' }}>
                 {selectedMeta.description}
               </Typography>
             </Box>
@@ -249,10 +253,10 @@ export const WorkflowLauncher: React.FC<WorkflowLauncherProps> = ({
               severity="error"
               sx={{
                 mb: 2,
-                bgcolor: 'rgba(255, 0, 60, 0.08)',
-                color: '#ff003c',
-                border: '1px solid rgba(255, 0, 60, 0.2)',
-                '& .MuiAlert-icon': { color: '#ff003c' },
+                bgcolor: `${tokens.accent.error}1A`,
+                color: tokens.accent.error,
+                border: 1, borderColor: `${tokens.accent.error}33`,
+                '& .MuiAlert-icon': { color: tokens.accent.error },
               }}
               onClose={() => setErrorMessage(null)}
             >
@@ -268,7 +272,7 @@ export const WorkflowLauncher: React.FC<WorkflowLauncherProps> = ({
               value={target}
               onChange={(e) => setTarget(e.target.value)}
               disabled={isPending}
-              sx={fieldStyles}
+              sx={getFieldStyles(tokens)}
             />
 
             {/*
@@ -292,7 +296,7 @@ export const WorkflowLauncher: React.FC<WorkflowLauncherProps> = ({
                   )
                 }
                 sx={{
-                  bgcolor: CATEGORY_COLORS[selectedMeta.category],
+                  bgcolor: categoryColors[selectedMeta.category],
                   color: '#000',
                   fontWeight: 900,
                   fontFamily: 'Orbitron',
@@ -300,13 +304,13 @@ export const WorkflowLauncher: React.FC<WorkflowLauncherProps> = ({
                   letterSpacing: 1,
                   px: 3,
                   '&:hover': {
-                    bgcolor: CATEGORY_COLORS[selectedMeta.category],
+                    bgcolor: categoryColors[selectedMeta.category],
                     filter: 'brightness(1.15)',
-                    boxShadow: `0 0 16px ${CATEGORY_COLORS[selectedMeta.category]}55`,
+                    boxShadow: `0 0 16px ${categoryColors[selectedMeta.category]}55`,
                   },
                   '&.Mui-disabled': {
-                    bgcolor: `${CATEGORY_COLORS[selectedMeta.category]}30`,
-                    color: 'rgba(0,0,0,0.4)',
+                    bgcolor: `${categoryColors[selectedMeta.category]}30`,
+                    color: 'text.disabled',
                   },
                 }}
               >

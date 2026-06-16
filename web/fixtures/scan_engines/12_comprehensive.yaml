@@ -141,6 +141,9 @@
           - mpeg
           - mp3
         threads: 20
+      param_discovery:
+        enabled: true
+        min_confidence: 50
       web_api_discovery:
         uses_tools:
           - kiterunner

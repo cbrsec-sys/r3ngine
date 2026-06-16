@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Backdrop,
   Box,
@@ -17,6 +17,7 @@ import {
   ShieldCheck,
   RefreshCw,
   AlertTriangle,
+  RotateCw,
 } from 'lucide-react';
 import { useInstallStatus, type InstallStep } from '../api/pluginsApi';
 
@@ -39,8 +40,26 @@ interface Props {
   onError: (message: string) => void;
 }
 
+const RELOAD_COUNTDOWN_SECONDS = 30;
+
 const InstallProgressOverlay: React.FC<Props> = ({ installId, onComplete, onError }) => {
   const { data } = useInstallStatus(installId);
+  const [reloading, setReloading] = useState(false);
+  const [countdown, setCountdown] = useState(RELOAD_COUNTDOWN_SECONDS);
+
+  useEffect(() => {
+    if (!reloading) return;
+    if (countdown <= 0) {
+      window.location.reload();
+      return;
+    }
+    const timer = setTimeout(() => setCountdown(c => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [reloading, countdown]);
+
+  const handleReload = () => {
+    setReloading(true);
+  };
 
   // Merge backend steps with the full ordered step list so pending steps are always visible
   const mergedSteps: InstallStep[] = ALL_STEPS.map(({ key, label }) => {
@@ -52,6 +71,125 @@ const InstallProgressOverlay: React.FC<Props> = ({ installId, onComplete, onErro
   const progress = Math.round((completedCount / ALL_STEPS.length) * 100);
   const isSuccess = data?.status === 'success';
   const isFailed = data?.status === 'failed';
+
+  if (reloading) {
+    return (
+      <Backdrop
+        open
+        sx={{
+          zIndex: (theme) => theme.zIndex.drawer + 100,
+          backdropFilter: 'blur(8px)',
+          bgcolor: 'rgba(0, 0, 0, 0.85)',
+        }}
+      >
+        <Box
+          sx={{
+            width: 420,
+            background: 'linear-gradient(145deg, rgba(8,8,18,0.99) 0%, rgba(12,12,22,1) 100%)',
+            border: '1px solid rgba(0,243,255,0.25)',
+            borderRadius: '20px',
+            p: 5,
+            textAlign: 'center',
+            boxShadow: '0 0 80px rgba(0,243,255,0.1)',
+          }}
+        >
+          <Box
+            sx={{
+              display: 'inline-flex',
+              mb: 3,
+              color: '#00f3ff',
+              filter: 'drop-shadow(0 0 12px #00f3ff)',
+              animation: 'spinSlow 2s linear infinite',
+              '@keyframes spinSlow': { from: { transform: 'rotate(0deg)' }, to: { transform: 'rotate(360deg)' } },
+            }}
+          >
+            <RotateCw size={48} />
+          </Box>
+
+          <Typography
+            sx={{
+              fontFamily: 'Orbitron',
+              fontWeight: 900,
+              fontSize: '1.1rem',
+              letterSpacing: 3,
+              color: '#00f3ff',
+              mb: 1.5,
+            }}
+          >
+            SYSTEM RELOADING
+          </Typography>
+
+          <Typography
+            sx={{
+              color: 'rgba(255,255,255,0.5)',
+              fontSize: '0.8rem',
+              fontFamily: 'monospace',
+              lineHeight: 1.7,
+              mb: 3,
+            }}
+          >
+            The system is reloading to apply the newly installed plugin.
+            <br />
+            The page will automatically reload in
+          </Typography>
+
+          <Box
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              width: 72,
+              height: 72,
+              borderRadius: '50%',
+              border: '2px solid rgba(0,243,255,0.3)',
+              bgcolor: 'rgba(0,243,255,0.05)',
+              mb: 3,
+              boxShadow: '0 0 20px rgba(0,243,255,0.1)',
+            }}
+          >
+            <Typography
+              sx={{
+                fontFamily: 'Orbitron',
+                fontWeight: 900,
+                fontSize: '1.6rem',
+                color: '#00f3ff',
+                lineHeight: 1,
+              }}
+            >
+              {countdown}
+            </Typography>
+          </Box>
+
+          <LinearProgress
+            variant="determinate"
+            value={((RELOAD_COUNTDOWN_SECONDS - countdown) / RELOAD_COUNTDOWN_SECONDS) * 100}
+            sx={{
+              height: 3,
+              borderRadius: 2,
+              bgcolor: 'rgba(255,255,255,0.06)',
+              '& .MuiLinearProgress-bar': {
+                borderRadius: 2,
+                bgcolor: '#00f3ff',
+                boxShadow: '0 0 8px #00f3ff',
+              },
+            }}
+          />
+
+          <Typography
+            sx={{
+              mt: 1.5,
+              color: 'rgba(255,255,255,0.25)',
+              fontSize: '0.65rem',
+              fontFamily: 'Orbitron',
+              letterSpacing: 1,
+            }}
+          >
+            SECONDS REMAINING
+          </Typography>
+        </Box>
+      </Backdrop>
+    );
+  }
 
   return (
     <Backdrop
@@ -158,7 +296,7 @@ const InstallProgressOverlay: React.FC<Props> = ({ installId, onComplete, onErro
         {(isSuccess || isFailed) && (
           <Button
             fullWidth
-            onClick={() => window.location.reload()}
+            onClick={handleReload}
             startIcon={<RefreshCw size={14} />}
             sx={{
               mt: 3,

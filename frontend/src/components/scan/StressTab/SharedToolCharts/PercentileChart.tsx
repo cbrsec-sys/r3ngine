@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../../../../theme/useThemeTokens';
 import React, { useMemo } from 'react';
 import { useTheme, alpha } from '@mui/material';
 import ReactECharts from 'echarts-for-react';
@@ -26,6 +27,7 @@ export const PercentileChart: React.FC<PercentileChartProps> = ({
   unit,
   height = 300,
 }) => {
+  const { tokens } = useThemeTokens();
   const theme = useTheme();
 
   const option = useMemo(() => {
@@ -119,7 +121,7 @@ export const PercentileChart: React.FC<PercentileChartProps> = ({
         trigger: 'axis',
         backgroundColor: 'rgba(5, 5, 10, 0.95)',
         borderColor: alpha(theme.palette.primary.main, 0.3),
-        textStyle: { color: '#fff', fontSize: 11, fontFamily: 'monospace' },
+        textStyle: { color: 'text.primary', fontSize: 11, fontFamily: 'monospace' },
         borderWidth: 1,
         borderRadius: 4,
         formatter: (params: any) => {

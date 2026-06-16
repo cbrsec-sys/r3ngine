@@ -260,23 +260,26 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		ffuf_base_cmd += f' -w {wordlist_path}'
 		ffuf_base_cmd += f' -e {extensions_str}' if extensions else ''
 		ffuf_base_cmd += f' -maxtime {max_time}' if max_time > 0 else ''
-		ffuf_base_cmd += f' -p {delay}' if delay > 0 else ''
+		ffuf_base_cmd += f' -rate {rate_limit}' if rate_limit > 0 else ''
 		if recursive_level > 0:
 			ffuf_base_cmd += f' -recursion -recursion-depth {recursive_level}'
-		ffuf_base_cmd += f' -maxtime-job {max_time}' if max_time > 0 else ''
+			if max_time > 0:
+				job_time = max(30, max_time // (recursive_level + 1))
+				ffuf_base_cmd += f' -maxtime-job {job_time}'
 		ffuf_base_cmd += f' -t {threads}' if threads and threads > 0 else ''
 		ffuf_base_cmd += f' -timeout {timeout}' if timeout and timeout > 0 else ''
 		ffuf_base_cmd += ' -se' if stop_on_error else ''
 		ffuf_base_cmd += ' -r' if follow_redirect else ''
 		ffuf_base_cmd += ' -ac' if auto_calibration else ''
-		ffuf_base_cmd += f' -mc {mc}' if mc else ''
+		if not auto_calibration and mc:
+			ffuf_base_cmd += f' -mc {mc}'
 
 		has_ua = any('user-agent' in h.lower() for h in custom_headers_list)
 		if not has_ua:
-			ffuf_base_cmd += ' -H "User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"'
+			ffuf_base_cmd += " -H 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'"
 
 		for header in custom_headers_list:
-			ffuf_base_cmd += f' -H "{header}"'
+			ffuf_base_cmd += f" -H '{header}'"
 			if 'cookie' in header.lower() or 'authorization' in header.lower():
 				logger.warning(f'Authenticated FFUF fuzzing enabled via header: {header}')
 
@@ -383,7 +386,8 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 
 				def _run_ffuf():
 					try:
-						fcmd = ffuf_base_cmd + f' -u {target_url}FUZZ -json'
+						_fuzz_url = target_url if target_url.endswith('/') else target_url + '/'
+						fcmd = ffuf_base_cmd + f' -u {_fuzz_url}FUZZ -json'
 						fcmd += f' -x {proxy}' if proxy else ''
 						fcmd = opsec.apply_stealth('ffuf', fcmd, proxy=proxy)
 
@@ -420,7 +424,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 									history_file=self.history_file,
 									scan_id=self.scan_id,
 									activity_id=self.activity_id,
-									route_to_executor=True):
+									route_to_executor=False):
 								if not isinstance(line, dict):
 									continue
 								batch.append(line)

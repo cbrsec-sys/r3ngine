@@ -28,8 +28,7 @@ import {
   Tooltip,
   Snackbar,
   Divider,
-  Alert,
-  useTheme
+  Alert
 } from '@mui/material';
 import { PageHeader } from '../../../components/PageHeader';
 import {
@@ -57,28 +56,30 @@ import { useBountyPrograms, useProgramDetails, useImportPrograms } from '../api'
 import { useAddTarget } from '../../targets/api';
 import { formatDistanceToNow, subMonths } from 'date-fns';
 //import { HackerOneProgram } from '../types';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
-const PROGRAM_CARD_STYLE = {
-  bgcolor: 'rgba(255, 255, 255, 0.02)',
-  border: '1px solid rgba(255, 255, 255, 0.05)',
+const getProgramCardStyle = (tokens: any) => ({
+  bgcolor: 'action.hover',
+  border: 1, borderColor: 'divider',
   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   cursor: 'pointer',
   position: 'relative',
   overflow: 'hidden',
   height: '100%',
   '&:hover': {
-    border: '1px solid rgba(0, 243, 255, 0.3)',
-    boxShadow: '0 0 20px rgba(0, 243, 255, 0.1)',
+    border: `1px solid ${tokens.accent.primary}4D`,
+    boxShadow: `0 0 20px ${tokens.accent.primary}1A`,
     transform: 'translateY(-4px)'
   },
   '&.selected': {
-    border: '1px solid #00f3ff',
-    bgcolor: 'rgba(0, 243, 255, 0.05)',
-    boxShadow: '0 0 25px rgba(0, 243, 255, 0.2)',
+    border: `1px solid ${tokens.accent.primary}`,
+    bgcolor: `${tokens.accent.primary}0D`,
+    boxShadow: `0 0 25px ${tokens.accent.primary}33`,
   }
-};
+});
 
 export const BountyHubPage: React.FC = () => {
+  const { tokens, theme, isLight } = useThemeTokens();
   const { projectSlug } = useParams({ strict: false });
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('All');
@@ -94,9 +95,6 @@ export const BountyHubPage: React.FC = () => {
   });
 
   const handleCloseSnackbar = () => setSnackbar(prev => ({ ...prev, open: false }));
-
-  const theme = useTheme();
-  const isLight = theme.palette.mode === 'light';
 
   const [sortKey, sortOrder] = sortBy.split('-');
   const { data: programs, isLoading, error } = useBountyPrograms({
@@ -186,7 +184,7 @@ export const BountyHubPage: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 4, bgcolor: '#0a0a0a', minHeight: '100vh' }}>
+    <Box sx={{ p: 4, bgcolor: 'background.default', minHeight: '100vh' }}>
       {/* Header */}
       <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start", mb: 0 }}>
         <PageHeader
@@ -259,11 +257,11 @@ export const BountyHubPage: React.FC = () => {
             <Stack direction="row" spacing={2} sx={{ justifyContent: "flex-end" }}>
               <FormControlLabel
                 control={<Checkbox checked={showClosed} onChange={(e) => setShowClosed(e.target.checked)} />}
-                label={<Typography variant="body2" sx={{ color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.6)' }}>Show Closed</Typography>}
+                label={<Typography variant="body2" sx={{ color: 'text.secondary' }}>Show Closed</Typography>}
               />
               <FormControlLabel
                 control={<Checkbox checked={showBookmarked} onChange={(e) => setShowBookmarked(e.target.checked)} />}
-                label={<Typography variant="body2" sx={{ color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.6)' }}>Bookmarked</Typography>}
+                label={<Typography variant="body2" sx={{ color: 'text.secondary' }}>Bookmarked</Typography>}
               />
             </Stack>
           </Grid>
@@ -273,7 +271,7 @@ export const BountyHubPage: React.FC = () => {
       {/* Grid */}
       {isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}>
-          <CircularProgress sx={{ color: '#00f3ff' }} />
+          <CircularProgress sx={{ color: tokens.accent.primary }} />
         </Box>
       ) : error ? (
         <Alert severity="error" sx={{ bgcolor: 'rgba(211, 47, 47, 0.1)', color: '#ff5252' }}>
@@ -285,7 +283,7 @@ export const BountyHubPage: React.FC = () => {
             <Grid size={{ xs: 12, sm: 6, md: 4, lg: 3 }} key={p.id}>
               <Card
                 className={selectedHandles.includes(p.attributes.handle) ? 'selected' : ''}
-                sx={PROGRAM_CARD_STYLE}
+                sx={getProgramCardStyle(tokens)}
                 onClick={() => toggleSelection(p.attributes.handle)}
               >
                 <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
@@ -296,11 +294,11 @@ export const BountyHubPage: React.FC = () => {
                       sx={{ width: 48, height: 48, border: '1px solid rgba(255,255,255,0.1)' }}
                     />
                     <Box sx={{ minWidth: 0 }}>
-                      <Typography variant="subtitle1" noWrap sx={{ color: '#fff', fontWeight: 600 }}>
+                      <Typography variant="subtitle1" noWrap sx={{ color: 'text.primary', fontWeight: 600 }}>
                         {p.attributes.name}
-                        {p.attributes.bookmarked && <Bookmark size={14} fill="#ffd600" color="#ffd600" style={{ marginLeft: 6 }} />}
+                        {p.attributes.bookmarked && <Bookmark size={14} fill={tokens.accent.primary} color={tokens.accent.primary} style={{ marginLeft: 6 }} />}
                       </Typography>
-                      <Typography variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.7)', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                      <Typography variant="caption" sx={{ color: tokens.accent.primary, display: 'flex', alignItems: 'center', gap: 0.5, opacity: 0.7 }}>
                         @{p.attributes.handle}
                         <ExternalLink size={10} />
                       </Typography>
@@ -321,10 +319,10 @@ export const BountyHubPage: React.FC = () => {
                     <Chip
                       label={p.attributes.state === 'public_mode' ? 'PUBLIC' : 'PRIVATE'}
                       size="small"
-                      sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.6)' }}
+                      sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'action.hover', color: 'text.secondary' }}
                     />
                     {p.attributes.offers_bounties ? (
-                      <Chip label="BOUNTY" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff' }} />
+                      <Chip label="BOUNTY" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: `${tokens.accent.primary}1A`, color: tokens.accent.primary }} />
                     ) : (
                       <Chip label="VDP" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'rgba(255, 152, 0, 0.1)', color: '#ff9800' }} />
                     )}
@@ -332,7 +330,7 @@ export const BountyHubPage: React.FC = () => {
                       <Chip label="OPEN SCOPE" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'rgba(76, 175, 80, 0.1)', color: '#4caf50' }} />
                     )}
                     {new Date(p.attributes.started_accepting_at) > subMonths(new Date(), 3) && (
-                      <Chip icon={<Zap size={10} />} label="NEW" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', '& .MuiChip-icon': { color: '#00f3ff' } }} />
+                      <Chip icon={<Zap size={10} />} label="NEW" size="small" sx={{ height: 18, fontSize: '0.65rem', fontWeight: 900, bgcolor: `${tokens.accent.primary}1A`, color: tokens.accent.primary, '& .MuiChip-icon': { color: tokens.accent.primary } }} />
                     )}
                   </Stack>
 
@@ -340,7 +338,7 @@ export const BountyHubPage: React.FC = () => {
                     <Grid size={{ xs: 6 }}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                         <Flag size={12} color="rgba(255,255,255,0.4)" />
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                           Reports: {p.attributes.number_of_reports_for_user}
                         </Typography>
                       </Stack>
@@ -348,16 +346,16 @@ export const BountyHubPage: React.FC = () => {
                     <Grid size={{ xs: 6 }}>
                       <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
                         <DollarSign size={12} color="rgba(255,255,255,0.4)" />
-                        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.6)' }}>
+                        <Typography variant="caption" sx={{ color: 'text.secondary' }}>
                           Earnings: ${p.attributes.bounty_earned_for_user.toFixed(0)}
                         </Typography>
                       </Stack>
                     </Grid>
                   </Grid>
 
-                  <Divider sx={{ mb: 1.5, borderColor: 'rgba(255,255,255,0.05)' }} />
+                  <Divider sx={{ mb: 1.5, borderColor: 'divider' }} />
 
-                  <Stack direction="row" sx={{ justifyContent: "space-between", color: 'rgba(255,255,255,0.4)', mb: 1.5 }}>
+                  <Stack direction="row" sx={{ justifyContent: "space-between", color: 'text.disabled', mb: 1.5 }}>
                     <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                       Since {new Date(p.attributes.started_accepting_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
                     </Typography>
@@ -374,7 +372,7 @@ export const BountyHubPage: React.FC = () => {
                       e.stopPropagation();
                       setDetailHandle(p.attributes.handle);
                     }}
-                    sx={{ color: 'rgba(255,255,255,0.6)', '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' } }}
+                    sx={{ color: 'text.secondary', '&:hover': { bgcolor: 'action.hover' } }}
                   >
                     SEE DETAILS
                   </Button>
@@ -393,14 +391,14 @@ export const BountyHubPage: React.FC = () => {
           left: '50%',
           transform: 'translateX(-50%)',
           zIndex: 1000,
-          bgcolor: 'rgba(13, 12, 20, 0.95)',
-          border: '1px solid #00f3ff',
+          bgcolor: 'background.paper',
+          border: 1, borderColor: tokens.accent.primary,
           p: 1.5,
           borderRadius: 2,
           display: 'flex',
           alignItems: 'center',
           gap: 3,
-          boxShadow: '0 0 30px rgba(0, 243, 255, 0.2)',
+          boxShadow: `0 0 30px ${tokens.accent.primary}33`,
           backdropFilter: 'blur(10px)'
         }}>
           <Button
@@ -409,11 +407,11 @@ export const BountyHubPage: React.FC = () => {
             disabled={importMutation.isPending}
             startIcon={importMutation.isPending ? <CircularProgress size={16} color="inherit" /> : <DownloadCloud size={18} />}
             sx={{
-              bgcolor: '#00f3ff',
+              bgcolor: tokens.accent.primary,
               color: '#000',
               fontFamily: 'Orbitron',
               fontWeight: 900,
-              '&:hover': { bgcolor: '#00d8e4' }
+              '&:hover': { bgcolor: tokens.accent.primary, filter: 'brightness(1.1)' }
             }}
           >
             {importMutation.isPending ? 'IMPORTING...' : `IMPORT ${selectedHandles.length} PROGRAM${selectedHandles.length !== 1 ? 'S' : ''}`}
@@ -421,7 +419,7 @@ export const BountyHubPage: React.FC = () => {
           <Button
             variant="text"
             onClick={() => setSelectedHandles([])}
-            sx={{ color: 'rgba(255,255,255,0.6)', fontFamily: 'Orbitron', fontSize: '0.7rem', fontWeight: 800 }}
+            sx={{ color: 'text.secondary', fontFamily: 'Orbitron', fontSize: '0.7rem', fontWeight: 800 }}
           >
             CLEAR ALL <XCircle size={14} style={{ marginLeft: 8 }} />
           </Button>
@@ -436,7 +434,7 @@ export const BountyHubPage: React.FC = () => {
         fullWidth
         slotProps={{
           paper: {
-            sx: { bgcolor: '#0d0d0d', border: '1px solid rgba(255,255,255,0.1)', backgroundImage: 'none' }
+            sx: { bgcolor: 'background.default', border: '1px solid rgba(255,255,255,0.1)', backgroundImage: 'none' }
           }
         }}
       >
@@ -444,34 +442,34 @@ export const BountyHubPage: React.FC = () => {
           <Box sx={{ p: 4, textAlign: 'center' }}><CircularProgress /></Box>
         ) : details && (
           <>
-            <DialogTitle sx={{ p: 3, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+            <DialogTitle sx={{ p: 3, borderBottom: 1, borderColor: 'divider' }}>
               <Stack direction="row" spacing={2} sx={{ alignItems: "center" }}>
                 <Avatar src={details.attributes.profile_picture} sx={{ width: 40, height: 40 }} />
                 <Box>
-                  <Typography variant="h6" sx={{ color: '#fff', fontFamily: 'Orbitron' }}>{details.attributes.name}</Typography>
-                  <Typography variant="caption" sx={{ color: '#00f3ff' }}>@{details.attributes.handle}</Typography>
+                  <Typography variant="h6" sx={{ color: 'text.primary', fontFamily: 'Orbitron' }}>{details.attributes.name}</Typography>
+                  <Typography variant="caption" sx={{ color: tokens.accent.primary }}>@{details.attributes.handle}</Typography>
                 </Box>
               </Stack>
             </DialogTitle>
             <DialogContent sx={{ p: 3 }}>
               <Grid container spacing={4}>
                 <Grid size={{ xs: 12, md: 7 }}>
-                  <Typography variant="subtitle2" sx={{ color: 'rgba(0, 243, 255, 0.7)', mb: 2, letterSpacing: 1 }}>ASSETS ON SCOPE</Typography>
+                  <Typography variant="subtitle2" sx={{ color: tokens.accent.primary, mb: 2, letterSpacing: 1, opacity: 0.7 }}>ASSETS ON SCOPE</Typography>
                   <Box sx={{ maxHeight: 400, overflowY: 'auto', pr: 1 }}>
                     {Object.keys(groupedAssets).length > 0 ? (
                       Object.entries(groupedAssets).map(([type, assets]) => (
                         <Accordion key={type} sx={{
                           bgcolor: 'transparent',
                           backgroundImage: 'none',
-                          border: '1px solid rgba(255,255,255,0.05)',
+                          border: 1, borderColor: 'divider',
                           mb: 1,
                           '&:before': { display: 'none' }
                         }}>
                           <AccordionSummary expandIcon={<ChevronDown color="rgba(255,255,255,0.3)" size={18} />}>
                             <Stack direction="row" spacing={1.5} sx={{ alignItems: "center" }}>
-                              <Folder size={16} color="#00f3ff" />
-                              <Typography variant="body2" sx={{ fontWeight: 800, color: '#fff', fontFamily: 'Orbitron' }}>
-                                {type}S <Typography component="span" variant="caption" sx={{ color: 'rgba(0, 243, 255, 0.5)', ml: 1 }}>({assets.length})</Typography>
+                              <Folder size={16} color={tokens.accent.primary} />
+                              <Typography variant="body2" sx={{ fontWeight: 800, color: 'text.primary', fontFamily: 'Orbitron' }}>
+                                {type}S <Typography component="span" variant="caption" sx={{ color: tokens.accent.primary, ml: 1, opacity: 0.5 }}>({assets.length})</Typography>
                               </Typography>
                             </Stack>
                           </AccordionSummary>
@@ -480,17 +478,17 @@ export const BountyHubPage: React.FC = () => {
                               {assets.map((scope: any) => (
                                 <Box key={scope.id} sx={{
                                   p: 1.5,
-                                  bgcolor: 'rgba(255,255,255,0.02)',
-                                  border: '1px solid rgba(255,255,255,0.05)',
+                                  bgcolor: 'action.hover',
+                                  border: 1, borderColor: 'divider',
                                   borderRadius: 1,
                                   display: 'flex',
                                   justifyContent: 'space-between',
                                   alignItems: 'center',
-                                  '&:hover': { bgcolor: 'rgba(255,255,255,0.04)' }
+                                  '&:hover': { bgcolor: 'action.hover' }
                                 }}>
                                   <Box sx={{ minWidth: 0, flexGrow: 1, mr: 2 }}>
-                                    <Typography variant="body2" noWrap sx={{ color: '#fff', fontWeight: 600 }}>{scope.attributes.asset_identifier}</Typography>
-                                    <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>{scope.attributes.asset_type}</Typography>
+                                    <Typography variant="body2" noWrap sx={{ color: 'text.primary', fontWeight: 600 }}>{scope.attributes.asset_identifier}</Typography>
+                                    <Typography variant="caption" sx={{ color: 'text.disabled' }}>{scope.attributes.asset_type}</Typography>
                                   </Box>
                                   <Button
                                     size="small"
@@ -498,7 +496,7 @@ export const BountyHubPage: React.FC = () => {
                                     startIcon={<PlusCircle size={14} />}
                                     onClick={() => handleAddTarget(scope.attributes.asset_identifier, details.attributes.name)}
                                     disabled={addTargetMutation.isPending}
-                                    sx={{ color: '#00f3ff', minWidth: 'auto', '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' } }}
+                                    sx={{ color: tokens.accent.primary, minWidth: 'auto', '&:hover': { bgcolor: `${tokens.accent.primary}1A` } }}
                                   >
                                     ADD
                                   </Button>
@@ -509,37 +507,37 @@ export const BountyHubPage: React.FC = () => {
                         </Accordion>
                       ))
                     ) : (
-                      <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.4)' }}>No structured scope found.</Typography>
+                      <Typography variant="body2" sx={{ color: 'text.disabled' }}>No structured scope found.</Typography>
                     )}
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 12, md: 5 }}>
                   <Stack spacing={3}>
                     <Box>
-                      <Typography variant="subtitle2" sx={{ color: 'rgba(0, 243, 255, 0.7)', mb: 1.5, letterSpacing: 1 }}>STATS</Typography>
+                      <Typography variant="subtitle2" sx={{ color: tokens.accent.primary, mb: 1.5, letterSpacing: 1, opacity: 0.7 }}>STATS</Typography>
                       <Grid container spacing={2}>
                         <Grid size={{ xs: 6 }}>
-                          <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1, textAlign: 'center' }}>
-                            <Typography variant="h5" sx={{ color: '#fff', fontWeight: 900 }}>{details.attributes.number_of_reports_for_user || 0}</Typography>
-                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>REPORTS</Typography>
+                          <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1, textAlign: 'center' }}>
+                            <Typography variant="h5" sx={{ color: 'text.primary', fontWeight: 900 }}>{details.attributes.number_of_reports_for_user || 0}</Typography>
+                            <Typography variant="caption" sx={{ color: 'text.disabled' }}>REPORTS</Typography>
                           </Box>
                         </Grid>
                         <Grid size={{ xs: 6 }}>
-                          <Box sx={{ p: 2, bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 1, textAlign: 'center' }}>
-                            <Typography variant="h5" sx={{ color: '#fff', fontWeight: 900 }}>${(details.attributes.bounty_earned_for_user || 0).toFixed(0)}</Typography>
-                            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.4)' }}>EARNED</Typography>
+                          <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1, textAlign: 'center' }}>
+                            <Typography variant="h5" sx={{ color: 'text.primary', fontWeight: 900 }}>${(details.attributes.bounty_earned_for_user || 0).toFixed(0)}</Typography>
+                            <Typography variant="caption" sx={{ color: 'text.disabled' }}>EARNED</Typography>
                           </Box>
                         </Grid>
                       </Grid>
                     </Box>
                     <Box>
-                      <Typography variant="subtitle2" sx={{ color: 'rgba(0, 243, 255, 0.7)', mb: 1.5, letterSpacing: 1 }}>PROGRAM INFO</Typography>
+                      <Typography variant="subtitle2" sx={{ color: tokens.accent.primary, mb: 1.5, letterSpacing: 1, opacity: 0.7 }}>PROGRAM INFO</Typography>
                       <Stack spacing={1}>
-                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 1 }}>
                           <CheckCircle2 size={14} color="#00ff00" /> Active since {new Date(details.attributes.started_accepting_at).toLocaleDateString()}
                         </Typography>
-                        <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Zap size={14} color="#00f3ff" /> {details.attributes.currency.toUpperCase()} Currency
+                        <Typography variant="body2" sx={{ color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <Zap size={14} color={tokens.accent.primary} /> {details.attributes.currency.toUpperCase()} Currency
                         </Typography>
                       </Stack>
                     </Box>
@@ -547,8 +545,8 @@ export const BountyHubPage: React.FC = () => {
                 </Grid>
               </Grid>
             </DialogContent>
-            <DialogActions sx={{ p: 3, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-              <Button onClick={() => setDetailHandle(null)} sx={{ color: 'rgba(255,255,255,0.6)' }}>CLOSE</Button>
+            <DialogActions sx={{ p: 3, borderTop: 1, borderColor: 'divider' }}>
+              <Button onClick={() => setDetailHandle(null)} sx={{ color: 'text.secondary' }}>CLOSE</Button>
               <Button
                 variant="contained"
                 startIcon={<DownloadCloud size={16} />}
@@ -556,7 +554,7 @@ export const BountyHubPage: React.FC = () => {
                   toggleSelection(details.attributes.handle);
                   setDetailHandle(null);
                 }}
-                sx={{ bgcolor: '#00f3ff', color: '#000', fontWeight: 900, fontFamily: 'Orbitron' }}
+                sx={{ bgcolor: tokens.accent.primary, color: '#000', fontWeight: 900, fontFamily: 'Orbitron' }}
               >
                 SELECT FOR IMPORT
               </Button>
@@ -579,10 +577,10 @@ export const BountyHubPage: React.FC = () => {
             fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' :
-              snackbar.severity === 'error' ? 'rgba(255, 0, 85, 0.9)' : 'rgba(0, 243, 255, 0.5)',
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}E6` :
+              snackbar.severity === 'error' ? 'rgba(255, 0, 85, 0.9)' : `${tokens.accent.primary}80`,
             color: '#000',
-            border: '1px solid rgba(255,255,255,0.1)',
+            border: 1, borderColor: 'divider',
             '& .MuiAlert-icon': { color: '#000' }
           }}
         >

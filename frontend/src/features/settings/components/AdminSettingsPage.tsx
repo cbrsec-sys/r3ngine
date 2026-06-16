@@ -31,17 +31,8 @@ import {
 } from 'lucide-react';
 import { useUsers, useCreateUser, useToggleUserStatus, useUpdateUser, useDeleteUser } from '../api';
 import type { User } from '../api';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
-const textFieldStyle = {
-  '& .MuiOutlinedInput-root': {
-    '& fieldset': { borderColor: 'rgba(0, 243, 255, 0.2)' },
-    '&:hover fieldset': { borderColor: 'rgba(0, 243, 255, 0.5)' },
-    '&.Mui-focused fieldset': { borderColor: '#00f3ff' },
-    backgroundColor: 'rgba(0, 20, 40, 0.4)',
-  },
-  '& .MuiInputLabel-root': { color: 'rgba(0, 243, 255, 0.7)' },
-  '& .MuiInputBase-input': { color: '#fff', fontFamily: 'Inter, sans-serif' },
-};
 
 const ROLES = [
   { value: 'sys_admin', label: 'Sys Admin' },
@@ -50,11 +41,23 @@ const ROLES = [
 ];
 
 export const AdminSettingsPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { data: users, isLoading } = useUsers();
   const createUserMutation = useCreateUser();
   const toggleStatusMutation = useToggleUserStatus();
   const updateUserMutation = useUpdateUser();
   const deleteUserMutation = useDeleteUser();
+
+  const textFieldStyle = {
+    '& .MuiOutlinedInput-root': {
+      '& fieldset': { borderColor: 'divider' },
+      '&:hover fieldset': { borderColor: `${tokens.accent.primary}80` },
+      '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
+      backgroundColor: 'background.paper',
+    },
+    '& .MuiInputLabel-root': { color: 'text.secondary' },
+    '& .MuiInputBase-input': { color: 'text.primary', fontFamily: 'Inter, sans-serif' },
+  };
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -161,7 +164,7 @@ export const AdminSettingsPage: React.FC = () => {
   if (isLoading) {
     return (
       <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", height: "400px" }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
       </Box>
     );
   }
@@ -175,19 +178,19 @@ export const AdminSettingsPage: React.FC = () => {
             fontFamily: 'Orbitron',
             fontWeight: 900,
             letterSpacing: 2,
-            color: '#fff',
-            textShadow: '0 0 15px rgba(0, 243, 255, 0.3)'
+            color: 'text.primary',
+            textShadow: `0 0 15px ${tokens.accent.primary}4D`
           }}
         >
           USER MANAGEMENT
         </Typography>
-        <Box sx={{ flexGrow: 1, height: '1px', background: 'linear-gradient(90deg, rgba(0, 243, 255, 0.5), transparent)' }} />
+        <Box sx={{ flexGrow: 1, height: '1px', background: `linear-gradient(90deg, ${tokens.accent.primary}80, transparent)` }} />
         <Button
           variant="contained"
           startIcon={<PersonAddIcon size={18} />}
           onClick={() => handleOpenModal()}
           sx={{
-            bgcolor: '#00f3ff',
+            bgcolor: tokens.accent.primary,
             color: '#000',
             fontFamily: 'Orbitron',
             fontWeight: 900,
@@ -195,8 +198,9 @@ export const AdminSettingsPage: React.FC = () => {
             px: 3,
             height: '36px',
             '&:hover': {
-              bgcolor: '#00c8d4',
-              boxShadow: '0 0 15px rgba(0, 243, 255, 0.4)'
+              bgcolor: tokens.accent.primary,
+              filter: 'brightness(1.1)',
+              boxShadow: `0 0 15px ${tokens.accent.primary}66`
             }
           }}
         >
@@ -205,44 +209,45 @@ export const AdminSettingsPage: React.FC = () => {
       </Box>
 
       <TableContainer component={Paper} sx={{
-        background: 'rgba(10, 25, 41, 0.7)',
+        background: 'background.paper',
         backdropFilter: 'blur(10px)',
-        border: '1px solid rgba(0, 243, 255, 0.2)',
+        border: 1,
+        borderColor: 'divider',
         borderRadius: '12px',
         boxShadow: '0 8px 32px 0 rgba(0, 0, 0, 0.8)',
       }}>
         <Table>
           <TableHead>
-            <TableRow sx={{ backgroundColor: 'rgba(0, 243, 255, 0.05)' }}>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 'bold', fontFamily: 'Orbitron' }}>USERNAME</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 'bold', fontFamily: 'Orbitron' }}>NAME</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 'bold', fontFamily: 'Orbitron' }}>ROLE</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 'bold', fontFamily: 'Orbitron' }}>CREATED ON</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 'bold', fontFamily: 'Orbitron' }}>LAST LOGGED IN</TableCell>
-              <TableCell sx={{ color: '#00f3ff', fontWeight: 'bold', fontFamily: 'Orbitron' }}>STATUS</TableCell>
-              <TableCell align="right" sx={{ color: '#00f3ff', fontWeight: 'bold', fontFamily: 'Orbitron' }}>ACTIONS</TableCell>
+            <TableRow sx={{ backgroundColor: 'action.hover' }}>
+              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 'bold', fontFamily: 'Orbitron' }}>USERNAME</TableCell>
+              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 'bold', fontFamily: 'Orbitron' }}>NAME</TableCell>
+              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 'bold', fontFamily: 'Orbitron' }}>ROLE</TableCell>
+              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 'bold', fontFamily: 'Orbitron' }}>CREATED ON</TableCell>
+              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 'bold', fontFamily: 'Orbitron' }}>LAST LOGGED IN</TableCell>
+              <TableCell sx={{ color: tokens.accent.primary, fontWeight: 'bold', fontFamily: 'Orbitron' }}>STATUS</TableCell>
+              <TableCell align="right" sx={{ color: tokens.accent.primary, fontWeight: 'bold', fontFamily: 'Orbitron' }}>ACTIONS</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {users?.map((user) => (
-              <TableRow key={user.id} sx={{ '&:hover': { backgroundColor: 'rgba(0, 243, 255, 0.02)' } }}>
-                <TableCell sx={{ color: '#fff' }}>{user.username}</TableCell>
-                <TableCell sx={{ color: '#fff' }}>{user.full_name}</TableCell>
+              <TableRow key={user.id} sx={{ '&:hover': { backgroundColor: 'action.hover' } }}>
+                <TableCell sx={{ color: 'text.primary' }}>{user.username}</TableCell>
+                <TableCell sx={{ color: 'text.primary' }}>{user.full_name}</TableCell>
                 <TableCell>
                   <Chip
                     label={user.role.replace('_', ' ').toUpperCase()}
                     size="small"
                     sx={{
-                      backgroundColor: 'rgba(188, 0, 255, 0.1)',
-                      color: '#bc00ff',
-                      border: '1px solid rgba(188, 0, 255, 0.3)',
+                      backgroundColor: `${tokens.accent.secondary}1A`,
+                      color: tokens.accent.secondary,
+                      border: `1px solid ${tokens.accent.secondary}4D`,
                       fontFamily: 'Orbitron',
                       fontSize: '0.7rem'
                     }}
                   />
                 </TableCell>
-                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>{user.date_joined_humanized}</TableCell>
-                <TableCell sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>{user.last_login_humanized}</TableCell>
+                <TableCell sx={{ color: 'text.secondary' }}>{user.date_joined_humanized}</TableCell>
+                <TableCell sx={{ color: 'text.secondary' }}>{user.last_login_humanized}</TableCell>
                 <TableCell>
                   <Chip
                     label={user.is_active ? 'ACTIVE' : 'INACTIVE'}
@@ -254,12 +259,12 @@ export const AdminSettingsPage: React.FC = () => {
                 </TableCell>
                 <TableCell align="right">
                   <Tooltip title={user.is_active ? "Disable User" : "Enable User"}>
-                    <IconButton size="small" onClick={() => handleToggleStatus(user.id)} sx={{ color: user.is_active ? '#00f3ff' : '#ff0055' }}>
+                    <IconButton size="small" onClick={() => handleToggleStatus(user.id)} sx={{ color: user.is_active ? tokens.accent.primary : '#ff0055' }}>
                       <PowerIcon />
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Edit User">
-                    <IconButton size="small" onClick={() => handleOpenModal(user)} sx={{ color: '#00f3ff' }}>
+                    <IconButton size="small" onClick={() => handleOpenModal(user)} sx={{ color: tokens.accent.primary }}>
                       <EditIcon />
                     </IconButton>
                   </Tooltip>
@@ -281,16 +286,17 @@ export const AdminSettingsPage: React.FC = () => {
         slotProps={{
           paper: {
             sx: {
-              background: 'rgba(10, 25, 41, 0.95)',
+              background: 'background.paper',
               backdropFilter: 'blur(20px)',
-              border: '1px solid rgba(0, 243, 255, 0.3)',
-              color: '#fff',
+              border: 1,
+              borderColor: 'divider',
+              color: 'text.primary',
               minWidth: '400px'
             }
           }
         }}
       >
-        <DialogTitle sx={{ fontFamily: 'Orbitron', color: '#00f3ff' }}>
+        <DialogTitle sx={{ fontFamily: 'Orbitron', color: tokens.accent.primary }}>
           {editingUser ? 'EDIT USER' : 'ADD NEW USER'}
         </DialogTitle>
         <DialogContent>
@@ -329,15 +335,15 @@ export const AdminSettingsPage: React.FC = () => {
           </Box>
         </DialogContent>
         <DialogActions sx={{ p: 3 }}>
-          <Button onClick={handleCloseModal} sx={{ color: 'rgba(255, 255, 255, 0.7)' }}>CANCEL</Button>
+          <Button onClick={handleCloseModal} sx={{ color: 'text.secondary' }}>CANCEL</Button>
           <Button
             variant="contained"
             onClick={handleSubmit}
             sx={{
-              backgroundColor: '#00f3ff',
+              backgroundColor: tokens.accent.primary,
               color: '#000',
               fontWeight: 'bold',
-              '&:hover': { backgroundColor: '#00d0db' }
+              '&:hover': { backgroundColor: tokens.accent.primary, filter: 'brightness(1.1)' }
             }}
           >
             {editingUser ? 'UPDATE' : 'CREATE'}
@@ -359,7 +365,7 @@ export const AdminSettingsPage: React.FC = () => {
             fontFamily: 'Orbitron', 
             fontSize: '0.8rem',
             fontWeight: 700,
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}E6` : 'rgba(255, 0, 85, 0.9)',
             color: '#000',
             '& .MuiAlert-icon': { color: '#000' }
           }}

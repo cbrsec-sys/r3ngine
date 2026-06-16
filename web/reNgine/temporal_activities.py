@@ -135,51 +135,60 @@ class TemporalTaskProxy:
             self._create_scan_activity()
 
     def _create_scan_activity(self):
-        """Claim the pre-populated INITIATED_TASK row for this task or create one.
+        """Claim an unclaimed ScanActivity row for this task, or create one if none available.
 
-        InitializeScanTasksActivity pre-creates rows with status=INITIATED_TASK(-1).
-        This method transitions that row to RUNNING and records time_started.
-        Falls back to creating a new row if no pre-populated row is found.
+        Uses SELECT FOR UPDATE (skip_locked=True) so that only rows with
+        time_started__isnull=True are claimed. This prevents a Temporal activity
+        retry from overwriting SUCCESS rows left by prior attempts (AUD-003).
         """
         from startScan.models import ScanActivity
-        from reNgine.definitions import RUNNING_TASK, INITIATED_TASK
+        from reNgine.definitions import RUNNING_TASK
+        from django.db import transaction
+
         try:
             temporal_activity_id = activity.info().activity_id
             now = timezone.now()
-            execution_id = f"temporal-{temporal_activity_id}"
-
-            # Try to claim the pre-populated row (it could be INITIATED, FAILED from prior run, etc.)
-            updated = ScanActivity.objects.filter(
-                scan_of=self.scan,
-                name=self.task_name,
-            ).update(
-                status=RUNNING_TASK,
-                time_started=now,
-                time=now,
-                execution_id=execution_id,
-            )
-            if updated:
-                self.activity = ScanActivity.objects.filter(
+            execution_id = "temporal-%s" % temporal_activity_id
+            with transaction.atomic():
+                # Claim only a row that has not been started yet (time_started is NULL).
+                # skip_locked=True ensures concurrent retries do not race on the same row.
+                activity_row = ScanActivity.objects.select_for_update(skip_locked=True).filter(
                     scan_of=self.scan,
                     name=self.task_name,
-                    execution_id=execution_id,
+                    time_started__isnull=True,
                 ).first()
-            else:
-                # No pre-populated row — create one directly (backward compat)
-                self.activity = ScanActivity.objects.create(
-                    scan_of=self.scan,
-                    name=self.task_name,
-                    title=self.description,
-                    status=RUNNING_TASK,
-                    time=now,
-                    time_started=now,
-                    execution_id=execution_id,
-                )
-            self.activity_id = self.activity.id if self.activity else None
+
+                if activity_row:
+                    activity_row.status = RUNNING_TASK
+                    activity_row.time_started = now
+                    activity_row.time = now
+                    activity_row.execution_id = execution_id
+                    activity_row.save(
+                        update_fields=['status', 'time_started', 'time', 'execution_id']
+                    )
+                    self.activity = activity_row
+                    self.activity_id = activity_row.id
+                else:
+                    # No unclaimed row found — create one for this retry attempt.
+                    self.activity = ScanActivity.objects.create(
+                        scan_of=self.scan,
+                        name=self.task_name,
+                        title=self.description,
+                        status=RUNNING_TASK,
+                        time=now,
+                        time_started=now,
+                        execution_id=execution_id,
+                    )
+                    self.activity_id = self.activity.id
+
         except Exception as e:
-            logger.warning(f"Could not create/claim ScanActivity for {self.task_name}: {e}")
-            self.activity = None
-            self.activity_id = None
+            logger.log_line(
+                "[SCAN]", "ERROR",
+                "_create_scan_activity failed for %s: %s" % (self.task_name, format_exception_for_log(e)),
+                level="error",
+                exc_info=True,
+            )
+            raise  # let Temporal retry — do not silently proceed untracked
 
     def update_scan_activity(self, status, error_message=None):
         """Update the ScanActivity record with the final task status and time_ended.
@@ -442,6 +451,19 @@ def initialize_scan_tasks_activity(ctx: dict) -> dict:
 
     logger.log_line("[TEMPORAL]", "COMPLETE", "task=initialize_scan_tasks scan_id=%s created=%d existing=%d" % (scan_id, created_count, existing_count))
     return {'created': created_count, 'existing': existing_count}
+
+
+@activity.defn(name="UpdateScanStatusActivity")
+def update_scan_status_activity(scan_id: int, status: int) -> None:
+    """Update scan status in DB (used by pause/resume signals)."""
+    from startScan.models import ScanHistory
+    try:
+        scan = ScanHistory.objects.get(id=scan_id)
+        scan.scan_status = status
+        scan.save(update_fields=["scan_status"])
+        logger.log_line("[TEMPORAL]", "STATUS_UPDATE", "scan_id=%d status=%d" % (scan_id, status))
+    except ScanHistory.DoesNotExist:
+        logger.warning("UpdateScanStatusActivity: ScanHistory %d not found" % scan_id)
 
 
 @activity.defn(name="TargetProfilingActivity")
@@ -1270,6 +1292,7 @@ def run_acunetix_activity(ctx: dict) -> bool:
         description='Acunetix Scan',
         domain_id=ctx.get('domain_id'),
         scan_history_id=ctx.get('scan_history_id'),
+        subdomain_id=ctx.get('subdomain_id'),
         subdomain_name=ctx.get('subdomain_name'),
         subdomain_http_url=ctx.get('subdomain_http_url'),
     )

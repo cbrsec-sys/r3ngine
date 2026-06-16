@@ -43,12 +43,14 @@ import {
   useBulkPromoteOsint
 } from '../../api';
 import type { OsintStaging } from '../../types';
+import { useThemeTokens } from '../../../../theme/useThemeTokens';
 
 interface OsintStagingSectionProps {
   scanId: number;
 }
 
 export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId }) => {
+  const { tokens } = useThemeTokens();
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -110,7 +112,7 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
 
   const getConfidenceColor = (confidence: number) => {
     if (confidence >= 80) return '#00ff62';
-    if (confidence >= 60) return '#00f3ff';
+    if (confidence >= 60) return tokens.accent.primary;
     return '#fffc00';
   };
 
@@ -145,7 +147,7 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
                 sx: { 
                   fontSize: '0.75rem', 
                   bgcolor: 'rgba(255,255,255,0.03)',
-                  border: '1px solid rgba(255,255,255,0.05)',
+                  border: 1, borderColor: 'divider',
                   '&:hover': { border: '1px solid rgba(255,255,255,0.2)' }
                 }
               }
@@ -209,7 +211,7 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
                       indeterminate={selected.length > 0 && selected.length < (data?.results?.length || 0)}
                       checked={(data?.results?.length || 0) > 0 && selected.length === (data?.results?.length || 0)}
                       onChange={handleSelectAll}
-                      sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
+                      sx={{ color: 'text.disabled', '&.Mui-checked': { color: tokens.accent.primary } }}
                     />
                   </TableCell>
                   <TableCell sx={{ color: 'text.secondary', fontWeight: 'bold', fontSize: '0.65rem' }}>TYPE</TableCell>
@@ -234,7 +236,7 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
                           size="small"
                           checked={selected.includes(item.id)}
                           onChange={() => handleSelectOne(item.id)}
-                          sx={{ color: 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: '#00f3ff' } }}
+                          sx={{ color: 'text.disabled', '&.Mui-checked': { color: tokens.accent.primary } }}
                         />
                       </TableCell>
                       <TableCell>
@@ -245,7 +247,7 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
                             fontSize: '10px', 
                             height: 18, 
                             fontWeight: 800,
-                            bgcolor: 'rgba(255,255,255,0.05)',
+                            bgcolor: 'action.hover',
                             color: 'rgba(255,255,255,0.7)',
                             border: '1px solid rgba(255,255,255,0.1)',
                             textTransform: 'uppercase'
@@ -268,7 +270,7 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
                             sx={{ 
                               width: 30, 
                               height: 4, 
-                              bgcolor: 'rgba(255,255,255,0.05)', 
+                              bgcolor: 'action.hover', 
                               borderRadius: 1,
                               overflow: 'hidden'
                             }}
@@ -321,11 +323,11 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
                     <TableRow>
                       <TableCell colSpan={6} sx={{ p: 0, border: 'none' }}>
                         <Collapse in={expandedId === item.id} timeout="auto" unmountOnExit>
-                          <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
-                            <Typography sx={{ fontSize: '0.7rem', color: '#00f3ff', fontWeight: 900, mb: 1, textTransform: 'uppercase' }}>
+                          <Box sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.2)', borderBottom: 1, borderColor: 'divider' }}>
+                            <Typography sx={{ fontSize: '0.7rem', color: tokens.accent.primary, fontWeight: 900, mb: 1, textTransform: 'uppercase' }}>
                               Extended Metadata
                             </Typography>
-                            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.05)' }}>
+                            <Paper variant="outlined" sx={{ p: 1.5, bgcolor: 'action.hover', borderColor: 'rgba(255,255,255,0.05)' }}>
                               <Typography variant="body2" sx={{ fontFamily: 'monospace', fontSize: '0.7rem', color: 'rgba(255,255,255,0.6)', whiteSpace: 'pre-wrap' }}>
                                 {item.metadata || 'No extended metadata available.'}
                               </Typography>
@@ -360,8 +362,8 @@ export const OsintStagingSection: React.FC<OsintStagingSectionProps> = ({ scanId
               sx={{
                 borderTop: '1px solid rgba(255,255,255,0.05)',
                 color: 'rgba(255,255,255,0.6)',
-                '& .MuiTablePagination-select': { color: '#fff' },
-                '& .MuiIconButton-root': { color: '#00f3ff' }
+                '& .MuiTablePagination-select': { color: 'text.primary' },
+                '& .MuiIconButton-root': { color: tokens.accent.primary }
               }}
             />
           </>

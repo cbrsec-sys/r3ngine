@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../theme/useThemeTokens';
 import React from 'react';
 import {
   Dialog,
@@ -38,6 +39,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isLoading = false,
   type,
 }) => {
+  const { tokens } = useThemeTokens();
   const isActuallyDestructive = isDestructive || type === 'danger' || type === 'warning';
   const theme = useTheme();
   const isLight = theme.palette.mode === 'light';
@@ -77,11 +79,11 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
         justifyContent: 'space-between'
       }}>
         <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-          {isActuallyDestructive ? <ShieldAlert size={20} color="#ff003c" /> : <AlertTriangle size={20} color="#00f3ff" />}
+          {isActuallyDestructive ? <ShieldAlert size={20} color="#ff003c" /> : <AlertTriangle size={20} color={tokens.accent.primary} />}
           <Typography sx={{
             fontFamily: 'var(--r3-heading-font)',
             fontWeight: 900,
-            color: isLight ? theme.palette.text.primary : '#fff',
+            color: 'text.primary',
             letterSpacing: '0.1rem',
             fontSize: '0.9rem'
           }}>
@@ -89,7 +91,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
           </Typography>
         </Stack>
         {!isLoading && (
-          <IconButton onClick={onClose} size="small" sx={{ color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.3)', '&:hover': { color: isLight ? theme.palette.text.primary : '#fff' } }}>
+          <IconButton onClick={onClose} size="small" sx={{ color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.3)', '&:hover': { color: 'text.primary' } }}>
             <X size={18} />
           </IconButton>
         )}
@@ -117,7 +119,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             fontWeight: 800,
             fontSize: '0.7rem',
             '&:hover': {
-              color: isLight ? theme.palette.text.primary : '#fff',
+              color: 'text.primary',
               bgcolor: isLight ? alpha(theme.palette.divider, 0.5) : 'rgba(255,255,255,0.05)'
             }
           }}
@@ -132,7 +134,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             flex: 1,
             bgcolor: accentColor,
             color: isLight ? (isActuallyDestructive ? '#fff' : '#000') : '#fff',
-            fontFamily: 'var(--r3-heading-font)',
+            fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
             fontWeight: 900,
             fontSize: '0.7rem',
             '&:hover': { bgcolor: isActuallyDestructive ? '#e60036' : theme.palette.primary.dark }

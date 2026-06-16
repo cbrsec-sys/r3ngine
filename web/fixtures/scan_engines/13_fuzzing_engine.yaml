@@ -90,15 +90,18 @@
         wordlist_name: dicc
         use_api_wordlist: false
       http_crawl: {}
+      param_discovery:
+        enabled: true
+        min_confidence: 50
       url_fuzz:
         fuzzers:
           - ffuf
           - feroxbuster
-        hunt_secrets: false
+        hunt_secrets: true
       url_crawl:
         passive: false
         active: false
-        hunt_secrets: false
+        hunt_secrets: true
       url_params_fuzz:
         fuzz_values: true
         hunt_secrets: false
