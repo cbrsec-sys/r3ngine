@@ -1510,6 +1510,13 @@ class AddManualSubdomain(APIView):
 		# Filter out duplicates within the input itself
 		subdomains_to_process = list(dict.fromkeys(subdomains_to_process))
 
+		MAX_SUBDOMAINS_PER_REQUEST = 500
+		if len(subdomains_to_process) > MAX_SUBDOMAINS_PER_REQUEST:
+			return Response(
+				{'status': False, 'message': f'Too many subdomains. Maximum {MAX_SUBDOMAINS_PER_REQUEST} per request.'},
+				status=400
+			)
+
 		added_count = 0
 		duplicate_count = 0
 		invalid_count = 0
