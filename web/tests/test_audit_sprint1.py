@@ -7,6 +7,10 @@ WORKFLOWS_FILE = os.path.join(
     os.path.dirname(__file__), '..', 'reNgine', 'temporal_workflows.py'
 )
 
+ACTIVITIES_FILE = os.path.join(
+    os.path.dirname(__file__), '..', 'reNgine', 'temporal_activities.py'
+)
+
 
 class TestAUD001AsyncioSleepInWorkflows(unittest.TestCase):
     """AUD-001: asyncio.sleep() must not appear inside workflow classes."""
@@ -149,4 +153,109 @@ class TestAUD006NucleiChildWorkflowRetryPolicy(unittest.TestCase):
         self.assertEqual(
             missing_retry, [],
             f"NucleiPlannerWorkflow child invocation without retry_policy: {missing_retry} (AUD-006)"
+        )
+
+
+class TestAUD003OldBehaviourIsGone(unittest.TestCase):
+    """AUD-003: _create_scan_activity must use select_for_update and not swallow exceptions."""
+
+    def test_uses_select_for_update(self):
+        with open(ACTIVITIES_FILE, encoding='utf-8-sig') as f:
+            source = f.read()
+        self.assertIn(
+            'select_for_update',
+            source,
+            "_create_scan_activity must use select_for_update() to prevent retry race (AUD-003)"
+        )
+
+    def test_filters_unclaimed_rows_only(self):
+        with open(ACTIVITIES_FILE, encoding='utf-8-sig') as f:
+            source = f.read()
+        self.assertIn(
+            'time_started__isnull=True',
+            source,
+            "_create_scan_activity must filter time_started__isnull=True before claiming (AUD-003)"
+        )
+
+    def test_exception_is_reraised_not_swallowed(self):
+        with open(ACTIVITIES_FILE, encoding='utf-8-sig') as f:
+            source = f.read()
+        # The old bad pattern: self.activity = None after an exception
+        self.assertNotIn(
+            'self.activity = None',
+            source,
+            "_create_scan_activity must not silently set self.activity=None on exception (AUD-003)"
+        )
+
+
+from django.test import TestCase as DjangoTestCase
+from django.utils import timezone as tz_module
+
+
+class TestAUD003ScanActivityRetryBehaviour(DjangoTestCase):
+    """AUD-003: Retrying an activity must not overwrite prior SUCCESS rows."""
+
+    def setUp(self):
+        from startScan.models import ScanHistory, Domain
+        from scanEngine.models import EngineType
+        self.domain = Domain.objects.create(name='test-aud003.internal')
+        self.engine = EngineType.objects.create(
+            engine_name='test-engine-aud003',
+            yaml_configuration='{}',
+        )
+        self.scan = ScanHistory.objects.create(
+            domain=self.domain,
+            scan_type=self.engine,
+            scan_status=1,
+            start_scan_date=tz_module.now(),
+        )
+
+    def test_retry_does_not_overwrite_success_row(self):
+        from reNgine.definitions import SUCCESS_TASK, RUNNING_TASK, INITIATED_TASK
+        from startScan.models import ScanActivity
+        from django.db import transaction
+
+        # Prior successful run left a SUCCESS row
+        success_row = ScanActivity.objects.create(
+            scan_of=self.scan,
+            name='nuclei_scan',
+            title='nuclei_scan',
+            status=SUCCESS_TASK,
+            time_started=tz_module.now(),
+            time=tz_module.now(),
+        )
+
+        # A new unclaimed INITIATED row exists for this retry
+        initiated_row = ScanActivity.objects.create(
+            scan_of=self.scan,
+            name='nuclei_scan',
+            title='nuclei_scan',
+            status=INITIATED_TASK,
+            time_started=None,
+            time=tz_module.now(),
+        )
+
+        # The correct behaviour: only claim the unclaimed row
+        with transaction.atomic():
+            updated = ScanActivity.objects.select_for_update(skip_locked=True).filter(
+                scan_of=self.scan,
+                name='nuclei_scan',
+                time_started__isnull=True,
+            ).update(
+                status=RUNNING_TASK,
+                time_started=tz_module.now(),
+            )
+
+        self.assertEqual(updated, 1, "Should claim exactly one unclaimed row")
+
+        success_row.refresh_from_db()
+        self.assertEqual(
+            success_row.status, SUCCESS_TASK,
+            "Prior SUCCESS row must not be overwritten on retry (AUD-003)"
+        )
+
+        initiated_row.refresh_from_db()
+        self.assertEqual(
+            initiated_row.status, RUNNING_TASK,
+            "Unclaimed INITIATED row should now be RUNNING (AUD-003)"
         )
