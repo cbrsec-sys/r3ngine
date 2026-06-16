@@ -322,9 +322,9 @@ COPY --from=vigolium-builder /usr/local/bin/vigolium /usr/local/bin/vigolium
 # Install pre-built binary tools (no compilation needed at runtime)
 # ---------------------------------------------------------------------------
 
-# Trufflehog — secret scanning binary
+# Trufflehog — secret scanning binary (pinned to avoid GitHub API rate-limit failures at build time)
 RUN ARCH=$(dpkg --print-architecture) && \
-    TRUFFLEHOG_VERSION=$(curl -s https://api.github.com/repos/trufflesecurity/trufflehog/releases/latest | jq -r .tag_name | sed 's/v//') && \
+    TRUFFLEHOG_VERSION="3.89.1" && \
     wget -q "https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}/trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH}.tar.gz" && \
     tar -xf "trufflehog_${TRUFFLEHOG_VERSION}_linux_${ARCH}.tar.gz" trufflehog && \
     mv trufflehog /usr/local/bin/ && \
@@ -353,9 +353,8 @@ RUN ARCH=$(dpkg --print-architecture) && \
     mv aquatone /usr/local/bin/ && \
     rm -f "aquatone_linux_${ARCH}_1.7.0.zip"
 
-# Feroxbuster — recursive web content discovery
-RUN FEROX_VERSION=$(curl -s https://api.github.com/repos/epi052/feroxbuster/releases/latest \
-      | python3 -c "import sys,json; print(json.load(sys.stdin)['tag_name'].lstrip('v'))") && \
+# Feroxbuster — recursive web content discovery (pinned to avoid GitHub API rate-limit failures at build time)
+RUN FEROX_VERSION="2.11.0" && \
     wget -q "https://github.com/epi052/feroxbuster/releases/download/v${FEROX_VERSION}/x86-linux-feroxbuster.zip" \
       -O /tmp/feroxbuster.zip && \
     unzip /tmp/feroxbuster.zip feroxbuster -d /usr/local/bin && \

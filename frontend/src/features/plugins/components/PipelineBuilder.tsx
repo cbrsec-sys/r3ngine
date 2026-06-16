@@ -1,3 +1,4 @@
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 import React, { useState } from 'react';
 import {
   Box,
@@ -12,7 +13,7 @@ import {
   Chip,
   Divider,
 } from '@mui/material';
-import { useTheme, alpha } from '@mui/material/styles';
+import { alpha } from '@mui/material/styles';
 import {
   DndContext,
   closestCenter,
@@ -134,7 +135,7 @@ function categorise(plugin: Plugin): PluginCategory {
 // ── Positioned plugin card (draggable, shown inline on the timeline) ─────────
 
 const PositionedPluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
-  const theme = useTheme();
+  const { theme } = useThemeTokens();
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: plugin.slug });
 
@@ -214,7 +215,7 @@ const PositionedPluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
 // ── Standalone plugin card (right column, no pipeline position) ──────────────
 
 const StandalonePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
-  const theme = useTheme();
+  const { theme } = useThemeTokens();
   return (
     <Box
       sx={{
@@ -268,7 +269,7 @@ const StandalonePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
 // ── Configurable plugin card (right column, user-settable position) ──────────
 
 const ConfigurablePluginCard: React.FC<{ plugin: Plugin }> = ({ plugin }) => {
-  const theme = useTheme();
+  const { theme } = useThemeTokens();
   const updatePosition = useUpdatePluginPosition();
 
   const [selectedStage, setSelectedStage] = useState(plugin.anchor_step || '');
@@ -399,7 +400,7 @@ interface Props {
 }
 
 const PipelineBuilder: React.FC<Props> = ({ plugins }) => {
-  const theme = useTheme();
+  const { theme } = useThemeTokens();
   const updateWeightMutation = useUpdatePluginWeight();
 
   const sensors = useSensors(
