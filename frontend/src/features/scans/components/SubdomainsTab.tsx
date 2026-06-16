@@ -1479,20 +1479,22 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         }}
       >
         <DialogTitle sx={{ color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2 }}>
-          ADD SUBDOMAIN MANUALLY
+          ADD SUBDOMAINS MANUALLY
         </DialogTitle>
         <DialogContent>
           <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', mb: 2, fontFamily: 'monospace' }}>
-            ENTER HIERARCHICAL SUBDOMAIN OR TARGET HOSTNAME
+            ENTER SUBDOMAINS (SEPARATED BY NEWLINES, COMMAS, OR SPACES)
           </Typography>
           <TextField
             autoFocus
             fullWidth
+            multiline
+            rows={5}
             size="small"
-            label="Subdomain Name"
+            label="Subdomain List"
             value={manualSubdomainName}
             onChange={(e) => setManualSubdomainName(e.target.value)}
-            placeholder="sub.domain.com"
+            placeholder="sub1.domain.com&#10;sub2.domain.com&#10;sub3.domain.com"
             disabled={addSubdomainMutation.isPending}
             sx={{
               mt: 1,
