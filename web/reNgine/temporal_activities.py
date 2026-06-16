@@ -30,6 +30,7 @@ from reNgine.auth_discovery_tasks import (
     _extract_login_forms,
 )
 from reNgine.common_func import get_proxy_list, get_random_proxy
+from reNgine.utils.task import activity_heartbeat_safe
 
 logger = get_module_logger(__name__)
 
@@ -3149,7 +3150,6 @@ def extract_auth_for_url_activity(ctx: dict) -> dict:
     url = ctx.get('url')
     scan_id = ctx.get('scan_id')
 
-    from reNgine.utils.task import activity_heartbeat_safe
     activity_heartbeat_safe("ExtractAuthForURLActivity starting for %s" % url)
     logger.log_line("[AUTH_EXTRACT]", "START", "extracting auth from %s (scan %s)" % (url, scan_id))
 
@@ -3175,7 +3175,7 @@ def extract_auth_for_url_activity(ctx: dict) -> dict:
             return {'found': 0}
 
         raw_scheme = parsed_url.scheme.lower()
-        protocol = 'http' if raw_scheme in ('http', 'https') else raw_scheme
+        protocol = raw_scheme
         port = parsed_url.port or (443 if raw_scheme == 'https' else 80)
 
         saved = 0
