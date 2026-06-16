@@ -508,3 +508,36 @@ class CodeScanWorkflowTimeoutCastTest(TestCase):
         self.assertEqual(safe_timeout_cast(None), 3600)
         self.assertEqual(safe_timeout_cast('7200'), 7200)
         self.assertEqual(safe_timeout_cast(99999), 14400)
+
+
+class VigoliumAuditIntensityValidationTest(TestCase):
+    """Unrecognised intensity values must be coerced to 'balanced'."""
+
+    @patch('reNgine.vigolium_tasks.subprocess.run')
+    def test_invalid_intensity_coerced(self, mock_run):
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+
+        mock_run.return_value = MagicMock(returncode=0, stderr='', stdout='')
+        task = MagicMock()
+        task.scan = MagicMock()
+        task.scan.results_dir = '/tmp/test_audit'
+        task.domain = MagicMock()
+        task.starting_point_path = None
+        task.yaml_configuration = {
+            'vigolium_audit': {
+                'run_vigolium_audit': True,
+                'intensity': 'HACKER_MODE',
+                'use_ai': False,
+                'timeout': 10,
+            }
+        }
+        try:
+            vigolium_audit_scan(task, code_path='/tmp/fakecode', ctx={})
+        except Exception:
+            pass
+
+        self.assertTrue(mock_run.called, "subprocess.run must have been called")
+        call_args = mock_run.call_args[0][0]
+        idx = call_args.index('--intensity')
+        self.assertEqual(call_args[idx + 1], 'balanced',
+                         "Invalid intensity must be coerced to 'balanced'")
