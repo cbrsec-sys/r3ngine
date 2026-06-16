@@ -155,7 +155,7 @@ class MasterScanWorkflow:
             )
             if can_proceed:
                 break
-            await asyncio.sleep(30)
+            await workflow.sleep(timedelta(seconds=30))
 
         # ------------------------------------------------------------------
         # STEP -1: Pre-populate task timeline (idempotent)
@@ -1284,7 +1284,7 @@ class SubScanWorkflow:
             )
             if can_proceed:
                 break
-            await asyncio.sleep(30)
+            await workflow.sleep(timedelta(seconds=30))
 
         # Pre-populate subscan task timeline (idempotent)
         try:
