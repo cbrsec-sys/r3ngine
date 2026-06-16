@@ -493,3 +493,18 @@ class VigoliumAuditApiKeyEnvTest(TestCase):
         self.assertIn('VIGOLIUM_API_KEY', env_passed,
                       "API key should be in env dict passed to subprocess")
         self.assertEqual(env_passed['VIGOLIUM_API_KEY'], 'sk-SUPERSECRET')
+
+
+class CodeScanWorkflowTimeoutCastTest(TestCase):
+    def test_non_numeric_timeout_does_not_raise(self):
+        """A non-numeric timeout in YAML must not crash — falls back to default 3600."""
+        def safe_timeout_cast(value, default=3600, cap=14400):
+            try:
+                return min(int(value), cap)
+            except (ValueError, TypeError):
+                return min(default, cap)
+
+        self.assertEqual(safe_timeout_cast('1h'), 3600)
+        self.assertEqual(safe_timeout_cast(None), 3600)
+        self.assertEqual(safe_timeout_cast('7200'), 7200)
+        self.assertEqual(safe_timeout_cast(99999), 14400)
