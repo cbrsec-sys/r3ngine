@@ -468,16 +468,22 @@ def vigolium_audit_scan(self, code_path=None, ctx={}, description=None):
     audit_config = self.yaml_configuration.get(VIGOLIUM_AUDIT, {})
     if not audit_config.get(RUN_VIGOLIUM_AUDIT, True):
         logger.info("Vigolium audit disabled in configuration. Skipping.")
-        return
+        return "Vigolium audit skipped (disabled)"
 
     source = (
         code_path
         or getattr(self, 'starting_point_path', None)
         or (ctx.get('target') if ctx else None)
-        or '/tmp/code'
     )
+    if not source:
+        logger.error("Vigolium audit: no source path available, skipping.")
+        return None
 
+    _VALID_INTENSITIES = ('quick', 'balanced', 'deep')
     intensity = audit_config.get(VIGOLIUM_AUDIT_INTENSITY, 'balanced')
+    if intensity not in _VALID_INTENSITIES:
+        logger.warning("vigolium audit: unknown intensity '%s', defaulting to 'balanced'", intensity)
+        intensity = 'balanced'
     use_ai = audit_config.get(VIGOLIUM_AUDIT_USE_AI, False)
     timeout_seconds = int(audit_config.get(VIGOLIUM_AUDIT_TIMEOUT, 3600))
 
@@ -500,15 +506,19 @@ def vigolium_audit_scan(self, code_path=None, ctx={}, description=None):
         '--soft-fail',
     ]
 
+    audit_env = dict(os.environ)
+
     if use_ai:
         from dashboard.models import LLMConfig
         llm_config = LLMConfig.objects.filter(is_active=True).first()
         if llm_config and llm_config.api_key:
             if llm_config.provider == ANTHROPIC:
-                cmd += ['--driver', 'audit', '--agent', 'claude', '--api-key', llm_config.api_key]
+                cmd += ['--driver', 'audit', '--agent', 'claude']
+                audit_env['VIGOLIUM_API_KEY'] = llm_config.api_key
                 logger.info("Vigolium audit: using Anthropic (Claude) as AI agent")
             elif llm_config.provider == OPENAI:
-                cmd += ['--driver', 'audit', '--agent', 'codex', '--api-key', llm_config.api_key]
+                cmd += ['--driver', 'audit', '--agent', 'codex']
+                audit_env['VIGOLIUM_API_KEY'] = llm_config.api_key
                 logger.info("Vigolium audit: using OpenAI (Codex) as AI agent")
             else:
                 logger.warning("Vigolium audit: LLM provider '%s' not supported, falling back to piolium", llm_config.provider)
@@ -520,15 +530,20 @@ def vigolium_audit_scan(self, code_path=None, ctx={}, description=None):
         cmd += ['--driver', 'piolium']
 
     logger.info("Starting Vigolium Audit: source=%s intensity=%s use_ai=%s scan_id=%s", source, intensity, use_ai, scan_id)
-    logger.warning("Command: %s", ' '.join(shlex.quote(c) for c in cmd))
+    _prev = ''
+    safe_cmd = []
+    for _tok in cmd:
+        safe_cmd.append('***' if _prev == '--api-key' else _tok)
+        _prev = _tok
+    logger.warning("Command: %s", ' '.join(shlex.quote(c) for c in safe_cmd))
 
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds, env=audit_env)
         if proc.returncode != 0:
             logger.warning("Vigolium audit exited %s: %s", proc.returncode, proc.stderr[:500])
     except subprocess.TimeoutExpired:
         logger.warning("Vigolium audit timed out after %d seconds for scan_id=%s", timeout_seconds, scan_id)
-        return
+        return "Vigolium audit timed out"
     except Exception as exc:
         logger.error("Vigolium audit failed to run: %s", exc)
         raise
