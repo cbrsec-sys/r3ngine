@@ -384,8 +384,11 @@ class VigoliumAuditTaskGatingTest(TestCase):
             cmd = mock_run.call_args_list[0][0][0]
             self.assertIn('--agent', cmd)
             self.assertIn('claude', cmd)
-            self.assertIn('--api-key', cmd)
-            self.assertIn('sk-ant-test-key', cmd)
+            # API key must NOT be in CLI args — it is passed via env var instead
+            self.assertNotIn('--api-key', cmd)
+            self.assertNotIn('sk-ant-test-key', cmd)
+            env_passed = mock_run.call_args_list[0][1].get('env', {})
+            self.assertEqual(env_passed.get('VIGOLIUM_API_KEY'), 'sk-ant-test-key')
 
     def test_audit_falls_back_to_piolium_when_no_llm_config(self):
         from reNgine.vigolium_tasks import vigolium_audit_scan
@@ -446,3 +449,47 @@ class VigoliumAuditApiKeyMaskTest(TestCase):
 
         all_log_text = '\n'.join(log_ctx.output)
         self.assertNotIn('sk-SUPERSECRET', all_log_text, "API key must not appear in logs")
+
+
+class VigoliumAuditApiKeyEnvTest(TestCase):
+    """API key must be passed via env var, never as a CLI argument."""
+
+    @patch('reNgine.vigolium_tasks.subprocess.run')
+    @patch('reNgine.vigolium_tasks.LLMConfig')
+    def test_api_key_not_in_cmd_args(self, mock_llm_cls, mock_run):
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+
+        mock_run.return_value = MagicMock(returncode=0, stderr='', stdout='')
+        mock_llm = MagicMock()
+        mock_llm.is_active = True
+        mock_llm.api_key = 'sk-SUPERSECRET'
+        mock_llm.provider = 'anthropic'
+        mock_llm_cls.objects.filter.return_value.first.return_value = mock_llm
+
+        task = MagicMock()
+        task.scan = MagicMock()
+        task.scan.results_dir = '/tmp/test_audit'
+        task.domain = MagicMock()
+        task.starting_point_path = None
+        task.yaml_configuration = {
+            'vigolium_audit': {
+                'run_vigolium_audit': True,
+                'intensity': 'balanced',
+                'use_ai': True,
+                'timeout': 10,
+            }
+        }
+        try:
+            vigolium_audit_scan(task, code_path='/tmp/fakecode', ctx={})
+        except Exception:
+            pass
+
+        self.assertTrue(mock_run.called, "subprocess.run must have been called")
+        call_kwargs = mock_run.call_args
+        cmd_args = call_kwargs[0][0] if call_kwargs[0] else []
+        self.assertNotIn('sk-SUPERSECRET', cmd_args,
+                         "API key must not appear in subprocess arg list")
+        env_passed = call_kwargs[1].get('env', {}) if call_kwargs[1] else {}
+        self.assertIn('VIGOLIUM_API_KEY', env_passed,
+                      "API key should be in env dict passed to subprocess")
+        self.assertEqual(env_passed['VIGOLIUM_API_KEY'], 'sk-SUPERSECRET')
