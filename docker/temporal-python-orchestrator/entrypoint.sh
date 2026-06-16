@@ -6,6 +6,7 @@
 # Start deferred tool installer in the background so normal setup tasks
 # (wordlists, nuclei templates, etc.) run in parallel. We wait for it to
 # finish just before the Temporal worker starts.
+# *Disabled temporarily*
 # ---------------------------------------------------------------------------
 # echo "[entrypoint] Starting deferred tool installer in background..."
 # /usr/src/internal_tools.sh &
