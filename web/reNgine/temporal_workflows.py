@@ -911,6 +911,7 @@ class NucleiPlannerWorkflow:
                                 args=[severity_ctx, severity, batch],
                                 start_to_close_timeout=timedelta(hours=6),
                                 heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_LONG_SCAN,
                                 task_queue="python-orchestrator-queue",
                             )
                 finally:
@@ -952,9 +953,10 @@ class NucleiPlannerWorkflow:
                             args=[severity_ctx, severity, batch],
                             start_to_close_timeout=timedelta(hours=6),
                             heartbeat_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_LONG_SCAN,
                             task_queue="python-orchestrator-queue",
                         )
-        
+
         if vuln_config.get('run_crlfuzz', False):
             await workflow.execute_activity(
                 "RunCRLFuzzActivity", 
