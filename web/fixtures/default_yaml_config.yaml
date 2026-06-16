@@ -210,6 +210,13 @@ vigolium_analysis: {
   'timeout': '10s'
 }
 
+vigolium_audit: {
+  'run_vigolium_audit': true,
+  'intensity': 'balanced',          # Options: quick, balanced, deep
+  'use_ai': false,                  # Use configured LLM (Anthropic/OpenAI) as audit agent
+  'timeout': 3600                   # Max seconds for the audit run (default 1 hour)
+}
+
 leaks_and_secrets: {
   'gitleaks': true,
   'trufflehog': true,

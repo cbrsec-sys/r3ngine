@@ -1,13 +1,23 @@
 import json
 import logging
 import os
+import shlex
+import subprocess
+import tempfile
 
 from reNgine.definitions import (
+    ANTHROPIC,
     NUCLEI_SEVERITY_MAP,
+    OPENAI,
     RUN_VIGOLIUM,
     RUN_VIGOLIUM_ANALYSIS,
+    RUN_VIGOLIUM_AUDIT,
     RUN_VIGOLIUM_DISCOVERY,
     VIGOLIUM,
+    VIGOLIUM_AUDIT,
+    VIGOLIUM_AUDIT_INTENSITY,
+    VIGOLIUM_AUDIT_TIMEOUT,
+    VIGOLIUM_AUDIT_USE_AI,
     VIGOLIUM_CONCURRENCY,
     VIGOLIUM_MODULES,
     VIGOLIUM_RATE_LIMIT,
@@ -230,6 +240,7 @@ def vigolium_scan(self, urls=None, ctx={}, description=None):
         f" -T {targets_file}"
         f" --stateless"
         f" --format jsonl"
+        f" --verbose"
         f" -o {output_file}"
         # f" --only known-issue-scan,dynamic-assessment"
         f" -c {concurrency}"
@@ -373,3 +384,185 @@ def vigolium_analysis(self, ctx={}, description=None):
     _run_vigolium_phase(self, cmd, output_file, f"Analysis ({len(subdomains)} targets)", save_http_records=True)
 
     return "Vigolium analysis completed"
+
+
+def _parse_vigolium_audit_finding(task_instance, data: dict) -> None:
+    """Save a single vigolium audit finding to the Vulnerability model.
+
+    Used for findings from `vigolium export --only findings` JSONL output,
+    which may lack a hostname (code-scan context, no live HTTP target).
+    Falls back to `parse_vigolium_finding` when a matching subdomain exists.
+    """
+    name = data.get('module_name') or data.get('name')
+    if not name:
+        return
+
+    hostname = data.get('hostname', '')
+    subdomain = None
+    if hostname and task_instance.scan:
+        subdomain = Subdomain.objects.filter(
+            scan_history=task_instance.scan, name=hostname
+        ).first()
+
+    if subdomain:
+        parse_vigolium_finding(task_instance, data, subdomain)
+        return
+
+    severity_str = (data.get('severity') or 'info').lower()
+    severity_num = NUCLEI_SEVERITY_MAP.get(severity_str, 0)
+
+    matched_at = data.get('matched_at') or []
+    file_path = data.get('file') or data.get('source') or ''
+    line_no = data.get('line') or data.get('start_line') or 0
+    # Prefer a file reference when no URL is present
+    http_url = (matched_at[0] if matched_at else None) or (
+        'file://%s#L%s' % (file_path, line_no) if file_path else ''
+    )
+
+    tags = data.get('tags') or []
+    if isinstance(tags, str):
+        tags = [tags]
+
+    extracted = data.get('extracted_results') or []
+    if isinstance(extracted, str):
+        extracted = [extracted]
+
+    raw_cvss = data.get('cvss_score')
+    cvss_score = float(raw_cvss) if raw_cvss else None
+
+    snippet = data.get('snippet') or data.get('request') or ''
+
+    save_vulnerability(
+        target_domain=task_instance.domain,
+        http_url=http_url,
+        scan_history=task_instance.scan,
+        subdomain=subdomain,
+        name=name,
+        severity=severity_num,
+        description=data.get('description', ''),
+        type='VigoliumAudit',
+        template_id=data.get('module_id', ''),
+        curl_command='',
+        request=snippet,
+        response=data.get('response', ''),
+        extracted_results=extracted or None,
+        cvss_score=cvss_score,
+        tags=tags,
+        cve_ids=[],
+        references=[],
+        source='VigoliumAudit',
+    )
+
+
+def vigolium_audit_scan(self, code_path=None, ctx={}, description=None):
+    """Run vigolium audit (source code security audit) against a code path or git URL.
+
+    Dispatched by CodeScanWorkflow. Uses piolium (built-in, no AI) by default.
+    When vigolium_audit.use_ai is true, looks up the active LLMConfig and passes
+    credentials to vigolium audit via --agent/--api-key; unsupported providers
+    fall back to piolium silently.
+
+    Findings are exported from a temporary vigolium SQLite database after the
+    audit completes and saved as Vulnerability records (type='VigoliumAudit').
+    """
+    audit_config = self.yaml_configuration.get(VIGOLIUM_AUDIT, {})
+    if not audit_config.get(RUN_VIGOLIUM_AUDIT, True):
+        logger.info("Vigolium audit disabled in configuration. Skipping.")
+        return
+
+    source = (
+        code_path
+        or getattr(self, 'starting_point_path', None)
+        or (ctx.get('target') if ctx else None)
+        or '/tmp/code'
+    )
+
+    intensity = audit_config.get(VIGOLIUM_AUDIT_INTENSITY, 'balanced')
+    use_ai = audit_config.get(VIGOLIUM_AUDIT_USE_AI, False)
+    timeout_seconds = int(audit_config.get(VIGOLIUM_AUDIT_TIMEOUT, 3600))
+
+    scan_id = getattr(self, 'scan_id', 'unknown')
+    results_dir = f"{self.scan.results_dir}/vigolium/audit" if self.scan else '/tmp'
+    os.makedirs(results_dir, exist_ok=True)
+
+    temp_db = os.path.join(results_dir, 'vigolium-audit.sqlite')
+    findings_file = os.path.join(results_dir, 'audit-findings.jsonl')
+
+    cmd = [
+        'vigolium', 'audit',
+        '--source', source,
+        '--db', temp_db,
+        '--intensity', intensity,
+        '--skip-dependency-check',
+        '--no-preflight',
+        '--no-stream',
+        '--no-dedup',
+        '--soft-fail',
+    ]
+
+    if use_ai:
+        from dashboard.models import LLMConfig
+        llm_config = LLMConfig.objects.filter(is_active=True).first()
+        if llm_config and llm_config.api_key:
+            if llm_config.provider == ANTHROPIC:
+                cmd += ['--driver', 'audit', '--agent', 'claude', '--api-key', llm_config.api_key]
+                logger.info("Vigolium audit: using Anthropic (Claude) as AI agent")
+            elif llm_config.provider == OPENAI:
+                cmd += ['--driver', 'audit', '--agent', 'codex', '--api-key', llm_config.api_key]
+                logger.info("Vigolium audit: using OpenAI (Codex) as AI agent")
+            else:
+                logger.warning("Vigolium audit: LLM provider '%s' not supported, falling back to piolium", llm_config.provider)
+                cmd += ['--driver', 'piolium']
+        else:
+            logger.info("Vigolium audit: no active LLM config, falling back to piolium")
+            cmd += ['--driver', 'piolium']
+    else:
+        cmd += ['--driver', 'piolium']
+
+    logger.info("Starting Vigolium Audit: source=%s intensity=%s use_ai=%s scan_id=%s", source, intensity, use_ai, scan_id)
+    logger.warning("Command: %s", ' '.join(shlex.quote(c) for c in cmd))
+
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
+        if proc.returncode != 0:
+            logger.warning("Vigolium audit exited %s: %s", proc.returncode, proc.stderr[:500])
+    except subprocess.TimeoutExpired:
+        logger.warning("Vigolium audit timed out after %d seconds for scan_id=%s", timeout_seconds, scan_id)
+        return
+    except Exception as exc:
+        logger.error("Vigolium audit failed to run: %s", exc)
+        raise
+
+    # Export findings from the temp database
+    export_cmd = [
+        'vigolium', 'export',
+        '--db', temp_db,
+        '--only', 'findings',
+        '--format', 'jsonl',
+        '--omit-response',
+        '-o', findings_file,
+    ]
+    try:
+        subprocess.run(export_cmd, capture_output=True, text=True, timeout=120)
+    except Exception as exc:
+        logger.warning("Vigolium audit: export failed: %s", exc)
+
+    findings_saved = 0
+    for record in _iter_jsonl(findings_file):
+        # vigolium export uses the same {type, data} envelope as vigolium scan
+        record_type = record.get('type')
+        data = record.get('data', record)  # flat if no envelope
+        if record_type and record_type != 'finding':
+            continue
+        _parse_vigolium_audit_finding(self, data)
+        findings_saved += 1
+
+    logger.info("Vigolium audit complete — %d findings saved for scan_id=%s", findings_saved, scan_id)
+
+    try:
+        if os.path.exists(temp_db):
+            os.unlink(temp_db)
+    except Exception:
+        pass
+
+    return "Vigolium audit completed"

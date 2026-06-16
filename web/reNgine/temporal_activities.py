@@ -3079,6 +3079,18 @@ def run_trivy_secret_scan_activity(ctx: dict) -> bool:
     )
 
 
+@activity.defn(name="RunVigoliumAuditActivity")
+def run_vigolium_audit_activity(ctx: dict) -> bool:
+    from reNgine.vigolium_tasks import vigolium_audit_scan
+    activity.logger.info("[RunVigoliumAuditActivity] scan_id=%s", ctx.get('scan_history_id'))
+    return _run_task(
+        vigolium_audit_scan, ctx, task_name='vigolium_audit_scan',
+        description='Source Code Security Audit (vigolium)',
+        code_path=ctx.get('starting_point_path'),
+        ctx=ctx,
+    )
+
+
 @activity.defn(name="RunURLParserActivity")
 def run_urlparser_activity(ctx: dict) -> bool:
     from reNgine.crawl_tasks import urlparser_scan
