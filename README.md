@@ -24,8 +24,9 @@
   <a href="#" target="_blank">
     <img src="https://img.shields.io/badge/first--timers--only-friendly-blue.svg?&logo=none" alt="" />
   </a>
+  &nbsp;
   <a href="https://github.com/Security-Tools-Alliance/rengine-ng" target="_blank">
-    <img src="https://img.shields.io/badge/inspired-by--rengine-ng--red.svg?&logo=none" alt="Inspired by rengine-ng" />
+    <img src="https://img.shields.io/badge/inspired_by-rengine--ng-purple.svg?&logo=none" alt="Inspired by rengine-ng" />
   </a>
 </p>
 
@@ -43,9 +44,9 @@
 
 ![-----------------------------------------------------](https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/aqua.png)
 
-<h2 align="center"><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">r3NgineMobileSOC</a>: Beta Release Out Now</h2>
+<h2 align="center"><a href="https://github.com/whiterabb17/r3ngine-mobile" target="_blank">R3NgineMobileSOC</a>: Beta Release Out Now</h2>
 <p align="center">
-<img src="https://img.shields.io/badge/r3ngine--mobile-1.2.4-orange.svg?logo=none" alt="r3ngine Mobile SOC" />
+<img src="https://img.shields.io/badge/r3ngine--mobile-1.4.1-orange.svg?logo=none" alt="r3ngine Mobile SOC" />
 </p>
 
 | Dashboard | Geo-Tactical Map | Scan Details | Scan Orchestration |
@@ -58,7 +59,7 @@ The r3ngine Mobile SOC companion app provides a full command-and-control interfa
 
 <h2 align="center"><a href="https://github.com/whiterabb17/r3ngine-plugins" target="_blank">r3Ngine Plugins</a>: Alpha Release Out Now</h2>
 <p align="center">
-<img src="https://img.shields.io/badge/r3ngine--plugins-1.0.0-orange.svg?logo=none" alt="r3ngine Plugins" />
+<img src="https://img.shields.io/badge/r3ngine--plugins-1.5.0-orange.svg?logo=none" alt="r3ngine Plugins" />
 </p>
 
 | Active Directory |
