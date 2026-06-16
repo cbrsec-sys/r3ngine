@@ -1052,7 +1052,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#0a0a0a',
+              bgcolor: tokens.surface.elevated,
               border: `1px solid ${tokens.accent.primary}33`,
             }
           }
@@ -1186,7 +1186,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#0a0a0a',
+              bgcolor: tokens.surface.elevated,
               border: `1px solid ${tokens.accent.primary}33`,
             }
           }
@@ -1253,7 +1253,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#0a0a0a',
+              bgcolor: tokens.surface.elevated,
               border: '1px solid rgba(255, 174, 0, 0.2)',
             }
           }
@@ -1472,7 +1472,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#0a0a0a',
+              bgcolor: tokens.surface.elevated,
               border: `1px solid ${tokens.accent.primary}33`,
             }
           }
