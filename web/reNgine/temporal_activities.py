@@ -25,6 +25,11 @@ from django.utils import timezone
 
 from reNgine.scan_context import ScanContext
 from reNgine.utils.logger import get_module_logger, format_exception_for_log
+from reNgine.auth_discovery_tasks import (
+    _fetch_with_proxy_retry,
+    _extract_login_forms,
+)
+from reNgine.common_func import get_proxy_list, get_random_proxy
 
 logger = get_module_logger(__name__)
 
@@ -3133,4 +3138,75 @@ def recalculate_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
     except Exception as e:
         update_job(job_id, "FAILED", 100, f"Error: {str(e)}") if job_id else None
         logger.log_line("[TEMPORAL]", "ERROR", "task=recalculate_apme scan_id=%s error=%s" % (scan_history_id, format_exception_for_log(e)), level="error")
+        raise
+
+
+@activity.defn(name="ExtractAuthForURLActivity")
+def extract_auth_for_url_activity(ctx: dict) -> dict:
+    from startScan.models import ScanHistory
+    from urllib.parse import urlparse
+
+    url = ctx.get('url')
+    scan_id = ctx.get('scan_id')
+
+    from reNgine.utils.task import activity_heartbeat_safe
+    activity_heartbeat_safe("ExtractAuthForURLActivity starting for %s" % url)
+    logger.log_line("[AUTH_EXTRACT]", "START", "extracting auth from %s (scan %s)" % (url, scan_id))
+
+    try:
+        scan = ScanHistory.objects.get(id=scan_id)
+
+        proxy_list = get_proxy_list()
+        if not proxy_list:
+            tor_or_single = get_random_proxy()
+            if tor_or_single:
+                proxy_list = [tor_or_single]
+
+        parsed_url = urlparse(url)
+        if parsed_url.scheme not in ('http', 'https'):
+            logger.log_line("[AUTH_EXTRACT]", "COMPLETE", "skipped non-HTTP URL %s" % url)
+            return {'found': 0}
+
+        response, _ = _fetch_with_proxy_retry(url, proxy_list)
+        forms = _extract_login_forms(response.text, url)
+
+        if not forms:
+            logger.log_line("[AUTH_EXTRACT]", "COMPLETE", "no auth forms found at %s" % url)
+            return {'found': 0}
+
+        raw_scheme = parsed_url.scheme.lower()
+        protocol = 'http' if raw_scheme in ('http', 'https') else raw_scheme
+        port = parsed_url.port or (443 if raw_scheme == 'https' else 80)
+
+        saved = 0
+        for form in forms:
+            from startScan.models import AuthCandidate
+            _, created = AuthCandidate.objects.get_or_create(
+                scan_history=scan,
+                target=form.get('action', url),
+                protocol=protocol,
+                port=port,
+                defaults={
+                    'source_tool': 'ExtractAuthForURLActivity',
+                    'metadata': {
+                        'type': 'form',
+                        'method': form.get('method', 'POST'),
+                        'user_field': form.get('user_field', ''),
+                        'pass_field': form.get('pass_field', ''),
+                        'hidden_fields': form.get('hidden_fields', {}),
+                        'all_fields': form.get('all_fields', []),
+                    },
+                    'status': 'pending',
+                },
+            )
+            if created:
+                saved += 1
+
+        logger.log_line("[AUTH_EXTRACT]", "COMPLETE",
+                        "found %d new auth candidates from %s" % (saved, url))
+        return {'found': saved}
+
+    except Exception as exc:
+        logger.log_line("[AUTH_EXTRACT]", "ERROR", format_exception_for_log(exc),
+                        level="error", exc_info=True)
         raise
