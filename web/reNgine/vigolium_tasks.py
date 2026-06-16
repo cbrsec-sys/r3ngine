@@ -520,7 +520,12 @@ def vigolium_audit_scan(self, code_path=None, ctx={}, description=None):
         cmd += ['--driver', 'piolium']
 
     logger.info("Starting Vigolium Audit: source=%s intensity=%s use_ai=%s scan_id=%s", source, intensity, use_ai, scan_id)
-    logger.warning("Command: %s", ' '.join(shlex.quote(c) for c in cmd))
+    _prev = ''
+    safe_cmd = []
+    for _tok in cmd:
+        safe_cmd.append('***' if _prev == '--api-key' else _tok)
+        _prev = _tok
+    logger.warning("Command: %s", ' '.join(shlex.quote(c) for c in safe_cmd))
 
     try:
         proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout_seconds)
