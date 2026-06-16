@@ -362,6 +362,8 @@ COPY web/requirements.txt /tmp/requirements.txt
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip3 install -r /tmp/requirements.txt --ignore-installed blinker
 
+RUN pip3 install tenacity==8.2.2
+
 # pip's httpx Python package installs a CLI wrapper at /usr/local/bin/httpx that
 # overwrites the ProjectDiscovery Go tool copied earlier. Restore the Go binary.
 COPY --from=go-tools-builder /go/bin/httpx /usr/local/bin/httpx
