@@ -1471,6 +1471,80 @@ class ToggleSubdomainImportantStatus(APIView):
 		return Response(response)
 
 
+class AddManualSubdomain(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		data = request.data
+		subdomain_name = data.get('subdomain_name')
+		target_id = data.get('target_id')
+		scan_id = data.get('scan_id')
+
+		if not subdomain_name:
+			return Response({'status': False, 'message': 'Subdomain name is required.'})
+
+		subdomain_name = subdomain_name.strip().lower()
+
+		# Resolve target domain
+		domain = None
+		if target_id:
+			domain = Domain.objects.filter(id=target_id).first()
+		elif scan_id:
+			scan = ScanHistory.objects.filter(id=scan_id).first()
+			if scan:
+				domain = scan.domain
+
+		if not domain:
+			return Response({'status': False, 'message': 'Target domain not found.'})
+
+		# Basic validation
+		valid_domain = (
+			validators.domain(subdomain_name) or
+			validators.ipv4(subdomain_name) or
+			validators.ipv6(subdomain_name)
+		)
+		if not valid_domain:
+			return Response({'status': False, 'message': 'Invalid subdomain name/IP address.'})
+
+		# Check suffix for domain targets
+		if domain.target_type in ['domain', 'subdomain']:
+			domain_name = domain.name.lower().strip()
+			if subdomain_name != domain_name and not subdomain_name.endswith('.' + domain_name):
+				return Response({'status': False, 'message': f'{subdomain_name} is not a valid subdomain of {domain.name}.'})
+
+		# Check for duplicates
+		existing = Subdomain.objects.filter(target_domain=domain, name__iexact=subdomain_name).exists()
+		if existing:
+			return Response({'status': False, 'message': f'Subdomain {subdomain_name} already exists for this target.'})
+
+		# Find/create scan history
+		scan = ScanHistory.objects.filter(domain=domain).order_by('-start_scan_date').first()
+		if not scan:
+			engine = EngineType.objects.order_by('id').first()
+			if not engine:
+				return Response({'status': False, 'message': 'No Engine Configuration exists to create a scan history.'})
+			scan = ScanHistory.objects.create(
+				domain=domain,
+				scan_type=engine,
+				scan_status=SUCCESS_TASK,
+				start_scan_date=timezone.now(),
+				stop_scan_date=timezone.now(),
+				tasks=[]
+			)
+
+		# Create subdomain record
+		subdomain = Subdomain.objects.create(
+			scan_history=scan,
+			target_domain=domain,
+			name=subdomain_name,
+			is_imported_subdomain=True,
+			discovered_date=timezone.now()
+		)
+
+		return Response({'status': True, 'message': f'Subdomain {subdomain_name} added successfully.'})
+
+
 class AddTarget(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_TARGETS
