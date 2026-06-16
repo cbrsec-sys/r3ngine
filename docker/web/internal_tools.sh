@@ -274,6 +274,7 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         rm -rf /usr/src/github/react2shell-scanner/.git
         log_done
     fi
+    pip3 install -q -r /usr/src/github/react2shell-scanner/requirements.txt
 
     # ctfr
     if clone_repo ctfr https://github.com/UnaPibaGeek/ctfr; then
@@ -281,6 +282,7 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         rm -rf /usr/src/github/ctfr/.git
         log_done
     fi
+    pip3 install -q -r /usr/src/github/ctfr/requirements.txt
 
     # username-anarchy (no pip deps)
     if clone_repo username-anarchy https://github.com/urbanadventurer/username-anarchy; then
@@ -294,6 +296,8 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         pip3 install -q --no-cache-dir /usr/src/github/acunetix-python
         rm -rf /usr/src/github/acunetix-python/.git
         log_done
+    else
+        pip3 install -q --no-cache-dir /usr/src/github/acunetix-python
     fi
 
     # OneForAll
@@ -301,6 +305,8 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         pip3 install -q -r /usr/src/github/OneForAll/requirements.txt
         rm -rf /usr/src/github/OneForAll/.git
         log_done
+    else
+        pip3 install -q -r /usr/src/github/OneForAll/requirements.txt
     fi
 
     # Sublist3r
@@ -308,8 +314,9 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         pip3 install -q -r /usr/src/github/Sublist3r/requirements.txt
         rm -rf /usr/src/github/Sublist3r/.git
         log_done
+    else
+        pip3 install -q -r /usr/src/github/Sublist3r/requirements.txt
     fi
-
     # theHarvester (uses uv sync)
     if [ ! -d /usr/src/github/theHarvester ]; then
         log "  Cloning theHarvester..."
@@ -320,6 +327,7 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         log_done
     else
         log "  theHarvester already present."
+        cd /usr/src/github/theHarvester && uv sync 2>&1 | tail -5 | sed 's/^/    /' && cd -
     fi
 
     # ParamSpider
@@ -327,6 +335,8 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         cd /usr/src/github/ParamSpider && pip3 install -q . && python3 setup.py install && cd -
         rm -rf /usr/src/github/ParamSpider/.git
         log_done
+    else
+        cd /usr/src/github/ParamSpider && pip3 install -q . && python3 setup.py install && cd -
     fi
 
     # LinkFinder
@@ -335,6 +345,9 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         cd /usr/src/github/LinkFinder && python3 setup.py install -q && pip3 install jsbeautifier && cd -
         rm -rf /usr/src/github/LinkFinder/.git
         log_done
+    else
+        pip3 install -q -r /usr/src/github/LinkFinder/requirements.txt
+        cd /usr/src/github/LinkFinder && python3 setup.py install -q && pip3 install jsbeautifier && cd -
     fi
 
     # CMSeeK
@@ -342,6 +355,8 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         pip3 install -q -r /usr/src/github/CMSeeK/requirements.txt
         rm -rf /usr/src/github/CMSeeK/.git
         log_done
+    else
+        pip3 install -q -r /usr/src/github/CMSeeK/requirements.txt
     fi
 
     # testssl.sh (shell script, no pip)
@@ -356,6 +371,8 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         pip3 install -q -r /usr/src/github/jwt_tool/requirements.txt
         rm -rf /usr/src/github/jwt_tool/.git
         log_done
+    else
+        pip3 install -q -r /usr/src/github/jwt_tool/requirements.txt
     fi
 
     # graphql-cop
@@ -363,6 +380,8 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         pip3 install -q -r /usr/src/github/graphql-cop/requirements.txt
         rm -rf /usr/src/github/graphql-cop/.git
         log_done
+    else
+        pip3 install -q -r /usr/src/github/graphql-cop/requirements.txt
     fi
 
     # enum4linux-ng
@@ -370,6 +389,8 @@ log "Acquiring shared-volume lock (${SHARED_LOCK})..."
         pip3 install -q -r /usr/src/github/enum4linux-ng/requirements.txt
         rm -rf /usr/src/github/enum4linux-ng/.git
         log_done
+    else
+        pip3 install -q -r /usr/src/github/enum4linux-ng/requirements.txt
     fi
     ln -sf /usr/src/github/enum4linux-ng/enum4linux-ng.py /usr/local/bin/enum4linux-ng 2>/dev/null || true
 

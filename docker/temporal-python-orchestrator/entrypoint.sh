@@ -12,7 +12,7 @@ echo "[entrypoint] Starting deferred tool installer in background..."
 INTERNAL_TOOLS_PID=$!
 
 # Ensure OpenSSL compatibility
-pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0
+pip3 install --upgrade --no-cache-dir pyOpenSSL==24.0.0 tenacity==8.2.2
 
 
 
