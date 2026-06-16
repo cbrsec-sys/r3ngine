@@ -1471,6 +1471,138 @@ class ToggleSubdomainImportantStatus(APIView):
 		return Response(response)
 
 
+class AddManualSubdomain(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		data = request.data
+		subdomain_input = data.get('subdomain_name')
+		target_id = data.get('target_id')
+		scan_id = data.get('scan_id')
+
+		if not subdomain_input:
+			return Response({'status': False, 'message': 'Subdomain name or list is required.'}, status=400)
+
+		# Resolve target domain
+		domain = None
+		if target_id:
+			domain = Domain.objects.filter(id=target_id).first()
+		elif scan_id:
+			scan = ScanHistory.objects.filter(id=scan_id).first()
+			if scan:
+				domain = scan.domain
+
+		if not domain:
+			return Response({'status': False, 'message': 'Target domain not found.'}, status=404)
+
+		# Split input by newlines, commas, or spaces
+		raw_subdomains = re.split(r'[\s,]+', subdomain_input)
+		subdomains_to_process = []
+		for name in raw_subdomains:
+			name = name.strip().lower()
+			if name:
+				subdomains_to_process.append(name)
+
+		if not subdomains_to_process:
+			return Response({'status': False, 'message': 'No valid subdomain names found in input.'}, status=400)
+
+		# Filter out duplicates within the input itself
+		subdomains_to_process = list(dict.fromkeys(subdomains_to_process))
+
+		MAX_SUBDOMAINS_PER_REQUEST = 500
+		if len(subdomains_to_process) > MAX_SUBDOMAINS_PER_REQUEST:
+			return Response(
+				{'status': False, 'message': f'Too many subdomains. Maximum {MAX_SUBDOMAINS_PER_REQUEST} per request.'},
+				status=400
+			)
+
+		added_count = 0
+		duplicate_count = 0
+		invalid_count = 0
+		out_of_scope_count = 0
+
+		# Find/create scan history
+		scan = ScanHistory.objects.filter(domain=domain).order_by('-start_scan_date').first()
+		
+		subdomains_to_create = []
+
+		for sub_name in subdomains_to_process:
+			# Basic validation
+			valid_domain = (
+				validators.domain(sub_name) or
+				validators.ipv4(sub_name) or
+				validators.ipv6(sub_name)
+			)
+			if not valid_domain:
+				invalid_count += 1
+				continue
+
+			# Check suffix for domain targets
+			if domain.target_type in ['domain', 'subdomain']:
+				domain_name = domain.name.lower().strip()
+				if sub_name != domain_name and not sub_name.endswith('.' + domain_name):
+					out_of_scope_count += 1
+					continue
+
+			# Check if subdomain already exists under this target
+			existing = Subdomain.objects.filter(target_domain=domain, name__iexact=sub_name).exists()
+			if existing:
+				duplicate_count += 1
+				continue
+
+			subdomains_to_create.append(sub_name)
+
+		if subdomains_to_create:
+			if not scan:
+				engine = EngineType.objects.order_by('id').first()
+				if not engine:
+					return Response({'status': False, 'message': 'No Engine Configuration exists to create a scan history.'}, status=500)
+				scan = ScanHistory.objects.create(
+					domain=domain,
+					scan_type=engine,
+					scan_status=SUCCESS_TASK,
+					start_scan_date=timezone.now(),
+					stop_scan_date=timezone.now(),
+					tasks=[]
+				)
+
+			# Create subdomains in bulk
+			objs = [
+				Subdomain(
+					scan_history=scan,
+					target_domain=domain,
+					name=sub_name,
+					is_imported_subdomain=True,
+					discovered_date=timezone.now()
+				)
+				for sub_name in subdomains_to_create
+			]
+			Subdomain.objects.bulk_create(objs, ignore_conflicts=True)
+			added_count = len(objs)
+
+		# Build response message
+		msg_parts = []
+		if added_count > 0:
+			msg_parts.append(f'Successfully added {added_count} subdomain(s).')
+		if duplicate_count > 0:
+			msg_parts.append(f'{duplicate_count} already existed.')
+		if invalid_count > 0:
+			msg_parts.append(f'{invalid_count} had invalid format.')
+		if out_of_scope_count > 0:
+			msg_parts.append(f'{out_of_scope_count} did not belong to target {domain.name}.')
+
+		message = ' '.join(msg_parts)
+		return Response({
+			'status': added_count > 0,
+			'message': message,
+			'added_count': added_count,
+			'duplicate_count': duplicate_count,
+			'invalid_count': invalid_count,
+			'out_of_scope_count': out_of_scope_count
+		})
+
+
 class AddTarget(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_TARGETS

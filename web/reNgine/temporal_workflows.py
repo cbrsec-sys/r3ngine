@@ -2460,7 +2460,10 @@ class CodeScanWorkflow:
 
         if audit_config.get('run_vigolium_audit', True):
             # Timeout from config (seconds), default 1 hour; cap at 4 hours.
-            audit_timeout_s = min(int(audit_config.get('timeout', 3600)), 14400)
+            try:
+                audit_timeout_s = min(int(audit_config.get('timeout', 3600)), 14400)
+            except (ValueError, TypeError):
+                audit_timeout_s = 3600
             activities.append(
                 workflow.execute_activity(
                     "RunVigoliumAuditActivity",

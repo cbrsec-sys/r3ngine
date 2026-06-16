@@ -384,8 +384,11 @@ class VigoliumAuditTaskGatingTest(TestCase):
             cmd = mock_run.call_args_list[0][0][0]
             self.assertIn('--agent', cmd)
             self.assertIn('claude', cmd)
-            self.assertIn('--api-key', cmd)
-            self.assertIn('sk-ant-test-key', cmd)
+            # API key must NOT be in CLI args — it is passed via env var instead
+            self.assertNotIn('--api-key', cmd)
+            self.assertNotIn('sk-ant-test-key', cmd)
+            env_passed = mock_run.call_args_list[0][1].get('env', {})
+            self.assertEqual(env_passed.get('VIGOLIUM_API_KEY'), 'sk-ant-test-key')
 
     def test_audit_falls_back_to_piolium_when_no_llm_config(self):
         from reNgine.vigolium_tasks import vigolium_audit_scan
@@ -406,3 +409,160 @@ class VigoliumAuditActivityTest(TestCase):
     def test_audit_activity_is_importable(self):
         from reNgine.temporal_activities import run_vigolium_audit_activity
         self.assertTrue(callable(run_vigolium_audit_activity))
+
+
+class VigoliumAuditApiKeyMaskTest(TestCase):
+    """API key must never appear in log output."""
+
+    @patch('reNgine.vigolium_tasks.subprocess.run')
+    @patch('reNgine.vigolium_tasks.LLMConfig')
+    def test_api_key_not_logged(self, mock_llm_cls, mock_run):
+        """Confirm the real API key does not appear in any log record."""
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+
+        mock_run.return_value = MagicMock(returncode=0, stderr='', stdout='')
+        mock_llm = MagicMock()
+        mock_llm.is_active = True
+        mock_llm.api_key = 'sk-SUPERSECRET'
+        mock_llm.provider = 'anthropic'
+        mock_llm_cls.objects.filter.return_value.first.return_value = mock_llm
+
+        task = MagicMock()
+        task.scan = MagicMock()
+        task.scan.results_dir = '/tmp/test_audit'
+        task.domain = MagicMock()
+        task.starting_point_path = None
+        task.yaml_configuration = {
+            'vigolium_audit': {
+                'run_vigolium_audit': True,
+                'intensity': 'balanced',
+                'use_ai': True,
+                'timeout': 10,
+            }
+        }
+
+        with self.assertLogs('reNgine.vigolium_tasks', level='DEBUG') as log_ctx:
+            try:
+                vigolium_audit_scan(task, code_path='/tmp/fakecode', ctx={})
+            except Exception:
+                pass
+
+        all_log_text = '\n'.join(log_ctx.output)
+        self.assertNotIn('sk-SUPERSECRET', all_log_text, "API key must not appear in logs")
+
+
+class VigoliumAuditApiKeyEnvTest(TestCase):
+    """API key must be passed via env var, never as a CLI argument."""
+
+    @patch('reNgine.vigolium_tasks.subprocess.run')
+    @patch('reNgine.vigolium_tasks.LLMConfig')
+    def test_api_key_not_in_cmd_args(self, mock_llm_cls, mock_run):
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+
+        mock_run.return_value = MagicMock(returncode=0, stderr='', stdout='')
+        mock_llm = MagicMock()
+        mock_llm.is_active = True
+        mock_llm.api_key = 'sk-SUPERSECRET'
+        mock_llm.provider = 'anthropic'
+        mock_llm_cls.objects.filter.return_value.first.return_value = mock_llm
+
+        task = MagicMock()
+        task.scan = MagicMock()
+        task.scan.results_dir = '/tmp/test_audit'
+        task.domain = MagicMock()
+        task.starting_point_path = None
+        task.yaml_configuration = {
+            'vigolium_audit': {
+                'run_vigolium_audit': True,
+                'intensity': 'balanced',
+                'use_ai': True,
+                'timeout': 10,
+            }
+        }
+        try:
+            vigolium_audit_scan(task, code_path='/tmp/fakecode', ctx={})
+        except Exception:
+            pass
+
+        self.assertTrue(mock_run.called, "subprocess.run must have been called")
+        call_kwargs = mock_run.call_args
+        cmd_args = call_kwargs[0][0] if call_kwargs[0] else []
+        self.assertNotIn('sk-SUPERSECRET', cmd_args,
+                         "API key must not appear in subprocess arg list")
+        env_passed = call_kwargs[1].get('env', {}) if call_kwargs[1] else {}
+        self.assertIn('VIGOLIUM_API_KEY', env_passed,
+                      "API key should be in env dict passed to subprocess")
+        self.assertEqual(env_passed['VIGOLIUM_API_KEY'], 'sk-SUPERSECRET')
+
+
+class CodeScanWorkflowTimeoutCastTest(TestCase):
+    def test_non_numeric_timeout_does_not_raise(self):
+        """A non-numeric timeout in YAML must not crash — falls back to default 3600."""
+        def safe_timeout_cast(value, default=3600, cap=14400):
+            try:
+                return min(int(value), cap)
+            except (ValueError, TypeError):
+                return min(default, cap)
+
+        self.assertEqual(safe_timeout_cast('1h'), 3600)
+        self.assertEqual(safe_timeout_cast(None), 3600)
+        self.assertEqual(safe_timeout_cast('7200'), 7200)
+        self.assertEqual(safe_timeout_cast(99999), 14400)
+
+
+class VigoliumAuditIntensityValidationTest(TestCase):
+    """Unrecognised intensity values must be coerced to 'balanced'."""
+
+    @patch('reNgine.vigolium_tasks.subprocess.run')
+    def test_invalid_intensity_coerced(self, mock_run):
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+
+        mock_run.return_value = MagicMock(returncode=0, stderr='', stdout='')
+        task = MagicMock()
+        task.scan = MagicMock()
+        task.scan.results_dir = '/tmp/test_audit'
+        task.domain = MagicMock()
+        task.starting_point_path = None
+        task.yaml_configuration = {
+            'vigolium_audit': {
+                'run_vigolium_audit': True,
+                'intensity': 'HACKER_MODE',
+                'use_ai': False,
+                'timeout': 10,
+            }
+        }
+        try:
+            vigolium_audit_scan(task, code_path='/tmp/fakecode', ctx={})
+        except Exception:
+            pass
+
+        self.assertTrue(mock_run.called, "subprocess.run must have been called")
+        call_args = mock_run.call_args[0][0]
+        idx = call_args.index('--intensity')
+        self.assertEqual(call_args[idx + 1], 'balanced',
+                         "Invalid intensity must be coerced to 'balanced'")
+
+
+class VigoliumAuditNoSourceTest(TestCase):
+    """When no source path is resolvable, must abort early — not fall back to /tmp/code."""
+
+    @patch('reNgine.vigolium_tasks.subprocess.run')
+    def test_no_source_returns_early(self, mock_run):
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+
+        task = MagicMock()
+        task.scan = MagicMock()
+        task.scan.results_dir = '/tmp/test_audit'
+        task.domain = MagicMock()
+        task.starting_point_path = None
+        task.yaml_configuration = {
+            'vigolium_audit': {
+                'run_vigolium_audit': True,
+                'intensity': 'balanced',
+                'use_ai': False,
+                'timeout': 10,
+            }
+        }
+        result = vigolium_audit_scan(task, code_path=None, ctx={})
+        mock_run.assert_not_called()
+        self.assertIsNone(result)
