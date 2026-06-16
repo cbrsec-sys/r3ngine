@@ -1,6 +1,33 @@
 # Changelog
 
-### [v3.6.0] - Unreleased
+### [v3.6.0]
+
+- **Intelligent Auth Form Extraction — Full Rewrite (`auth_discovery_tasks.py`)**:
+  - Replaced the single-attempt, regex-based implementation with a robust two-helper architecture:
+    - `_fetch_with_proxy_retry(url, proxy_list)` — tries up to 3 configured proxies in sequence, then falls back to a direct (no-proxy) 4th attempt. Raises only if all four attempts fail, eliminating the previous silent-drop behaviour that caused the feature to always fail when proxies were configured.
+    - `_extract_login_forms(html_content, base_url)` — uses `BeautifulSoup` (already in requirements) to find `<form>` elements that contain password fields. Returns structured dicts per form with `action` (absolute URL, `urljoin`-resolved), `method` (GET/POST), `user_field`, `pass_field`, `hidden_fields` (CSRF tokens, nonces), and `all_fields`.
+  - Fixed 9 bugs in the original implementation:
+    1. **No proxy retry** — single `get_random_proxy()` call; any proxy failure silently skipped the endpoint. Fixed with 3-proxy rotation + direct fallback.
+    2. **Fragile password-field detection** — `'type="password"' in content.lower()` missed `type=password` (unquoted), `type = "password"` (spaces), and `autocomplete="current-password"` (WebAuthn). Fixed via BeautifulSoup attribute access.
+    3. **Input names from entire page** — regex matched all `name=` attributes site-wide, not just inside the login form. Fixed with per-`<form>` iteration.
+    4. **Form `action` URL never captured** — always saved `ep.http_url` as target; the actual POST endpoint (e.g. `/api/auth/login`) was ignored. Fixed via `urljoin` resolution.
+    5. **Protocol hardcoded as `'http'`** — HTTPS endpoints recorded with wrong protocol. Fixed using `urlparse(ep.http_url).scheme`.
+    6. **F-string logging** — violated security Rule 2.1 (externally-controlled data in f-strings). Fixed to `%s`-style throughout.
+    7. **Unused imports** — `import os`, `import json`, `from django.conf import settings` removed.
+    8. **Hardcoded User-Agent** — `'Mozilla/5.0'` replaced with `get_random_user_agent()`.
+    9. **Narrow keyword list** — expanded from 9 to 18 terms, adding `wp-login`, `wp-admin`, `dashboard`, `session`, `oauth`, `sso`, `saml`, `sign-in`.
+  - Added SSRF protection: scheme validated (`http`/`https` only) before every fetch.
+  - Added `http_status__isnull=False` guard and `select_related('subdomain')` to the endpoint queryset (null-status safety + N+1 fix).
+  - Hidden fields (CSRF tokens, nonces) now captured and stored in `AuthCandidate.metadata['hidden_fields']` for use by the brute-force engine.
+  - TOR mode respected: when `use_tor=True`, `get_random_proxy()` returns `socks5://tor:9050` which is used as the single proxy entry in the rotation.
+  - 21 new tests in `web/tests/test_auth_discovery_tasks.py` covering proxy retry, form extraction, and orchestrator integration.
+
+- **Scan Recovery Enhancement (`recover_stuck_scans`)**:
+  - Extended the recovery candidates queryset to include `FAILED_TASK` scans in addition to `RUNNING_TASK`. Scans that were previously marked as failed due to a dead workflow are now picked up on the next orchestrator restart and re-queued.
+  - Aborted scans (`ABORTED_TASK`) continue to be excluded from recovery.
+
+- **Scan Task Plan — Always-Present Tier-7 Finalisation Tasks**:
+  - `build_scan_task_plan` now unconditionally appends `correlate_vulnerabilities`, `calculate_risk_scores`, `generate_impact_assessment`, `sync_graph`, and `run_apme` to every scan plan, regardless of which scanning tiers are configured. Previously these were gated behind `'vulnerability_scan' in tasks`, meaning minimal-config scans never ran correlation or risk scoring.
 
 - **Docker Build Image Size Optimization**:
   - Relocated the Exploit-DB/Searchsploit database (~359MB) from build-time to container runtime. It is now dynamically cloned at startup inside the `temporal-python-orchestrator` container and shared with other containers via a new named Docker volume `exploitdb`.
