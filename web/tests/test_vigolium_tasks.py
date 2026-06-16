@@ -231,3 +231,178 @@ class VigoliumActivitiesTest(TestCase):
         self.assertTrue(callable(run_vigolium_scan_activity))
         self.assertTrue(callable(run_vigolium_discovery_activity))
         self.assertTrue(callable(run_vigolium_analysis_activity))
+
+
+class VigoliumAuditDefinitionsTest(TestCase):
+    def test_audit_constants_defined(self):
+        from reNgine.definitions import (
+            RUN_VIGOLIUM_AUDIT,
+            VIGOLIUM_AUDIT,
+            VIGOLIUM_AUDIT_INTENSITY,
+            VIGOLIUM_AUDIT_USE_AI,
+            VIGOLIUM_AUDIT_TIMEOUT,
+            VIGOLIUM_DEFAULT_AUDIT_CONFIG,
+        )
+        self.assertEqual(RUN_VIGOLIUM_AUDIT, 'run_vigolium_audit')
+        self.assertEqual(VIGOLIUM_AUDIT, 'vigolium_audit')
+        self.assertEqual(VIGOLIUM_AUDIT_INTENSITY, 'intensity')
+        self.assertEqual(VIGOLIUM_AUDIT_USE_AI, 'use_ai')
+        self.assertEqual(VIGOLIUM_AUDIT_TIMEOUT, 'timeout')
+        self.assertIn('run_vigolium_audit', VIGOLIUM_DEFAULT_AUDIT_CONFIG)
+        self.assertTrue(VIGOLIUM_DEFAULT_AUDIT_CONFIG['run_vigolium_audit'])
+        self.assertFalse(VIGOLIUM_DEFAULT_AUDIT_CONFIG['use_ai'])
+        self.assertEqual(VIGOLIUM_DEFAULT_AUDIT_CONFIG['intensity'], 'balanced')
+
+
+class VigoliumAuditParserTest(TestCase):
+    def _make_task(self):
+        task = MagicMock()
+        task.scan_id = 1
+        task.activity_id = 1
+        task.domain_id = 1
+        task.scan = MagicMock()
+        task.scan.results_dir = '/tmp/test_scan'
+        task.domain = MagicMock()
+        task.subscan = None
+        task.subdomain = None
+        task.yaml_configuration = {'vigolium_audit': {'run_vigolium_audit': True}}
+        return task
+
+    def test_audit_finding_saves_vulnerability(self):
+        """_parse_vigolium_audit_finding saves a code finding without a subdomain."""
+        from reNgine.vigolium_tasks import _parse_vigolium_audit_finding
+
+        finding_data = {
+            'module_id': 'sqli-error',
+            'module_name': 'SQL Injection (Error-Based)',
+            'severity': 'high',
+            'file': '/src/db/queries.py',
+            'line': 42,
+            'description': 'Unsanitized input concatenated into SQL query.',
+            'matched_at': [],
+            'tags': ['sqli', 'injection'],
+            'cvss_score': 8.1,
+        }
+        task = self._make_task()
+        with patch('reNgine.vigolium_tasks.Subdomain') as mock_sub, \
+             patch('reNgine.vigolium_tasks.save_vulnerability') as mock_save:
+            mock_sub.objects.filter.return_value.first.return_value = None
+            _parse_vigolium_audit_finding(task, finding_data)
+            mock_save.assert_called_once()
+            kwargs = mock_save.call_args[1]
+            self.assertEqual(kwargs['name'], 'SQL Injection (Error-Based)')
+            self.assertEqual(kwargs['severity'], 3)
+            self.assertEqual(kwargs['type'], 'VigoliumAudit')
+            self.assertEqual(kwargs['source'], 'VigoliumAudit')
+            self.assertIn('/src/db/queries.py', kwargs['http_url'])
+
+    def test_audit_finding_skips_missing_name(self):
+        """_parse_vigolium_audit_finding skips records with no module_name or name."""
+        from reNgine.vigolium_tasks import _parse_vigolium_audit_finding
+
+        task = self._make_task()
+        with patch('reNgine.vigolium_tasks.save_vulnerability') as mock_save:
+            _parse_vigolium_audit_finding(task, {'severity': 'high'})
+            mock_save.assert_not_called()
+
+    def test_audit_finding_uses_matched_at_when_present(self):
+        """_parse_vigolium_audit_finding uses matched_at[0] as URL when available."""
+        from reNgine.vigolium_tasks import _parse_vigolium_audit_finding
+
+        finding_data = {
+            'module_name': 'Hardcoded Secret',
+            'severity': 'critical',
+            'matched_at': ['https://example.com/api/key'],
+            'hostname': '',
+        }
+        task = self._make_task()
+        with patch('reNgine.vigolium_tasks.Subdomain') as mock_sub, \
+             patch('reNgine.vigolium_tasks.save_vulnerability') as mock_save:
+            mock_sub.objects.filter.return_value.first.return_value = None
+            _parse_vigolium_audit_finding(task, finding_data)
+            mock_save.assert_called_once()
+            kwargs = mock_save.call_args[1]
+            self.assertEqual(kwargs['http_url'], 'https://example.com/api/key')
+
+
+class VigoliumAuditTaskGatingTest(TestCase):
+    def _make_task(self, enabled=True, use_ai=False, intensity='balanced', timeout=3600):
+        task = MagicMock()
+        task.scan_id = 1
+        task.activity_id = 1
+        task.scan = MagicMock()
+        task.scan.results_dir = '/tmp/test_scan'
+        task.domain = MagicMock()
+        task.subscan = None
+        task.subdomain = None
+        task.yaml_configuration = {
+            'vigolium_audit': {
+                'run_vigolium_audit': enabled,
+                'intensity': intensity,
+                'use_ai': use_ai,
+                'timeout': timeout,
+            },
+        }
+        return task
+
+    def test_audit_skips_when_disabled(self):
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+        task = self._make_task(enabled=False)
+        with patch('reNgine.vigolium_tasks.subprocess') as mock_sp:
+            vigolium_audit_scan(task)
+            mock_sp.run.assert_not_called()
+
+    def test_audit_uses_piolium_driver_by_default(self):
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+        task = self._make_task(use_ai=False)
+        with patch('reNgine.vigolium_tasks.subprocess.run') as mock_run, \
+             patch('os.makedirs'), \
+             patch('os.path.exists', return_value=False):
+            mock_run.return_value = MagicMock(returncode=0, stderr='')
+            vigolium_audit_scan(task, code_path='/tmp/src')
+            self.assertTrue(mock_run.called)
+            cmd = mock_run.call_args_list[0][0][0]
+            self.assertIn('--driver', cmd)
+            self.assertIn('piolium', cmd)
+            self.assertIn('--source', cmd)
+            self.assertIn('/tmp/src', cmd)
+
+    def test_audit_uses_claude_when_anthropic_configured(self):
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+        task = self._make_task(use_ai=True)
+        mock_llm = MagicMock()
+        mock_llm.provider = 'anthropic'
+        mock_llm.api_key = 'sk-ant-test-key'
+        with patch('reNgine.vigolium_tasks.subprocess.run') as mock_run, \
+             patch('os.makedirs'), \
+             patch('os.path.exists', return_value=False), \
+             patch('dashboard.models.LLMConfig') as mock_llm_cls:
+            mock_llm_cls.objects.filter.return_value.first.return_value = mock_llm
+            mock_run.return_value = MagicMock(returncode=0, stderr='')
+            vigolium_audit_scan(task, code_path='/tmp/src')
+            self.assertTrue(mock_run.called)
+            cmd = mock_run.call_args_list[0][0][0]
+            self.assertIn('--agent', cmd)
+            self.assertIn('claude', cmd)
+            self.assertIn('--api-key', cmd)
+            self.assertIn('sk-ant-test-key', cmd)
+
+    def test_audit_falls_back_to_piolium_when_no_llm_config(self):
+        from reNgine.vigolium_tasks import vigolium_audit_scan
+        task = self._make_task(use_ai=True)
+        with patch('reNgine.vigolium_tasks.subprocess.run') as mock_run, \
+             patch('os.makedirs'), \
+             patch('os.path.exists', return_value=False), \
+             patch('dashboard.models.LLMConfig') as mock_llm_cls:
+            mock_llm_cls.objects.filter.return_value.first.return_value = None
+            mock_run.return_value = MagicMock(returncode=0, stderr='')
+            vigolium_audit_scan(task, code_path='/tmp/src')
+            cmd = mock_run.call_args_list[0][0][0]
+            self.assertIn('piolium', cmd)
+            self.assertNotIn('claude', cmd)
+
+
+class VigoliumAuditActivityTest(TestCase):
+    def test_audit_activity_is_importable(self):
+        from reNgine.temporal_activities import run_vigolium_audit_activity
+        self.assertTrue(callable(run_vigolium_audit_activity))

@@ -3971,7 +3971,7 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		templates.extend(custom_nuclei_template_paths)
 
 	# Build CMD
-	cmd = 'nuclei -j'
+	cmd = 'nuclei -j -hang-monitor -stats'
 	cmd += ' -config /root/.config/nuclei/config.yaml' if use_nuclei_conf else ''
 	cmd += f' -irr'
 

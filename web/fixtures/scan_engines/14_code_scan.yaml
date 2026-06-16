@@ -11,6 +11,11 @@
         gitleaks: true
         trufflehog: true
         leaklookup: false
+      vigolium_audit:
+        run_vigolium_audit: true
+        intensity: balanced
+        use_ai: false
+        timeout: 3600
       vulnerability_scan:
         run_nuclei: false
         run_dalfox: false

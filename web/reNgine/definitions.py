@@ -252,6 +252,19 @@ VIGOLIUM_DEFAULT_ANALYSIS_CONFIG = {
     'timeout': '10s',
 }
 
+RUN_VIGOLIUM_AUDIT = 'run_vigolium_audit'
+VIGOLIUM_AUDIT = 'vigolium_audit'
+VIGOLIUM_AUDIT_INTENSITY = 'intensity'
+VIGOLIUM_AUDIT_USE_AI = 'use_ai'
+VIGOLIUM_AUDIT_TIMEOUT = 'timeout'
+
+VIGOLIUM_DEFAULT_AUDIT_CONFIG = {
+    'run_vigolium_audit': True,
+    'intensity': 'balanced',
+    'use_ai': False,
+    'timeout': 3600,
+}
+
 ATTACK_PATH_MODELING = 'attack_path_modeling'
 ATTACK_PATH_MODELING_DEFAULT_CONFIG = {
     'enabled': True,

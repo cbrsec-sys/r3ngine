@@ -2417,7 +2417,10 @@ class CodeScanWorkflow:
 
     @workflow.run
     async def run(self, ctx: dict) -> bool:
-        await asyncio.gather(
+        yaml_config = ctx.get('yaml_configuration') or {}
+        audit_config = yaml_config.get('vigolium_audit', {})
+
+        activities = [
             workflow.execute_activity(
                 "RunGenericTaskActivity",
                 {**ctx, 'task_name': 'gitleaks_scan'},
@@ -2453,7 +2456,22 @@ class CodeScanWorkflow:
                 retry_policy=_RETRY_LONG_SCAN,
                 task_queue="python-orchestrator-queue",
             ),
-        )
+        ]
+
+        if audit_config.get('run_vigolium_audit', True):
+            # Timeout from config (seconds), default 1 hour; cap at 4 hours.
+            audit_timeout_s = min(int(audit_config.get('timeout', 3600)), 14400)
+            activities.append(
+                workflow.execute_activity(
+                    "RunVigoliumAuditActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(seconds=audit_timeout_s + 300),
+                    retry_policy=_RETRY_LONG_SCAN,
+                    task_queue="python-orchestrator-queue",
+                )
+            )
+
+        await asyncio.gather(*activities)
         return True
 
 
