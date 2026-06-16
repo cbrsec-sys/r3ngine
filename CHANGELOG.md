@@ -1,6 +1,6 @@
 # Changelog
 
-### [v3.6.0] - Unreleased
+### [v3.6.0]
 
 - **Intelligent Auth Form Extraction — Full Rewrite (`auth_discovery_tasks.py`)**:
   - Replaced the single-attempt, regex-based implementation with a robust two-helper architecture:
