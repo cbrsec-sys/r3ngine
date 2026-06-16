@@ -64,6 +64,7 @@ import {
   useToggleSubdomainImportant,
   useInitiateSubscan,
   useGPTAttackSurface,
+  useAddManualSubdomain,
 } from '../../subdomains/api';
 import type { SubdomainFilters } from '../../subdomains/api';
 import { useEngines } from '../../engines/api';
@@ -72,6 +73,7 @@ import { useCreateTodo } from '../../todos/api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { getDialogPaperSx, getFieldSx, getMenuPaperSx } from '../../../theme/semanticColors';
 
 interface SubdomainsTabProps {
   projectSlug: string;
@@ -97,7 +99,8 @@ const TASK_TIER_ORDER: string[] = [
 ];
 
 export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId, targetId, onTabChange }) => {
-  const { tokens, isLight } = useThemeTokens();
+  const { tokens, isLight, theme } = useThemeTokens();
+  const warningAccent = tokens.accent.warning;
 
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -130,6 +133,10 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   const [subscanModalOpen, setSubscanModalOpen] = useState(false);
   const [attackSurfaceModalOpen, setAttackSurfaceModalOpen] = useState(false);
   const [todoModalOpen, setTodoModalOpen] = useState(false);
+  const [addSubdomainModalOpen, setAddSubdomainModalOpen] = useState(false);
+  const [manualSubdomainName, setManualSubdomainName] = useState('');
+
+  const addSubdomainMutation = useAddManualSubdomain(projectSlug);
   
   // Selected subdomain for single actions
   const [targetSubdomain, setTargetSubdomain] = useState<any>(null);
@@ -421,6 +428,30 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             V3.0 SCAN ASSETS RECON ACTIVE
           </Typography>
         </Box>
+
+        {/* Manual Subdomain Addition Button */}
+        {(targetId || scanId) && (
+          <Button
+            variant="contained"
+            startIcon={<FilePlus size={16} />}
+            onClick={() => setAddSubdomainModalOpen(true)}
+            sx={{
+              bgcolor: `${tokens.accent.primary}15`,
+              color: tokens.accent.primary,
+              border: `1px solid ${tokens.accent.primary}33`,
+              fontSize: '11px',
+              fontWeight: 800,
+              letterSpacing: 1,
+              fontFamily: 'Orbitron',
+              '&:hover': {
+                bgcolor: `${tokens.accent.primary}33`,
+                borderColor: tokens.accent.primary,
+              }
+            }}
+          >
+            ADD SUBDOMAIN
+          </Button>
+        )}
       </Box>
 
       {/* Enterprise-Grade Search Bar */}
@@ -974,7 +1005,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#001a24',
+              ...getMenuPaperSx(isLight, theme, tokens),
               border: `1px solid ${tokens.accent.primary}33`,
               color: 'text.primary',
               '& .MuiMenuItem-root': {
@@ -1023,7 +1054,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#0a0a0a',
+              ...getDialogPaperSx(isLight, theme, tokens),
               border: `1px solid ${tokens.accent.primary}33`,
             }
           }
@@ -1049,7 +1080,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
               }}
               sx={{
                 color: 'text.primary',
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: isLight ? tokens.border.subtle : 'rgba(255,255,255,0.1)' },
                 '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${tokens.accent.primary}4D` },
                 '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: tokens.accent.primary },
               }}
@@ -1157,7 +1188,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#0a0a0a',
+              ...getDialogPaperSx(isLight, theme, tokens),
               border: `1px solid ${tokens.accent.primary}33`,
             }
           }
@@ -1224,13 +1255,13 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#0a0a0a',
-              border: '1px solid rgba(255, 174, 0, 0.2)',
+              ...getDialogPaperSx(isLight, theme, tokens),
+              border: `1px solid ${warningAccent}33`,
             }
           }
         }}
       >
-        <DialogTitle sx={{ color: '#ffae00', fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2 }}>
+        <DialogTitle sx={{ color: warningAccent, fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2 }}>
           ADD RECON NOTE: {targetSubdomain?.name}
         </DialogTitle>
         <DialogContent>
@@ -1242,15 +1273,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
               value={todoTitle}
               onChange={(e) => setTodoTitle(e.target.value)}
               variant="outlined"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  color: 'text.primary',
-                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                  '&:hover fieldset': { borderColor: '#ffae00' },
-                  '&.Mui-focused fieldset': { borderColor: '#ffae00' },
-                },
-                '& .MuiInputLabel-root': { color: 'text.secondary' }
-              }}
+              sx={getFieldSx(isLight, tokens, warningAccent)}
             />
             <TextField
               label="Description"
@@ -1260,15 +1283,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
               value={todoDescription}
               onChange={(e) => setTodoDescription(e.target.value)}
               variant="outlined"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  color: 'text.primary',
-                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                  '&:hover fieldset': { borderColor: '#ffae00' },
-                  '&.Mui-focused fieldset': { borderColor: '#ffae00' },
-                },
-                '& .MuiInputLabel-root': { color: 'text.secondary' }
-              }}
+              sx={getFieldSx(isLight, tokens, warningAccent)}
             />
           </Stack>
         </DialogContent>
@@ -1280,7 +1295,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             disabled={createTodoMutation.isPending}
             sx={{
               bgcolor: 'rgba(255, 174, 0, 0.1)',
-              color: '#ffae00',
+              color: warningAccent,
               border: '1px solid rgba(255, 174, 0, 0.2)',
               fontSize: '0.7rem',
               fontWeight: 900,
@@ -1428,6 +1443,98 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             </Box>
           </Fade>
       </Modal>
+
+      {/* Add Subdomain Dialog */}
+      <Dialog
+        open={addSubdomainModalOpen}
+        onClose={() => {
+          if (!addSubdomainMutation.isPending) {
+            setAddSubdomainModalOpen(false);
+            setManualSubdomainName('');
+          }
+        }}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              ...getDialogPaperSx(isLight, theme, tokens),
+              border: `1px solid ${tokens.accent.primary}33`,
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2 }}>
+          ADD SUBDOMAINS MANUALLY
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', mb: 2, fontFamily: 'monospace' }}>
+            ENTER SUBDOMAINS (SEPARATED BY NEWLINES, COMMAS, OR SPACES)
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            rows={5}
+            size="small"
+            label="Subdomain List"
+            value={manualSubdomainName}
+            onChange={(e) => setManualSubdomainName(e.target.value)}
+            placeholder="sub1.domain.com&#10;sub2.domain.com&#10;sub3.domain.com"
+            disabled={addSubdomainMutation.isPending}
+            sx={{
+              mt: 1,
+              ...getFieldSx(isLight, tokens, tokens.accent.primary),
+              '& .MuiInputLabel-root': { color: 'text.secondary', fontSize: '0.8rem' },
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            size="small"
+            onClick={() => {
+              setAddSubdomainModalOpen(false);
+              setManualSubdomainName('');
+            }}
+            disabled={addSubdomainMutation.isPending}
+            sx={{ color: 'text.secondary', fontSize: '10px', fontWeight: 700 }}
+          >
+            CANCEL
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            disabled={addSubdomainMutation.isPending || !manualSubdomainName.trim()}
+            onClick={async () => {
+              try {
+                const res = await addSubdomainMutation.mutateAsync({
+                  target_id: targetId,
+                  scan_id: scanId,
+                  subdomain_name: manualSubdomainName.trim(),
+                });
+                if (res.status) {
+                  showNotification(res.message || 'Subdomain added successfully');
+                  setAddSubdomainModalOpen(false);
+                  setManualSubdomainName('');
+                } else {
+                  showNotification(res.message || 'Failed to add subdomain', 'error');
+                }
+              } catch (err: any) {
+                showNotification(err.response?.data?.message || err.message || 'Error adding subdomain', 'error');
+              }
+            }}
+            sx={{
+              bgcolor: tokens.accent.primary,
+              color: '#000',
+              fontWeight: 800,
+              fontSize: '10px',
+              '&:hover': { bgcolor: `${tokens.accent.primary}CC` }
+            }}
+          >
+            {addSubdomainMutation.isPending ? 'ADDING...' : 'ADD SUBDOMAIN'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };

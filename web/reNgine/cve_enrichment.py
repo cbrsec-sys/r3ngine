@@ -588,30 +588,40 @@ class CVEEnrichmentService:
                 # Public exploits
                 public_exploits = []
                 # ExploitDB
-                edb_data = cve_data.get("ExploitDB Data", [])
-                for e in edb_data:
-                    public_exploits.append({"source": "ExploitDB", "exploit": e.get("id")})
+                edb_data = cve_data.get("ExploitDB Data") or []
+                if isinstance(edb_data, list):
+                    for e in edb_data:
+                        if isinstance(e, dict):
+                            public_exploits.append({"source": "ExploitDB", "exploit": e.get("id")})
                 
                 # Metasploit
-                msf_data = cve_data.get("Metasploit Data", {}).get("modules", [])
-                for m in msf_data:
-                    public_exploits.append({"source": "Metasploit", "exploit": m})
+                msf_data = (cve_data.get("Metasploit Data") or {}).get("modules") or []
+                if isinstance(msf_data, list):
+                    for m in msf_data:
+                        public_exploits.append({"source": "Metasploit", "exploit": m})
                 
                 # GitHub
-                github_data = cve_data.get("GitHub Data", {}).get("pocs", [])
-                for g in github_data:
-                    public_exploits.append({"source": "GitHub", "exploit": g})
+                github_data = (cve_data.get("GitHub Data") or {}).get("pocs") or []
+                if isinstance(github_data, list):
+                    for g in github_data:
+                        public_exploits.append({"source": "GitHub", "exploit": g})
                     
                 if public_exploits:
                     cve_obj.public_exploits = public_exploits
                     
                 # HackerOne data
-                h1_data = cve_data.get("HackerOne Data", {}).get("data", {}).get("cve_entry", {})
+                h1_entry = cve_data.get("HackerOne Data") or {}
+                h1_data = None
+                if isinstance(h1_entry, dict):
+                    h1_data = (h1_entry.get("data") or {}).get("cve_entry")
                 if h1_data:
                     cve_obj.hackerone_data = h1_data
                     
                 # Priority
-                priority = cve_data.get("Priority", {}).get("Priority")
+                priority_dict = cve_data.get("Priority") or {}
+                priority = None
+                if isinstance(priority_dict, dict):
+                    priority = priority_dict.get("Priority")
                 if priority:
                     cve_obj.patching_priority = priority
                     
