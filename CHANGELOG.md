@@ -49,6 +49,7 @@
   - Extended wp-taint plugin discovery to support three sources of WordPress plugin slugs (legacy `WordPress Plugin: {slug}`, `WordPress Plugin: {slug} - {vuln title}`, and `WordPress Plugin Detected: {slug}`) and HTTP URLs matching the pattern `/wp-content/plugins/([^/?#]+)/` from crawled or fuzz-discovered endpoints.
   - Ensured that new findings from both WPScan and WPTaint are dynamically passed through the LLM description generator (`get_vulnerability_gpt_report`) with full PII anonymization layer. Added checks to verify if a description/GPT has already been generated (`is_gpt_used=False`) before triggering the LLM call.
   - Added comprehensive tests in `test_wpscan.py` and `test_wptaint.py`.
+  - Fixed `parse_wptaint_results` crashing with `'str' object has no attribute 'get'` for every plugin: `taint-scan` emits `{"summary": {...}, "results": [...], "errors": null}` but the parser was iterating the top-level dict (yielding string keys). Added `_CHECK_ID_MAP` mapping all 11 known `check_id` values to `(severity, canonical_name)` tuples with a keyword-based fallback for future rules, and rewrote the field extraction to use the actual schema (`check_id`, `extra.message`, `path`, `start.line`, `extra.dataflow_trace`). Validated against 256 findings across 12 plugins from a live scan.
 
 - **WPScan Execution Reliability**:
   - Automatically runs `wpscan --update --no-banner` (with rotation proxies if configured) before starting the scan loop to ensure up-to-date vulnerability definition databases.
