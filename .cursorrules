@@ -16,13 +16,23 @@ Repository navigation rules:
 - For UI changes, inspect `frontend/src/features/` before shared components.
 - Prefer targeted reads over full repo rescans.
 
-Branch-aware rules for `feat/themes-bulk_targets` and manual subdomains:
-- This branch combines theme refreshes, bulk target support, scan-profile UX, standalone workflows, and manual subdomain additions.
+Branch-aware rules for `dev-latest`, `feat/themes-bulk_targets`, and manual subdomains:
+- Local `dev-latest` is the freshest integration branch when present/current.
+- This branch family combines theme refreshes, bulk target support, scan-profile UX, standalone workflows, and manual subdomain additions.
 - Manual subdomain additions (single or bulk):
   - Backend: `AddManualSubdomain` view at `/api/action/subdomain/add/` in `web/api/views.py`.
   - Frontend: Hook `useAddManualSubdomain` in `frontend/src/features/subdomains/api/index.ts` and UI in `frontend/src/features/scans/components/SubdomainsTab.tsx`.
-- Theme issues: start in `frontend/src/theme/`, `frontend/src/context/ThemeContext.tsx`, and the impacted page/component. All dialogs/modals in `SubdomainsTab.tsx` must use `tokens.surface.elevated` rather than `#0a0a0a` to support light/dark themes.
+- Theme issues: start in `frontend/src/theme/`, `frontend/src/context/ThemeContext.tsx`, and the impacted page/component.
+- Theme contract:
+  - Prefer `useThemeTokens()`, `useSemanticColors()`, and helpers from `frontend/src/theme/semanticColors.ts`.
+  - Use `getDialogPaperSx`, `getMenuPaperSx`, `getSurfaceSx`, and `getFieldSx` for theme-aware surfaces and fields.
+  - Keep theme menus aligned with `selectableThemes`.
+  - Avoid adding hardcoded `#...`, `rgb(...)`, or `rgba(...)` UI colors outside the theme layer unless they are intentional data/brand swatches.
+  - All dialogs/modals in `SubdomainsTab.tsx` must use dynamic surfaces rather than hardcoded dark colors to support light/dark themes.
 - Ignore ad-hoc untracked helper scripts (`fix_colors.py`, `fix_quotes.py`, `scratch/`, local one-off test files) unless the user explicitly asks about them.
+
+Local validation:
+- Do not assume the local services can start. Prefer static checks (`npm run build`, `npm run lint`, TypeScript, Django unit tests) and `npx` one-off tooling when needed.
 
 Mental model:
 - `frontend/` = React UI

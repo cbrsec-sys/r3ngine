@@ -73,6 +73,7 @@ import { useCreateTodo } from '../../todos/api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { getDialogPaperSx, getFieldSx, getMenuPaperSx } from '../../../theme/semanticColors';
 
 interface SubdomainsTabProps {
   projectSlug: string;
@@ -98,7 +99,8 @@ const TASK_TIER_ORDER: string[] = [
 ];
 
 export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId, targetId, onTabChange }) => {
-  const { tokens, isLight } = useThemeTokens();
+  const { tokens, isLight, theme } = useThemeTokens();
+  const warningAccent = tokens.accent.warning;
 
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -1003,7 +1005,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#001a24',
+              ...getMenuPaperSx(isLight, theme, tokens),
               border: `1px solid ${tokens.accent.primary}33`,
               color: 'text.primary',
               '& .MuiMenuItem-root': {
@@ -1052,7 +1054,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: tokens.surface.elevated,
+              ...getDialogPaperSx(isLight, theme, tokens),
               border: `1px solid ${tokens.accent.primary}33`,
             }
           }
@@ -1078,7 +1080,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
               }}
               sx={{
                 color: 'text.primary',
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: isLight ? tokens.border.subtle : 'rgba(255,255,255,0.1)' },
                 '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${tokens.accent.primary}4D` },
                 '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: tokens.accent.primary },
               }}
@@ -1186,7 +1188,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: tokens.surface.elevated,
+              ...getDialogPaperSx(isLight, theme, tokens),
               border: `1px solid ${tokens.accent.primary}33`,
             }
           }
@@ -1253,13 +1255,13 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: tokens.surface.elevated,
-              border: '1px solid rgba(255, 174, 0, 0.2)',
+              ...getDialogPaperSx(isLight, theme, tokens),
+              border: `1px solid ${warningAccent}33`,
             }
           }
         }}
       >
-        <DialogTitle sx={{ color: '#ffae00', fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2 }}>
+        <DialogTitle sx={{ color: warningAccent, fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2 }}>
           ADD RECON NOTE: {targetSubdomain?.name}
         </DialogTitle>
         <DialogContent>
@@ -1271,15 +1273,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
               value={todoTitle}
               onChange={(e) => setTodoTitle(e.target.value)}
               variant="outlined"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  color: 'text.primary',
-                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                  '&:hover fieldset': { borderColor: '#ffae00' },
-                  '&.Mui-focused fieldset': { borderColor: '#ffae00' },
-                },
-                '& .MuiInputLabel-root': { color: 'text.secondary' }
-              }}
+              sx={getFieldSx(isLight, tokens, warningAccent)}
             />
             <TextField
               label="Description"
@@ -1289,15 +1283,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
               value={todoDescription}
               onChange={(e) => setTodoDescription(e.target.value)}
               variant="outlined"
-              sx={{
-                '& .MuiOutlinedInput-root': {
-                  color: 'text.primary',
-                  '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                  '&:hover fieldset': { borderColor: '#ffae00' },
-                  '&.Mui-focused fieldset': { borderColor: '#ffae00' },
-                },
-                '& .MuiInputLabel-root': { color: 'text.secondary' }
-              }}
+              sx={getFieldSx(isLight, tokens, warningAccent)}
             />
           </Stack>
         </DialogContent>
@@ -1309,7 +1295,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             disabled={createTodoMutation.isPending}
             sx={{
               bgcolor: 'rgba(255, 174, 0, 0.1)',
-              color: '#ffae00',
+              color: warningAccent,
               border: '1px solid rgba(255, 174, 0, 0.2)',
               fontSize: '0.7rem',
               fontWeight: 900,
@@ -1472,7 +1458,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         slotProps={{
           paper: {
             sx: {
-              bgcolor: tokens.surface.elevated,
+              ...getDialogPaperSx(isLight, theme, tokens),
               border: `1px solid ${tokens.accent.primary}33`,
             }
           }
@@ -1498,13 +1484,8 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             disabled={addSubdomainMutation.isPending}
             sx={{
               mt: 1,
+              ...getFieldSx(isLight, tokens, tokens.accent.primary),
               '& .MuiInputLabel-root': { color: 'text.secondary', fontSize: '0.8rem' },
-              '& .MuiOutlinedInput-root': {
-                color: 'text.primary',
-                '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-                '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
-                '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
-              }
             }}
           />
         </DialogContent>

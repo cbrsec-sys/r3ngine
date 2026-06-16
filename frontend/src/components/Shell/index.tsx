@@ -77,7 +77,6 @@ import { useUnreadCount } from '../../features/notifications/api';
 import { ScanHistoryDrawer } from '../../features/scans/components/ScanHistoryDrawer';
 import { CheckForUpdateModal } from '../../features/settings/components/CheckForUpdateModal';
 import { useRengineUpdateCheck, useTorStatus, useTorExitIP } from '../../features/settings/api';
-import { useAppTheme } from '../../context/ThemeContext';
 import { HeaderThemeSwitcher } from './HeaderThemeSwitcher';
 
 const drawerWidth = 260;
@@ -94,7 +93,6 @@ interface NavItem {
 export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { tokens, isLight, isCyber } = useThemeTokens();
   const theme = useTheme();
-  const { themeName } = useAppTheme();
   const { version, projectName, setVersion } = useAppContext();
   const [isHovered, setIsHovered] = useState(false);
   const [openItems, setOpenItems] = useState<string[]>([]);
@@ -630,13 +628,9 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               slotProps={{
                 paper: {
                   sx: {
-                    bgcolor: isLight ? theme.palette.background.paper : 'rgba(10, 10, 15, 0.95)',
-                    backdropFilter: 'blur(12px)',
-                    border: isLight ? `1px solid ${theme.palette.divider}` : '1px solid rgba(0, 243, 255, 0.2)',
-                    borderRadius: 2,
+                    ...getMenuPaperSx(isLight, theme, tokens),
                     minWidth: 200,
                     mt: 1.5,
-                    boxShadow: isLight ? theme.shadows[4] : '0 8px 32px rgba(0,0,0,0.8)',
                     '& .MuiMenuItem-root': {
                       py: 1.5,
                       px: 2.5,
@@ -679,14 +673,11 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               slotProps={{
                 paper: {
                   sx: {
-                    bgcolor: isLight ? theme.palette.background.paper : 'rgba(10, 10, 15, 0.98)',
-                    backdropFilter: 'blur(15px)',
-                    border: isLight ? `1px solid ${theme.palette.divider}` : '1px solid rgba(0, 243, 255, 0.2)',
+                    ...getMenuPaperSx(isLight, theme, tokens),
                     borderRadius: 3,
                     p: 2.5,
                     width: 320,
                     mt: 1.5,
-                    boxShadow: isLight ? theme.shadows[4] : '0 10px 40px rgba(0,0,0,0.9)',
                     overflow: 'hidden',
                     '&::before': {
                       content: '""',

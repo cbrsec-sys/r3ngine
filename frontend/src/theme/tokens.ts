@@ -293,6 +293,13 @@ export const themeDefinitions: Record<ThemeType, ThemeTokenSet> = {
   script_kiddie: hackerSet,
 };
 
+export const selectableThemes: Array<{ id: ThemeType; label: string }> = [
+  { id: 'hacker', label: 'V3 Hacker' },
+  { id: 'modern', label: 'V3 Hybrid' },
+  { id: 'enterprise', label: 'V3 Enterprise' },
+  { id: 'v3_light', label: 'V3 Light' },
+];
+
 export const sharedThemeEffects = sharedEffects;
 
 /** @deprecated Use themeDefinitions + resolveThemeTokens + sharedThemeEffects */
