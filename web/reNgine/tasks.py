@@ -8297,13 +8297,13 @@ def recover_stuck_scans():
 	import datetime as _dt
 	_abort_grace = _tz.now() - _dt.timedelta(minutes=2)
 	candidates = list(ScanHistory.objects.filter(
-		scan_status=RUNNING_TASK,
+		scan_status__in=[RUNNING_TASK, FAILED_TASK],
 		recovery_count__lt=3,
 	).exclude(
 		stop_scan_date__gte=_abort_grace,
 	))
 
-	logger.info("[RECOVERY] Evaluating %d RUNNING scan(s) for recovery", len(candidates))
+	logger.info("[RECOVERY] Evaluating %d RUNNING/FAILED scan(s) for recovery", len(candidates))
 
 	recovered = 0
 	active = 0
