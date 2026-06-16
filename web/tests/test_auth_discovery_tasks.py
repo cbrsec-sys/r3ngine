@@ -3,6 +3,12 @@ import requests as req
 import unittest
 from unittest.mock import patch, MagicMock
 from django.test import TestCase
+from django.utils import timezone
+
+from startScan.models import ScanHistory, EndPoint, Subdomain, AuthCandidate
+from targetApp.models import Domain
+from scanEngine.models import EngineType
+from reNgine.definitions import RUNNING_TASK
 
 
 # ---------------------------------------------------------------------------
@@ -226,3 +232,157 @@ class TestExtractLoginForms(TestCase):
         self.assertIn('username', forms[0]['all_fields'])
         self.assertIn('password', forms[0]['all_fields'])
         self.assertIn('_csrf_token', forms[0]['all_fields'])
+
+
+class TestExtractAuthCandidates(TestCase):
+    """Integration tests for extract_auth_candidates orchestrator."""
+
+    def setUp(self):
+        self.domain = Domain.objects.create(name='test.example.com')
+        self.engine = EngineType.objects.create(
+            engine_name='test-engine-auth',
+            yaml_configuration='{}',
+        )
+        self.scan = ScanHistory.objects.create(
+            domain=self.domain,
+            scan_type=self.engine,
+            scan_status=RUNNING_TASK,
+            start_scan_date=timezone.now(),
+        )
+        self.subdomain = Subdomain.objects.create(
+            scan_history=self.scan,
+            name='test.example.com',
+            target_domain=self.domain,
+        )
+        self.login_endpoint = EndPoint.objects.create(
+            scan_history=self.scan,
+            subdomain=self.subdomain,
+            http_url='http://test.example.com/login',
+            http_status=200,
+        )
+        self.mock_self = MagicMock()
+        self.mock_self.scan = self.scan
+        self.mock_self.scan_id = self.scan.id
+
+    @patch('reNgine.auth_discovery_tasks.get_proxy_list')
+    @patch('reNgine.auth_discovery_tasks.get_random_proxy')
+    @patch('reNgine.auth_discovery_tasks._fetch_with_proxy_retry')
+    def test_saves_auth_candidate_when_login_form_found(
+        self, mock_fetch, mock_rp, mock_pl
+    ):
+        mock_pl.return_value = []
+        mock_rp.return_value = ''
+        mock_fetch.return_value = (MagicMock(text=SIMPLE_LOGIN_FORM), None)
+
+        from reNgine.auth_discovery_tasks import extract_auth_candidates
+        extract_auth_candidates(self.mock_self, ctx={})
+
+        candidates = AuthCandidate.objects.filter(scan_history=self.scan)
+        self.assertEqual(candidates.count(), 1)
+        c = candidates.first()
+        # form action="/login" resolved against base "http://test.example.com/login"
+        self.assertEqual(c.target, 'http://test.example.com/login')
+        self.assertEqual(c.protocol, 'http')
+        self.assertEqual(c.port, 80)
+        self.assertEqual(c.metadata['user_field'], 'username')
+        self.assertEqual(c.metadata['pass_field'], 'password')
+        self.assertEqual(c.metadata['method'], 'POST')
+        self.assertIn('_csrf_token', c.metadata['hidden_fields'])
+
+    @patch('reNgine.auth_discovery_tasks.get_proxy_list')
+    @patch('reNgine.auth_discovery_tasks.get_random_proxy')
+    @patch('reNgine.auth_discovery_tasks._fetch_with_proxy_retry')
+    def test_no_candidate_saved_when_no_login_form(
+        self, mock_fetch, mock_rp, mock_pl
+    ):
+        mock_pl.return_value = []
+        mock_rp.return_value = ''
+        mock_fetch.return_value = (
+            MagicMock(text='<html><body><p>Welcome</p></body></html>'), None
+        )
+
+        from reNgine.auth_discovery_tasks import extract_auth_candidates
+        extract_auth_candidates(self.mock_self, ctx={})
+
+        self.assertEqual(
+            AuthCandidate.objects.filter(scan_history=self.scan).count(), 0
+        )
+
+    @patch('reNgine.auth_discovery_tasks.get_proxy_list')
+    @patch('reNgine.auth_discovery_tasks.get_random_proxy')
+    @patch('reNgine.auth_discovery_tasks._fetch_with_proxy_retry')
+    def test_skips_endpoints_already_in_candidate_list(
+        self, mock_fetch, mock_rp, mock_pl
+    ):
+        AuthCandidate.objects.create(
+            scan_history=self.scan,
+            target=self.login_endpoint.http_url,
+            protocol='http',
+            port=80,
+        )
+        mock_pl.return_value = []
+        mock_rp.return_value = ''
+
+        from reNgine.auth_discovery_tasks import extract_auth_candidates
+        extract_auth_candidates(self.mock_self, ctx={})
+
+        mock_fetch.assert_not_called()
+
+    @patch('reNgine.auth_discovery_tasks.get_proxy_list')
+    @patch('reNgine.auth_discovery_tasks.get_random_proxy')
+    @patch('reNgine.auth_discovery_tasks._fetch_with_proxy_retry')
+    def test_continues_to_next_endpoint_on_fetch_error(
+        self, mock_fetch, mock_rp, mock_pl
+    ):
+        EndPoint.objects.create(
+            scan_history=self.scan,
+            subdomain=self.subdomain,
+            http_url='http://test.example.com/admin',
+            http_status=200,
+        )
+        mock_pl.return_value = []
+        mock_rp.return_value = ''
+        mock_fetch.side_effect = [
+            req.exceptions.ConnectionError("down"),
+            (MagicMock(text=SIMPLE_LOGIN_FORM), None),
+        ]
+
+        from reNgine.auth_discovery_tasks import extract_auth_candidates
+        extract_auth_candidates(self.mock_self, ctx={})
+
+        # The first endpoint fails; the second succeeds and produces one candidate.
+        # The form action="/login" resolves to http://test.example.com/login
+        # regardless of which base URL was fetched.
+        candidates = AuthCandidate.objects.filter(scan_history=self.scan)
+        self.assertEqual(candidates.count(), 1)
+        self.assertIn('/login', candidates.first().target)
+
+    @patch('reNgine.auth_discovery_tasks.get_proxy_list')
+    @patch('reNgine.auth_discovery_tasks.get_random_proxy')
+    @patch('reNgine.auth_discovery_tasks._fetch_with_proxy_retry')
+    def test_protocol_is_http_for_https_endpoints(
+        self, mock_fetch, mock_rp, mock_pl
+    ):
+        """HTTPS endpoints are mapped to protocol='http' (PROTOCOL_CHOICES has no 'https')."""
+        EndPoint.objects.create(
+            scan_history=self.scan,
+            subdomain=self.subdomain,
+            http_url='https://test.example.com/login',
+            http_status=200,
+        )
+        mock_pl.return_value = []
+        mock_rp.return_value = ''
+        mock_fetch.return_value = (MagicMock(text=SIMPLE_LOGIN_FORM), None)
+
+        # Remove the http endpoint so only the https one fires
+        self.login_endpoint.delete()
+
+        from reNgine.auth_discovery_tasks import extract_auth_candidates
+        extract_auth_candidates(self.mock_self, ctx={})
+
+        candidates = AuthCandidate.objects.filter(scan_history=self.scan)
+        self.assertEqual(candidates.count(), 1)
+        # protocol maps to 'http' even for https (PROTOCOL_CHOICES constraint)
+        self.assertEqual(candidates.first().protocol, 'http')
+        # port should default to 443 for https endpoints
+        self.assertEqual(candidates.first().port, 443)
