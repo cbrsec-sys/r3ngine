@@ -64,6 +64,7 @@ import {
   useToggleSubdomainImportant,
   useInitiateSubscan,
   useGPTAttackSurface,
+  useAddManualSubdomain,
 } from '../../subdomains/api';
 import type { SubdomainFilters } from '../../subdomains/api';
 import { useEngines } from '../../engines/api';
@@ -130,6 +131,10 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   const [subscanModalOpen, setSubscanModalOpen] = useState(false);
   const [attackSurfaceModalOpen, setAttackSurfaceModalOpen] = useState(false);
   const [todoModalOpen, setTodoModalOpen] = useState(false);
+  const [addSubdomainModalOpen, setAddSubdomainModalOpen] = useState(false);
+  const [manualSubdomainName, setManualSubdomainName] = useState('');
+
+  const addSubdomainMutation = useAddManualSubdomain(projectSlug);
   
   // Selected subdomain for single actions
   const [targetSubdomain, setTargetSubdomain] = useState<any>(null);
@@ -421,6 +426,30 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             V3.0 SCAN ASSETS RECON ACTIVE
           </Typography>
         </Box>
+
+        {/* Manual Subdomain Addition Button */}
+        {(targetId || scanId) && (
+          <Button
+            variant="contained"
+            startIcon={<FilePlus size={16} />}
+            onClick={() => setAddSubdomainModalOpen(true)}
+            sx={{
+              bgcolor: `${tokens.accent.primary}15`,
+              color: tokens.accent.primary,
+              border: `1px solid ${tokens.accent.primary}33`,
+              fontSize: '11px',
+              fontWeight: 800,
+              letterSpacing: 1,
+              fontFamily: 'Orbitron',
+              '&:hover': {
+                bgcolor: `${tokens.accent.primary}33`,
+                borderColor: tokens.accent.primary,
+              }
+            }}
+          >
+            ADD SUBDOMAIN
+          </Button>
+        )}
       </Box>
 
       {/* Enterprise-Grade Search Bar */}
@@ -1428,6 +1457,101 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             </Box>
           </Fade>
       </Modal>
+
+      {/* Add Subdomain Dialog */}
+      <Dialog
+        open={addSubdomainModalOpen}
+        onClose={() => {
+          if (!addSubdomainMutation.isPending) {
+            setAddSubdomainModalOpen(false);
+            setManualSubdomainName('');
+          }
+        }}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: '#0a0a0a',
+              border: `1px solid ${tokens.accent.primary}33`,
+            }
+          }
+        }}
+      >
+        <DialogTitle sx={{ color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2 }}>
+          ADD SUBDOMAIN MANUALLY
+        </DialogTitle>
+        <DialogContent>
+          <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', mb: 2, fontFamily: 'monospace' }}>
+            ENTER HIERARCHICAL SUBDOMAIN OR TARGET HOSTNAME
+          </Typography>
+          <TextField
+            autoFocus
+            fullWidth
+            size="small"
+            label="Subdomain Name"
+            value={manualSubdomainName}
+            onChange={(e) => setManualSubdomainName(e.target.value)}
+            placeholder="sub.domain.com"
+            disabled={addSubdomainMutation.isPending}
+            sx={{
+              mt: 1,
+              '& .MuiInputLabel-root': { color: 'text.secondary', fontSize: '0.8rem' },
+              '& .MuiOutlinedInput-root': {
+                color: 'text.primary',
+                '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
+                '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+                '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
+              }
+            }}
+          />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 3 }}>
+          <Button
+            size="small"
+            onClick={() => {
+              setAddSubdomainModalOpen(false);
+              setManualSubdomainName('');
+            }}
+            disabled={addSubdomainMutation.isPending}
+            sx={{ color: 'text.secondary', fontSize: '10px', fontWeight: 700 }}
+          >
+            CANCEL
+          </Button>
+          <Button
+            size="small"
+            variant="contained"
+            disabled={addSubdomainMutation.isPending || !manualSubdomainName.trim()}
+            onClick={async () => {
+              try {
+                const res = await addSubdomainMutation.mutateAsync({
+                  target_id: targetId,
+                  scan_id: scanId,
+                  subdomain_name: manualSubdomainName.trim(),
+                });
+                if (res.status) {
+                  showNotification(res.message || 'Subdomain added successfully');
+                  setAddSubdomainModalOpen(false);
+                  setManualSubdomainName('');
+                } else {
+                  showNotification(res.message || 'Failed to add subdomain', 'error');
+                }
+              } catch (err: any) {
+                showNotification(err.response?.data?.message || err.message || 'Error adding subdomain', 'error');
+              }
+            }}
+            sx={{
+              bgcolor: tokens.accent.primary,
+              color: '#000',
+              fontWeight: 800,
+              fontSize: '10px',
+              '&:hover': { bgcolor: `${tokens.accent.primary}CC` }
+            }}
+          >
+            {addSubdomainMutation.isPending ? 'ADDING...' : 'ADD SUBDOMAIN'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
