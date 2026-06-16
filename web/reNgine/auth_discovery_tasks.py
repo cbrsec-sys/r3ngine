@@ -1,5 +1,5 @@
 import requests
-from urllib.parse import urlparse, urljoin
+from urllib.parse import urlparse, urljoin, urldefrag
 from bs4 import BeautifulSoup
 
 from startScan.models import EndPoint, AuthCandidate
@@ -62,6 +62,8 @@ def _fetch_with_proxy_retry(url: str, proxy_list: list, timeout: int = 10):
             else:
                 logger.warning("Direct connection failed for %s: %s", url, type(exc).__name__)
 
+    if last_exc is None:
+        raise RuntimeError("_fetch_with_proxy_retry: no attempts were made")
     raise last_exc
 
 
@@ -97,9 +99,10 @@ def _extract_login_forms(html_content: str, base_url: str) -> list:
         if not password_inputs:
             continue
 
-        # Resolve action URL
+        # Resolve action URL and strip any fragment (#...)
         action_raw = (form.get('action') or '').strip()
-        action = urljoin(base_url, action_raw) if action_raw else base_url
+        resolved = urljoin(base_url, action_raw) if action_raw else base_url
+        action, _ = urldefrag(resolved)
         method = (form.get('method') or 'post').upper()
 
         all_fields = []
@@ -150,7 +153,7 @@ def _extract_login_forms(html_content: str, base_url: str) -> list:
 # Public task function
 # ---------------------------------------------------------------------------
 
-def extract_auth_candidates(self, ctx={}, description=None):
+def extract_auth_candidates(self, ctx=None, description=None):
     """
     Tier 3 Auth Discovery: Fetch endpoints likely to host login forms, parse
     their HTML with BeautifulSoup, and save any discovered login forms as
@@ -160,13 +163,16 @@ def extract_auth_candidates(self, ctx={}, description=None):
     connection.  If all four attempts fail the endpoint is skipped and the
     error is logged.
     """
+    if ctx is None:
+        ctx = {}
     logger.info("Starting Intelligent Auth Form Extraction for Scan %s", self.scan_id)
 
     endpoints = EndPoint.objects.filter(
         subdomain__scan_history=self.scan,
+        http_status__isnull=False,
         http_status__gt=0,
         http_status__lt=500,
-    ).exclude(http_status=404)
+    ).exclude(http_status=404).select_related('subdomain')
 
     existing_candidate_urls = set(
         AuthCandidate.objects.filter(scan_history=self.scan).values_list('target', flat=True)
@@ -199,6 +205,10 @@ def extract_auth_candidates(self, ctx={}, description=None):
             proxy_list = [tor_or_single]
 
     for ep in potential_endpoints:
+        parsed_ep = urlparse(ep.http_url)
+        if parsed_ep.scheme not in ('http', 'https'):
+            logger.warning("Skipping non-HTTP endpoint %s", ep.http_url)
+            continue
         try:
             response, _ = _fetch_with_proxy_retry(ep.http_url, proxy_list)
             forms = _extract_login_forms(response.text, ep.http_url)
@@ -207,8 +217,9 @@ def extract_auth_candidates(self, ctx={}, description=None):
                 continue
 
             parsed = urlparse(ep.http_url)
-            protocol = parsed.scheme or 'http'
-            port = parsed.port or (443 if protocol == 'https' else 80)
+            raw_scheme = (parsed.scheme or 'http').lower()
+            protocol = 'http' if raw_scheme in ('http', 'https') else raw_scheme
+            port = parsed.port or (443 if raw_scheme == 'https' else 80)
 
             for form in forms:
                 logger.info(
