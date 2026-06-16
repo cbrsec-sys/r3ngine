@@ -25,8 +25,10 @@ import {
 } from 'lucide-react';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { useScheduledScans, useToggleScheduledScan, useBulkDeleteScheduledScans } from '../api';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const ScheduledScansPage: React.FC = () => {
+  const { tokens } = useThemeTokens();
   const { data, isLoading, isError } = useScheduledScans();
   const toggleMutation = useToggleScheduledScan();
   const bulkDeleteMutation = useBulkDeleteScheduledScans();
@@ -123,25 +125,25 @@ export const ScheduledScansPage: React.FC = () => {
         justifyContent: 'space-between', 
         alignItems: 'center', 
         mb: 4,
-        background: 'linear-gradient(90deg, rgba(0, 243, 255, 0.05) 0%, transparent 100%)',
+        background: `linear-gradient(90deg, ${tokens.accent.primary}0D 0%, transparent 100%)`,
         p: 2,
         borderRadius: 1,
-        borderLeft: '4px solid #00f3ff'
+        borderLeft: `4px solid ${tokens.accent.primary}`
       }}>
         <Box>
           <Typography variant="h4" sx={{ 
             fontFamily: 'Orbitron', 
             fontWeight: 900, 
             letterSpacing: 4,
-            textShadow: '0 0 15px rgba(0, 243, 255, 0.3)',
+            textShadow: `0 0 15px ${tokens.accent.primary}4D`,
             display: 'flex',
             alignItems: 'center',
             gap: 2
           }}>
-            <Clock size={32} color="#00f3ff" />
+            <Clock size={32} color={tokens.accent.primary} />
             SCHEDULED SCANS
           </Typography>
-          <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)', letterSpacing: 2 }}>
+          <Typography variant="caption" sx={{ color: 'text.secondary', letterSpacing: 2 }}>
             TACTICAL AUTOMATION REGISTRY
           </Typography>
         </Box>
@@ -174,7 +176,7 @@ export const ScheduledScansPage: React.FC = () => {
         p: 2, 
         bgcolor: 'rgba(0,0,0,0.3)', 
         borderRadius: 1, 
-        border: '1px solid rgba(255,255,255,0.05)',
+        border: 1, borderColor: 'divider',
         display: 'flex',
         gap: 2
       }}>
@@ -187,16 +189,16 @@ export const ScheduledScansPage: React.FC = () => {
             width: 400,
             '& .MuiInputBase-root': {
               fontFamily: 'monospace',
-              color: '#00f3ff',
+              color: tokens.accent.primary,
               fontSize: '14px',
-              '&:before, &:after': { borderBottomColor: 'rgba(0, 243, 255, 0.3)' }
+              '&:before, &:after': { borderBottomColor: `${tokens.accent.primary}4D` }
             }
           }}
           slotProps={{
             input: {
               startAdornment: (
                 <InputAdornment position="start">
-                  <Search size={18} color="#00f3ff" />
+                  <Search size={18} color={tokens.accent.primary} />
                 </InputAdornment>
               ),
             }
@@ -208,42 +210,42 @@ export const ScheduledScansPage: React.FC = () => {
       <Box sx={{ 
         bgcolor: 'rgba(10, 15, 25, 0.7)', 
         borderRadius: 1, 
-        border: '1px solid rgba(0, 243, 255, 0.1)',
+        border: `1px solid ${tokens.accent.primary}15`,
         overflow: 'hidden',
         position: 'relative'
       }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
           <thead>
-            <tr style={{ borderBottom: '2px solid rgba(0, 243, 255, 0.2)', background: 'rgba(0, 243, 255, 0.03)' }}>
+            <tr style={{ borderBottom: `2px solid ${tokens.accent.primary}33`, background: 'rgba(0, 243, 255, 0.03)' }}>
               <th style={{ padding: '16px' }}>
                 <input 
                   type="checkbox" 
                   checked={selectedIds.length === filteredData.length && filteredData.length > 0}
                   onChange={handleSelectAll}
-                  style={{ accentColor: '#00f3ff' }}
+                  style={{ accentColor: tokens.accent.primary }}
                 />
               </th>
-              <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>DESCRIPTION</th>
-              <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>FREQUENCY</th>
-              <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>LAST RUN</th>
-              <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>RUNS</th>
-              <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ONE OFF</th>
-              <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ENABLED</th>
-              <th style={{ padding: '16px', color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ACTION</th>
+              <th style={{ padding: '16px', color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>DESCRIPTION</th>
+              <th style={{ padding: '16px', color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>FREQUENCY</th>
+              <th style={{ padding: '16px', color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2 }}>LAST RUN</th>
+              <th style={{ padding: '16px', color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>RUNS</th>
+              <th style={{ padding: '16px', color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ONE OFF</th>
+              <th style={{ padding: '16px', color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ENABLED</th>
+              <th style={{ padding: '16px', color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '12px', letterSpacing: 2, textAlign: 'center' }}>ACTION</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
                 <td colSpan={8} style={{ padding: '100px', textAlign: 'center' }}>
-                  <CircularProgress size={40} sx={{ color: '#00f3ff' }} />
-                  <Typography sx={{ mt: 2, fontFamily: 'monospace', color: '#00f3ff' }}>ACCESSING TACTICAL REGISTRY...</Typography>
+                  <CircularProgress size={40} sx={{ color: tokens.accent.primary }} />
+                  <Typography sx={{ mt: 2, fontFamily: 'monospace', color: tokens.accent.primary }}>ACCESSING TACTICAL REGISTRY...</Typography>
                 </td>
               </tr>
             ) : paginatedData.length === 0 ? (
               <tr>
                 <td colSpan={8} style={{ padding: '60px', textAlign: 'center' }}>
-                  <Typography sx={{ fontFamily: 'monospace', color: 'rgba(255,255,255,0.3)' }}>NO SCHEDULED OPERATIONS DETECTED</Typography>
+                  <Typography sx={{ fontFamily: 'monospace', color: 'text.disabled' }}>NO SCHEDULED OPERATIONS DETECTED</Typography>
                 </td>
               </tr>
             ) : (
@@ -251,7 +253,7 @@ export const ScheduledScansPage: React.FC = () => {
                 <tr 
                   key={scan.id!} 
                   style={{ 
-                    borderBottom: '1px solid rgba(255,255,255,0.05)',
+                    borderBottom: 1, borderColor: 'divider',
                     transition: 'background 0.2s',
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'rgba(0, 243, 255, 0.02)')}
@@ -262,17 +264,17 @@ export const ScheduledScansPage: React.FC = () => {
                       type="checkbox" 
                       checked={selectedIds.includes(scan.id!)}
                       onChange={() => handleSelectOne(scan.id!)}
-                      style={{ accentColor: '#00f3ff' }}
+                      style={{ accentColor: tokens.accent.primary }}
                     />
                   </td>
                   <td style={{ padding: '12px 16px' }}>
-                    <Typography sx={{ color: '#fff', fontWeight: 600, fontSize: '13px' }}>{scan.description}</Typography>
-                    <Typography sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '10px', fontFamily: 'monospace' }}>ID: {scan.id!}</Typography>
+                    <Typography sx={{ color: 'text.primary', fontWeight: 600, fontSize: '13px' }}>{scan.description}</Typography>
+                    <Typography sx={{ color: 'text.secondary', fontSize: '10px', fontFamily: 'monospace' }}>ID: {scan.id!}</Typography>
                   </td>
                   <td style={{ padding: '12px 16px' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Calendar size={14} color="#00f3ff" />
-                      <Typography sx={{ color: '#00f3ff', fontSize: '11px', fontWeight: 800 }}>{scan.frequency?.toUpperCase() || 'UNKNOWN'}</Typography>
+                      <Calendar size={14} color={tokens.accent.primary} />
+                      <Typography sx={{ color: tokens.accent.primary, fontSize: '11px', fontWeight: 800 }}>{scan.frequency?.toUpperCase() || 'UNKNOWN'}</Typography>
                     </Box>
                   </td>
                   <td style={{ padding: '12px 16px' }}>
@@ -288,7 +290,7 @@ export const ScheduledScansPage: React.FC = () => {
                         height: 18, 
                         fontSize: '10px', 
                         fontWeight: 900,
-                        bgcolor: 'rgba(255,255,255,0.05)',
+                        bgcolor: 'action.hover',
                         color: 'rgba(255,255,255,0.7)',
                         border: '1px solid rgba(255,255,255,0.1)'
                       }} 
@@ -307,8 +309,8 @@ export const ScheduledScansPage: React.FC = () => {
                       checked={scan.enabled}
                       onChange={() => handleToggle(scan.id!)}
                       sx={{
-                        '& .MuiSwitch-switchBase.Mui-checked': { color: '#00f3ff' },
-                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: '#00f3ff' },
+                        '& .MuiSwitch-switchBase.Mui-checked': { color: tokens.accent.primary },
+                        '& .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': { bgcolor: tokens.accent.primary },
                       }}
                     />
                   </td>
@@ -345,11 +347,11 @@ export const ScheduledScansPage: React.FC = () => {
           rowsPerPage={rowsPerPage}
           onRowsPerPageChange={handleRowsPerPageChange}
           sx={{
-            color: '#00f3ff',
+            color: tokens.accent.primary,
             fontFamily: 'monospace',
-            borderTop: '1px solid rgba(0, 243, 255, 0.1)',
-            '& .MuiTablePagination-selectIcon': { color: '#00f3ff' },
-            '& .MuiTablePagination-actions': { color: '#00f3ff' },
+            borderTop: `1px solid ${tokens.accent.primary}15`,
+            '& .MuiTablePagination-selectIcon': { color: tokens.accent.primary },
+            '& .MuiTablePagination-actions': { color: tokens.accent.primary },
             '& .MuiTablePagination-select': { fontFamily: 'monospace' },
             '& .MuiTablePagination-displayedRows': { fontFamily: 'monospace' },
           }}
@@ -358,19 +360,19 @@ export const ScheduledScansPage: React.FC = () => {
 
       {/* Footer Info */}
       <Box sx={{ mt: 2, display: 'flex', justifyContent: 'space-between', px: 1 }}>
-        <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>
+        <Typography variant="caption" sx={{ color: 'text.disabled', fontFamily: 'monospace' }}>
           TOTAL RECORDS: {filteredData.length}
         </Typography>
         <Box sx={{ display: 'flex', gap: 2 }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: '#00ff9d' }} />
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>ACTIVE TASKS</Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>ACTIVE TASKS</Typography>
           </Box>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'rgba(255,255,255,0.2)' }}>
               <Zap size={8} color="#fff" />
             </Box>
-            <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.5)' }}>ONE OFF OPS</Typography>
+            <Typography variant="caption" sx={{ color: 'text.secondary' }}>ONE OFF OPS</Typography>
           </Box>
         </Box>
       </Box>

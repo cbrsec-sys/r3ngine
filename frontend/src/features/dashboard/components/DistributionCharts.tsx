@@ -1,4 +1,6 @@
 import React, { useState } from 'react';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { getSeverityColor, getChartSeriesColors, getSurfaceSx, getMenuPaperSx } from '../../../theme/semanticColors';
 import {
   Box,
   Card,
@@ -21,10 +23,11 @@ import {
   Button,
   CircularProgress,
   Divider,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
 import Chart from 'react-apexcharts';
 import type { DashboardData } from '../api';
-import { themeTokens } from '../../../theme/tokens';
 
 interface CWEInfo {
   name: string;
@@ -35,61 +38,45 @@ interface CWEInfo {
   severity: string;
 }
 
-const CWE_COLORS = [
-  '#7000ff', '#9020f0', '#b040ff', '#5500cc',
-  '#c060ff', '#4400aa', '#d080ff', '#330088',
-];
-
 const ChartCard: React.FC<{ title: React.ReactNode; children: React.ReactNode; height?: number | string }> = ({ title, children, height }) => {
-  const theme = useTheme();
-  const isLight = theme.palette.mode === 'light';
-
+  const { isLight, tokens } = useThemeTokens();
   return (
-    <Card sx={{
-      height: height || '100%',
-      minHeight: 320,
-      bgcolor: isLight ? theme.palette.background.paper : 'rgba(5, 5, 15, 0.6)',
-      backdropFilter: isLight ? 'none' : 'blur(10px)',
-      border: isLight ? `1px solid ${theme.palette.divider}` : '1px solid rgba(0, 243, 255, 0.1)',
-      boxShadow: isLight ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
-    }}>
-      <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {typeof title === 'string' ? (
-          <Typography variant="h6" sx={{
-            mb: 2,
-            fontSize: '0.85rem',
-            fontWeight: 800,
-            textTransform: 'uppercase',
-            letterSpacing: 1.5,
-            color: 'primary.main',
-            fontFamily: 'var(--r3-heading-font)'
-          }}>
-            {title}
-          </Typography>
-        ) : (
-          <Box sx={{ mb: 2 }}>{title}</Box>
-        )}
-        <Box sx={{ mt: 1, flexGrow: 1, overflow: 'hidden' }}>
-          {children}
-        </Box>
-      </CardContent>
-    </Card>
+  <Card sx={{ height: height || '100%', minHeight: 320, ...getSurfaceSx(isLight, tokens) }}>
+    <CardContent sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+      {typeof title === 'string' ? (
+        <Typography variant="h6" sx={{ mb: 2, fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: 'primary.main', fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>
+          {title}
+        </Typography>
+      ) : (
+        <Box sx={{ mb: 2 }}>{title}</Box>
+      )}
+      <Box sx={{ mt: 1, flexGrow: 1, overflow: 'hidden' }}>
+        {children}
+      </Box>
+    </CardContent>
+  </Card>
   );
 };
 
 const SeverityBadge: React.FC<{ severity: number | string; label?: string }> = ({ severity, label }) => {
-  const theme = useTheme();
-  const isLight = theme.palette.mode === 'light';
-  const es = themeTokens.enterprise.severity;
-
+  const { tokens } = useThemeTokens();
   const getSeverityInfo = (sev: number | string) => {
     const sevNum = typeof sev === 'string' ? parseInt(sev) : sev;
-    if (sev === 'critical' || sevNum === 4) return { label: label || 'CRITICAL', color: isLight ? es.critical : '#ff003c' };
-    if (sev === 'high'     || sevNum === 3) return { label: label || 'HIGH',     color: isLight ? es.high     : '#ff9f00' };
-    if (sev === 'medium'   || sevNum === 2) return { label: label || 'MEDIUM',   color: isLight ? es.medium   : '#fffc00' };
-    if (sev === 'low'      || sevNum === 1) return { label: label || 'LOW',      color: isLight ? es.low      : '#00ff62' };
-    if (sev === 'info'     || sevNum === 0) return { label: label || 'INFO',     color: isLight ? es.info     : '#00f3ff' };
-    return { label: label || 'UNKNOWN', color: isLight ? es.unknown : '#7000ff' };
+    let level: 'critical' | 'high' | 'medium' | 'low' | 'info' | 'unknown' = 'unknown';
+    if (sev === 'critical' || sevNum === 4) level = 'critical';
+    else if (sev === 'high' || sevNum === 3) level = 'high';
+    else if (sev === 'medium' || sevNum === 2) level = 'medium';
+    else if (sev === 'low' || sevNum === 1) level = 'low';
+    else if (sev === 'info' || sevNum === 0) level = 'info';
+    const labels: Record<string, string> = {
+      critical: label || 'CRITICAL',
+      high: label || 'HIGH',
+      medium: label || 'MEDIUM',
+      low: label || 'LOW',
+      info: label || 'INFO',
+      unknown: label || 'UNKNOWN',
+    };
+    return { label: labels[level], color: getSeverityColor(level, tokens) };
   };
 
   const info = getSeverityInfo(severity);
@@ -112,13 +99,32 @@ const SeverityBadge: React.FC<{ severity: number | string; label?: string }> = (
 };
 
 export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) => {
-  const theme = useTheme();
-  const isLight = theme.palette.mode === 'light';
-  const ec = themeTokens.enterprise.charts;
-  const donutChartColors = isLight ? ec.donut : ['#00f3ff', '#7000ff', '#ff00f7', '#ff003c', '#00ff62', '#fffc00', '#ff9f00'];
-  const treemapColors = isLight ? ec.treemap : CWE_COLORS;
-  const chartMode = isLight ? 'light' : 'dark';
-
+  const { theme, isLight, tokens } = useThemeTokens();
+  const CWE_COLORS = getChartSeriesColors(tokens);
+  const severityChartColors = [
+    tokens.severity.critical,
+    tokens.severity.high,
+    tokens.severity.medium,
+    tokens.severity.low,
+    tokens.severity.info,
+    tokens.severity.unknown,
+  ];
+  const tableHeaderSx = {
+    bgcolor: isLight ? theme.palette.background.paper : 'rgba(10, 10, 20, 0.95)',
+    fontSize: '0.65rem',
+    fontWeight: 800,
+    borderBottom: `1px solid ${tokens.border.subtle}`,
+    textTransform: 'uppercase' as const,
+    letterSpacing: 1,
+  };
+  const emptyCountColor = isLight ? tokens.text.disabled : 'rgba(255,255,255,0.1)';
+  const getCvssColor = (score: number) => {
+    if (score >= 9.0) return tokens.severity.critical;
+    if (score >= 7.0) return tokens.severity.high;
+    if (score >= 4.0) return tokens.severity.medium;
+    if (score > 0.0) return tokens.severity.low;
+    return tokens.accent.primary;
+  };
   const [viewMode, setViewMode] = useState<'cve' | 'cwe'>('cve');
 
   // CWE dialog state
@@ -134,6 +140,8 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
   const [cveInfo, setCveInfo] = useState<any | null>(null);
   const [cveLoading, setCveLoading] = useState(false);
   const [cveError, setCveError] = useState<string | null>(null);
+  const [descGenerating, setDescGenerating] = useState(false);
+  const [descGenError, setDescGenError] = useState<string | null>(null);
 
   const handleCweClick = async (cweName: string) => {
     setSelectedCwe(cweName);
@@ -183,16 +191,41 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
     }
   };
 
+  const handleGenerateCveDescription = async () => {
+    if (!selectedCve) return;
+    setDescGenerating(true);
+    setDescGenError(null);
+    const csrfToken = document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
+    try {
+      const response = await fetch('/api/tools/cve_description_generate/', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+        body: JSON.stringify({ cve_id: selectedCve }),
+      });
+      const json = await response.json();
+      if (json.status) {
+        setCveInfo((prev: any) => ({
+          ...prev,
+          summary: json.description || prev?.summary,
+          ai_risk_assessment: json.ai_risk_assessment,
+        }));
+      } else {
+        setDescGenError(json.message || 'Failed to generate description.');
+      }
+    } catch {
+      setDescGenError('Network error generating description.');
+    } finally {
+      setDescGenerating(false);
+    }
+  };
+
   const donutOptions: any = {
     chart: { type: 'donut' as any, background: 'transparent' },
-    theme: { mode: chartMode as any },
-    stroke: { show: true, width: 2, colors: isLight ? ['#f8fafc'] : ['#05050f'] },
+    theme: { mode: isLight ? 'light' : 'dark' as any },
+    stroke: { show: true, width: 2, colors: isLight ? [tokens.surface.secondary] : ['#05050f'] },
     dataLabels: { enabled: false },
-    legend: {
-      position: 'bottom',
-      labels: { colors: theme.palette.text.secondary },
-      fontSize: '10px'
-    },
+    legend: { position: 'bottom', labels: { colors: theme.palette.text.secondary }, fontSize: '10px' },
     plotOptions: {
       pie: {
         donut: {
@@ -206,28 +239,22 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         }
       }
     },
-    colors: donutChartColors,
+    colors: [tokens.accent.primary, '#7000ff', '#ff00f7', '#ff003c', '#00ff62', '#fffc00', '#ff9f00']
   };
 
-  const getBarOptions = (categories: string[], color?: string) => {
-    const barColor = color ?? (isLight ? ec.bar : '#00f3ff');
-    return {
-      chart: { type: 'bar' as any, toolbar: { show: false }, background: 'transparent' },
-      plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '60%' } },
-      dataLabels: { enabled: false },
-      xaxis: {
-        categories,
-        labels: { style: { colors: theme.palette.text.secondary, fontSize: '9px' } }
-      },
-      yaxis: { labels: { style: { colors: theme.palette.text.secondary, fontSize: '9px' } } },
-      colors: [barColor],
-      grid: {
-        borderColor: isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)',
-        strokeDashArray: 4
-      },
-      theme: { mode: chartMode as any }
-    };
-  };
+  const getBarOptions = (categories: string[], color = tokens.accent.primary) => ({
+    chart: { type: 'bar' as any, toolbar: { show: false }, background: 'transparent' },
+    plotOptions: { bar: { horizontal: true, borderRadius: 4, barHeight: '60%' } },
+    dataLabels: { enabled: false },
+    xaxis: {
+      categories,
+      labels: { style: { colors: theme.palette.text.secondary, fontSize: '9px' } }
+    },
+    yaxis: { labels: { style: { colors: theme.palette.text.secondary, fontSize: '9px' } } },
+    colors: [color],
+    grid: { borderColor: isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)', strokeDashArray: 4 },
+    theme: { mode: isLight ? 'light' : 'dark' as any }
+  });
 
   return (
     <Box>
@@ -239,9 +266,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               options={{
                 ...donutOptions,
                 labels: ['Critical', 'High', 'Medium', 'Low', 'Info', 'Unknown'],
-                colors: isLight
-                  ? [ec.donut[0], ec.donut[1], ec.donut[2], ec.donut[3], ec.donut[4], ec.donut[5]]
-                  : ['#ff003c', '#ff9f00', '#fffc00', '#00ff62', '#00f3ff', '#7000ff']
+                colors: severityChartColors
               }}
               series={[
                 data.kpis.critical_count,
@@ -263,35 +288,35 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ bgcolor: isLight ? alpha(theme.palette.primary.main, 0.05) : 'rgba(10, 10, 20, 0.95)', color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 800, borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.2)'}`, textTransform: 'uppercase', letterSpacing: 1 }}>Target Name</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: isLight ? alpha(theme.palette.primary.main, 0.05) : 'rgba(10, 10, 20, 0.95)', color: isLight ? themeTokens.enterprise.severity.critical : '#ff003c', fontSize: '0.65rem', fontWeight: 800, borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.2)'}`, textTransform: 'uppercase' }}>Critical</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: isLight ? alpha(theme.palette.primary.main, 0.05) : 'rgba(10, 10, 20, 0.95)', color: isLight ? themeTokens.enterprise.severity.high : '#ff9f00', fontSize: '0.65rem', fontWeight: 800, borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.2)'}`, textTransform: 'uppercase' }}>High</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: isLight ? alpha(theme.palette.primary.main, 0.05) : 'rgba(10, 10, 20, 0.95)', color: isLight ? themeTokens.enterprise.severity.medium : '#fffc00', fontSize: '0.65rem', fontWeight: 800, borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.2)'}`, textTransform: 'uppercase' }}>Med</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: isLight ? alpha(theme.palette.primary.main, 0.05) : 'rgba(10, 10, 20, 0.95)', color: isLight ? themeTokens.enterprise.severity.low : '#00ff62', fontSize: '0.65rem', fontWeight: 800, borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.2)'}`, textTransform: 'uppercase' }}>Low</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: isLight ? alpha(theme.palette.primary.main, 0.05) : 'rgba(10, 10, 20, 0.95)', color: 'primary.main', fontSize: '0.65rem', fontWeight: 800, borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.2)'}`, textTransform: 'uppercase' }}>Total</TableCell>
+                    <TableCell sx={{ ...tableHeaderSx, color: theme.palette.text.secondary }}>Target Name</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: tokens.severity.critical }}>Critical</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: tokens.severity.high }}>High</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: tokens.severity.medium }}>Med</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: tokens.severity.low }}>Low</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: tokens.accent.primary }}>Total</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {data.most_vulnerable_targets.map((target, index) => (
-                    <TableRow key={index} sx={{ '&:hover': { bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255,255,255,0.02)' } }}>
-                      <TableCell sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}`, py: 1 }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: isLight ? theme.palette.text.primary : '#c7c7c7ff' }}>{target.name}</Typography>
+                    <TableRow key={index} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                      <TableCell sx={{ borderBottom: `1px solid ${theme.palette.divider}`, py: 1 }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: theme.palette.text.primary }}>{target.name}</Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}` }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.critical_count > 0 ? '#ff003c' : isLight ? theme.palette.text.disabled : 'rgba(255,255,255,0.1)' }}>{target.critical_count}</Typography>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.critical_count > 0 ? tokens.severity.critical : emptyCountColor }}>{target.critical_count}</Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}` }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.high_count > 0 ? '#ff9f00' : isLight ? theme.palette.text.disabled : 'rgba(255,255,255,0.1)' }}>{target.high_count}</Typography>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.high_count > 0 ? tokens.severity.high : emptyCountColor }}>{target.high_count}</Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}` }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.medium_count > 0 ? '#fffc00' : isLight ? theme.palette.text.disabled : 'rgba(255,255,255,0.1)' }}>{target.medium_count}</Typography>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.medium_count > 0 ? tokens.severity.medium : emptyCountColor }}>{target.medium_count}</Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}` }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.low_count > 0 ? '#00ff62' : isLight ? theme.palette.text.disabled : 'rgba(255,255,255,0.1)' }}>{target.low_count}</Typography>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: target.low_count > 0 ? tokens.severity.low : emptyCountColor }}>{target.low_count}</Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}` }}>
-                        <Box sx={{ px: 1, py: 0.25, borderRadius: 0.5, bgcolor: alpha(theme.palette.primary.main, 0.1), display: 'inline-block' }}>
-                          <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 800, color: 'primary.main' }}>{target.vuln_count}</Typography>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
+                        <Box sx={{ px: 1, py: 0.25, borderRadius: 0.5, bgcolor: isLight ? 'rgba(0,0,0,0.05)' : 'rgba(0, 243, 255, 0.1)', display: 'inline-block' }}>
+                          <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 800, color: tokens.accent.primary }}>{target.vuln_count}</Typography>
                         </Box>
                       </TableCell>
                     </TableRow>
@@ -322,21 +347,21 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               <Table size="small" stickyHeader>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ bgcolor: isLight ? alpha(theme.palette.primary.main, 0.05) : 'rgba(10, 10, 20, 0.95)', color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 800, borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.2)'}`, textTransform: 'uppercase', letterSpacing: 1 }}>Vulnerability Name</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: isLight ? alpha(theme.palette.primary.main, 0.05) : 'rgba(10, 10, 20, 0.95)', color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 800, borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.2)'}`, textTransform: 'uppercase', letterSpacing: 1 }}>Severity</TableCell>
-                    <TableCell align="center" sx={{ bgcolor: isLight ? alpha(theme.palette.primary.main, 0.05) : 'rgba(10, 10, 20, 0.95)', color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.5)', fontSize: '0.65rem', fontWeight: 800, borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.2)'}`, textTransform: 'uppercase', letterSpacing: 1 }}>Count</TableCell>
+                    <TableCell sx={{ ...tableHeaderSx, color: theme.palette.text.secondary }}>Vulnerability Name</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: theme.palette.text.secondary }}>Severity</TableCell>
+                    <TableCell align="center" sx={{ ...tableHeaderSx, color: theme.palette.text.secondary }}>Count</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {data.most_common_vulnerabilities.map((vuln, index) => (
-                    <TableRow key={index} sx={{ '&:hover': { bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255,255,255,0.02)' } }}>
-                      <TableCell sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}`, py: 1 }}>
-                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: isLight ? theme.palette.text.primary : '#fff' }}>{vuln.name}</Typography>
+                    <TableRow key={index} sx={{ '&:hover': { bgcolor: 'action.hover' } }}>
+                      <TableCell sx={{ borderBottom: `1px solid ${theme.palette.divider}`, py: 1 }}>
+                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 600, color: theme.palette.text.primary }}>{vuln.name}</Typography>
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}` }}>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
                         <SeverityBadge severity={vuln.severity} />
                       </TableCell>
-                      <TableCell align="center" sx={{ borderBottom: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}` }}>
+                      <TableCell align="center" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
                         <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'primary.main' }}>{vuln.count}</Typography>
                       </TableCell>
                     </TableRow>
@@ -368,7 +393,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
           <ChartCard
             title={
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
-                <Typography variant="h6" sx={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: 'primary.main', fontFamily: 'var(--r3-heading-font)' }}>
+                <Typography variant="h6" sx={{ fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: 'primary.main', fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron' }}>
                   {viewMode === 'cwe' ? 'Most Common CWE' : 'Most Common CVE'}
                 </Typography>
                 <Box sx={{
@@ -386,14 +411,14 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                       height: 22,
                       fontSize: '0.65rem',
                       fontWeight: 700,
-                      fontFamily: 'var(--r3-heading-font)',
+                      fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
                       borderRadius: 0.5,
-                      color: viewMode === 'cve' ? theme.palette.primary.main : theme.palette.text.secondary,
-                      bgcolor: viewMode === 'cve' ? alpha(theme.palette.primary.main, 0.15) : 'transparent',
-                      boxShadow: viewMode === 'cve' && !isLight ? '0 0 8px rgba(0, 243, 255, 0.2)' : 'none',
+                      color: viewMode === 'cve' ? tokens.accent.primary : tokens.text.secondary,
+                      bgcolor: viewMode === 'cve' ? alpha(tokens.accent.primary, 0.15) : 'transparent',
+                      boxShadow: viewMode === 'cve' && !isLight ? `0 0 8px ${alpha(tokens.accent.primary, 0.2)}` : 'none',
                       p: 0,
                       '&:hover': {
-                        bgcolor: viewMode === 'cve' ? alpha(theme.palette.primary.main, 0.25) : alpha(theme.palette.divider, 0.5),
+                        bgcolor: viewMode === 'cve' ? alpha(tokens.accent.primary, 0.25) : alpha(theme.palette.divider, 0.5),
                       }
                     }}
                   >
@@ -407,14 +432,14 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                       height: 22,
                       fontSize: '0.65rem',
                       fontWeight: 700,
-                      fontFamily: 'var(--r3-heading-font)',
+                      fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
                       borderRadius: 0.5,
-                      color: viewMode === 'cwe' ? theme.palette.primary.main : theme.palette.text.secondary,
-                      bgcolor: viewMode === 'cwe' ? alpha(theme.palette.primary.main, 0.15) : 'transparent',
-                      boxShadow: viewMode === 'cwe' && !isLight ? '0 0 8px rgba(0, 243, 255, 0.2)' : 'none',
+                      color: viewMode === 'cwe' ? tokens.accent.primary : tokens.text.secondary,
+                      bgcolor: viewMode === 'cwe' ? alpha(tokens.accent.primary, 0.15) : 'transparent',
+                      boxShadow: viewMode === 'cwe' && !isLight ? `0 0 8px ${alpha(tokens.accent.primary, 0.2)}` : 'none',
                       p: 0,
                       '&:hover': {
-                        bgcolor: viewMode === 'cwe' ? alpha(theme.palette.primary.main, 0.25) : alpha(theme.palette.divider, 0.5),
+                        bgcolor: viewMode === 'cwe' ? alpha(tokens.accent.primary, 0.25) : alpha(theme.palette.divider, 0.5),
                       }
                     }}
                   >
@@ -443,7 +468,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                       },
                       dataLabels: {
                         enabled: true,
-                        style: { fontSize: '10px', fontFamily: 'Inter, sans-serif', colors: ['#ffffffcc'] },
+                        style: { fontSize: '10px', fontFamily: 'Inter, sans-serif', colors: [isLight ? 'rgba(0,0,0,0.6)' : '#ffffffcc'] },
                         formatter: (text: string, op: any) => [text, `×${op.value}`],
                       },
                       plotOptions: {
@@ -458,19 +483,19 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                           },
                         },
                       },
-                      colors: treemapColors,
+                      colors: CWE_COLORS,
                       tooltip: {
-                        theme: chartMode,
+                        theme: isLight ? 'light' : 'dark',
                         y: { formatter: (v: number) => `${v} occurrence${v !== 1 ? 's' : ''}` },
                       },
                       legend: { show: false },
-                      theme: { mode: chartMode as any },
+                      theme: { mode: isLight ? 'light' : 'dark' as any },
                     }}
                     series={[{
                       data: data.most_common_cwe.slice(0, 8).map((c, i) => ({
                         x: c.name,
                         y: c.count,
-                        fillColor: treemapColors[i % treemapColors.length],
+                        fillColor: CWE_COLORS[i % CWE_COLORS.length],
                       })),
                     }]}
                     type="treemap"
@@ -479,7 +504,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                   {/* Clickable legend */}
                   <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {data.most_common_cwe.slice(0, 8).map((c, i) => {
-                      const chipColor = treemapColors[i % treemapColors.length];
+                      const chipColor = CWE_COLORS[i % CWE_COLORS.length];
                       return (
                         <Chip
                           key={c.name}
@@ -506,7 +531,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                 </>
               ) : (
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 210 }}>
-                  <Typography sx={{ color: isLight ? theme.palette.text.disabled : 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
+                  <Typography sx={{ color: tokens.text.disabled, fontSize: '0.8rem', fontFamily: 'Inter' }}>
                     No CWE Data Available
                   </Typography>
                 </Box>
@@ -530,7 +555,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                       },
                       dataLabels: {
                         enabled: true,
-                        style: { fontSize: '10px', fontFamily: 'Inter, sans-serif', colors: ['#ffffffcc'] },
+                        style: { fontSize: '10px', fontFamily: 'Inter, sans-serif', colors: [isLight ? 'rgba(0,0,0,0.6)' : '#ffffffcc'] },
                         formatter: (text: string, op: any) => [text, `×${op.value}`],
                       },
                       plotOptions: {
@@ -545,19 +570,19 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                           },
                         },
                       },
-                      colors: treemapColors,
+                      colors: CWE_COLORS,
                       tooltip: {
-                        theme: chartMode,
+                        theme: isLight ? 'light' : 'dark',
                         y: { formatter: (v: number) => `${v} occurrence${v !== 1 ? 's' : ''}` },
                       },
                       legend: { show: false },
-                      theme: { mode: chartMode as any },
+                      theme: { mode: isLight ? 'light' : 'dark' as any },
                     }}
                     series={[{
                       data: data.most_common_cve.slice(0, 8).map((c, i) => ({
                         x: c.name,
                         y: c.count,
-                        fillColor: treemapColors[i % treemapColors.length],
+                        fillColor: CWE_COLORS[i % CWE_COLORS.length],
                       })),
                     }]}
                     type="treemap"
@@ -566,7 +591,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                   {/* Clickable legend */}
                   <Box sx={{ mt: 1, display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
                     {data.most_common_cve.slice(0, 8).map((c, i) => {
-                      const chipColor = treemapColors[i % treemapColors.length];
+                      const chipColor = CWE_COLORS[i % CWE_COLORS.length];
                       return (
                         <Chip
                           key={c.name}
@@ -593,7 +618,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                 </>
               ) : (
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 210 }}>
-                  <Typography sx={{ color: isLight ? theme.palette.text.disabled : 'rgba(255, 255, 255, 0.3)', fontSize: '0.8rem', fontFamily: 'Inter' }}>
+                  <Typography sx={{ color: tokens.text.disabled, fontSize: '0.8rem', fontFamily: 'Inter' }}>
                     No CVE Data Available
                   </Typography>
                 </Box>
@@ -605,7 +630,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         <Grid size={{ xs: 12, md: 4 }}>
           <ChartCard title="Top IP Addresses">
             <Chart
-              options={getBarOptions(data.most_used_ip.slice(0, 8).map(ip => ip.address || 'Unknown'), isLight ? '#16a34a' : '#00ff62')}
+              options={getBarOptions(data.most_used_ip.slice(0, 8).map(ip => ip.address || 'Unknown'), tokens.accent.success)}
               series={[{ name: 'Usage', data: data.most_used_ip.slice(0, 8).map(ip => ip.count) }]}
               type="bar"
               height={240}
@@ -622,19 +647,17 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         fullWidth
         sx={{
           '& .MuiDialog-paper': {
-            bgcolor: isLight ? theme.palette.background.paper : 'rgba(5, 5, 15, 0.97)',
-            border: isLight ? `1px solid ${theme.palette.divider}` : '1px solid rgba(112, 0, 255, 0.4)',
-            backdropFilter: isLight ? 'none' : 'blur(20px)',
+            ...getMenuPaperSx(isLight, theme, tokens),
             borderRadius: 2,
           },
         }}
       >
         <DialogTitle sx={{ pb: 1 }}>
-          <Typography variant="h6" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: isLight ? themeTokens.enterprise.severity.unknown : '#7000ff' }}>
+          <Typography variant="h6" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: tokens.severity.unknown }}>
             {selectedCwe}
           </Typography>
           {cweInfo && (
-            <Typography variant="caption" sx={{ color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.5)', fontFamily: 'Inter', display: 'block', mt: 0.25 }}>
+            <Typography variant="caption" sx={{ color: tokens.text.secondary, fontFamily: 'Inter', display: 'block', mt: 0.25 }}>
               {cweInfo.name}
             </Typography>
           )}
@@ -643,15 +666,15 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         <DialogContent sx={{ pt: 0 }}>
           {cweLoading && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
-              <CircularProgress size={20} sx={{ color: isLight ? themeTokens.enterprise.severity.unknown : '#7000ff' }} />
-              <Typography variant="body2" sx={{ color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.5)', fontFamily: 'Inter', fontSize: '0.8rem' }}>
+              <CircularProgress size={20} sx={{ color: tokens.severity.unknown }} />
+              <Typography variant="body2" sx={{ color: tokens.text.secondary, fontFamily: 'Inter', fontSize: '0.8rem' }}>
                 Generating CWE intelligence...
               </Typography>
             </Box>
           )}
 
           {cweError && (
-            <Typography variant="body2" sx={{ color: '#ff003c', fontFamily: 'Inter', fontSize: '0.8rem', py: 2 }}>
+            <Typography variant="body2" sx={{ color: tokens.severity.critical, fontFamily: 'Inter', fontSize: '0.8rem', py: 2 }}>
               {cweError}
             </Typography>
           )}
@@ -664,42 +687,42 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                 </Box>
               )}
 
-              <Typography variant="subtitle2" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: isLight ? themeTokens.enterprise.severity.unknown : '#7000ff', mb: 0.5 }}>
+              <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: tokens.severity.unknown, mb: 0.5 }}>
                 Description
               </Typography>
-              <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.8)', lineHeight: 1.6, mb: 2 }}>
+              <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: tokens.text.primary, lineHeight: 1.6, mb: 2 }}>
                 {cweInfo.description}
               </Typography>
 
-              <Divider sx={{ borderColor: isLight ? theme.palette.divider : 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
+              <Divider sx={{ borderColor: isLight ? tokens.border.subtle : 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
 
-              <Typography variant="subtitle2" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: isLight ? themeTokens.enterprise.severity.high : '#ff9f00', mb: 0.5 }}>
+              <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: tokens.severity.high, mb: 0.5 }}>
                 Impact
               </Typography>
-              <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.8)', lineHeight: 1.6, mb: 2 }}>
+              <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: tokens.text.primary, lineHeight: 1.6, mb: 2 }}>
                 {cweInfo.impact}
               </Typography>
 
-              <Divider sx={{ borderColor: isLight ? theme.palette.divider : 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
+              <Divider sx={{ borderColor: isLight ? tokens.border.subtle : 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
 
-              <Typography variant="subtitle2" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: isLight ? themeTokens.enterprise.severity.low : '#00ff62', mb: 0.5 }}>
+              <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: tokens.severity.low, mb: 0.5 }}>
                 Remediation
               </Typography>
-              <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.8)', lineHeight: 1.6, mb: 2 }}>
+              <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: tokens.text.primary, lineHeight: 1.6, mb: 2 }}>
                 {cweInfo.remediation}
               </Typography>
 
               {cweInfo.examples && cweInfo.examples.length > 0 && (
                 <>
-                  <Divider sx={{ borderColor: isLight ? theme.palette.divider : 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
-                  <Typography variant="subtitle2" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: isLight ? themeTokens.enterprise.severity.info : '#00f3ff', mb: 1 }}>
+                  <Divider sx={{ borderColor: isLight ? tokens.border.subtle : 'rgba(112, 0, 255, 0.2)', mb: 2 }} />
+                  <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: tokens.severity.info, mb: 1 }}>
                     Examples
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                     {cweInfo.examples.map((ex, i) => (
                       <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                        <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: isLight ? themeTokens.enterprise.severity.info : '#00f3ff', mt: 0.8, flexShrink: 0 }} />
-                        <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.78rem', color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.7)', lineHeight: 1.5 }}>
+                        <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: tokens.severity.info, mt: 0.8, flexShrink: 0 }} />
+                        <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.78rem', color: tokens.text.secondary, lineHeight: 1.5 }}>
                           {ex}
                         </Typography>
                       </Box>
@@ -716,15 +739,15 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
             onClick={() => setCweDialogOpen(false)}
             size="small"
             sx={{
-              fontFamily: 'var(--r3-heading-font)',
+              fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
               fontSize: '0.65rem',
               fontWeight: 800,
               textTransform: 'uppercase',
               letterSpacing: 1,
-              color: isLight ? themeTokens.enterprise.severity.unknown : '#7000ff',
-              border: `1px solid ${isLight ? alpha(themeTokens.enterprise.severity.unknown, 0.4) : 'rgba(112, 0, 255, 0.4)'}`,
+              color: tokens.severity.unknown,
+              border: `1px solid ${alpha(tokens.severity.unknown, 0.4)}`,
               px: 2,
-              '&:hover': { bgcolor: isLight ? alpha(themeTokens.enterprise.severity.unknown, 0.1) : 'rgba(112, 0, 255, 0.1)' },
+              '&:hover': { bgcolor: alpha(tokens.severity.unknown, 0.1) },
             }}
           >
             Close
@@ -735,14 +758,12 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
       {/* CVE Detail Modal */}
       <Dialog
         open={cveDialogOpen}
-        onClose={() => setCveDialogOpen(false)}
+        onClose={() => { setCveDialogOpen(false); setDescGenError(null); }}
         maxWidth="sm"
         fullWidth
         sx={{
           '& .MuiDialog-paper': {
-            bgcolor: isLight ? theme.palette.background.paper : 'rgba(5, 5, 15, 0.97)',
-            border: isLight ? `1px solid ${theme.palette.divider}` : '1px solid rgba(0, 243, 255, 0.4)',
-            backdropFilter: isLight ? 'none' : 'blur(20px)',
+            ...getMenuPaperSx(isLight, theme, tokens),
             borderRadius: 2,
           },
         }}
@@ -750,11 +771,11 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         <DialogTitle sx={{ pb: 1 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <Box>
-              <Typography variant="h6" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: isLight ? theme.palette.primary.main : '#00f3ff' }}>
+              <Typography variant="h6" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.85rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1.5, color: tokens.accent.primary }}>
                 {selectedCve}
               </Typography>
               {cveInfo && (
-                <Typography variant="caption" sx={{ color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.5)', fontFamily: 'Inter', display: 'block', mt: 0.25 }}>
+                <Typography variant="caption" sx={{ color: tokens.text.secondary, fontFamily: 'Inter', display: 'block', mt: 0.25 }}>
                   {cveInfo.assigner ? `Assigner: ${cveInfo.assigner}` : 'Threat Intelligence Data'}
                 </Typography>
               )}
@@ -765,7 +786,7 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
                   label={`CVSS ${cveInfo.cvss_v31_base_score}`}
                   size="small"
                   sx={{
-                    fontFamily: 'var(--r3-heading-font)',
+                    fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
                     fontSize: '0.7rem',
                     fontWeight: 900,
                     bgcolor: `${getCvssColor(cveInfo.cvss_v31_base_score)}20`,
@@ -782,15 +803,15 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
         <DialogContent sx={{ pt: 0 }}>
           {cveLoading && (
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 3 }}>
-              <CircularProgress size={20} sx={{ color: isLight ? theme.palette.primary.main : '#00f3ff' }} />
-              <Typography variant="body2" sx={{ color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.5)', fontFamily: 'Inter', fontSize: '0.8rem' }}>
+              <CircularProgress size={20} sx={{ color: tokens.accent.primary }} />
+              <Typography variant="body2" sx={{ color: tokens.text.secondary, fontFamily: 'Inter', fontSize: '0.8rem' }}>
                 Loading enriched CVE intelligence...
               </Typography>
             </Box>
           )}
 
           {cveError && (
-            <Typography variant="body2" sx={{ color: '#ff003c', fontFamily: 'Inter', fontSize: '0.8rem', py: 2 }}>
+            <Typography variant="body2" sx={{ color: tokens.severity.critical, fontFamily: 'Inter', fontSize: '0.8rem', py: 2 }}>
               {cveError}
             </Typography>
           )}
@@ -820,83 +841,111 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
               {cveInfo.epss_score !== null && (
                 <Box>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
-                    <Typography variant="subtitle2" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: isLight ? theme.palette.primary.main : '#00f3ff' }}>
+                    <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: tokens.accent.primary }}>
                       EPSS Exploit Probability
                     </Typography>
-                    <Typography variant="body2" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.7rem', fontWeight: 800, color: isLight ? theme.palette.primary.main : '#00f3ff' }}>
+                    <Typography variant="body2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.7rem', fontWeight: 800, color: tokens.accent.primary }}>
                       {(cveInfo.epss_score * 100).toFixed(2)}% ({cveInfo.epss_percentile?.toFixed(1) || 0}th percentile)
                     </Typography>
                   </Box>
                   <Box sx={{ width: '100%', height: 6, bgcolor: isLight ? theme.palette.action.hover : 'rgba(255,255,255,0.05)', borderRadius: 3, overflow: 'hidden', border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255,255,255,0.05)'}` }}>
-                    <Box sx={{ width: `${Math.min(cveInfo.epss_score * 100, 100).toFixed(1)}%`, height: '100%', bgcolor: theme.palette.primary.main, boxShadow: isLight ? 'none' : `0 0 8px ${theme.palette.primary.main}` }} />
+                    <Box sx={{ width: `${Math.min(cveInfo.epss_score * 100, 100).toFixed(1)}%`, height: '100%', bgcolor: tokens.accent.primary, boxShadow: isLight ? 'none' : `0 0 8px ${tokens.accent.primary}` }} />
                   </Box>
                 </Box>
               )}
 
               {/* Metrics Grid */}
-              <Typography variant="subtitle2" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: isLight ? themeTokens.enterprise.severity.unknown : '#7000ff' }}>
+              <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: tokens.severity.unknown }}>
                 CVSS v3.1 Metrics
               </Typography>
               <Grid container spacing={1}>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255, 255, 255, 0.02)', border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>Attack Vector</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: isLight ? theme.palette.text.primary : '#fff', textTransform: 'uppercase' }}>{cveInfo.attack_vector || 'N/A'}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: tokens.text.secondary, textTransform: 'uppercase', display: 'block' }}>Attack Vector</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: tokens.text.primary, textTransform: 'uppercase' }}>{cveInfo.attack_vector || 'N/A'}</Typography>
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255, 255, 255, 0.02)', border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>Complexity</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: isLight ? theme.palette.text.primary : '#fff', textTransform: 'uppercase' }}>{cveInfo.attack_complexity || 'N/A'}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: tokens.text.secondary, textTransform: 'uppercase', display: 'block' }}>Complexity</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: tokens.text.primary, textTransform: 'uppercase' }}>{cveInfo.attack_complexity || 'N/A'}</Typography>
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255, 255, 255, 0.02)', border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>User Interaction</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: isLight ? theme.palette.text.primary : '#fff', textTransform: 'uppercase' }}>{cveInfo.user_interaction || 'N/A'}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: tokens.text.secondary, textTransform: 'uppercase', display: 'block' }}>User Interaction</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: tokens.text.primary, textTransform: 'uppercase' }}>{cveInfo.user_interaction || 'N/A'}</Typography>
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255, 255, 255, 0.02)', border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>Confidentiality</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.confidentiality_impact === 'HIGH' ? (isLight ? themeTokens.enterprise.severity.critical : '#ff003c') : cveInfo.confidentiality_impact === 'LOW' ? (isLight ? themeTokens.enterprise.severity.high : '#ff9f00') : (isLight ? themeTokens.enterprise.severity.low : '#00ff62'), textTransform: 'uppercase' }}>{cveInfo.confidentiality_impact || 'N/A'}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: tokens.text.secondary, textTransform: 'uppercase', display: 'block' }}>Confidentiality</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.confidentiality_impact === 'HIGH' ? tokens.severity.critical : cveInfo.confidentiality_impact === 'LOW' ? tokens.severity.high : tokens.severity.low, textTransform: 'uppercase' }}>{cveInfo.confidentiality_impact || 'N/A'}</Typography>
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255, 255, 255, 0.02)', border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>Integrity</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.integrity_impact === 'HIGH' ? (isLight ? themeTokens.enterprise.severity.critical : '#ff003c') : cveInfo.integrity_impact === 'LOW' ? (isLight ? themeTokens.enterprise.severity.high : '#ff9f00') : (isLight ? themeTokens.enterprise.severity.low : '#00ff62'), textTransform: 'uppercase' }}>{cveInfo.integrity_impact || 'N/A'}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: tokens.text.secondary, textTransform: 'uppercase', display: 'block' }}>Integrity</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.integrity_impact === 'HIGH' ? tokens.severity.critical : cveInfo.integrity_impact === 'LOW' ? tokens.severity.high : tokens.severity.low, textTransform: 'uppercase' }}>{cveInfo.integrity_impact || 'N/A'}</Typography>
                   </Box>
                 </Grid>
                 <Grid size={{ xs: 6, sm: 4 }}>
                   <Box sx={{ p: 1, bgcolor: isLight ? alpha(theme.palette.primary.main, 0.04) : 'rgba(255, 255, 255, 0.02)', border: `1px solid ${isLight ? theme.palette.divider : 'rgba(255, 255, 255, 0.05)'}`, borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)', textTransform: 'uppercase', display: 'block' }}>Availability</Typography>
-                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.availability_impact === 'HIGH' ? (isLight ? themeTokens.enterprise.severity.critical : '#ff003c') : cveInfo.availability_impact === 'LOW' ? (isLight ? themeTokens.enterprise.severity.high : '#ff9f00') : (isLight ? themeTokens.enterprise.severity.low : '#00ff62'), textTransform: 'uppercase' }}>{cveInfo.availability_impact || 'N/A'}</Typography>
+                    <Typography variant="caption" sx={{ fontSize: '0.55rem', fontWeight: 700, color: tokens.text.secondary, textTransform: 'uppercase', display: 'block' }}>Availability</Typography>
+                    <Typography variant="body2" sx={{ fontSize: '0.7rem', fontWeight: 800, color: cveInfo.availability_impact === 'HIGH' ? tokens.severity.critical : cveInfo.availability_impact === 'LOW' ? tokens.severity.high : tokens.severity.low, textTransform: 'uppercase' }}>{cveInfo.availability_impact || 'N/A'}</Typography>
                   </Box>
                 </Grid>
               </Grid>
 
               {/* Description */}
               <Box>
-                <Typography variant="subtitle2" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: isLight ? themeTokens.enterprise.severity.unknown : '#7000ff', mb: 0.5 }}>
-                  Description
-                </Typography>
-                <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.8)', lineHeight: 1.6 }}>
-                  {cveInfo.summary || 'No description summary available.'}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mb: 0.5 }}>
+                  <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: tokens.severity.unknown }}>
+                    Description
+                  </Typography>
+                  <Tooltip title={cveInfo.ai_risk_assessment ? 'Regenerate AI description' : 'Generate AI description'} placement="top">
+                    <IconButton
+                      size="small"
+                      onClick={handleGenerateCveDescription}
+                      disabled={descGenerating}
+                      sx={{
+                        width: 18,
+                        height: 18,
+                        fontSize: '0.6rem',
+                        fontWeight: 900,
+                        color: tokens.severity.unknown,
+                        border: `1px solid ${alpha(tokens.severity.unknown, 0.4)}`,
+                        borderRadius: '50%',
+                        p: 0,
+                        '&:hover': { bgcolor: alpha(tokens.severity.unknown, 0.1) },
+                        '&:disabled': { opacity: 0.5 },
+                      }}
+                    >
+                      {descGenerating ? <CircularProgress size={10} sx={{ color: 'inherit' }} /> : '?'}
+                    </IconButton>
+                  </Tooltip>
+                </Box>
+                {descGenError && (
+                  <Typography variant="caption" sx={{ color: tokens.severity.critical, fontFamily: 'Inter', fontSize: '0.7rem', display: 'block', mb: 0.5 }}>
+                    {descGenError}
+                  </Typography>
+                )}
+                <Typography variant="body2" sx={{ fontFamily: 'Inter', fontSize: '0.8rem', color: tokens.text.primary, lineHeight: 1.6 }}>
+                  {cveInfo.summary || 'No description summary available. Click ? to generate with AI.'}
                 </Typography>
               </Box>
 
               {/* References */}
               {cveInfo.references && cveInfo.references.length > 0 && (
                 <Box>
-                  <Divider sx={{ borderColor: isLight ? theme.palette.divider : 'rgba(0, 243, 255, 0.1)', mb: 1.5 }} />
-                  <Typography variant="subtitle2" sx={{ fontFamily: 'var(--r3-heading-font)', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: isLight ? themeTokens.enterprise.severity.high : '#ff9f00', mb: 1 }}>
+                  <Divider sx={{ borderColor: isLight ? tokens.border.subtle : 'rgba(0, 243, 255, 0.1)', mb: 1.5 }} />
+                  <Typography variant="subtitle2" sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', fontSize: '0.65rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: 1, color: tokens.severity.high, mb: 1 }}>
                     References
                   </Typography>
                   <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.75, maxHeight: 120, overflowY: 'auto', pr: 1 }}>
                     {cveInfo.references.map((ref: string, i: number) => (
                       <Box key={i} sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}>
-                        <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: isLight ? themeTokens.enterprise.severity.high : '#ff9f00', mt: 0.8, flexShrink: 0 }} />
+                        <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: tokens.severity.high, mt: 0.8, flexShrink: 0 }} />
                         <Typography
                           component="a"
                           href={ref}
@@ -928,15 +977,15 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
             onClick={() => setCveDialogOpen(false)}
             size="small"
             sx={{
-              fontFamily: 'var(--r3-heading-font)',
+              fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron',
               fontSize: '0.65rem',
               fontWeight: 800,
               textTransform: 'uppercase',
               letterSpacing: 1,
-              color: isLight ? theme.palette.primary.main : '#00f3ff',
-              border: `1px solid ${isLight ? alpha(theme.palette.primary.main, 0.4) : 'rgba(0, 243, 255, 0.4)'}`,
+              color: tokens.accent.primary,
+              border: `1px solid ${alpha(tokens.accent.primary, 0.4)}`,
               px: 2,
-              '&:hover': { bgcolor: isLight ? alpha(theme.palette.primary.main, 0.1) : 'rgba(0, 243, 255, 0.1)' },
+              '&:hover': { bgcolor: alpha(tokens.accent.primary, isLight ? 0.05 : 0.1) },
             }}
           >
             Close
@@ -945,12 +994,4 @@ export const DistributionCharts: React.FC<{ data: DashboardData }> = ({ data }) 
       </Dialog>
     </Box>
   );
-};
-
-const getCvssColor = (score: number) => {
-  if (score >= 9.0) return '#ff003c';
-  if (score >= 7.0) return '#ff9f00';
-  if (score >= 4.0) return '#fffc00';
-  if (score > 0.0) return '#00ff62';
-  return '#00f3ff';
 };

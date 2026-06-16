@@ -24,8 +24,10 @@ import {
 } from 'lucide-react';
 import { useWordlists, useDeleteWordlist } from '../api';
 import { ViewWordlistModal } from './ViewWordlistModal';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 export const WordlistList: React.FC = () => {
+  const { tokens, isLight } = useThemeTokens();
   const { data: wordlists, isLoading } = useWordlists();
   const deleteWordlist = useDeleteWordlist();
   const [viewModalOpen, setViewModalOpen] = React.useState(false);
@@ -36,21 +38,21 @@ export const WordlistList: React.FC = () => {
     setViewModalOpen(true);
   };
 
-  if (isLoading) return <LinearProgress sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />;
+  if (isLoading) return <LinearProgress sx={{ bgcolor: isLight ? `${tokens.accent.primary}1A` : 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary } }} />;
 
   return (
     <Box>
       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
         {wordlists?.map((wordlist) => (
           <Card key={wordlist.id} sx={{
-            bgcolor: 'rgba(10, 10, 20, 0.4)',
+            bgcolor: isLight ? 'background.paper' : 'rgba(10, 10, 20, 0.4)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(255, 255, 255, 0.05)',
+            border: isLight ? '1px solid rgba(0,0,0,0.08)' : '1px solid rgba(255, 255, 255, 0.05)',
             borderRadius: 1,
             transition: 'all 0.2s ease',
             '&:hover': {
-              bgcolor: 'rgba(20, 10, 30, 0.6)',
-              border: '1px solid rgba(255, 0, 255, 0.2)',
+              bgcolor: isLight ? 'action.hover' : 'rgba(20, 10, 30, 0.6)',
+              border: `1px solid ${isLight ? '#ff00ff4D' : 'rgba(255, 0, 255, 0.2)'}`,
               transform: 'translateX(4px)',
               '& .action-btns': { opacity: 1 }
             }
@@ -78,7 +80,7 @@ export const WordlistList: React.FC = () => {
                   <Typography variant="body2" sx={{
                     fontFamily: 'Orbitron',
                     fontWeight: 800,
-                    color: '#fff',
+                    color: isLight ? 'text.primary' : '#fff',
                     fontSize: '0.8rem',
                     whiteSpace: 'nowrap',
                     overflow: 'hidden',
@@ -86,13 +88,13 @@ export const WordlistList: React.FC = () => {
                   }}>
                     {wordlist.name}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', fontSize: '0.55rem', fontFamily: 'monospace' }}>
+                  <Typography variant="caption" sx={{ color: isLight ? 'text.secondary' : 'rgba(255,255,255,0.3)', fontSize: '0.55rem', fontFamily: 'monospace' }}>
                     {wordlist.short_name}
                   </Typography>
                 </Box>
               </Box>
 
-              <Divider orientation="vertical" flexItem sx={{ mx: 3, display: { xs: 'none', md: 'block' }, borderColor: 'rgba(255,255,255,0.05)' }} />
+              <Divider orientation="vertical" flexItem sx={{ mx: 3, display: { xs: 'none', md: 'block' }, borderColor: isLight ? 'divider' : 'rgba(255,255,255,0.05)' }} />
 
               {/* Center: Count (Left-aligned in center area) */}
               <Box sx={{ flexGrow: 1, display: 'flex', justifyContent: 'flex-start', minWidth: { xs: '100%', md: 0 }, px: { md: 2 } }}>
@@ -100,13 +102,13 @@ export const WordlistList: React.FC = () => {
                   <Typography sx={{ color: '#ff00ff', fontWeight: 900, fontFamily: 'Orbitron', fontSize: '1rem' }}>
                     {wordlist.count.toLocaleString()}
                   </Typography>
-                  <Typography variant="caption" sx={{ color: 'rgba(255,255,255,0.3)', letterSpacing: 1 }}>
+                  <Typography variant="caption" sx={{ color: isLight ? 'text.secondary' : 'rgba(255,255,255,0.3)', letterSpacing: 1 }}>
                     ENTRIES DETECTED
                   </Typography>
                 </Box>
               </Box>
 
-              <Divider orientation="vertical" flexItem sx={{ mx: 3, display: { xs: 'none', md: 'block' }, borderColor: 'rgba(255,255,255,0.05)' }} />
+              <Divider orientation="vertical" flexItem sx={{ mx: 3, display: { xs: 'none', md: 'block' }, borderColor: isLight ? 'divider' : 'rgba(255,255,255,0.05)' }} />
 
               {/* Right: Actions */}
               <Box className="action-btns" sx={{
@@ -122,7 +124,7 @@ export const WordlistList: React.FC = () => {
                   <IconButton
                     size="small"
                     onClick={() => handleView(wordlist.id)}
-                    sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#ff00ff', bgcolor: 'rgba(255,0,255,0.1)' } }}
+                    sx={{ color: isLight ? 'text.secondary' : 'rgba(255,255,255,0.5)', '&:hover': { color: '#ff00ff', bgcolor: 'rgba(255,0,255,0.1)' } }}
                   >
                     <Eye size={16} />
                   </IconButton>
@@ -136,14 +138,14 @@ export const WordlistList: React.FC = () => {
                         deleteWordlist.mutate(wordlist.id);
                       }
                     }}
-                    sx={{ color: 'rgba(255,255,255,0.5)', '&:hover': { color: '#ff003c', bgcolor: 'rgba(255,0,60,0.1)' } }}
+                    sx={{ color: isLight ? 'text.secondary' : 'rgba(255,255,255,0.5)', '&:hover': { color: tokens.accent.error, bgcolor: `${tokens.accent.error}1A` } }}
                   >
                     <Trash2 size={16} />
                   </IconButton>
                 </Tooltip>
                 <IconButton
                   size="small"
-                  sx={{ color: 'rgba(255,255,255,0.3)' }}
+                  sx={{ color: isLight ? 'text.disabled' : 'rgba(255,255,255,0.3)' }}
                   onClick={() => handleView(wordlist.id)}
                 >
                   <ChevronRight size={18} />
@@ -153,8 +155,8 @@ export const WordlistList: React.FC = () => {
           </Card>
         ))}
         {(!wordlists || wordlists.length === 0) && (
-          <Box sx={{ py: 8, textAlign: 'center', bgcolor: 'rgba(255,255,255,0.02)', borderRadius: 2, border: '1px dashed rgba(255,255,255,0.05)' }}>
-            <Typography variant="body2" sx={{ color: 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron' }}>
+          <Box sx={{ py: 8, textAlign: 'center', bgcolor: isLight ? 'action.hover' : 'rgba(255,255,255,0.02)', borderRadius: 2, border: isLight ? '1px dashed rgba(0,0,0,0.15)' : '1px dashed rgba(255,255,255,0.05)' }}>
+            <Typography variant="body2" sx={{ color: isLight ? 'text.secondary' : 'rgba(255,255,255,0.3)', fontFamily: 'Orbitron' }}>
               VAULT EMPTY NO CUSTOM WORDLISTS DETECTED
             </Typography>
           </Box>

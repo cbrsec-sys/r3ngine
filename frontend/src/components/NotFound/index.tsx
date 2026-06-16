@@ -1,9 +1,11 @@
+import { useThemeTokens } from '../../theme/useThemeTokens';
 import React from 'react';
 import { Box, Typography, Button } from '@mui/material';
 import { ShieldAlert, Home, RefreshCw } from 'lucide-react';
 import { Link } from '@tanstack/react-router';
 
 export const NotFound: React.FC = () => {
+  const { tokens } = useThemeTokens();
   return (
     <Box
       sx={{
@@ -53,7 +55,7 @@ export const NotFound: React.FC = () => {
           fontFamily: 'Orbitron',
           fontWeight: 900,
           letterSpacing: 4,
-          color: '#fff',
+          color: 'text.primary',
           mb: 1,
           textShadow: '0 0 10px rgba(255, 0, 60, 0.8)'
         }}>
@@ -83,7 +85,7 @@ export const NotFound: React.FC = () => {
             startIcon={<Home size={18} />}
             sx={{
               bgcolor: 'rgba(255, 255, 255, 0.05)',
-              color: '#fff',
+              color: 'text.primary',
               border: '1px solid rgba(255,255,255,0.1)',
               '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.1)', borderColor: '#fff' },
               fontFamily: 'Orbitron',

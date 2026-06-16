@@ -10,9 +10,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
-	"sync"
 
 	"github.com/redis/go-redis/v9"
 	"go.temporal.io/sdk/activity"
@@ -84,6 +84,14 @@ func (a *Activities) SubprocessActivity(ctx context.Context, input ToolExecution
 		}, err
 	}
 
+	killProcessGroup := func(reason string) {
+		if cmd.Process == nil {
+			return
+		}
+		activity.GetLogger(ctx).Warn("Force-killing subprocess group", "reason", reason, "pid", cmd.Process.Pid, "scan_id", input.ScanID)
+		_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+	}
+
 	// Keep heartbeating to Temporal every 5 seconds to prevent activity timeout
 	stopHeartbeat := make(chan bool)
 	go func() {
@@ -99,6 +107,33 @@ func (a *Activities) SubprocessActivity(ctx context.Context, input ToolExecution
 		}
 	}()
 	defer close(stopHeartbeat)
+
+	// Independent stop watchdog: if the scan stop kill switch is set in Redis,
+	// kill the entire process group even if Temporal cancellation did not reach
+	// this executor activity cleanly.
+	stopKillWatch := make(chan bool)
+	if a.rdb != nil && input.ScanID > 0 {
+		go func() {
+			ticker := time.NewTicker(3 * time.Second)
+			defer ticker.Stop()
+			for {
+				select {
+				case <-ticker.C:
+					killKey := fmt.Sprintf("scan_stop_%d", input.ScanID)
+					val, err := a.rdb.Get(context.Background(), killKey).Result()
+					if err == nil && val == "1" {
+						killProcessGroup("scan stop kill switch")
+						return
+					}
+				case <-stopKillWatch:
+					return
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+	}
+	defer close(stopKillWatch)
 
 	// Goroutine to read from pipe line-by-line and send to Redis stream
 	var wg sync.WaitGroup

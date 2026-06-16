@@ -17,6 +17,7 @@ import {
 import { Shield, ExternalLink, Copy, AlertTriangle } from 'lucide-react';
 import { useSecretLeaks } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 interface SecretLeaksTabProps {
   projectSlug: string;
@@ -24,12 +25,13 @@ interface SecretLeaksTabProps {
 }
 
 export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, scanId }) => {
+  const { tokens } = useThemeTokens();
   const { data: leaks, isLoading } = useSecretLeaks(projectSlug, scanId);
 
   if (isLoading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', p: 8 }}>
-        <CircularProgress sx={{ color: '#00f3ff' }} />
+        <CircularProgress sx={{ color: tokens.accent.primary }} />
       </Box>
     );
   }
@@ -50,12 +52,12 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
           fontWeight: 900, 
           fontFamily: 'Orbitron', 
           letterSpacing: 3, 
-          color: '#fff',
+          color: 'text.primary',
           textTransform: 'uppercase'
         }}>
           Leaks & Secrets
         </Typography>
-        <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
+        <Typography sx={{ fontSize: '12px', color: 'text.secondary', mt: 0.5, letterSpacing: 1 }}>
           V3.0 CREDENTIAL INTELLIGENCE REPORT
         </Typography>
       </Box>
@@ -64,17 +66,17 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
         <TableContainer>
           <Table size="small">
             <TableHead>
-              <TableRow sx={{ '& th': { borderBottom: '2px solid #7000ff', bgcolor: 'rgba(255,255,255,0.02)', color: '#00f3ff', fontSize: '0.7rem', fontWeight: 900, py: 2 } }}>
-                <TableCell sx={{ color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>TOOL</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>TYPE</TableCell>
-                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>SOURCE</TableCell>
-                <TableCell sx={{ color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>MATCH CONTENT</TableCell>
-                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' }, color: '#00f3ff', fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>STATUS</TableCell>
+              <TableRow sx={{ '& th': { borderBottom: '2px solid #7000ff', bgcolor: 'action.hover', color: tokens.accent.primary, fontSize: '0.7rem', fontWeight: 900, py: 2 } }}>
+                <TableCell sx={{ color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>TOOL</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>TYPE</TableCell>
+                <TableCell sx={{ display: { xs: 'none', md: 'table-cell' }, color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>SOURCE</TableCell>
+                <TableCell sx={{ color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>MATCH CONTENT</TableCell>
+                <TableCell sx={{ display: { xs: 'none', sm: 'table-cell' }, color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, fontFamily: 'Orbitron' }}>STATUS</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {leaks?.map((leak: any) => (
-                <TableRow key={leak.id} sx={{ '& td': { borderBottom: '1px solid rgba(255,255,255,0.05)', py: 2 } }}>
+                <TableRow key={leak.id} sx={{ '& td': { borderBottom: 1, borderColor: 'divider', py: 2 } }}>
                   <TableCell>
                     <Chip 
                       label={leak.tool_name} 
@@ -89,16 +91,16 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
                     />
                   </TableCell>
                   <TableCell>
-                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: '#fff' }}>
+                    <Typography sx={{ fontSize: '0.75rem', fontWeight: 700, color: 'text.primary' }}>
                       {leak.secret_type}
                     </Typography>
                   </TableCell>
                   <TableCell sx={{ display: { xs: 'none', md: 'table-cell' } }}>
                     <Stack direction="row" sx={{ alignItems: 'center' }} spacing={1}>
-                      <Typography sx={{ fontSize: '0.7rem', color: 'rgba(255,255,255,0.5)', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <Typography sx={{ fontSize: '0.7rem', color: 'text.secondary', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {leak.source_url}
                       </Typography>
-                      <IconButton size="small" component="a" href={leak.source_url} target="_blank" sx={{ color: '#00f3ff', p: 0.5 }}>
+                      <IconButton size="small" component="a" href={leak.source_url} target="_blank" sx={{ color: tokens.accent.primary, p: 0.5 }}>
                         <ExternalLink size={12} />
                       </IconButton>
                     </Stack>
@@ -107,7 +109,7 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
                     <Box sx={{ 
                       p: 1, 
                       bgcolor: 'rgba(0,0,0,0.3)', 
-                      border: '1px solid rgba(255,255,255,0.05)', 
+                      border: 1, borderColor: 'divider', 
                       borderRadius: 0.5,
                       display: 'flex',
                       alignItems: 'center',
@@ -124,7 +126,7 @@ export const SecretLeaksTab: React.FC<SecretLeaksTabProps> = ({ projectSlug, sca
                       }}>
                         {leak.match_content}
                       </Typography>
-                      <IconButton size="small" sx={{ color: 'rgba(255,255,255,0.3)', p: 0.2 }}>
+                      <IconButton size="small" sx={{ color: 'text.disabled', p: 0.2 }}>
                         <Copy size={12} />
                       </IconButton>
                     </Box>

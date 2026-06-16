@@ -1,4 +1,4 @@
-"""
+﻿"""
 Temporal Workflow definitions for the r3ngine scan pipeline.
 
 Workflows define the durable orchestration logic — the "what runs when" in the
@@ -63,13 +63,19 @@ _RETRY_LLM = RetryPolicy(
 async def _dispatch_tier_plugins(ctx: dict, tier: str, wf_id_prefix: str) -> None:
     """Dispatch selected plugins anchored to `tier` as child workflows.
 
+    Called after every scan tier completes. Valid tier values:
+      tier_1 (subdomain discovery), tier_2 (port scan / HTTP crawl),
+      tier_3 (URL fetch / screenshot), tier_4 (dir/file fuzz),
+      tier_5 (API discovery / secrets / WAF), tier_6 (vulnerability scan),
+      tier_7 (correlation / risk / APME), standalone (not injected).
+
     Only runs if the scan explicitly selected at least one plugin slug.
     An empty or absent `selected_plugin_slugs` in ctx means no plugins were
     chosen for this scan — the activity is skipped entirely in that case.
 
     Args:
         ctx: Scan context dict passed through to each plugin workflow.
-        tier: Anchor tier string, e.g. "tier_2", "vulnerability_scan".
+        tier: Anchor tier string, e.g. "tier_2", "tier_7".
         wf_id_prefix: Unique prefix for child workflow IDs (scan or subscan ID).
     """
     selected_slugs = ctx.get("selected_plugin_slugs") or []
@@ -149,7 +155,7 @@ class MasterScanWorkflow:
             )
             if can_proceed:
                 break
-            await asyncio.sleep(30)
+            await workflow.sleep(timedelta(seconds=30))
 
         # ------------------------------------------------------------------
         # STEP -1: Pre-populate task timeline (idempotent)
@@ -320,6 +326,10 @@ class MasterScanWorkflow:
 
             await self._check_paused()
 
+            # Post-Tier-1: dispatch any enabled "run after tier_1" plugins
+            await _dispatch_tier_plugins(ctx, "tier_1", str(ctx.get('scan_history_id', 'scan')))
+
+            await self._check_paused()
             # ------------------------------------------------------------------
             # TIER 2: HTTP Crawl + Port Scan + Screenshot (all parallel)
             #
@@ -395,9 +405,11 @@ class MasterScanWorkflow:
                 )
                 await _fan_out_search_vulns(ctx, services or [])
 
+            await self._check_paused()
             # Post-Tier-2: dispatch any enabled "run after tier_2" plugins
             await _dispatch_tier_plugins(ctx, "tier_2", str(ctx.get('scan_history_id', 'scan')))
 
+            await self._check_paused()
             # ------------------------------------------------------------------
             # TIER 3: URL Fetching + Screenshot (parallel — both depend only on
             # Tier 2 http_crawl; screenshot does NOT depend on fetch_url output)
@@ -427,6 +439,8 @@ class MasterScanWorkflow:
                 )
             if tier3_futures:
                 await asyncio.gather(*tier3_futures)
+
+            await self._check_paused()
 
             # ------------------------------------------------------------------
             # TIER 3a: HTTP Crawl Bridge
@@ -461,6 +475,12 @@ class MasterScanWorkflow:
                     task_queue="python-orchestrator-queue"
                 )
 
+            await self._check_paused()
+
+            # Post-Tier-3: dispatch any enabled "run after tier_3" plugins
+            await _dispatch_tier_plugins(ctx, "tier_3", str(ctx.get('scan_history_id', 'scan')))
+
+            await self._check_paused()
             # ------------------------------------------------------------------
             # TIER 4: Directory & File Fuzzing (sequential — needs Tier 3 URLs)
             # ------------------------------------------------------------------
@@ -494,6 +514,10 @@ class MasterScanWorkflow:
 
             await self._check_paused()
 
+            # Post-Tier-4: dispatch any enabled "run after tier_4" plugins
+            await _dispatch_tier_plugins(ctx, "tier_4", str(ctx.get('scan_history_id', 'scan')))
+
+            await self._check_paused()
             # ------------------------------------------------------------------
             # TIER 5: Analysis (parallel — API discovery, WAF detection, secrets)
             # ------------------------------------------------------------------
@@ -558,6 +582,10 @@ class MasterScanWorkflow:
 
             await self._check_paused()
 
+            # Post-Tier-5: dispatch any enabled "run after tier_5" plugins
+            await _dispatch_tier_plugins(ctx, "tier_5", str(ctx.get('scan_history_id', 'scan')))
+
+            await self._check_paused()
             # ------------------------------------------------------------------
             # TIER 6: Security Assessment
             # NucleiPlannerWorkflow runs sequentially FIRST to prevent orphaned
@@ -579,7 +607,8 @@ class MasterScanWorkflow:
                     id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
                     task_queue="python-orchestrator-queue",
                     execution_timeout=timedelta(hours=24),
-                    run_timeout=timedelta(hours=24)
+                    run_timeout=timedelta(hours=24),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
                 )
 
             other_t6_futures = []
@@ -610,6 +639,11 @@ class MasterScanWorkflow:
 
             await self._check_paused()
 
+            # Post-Tier-6: dispatch any enabled "run after tier_6" plugins
+            await _dispatch_tier_plugins(ctx, "tier_6", str(ctx.get('scan_history_id', 'scan')))
+
+            await self._check_paused()
+            
             # Tier 7, notification, and finalization have moved to the finally
             # block below — guarded by `if success:` to match SubScanWorkflow.
             success = True
@@ -704,6 +738,11 @@ class MasterScanWorkflow:
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue"
                             )
+                        # Post-Tier-7: dispatch any enabled "run after tier_7" plugins
+                        # (e.g. compliance_assessment). Runs after APME so full graph data is available.
+                        await _dispatch_tier_plugins(
+                            ctx, "tier_7", str(ctx.get('scan_history_id', 'scan'))
+                        )
                     except asyncio.CancelledError:
                         raise
                     except Exception as post_e:
@@ -873,6 +912,7 @@ class NucleiPlannerWorkflow:
                                 args=[severity_ctx, severity, batch],
                                 start_to_close_timeout=timedelta(hours=6),
                                 heartbeat_timeout=timedelta(minutes=5),
+                                retry_policy=_RETRY_LONG_SCAN,
                                 task_queue="python-orchestrator-queue",
                             )
                 finally:
@@ -914,9 +954,10 @@ class NucleiPlannerWorkflow:
                             args=[severity_ctx, severity, batch],
                             start_to_close_timeout=timedelta(hours=6),
                             heartbeat_timeout=timedelta(minutes=5),
+                            retry_policy=_RETRY_LONG_SCAN,
                             task_queue="python-orchestrator-queue",
                         )
-        
+
         if vuln_config.get('run_crlfuzz', False):
             await workflow.execute_activity(
                 "RunCRLFuzzActivity", 
@@ -1246,7 +1287,7 @@ class SubScanWorkflow:
             )
             if can_proceed:
                 break
-            await asyncio.sleep(30)
+            await workflow.sleep(timedelta(seconds=30))
 
         # Pre-populate subscan task timeline (idempotent)
         try:
@@ -1339,6 +1380,7 @@ class SubScanWorkflow:
                         task_queue="python-orchestrator-queue",
                         execution_timeout=timedelta(hours=12),
                         run_timeout=timedelta(hours=12),
+                        retry_policy=RetryPolicy(maximum_attempts=1),
                     )
                 elif dispatch is not None:
                     args = dispatch["args_builder"](ctx_task)
@@ -1499,7 +1541,13 @@ class SubScanWorkflow:
                         task_queue="python-orchestrator-queue"
                     )
                     await self._check_paused()
+                    await _dispatch_tier_plugins(
+                        ctx, "tier_1",
+                        str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
+                    )
+                    await self._check_paused()
                 elif tier_index == 2:
+                    await self._check_paused()
                     # Post-Tier-2 plugin dispatch
                     await _dispatch_tier_plugins(
                         ctx, "tier_2",
@@ -1507,6 +1555,11 @@ class SubScanWorkflow:
                     )
                     await self._check_paused()
                 elif tier_index == 3:
+                    await self._check_paused()
+                    await _dispatch_tier_plugins(
+                        ctx, "tier_3",
+                        str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
+                    )
                     await self._check_paused()
                 elif tier_index == 4:
                     # ParseFuzzResultsActivity after dir_file_fuzz completes.
@@ -1520,6 +1573,12 @@ class SubScanWorkflow:
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
                     )
+                    await self._check_paused()
+                    await _dispatch_tier_plugins(
+                        ctx, "tier_4",
+                        str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
+                    )
+                    await self._check_paused()
                 elif tier_index == 5:
                     await workflow.execute_activity(
                         "ParseAnalysisResultsActivity",
@@ -1528,6 +1587,11 @@ class SubScanWorkflow:
                         heartbeat_timeout=timedelta(minutes=5),
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue"
+                    )
+                    await self._check_paused()
+                    await _dispatch_tier_plugins(
+                        ctx, "tier_5",
+                        str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
                     )
                     await self._check_paused()
                 elif tier_index == 6:
@@ -1540,6 +1604,10 @@ class SubScanWorkflow:
                         task_queue="python-orchestrator-queue"
                     )
                     await self._check_paused()
+                    await _dispatch_tier_plugins(
+                        ctx, "tier_6",
+                        str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
+                    )
 
             # Unconditional endpoint count consolidation after all enumeration tiers complete.
             # Bug fix: previously this only ran when dir_file_fuzz was selected (inside Tier 4
@@ -1622,6 +1690,10 @@ class SubScanWorkflow:
                                 retry_policy=_RETRY_INTERNAL,
                                 task_queue="python-orchestrator-queue",
                             )
+                        await _dispatch_tier_plugins(
+                            ctx, "tier_7",
+                            str(ctx.get('subscan_id') or ctx.get('scan_history_id', 'scan')),
+                        )
                     except asyncio.CancelledError:
                         raise
                     except Exception as post_e:

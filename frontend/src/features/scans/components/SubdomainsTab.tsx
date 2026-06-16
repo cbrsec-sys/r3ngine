@@ -71,6 +71,7 @@ import { usePlugins } from '../../plugins/api/pluginsApi';
 import { useCreateTodo } from '../../todos/api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
 
 interface SubdomainsTabProps {
   projectSlug: string;
@@ -96,6 +97,7 @@ const TASK_TIER_ORDER: string[] = [
 ];
 
 export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanId, targetId, onTabChange }) => {
+  const { tokens, isLight } = useThemeTokens();
 
   const [page, setPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
@@ -394,11 +396,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
   };
 
   const getStatusColor = (status: number) => {
-    if (status >= 200 && status < 300) return '#00ffaa';
-    if (status >= 300 && status < 400) return '#00f3ff';
-    if (status >= 400 && status < 500) return '#ffae00';
-    if (status >= 500) return '#ff003c';
-    return '#888';
+    if (status >= 200 && status < 300) return isLight ? tokens.accent.success : '#00ffaa';
+    if (status >= 300 && status < 400) return tokens.accent.primary;
+    if (status >= 400 && status < 500) return isLight ? '#d97706' : '#ffae00';
+    if (status >= 500) return isLight ? tokens.accent.error : '#ff003c';
+    return isLight ? 'text.secondary' : '#888';
   };
 
   return (
@@ -410,12 +412,12 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             fontWeight: 900,
             fontFamily: 'Orbitron',
             letterSpacing: 3,
-            color: '#fff',
+            color: 'text.primary',
             textTransform: 'uppercase'
           }}>
             Subdomain Inventory
           </Typography>
-          <Typography sx={{ fontSize: '12px', color: 'rgba(255,255,255,0.5)', mt: 0.5, letterSpacing: 1 }}>
+          <Typography sx={{ fontSize: '12px', color: 'text.secondary', mt: 0.5, letterSpacing: 1 }}>
             V3.0 SCAN ASSETS RECON ACTIVE
           </Typography>
         </Box>
@@ -428,14 +430,14 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
         borderRadius: '4px',
         overflow: 'hidden',
         mb: 3,
-        border: '1px solid rgba(0, 243, 255, 0.1)',
+        border: `1px solid ${tokens.accent.primary}15`,
         '&:focus-within': {
-          borderColor: 'rgba(0, 243, 255, 0.4)',
-          boxShadow: '0 0 15px rgba(0, 243, 255, 0.1)'
+          borderColor: `${tokens.accent.primary}66`,
+          boxShadow: `0 0 15px ${tokens.accent.primary}15`
         },
         transition: 'all 0.2s'
       }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', pl: 2, color: 'rgba(255,255,255,0.3)' }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', pl: 2, color: 'text.disabled' }}>
           <Search size={18} />
         </Box>
         <InputBase
@@ -448,22 +450,22 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             px: 2,
             py: 1,
             fontSize: '0.9rem',
-            color: '#fff',
-            '&::placeholder': { color: 'rgba(255,255,255,0.2)', opacity: 1 }
+            color: 'text.primary',
+            '&::placeholder': { color: isLight ? 'text.disabled' : 'rgba(255,255,255,0.2)', opacity: 1 }
           }}
         />
         <Button
           onClick={handleSearch}
           sx={{
-            bgcolor: 'rgba(0, 243, 255, 0.1)',
-            color: '#00f3ff',
+            bgcolor: `${tokens.accent.primary}15`,
+            color: tokens.accent.primary,
             px: 4,
             borderRadius: 0,
             fontWeight: 700,
             fontSize: '11px',
             letterSpacing: 1,
-            borderLeft: '1px solid rgba(0, 243, 255, 0.1)',
-            '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+            borderLeft: `1px solid ${tokens.accent.primary}15`,
+            '&:hover': { bgcolor: `${tokens.accent.primary}33` }
           }}
         >
           SEARCH
@@ -476,16 +478,16 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           }}
           disabled={isLoading}
           sx={{
-            bgcolor: hasIpFilter ? 'rgba(0, 243, 255, 0.2)' : 'transparent',
-            color: hasIpFilter ? '#00f3ff' : 'rgba(255, 255, 255, 0.6)',
+            bgcolor: hasIpFilter ? `${tokens.accent.primary}33` : 'transparent',
+            color: hasIpFilter ? tokens.accent.primary : (isLight ? 'text.primary' : 'rgba(255, 255, 255, 0.6)'),
             opacity: isLoading ? 0.6 : 1,
             px: 3,
             borderRadius: 0,
             fontWeight: 700,
             fontSize: '11px',
             letterSpacing: 1,
-            borderLeft: '1px solid rgba(0, 243, 255, 0.1)',
-            '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.15)' }
+            borderLeft: `1px solid ${tokens.accent.primary}15`,
+            '&:hover': { bgcolor: `${tokens.accent.primary}26` }
           }}
         >
           {isLoading ? 'LOADING...' : hasIpFilter ? 'HAS IP [ON]' : 'HAS IP'}
@@ -500,14 +502,14 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
-          borderBottom: '1px solid rgba(255,255,255,0.05)',
-          bgcolor: 'rgba(255,255,255,0.01)'
+          borderBottom: 1, borderColor: 'divider',
+          bgcolor: 'action.hover'
         }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-              <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'rgba(255,255,255,0.5)' }}>Results :</Typography>
-              <Box sx={{ px: 1, py: 0.5, bgcolor: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1 }}>
-                <Typography sx={{ fontSize: '11px', color: '#fff', fontWeight: 700 }}>50</Typography>
+              <Typography sx={{ fontSize: '11px', fontWeight: 600, color: 'text.secondary' }}>Results :</Typography>
+              <Box sx={{ px: 1, py: 0.5, bgcolor: 'action.hover', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 1 }}>
+                <Typography sx={{ fontSize: '11px', color: 'text.primary', fontWeight: 700 }}>50</Typography>
               </Box>
             </Box>
             <Box sx={{ px: 3, py: 0.8, bgcolor: 'rgba(255,255,255,0.03)', borderRadius: 1, border: '1px solid rgba(255,255,255,0.1)' }}>
@@ -524,12 +526,12 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   variant="contained" 
                   onClick={() => setSubscanModalOpen(true)}
                   sx={{ 
-                    bgcolor: 'rgba(0, 243, 255, 0.1)', 
-                    color: '#00f3ff', 
+                    bgcolor: `${tokens.accent.primary}15`, 
+                    color: tokens.accent.primary, 
                     fontSize: '10px', 
                     fontWeight: 800, 
-                    border: '1px solid rgba(0, 243, 255, 0.2)',
-                    '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' } 
+                    border: `1px solid ${tokens.accent.primary}33`,
+                    '&:hover': { bgcolor: `${tokens.accent.primary}33` } 
                   }}
                 >
                   SUBSCAN SELECTED ({selectedAssets.length})
@@ -567,7 +569,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 </Button>
               </Stack>
             )}
-            <IconButton size="small" sx={{ color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)', border: '1px solid rgba(0, 243, 255, 0.1)', borderRadius: 1 }}>
+            <IconButton size="small" sx={{ color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D`, border: `1px solid ${tokens.accent.primary}15`, borderRadius: 1 }}>
               <Download size={14} />
             </IconButton>
           </Box>
@@ -578,7 +580,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           overflowX: 'auto',
           width: '100%',
           '&::-webkit-scrollbar': { height: '6px' },
-          '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(0, 243, 255, 0.2)', borderRadius: '3px' }
+          '&::-webkit-scrollbar-thumb': { bgcolor: `${tokens.accent.primary}33`, borderRadius: '3px' }
         }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'auto' }}>
             <thead>
@@ -592,7 +594,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                     type="checkbox"
                     checked={selectedAssets.length === data?.results.length && data?.results.length > 0}
                     onChange={toggleSelectAll}
-                    style={{ width: '14px', height: '14px', accentColor: '#00f3ff', cursor: 'pointer', opacity: 0.6 }}
+                    style={{ width: '14px', height: '14px', accentColor: tokens.accent.primary, cursor: 'pointer', opacity: 0.6 }}
                   />
                 </th>
                 <th
@@ -608,7 +610,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   aria-label={`Sort by subdomain${sortCol === '1' ? (sortDir === 'asc' ? ', ascending' : ', descending') : ''}`}
                   style={{
                     padding: '12px 16px',
-                    color: '#00f3ff',
+                    color: tokens.accent.primary,
                     fontSize: '10px',
                     fontWeight: 900,
                     letterSpacing: 1.5,
@@ -634,7 +636,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   sx={{
                     display: { xs: 'none', sm: 'table-cell' },
                     padding: '12px 16px',
-                    color: '#00f3ff',
+                    color: tokens.accent.primary,
                     fontSize: '10px',
                     fontWeight: 900,
                     letterSpacing: 1.5,
@@ -645,8 +647,8 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 >
                   STATUS {sortCol === '4' && (sortDir === 'asc' ? '▲' : '▼')}
                 </Box>
-                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>IP</Box>
-                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PORTS</Box>
+                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>IP</Box>
+                <Box component="th" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>PORTS</Box>
                 <Box
                   component="th"
                   onClick={() => handleSort('8')}
@@ -662,7 +664,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   sx={{
                     display: { xs: 'none', xl: 'table-cell' },
                     padding: '12px 16px',
-                    color: '#00f3ff',
+                    color: tokens.accent.primary,
                     fontSize: '10px',
                     fontWeight: 900,
                     letterSpacing: 1.5,
@@ -688,7 +690,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   sx={{
                     display: { xs: 'none', lg: 'table-cell' },
                     padding: '12px 16px',
-                    color: '#00f3ff',
+                    color: tokens.accent.primary,
                     fontSize: '10px',
                     fontWeight: 900,
                     letterSpacing: 1.5,
@@ -699,8 +701,8 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 >
                   TIME {sortCol === '10' && (sortDir === 'asc' ? '▲' : '▼')}
                 </Box>
-                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SCREENSHOT</Box>
-                <th style={{ padding: '12px 16px', color: '#00f3ff', fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron', textAlign: 'right' }}>ACTION</th>
+                <Box component="th" sx={{ display: { xs: 'none', md: 'table-cell' }, padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron' }}>SCREENSHOT</Box>
+                <th style={{ padding: '12px 16px', color: tokens.accent.primary, fontSize: '10px', fontWeight: 900, letterSpacing: 1.5, fontFamily: 'Orbitron', textAlign: 'right' }}>ACTION</th>
               </tr>
             </thead>
             <tbody>
@@ -708,11 +710,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 <tr>
                   <td colSpan={9} style={{ padding: '80px', textAlign: 'center' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-                      <CircularProgress size={32} sx={{ color: '#00f3ff', filter: 'drop-shadow(0 0 8px #00f3ff)' }} />
+                      <CircularProgress size={32} sx={{ color: tokens.accent.primary, filter: `drop-shadow(0 0 8px ${tokens.accent.primary})` }} />
                       <Typography sx={{
                         fontSize: '10px',
                         fontWeight: 900,
-                        color: 'rgba(0, 243, 255, 0.5)',
+                        color: `${tokens.accent.primary}80`,
                         fontFamily: 'Orbitron',
                         letterSpacing: 2,
                         textTransform: 'uppercase'
@@ -724,7 +726,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 </tr>
               ) : data?.results.map((sub) => (
                 <tr key={sub.id} style={{
-                  borderBottom: '1px solid rgba(255,255,255,0.05)',
+                  borderBottom: 1, borderColor: 'divider',
                   backgroundColor: selectedAssets.includes(sub.id) ? 'rgba(0, 243, 255, 0.02)' : (sub.is_important ? 'rgba(255, 0, 60, 0.03)' : 'transparent'),
                   transition: 'background 0.2s'
                 }}>
@@ -736,7 +738,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                       style={{
                         width: '14px',
                         height: '14px',
-                        accentColor: '#00f3ff',
+                        accentColor: tokens.accent.primary,
                         cursor: 'pointer',
                         opacity: 0.6
                       }}
@@ -745,7 +747,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   <td style={{ padding: '12px 16px' }}>
                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography sx={{ fontSize: '13px', fontWeight: 700, color: '#fff', letterSpacing: 0.2 }}>{sub.name}</Typography>
+                        <Typography sx={{ fontSize: '13px', fontWeight: 700, color: 'text.primary', letterSpacing: 0.2 }}>{sub.name}</Typography>
                         {sub.is_important && <Shield size={12} color="#ffae00" style={{ filter: 'drop-shadow(0 0 5px #ffae00)' }} />}
                         <IconButton 
                           size="small" 
@@ -753,7 +755,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                             navigator.clipboard.writeText(sub.name);
                             showNotification('Copied to clipboard');
                           }}
-                          sx={{ p: 0.2, color: 'rgba(255,255,255,0.3)', '&:hover': { color: '#00f3ff' } }}
+                          sx={{ p: 0.2, color: 'text.disabled', '&:hover': { color: tokens.accent.primary } }}
                         >
                           <Copy size={12} />
                         </IconButton>
@@ -763,35 +765,35 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                       <Box sx={{ display: 'flex', gap: 1.5, mt: 0.5 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Tooltip title="Subscans">
-                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'help' }}>
-                              <Zap size={10} style={{ color: '#00f3ff' }} /> {sub.subscan_count || 0}
+                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'help' }}>
+                              <Zap size={10} style={{ color: tokens.accent.primary }} /> {sub.subscan_count || 0}
                             </Typography>
                           </Tooltip>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Tooltip title="Endpoints">
-                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'help' }}>
+                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'help' }}>
                               <ExternalLink size={10} style={{ color: '#7000ff' }} /> {sub.endpoint_count || 0}
                             </Typography>
                           </Tooltip>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Tooltip title="Critical Vulnerabilities">
-                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'help' }}>
+                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'help' }}>
                               <AlertTriangle size={10} style={{ color: '#ff003c' }} /> {sub.critical_count || 0}
                             </Typography>
                           </Tooltip>
                         </Box>
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                           <Tooltip title="Directories Discovered">
-                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: 'rgba(255,255,255,0.4)', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'help' }}>
+                            <Typography sx={{ fontSize: '9px', fontWeight: 800, color: 'text.secondary', display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'help' }}>
                               <Folder size={10} style={{ color: '#fffc00' }} /> {sub.directories_count || 0}
                             </Typography>
                           </Tooltip>
                         </Box>
 
                         {sub.info_count > 0 && (
-                          <Chip label={`${sub.info_count} Info`} size="small" sx={{ height: 14, fontSize: '7px', fontWeight: 900, bgcolor: 'rgba(0, 243, 255, 0.1)', color: '#00f3ff', borderRadius: 0.5 }} />
+                          <Chip label={`${sub.info_count} Info`} size="small" sx={{ height: 14, fontSize: '7px', fontWeight: 900, bgcolor: `${tokens.accent.primary}15`, color: tokens.accent.primary, borderRadius: 0.5 }} />
                         )}
                       </Box>
                     </Box>
@@ -817,7 +819,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                           key={`ip-${sub.id}-${ip.id}`}
                           sx={{
                             fontSize: '11px',
-                            color: ip.is_cdn ? '#ffae00' : 'rgba(255,255,255,0.5)',
+                            color: ip.is_cdn ? (isLight ? '#d97706' : '#ffae00') : (isLight ? 'text.primary' : 'rgba(255,255,255,0.5)'),
                             fontFamily: 'monospace',
                             fontWeight: 600
                           }}
@@ -836,11 +838,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                             px: 1,
                             py: 0.2,
                             borderRadius: 0.5,
-                            bgcolor: port.is_uncommon ? 'rgba(255, 0, 60, 0.1)' : 'rgba(255,255,255,0.05)',
-                            border: `1px solid ${port.is_uncommon ? 'rgba(255, 0, 60, 0.2)' : 'rgba(255,255,255,0.1)'}`,
+                            bgcolor: port.is_uncommon ? (isLight ? `${tokens.accent.error}15` : 'rgba(255, 0, 60, 0.1)') : (isLight ? 'action.hover' : 'rgba(255,255,255,0.05)'),
+                            border: `1px solid ${port.is_uncommon ? (isLight ? `${tokens.accent.error}4D` : 'rgba(255, 0, 60, 0.2)') : (isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.1)')}`,
                           }}
                         >
-                          <Typography sx={{ fontSize: '9px', fontWeight: 800, color: port.is_uncommon ? '#ff003c' : 'rgba(255,255,255,0.6)', fontFamily: 'monospace' }}>
+                          <Typography sx={{ fontSize: '9px', fontWeight: 800, color: port.is_uncommon ? (isLight ? tokens.accent.error : '#ff003c') : (isLight ? 'text.secondary' : 'rgba(255,255,255,0.6)'), fontFamily: 'monospace' }}>
                             {port.number}
                           </Typography>
                         </Box>
@@ -848,12 +850,12 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                     </Box>
                   </Box>
                   <Box component="td" sx={{ display: { xs: 'none', xl: 'table-cell' }, padding: '12px 16px' }}>
-                    <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                    <Typography sx={{ fontSize: '11px', color: 'text.secondary', fontFamily: 'monospace' }}>
                       {sub.content_length ? `${(sub.content_length / 1024).toFixed(1)} KB` : '0 KB'}
                     </Typography>
                   </Box>
                   <Box component="td" sx={{ display: { xs: 'none', lg: 'table-cell' }, padding: '12px 16px' }}>
-                    <Typography sx={{ fontSize: '11px', color: 'rgba(255,255,255,0.4)', fontFamily: 'monospace' }}>
+                    <Typography sx={{ fontSize: '11px', color: 'text.secondary', fontFamily: 'monospace' }}>
                       {sub.response_time ? `${(sub.response_time * 1000).toFixed(0)}ms` : '-'}
                     </Typography>
                   </Box>
@@ -873,10 +875,10 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                             transition: 'all 0.2s',
                             position: 'relative',
                             '&:hover': {
-                              borderColor: '#00f3ff',
+                              borderColor: tokens.accent.primary,
                               transform: 'scale(1.1)',
                               zIndex: 10,
-                              boxShadow: '0 0 15px rgba(0, 243, 255, 0.3)'
+                              boxShadow: `0 0 15px ${tokens.accent.primary}4D`
                             }
                           }}
                         >
@@ -897,7 +899,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                         <IconButton 
                           size="small" 
                           onClick={() => handleShowAttackSurface(sub)}
-                          sx={{ color: '#00f3ff', bgcolor: 'rgba(0, 243, 255, 0.05)', p: 0.5 }}
+                          sx={{ color: tokens.accent.primary, bgcolor: `${tokens.accent.primary}0D`, p: 0.5 }}
                         >
                           <Eye size={14} />
                         </IconButton>
@@ -926,7 +928,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                           <FileText size={14} />
                         </IconButton>
                       </Tooltip>
-                      <IconButton size="small" onClick={(e) => handleActionClick(e, sub)} sx={{ color: 'rgba(255,255,255,0.3)', p: 0.5 }}>
+                      <IconButton size="small" onClick={(e) => handleActionClick(e, sub)} sx={{ color: 'text.disabled', p: 0.5 }}>
                         <MoreHorizontal size={14} />
                       </IconButton>
                     </Box>
@@ -948,14 +950,14 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
               size="small"
               sx={{
                 '& .MuiPaginationItem-root': {
-                  color: 'rgba(255,255,255,0.5)',
+                  color: 'text.secondary',
                   borderColor: 'rgba(255,255,255,0.1)',
                   fontFamily: 'Orbitron',
                   fontSize: '10px',
                   '&.Mui-selected': {
-                    bgcolor: 'rgba(0, 243, 255, 0.1)',
-                    color: '#00f3ff',
-                    borderColor: '#00f3ff'
+                    bgcolor: `${tokens.accent.primary}15`,
+                    color: tokens.accent.primary,
+                    borderColor: tokens.accent.primary
                   }
                 }
               }}
@@ -973,32 +975,32 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           paper: {
             sx: {
               bgcolor: '#001a24',
-              border: '1px solid rgba(0, 243, 255, 0.2)',
-              color: '#fff',
+              border: `1px solid ${tokens.accent.primary}33`,
+              color: 'text.primary',
               '& .MuiMenuItem-root': {
                 fontSize: '12px',
                 fontWeight: 600,
                 fontFamily: 'Inter',
-                '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.1)' }
+                '&:hover': { bgcolor: `${tokens.accent.primary}15` }
               }
             }
           }
         }}
       >
         {/* <MenuItem onClick={() => { handleActionClose(); setAttackSurfaceModalOpen(true); }}>
-          <ListItemIcon><Eye size={16} color="#00f3ff" /></ListItemIcon>
+          <ListItemIcon><Eye size={16} color={tokens.accent.primary} /></ListItemIcon>
           <ListItemText primary="ATTACK SURFACE" />
         </MenuItem>
         <MenuItem onClick={() => { handleActionClose(); setSubscanModalOpen(true); }}>
-          <ListItemIcon><Zap size={16} color="#00f3ff" /></ListItemIcon>
+          <ListItemIcon><Zap size={16} color={tokens.accent.primary} /></ListItemIcon>
           <ListItemText primary="INITIATE SCAN" />
         </MenuItem>
         <MenuItem onClick={() => { handleActionClose(); setTodoModalOpen(true); }}>
-          <ListItemIcon><FilePlus size={16} color="#00f3ff" /></ListItemIcon>
+          <ListItemIcon><FilePlus size={16} color={tokens.accent.primary} /></ListItemIcon>
           <ListItemText primary="ADD NOTE" />
         </MenuItem> */}
-        <MenuItem onClick={handleLaunchADAssessment} sx={{ color: '#00f3ff' }}>
-          <ListItemIcon><Network size={16} color="#00f3ff" /></ListItemIcon>
+        <MenuItem onClick={handleLaunchADAssessment} sx={{ color: tokens.accent.primary }}>
+          <ListItemIcon><Network size={16} color={tokens.accent.primary} /></ListItemIcon>
           <ListItemText primary="ASSESS IDENTITY INFRASTRUCTURE" />
         </MenuItem>
         <Divider sx={{ my: 0.5, borderColor: 'rgba(255,255,255,0.08)' }} />
@@ -1022,21 +1024,21 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           paper: {
             sx: {
               bgcolor: '#0a0a0a',
-              border: '1px solid rgba(0, 243, 255, 0.2)',
+              border: `1px solid ${tokens.accent.primary}33`,
             }
           }
         }}
       >
-        <DialogTitle sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2 }}>
+        <DialogTitle sx={{ color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2 }}>
           CONFIGURE SUBSCAN: {selectedAssets.length > 0 ? `${selectedAssets.length} ASSETS` : targetSubdomain?.name}
         </DialogTitle>
         <DialogContent>
-          <Typography sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem', mb: 2, fontFamily: 'monospace' }}>
+          <Typography sx={{ color: 'text.secondary', fontSize: '0.7rem', mb: 2, fontFamily: 'monospace' }}>
             SELECT ENGINE & ANALYTIC TASKS
           </Typography>
           
           <FormControl fullWidth size="small" sx={{ mb: 3 }}>
-            <InputLabel id="engine-select-label" sx={{ color: 'rgba(255,255,255,0.4)', fontSize: '0.8rem' }}>Scan Engine</InputLabel>
+            <InputLabel id="engine-select-label" sx={{ color: 'text.secondary', fontSize: '0.8rem' }}>Scan Engine</InputLabel>
             <Select
               labelId="engine-select-label"
               value={selectedEngineId || ''}
@@ -1046,10 +1048,10 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 setSelectedTasks([]);
               }}
               sx={{
-                color: '#fff',
+                color: 'text.primary',
                 '& .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(255,255,255,0.1)' },
-                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: 'rgba(0, 243, 255, 0.3)' },
-                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: '#00f3ff' },
+                '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: `${tokens.accent.primary}4D` },
+                '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: tokens.accent.primary },
               }}
             >
               {enginesData?.map(engine => (
@@ -1081,10 +1083,10 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                           if (e.target.checked) setSelectedTasks(prev => [...prev, task]);
                           else setSelectedTasks(prev => prev.filter(t => t !== task));
                         }}
-                        sx={{ color: 'rgba(0, 243, 255, 0.2)', '&.Mui-checked': { color: '#00f3ff' } }}
+                        sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }}
                       />
                     }
-                    label={<Typography sx={{ fontSize: '0.8rem', color: '#fff', fontWeight: 600 }}>{task.replace(/_/g, ' ').toUpperCase()}</Typography>}
+                    label={<Typography sx={{ fontSize: '0.8rem', color: 'text.primary', fontWeight: 600 }}>{task.replace(/_/g, ' ').toUpperCase()}</Typography>}
                   />
                 ))}
               </FormGroup>
@@ -1110,11 +1112,11 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                                   : prev.filter(s => s !== plugin.slug)
                               );
                             }}
-                            sx={{ color: 'rgba(0, 243, 255, 0.2)', '&.Mui-checked': { color: '#00f3ff' } }}
+                            sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }}
                           />
                         }
                         label={
-                          <Typography sx={{ fontSize: '0.8rem', color: '#fff', fontWeight: 600 }}>
+                          <Typography sx={{ fontSize: '0.8rem', color: 'text.primary', fontWeight: 600 }}>
                             {plugin.name}
                           </Typography>
                         }
@@ -1127,18 +1129,18 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           )}
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <Button onClick={() => setSubscanModalOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem' }}>CANCEL</Button>
+          <Button onClick={() => setSubscanModalOpen(false)} sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>CANCEL</Button>
           <Button
             variant="contained"
             onClick={handleInitiateSubscan}
             disabled={subscanMutation.isPending || !selectedEngineId || selectedTasks.length === 0}
             sx={{
-              bgcolor: 'rgba(0, 243, 255, 0.1)',
-              color: '#00f3ff',
-              border: '1px solid rgba(0, 243, 255, 0.2)',
+              bgcolor: `${tokens.accent.primary}15`,
+              color: tokens.accent.primary,
+              border: `1px solid ${tokens.accent.primary}33`,
               fontSize: '0.7rem',
               fontWeight: 900,
-              '&:hover': { bgcolor: 'rgba(0, 243, 255, 0.2)' }
+              '&:hover': { bgcolor: `${tokens.accent.primary}33` }
             }}
           >
             {subscanMutation.isPending ? 'INITIATING...' : 'RUN SUBSCAN'}
@@ -1156,20 +1158,20 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           paper: {
             sx: {
               bgcolor: '#0a0a0a',
-              border: '1px solid rgba(0, 243, 255, 0.2)',
+              border: `1px solid ${tokens.accent.primary}33`,
             }
           }
         }}
       >
-        <DialogTitle sx={{ color: '#00f3ff', fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <DialogTitle sx={{ color: tokens.accent.primary, fontFamily: 'Orbitron', fontSize: '0.9rem', letterSpacing: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           ATTACK SURFACE ANALYSIS: {targetSubdomain?.name}
-          <IconButton onClick={() => setAttackSurfaceModalOpen(false)} size="small" sx={{ color: 'rgba(255,255,255,0.3)' }}><X size={18} /></IconButton>
+          <IconButton onClick={() => setAttackSurfaceModalOpen(false)} size="small" sx={{ color: 'text.disabled' }}><X size={18} /></IconButton>
         </DialogTitle>
         <DialogContent>
           {attackSurfaceMutation.isPending ? (
             <Box sx={{ py: 8, textAlign: 'center' }}>
-              <CircularProgress size={32} sx={{ color: '#00f3ff' }} />
-              <Typography sx={{ color: 'rgba(0, 243, 255, 0.5)', fontSize: '0.7rem', mt: 2, fontFamily: 'Orbitron', letterSpacing: 1 }}>
+              <CircularProgress size={32} sx={{ color: tokens.accent.primary }} />
+              <Typography sx={{ color: `${tokens.accent.primary}80`, fontSize: '0.7rem', mt: 2, fontFamily: 'Orbitron', letterSpacing: 1 }}>
                 AI ENGINE ANALYZING TARGET VECTOR...
               </Typography>
             </Box>
@@ -1184,8 +1186,8 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
           ) : (
             <Box sx={{
               p: 3,
-              bgcolor: 'rgba(255,255,255,0.02)',
-              border: '1px solid rgba(255,255,255,0.05)',
+              bgcolor: 'action.hover',
+              border: 1, borderColor: 'divider',
               borderRadius: 1,
               maxHeight: '70vh',
               overflow: 'auto',
@@ -1194,13 +1196,13 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 fontFamily: 'Inter, sans-serif',
                 fontSize: '0.9rem',
                 lineHeight: 1.6,
-                '& h1, h2, h3': { color: '#00f3ff', fontFamily: 'Orbitron', mt: 3, mb: 1.5, letterSpacing: 1 },
+                '& h1, h2, h3': { color: tokens.accent.primary, fontFamily: 'Orbitron', mt: 3, mb: 1.5, letterSpacing: 1 },
                 '& p': { mb: 2 },
                 '& ul, ol': { mb: 2, pl: 3 },
                 '& li': { mb: 1 },
-                '& strong': { color: '#00f3ff', fontWeight: 800 },
-                '& code': { bgcolor: 'rgba(0, 243, 255, 0.1)', px: 0.5, borderRadius: 0.5, color: '#00f3ff', fontFamily: 'monospace' },
-                '& pre': { bgcolor: 'rgba(0,0,0,0.3)', p: 2, borderRadius: 1, border: '1px solid rgba(255,255,255,0.05)', overflow: 'auto', mb: 2 },
+                '& strong': { color: tokens.accent.primary, fontWeight: 800 },
+                '& code': { bgcolor: `${tokens.accent.primary}15`, px: 0.5, borderRadius: 0.5, color: tokens.accent.primary, fontFamily: 'monospace' },
+                '& pre': { bgcolor: 'rgba(0,0,0,0.3)', p: 2, borderRadius: 1, border: 1, borderColor: 'divider', overflow: 'auto', mb: 2 },
               }
             }}>
               <div className="markdown-content">
@@ -1242,12 +1244,12 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
               variant="outlined"
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: '#fff',
+                  color: 'text.primary',
                   '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
                   '&:hover fieldset': { borderColor: '#ffae00' },
                   '&.Mui-focused fieldset': { borderColor: '#ffae00' },
                 },
-                '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.4)' }
+                '& .MuiInputLabel-root': { color: 'text.secondary' }
               }}
             />
             <TextField
@@ -1260,18 +1262,18 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
               variant="outlined"
               sx={{
                 '& .MuiOutlinedInput-root': {
-                  color: '#fff',
+                  color: 'text.primary',
                   '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
                   '&:hover fieldset': { borderColor: '#ffae00' },
                   '&.Mui-focused fieldset': { borderColor: '#ffae00' },
                 },
-                '& .MuiInputLabel-root': { color: 'rgba(255,255,255,0.4)' }
+                '& .MuiInputLabel-root': { color: 'text.secondary' }
               }}
             />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ p: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-          <Button onClick={() => setTodoModalOpen(false)} sx={{ color: 'rgba(255,255,255,0.5)', fontSize: '0.7rem' }}>CANCEL</Button>
+          <Button onClick={() => setTodoModalOpen(false)} sx={{ color: 'text.secondary', fontSize: '0.7rem' }}>CANCEL</Button>
           <Button
             variant="contained"
             onClick={handleAddTodo}
@@ -1316,7 +1318,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
             fontFamily: 'Orbitron',
             fontSize: '0.8rem',
             fontWeight: 700,
-            bgcolor: snackbar.severity === 'success' ? 'rgba(0, 243, 255, 0.9)' : 'rgba(255, 0, 85, 0.9)',
+            bgcolor: snackbar.severity === 'success' ? `${tokens.accent.primary}E6` : 'rgba(255, 0, 85, 0.9)',
             color: '#000',
             '& .MuiAlert-icon': { color: '#000' }
           }}
@@ -1401,7 +1403,7 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                   color: 'rgba(255,255,255,0.8)',
                   bgcolor: 'rgba(0,0,0,0.5)',
                   zIndex: 3,
-                  '&:hover': { color: '#fff', bgcolor: 'rgba(0, 243, 255, 0.2)' }
+                  '&:hover': { color: 'text.primary', bgcolor: `${tokens.accent.primary}33` }
                 }}
               >
                 <X size={20} />
@@ -1417,8 +1419,8 @@ export const SubdomainsTab: React.FC<SubdomainsTabProps> = ({ projectSlug, scanI
                 maxHeight: '85vh',
                 objectFit: 'contain',
                 borderRadius: 1,
-                border: '1px solid rgba(0, 243, 255, 0.2)',
-                boxShadow: '0 0 50px rgba(0, 243, 255, 0.15)',
+                border: `1px solid ${tokens.accent.primary}33`,
+                boxShadow: `0 0 50px ${tokens.accent.primary}26`,
                 cursor: 'default'
               }}
             />

@@ -228,14 +228,58 @@ class TestTemporalOrchestration(TestCase):
         for subscan in subscans:
             self.assertEqual(subscan.workflow_ids, ['mock-multi-subscan-workflow-id'])
 
+    @patch('reNgine.temporal_client.TemporalClientProvider.get_client', new_callable=AsyncMock)
+    @patch('reNgine.tasks.save_endpoint')
+    @patch('reNgine.tasks.send_scan_notif')
+    def test_initiate_subscan_temporal_skips_duplicate_active_type(self, mock_send_notif, mock_save_endpoint, mock_get_client):
+        """Duplicate subscan launches for the same subdomain/type should reuse the active run."""
+        from reNgine.tasks import initiate_subscan_temporal
+        from reNgine.definitions import RUNNING_TASK
+
+        subdomain = Subdomain.objects.create(
+            name='dedupe.temporal-test.local',
+            target_domain=self.domain,
+            scan_history=self.scan
+        )
+
+        existing_subscan = SubScan.objects.create(
+            start_scan_date=timezone.now(),
+            workflow_ids=['existing-workflow-id'],
+            scan_history=self.scan,
+            subdomain=subdomain,
+            type='run_acunetix',
+            status=RUNNING_TASK,
+            engine=self.engine
+        )
+
+        result = initiate_subscan_temporal(
+            scan_history_id=self.scan.id,
+            subdomain_id=subdomain.id,
+            engine_id=self.engine.id,
+            scan_type='run_acunetix'
+        )
+
+        self.assertTrue(result['success'])
+        self.assertTrue(result['skipped'])
+        self.assertEqual(result['workflow_id'], 'existing-workflow-id')
+        self.assertEqual(result['skipped_scan_types'], ['run_acunetix'])
+        self.assertEqual(SubScan.objects.filter(subdomain=subdomain, type='run_acunetix').count(), 1)
+        self.assertEqual(SubScan.objects.get(id=existing_subscan.id).workflow_ids, ['existing-workflow-id'])
+        mock_get_client.assert_not_called()
+        mock_save_endpoint.assert_not_called()
+        mock_send_notif.assert_not_called()
+
     @patch('reNgine.tasks.resume_scan_temporal')
     @patch('reNgine.temporal_client.TemporalClientProvider.get_client', new_callable=AsyncMock)
-    def test_recover_stuck_scans_only_restarts_running(self, mock_get_client, mock_resume_scan):
-        """Verify recover_stuck_scans only recovers RUNNING_TASK scans with dead workflows, not FAILED/ABORTED ones."""
+    def test_recover_stuck_scans_restarts_running_and_failed(self, mock_get_client, mock_resume_scan):
+        """Verify recover_stuck_scans recovers both RUNNING_TASK and FAILED_TASK scans with dead workflows, but not ABORTED ones."""
         from reNgine.tasks import recover_stuck_scans
         from reNgine.definitions import FAILED_TASK, RUNNING_TASK, ABORTED_TASK
         from temporalio.service import RPCError, RPCStatusCode
         from django.utils import timezone
+
+        # Clear RUNNING/FAILED scans created by setUp to isolate this test
+        ScanHistory.objects.filter(scan_status__in=[RUNNING_TASK, FAILED_TASK]).delete()
 
         # Create test scans under different states
         scan_running_stuck = ScanHistory.objects.create(
@@ -302,8 +346,10 @@ class TestTemporalOrchestration(TestCase):
         # Execute recovery
         recover_stuck_scans()
 
-        # Assert only the stuck running scan is resumed
-        mock_resume_scan.assert_called_once_with(scan_running_stuck.id)
+        # Assert both the stuck running scan and the failed scan are resumed (dead workflows)
+        self.assertEqual(mock_resume_scan.call_count, 2)
+        mock_resume_scan.assert_any_call(scan_running_stuck.id)
+        mock_resume_scan.assert_any_call(scan_failed.id)
 
         # Clean up database records
         scan_running_stuck.delete()

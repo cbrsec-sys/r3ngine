@@ -11,6 +11,8 @@ import type { SelectChangeEvent } from '@mui/material';
 import { useScanProfiles } from '../api';
 import type { ScanProfile } from '../types';
 
+import { useThemeTokens } from '../../../theme/useThemeTokens';
+
 interface ProfileSelectorProps {
   value: string | null;
   onChange: (profileName: string | null) => void;
@@ -35,27 +37,28 @@ const CATEGORY_ORDER: ScanProfile['category'][] = [
   'hardware',
 ];
 
-const fieldStyles = {
+const fieldStyles = (tokens: any) => ({
   '& .MuiOutlinedInput-root': {
-    color: '#fff',
+    color: 'text.primary',
     '& fieldset': { borderColor: 'rgba(255,255,255,0.1)' },
-    '&:hover fieldset': { borderColor: 'rgba(0, 255, 98, 0.3)' },
-    '&.Mui-focused fieldset': { borderColor: '#00ff62' },
-    bgcolor: 'rgba(255,255,255,0.03)',
+    '&:hover fieldset': { borderColor: `${tokens.accent.primary}4D` },
+    '&.Mui-focused fieldset': { borderColor: tokens.accent.primary },
+    bgcolor: 'action.hover',
   },
   '& .MuiInputLabel-root': {
-    color: 'rgba(255,255,255,0.4)',
-    '&.Mui-focused': { color: '#00ff62' },
+    color: 'text.secondary',
+    '&.Mui-focused': { color: tokens.accent.primary },
   },
-  '& .MuiSelect-icon': { color: 'rgba(255,255,255,0.4)' },
-  '& .MuiFormHelperText-root': { color: 'rgba(255,255,255,0.3)' },
-};
+  '& .MuiSelect-icon': { color: 'text.secondary' },
+  '& .MuiFormHelperText-root': { color: 'text.disabled' },
+});
 
 export const ProfileSelector: React.FC<ProfileSelectorProps> = ({
   value,
   onChange,
   disabled = false,
 }) => {
+  const { tokens } = useThemeTokens();
   const { data: profiles, isLoading } = useScanProfiles();
 
   const handleChange = (event: SelectChangeEvent<string>) => {
@@ -91,7 +94,7 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({
         key={`header-${category}`}
         sx={{
           bgcolor: 'rgba(0,0,0,0.7)',
-          color: 'rgba(0, 255, 98, 0.7)',
+          color: `${tokens.accent.primary}B3`,
           fontWeight: 800,
           fontSize: '0.65rem',
           letterSpacing: 1,
@@ -119,7 +122,7 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({
         key={`header-${category}`}
         sx={{
           bgcolor: 'rgba(0,0,0,0.7)',
-          color: 'rgba(0, 255, 98, 0.7)',
+          color: `${tokens.accent.primary}B3`,
           fontWeight: 800,
           fontSize: '0.65rem',
           letterSpacing: 1,
@@ -142,7 +145,7 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({
   const helperText = selectedProfile?.description ?? '';
 
   return (
-    <FormControl fullWidth sx={fieldStyles} disabled={disabled || isLoading}>
+    <FormControl fullWidth sx={fieldStyles(tokens)} disabled={disabled || isLoading}>
       <InputLabel id="profile-selector-label">Scan Profile</InputLabel>
       <Select
         labelId="profile-selector-label"
@@ -153,14 +156,14 @@ export const ProfileSelector: React.FC<ProfileSelectorProps> = ({
         MenuProps={{
           slotProps: { paper: {
             sx: {
-              bgcolor: '#0a0a14',
-              border: '1px solid rgba(0, 255, 98, 0.15)',
+              bgcolor: 'background.default',
+              border: 1, borderColor: 'divider',
               '& .MuiMenuItem-root': {
-                color: '#fff',
-                '&:hover': { bgcolor: 'rgba(0, 255, 98, 0.08)' },
+                color: 'text.primary',
+                '&:hover': { bgcolor: 'action.hover' },
                 '&.Mui-selected': {
-                  bgcolor: 'rgba(0, 255, 98, 0.12)',
-                  '&:hover': { bgcolor: 'rgba(0, 255, 98, 0.16)' },
+                  bgcolor: `${tokens.accent.primary}1F`,
+                  '&:hover': { bgcolor: `${tokens.accent.primary}29` },
                 },
               },
             },

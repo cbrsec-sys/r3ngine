@@ -1,0 +1,409 @@
+# ===========================================================================
+# Stage 1: Frontend Builder
+# Compiles the React/Vite frontend. Only the /dist output is used downstream.
+# ===========================================================================
+FROM node:22-alpine AS frontend-builder
+WORKDIR /app/frontend
+COPY frontend/package*.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm install
+COPY frontend/ ./
+RUN npm run build
+
+
+# ===========================================================================
+# Stage 2: Go Tools Builder
+#
+# Compiles all third-party Go security tools in a single RUN statement so the
+# module download cache never bloats a committed image layer.
+# libpcap-dev is required by naabu (raw packet capture via CGo).
+#
+# Only /go/bin/* binaries are exported to the final image — the entire Go SDK,
+# module cache, and build cache stay inside this ephemeral stage.
+# ===========================================================================
+FROM golang:1.25-bookworm AS go-tools-builder
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpcap-dev make && \
+    rm -rf /var/lib/apt/lists/*
+
+ENV GO111MODULE=on
+
+# All tools in one RUN: single cache-invalidation point, no intermediate layers
+# retaining module/build cache. -ldflags="-s -w" strips debug + DWARF symbols.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go install -ldflags="-s -w" -v github.com/ibnaleem/gosearch@5d2e872aac3f && \
+    go install -ldflags="-s -w" -v github.com/jaeles-project/gospider@latest && \
+    go install -ldflags="-s -w" -v github.com/tomnomnom/gf@dcd4c361f9f5ba302294ed38b8ce278e8ba69006 && \
+    go install -ldflags="-s -w" -v github.com/tomnomnom/unfurl@latest && \
+    go install -ldflags="-s -w" -v github.com/tomnomnom/waybackurls@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/httpx/cmd/httpx@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/subfinder/v2/cmd/subfinder@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/chaos-client/cmd/chaos@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/nuclei/v3/cmd/nuclei@v3.9.0 && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/naabu/v2/cmd/naabu@latest && \
+    go install -ldflags="-s -w" -v github.com/hakluke/hakrawler@latest && \
+    go install -ldflags="-s -w" -v github.com/lc/gau/v2/cmd/gau@latest && \
+    go install -ldflags="-s -w" -v github.com/owasp-amass/amass/v4/...@v4.2.0 && \
+    go install -ldflags="-s -w" -v github.com/ffuf/ffuf/v2@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/tlsx/cmd/tlsx@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/katana/cmd/katana@latest && \
+    go install -ldflags="-s -w" -v github.com/dwisiswant0/crlfuzz/cmd/crlfuzz@latest && \
+    go install -ldflags="-s -w" -v github.com/sa7mon/s3scanner@b6c26d67bc2abe346555dd7010e6065889d66039 && \
+    go install -ldflags="-s -w" -v github.com/zricethezav/gitleaks/v8@latest && \
+    go install -ldflags="-s -w" -v github.com/xalgord/reconx/cmd/reconx@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/vulnx/v2/cmd/vulnx@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/dnsx/cmd/dnsx@latest && \
+    go install -ldflags="-s -w" -v github.com/Vulnpire/getasn@latest && \
+    go install -ldflags="-s -w" -v github.com/jschauma/jswhois@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/mapcidr/cmd/mapcidr@latest && \
+    go install -ldflags="-s -w" -v github.com/projectdiscovery/urlfinder/cmd/urlfinder@latest && \
+    go install -ldflags="-s -w" -v github.com/Chocapikk/wpprobe@latest && \
+    go install -ldflags="-s -w" -v github.com/hueristiq/xurlfind3r/cmd/xurlfind3r@latest && \
+    go install -ldflags="-s -w" -v github.com/edoardottt/cariddi/cmd/cariddi@latest && \
+    go install -ldflags="-s -w" -v github.com/dimasma0305/wp-taint-scan/cmd/taint-scan@latest
+
+# betterleaks has no published go install path — clone and build directly.
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    git clone --depth 1 https://github.com/betterleaks/betterleaks /tmp/betterleaks && \
+    cd /tmp/betterleaks && make build && \
+    cp betterleaks /go/bin/betterleaks && \
+    rm -rf /tmp/betterleaks
+
+
+# ===========================================================================
+# Stage 3: r3ngine Executor Builder
+#
+# Compiles the Temporal Go activity worker binary (r3ngine-executor).
+# The executor is a pure-Go project (no CGo) so no special libs needed.
+# ===========================================================================
+FROM golang:1.25-bookworm AS executor-builder
+
+WORKDIR /build
+# Copy executor source from the repo root context
+COPY web/executor/go.mod web/executor/go.sum ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
+COPY web/executor/ ./
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GO111MODULE=on go build -ldflags="-s -w" -o /usr/local/bin/r3ngine-executor .
+
+# ===========================================================================
+# Stage: Vigolium Builder
+#
+# Vigolium requires Go 1.26+ and bun (for embedded vigolium-audit and jsscan
+# binaries). Clone, build embedded deps, then compile the binary.
+# The ~341MB binary is copied directly to /usr/local/bin in the runtime image.
+# ===========================================================================
+FROM golang:1.26-bookworm AS vigolium-builder
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl git make unzip && \
+    rm -rf /var/lib/apt/lists/*
+
+# Install bun (needed for vigolium-audit and jsscan embedded binary builds)
+RUN curl -fsSL https://bun.sh/install | bash -s "bun-v1.1.34"
+ENV PATH="/root/.bun/bin:${PATH}"
+ENV GO111MODULE=on
+
+# Clone vigolium at the pinned release tag
+RUN git clone --depth 1 https://github.com/vigolium/vigolium /build/vigolium
+
+WORKDIR /build/vigolium
+
+# Build embedded binaries (vigolium-audit via bun, jsscan via bun)
+RUN make ensure-audit && make ensure-jsscan
+
+# Compile vigolium binary
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    go build -ldflags="-s -w" -o /usr/local/bin/vigolium ./cmd/vigolium && \
+    rm -rf /build/vigolium
+
+
+# ===========================================================================
+# Stage: Dalfox Builder
+#
+# Dalfox v3 is a Rust rewrite with no pre-built binaries; must be compiled
+# from source. Targets x86_64-unknown-linux-musl to produce a fully static
+# binary with no libc dependency in the runtime image.
+# ===========================================================================
+FROM rust:bookworm AS dalfox-builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    musl-tools \
+    pkg-config \
+    git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN rustup target add x86_64-unknown-linux-musl
+
+RUN git clone --depth 1 https://github.com/hahwul/dalfox /tmp/dalfox
+
+WORKDIR /tmp/dalfox
+
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/usr/local/cargo/git \
+    --mount=type=cache,target=/tmp/dalfox/target \
+    cargo build --release && \
+    cp target/release/dalfox /usr/local/bin/dalfox
+
+
+# ===========================================================================
+# Stage 4: Runtime Image
+#
+# Ubuntu 22.04 base. Contains ONLY what r3ngine needs to run:
+#   - Python + pip + runtime shared libs
+#   - Ruby (runtime for WPScan — gem installed at container start via internal_tools.sh)
+#   - Node.js (Retire.js)
+#   - Pre-compiled Go tool binaries (copied from go-tools-builder)
+#   - r3ngine-executor binary (copied from executor-builder)
+#   - Dalfox binary (copied from dalfox-builder)
+#   - Built frontend dist (copied from frontend-builder)
+#
+# NOT present in image (installed at first container start via internal_tools.sh):
+#   - Playwright Chromium
+#   - WPScan gem
+#   - Binary tools: Trufflehog, k6, brutus, Aquatone, Feroxbuster, GooFuzz
+#   - CVE tools: grype, trivy
+#   - Python repos: SpiderFoot, theHarvester, OneForAll, Sublist3r, ParamSpider,
+#     LinkFinder, CMSeeK, ctfr, jwt_tool, graphql-cop, enum4linux-ng, rdp-sec-check,
+#     acunetix-python, cpanel2shell-scanner, react2shell-scanner, testssl.sh, username-anarchy
+#   - pip3 tools: fierce, dirsearch, arjun, inql, netlas, holehe
+#   - pipx tools: maigret, semgrep, dnsrecon, ssh-audit, wafw00f, whoisdomain,
+#     bypass-url-parser, bbot, sploitscan, baddns
+#
+# NOT present anywhere: Go SDK, Rust toolchain, build caches, full git histories,
+#                        nuclei-templates (volume), wordlists (volume).
+# ===========================================================================
+FROM ubuntu:22.04
+
+# Prevent interactive APT prompts during build
+ENV DEBIAN_FRONTEND="noninteractive" \
+    DATABASE="postgres" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+LABEL \
+    name="reNgine" \
+    author="Reboot Dev: MistrHyd3 (https://github.com/whiterabb17) \
+    Original By: Yogesh Ojha" \
+    description="reNgine is an automated recon pipeline for web application penetration testing."
+
+# ---------------------------------------------------------------------------
+# Add the PostgreSQL 16 APT repository.
+# Ubuntu 22.04 ships postgresql-client 14 by default; pg_dump requires the
+# client version to be >= the server version (now 16), so we pin to 16.
+# ---------------------------------------------------------------------------
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends ca-certificates gnupg curl lsb-release && \
+    rm -rf /var/lib/apt/lists/* && \
+    curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+        | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" \
+        > /etc/apt/sources.list.d/pgdg.list && \
+    curl -fsSL "https://keyserver.ubuntu.com/pks/lookup?op=get&search=0xF23C5A6CF475977595C89F51BA6932366A755776" \
+        | gpg --dearmor -o /usr/share/keyrings/deadsnakes.gpg && \
+    echo "deb [signed-by=/usr/share/keyrings/deadsnakes.gpg] https://ppa.launchpadcontent.net/deadsnakes/ppa/ubuntu jammy main" \
+        > /etc/apt/sources.list.d/deadsnakes.list
+
+
+# ---------------------------------------------------------------------------
+# System packages — single combined RUN to keep the layer count low.
+# build-essential is kept because:
+#   - pip installs some packages that compile C extensions (cryptography, pycairo)
+#   - gem installs (wpscan) need gcc
+#   - internal_tools.sh pip3/gem installs run at container start
+# ---------------------------------------------------------------------------
+RUN apt-get update -y && \
+    apt-get install -y --no-install-recommends \
+    # Python 3.12 runtime
+    python3.12 \
+    python3.12-dev \
+    python3.12-venv \
+    # Ruby — runtime for WPScan (gem installed via internal_tools.sh at startup)
+    ruby-full \
+    ruby-dev \
+    # Shared libraries required by Python C-extension packages
+    libcurl4-openssl-dev \
+    libxml2 \
+    libxml2-dev \
+    libxslt1-dev \
+    zlib1g-dev \
+    liblzma-dev \
+    libpq-dev \
+    libffi-dev \
+    libjpeg-dev \
+    libopenjp2-7-dev \
+    libcairo2-dev \
+    libcairo2 \
+    libpangocairo-1.0-0 \
+    libgdk-pixbuf2.0-0 \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    pkg-config \
+    shared-mime-info \
+    # libpcap runtime lib — needed by naabu binary at runtime
+    libpcap-dev \
+    # Capability bits for naabu raw sockets
+    libcap2-bin \
+    libcap2 \
+    # EGL/PCI — required by Playwright/Chromium GPU path (installed via internal_tools.sh)
+    libpci-dev \
+    libpciaccess-dev \
+    libegl-dev \
+    libegl1 \
+    # Network and scanning tools
+    git \
+    wget \
+    curl \
+    nmap \
+    netcat \
+    ike-scan \
+    sslscan \
+    proxychains4 \
+    hping3 \
+    wrk \
+    postgresql-client-16 \
+    # Network protocol enumeration tools
+    onesixtyone \
+    snmp \
+    ldap-utils \
+    dnsutils \
+    # Utilities
+    jq \
+    unzip \
+    geoip-bin \
+    geoip-database \
+    patch \
+    bsdmainutils \
+    # Build tools — required by pip (C extensions) and gem installs at runtime
+    build-essential \
+    cmake \
+    ninja-build \
+    gcc \
+    fping \
+    arp-scan \
+    && rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
+# Make Python 3.12 the system default and redirect pip3 to it.
+# ensurepip installs pip into 3.12's site-packages; the symlinks ensure
+# all pip3/pip invocations in subsequent RUN blocks use 3.12.
+# ---------------------------------------------------------------------------
+RUN python3.12 -m ensurepip --upgrade && \
+    python3.12 -m pip install --upgrade pip && \
+    update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 && \
+    update-alternatives --install /usr/bin/python  python  /usr/bin/python3.12 1 && \
+    ln -sf /usr/local/bin/pip3 /usr/bin/pip3 && \
+    ln -sf /usr/local/bin/pip3 /usr/bin/pip
+
+# ---------------------------------------------------------------------------
+# Install uv (fast Python package manager — used by theHarvester)
+# ---------------------------------------------------------------------------
+RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+ENV PATH="/root/.local/bin:${PATH}"
+
+# ---------------------------------------------------------------------------
+# Node.js 20 + Retire.js (JS dependency vulnerability scanner)
+# Node runtime is needed at runtime for `retire` — not just build time.
+# ---------------------------------------------------------------------------
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y --no-install-recommends nodejs && \
+    npm install -g retire && \
+    rm -rf /var/lib/apt/lists/* /root/.npm
+
+# ---------------------------------------------------------------------------
+# Copy compiled Go tool binaries from the builder stage.
+# The entire Go SDK stays in the builder — only ~100MB of binaries come here.
+# ---------------------------------------------------------------------------
+COPY --from=go-tools-builder /go/bin/* /usr/local/bin/
+
+# ---------------------------------------------------------------------------
+# Copy the r3ngine Temporal executor binary
+# ---------------------------------------------------------------------------
+COPY --from=executor-builder /usr/local/bin/r3ngine-executor /usr/local/bin/r3ngine-executor
+
+# Vigolium — web vulnerability scanner (built separately due to Go 1.26 + bun requirement)
+COPY --from=vigolium-builder /usr/local/bin/vigolium /usr/local/bin/vigolium
+
+# Dalfox v3 — XSS scanner (Rust rewrite; built from source in dalfox-builder stage)
+COPY --from=dalfox-builder /usr/local/bin/dalfox /usr/local/bin/dalfox
+
+# ---------------------------------------------------------------------------
+# Searchsploit — offline Exploit-DB CLI search
+# The exploit-db repo is cloned into the exploitdb volume at container start
+# (by the temporal-python-orchestrator entrypoint). We just pre-create the
+# mount point and symlink so the CLI is on PATH when the volume is populated.
+# ---------------------------------------------------------------------------
+RUN mkdir -p /usr/src/exploitdb && \
+    ln -sf /usr/src/exploitdb/searchsploit /usr/local/bin/searchsploit
+
+WORKDIR /usr/src/app
+
+# ---------------------------------------------------------------------------
+# Core pip3 bootstrap — must come BEFORE requirements.txt so that
+# pkg_resources (part of setuptools) is available when packages like
+# playwright_stealth are installed and later imported at Django startup.
+# ---------------------------------------------------------------------------
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install --upgrade pip setuptools wheel pyOpenSSL h8mail
+
+# pipx is installed here so it is available inside internal_tools.sh at runtime.
+RUN python3 -m pip install pipx
+
+# ---------------------------------------------------------------------------
+# Copy and install the application's Python requirements.
+# ---------------------------------------------------------------------------
+COPY web/requirements.txt /tmp/requirements.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install -r /tmp/requirements.txt --ignore-installed blinker
+
+RUN pip3 install tenacity==8.2.2
+
+# pip's httpx Python package installs a CLI wrapper at /usr/local/bin/httpx that
+# overwrites the ProjectDiscovery Go tool copied earlier. Restore the Go binary.
+COPY --from=go-tools-builder /go/bin/httpx /usr/local/bin/httpx
+
+# ---------------------------------------------------------------------------
+# Install Playwright Chromium — required at startup by opsec/LinkedIn
+# modules (playwright_stealth is imported when Django loads osint_tasks.py).
+# ---------------------------------------------------------------------------
+RUN playwright install-deps chromium && \
+    playwright install chromium && \
+    ln -sf /root/.cache/ms-playwright/chromium-*/chrome-linux/chrome /usr/bin/chromium && \
+    rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
+# Copy internal_tools.sh — deferred installer for non-critical tools.
+# Called blocking from temporal-python-orchestrator and temporal-go-executor
+# entrypoints. NOT called from the web entrypoint.
+# ---------------------------------------------------------------------------
+COPY docker/web/internal_tools.sh /usr/src/internal_tools.sh
+RUN chmod +x /usr/src/internal_tools.sh
+
+# ---------------------------------------------------------------------------
+# Copy application source (placed last — changes most frequently, so layers
+# above this line are fully cached on code-only rebuilds)
+# ---------------------------------------------------------------------------
+COPY web/ /usr/src/app/
+COPY docker/web/entrypoint.sh /usr/src/app/entrypoint.sh
+COPY docker/temporal-python-orchestrator/entrypoint.sh /usr/src/app/temporal-entrypoint.sh
+COPY docker/temporal-go-executor/entrypoint.sh /usr/src/app/executor-entrypoint.sh
+RUN chmod +x /usr/src/app/entrypoint.sh /usr/src/app/temporal-entrypoint.sh /usr/src/app/executor-entrypoint.sh
+
+# ---------------------------------------------------------------------------
+# Copy built frontend from frontend-builder
+# ---------------------------------------------------------------------------
+COPY --from=frontend-builder /app/frontend/dist /usr/src/frontend/dist
+
+# ---------------------------------------------------------------------------
+# Final cleanup: strip Python bytecode and __pycache__ from all tool repos
+# to remove files that are regenerated on first import anyway.
+# ---------------------------------------------------------------------------
+RUN find /usr/src -name "*.pyc" -delete 2>/dev/null; \
+    find /usr/src -type d -name "__pycache__" -exec rm -rf {} + 2>/dev/null; \
+    true

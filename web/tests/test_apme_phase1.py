@@ -350,10 +350,14 @@ class ScorerTests(TestCase):
         self.assertGreater(p2.score, p1.score)
 
     def test_cisa_kev_boost_increases_score_by_010(self):
+        import datetime
+        # Use a fixed recent date so _compute_recency returns the same value for
+        # both paths regardless of has_cisa_kev, isolating the +0.10 KEV boost.
+        recent_date = datetime.date(2025, 6, 1)
         p1 = _make_path("P1", [_make_step(to_id="b1")])
         p2 = _make_path("P2", [_make_step(to_id="b2")])
-        self.scorer.score(p1, self._base_meta(has_cisa_kev=False))
-        self.scorer.score(p2, self._base_meta(has_cisa_kev=True))
+        self.scorer.score(p1, self._base_meta(has_cisa_kev=False, cve_published_date=recent_date))
+        self.scorer.score(p2, self._base_meta(has_cisa_kev=True, cve_published_date=recent_date))
         self.assertAlmostEqual(p2.score, min(p1.score + 0.10, 1.0), places=3)
 
     def test_low_confidence_product_reduces_score(self):
