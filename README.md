@@ -26,7 +26,7 @@
   </a>
   &nbsp;
   <a href="https://github.com/Security-Tools-Alliance/rengine-ng" target="_blank">
-    <img src="https://img.shields.io/badge/inspired_by-rengine--ng-red.svg?&logo=none" alt="Inspired by rengine-ng" />
+    <img src="https://img.shields.io/badge/inspired_by-rengine--ng-purple.svg?&logo=none" alt="Inspired by rengine-ng" />
   </a>
 </p>
 
