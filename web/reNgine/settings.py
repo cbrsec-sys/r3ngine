@@ -56,7 +56,7 @@ NEO4J_PASSWORD = env('NEO4J_PASSWORD', default='')
 # ALLOWED_HOSTS is driven by environment variable.
 # In production set ALLOWED_HOSTS=your.domain.com,other.host in the environment.
 # The DOMAIN_NAME block below additionally appends the configured domain host at startup.
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', '0.0.0.0', 'web', 'nginx'])
+ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', 'web', 'nginx'])
 
 # Automatically extract host from DOMAIN_NAME and add it to ALLOWED_HOSTS
 # to ensure out-of-the-box support for the configured domain name.
