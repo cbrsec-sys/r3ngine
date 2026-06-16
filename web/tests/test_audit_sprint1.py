@@ -53,3 +53,61 @@ class TestAUD001AsyncioSleepInWorkflows(unittest.TestCase):
             violations, [],
             f"Found asyncio.sleep() in workflow classes (AUD-001):\n" + "\n".join(violations)
         )
+
+
+class TestAUD005NucleiRetryPolicy(unittest.TestCase):
+    """AUD-005: All RunNucleiActivity calls must have an explicit retry_policy."""
+
+    def test_run_nuclei_activity_has_retry_policy(self):
+        with open(WORKFLOWS_FILE, encoding='utf-8-sig') as f:
+            source = f.read()
+        tree = ast.parse(source)
+
+        # Find all execute_activity calls with "RunNucleiActivity"
+        missing_retry = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Await):
+                continue
+            call = node.value
+            if not isinstance(call, ast.Call):
+                continue
+            # Check if this is workflow.execute_activity(...)
+            func = call.func
+            if not (isinstance(func, ast.Attribute) and func.attr == 'execute_activity'):
+                continue
+            # Check first arg is "RunNucleiActivity"
+            if not call.args:
+                continue
+            first_arg = call.args[0]
+            if not (isinstance(first_arg, ast.Constant) and first_arg.value == 'RunNucleiActivity'):
+                continue
+            # Check kwargs for retry_policy
+            kwarg_names = {kw.arg for kw in call.keywords}
+            if 'retry_policy' not in kwarg_names:
+                missing_retry.append(f"line {node.lineno}")
+
+        # Also assert we found at least one RunNucleiActivity call (guard against vacuous pass)
+        all_nuclei_calls = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Await):
+                continue
+            call = node.value
+            if not isinstance(call, ast.Call):
+                continue
+            func = call.func
+            if not (isinstance(func, ast.Attribute) and func.attr == 'execute_activity'):
+                continue
+            if not call.args:
+                continue
+            first_arg = call.args[0]
+            if isinstance(first_arg, ast.Constant) and first_arg.value == 'RunNucleiActivity':
+                all_nuclei_calls.append(f"line {node.lineno}")
+
+        self.assertGreater(
+            len(all_nuclei_calls), 0,
+            "No RunNucleiActivity calls found in temporal_workflows.py — is the file correct?"
+        )
+        self.assertEqual(
+            missing_retry, [],
+            f"RunNucleiActivity called without retry_policy at: {missing_retry} (AUD-005)"
+        )
