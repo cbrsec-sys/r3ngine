@@ -607,7 +607,8 @@ class MasterScanWorkflow:
                     id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
                     task_queue="python-orchestrator-queue",
                     execution_timeout=timedelta(hours=24),
-                    run_timeout=timedelta(hours=24)
+                    run_timeout=timedelta(hours=24),
+                    retry_policy=RetryPolicy(maximum_attempts=1),
                 )
 
             other_t6_futures = []
@@ -1379,6 +1380,7 @@ class SubScanWorkflow:
                         task_queue="python-orchestrator-queue",
                         execution_timeout=timedelta(hours=12),
                         run_timeout=timedelta(hours=12),
+                        retry_policy=RetryPolicy(maximum_attempts=1),
                     )
                 elif dispatch is not None:
                     args = dispatch["args_builder"](ctx_task)
