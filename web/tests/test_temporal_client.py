@@ -51,8 +51,6 @@ class TestTemporalClientProvider(TestCase):
     def test_get_client_timeout_not_builtin_connection_error(self, mock_connect, mock_wait):
         """TemporalConnectionError must NOT be a subclass of the built-in ConnectionError."""
         from reNgine.temporal_client import TemporalConnectionError
-        try:
+        with self.assertRaises(TemporalConnectionError) as cm:
             asyncio.run(TemporalClientProvider.get_client())
-        except Exception as exc:
-            self.assertIsInstance(exc, TemporalConnectionError)
-            self.assertNotIsInstance(exc, ConnectionError)
+        self.assertNotIsInstance(cm.exception, ConnectionError)
