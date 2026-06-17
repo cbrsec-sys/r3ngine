@@ -12,18 +12,19 @@ Project context and technology stack for the r3ngine v3 web reconnaissance and v
 - Contributing code, fixing bugs, or adding features in this repository
 - User asks about the stack, frameworks, or how the app is built
 - Implementing or modifying scans, targets, API, or UI
-- Need to know which versions are in use (Django 3.2, Python 3.12, Temporal 1.6.0, React 18+)
+- Need to know which versions are in use (Django 5.2.3 LTS, Python 3.12, Temporal 1.7.0, React 18+)
 - Debugging Temporal workflow failures or scan pipeline issues
+- Implementing CPDE (Custom Parameter Discovery Engine) or APME (Attack Path Modeling Engine) features
 
 ## Stack Summary
 
 | Layer        | Technology |
 |-------------|------------|
-| Backend     | Django 3.2, Python 3.12 |
+| Backend     | Django 5.2.3 LTS, Python 3.12 |
 | DB (primary)| PostgreSQL |
-| DB (graph)  | Neo4j (attack path modeling) |
+| DB (graph)  | Neo4j (APME — Attack Path Modeling Engine; `web/apme/` Django app) |
 | Cache/Broker| Redis (Channels, task state, caching) |
-| Orchestration | Temporal (Python SDK 1.6.0 + Go executor) |
+| Orchestration | Temporal (Python SDK 1.7.0 + Go executor) |
 | Frontend    | React 18+, TypeScript, Vite |
 | Async comms | Django Channels + WebSockets |
 | Containers  | Docker multi-stage + Docker Compose |
@@ -34,6 +35,7 @@ Project context and technology stack for the r3ngine v3 web reconnaissance and v
 - **Temporal UI**: `http://localhost:8080` — workflow history, signals, replay, cancellation.
 - **Logging**: `get_module_logger(__name__)` from `reNgine.utils.logger`; use `log_line(prefix, action, msg)` for structured output; `format_exception_for_log(exc)` for safe exception text; `%`-style formatting for user-controlled data in plain log calls.
 - **Container name**: `r3ngine-web-1` (use `python3` not `python` inside the container).
+- **Frontend build**: Run `npm run build` locally in `frontend/` (NOT inside the container).
 
 ## Scan Pipeline (7-Tier Architecture)
 
@@ -43,11 +45,18 @@ Project context and technology stack for the r3ngine v3 web reconnaissance and v
 | 1 | Subdomain discovery, intel gathering, firewall detection |
 | 2 | HTTP crawl, port scanning, screenshotting, URL fetching |
 | 3–4 | Directory/file fuzzing (ffuf, dirsearch, katana) |
-| 5 | Web API discovery, WAF detection, secret scanning |
+| 5 | Web API discovery, WAF detection, secret scanning, CPDE (Custom Parameter Discovery Engine) |
 | 6 | Vulnerability scanning (Nuclei), WAF bypass, credential brute force |
-| 7 | Vulnerability correlation, risk scoring, Neo4j sync, reporting |
+| 7 | Vulnerability correlation, risk scoring, Neo4j/APME sync, reporting |
 
 Scan entry point: `initiate_scan_temporal()` in `tasks.py` → starts `MasterScanWorkflow`.
+
+## Key Intelligence Engines
+
+- **APME** (Attack Path Modeling Engine): `web/apme/` Django app — Neo4j-based graph for feasible attack route discovery; orchestration via `apme/orchestrator.py`, engine in `apme/engine/`, graph ops in `apme/graph/`.
+- **CPDE** (Custom Parameter Discovery Engine): `web/reNgine/cpde/` — discovers injectable parameters via custom fuzzing; complementary to ffuf/dirsearch at Tier 5.
+- **ERL** (Exploitation Readiness Layer): safe, non-destructive validation layer for confirmed vulns.
+- **Vigolium**: `web/reNgine/vigolium_tasks.py` — integrated static code scanner dispatched via `CodeScanWorkflow`.
 
 ## Key Conventions (from project rules)
 
