@@ -602,6 +602,81 @@ def target_profiling_activity(ctx: dict) -> dict:
 
 
 # ===========================================================================
+# Child Workflow Lifecycle Guard
+# ===========================================================================
+
+@activity.defn(name="CheckScanAliveActivity")
+def check_scan_alive_activity(scan_id: int, subscan_id: int = None) -> bool:
+    """Entry-point lifecycle guard for child workflows (NucleiPlannerWorkflow, SubScanWorkflow).
+
+    Child workflows are launched after TargetProfilingActivity has already
+    completed in the parent MasterScanWorkflow. When Temporal replays a child
+    workflow after a container restart, it skips the parent's TargetProfiling
+    guard entirely and begins executing inside the child workflow directly.
+    This activity acts as a matching guard at the start of every child workflow.
+
+    Raises ApplicationError(non_retryable=True) if:
+      - ScanHistory with scan_id no longer exists (scan was deleted by the user)
+      - ScanHistory.scan_status is ABORTED_TASK (scan was aborted by the user)
+
+    Using non_retryable=True ensures Temporal permanently marks the activity
+    as failed and propagates the failure to the child workflow without any
+    retry loop, which in turn cancels the child workflow cleanly.
+
+    Args:
+        scan_id (int): ScanHistory PK to check.
+        subscan_id (int, optional): SubScan PK — used only for richer log context.
+
+    Returns:
+        bool: True if the scan is alive and the child workflow may proceed.
+
+    Raises:
+        ApplicationError: non_retryable if the scan is deleted or aborted.
+    """
+    from startScan.models import ScanHistory
+    from reNgine.definitions import ABORTED_TASK
+    from temporalio.exceptions import ApplicationError
+
+    context = f"scan_id={scan_id}" + (f" subscan_id={subscan_id}" if subscan_id else "")
+    logger.log_line("[TEMPORAL]", "CHECK_ALIVE", context)
+
+    # -------------------------------------------------------------------------
+    # Guard 1 — Deleted scan: ScanHistory no longer exists
+    # -------------------------------------------------------------------------
+    scan = ScanHistory.objects.filter(pk=scan_id).first()
+    if not scan:
+        activity.logger.warning(
+            "[CheckScanAliveActivity] %s — ScanHistory not found (scan deleted). "
+            "Raising non-retryable error to terminate child workflow.", context
+        )
+        raise ApplicationError(
+            f"[CheckScanAliveActivity] ScanHistory {scan_id} no longer exists — "
+            f"scan was deleted. Child workflow cancelled.",
+            non_retryable=True,
+        )
+
+    # -------------------------------------------------------------------------
+    # Guard 2 — Aborted scan: user explicitly aborted this scan
+    # -------------------------------------------------------------------------
+    if scan.scan_status == ABORTED_TASK:
+        activity.logger.warning(
+            "[CheckScanAliveActivity] %s — scan is ABORTED. "
+            "Raising non-retryable error to terminate child workflow.", context
+        )
+        raise ApplicationError(
+            f"[CheckScanAliveActivity] Scan {scan_id} was aborted by the user. "
+            f"Child workflow cancelled.",
+            non_retryable=True,
+        )
+
+    activity.logger.info(
+        "[CheckScanAliveActivity] %s — scan is alive (status=%s). Child workflow may proceed.",
+        context, scan.scan_status,
+    )
+    return True
+
+
+# ===========================================================================
 # Tier 1 — Discovery
 # ===========================================================================
 
