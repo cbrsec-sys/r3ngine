@@ -4017,28 +4017,15 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		) if all_techs else False
 	wordfence_exists = False
 	if is_wordpress_detected:
-		logger.info("WordPress detected. Preparing Wordfence Nuclei Templates...")
-		os.environ['GITHUB_TEMPLATE_REPO'] = 'topscoder/nuclei-wordfence-cve'
-
 		wordfence_dir = '/root/nuclei-templates/wordfence'
-		if not os.path.exists(wordfence_dir) or not os.listdir(wordfence_dir):
-			os.makedirs(os.path.dirname(wordfence_dir), exist_ok=True)
-			logger.info("Cloning topscoder/nuclei-wordfence-cve templates from GitHub...")
-			try:
-				import subprocess
-				subprocess.run(
-					["git", "clone", "--depth", "1", "https://github.com/topscoder/nuclei-wordfence-cve.git", wordfence_dir],
-					timeout=120,
-					check=True,
-					stdout=subprocess.PIPE,
-					stderr=subprocess.PIPE
-				)
-				logger.info("Successfully cloned Wordfence templates.")
-				wordfence_exists = True
-			except Exception as e:
-				logger.warning(f"Could not clone Wordfence templates: {str(e)}")
-		else:
+		if os.path.isdir(wordfence_dir) and os.listdir(wordfence_dir):
+			logger.info('WordPress detected; Wordfence templates present at %s', wordfence_dir)
 			wordfence_exists = True
+		else:
+			logger.warning(
+				'WordPress detected but Wordfence templates missing at %s; '
+				'templates should be pre-loaded at container startup', wordfence_dir
+			)
 
 	if auto_update_templates:
 		run_command(
