@@ -2433,6 +2433,7 @@ class InitiateSubTask(APIView):
 			if single:
 				subdomain_ids = [single]
 		subdomain_ids = list(dict.fromkeys(int(subdomain_id) for subdomain_id in subdomain_ids))
+		errors = []
 		for subdomain_id in subdomain_ids:
 			logger.info(f'Running subscans {scan_types} on subdomain "{subdomain_id}" ...')
 			ctx = {
@@ -2444,10 +2445,17 @@ class InitiateSubTask(APIView):
 			}
 			res = initiate_subscan_temporal(**ctx)
 			if not res.get('success'):
-				return Response({
-					'status': False,
-					'message': res.get('error', 'Failed to initiate subscan')
-				}, status=status.HTTP_400_BAD_REQUEST)
+				errors.append({
+					'subdomain_id': subdomain_id,
+					'error': res.get('error', 'Failed to initiate subscan'),
+				})
+
+		if errors:
+			return Response({
+				'status': False,
+				'message': f'Failed to initiate {len(errors)} subscan(s)',
+				'errors': errors,
+			}, status=status.HTTP_400_BAD_REQUEST)
 		return Response({'status': True})
 
 
