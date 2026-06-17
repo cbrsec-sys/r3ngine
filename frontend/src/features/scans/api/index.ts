@@ -773,7 +773,7 @@ export const useDirectoryFileDispatch = () => {
       });
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to dispatch directory file action');
+        throw new Error(errorData.error || errorData.message || 'Failed to dispatch directory file action');
       }
       return response.json();
     },
@@ -797,7 +797,7 @@ export const useDirectoryFileDelete = () => {
       });
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to delete directory file(s)');
+        throw new Error(errorData.error || errorData.message || 'Failed to delete directory file(s)');
       }
       return response.json();
     },
