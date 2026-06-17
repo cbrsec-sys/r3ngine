@@ -1,5 +1,45 @@
 # Changelog
 
+### [v3.7.0] — unreleased
+
+#### Fixed
+
+- **`run_param_discovery_activity` (CPDE) — ScanActivity permanently stuck at RUNNING**:
+  Refactored to use `_run_task`, which provides heartbeating, pre-flight abort-guard, and
+  `SUCCESS_TASK`/`FAILED_TASK` status updates identical to every other activity. Previously the
+  function called `param_discovery` directly with no try/except and never called
+  `update_scan_activity`, leaving the `ScanActivity` row at `RUNNING_TASK` forever after
+  completion. The no-URLs skip path now also marks the row `SUCCESS_TASK` instead of silently
+  returning.
+
+- **`run_search_vulns_activity` (CVE lookup) — all fan-out instances stuck at RUNNING**:
+  Same root cause as CPDE: direct call to `search_vulns_scan` with no status update or
+  heartbeat. Refactored to use `_run_task`. With 14+ concurrent instances per port scan, this
+  left up to 14 `ScanActivity` rows permanently at `RUNNING_TASK`.
+
+- **`web_api_discovery` — silent hang with no subprocess visible**:
+  Three bugs in the per-URL loop caused `has_graphql_endpoint` and `has_jwt_tokens` to be
+  called for every URL instead of once per subdomain, and LinkFinder to re-run for every URL
+  of the same subdomain when its output file was empty:
+  - Added `_graphql_gate_cache` (dict keyed by subdomain_name): `has_graphql_endpoint` issues
+    a DB `iregex` query against all endpoint rows plus up to 6 network probes × 5 s timeout
+    each. With 17 URLs the worst case was 17 × 2 call-sites × 30 s = **17 minutes of silent
+    Python I/O** with no subprocess spawned. Now called at most once per subdomain; both the
+    InQL and graphql-cop blocks share the same cache.
+  - Added `_jwt_gate_cache` (dict keyed by subdomain_name): `has_jwt_tokens` issues 2 DB
+    queries per call. Now called at most once per subdomain.
+  - Added `processed_linkfinder_subdomains` (set): LinkFinder previously re-ran for every URL
+    of the same subdomain when the output file was 0 bytes (no JS found). The primary dedup
+    guard is now the set (matching Arjun and ParamSpider); `os.path.exists` remains as the
+    Temporal retry guard for files written by a prior activity attempt.
+
+- **Gate-check functions — silent blocking with no log output**:
+  `has_graphql_endpoint`, `has_jwt_tokens`, and `has_openapi_spec` now log every DB query
+  and every individual network probe (URL, status code or exception) so any future slowdown
+  is immediately visible in the orchestrator log rather than appearing as a silent hang.
+
+---
+
 ### [v3.6.2]
 
 - **Intelligent Auth Form Extraction — Full Rewrite (`auth_discovery_tasks.py`)**:
