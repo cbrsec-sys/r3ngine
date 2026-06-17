@@ -882,7 +882,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
       >
         <Stack spacing={2} alignItems="center">
           <CircularProgress color="inherit" size={60} thickness={2} />
-          <Typography sx={{ fontFamily: 'Orbitron, sans-serif', letterSpacing: 2, fontSize: '0.9rem' }}>
+          <Typography sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', letterSpacing: 2, fontSize: '0.9rem' }}>
             {deleteMutation.isPending ? 'DELETING RECORD...' : 'DISPATCHING ACTION...'}
           </Typography>
         </Stack>
