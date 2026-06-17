@@ -2374,7 +2374,9 @@ class InitiateScan(APIView):
 						'selected_plugin_slugs': selected_plugins,
 						'profile_ctx': _profile_ctx,
 					}
-					initiate_scan_temporal(**kwargs)
+					res = initiate_scan_temporal(**kwargs)
+					if not res.get('success'):
+						raise Exception(res.get('error', 'Failed to initiate scan'))
 					results.append({'domain': domain.name, 'scan_id': scan.id})
 					
 				except Exception as e:
@@ -2439,7 +2441,12 @@ class InitiateSubTask(APIView):
 				'engine_id': engine_id,
 				'selected_plugin_slugs': selected_plugins,
 			}
-			initiate_subscan_temporal(**ctx)
+			res = initiate_subscan_temporal(**ctx)
+			if not res.get('success'):
+				return Response({
+					'status': False,
+					'message': res.get('error', 'Failed to initiate subscan')
+				}, status=status.HTTP_400_BAD_REQUEST)
 		return Response({'status': True})
 
 
