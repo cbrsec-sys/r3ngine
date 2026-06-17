@@ -268,9 +268,35 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
         Exception: Re-raises any exception from the underlying task so Temporal
                    can retry or fail the activity appropriately.
     """
-    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
+    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, ABORTED_TASK
+    from temporalio.exceptions import ApplicationError
     import contextvars
     import time
+
+    # ---------------------------------------------------------------------------
+    # Pre-flight guard: abort/delete check
+    # If the scan has been deleted or aborted in Django DB, raise a
+    # non-retryable ApplicationError so Temporal permanently fails this activity
+    # and bubbles the failure up to the workflow without retrying.
+    # This prevents infinite retry loops when a scan is deleted or aborted while
+    # Temporal replays the workflow after a container restart.
+    # ---------------------------------------------------------------------------
+    scan_id_check = ctx.get('scan_history_id')
+    if scan_id_check:
+        from startScan.models import ScanHistory as _ScanHistory
+        _scan = _ScanHistory.objects.filter(pk=scan_id_check).first()
+        if not _scan:
+            raise ApplicationError(
+                f"[{task_name}] ScanHistory {scan_id_check} no longer exists — "
+                f"scan was deleted. Workflow cancelled.",
+                non_retryable=True,
+            )
+        if _scan.scan_status == ABORTED_TASK:
+            raise ApplicationError(
+                f"[{task_name}] Scan {scan_id_check} was aborted by the user. "
+                f"Workflow cancelled.",
+                non_retryable=True,
+            )
 
     proxy = TemporalTaskProxy(ctx, db_task_name or task_name, description)
 
@@ -479,6 +505,13 @@ def target_profiling_activity(ctx: dict) -> dict:
     Reads the ScanHistory record, resolves the domain, loads and caches the
     engine YAML configuration into ctx, and creates the scan results directory.
 
+    This activity is the first real activity every scan workflow executes. It
+    acts as the primary lifecycle guard: if the scan has been deleted or aborted
+    in Django's DB (e.g. the user aborted/deleted the scan and the container
+    restarted with Temporal replaying the workflow from its own history), this
+    activity raises a non-retryable ApplicationError to permanently terminate
+    the workflow without further retries.
+
     Args:
         ctx (dict): Temporal workflow context. Must contain 'scan_history_id'
                     and 'engine_id'.
@@ -490,25 +523,48 @@ def target_profiling_activity(ctx: dict) -> dict:
     from startScan.models import ScanHistory
     from scanEngine.models import EngineType
     from reNgine.settings import RENGINE_RESULTS
-    from reNgine.definitions import RUNNING_TASK, SUCCESS_TASK, FAILED_TASK
+    from reNgine.definitions import RUNNING_TASK, SUCCESS_TASK, FAILED_TASK, ABORTED_TASK
+    from temporalio.exceptions import ApplicationError
 
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[TargetProfilingActivity] Profiling scan_history_id={scan_id}")
     logger.log_line("[TEMPORAL]", "START", "task=target_profiling scan_id=%s" % scan_id)
 
+    # ---------------------------------------------------------------------------
+    # Lifecycle guard — abort/delete check
+    # Temporal replays workflows from its own durable history after a container
+    # restart, independently of Django's DB state. If the scan was deleted or
+    # aborted while the container was down, we must terminate the workflow here
+    # (the earliest possible point) rather than letting it run and crash later
+    # with FK violations or silently overwrite the ABORTED status.
+    # ApplicationError(non_retryable=True) tells Temporal to mark this activity
+    # as permanently failed and propagate to the workflow without retrying.
+    # ---------------------------------------------------------------------------
+    scan = ScanHistory.objects.filter(pk=scan_id).first()
+    if not scan:
+        raise ApplicationError(
+            f"[TargetProfilingActivity] ScanHistory {scan_id} no longer exists — "
+            f"scan was deleted. Workflow cancelled.",
+            non_retryable=True,
+        )
+    if scan.scan_status == ABORTED_TASK:
+        raise ApplicationError(
+            f"[TargetProfilingActivity] Scan {scan_id} was aborted by the user. "
+            f"Workflow cancelled.",
+            non_retryable=True,
+        )
+
     proxy = TemporalTaskProxy(ctx, 'target_profiling', 'Target Profiling')
     try:
-        scan = ScanHistory.objects.filter(pk=scan_id).first()
-        if not scan:
-            raise ValueError(f"ScanHistory with id={scan_id} not found.")
-
         engine_id = ctx.get('engine_id') or (scan.scan_type.id if scan.scan_type else None)
         engine = EngineType.objects.filter(pk=engine_id).first()
         if not engine:
             raise ValueError(f"EngineType with id={engine_id} not found.")
 
         # Re-arm status to RUNNING so the Django DB reflects reality when a
-        # workflow is restarted after a prior run set it to FAILED or ABORTED.
+        # workflow is restarted after a prior run set it to FAILED.
+        # Note: ABORTED_TASK is already blocked above — only FAILED/other non-running
+        # states reach here (e.g. a legitimately failed scan being re-tried).
         if scan.scan_status != RUNNING_TASK:
             scan.scan_status = RUNNING_TASK
             scan.save(update_fields=['scan_status'])

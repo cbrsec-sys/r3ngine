@@ -189,9 +189,28 @@
   - Reorganized the Report Settings checkbox area into a two-column grid: left column holds "Ignore Information Vulnerabilities" and "Include Attack Surface Map"; right column holds "Include Attack Paths" and the new "Include Found Parameters".
   - Added **Include Found Parameters** checkbox, which gates whether discovered `Parameter` records are appended to the generated report. The flag is passed as `include_found_parameters` in the report generation request to `/scan/create_report/`.
 
+- **Fix: Report Generation Respects `include_found_parameters` Checkbox** (`startScan/views.py`, `reNgine/report_tasks.py`):
+  - Previously the "Include Found Parameters" checkbox in the report generation modal had no effect — `Parameter` records were always included in the report regardless of the user's selection.
+  - Root cause: `create_report` was not persisting the `include_found_parameters` flag in `ScanReport.params`, so `generate_report_task` always ran the parameters queryset unconditionally.
+  - Fixed by reading `include_found_parameters` from the GET request in `create_report` (defaulting `True` for backward-compat) and storing it in `ScanReport.params`. `generate_report_task` now reads the flag and gates the `Parameter` queryset behind `include_found_parameters`, producing reports without a parameters section when the box is unchecked.
+
+- **Fix: Temporal Workflows No Longer Resume Aborted or Deleted Scans** (`reNgine/temporal_activities.py`):
+  - After a container restart, Temporal replays durable workflows from its own history independently of Django's database. Scans that were aborted or deleted before the restart would continue executing, causing:
+    - **Deleted scans**: `IntegrityError` FK violations (`scan_history_id` not present in `startScan_scanhistory`), triggering infinite Temporal retry loops.
+    - **Aborted scans**: `TargetProfilingActivity` was unconditionally re-arming `scan_status` back to `RUNNING_TASK`, silently undoing the abort.
+  - Root cause confirmed by container logs showing the `dalfox_xss_scan` activity for deleted scan #32 entering an infinite retry cycle after every restart.
+  - Fixed with a two-layer guard using Temporal's `ApplicationError(non_retryable=True)`:
+    - **Layer 1 — `TargetProfilingActivity`**: Acts as the primary lifecycle guard (first real activity every workflow runs). If `ScanHistory` does not exist or has `scan_status=ABORTED_TASK`, raises a non-retryable error to permanently terminate the workflow before any work is attempted. The unconditional re-arm of `ABORTED_TASK` status has been removed; only `FAILED_TASK`/other states are re-armed to `RUNNING_TASK`.
+    - **Layer 2 — `_run_task` helper**: Pre-flight guard at the entry point of every activity function. Catches activities that were in-flight mid-scan at the time of abort/delete, preventing them from proceeding and entering retry loops.
+  - Orphaned `TemporalWorkflowExecution` DB records for aborted scans (scans 4 and 8) were reconciled and marked `CANCELLED`/`TERMINATED`. The actively-looping workflow for deleted scan 32 (`master-scan-32-run-0-f36d62b1-nuclei`) was cancelled directly via the Temporal API.
+
+
+
+
 ### [v3.5.0] - 2026-06-04
 
 - **Python 3.12 Runtime Upgrade**:
+
   - Upgraded the container execution runtime from Python 3.10 to Python 3.12 to improve performance by ~25% and ensure support until October 2028.
   - Configured the trusted deadsnakes PPA signing keyring (`/usr/share/keyrings/deadsnakes.gpg`) to install `python3.12`, `python3.12-dev`, and `python3.12-venv` in the Ubuntu 22.04 base image.
   - Avoided installing the system `python3-pip` package (which forces default Python 3.10 installation) by bootstrapping Python 3.12's `ensurepip` module directly.
