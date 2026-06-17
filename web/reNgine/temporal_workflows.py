@@ -1,4 +1,4 @@
-﻿"""
+"""
 Temporal Workflow definitions for the r3ngine scan pipeline.
 
 Workflows define the durable orchestration logic — the "what runs when" in the
@@ -863,11 +863,28 @@ class NucleiPlannerWorkflow:
         workflow.logger.info(
             f"Starting NucleiPlannerWorkflow for scan_id={ctx.get('scan_history_id')}"
         )
-        
+
+        # -----------------------------------------------------------------------
+        # Lifecycle guard — child workflow abort/delete check
+        # When Temporal replays this child workflow after a container restart, it
+        # skips MasterScanWorkflow's TargetProfilingActivity guard entirely.
+        # CheckScanAliveActivity mirrors that guard here at the earliest possible
+        # point, raising non_retryable ApplicationError if the scan was deleted or
+        # aborted so the child workflow terminates cleanly without retry loops.
+        # -----------------------------------------------------------------------
+        await workflow.execute_activity(
+            "CheckScanAliveActivity",
+            args=[ctx.get('scan_history_id')],
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+
         yaml_config = ctx.get('yaml_configuration', {})
         vuln_config = yaml_config.get('vulnerability_scan', {})
-        
+
         # --- Stage 1: Primary scanners ---
+
         if vuln_config.get('run_nuclei', True):
             nuclei_specific_config = vuln_config.get('nuclei', {})
             severities = nuclei_specific_config.get('severity') or NUCLEI_DEFAULT_SEVERITIES
@@ -883,22 +900,18 @@ class NucleiPlannerWorkflow:
                         task_queue="python-orchestrator-queue",
                     )
 
-                    # Gather tags via activity (DB + tech_mapping work is not allowed in workflows).
-                    all_tags = await workflow.execute_activity(
+                    # Gather tags and pre-built batches via activity.
+                    # Activity counts templates per tag so each batch is bounded by
+                    # template count rather than tag count — prevents 2-hour timeouts
+                    # on WordPress-heavy scans with 2000+ templates.
+                    nuclei_tag_result = await workflow.execute_activity(
                         "GatherNucleiTagsActivity",
                         args=[ctx],
-                        start_to_close_timeout=timedelta(minutes=5),
+                        start_to_close_timeout=timedelta(minutes=10),
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue",
                     )
-
-                    # Group into batches of 3 so each Nuclei call is bounded and provides
-                    # granular Temporal history entries.  An empty list → single pass with
-                    # no tag filter (preserves current behaviour when no tech is detected).
-                    if all_tags:
-                        tag_batches = [all_tags[i:i + 3] for i in range(0, len(all_tags), 3)]
-                    else:
-                        tag_batches = [None]  # sentinel: no -tags flag
+                    tag_batches = nuclei_tag_result.get('batches') or [None]
 
                     for severity in severities:
                         for batch in tag_batches:
@@ -926,22 +939,18 @@ class NucleiPlannerWorkflow:
                             task_queue="python-orchestrator-queue",
                         )
             else:
-                # Gather tags via activity (DB + tech_mapping work is not allowed in workflows).
-                all_tags = await workflow.execute_activity(
+                # Gather tags and pre-built batches via activity.
+                # Activity counts templates per tag so each batch is bounded by
+                # template count rather than tag count — prevents 2-hour timeouts
+                # on WordPress-heavy scans with 2000+ templates.
+                nuclei_tag_result = await workflow.execute_activity(
                     "GatherNucleiTagsActivity",
                     args=[ctx],
-                    start_to_close_timeout=timedelta(minutes=5),
+                    start_to_close_timeout=timedelta(minutes=10),
                     retry_policy=_RETRY_INTERNAL,
                     task_queue="python-orchestrator-queue",
                 )
-
-                # Group into batches of 3 so each Nuclei call is bounded and provides
-                # granular Temporal history entries.  An empty list → single pass with
-                # no tag filter (preserves current behaviour when no tech is detected).
-                if all_tags:
-                    tag_batches = [all_tags[i:i + 3] for i in range(0, len(all_tags), 3)]
-                else:
-                    tag_batches = [None]  # sentinel: no -tags flag
+                tag_batches = nuclei_tag_result.get('batches') or [None]
 
                 for severity in severities:
                     for batch in tag_batches:
@@ -1325,7 +1334,25 @@ class SubScanWorkflow:
                     f"Add it to _PERMITTED_GENERIC_TASKS in temporal_activities.py to enable dispatch."
                 )
 
+        # -----------------------------------------------------------------------
+        # Lifecycle guard — child workflow abort/delete check
+        # SubScanWorkflow is spawned after MasterScanWorkflow has run
+        # TargetProfilingActivity. When Temporal replays this child workflow after
+        # a container restart it skips the parent's guard entirely. This call
+        # mirrors that guard at the earliest point before any task dispatch,
+        # raising a non_retryable ApplicationError if the scan was deleted or
+        # aborted so the child workflow terminates cleanly without retry loops.
+        # -----------------------------------------------------------------------
+        await workflow.execute_activity(
+            "CheckScanAliveActivity",
+            args=[ctx.get('scan_history_id'), ctx.get('subscan_id')],
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+
         is_cancelled = False
+
         success = False
         task_success = {}
 
