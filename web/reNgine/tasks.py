@@ -3449,6 +3449,13 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	# that already completed in a previous attempt.
 	processed_paramspider_subdomains = set()
 	processed_arjun_subdomains = set()
+	processed_linkfinder_subdomains = set()
+	# Gate-check caches: has_graphql_endpoint probes up to 6 network paths with a
+	# 5s timeout each, and has_jwt_tokens issues 2 DB queries — both return the
+	# same result for every URL sharing a subdomain.  Evaluate each gate once per
+	# subdomain and reuse the cached bool for subsequent URLs.
+	_graphql_gate_cache: dict = {}  # subdomain_name -> bool
+	_jwt_gate_cache: dict = {}      # subdomain_name -> bool
 	logger.warning('[WEB_API] Starting per-URL tool phase for %d URLs', len(url_subdomain_map))
 
 	for url, subdomain_name, subdomain in url_subdomain_map:
@@ -3524,15 +3531,22 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			else:
 				logger.warning('[WEB_API] ParamSpider: output file missing for %s', subdomain_name)
 
-		# LinkFinder - per URL (fast; fetches and extracts JS links)
-		if 'linkfinder' in uses_tools:
+		# LinkFinder - once per subdomain (JS endpoint and parameter extraction).
+		# processed_linkfinder_subdomains is the primary dedup guard so the tool
+		# runs at most once per subdomain regardless of whether its output file is
+		# empty (empty output = no JS found, not an error requiring a retry).
+		# os.path.exists is the Temporal retry guard: a file written by a prior
+		# activity attempt is loaded directly without re-running the tool.
+		if 'linkfinder' in uses_tools and subdomain_name not in processed_linkfinder_subdomains:
+			processed_linkfinder_subdomains.add(subdomain_name)
 			lf_output = f"{results_dir}/lf_{subdomain_name}.txt"
-			if os.path.exists(lf_output) and os.path.getsize(lf_output) > 0:
+			if os.path.exists(lf_output):
 				logger.warning('[WEB_API] LinkFinder: cache hit for %s — loading existing results', subdomain_name)
 			else:
 				cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -d -i {url} -o cli | tee {lf_output}"
 				logger.warning('[WEB_API] LinkFinder: running on %s | cmd: %s', subdomain_name, cmd)
 				run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
+				logger.warning('[WEB_API] LinkFinder: finished on %s', subdomain_name)
 			if os.path.exists(lf_output):
 				try:
 					lf_endpoints = 0
@@ -3559,9 +3573,15 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			else:
 				logger.warning('[WEB_API] LinkFinder: output file missing for %s', subdomain_name)
 
-		# InQL - GraphQL Discovery (only when a GraphQL endpoint is detected)
+		# InQL - GraphQL Discovery (only when a GraphQL endpoint is detected).
+		# _graphql_gate_cache[subdomain_name] is populated on first visit so that
+		# has_graphql_endpoint (which issues a DB iregex query + up to 6 network
+		# probes × 5 s each) is called at most once per subdomain, not per URL.
 		if 'inql' in uses_tools:
-			if not has_graphql_endpoint(self.scan_id, url):
+			if subdomain_name not in _graphql_gate_cache:
+				logger.warning('[WEB_API] InQL: checking GraphQL gate for %s (first visit)', subdomain_name)
+				_graphql_gate_cache[subdomain_name] = has_graphql_endpoint(self.scan_id, url)
+			if not _graphql_gate_cache[subdomain_name]:
 				logger.warning('[WEB_API] InQL: no GraphQL endpoint detected, skipping %s', subdomain_name)
 			else:
 				inql_output = f"{results_dir}/inql_{subdomain_name}"
@@ -3584,9 +3604,14 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				else:
 					logger.warning('[WEB_API] InQL: no output directory found for %s', subdomain_name)
 
-		# jwt_tool - JWT security testing (only when JWT tokens have been found)
+		# jwt_tool - JWT security testing (only when JWT tokens have been found).
+		# _jwt_gate_cache[subdomain_name] is populated on first visit so that
+		# has_jwt_tokens (2 DB queries per call) runs at most once per subdomain.
 		if JWT_TOOL in uses_tools:
-			if has_jwt_tokens(self.scan_id, subdomain=subdomain):
+			if subdomain_name not in _jwt_gate_cache:
+				logger.warning('[WEB_API] jwt_tool: checking JWT gate for %s (first visit)', subdomain_name)
+				_jwt_gate_cache[subdomain_name] = has_jwt_tokens(self.scan_id, subdomain=subdomain)
+			if _jwt_gate_cache[subdomain_name]:
 				logger.warning('[WEB_API] jwt_tool: JWT tokens found, running on %s', subdomain_name)
 				from reNgine.api_tasks import run_jwt_scan
 				run_jwt_scan(self, ctx, url, subdomain, results_dir)
@@ -3594,9 +3619,13 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			else:
 				logger.warning('[WEB_API] jwt_tool: no JWT tokens detected, skipping %s', subdomain_name)
 
-		# graphql-cop - GraphQL security audit (only when a GraphQL endpoint is detected)
+		# graphql-cop - GraphQL security audit (only when a GraphQL endpoint is detected).
+		# Shares _graphql_gate_cache with InQL — no second round of probes needed.
 		if GRAPHQL_COP in uses_tools:
-			if not has_graphql_endpoint(self.scan_id, url):
+			if subdomain_name not in _graphql_gate_cache:
+				logger.warning('[WEB_API] graphql-cop: checking GraphQL gate for %s (first visit)', subdomain_name)
+				_graphql_gate_cache[subdomain_name] = has_graphql_endpoint(self.scan_id, url)
+			if not _graphql_gate_cache[subdomain_name]:
 				logger.warning('[WEB_API] graphql-cop: no GraphQL endpoint detected, skipping %s', subdomain_name)
 			else:
 				logger.warning('[WEB_API] graphql-cop: running on %s', subdomain_name)
