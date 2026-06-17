@@ -1,5 +1,5 @@
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 from reNgine.nuclei_batch_utils import count_templates_for_tag, build_tag_batches
 
 
@@ -105,3 +105,54 @@ class TestCountTemplatesForTag(TestCase):
         count = count_templates_for_tag('', ['/root/nuclei-templates'])
         self.assertEqual(count, 0)
         mock_run.assert_not_called()
+
+
+class TestGatherNucleiTagsActivity(TestCase):
+    @patch('reNgine.nuclei_batch_utils.subprocess.run')
+    def test_returns_dict_with_tags_and_batches(self, mock_run):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = '\n'.join(
+            [f'/root/nuclei-templates/wp-{i}.yaml' for i in range(50)]
+        )
+
+        with patch('reNgine.temporal_activities.Subdomain') as mock_sub:
+            mock_qs = MagicMock()
+            mock_qs.__iter__ = MagicMock(return_value=iter([]))
+            mock_sub.objects.filter.return_value = mock_qs
+
+            from reNgine.temporal_activities import gather_nuclei_tags_activity
+            ctx = {
+                'scan_history_id': 1,
+                'yaml_configuration': {
+                    'vulnerability_scan': {
+                        'nuclei': {
+                            'tags': ['wordpress'],
+                            'max_templates_per_batch': 100,
+                        }
+                    }
+                },
+            }
+            result = gather_nuclei_tags_activity(ctx)
+
+        self.assertIsInstance(result, dict)
+        self.assertIn('tags', result)
+        self.assertIn('batches', result)
+        self.assertIsInstance(result['tags'], list)
+        self.assertIsInstance(result['batches'], list)
+
+    @patch('reNgine.nuclei_batch_utils.subprocess.run')
+    def test_empty_tags_returns_empty_batches(self, mock_run):
+        mock_run.return_value.returncode = 0
+        mock_run.return_value.stdout = ''
+
+        with patch('reNgine.temporal_activities.Subdomain') as mock_sub:
+            mock_qs = MagicMock()
+            mock_qs.__iter__ = MagicMock(return_value=iter([]))
+            mock_sub.objects.filter.return_value = mock_qs
+
+            from reNgine.temporal_activities import gather_nuclei_tags_activity
+            ctx = {'scan_history_id': 1, 'yaml_configuration': {}}
+            result = gather_nuclei_tags_activity(ctx)
+
+        self.assertEqual(result['tags'], [])
+        self.assertEqual(result['batches'], [])
