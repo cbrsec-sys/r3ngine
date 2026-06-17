@@ -31,6 +31,7 @@ from reNgine.auth_discovery_tasks import (
 )
 from reNgine.common_func import get_proxy_list, get_random_proxy
 from reNgine.utils.task import activity_heartbeat_safe
+from startScan.models import Subdomain
 
 logger = get_module_logger(__name__)
 
@@ -1276,26 +1277,22 @@ def cleanup_proxy_list_activity(file_path: str) -> bool:
     return True
 
 @activity.defn(name="GatherNucleiTagsActivity")
-def gather_nuclei_tags_activity(ctx: dict) -> list:
-    """Pre-compute Nuclei tags from YAML config + detected technologies.
+def gather_nuclei_tags_activity(ctx: dict) -> dict:
+    """Pre-compute Nuclei tags and build template-count-aware batches.
 
-    Called once by NucleiPlannerWorkflow before the severity loop so that
-    the workflow can split tags into batches of 3 without performing any
-    DB work itself (which would violate Temporal determinism rules).
-
-    Returns a sorted, deduplicated list of tag strings.  An empty list
-    signals that no tag filter should be applied — Nuclei will run against
-    all default templates for that severity.
-
-    Args:
-        ctx (dict): Temporal workflow context (scan_history_id, yaml_configuration,
-                    and optionally subdomain_id for subscans).
+    Counts templates per detected tag via ``nuclei -tl`` so the workflow can
+    dispatch bounded nuclei invocations without violating Temporal determinism.
 
     Returns:
-        list[str]: Merged and sorted Nuclei tag strings.
+        dict with keys:
+          - ``tags``: sorted deduplicated list of all detected tag strings
+          - ``batches``: list of tag-lists, each batch's total template count
+                         <= max_templates_per_batch; empty list when no tags
+                         detected (caller falls back to unfiltered scan).
     """
     from reNgine.tech_mapping import get_nuclei_tags_from_techs
-    from startScan.models import Subdomain
+    from reNgine.nuclei_batch_utils import count_templates_for_tag, build_tag_batches
+    from reNgine.definitions import NUCLEI_MAX_TEMPLATES_PER_BATCH, NUCLEI_DEFAULT_TEMPLATES_PATH
 
     scan_id = ctx.get('scan_history_id')
     subdomain_id = ctx.get('subdomain_id')
@@ -1308,6 +1305,8 @@ def gather_nuclei_tags_activity(ctx: dict) -> list:
     if isinstance(user_tags, str):
         user_tags = [t.strip() for t in user_tags.split(',') if t.strip()]
 
+    max_per_batch = int(nuclei_cfg.get(NUCLEI_MAX_TEMPLATES_PER_BATCH, 100))
+
     qs = Subdomain.objects.filter(scan_history_id=scan_id)
     if subdomain_id:
         qs = qs.filter(pk=subdomain_id)
@@ -1317,14 +1316,29 @@ def gather_nuclei_tags_activity(ctx: dict) -> list:
         all_techs.update(sub.technologies.values_list('name', flat=True))
 
     tech_tags = get_nuclei_tags_from_techs(list(all_techs)) if all_techs else []
-
     merged = sorted(set(user_tags) | set(tech_tags))
+
+    # Count templates per tag so batches are bounded by template count not tag count.
+    template_dirs = [NUCLEI_DEFAULT_TEMPLATES_PATH]
+    tag_counts: dict = {}
+    for tag in merged:
+        tag_counts[tag] = count_templates_for_tag(tag, template_dirs)
+        logger.log_line(
+            "[TEMPORAL]", "INFO",
+            "task=gather_nuclei_tags scan_id=%s tag=%s templates=%d" % (scan_id, tag, tag_counts[tag])
+        )
+
+    batches = build_tag_batches(merged, tag_counts, max_per_batch=max_per_batch)
+
     activity.logger.info(
-        "[GatherNucleiTagsActivity] scan_id=%s subdomain_id=%s tags=%s",
-        scan_id, subdomain_id, merged,
+        "[GatherNucleiTagsActivity] scan_id=%s tags=%s batches=%d max_per_batch=%d",
+        scan_id, merged, len(batches), max_per_batch,
     )
-    logger.log_line("[TEMPORAL]", "COMPLETE", "task=gather_nuclei_tags scan_id=%s tags=%d" % (scan_id, len(merged)))
-    return merged
+    logger.log_line(
+        "[TEMPORAL]", "COMPLETE",
+        "task=gather_nuclei_tags scan_id=%s tags=%d batches=%d" % (scan_id, len(merged), len(batches))
+    )
+    return {'tags': merged, 'batches': batches}
 
 
 @activity.defn(name="RunNucleiActivity")
