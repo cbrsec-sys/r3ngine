@@ -754,3 +754,55 @@ export const useUnpauseScan = (projectSlug: string) => {
     },
   });
 };
+
+export const useDirectoryFileDispatch = () => {
+  return useMutation({
+    mutationFn: async (params: {
+      url: string;
+      action: string;
+      scan_id: number;
+    }): Promise<{ status: string; workflow_id: string }> => {
+      const response = await fetch('/api/action/directory-file/dispatch/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to dispatch directory file action');
+      }
+      return response.json();
+    },
+  });
+};
+
+export const useDirectoryFileDelete = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: {
+      directory_file_ids: number[];
+    }): Promise<{ deleted: number }> => {
+      const response = await fetch('/api/action/directory-file/delete/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-CSRFToken': document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || '',
+        },
+        credentials: 'include',
+        body: JSON.stringify(params),
+      });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to delete directory file(s)');
+      }
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['directories'] });
+    },
+  });
+};
