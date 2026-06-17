@@ -35,22 +35,29 @@ echo "Syncing roles..."
 python3 manage.py sync_roles
 
 # Check if fixtures are already loaded
-echo "Checking if default fixtures are already loaded..."
-if ! python3 manage.py shell -c "from scanEngine.models import EngineType; import sys; sys.exit(0 if EngineType.objects.exists() else 1)"; then
+#echo "Checking if default fixtures are already loaded..."
+#if ! python3 manage.py shell -c "from scanEngine.models import EngineType; import sys; sys.exit(0 if EngineType.objects.exists() else 1)"; then
+# Commented out the above check as sometimes 
+# engine are updated. This needs to be optimized
+# Load all scan_engine fixtures in a single command
+# Load all hardware_profile fixtures in a single command
+
     echo "Loading default fixtures..."
     python3 manage.py loaddata fixtures/external_tools.yaml
     python3 manage.py loaddata fixtures/default_keywords.yaml
+    python3 manage.py loaddata fixtures/scan_engines/*.yaml
+    python3 manage.py loaddata fixtures/hardware_profiles/*.yaml
 
-    for f in fixtures/scan_engines/*.yaml; do
-        python3 manage.py loaddata "$f" --app scanEngine.EngineType
-    done
-
-    for f in fixtures/hardware_profiles/*.yaml; do
-        python3 manage.py loaddata "$f" --app scanEngine.HardwareProfile
-    done
-else
-    echo "Default fixtures already exist. Skipping..."
-fi
+    # The below two loops are not required if we load all fixtures in a single command
+    # for f in fixtures/scan_engines/*.yaml; do
+    #     python3 manage.py loaddata "$f" --app scanEngine.EngineType
+    # done
+    # for f in fixtures/hardware_profiles/*.yaml; do
+    #     python3 manage.py loaddata "$f" --app scanEngine.HardwareProfile
+    # done
+# else
+#     echo "Default fixtures already exist. Skipping..."
+# fi
 
 # Start the server
 echo "Starting reNgine server..."

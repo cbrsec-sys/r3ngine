@@ -5,10 +5,10 @@ Loaded on demand when detailed stack or module information is needed.
 ## Core Technologies
 
 ### Backend
-- **Django** 3.2 (LTS): ORM, REST API (DRF 3.12.4), auth, permissions
+- **Django** 5.2.3 LTS: ORM, REST API (DRF 3.15.2), auth, permissions
 - **Python** 3.12: backend logic, task functions, Temporal activities
-- **temporalio** 1.6.0: workflow and activity SDK (replaced Celery entirely in v3.2.0)
-- **channels** 3.0.5: WebSocket support via Redis channel layer
+- **temporalio** 1.7.0: workflow and activity SDK (replaced Celery entirely in v3.2.0)
+- **channels** 4.2.2: WebSocket support via Redis channel layer
 - **Playwright** 1.42.0: headless browser (screenshotting)
 
 ### Database
@@ -20,14 +20,16 @@ Loaded on demand when detailed stack or module information is needed.
 - **React 18+**, TypeScript, Vite bundler
 - State: Zustand stores (`frontend/src/store/`)
 - API client layer: `frontend/src/api/`
-- Components: `frontend/src/components/`
+- Components: `frontend/src/components/`, `frontend/src/features/`
 - Pages: `frontend/src/pages/`
+- Theme: `frontend/src/theme/` — use `useThemeTokens()`, `useSemanticColors()`, theme helpers
 
 ### Deployment
 - **Docker** / Docker Compose (development + production)
-- Django dev server (development), Gunicorn/Daphne (production)
+- Django dev server (development), Gunicorn (production)
 - All `manage.py` commands must run inside the container (`r3ngine-web-1`)
 - Use `python3` (not `python`) inside the container
+- Frontend build: `npm run build` run **locally** in `frontend/` (NOT inside the container)
 
 ### Quality & Tooling
 - **flake8**: lint; **black**: format
@@ -56,13 +58,15 @@ Temporal Server
 - **startScan** (core domain):
   - `startScan/models.py`: `ScanHistory`, `Subdomain`, `EndPoint`, `Vulnerability`, `Parameter`, `ScanActivity`, `TemporalWorkflowExecution`
   - `startScan/views.py`: scan management REST endpoints
+  - `ScanHistory.workflow_ids`: ArrayField tracking running Temporal workflow IDs (no celery_ids)
 - **scanEngine**:
   - `scanEngine/models.py`: `EngineType` (YAML scan config templates), `InstalledExternalTool`
 - **reNgine app** (shared logic):
-  - `reNgine/tasks.py`: task functions called by activities (no `@app.task` decorators)
-  - `reNgine/temporal_workflows.py`: `MasterScanWorkflow`, `SubScanWorkflow`
+  - `reNgine/tasks.py`: legacy task entry points (no `@app.task` decorators); called by activities
+  - `reNgine/temporal_workflows.py`: `MasterScanWorkflow`, `SubScanWorkflow`, `CodeScanWorkflow`, `URLAuthExtractWorkflow`, plus tier-specific child workflows
   - `reNgine/temporal_activities.py`: 30+ `@activity.defn` functions
   - `reNgine/temporal_client.py`: `TemporalClientProvider` (sync/async bridge)
+  - `reNgine/temporal_schedule_utils.py`: scheduled scan helpers
   - `reNgine/graph_utils.py`: `Neo4jManager` for APME Cypher queries
   - `reNgine/llm.py`, `reNgine/llm_utils.py`: LLM integration with PII anonymisation
   - `reNgine/common_func.py`: shared utilities
@@ -70,8 +74,37 @@ Temporal Server
   - `reNgine/utils/logger.py`: `get_module_logger`, `ModuleLogger`, `format_exception_for_log`
   - `reNgine/utils/opsec.py`: proxy rotation, OpSec controls
   - `reNgine/utils/task.py`: task utility helpers
+  - `reNgine/scan_context.py`: scan context dataclass passed through pipeline
+  - `reNgine/target_router.py`: routes scans to correct workflow by target type
+  - `reNgine/task_plan.py`: pre-populates ordered task list for a scan config
+  - **Task modules** (one file per scanning domain, all plain Python functions):
+    - `reNgine/api_tasks.py`: API endpoint discovery
+    - `reNgine/auth_discovery_tasks.py`: authentication discovery and extraction
+    - `reNgine/cpde_tasks.py`: Custom Parameter Discovery Engine (CPDE)
+    - `reNgine/crawl_tasks.py`: HTTP crawling (katana, gau, hakrawler, gospider)
+    - `reNgine/dns_tasks.py`: DNS enumeration and subdomain discovery
+    - `reNgine/firewall_tasks.py`: WAF and firewall detection
+    - `reNgine/fuzzing_tasks.py`: directory/file fuzzing (ffuf, dirsearch)
+    - `reNgine/monitor_tasks.py`: scan monitoring and heartbeat
+    - `reNgine/network_tasks.py`: port scanning (nmap, naabu)
+    - `reNgine/osint_tasks.py`: OSINT gathering (holehe, maigret)
+    - `reNgine/recon_tasks.py`: general reconnaissance (httpx, tech detection)
+    - `reNgine/report_tasks.py`: report generation
+    - `reNgine/vigolium_tasks.py`: Vigolium static code scanner (dispatched by CodeScanWorkflow)
+    - `reNgine/vulnerability_tasks.py`: vulnerability correlation and lifecycle
+    - `reNgine/wpscan_tasks.py`: WPScan WordPress security scanner parser
+    - `reNgine/wptaint_tasks.py`: WPTaint taint-flow vulnerability analysis
+  - `reNgine/cpde/`: CPDE sub-package (custom parameter discovery engine)
+- **apme app** (`web/apme/`):
+  - `apme/orchestrator.py`: coordinates APME phases
+  - `apme/engine/`: attack path computation engine
+  - `apme/graph/`: Neo4j graph construction and traversal
+  - `apme/ingestion/`: ingest scan results into the attack graph
+  - `apme/models/`: APME-specific Django models
+  - `apme/output/`: formats attack paths for the frontend
+  - `apme/llm_orchestrator.py`: LLM-assisted attack path analysis
 - **api app**:
-  - `api/views.py`: additional REST endpoints (subdomains, endpoints, vulnerabilities)
+  - `api/views.py`: additional REST endpoints (subdomains, endpoints, vulnerabilities, directory file dispatch)
   - `api/urls.py`: URL routing for the API
 - **plugins app**:
   - `plugins/views.py`: plugin management endpoints
@@ -80,7 +113,7 @@ Temporal Server
 
 | Model | Purpose |
 |-------|---------|
-| `ScanHistory` | Top-level scan record with status, config, Temporal workflow ID |
+| `ScanHistory` | Top-level scan record with status, config, `workflow_ids` (Temporal IDs) |
 | `Subdomain` | Discovered subdomains with scan context |
 | `EndPoint` | HTTP endpoints (URL + method + parameters) |
 | `Vulnerability` | Findings with severity, status, correlation state |
