@@ -6,6 +6,7 @@ from targetApp.models import Domain
 from scanEngine.models import EngineType
 from django.contrib.auth.models import User
 from rest_framework.test import APIClient
+from rolepermissions.roles import assign_role
 
 
 class TestExtractAuthForURLActivity(TestCase):
@@ -88,9 +89,21 @@ class TestDirectoryFileDispatchView(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user('dispatchuser', password='testpass')
+        assign_role(self.user, 'penetration_tester')
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
         self.client.force_login(self.user)
+        self.domain = Domain.objects.create(name='dispatch-test.example.com')
+        self.engine = EngineType.objects.create(
+            engine_name='test-engine-dispatch',
+            yaml_configuration='{}',
+        )
+        self.scan = ScanHistory.objects.create(
+            domain=self.domain,
+            scan_type=self.engine,
+            scan_status=0,
+            start_scan_date=timezone.now(),
+        )
 
     @patch('api.views.run_and_close')
     @patch('api.views.TemporalClientProvider')
@@ -99,7 +112,7 @@ class TestDirectoryFileDispatchView(TestCase):
         response = self.client.post('/api/action/directory-file/dispatch/', {
             'url': 'http://example.com/admin/',
             'action': 'scan_vuln',
-            'scan_id': 1,
+            'scan_id': self.scan.id,
         }, format='json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['status'], 'dispatched')
@@ -112,7 +125,7 @@ class TestDirectoryFileDispatchView(TestCase):
         response = self.client.post('/api/action/directory-file/dispatch/', {
             'url': 'http://example.com/login.php',
             'action': 'extract_auth',
-            'scan_id': 1,
+            'scan_id': self.scan.id,
         }, format='json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['status'], 'dispatched')
@@ -121,7 +134,7 @@ class TestDirectoryFileDispatchView(TestCase):
         response = self.client.post('/api/action/directory-file/dispatch/', {
             'url': 'http://example.com/',
             'action': 'do_something_invalid',
-            'scan_id': 1,
+            'scan_id': self.scan.id,
         }, format='json')
         self.assertEqual(response.status_code, 400)
         self.assertIn('error', response.data)
@@ -136,7 +149,7 @@ class TestDirectoryFileDispatchView(TestCase):
         response = self.client.post('/api/action/directory-file/dispatch/', {
             'url': 'http://example.com/login',
             'action': 'brute_test',
-            'scan_id': 1,
+            'scan_id': self.scan.id,
         }, format='json')
         self.assertEqual(response.status_code, 403)
 
@@ -155,7 +168,7 @@ class TestDirectoryFileDispatchView(TestCase):
         response = self.client.post('/api/action/directory-file/dispatch/', {
             'url': 'http://example.com/login',
             'action': 'brute_test',
-            'scan_id': 1,
+            'scan_id': self.scan.id,
         }, format='json')
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data['status'], 'dispatched')
@@ -165,10 +178,43 @@ class TestDirectoryFileDispatchView(TestCase):
         response = unauthenticated.post('/api/action/directory-file/dispatch/', {
             'url': 'http://example.com/',
             'action': 'scan_vuln',
-            'scan_id': 1,
+            'scan_id': self.scan.id,
         }, format='json')
         # LoginRequiredMiddleware redirects (302) unauthenticated requests to login;
         # DRF itself would return 401/403 — both mean the endpoint is protected.
+        self.assertIn(response.status_code, [401, 403, 302])
+
+    def test_dispatch_rejects_non_http_url(self):
+        response = self.client.post('/api/action/directory-file/dispatch/', {
+            'url': 'file:///etc/passwd',
+            'action': 'scan_vuln',
+            'scan_id': self.scan.id,
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', response.data)
+
+    def test_dispatch_rejects_nonexistent_scan_id(self):
+        response = self.client.post('/api/action/directory-file/dispatch/', {
+            'url': 'http://example.com/path',
+            'action': 'scan_vuln',
+            'scan_id': 999999,
+        }, format='json')
+        self.assertEqual(response.status_code, 404)
+        self.assertIn('error', response.data)
+
+    def test_dispatch_requires_modify_scan_results_permission(self):
+        from django.contrib.auth.models import User
+        from rest_framework.test import APIClient
+        # A fresh user with no role assignments has no extra permissions
+        plain_user = User.objects.create_user('plain_dispatch', password='testpass')
+        c = APIClient()
+        c.force_authenticate(user=plain_user)
+        c.force_login(plain_user)
+        response = c.post('/api/action/directory-file/dispatch/', {
+            'url': 'http://example.com/',
+            'action': 'scan_vuln',
+            'scan_id': 1,
+        }, format='json')
         self.assertIn(response.status_code, [401, 403, 302])
 
 
@@ -179,6 +225,7 @@ class TestDirectoryFileDeleteView(TestCase):
 
     def setUp(self):
         self.user = User.objects.create_user('deluser', password='testpass')
+        assign_role(self.user, 'penetration_tester')
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
         self.client.force_login(self.user)
@@ -220,4 +267,23 @@ class TestDirectoryFileDeleteView(TestCase):
             'directory_file_ids': [self.file1.id],
         }, format='json')
         # LoginRequiredMiddleware redirects (302) unauthenticated requests to login
+        self.assertIn(response.status_code, [401, 403, 302])
+
+    def test_delete_rejects_more_than_500_ids(self):
+        response = self.client.post('/api/action/directory-file/delete/', {
+            'directory_file_ids': list(range(1, 502)),
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', response.data)
+
+    def test_delete_requires_modify_scan_results_permission(self):
+        from django.contrib.auth.models import User
+        from rest_framework.test import APIClient
+        plain_user = User.objects.create_user('plain_delete', password='testpass')
+        c = APIClient()
+        c.force_authenticate(user=plain_user)
+        c.force_login(plain_user)
+        response = c.post('/api/action/directory-file/delete/', {
+            'directory_file_ids': [self.file1.id],
+        }, format='json')
         self.assertIn(response.status_code, [401, 403, 302])

@@ -37,7 +37,6 @@ export const TacticalPanel: React.FC<TacticalPanelProps> = ({
           ? surfaceSx.bgcolor
           : `linear-gradient(135deg, ${alpha(tokens.surface.secondary, 0.72)} 0%, ${alpha(tokens.surface.elevated, 0.92)} 100%)`,
         backdropFilter: isLight ? surfaceSx.backdropFilter : 'blur(25px) saturate(180%)',
-        borderRadius: isLight ? theme.shape.borderRadius : tokens.effects.radius,
         position: 'relative',
         boxShadow: isLight
           ? surfaceSx.boxShadow
