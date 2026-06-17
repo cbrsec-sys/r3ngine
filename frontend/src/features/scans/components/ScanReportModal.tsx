@@ -54,6 +54,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
   const [ignoreInfoVuln, setIgnoreInfoVuln] = useState(false);
   const [includeAttackSurface, setIncludeAttackSurface] = useState(false);
   const [includeAttackPaths, setIncludeAttackPaths] = useState(false);
+  const [includeFoundParameters, setIncludeFoundParameters] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationStatus, setGenerationStatus] = useState<string | null>(null);
   const [reportUrl, setReportUrl] = useState<string | null>(null);
@@ -112,6 +113,7 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
         ignore_info_vuln: ignoreInfoVuln ? 'True' : 'False',
         include_attack_surface_map: includeAttackSurface ? 'True' : 'False',
         include_attack_paths: includeAttackPaths ? 'True' : 'False',
+        include_found_parameters: includeFoundParameters ? 'True' : 'False',
         download: download ? 'True' : 'False',
         comments: comments
       });
@@ -295,78 +297,95 @@ export const ScanReportModal: React.FC<ScanReportModalProps> = ({ open, onClose,
                 </RadioGroup>
               </Box>
 
-              <Stack spacing={1}>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={ignoreInfoVuln}
-                      onChange={(e) => setIgnoreInfoVuln(e.target.checked)}
-                      sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }}
-                    />
-                  }
-                  label={<Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', fontWeight: 600 }}>Ignore Information Vulnerabilities</Typography>}
-                />
+              <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0 }}>
+                {/* Column 1 */}
+                <Box>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={ignoreInfoVuln}
+                        onChange={(e) => setIgnoreInfoVuln(e.target.checked)}
+                        sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }}
+                      />
+                    }
+                    label={<Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', fontWeight: 600 }}>Ignore Information Vulnerabilities</Typography>}
+                  />
 
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={includeAttackSurface}
-                      disabled={reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro'}
-                      onChange={(e) => setIncludeAttackSurface(e.target.checked)}
-                      sx={{ 
-                        color: `${tokens.accent.primary}15`, 
-                        '&.Mui-checked': { color: tokens.accent.primary },
-                        '&.Mui-disabled': { color: 'rgba(255,255,255,0.05)' }
-                      }}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography sx={{ 
-                        color: (reportTemplate === 'enterprise' || reportTemplate === 'cyber_pro') ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)', 
-                        fontSize: '0.8rem', 
-                        fontWeight: 600,
-                        transition: 'color 0.2s'
-                      }}>
-                        Include Attack Surface Map
-                      </Typography>
-                      {reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro' && (
-                        <Typography sx={{ color: `${tokens.accent.primary}4D`, fontSize: '0.65rem' }}>Only available for Enterprise/Pro templates</Typography>
-                      )}
-                    </Box>
-                  }
-                />
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={includeAttackSurface}
+                        disabled={reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro'}
+                        onChange={(e) => setIncludeAttackSurface(e.target.checked)}
+                        sx={{
+                          color: `${tokens.accent.primary}15`,
+                          '&.Mui-checked': { color: tokens.accent.primary },
+                          '&.Mui-disabled': { color: 'rgba(255,255,255,0.05)' }
+                        }}
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography sx={{
+                          color: (reportTemplate === 'enterprise' || reportTemplate === 'cyber_pro') ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          transition: 'color 0.2s'
+                        }}>
+                          Include Attack Surface Map
+                        </Typography>
+                        {reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro' && (
+                          <Typography sx={{ color: `${tokens.accent.primary}4D`, fontSize: '0.65rem' }}>Enterprise/Pro only</Typography>
+                        )}
+                      </Box>
+                    }
+                  />
+                </Box>
 
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={includeAttackPaths}
-                      disabled={reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro'}
-                      onChange={(e) => setIncludeAttackPaths(e.target.checked)}
-                      sx={{ 
-                        color: 'rgba(0,243,255,0.1)', 
-                        '&.Mui-checked': { color: '#00f3ff' },
-                        '&.Mui-disabled': { color: 'rgba(255,255,255,0.05)' }
-                      }}
-                    />
-                  }
-                  label={
-                    <Box>
-                      <Typography sx={{ 
-                        color: (reportTemplate === 'enterprise' || reportTemplate === 'cyber_pro') ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)', 
-                        fontSize: '0.8rem', 
-                        fontWeight: 600,
-                        transition: 'color 0.2s'
-                      }}>
-                        Include Attack Paths
-                      </Typography>
-                      {reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro' && (
-                        <Typography sx={{ color: 'rgba(0,243,255,0.3)', fontSize: '0.65rem' }}>Only available for Enterprise/Pro templates</Typography>
-                      )}
-                    </Box>
-                  }
-                />
-              </Stack>
+                {/* Column 2 */}
+                <Box>
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={includeAttackPaths}
+                        disabled={reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro'}
+                        onChange={(e) => setIncludeAttackPaths(e.target.checked)}
+                        sx={{
+                          color: 'rgba(0,243,255,0.1)',
+                          '&.Mui-checked': { color: '#00f3ff' },
+                          '&.Mui-disabled': { color: 'rgba(255,255,255,0.05)' }
+                        }}
+                      />
+                    }
+                    label={
+                      <Box>
+                        <Typography sx={{
+                          color: (reportTemplate === 'enterprise' || reportTemplate === 'cyber_pro') ? 'rgba(255,255,255,0.7)' : 'rgba(255,255,255,0.2)',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          transition: 'color 0.2s'
+                        }}>
+                          Include Attack Paths
+                        </Typography>
+                        {reportTemplate !== 'enterprise' && reportTemplate !== 'cyber_pro' && (
+                          <Typography sx={{ color: 'rgba(0,243,255,0.3)', fontSize: '0.65rem' }}>Enterprise/Pro only</Typography>
+                        )}
+                      </Box>
+                    }
+                  />
+
+                  <FormControlLabel
+                    control={
+                      <Checkbox
+                        checked={includeFoundParameters}
+                        onChange={(e) => setIncludeFoundParameters(e.target.checked)}
+                        sx={{ color: `${tokens.accent.primary}33`, '&.Mui-checked': { color: tokens.accent.primary } }}
+                      />
+                    }
+                    label={<Typography sx={{ color: 'rgba(255,255,255,0.7)', fontSize: '0.8rem', fontWeight: 600 }}>Include Found Parameters</Typography>}
+                  />
+                </Box>
+              </Box>
             </Stack>
           </Box>
 

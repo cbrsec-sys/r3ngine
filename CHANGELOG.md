@@ -185,6 +185,10 @@
   - Added `LinkedInSessionCard` React component: live status indicator (green/amber/red), file upload, session revocation, and helper script download — all via the API vault settings page.
   - 24 tests covering model fields, scraper authentication paths (storage_state, cookie injection, graceful fallback), all four API endpoints, and `run_linkedint` caller resilience.
 
+- **Report Settings — 2-Column Layout & Found Parameters Toggle**:
+  - Reorganized the Report Settings checkbox area into a two-column grid: left column holds "Ignore Information Vulnerabilities" and "Include Attack Surface Map"; right column holds "Include Attack Paths" and the new "Include Found Parameters".
+  - Added **Include Found Parameters** checkbox, which gates whether discovered `Parameter` records are appended to the generated report. The flag is passed as `include_found_parameters` in the report generation request to `/scan/create_report/`.
+
 ### [v3.5.0] - 2026-06-04
 
 - **Python 3.12 Runtime Upgrade**:
