@@ -170,3 +170,54 @@ class TestDirectoryFileDispatchView(TestCase):
         # LoginRequiredMiddleware redirects (302) unauthenticated requests to login;
         # DRF itself would return 401/403 — both mean the endpoint is protected.
         self.assertIn(response.status_code, [401, 403, 302])
+
+
+from startScan.models import DirectoryFile
+
+
+class TestDirectoryFileDeleteView(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user('deluser', password='testpass')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+        self.client.force_login(self.user)
+        self.file1 = DirectoryFile.objects.create(
+            name='L2FkbWlu',
+            url='http://example.com/admin',
+            http_status=200,
+            length=1234,
+        )
+        self.file2 = DirectoryFile.objects.create(
+            name='L2xvZ2lu',
+            url='http://example.com/login',
+            http_status=200,
+            length=500,
+        )
+
+    def test_delete_records_by_ids(self):
+        response = self.client.post('/api/action/directory-file/delete/', {
+            'directory_file_ids': [self.file1.id, self.file2.id],
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['deleted'], 2)
+        self.assertFalse(DirectoryFile.objects.filter(id=self.file1.id).exists())
+        self.assertFalse(DirectoryFile.objects.filter(id=self.file2.id).exists())
+
+    def test_delete_missing_ids_returns_400(self):
+        response = self.client.post('/api/action/directory-file/delete/', {}, format='json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_delete_empty_list_returns_400(self):
+        response = self.client.post('/api/action/directory-file/delete/', {
+            'directory_file_ids': [],
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_delete_requires_authentication(self):
+        unauthenticated = APIClient()
+        response = unauthenticated.post('/api/action/directory-file/delete/', {
+            'directory_file_ids': [self.file1.id],
+        }, format='json')
+        # LoginRequiredMiddleware redirects (302) unauthenticated requests to login
+        self.assertIn(response.status_code, [401, 403, 302])

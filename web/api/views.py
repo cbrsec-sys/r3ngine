@@ -5637,6 +5637,29 @@ class DirectoryFileDispatchView(APIView):
             )
 
 
+class DirectoryFileDeleteView(APIView):
+    """Delete DirectoryFile records by primary key.
+
+    POST /api/action/directory-file/delete/
+    Body: { directory_file_ids: [int] }
+    Returns: { deleted: int }
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request) -> Response:
+        from startScan.models import DirectoryFile
+
+        ids = request.data.get('directory_file_ids')
+        if not ids:
+            return Response(
+                {'error': 'directory_file_ids is required and must not be empty'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        deleted_count, _ = DirectoryFile.objects.filter(id__in=ids).delete()
+        return Response({'deleted': deleted_count}, status=status.HTTP_200_OK)
+
+
 # ---------------------------------------------------------------------------
 # Phase 4 — ScanProfile CRUD API
 # ---------------------------------------------------------------------------
