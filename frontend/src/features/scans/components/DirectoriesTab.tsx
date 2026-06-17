@@ -14,7 +14,14 @@ import {
   InputBase,
   Modal,
   Backdrop,
-  Fade
+  Fade,
+  Menu,
+  MenuItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
+  Snackbar,
+  Alert,
 } from '@mui/material';
 import {
   Search,
@@ -30,12 +37,21 @@ import {
   MoreHorizontal,
   Download,
   X,
-  Camera
+  Camera,
+  KeyRound,
+  ShieldAlert,
+  Crosshair,
+  ScanSearch,
+  UserX,
+  Trash2,
 } from 'lucide-react';
 
 import { useDirectories } from '../api';
 import { TacticalPanel } from '../../../components/TacticalPanel';
 import type { DirectoryFile } from '../../subdomains/types';
+import { ConfirmDialog } from '../../../components/ConfirmDialog';
+import { usePlugins } from '../../plugins/api/pluginsApi';
+import { useDirectoryFileDispatch, useDirectoryFileDelete } from '../api';
 
 interface DirectoriesTabProps {
   projectSlug: string;
@@ -54,6 +70,90 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
   const [expandedScans, setExpandedScans] = useState<Record<string, boolean>>({});
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const [lightboxLabel, setLightboxLabel] = useState<string>('');
+
+  // Action menu state
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [selectedFile, setSelectedFile] = useState<DirectoryFile | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmConfig, setConfirmConfig] = useState<{
+    title: string;
+    message: string;
+    onConfirm: () => void;
+    type?: 'danger' | 'info' | 'warning';
+  }>({ title: '', message: '', onConfirm: () => {} });
+  const [snackbar, setSnackbar] = useState<{
+    open: boolean;
+    message: string;
+    severity: 'success' | 'error' | 'info' | 'warning';
+  }>({ open: false, message: '', severity: 'success' });
+
+  const { data: plugins } = usePlugins();
+  const credPluginEnabled = plugins?.some(
+    (p: { slug: string; is_enabled: boolean }) =>
+      p.slug === 'credential_intelligence' && p.is_enabled
+  );
+
+  const dispatchMutation = useDirectoryFileDispatch();
+  const deleteMutation = useDirectoryFileDelete();
+
+  const showNotification = (
+    message: string,
+    severity: 'success' | 'error' | 'info' | 'warning' = 'success'
+  ) => setSnackbar({ open: true, message, severity });
+
+  const handleActionClick = (
+    event: React.MouseEvent<HTMLButtonElement>,
+    file: DirectoryFile
+  ) => {
+    event.stopPropagation();
+    setAnchorEl(event.currentTarget);
+    setSelectedFile(file);
+  };
+
+  const handleActionClose = () => setAnchorEl(null);
+
+  const handleDispatchAction = async (action: string, label: string) => {
+    if (!selectedFile || !scanId) return;
+    handleActionClose();
+    try {
+      await dispatchMutation.mutateAsync({ url: selectedFile.url, action, scan_id: scanId });
+      showNotification(`${label} DISPATCHED`);
+    } catch {
+      showNotification(`Failed to dispatch ${label.toLowerCase()} — check Temporal logs`, 'error');
+    }
+  };
+
+  const handleCopyUrl = () => {
+    if (selectedFile) {
+      navigator.clipboard.writeText(selectedFile.url);
+      showNotification('URL COPIED TO CLIPBOARD', 'info');
+    }
+    handleActionClose();
+  };
+
+  const handleOpenInBrowser = () => {
+    if (selectedFile) window.open(selectedFile.url, '_blank', 'noopener,noreferrer');
+    handleActionClose();
+  };
+
+  const handleDelete = () => {
+    if (!selectedFile) return;
+    handleActionClose();
+    setConfirmConfig({
+      title: 'DELETE ENDPOINT RECORD',
+      message: `Delete the record for ${selectedFile.url}? This cannot be undone.`,
+      type: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteMutation.mutateAsync({ directory_file_ids: [selectedFile.id] });
+          showNotification('ENDPOINT RECORD DELETED');
+        } catch {
+          showNotification('Failed to delete endpoint record', 'error');
+        }
+      },
+    });
+    setConfirmOpen(true);
+  };
 
   const { data, isLoading, error } = useDirectories({
     scan_id: scanId,
@@ -491,6 +591,19 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
                                             <IconButton size="small" component="a" href={file.url} target="_blank" sx={{ color: 'text.disabled', p: 0.5 }}>
                                               <ExternalLink size={12} />
                                             </IconButton>
+                                            <IconButton
+                                              size="small"
+                                              onClick={(e) => handleActionClick(e, file as DirectoryFile)}
+                                              sx={{
+                                                color: theme.palette.text.secondary,
+                                                p: 0.5,
+                                                '&:hover': {
+                                                  color: isLight ? theme.palette.primary.main : theme.palette.primary.light,
+                                                },
+                                              }}
+                                            >
+                                              <MoreHorizontal size={12} />
+                                            </IconButton>
                                           </Box>
                                         </Box>
                                       ))}
@@ -663,6 +776,133 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
           </Box>
         </Fade>
       </Modal>
+
+      {/* Directory File Action Menu */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleActionClose}
+        slotProps={{
+          paper: {
+            sx: {
+              bgcolor: isLight ? 'background.paper' : 'background.default',
+              border: isLight
+                ? `1px solid ${theme.palette.divider}`
+                : `1px solid ${theme.palette.primary.main}33`,
+              color: 'text.primary',
+              minWidth: 220,
+              '& .MuiMenuItem-root': {
+                fontSize: '0.8rem',
+                fontWeight: 600,
+                fontFamily: 'Inter, sans-serif',
+                py: 1,
+                gap: 1.5,
+                '&:hover': {
+                  bgcolor: isLight ? 'action.hover' : `${theme.palette.primary.main}15`,
+                },
+              },
+            },
+          },
+        }}
+      >
+        <MenuItem onClick={() => handleDispatchAction('extract_auth', 'AUTH EXTRACTION')}>
+          <ListItemIcon><KeyRound size={15} color={theme.palette.warning.main} /></ListItemIcon>
+          <ListItemText primary="EXTRACT AUTH" />
+        </MenuItem>
+        <MenuItem onClick={() => handleDispatchAction('scan_vuln', 'VULNERABILITY SCAN')}>
+          <ListItemIcon><ShieldAlert size={15} color={theme.palette.error.main} /></ListItemIcon>
+          <ListItemText primary="SCAN VULNERABILITIES" />
+        </MenuItem>
+        <MenuItem onClick={() => handleDispatchAction('deep_fuzz', 'DEEP FUZZ')}>
+          <ListItemIcon><Crosshair size={15} color={theme.palette.info.main} /></ListItemIcon>
+          <ListItemText primary="DEEP FUZZ" />
+        </MenuItem>
+        <MenuItem onClick={() => handleDispatchAction('secret_scan', 'SECRET SCAN')}>
+          <ListItemIcon><ScanSearch size={15} color={theme.palette.success.main} /></ListItemIcon>
+          <ListItemText primary="SCAN FOR SECRETS" />
+        </MenuItem>
+        <MenuItem onClick={() => handleDispatchAction('bypass_waf', 'WAF BYPASS')}>
+          <ListItemIcon><Zap size={15} color={theme.palette.secondary.main} /></ListItemIcon>
+          <ListItemText primary="BYPASS WAF" />
+        </MenuItem>
+        <Divider sx={{ my: 0.5, borderColor: theme.palette.divider }} />
+        <Tooltip
+          title={credPluginEnabled ? '' : 'Credential Intelligence plugin not installed'}
+          placement="left"
+        >
+          <span>
+            <MenuItem
+              disabled={!credPluginEnabled}
+              onClick={() => handleDispatchAction('brute_test', 'BRUTE TEST')}
+            >
+              <ListItemIcon>
+                <UserX
+                  size={15}
+                  color={credPluginEnabled ? theme.palette.warning.main : theme.palette.text.disabled}
+                />
+              </ListItemIcon>
+              <ListItemText primary="SEND TO BRUTE TEST" />
+            </MenuItem>
+          </span>
+        </Tooltip>
+        <Divider sx={{ my: 0.5, borderColor: theme.palette.divider }} />
+        <MenuItem onClick={handleCopyUrl}>
+          <ListItemIcon><Copy size={15} color={theme.palette.text.secondary} /></ListItemIcon>
+          <ListItemText primary="COPY URL" />
+        </MenuItem>
+        <MenuItem onClick={handleOpenInBrowser}>
+          <ListItemIcon><ExternalLink size={15} color={theme.palette.text.secondary} /></ListItemIcon>
+          <ListItemText primary="OPEN IN BROWSER" />
+        </MenuItem>
+        <Divider sx={{ my: 0.5, borderColor: theme.palette.divider }} />
+        <MenuItem onClick={handleDelete} sx={{ color: theme.palette.error.main }}>
+          <ListItemIcon><Trash2 size={15} color={theme.palette.error.main} /></ListItemIcon>
+          <ListItemText primary="DELETE RECORD" />
+        </MenuItem>
+      </Menu>
+
+      {/* Confirm Dialog */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onClose={() => { setConfirmOpen(false); setSelectedFile(null); }}
+        onConfirm={() => { confirmConfig.onConfirm(); setConfirmOpen(false); }}
+        title={confirmConfig.title}
+        message={confirmConfig.message}
+        type={confirmConfig.type}
+      />
+
+      {/* Loading Backdrop */}
+      <Backdrop
+        sx={{
+          color: theme.palette.primary.main,
+          zIndex: (t) => t.zIndex.drawer + 1,
+          bgcolor: 'rgba(0,0,0,0.8)',
+        }}
+        open={dispatchMutation.isPending || deleteMutation.isPending}
+      >
+        <Stack spacing={2} alignItems="center">
+          <CircularProgress color="inherit" size={60} thickness={2} />
+          <Typography sx={{ fontFamily: 'Orbitron, sans-serif', letterSpacing: 2, fontSize: '0.9rem' }}>
+            {deleteMutation.isPending ? 'DELETING RECORD...' : 'DISPATCHING ACTION...'}
+          </Typography>
+        </Stack>
+      </Backdrop>
+
+      {/* Snackbar */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={() => setSnackbar((s) => ({ ...s, open: false }))}
+          severity={snackbar.severity}
+          variant="filled"
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
