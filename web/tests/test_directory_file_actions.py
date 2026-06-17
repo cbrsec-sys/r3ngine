@@ -90,6 +90,7 @@ class TestDirectoryFileDispatchView(TestCase):
         self.user = User.objects.create_user('dispatchuser', password='testpass')
         self.client = APIClient()
         self.client.force_authenticate(user=self.user)
+        self.client.force_login(self.user)
 
     @patch('api.views.run_and_close')
     @patch('api.views.TemporalClientProvider')
@@ -166,4 +167,6 @@ class TestDirectoryFileDispatchView(TestCase):
             'action': 'scan_vuln',
             'scan_id': 1,
         }, format='json')
-        self.assertIn(response.status_code, [401, 403])
+        # LoginRequiredMiddleware redirects (302) unauthenticated requests to login;
+        # DRF itself would return 401/403 — both mean the endpoint is protected.
+        self.assertIn(response.status_code, [401, 403, 302])
