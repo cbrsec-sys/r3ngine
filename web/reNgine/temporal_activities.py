@@ -638,8 +638,7 @@ def check_scan_alive_activity(scan_id: int, subscan_id: int = None) -> bool:
     from reNgine.definitions import ABORTED_TASK
     from temporalio.exceptions import ApplicationError
 
-    context = f"scan_id={scan_id}" + (f" subscan_id={subscan_id}" if subscan_id else "")
-    logger.log_line("[TEMPORAL]", "CHECK_ALIVE", context)
+    logger.log_line("[TEMPORAL]", "START", "task=check_scan_alive scan_id=%s subscan_id=%s" % (scan_id, subscan_id or ""))
 
     # -------------------------------------------------------------------------
     # Guard 1 — Deleted scan: ScanHistory no longer exists
@@ -647,12 +646,12 @@ def check_scan_alive_activity(scan_id: int, subscan_id: int = None) -> bool:
     scan = ScanHistory.objects.filter(pk=scan_id).first()
     if not scan:
         activity.logger.warning(
-            "[CheckScanAliveActivity] %s — ScanHistory not found (scan deleted). "
-            "Raising non-retryable error to terminate child workflow.", context
+            "[CheckScanAliveActivity] scan_id=%s — ScanHistory not found (scan deleted). "
+            "Raising non-retryable error to terminate child workflow.", scan_id
         )
         raise ApplicationError(
-            f"[CheckScanAliveActivity] ScanHistory {scan_id} no longer exists — "
-            f"scan was deleted. Child workflow cancelled.",
+            "[CheckScanAliveActivity] ScanHistory %s no longer exists — "
+            "scan was deleted. Child workflow cancelled." % scan_id,
             non_retryable=True,
         )
 
@@ -661,19 +660,20 @@ def check_scan_alive_activity(scan_id: int, subscan_id: int = None) -> bool:
     # -------------------------------------------------------------------------
     if scan.scan_status == ABORTED_TASK:
         activity.logger.warning(
-            "[CheckScanAliveActivity] %s — scan is ABORTED. "
-            "Raising non-retryable error to terminate child workflow.", context
+            "[CheckScanAliveActivity] scan_id=%s — scan is ABORTED. "
+            "Raising non-retryable error to terminate child workflow.", scan_id
         )
         raise ApplicationError(
-            f"[CheckScanAliveActivity] Scan {scan_id} was aborted by the user. "
-            f"Child workflow cancelled.",
+            "[CheckScanAliveActivity] Scan %s was aborted by the user. "
+            "Child workflow cancelled." % scan_id,
             non_retryable=True,
         )
 
     activity.logger.info(
-        "[CheckScanAliveActivity] %s — scan is alive (status=%s). Child workflow may proceed.",
-        context, scan.scan_status,
+        "[CheckScanAliveActivity] scan_id=%s — scan is alive (status=%s). Child workflow may proceed.",
+        scan_id, scan.scan_status,
     )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=check_scan_alive scan_id=%s alive=True" % scan_id)
     return True
 
 

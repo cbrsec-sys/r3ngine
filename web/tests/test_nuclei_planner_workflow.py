@@ -38,7 +38,7 @@ from reNgine.definitions import NUCLEI_DEFAULT_SEVERITIES
 # ---------------------------------------------------------------------------
 
 @activity.defn(name="CheckScanAliveActivity")
-async def _mock_check_scan_alive(scan_history_id: int) -> bool:
+async def _mock_check_scan_alive(scan_id: int, subscan_id: int = None) -> bool:
     """Lifecycle guard mock — always reports scan alive."""
     return True
 
