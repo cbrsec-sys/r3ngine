@@ -1,6 +1,5 @@
 """Integration tests verifying cpde_tasks.param_discovery wires all sources."""
-import inspect
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch, MagicMock
 from django.test import TestCase
 
 
