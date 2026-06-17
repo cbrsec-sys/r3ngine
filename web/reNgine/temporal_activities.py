@@ -2854,17 +2854,18 @@ def run_search_vulns_activity(ctx: dict) -> bool:
     MasterScanWorkflow Tier 2 after port scan returns.
     """
     from reNgine.recon_tasks import search_vulns_scan
-    scan_id = ctx.get('scan_history_id')
-    logger.log_line("[TEMPORAL]", "START", "task=search_vulns_scan service=%s host=%s scan_id=%s" % (ctx.get('service', ''), ctx.get('host', ''), scan_id))
     activity.logger.info(
         "[RunSearchVulnsActivity] service=%s host=%s scan_id=%s",
-        ctx.get('service'), ctx.get('host'), scan_id,
+        ctx.get('service'), ctx.get('host'), ctx.get('scan_history_id'),
     )
-    proxy = TemporalTaskProxy(ctx, task_name='search_vulns_scan',
-                              description='Per-service CVE Lookup (vulners.com)')
-    result = search_vulns_scan(
-        proxy,
-        scan_history_id=scan_id,
+    # _run_task provides heartbeating, pre-flight abort-guard, and correct
+    # SUCCESS_TASK / FAILED_TASK status updates — matching all other activities.
+    return _run_task(
+        search_vulns_scan,
+        ctx,
+        task_name='search_vulns_scan',
+        description='Per-service CVE Lookup (vulners.com)',
+        scan_history_id=ctx.get('scan_history_id'),
         service=ctx.get('service', ''),
         version=ctx.get('version'),
         host=ctx.get('host', ''),
@@ -2872,8 +2873,6 @@ def run_search_vulns_activity(ctx: dict) -> bool:
         subdomain_id=ctx.get('subdomain_id'),
         domain_id=ctx.get('domain_id'),
     )
-    logger.log_line("[TEMPORAL]", "COMPLETE", "task=search_vulns_scan service=%s scan_id=%s" % (ctx.get('service', ''), scan_id))
-    return result
 
 
 @activity.defn(name="RunXURLFind3rActivity")
@@ -3080,13 +3079,13 @@ def run_bbot_activity(ctx: dict) -> bool:
 def run_param_discovery_activity(ctx: dict) -> dict:
     """Run the Custom Parameter Discovery Engine (CPDE)."""
     from reNgine.cpde_tasks import param_discovery
+    from reNgine.definitions import SUCCESS_TASK
     scan_id = ctx.get('scan_history_id')
-    logger.log_line("[TEMPORAL]", "START", "task=param_discovery scan_id=%s" % scan_id)
-    activity.logger.info(
-        "[RunParamDiscoveryActivity] Starting CPDE for scan_id=%s",
-        scan_id,
-    )
-    proxy = TemporalTaskProxy(ctx, task_name='param_discovery', description='Custom Parameter Discovery (CPDE)')
+    activity.logger.info("[RunParamDiscoveryActivity] Starting CPDE for scan_id=%s", scan_id)
+
+    # Derive seed URLs before TemporalTaskProxy sets status=RUNNING — these are
+    # fast DB queries and must complete first so the skip path can mark SUCCESS
+    # without ever having set the row to RUNNING.
     urls = ctx.get('urls') or []
     if not urls:
         # Prefer a real endpoint URL (preserves correct scheme) from a prior http_crawl
@@ -3110,15 +3109,21 @@ def run_param_discovery_activity(ctx: dict) -> dict:
 
     if not urls:
         logger.log_line("[CPDE]", "WARN", "No seed URLs available for scan_id=%s — skipping CPDE" % scan_id)
-        logger.log_line("[TEMPORAL]", "COMPLETE", "task=param_discovery scan_id=%s (skipped)" % scan_id)
+        # Mark the ScanActivity row SUCCESS so it does not stay permanently RUNNING.
+        proxy = TemporalTaskProxy(ctx, task_name='param_discovery', description='Custom Parameter Discovery (CPDE)')
+        proxy.update_scan_activity(SUCCESS_TASK)
         return {}
-    result = param_discovery(
-        proxy,
+
+    # _run_task provides heartbeating, pre-flight abort-guard, and correct
+    # SUCCESS_TASK / FAILED_TASK status updates — matching all other activities.
+    _run_task(
+        param_discovery,
+        ctx,
+        task_name='param_discovery',
+        description='Custom Parameter Discovery (CPDE)',
         urls=urls,
-        ctx=ctx,
     )
-    logger.log_line("[TEMPORAL]", "COMPLETE", "task=param_discovery scan_id=%s" % scan_id)
-    return result
+    return {}
 
 
 @activity.defn(name="RunGrypeScanActivity")
