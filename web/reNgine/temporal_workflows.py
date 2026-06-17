@@ -900,22 +900,18 @@ class NucleiPlannerWorkflow:
                         task_queue="python-orchestrator-queue",
                     )
 
-                    # Gather tags via activity (DB + tech_mapping work is not allowed in workflows).
-                    all_tags = await workflow.execute_activity(
+                    # Gather tags and pre-built batches via activity.
+                    # Activity counts templates per tag so each batch is bounded by
+                    # template count rather than tag count — prevents 2-hour timeouts
+                    # on WordPress-heavy scans with 2000+ templates.
+                    nuclei_tag_result = await workflow.execute_activity(
                         "GatherNucleiTagsActivity",
                         args=[ctx],
-                        start_to_close_timeout=timedelta(minutes=5),
+                        start_to_close_timeout=timedelta(minutes=10),
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue",
                     )
-
-                    # Group into batches of 3 so each Nuclei call is bounded and provides
-                    # granular Temporal history entries.  An empty list → single pass with
-                    # no tag filter (preserves current behaviour when no tech is detected).
-                    if all_tags:
-                        tag_batches = [all_tags[i:i + 3] for i in range(0, len(all_tags), 3)]
-                    else:
-                        tag_batches = [None]  # sentinel: no -tags flag
+                    tag_batches = nuclei_tag_result.get('batches') or [None]
 
                     for severity in severities:
                         for batch in tag_batches:
@@ -943,22 +939,18 @@ class NucleiPlannerWorkflow:
                             task_queue="python-orchestrator-queue",
                         )
             else:
-                # Gather tags via activity (DB + tech_mapping work is not allowed in workflows).
-                all_tags = await workflow.execute_activity(
+                # Gather tags and pre-built batches via activity.
+                # Activity counts templates per tag so each batch is bounded by
+                # template count rather than tag count — prevents 2-hour timeouts
+                # on WordPress-heavy scans with 2000+ templates.
+                nuclei_tag_result = await workflow.execute_activity(
                     "GatherNucleiTagsActivity",
                     args=[ctx],
-                    start_to_close_timeout=timedelta(minutes=5),
+                    start_to_close_timeout=timedelta(minutes=10),
                     retry_policy=_RETRY_INTERNAL,
                     task_queue="python-orchestrator-queue",
                 )
-
-                # Group into batches of 3 so each Nuclei call is bounded and provides
-                # granular Temporal history entries.  An empty list → single pass with
-                # no tag filter (preserves current behaviour when no tech is detected).
-                if all_tags:
-                    tag_batches = [all_tags[i:i + 3] for i in range(0, len(all_tags), 3)]
-                else:
-                    tag_batches = [None]  # sentinel: no -tags flag
+                tag_batches = nuclei_tag_result.get('batches') or [None]
 
                 for severity in severities:
                     for batch in tag_batches:
