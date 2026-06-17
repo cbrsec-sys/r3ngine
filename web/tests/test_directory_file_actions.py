@@ -4,6 +4,8 @@ from unittest.mock import patch, MagicMock
 from startScan.models import ScanHistory
 from targetApp.models import Domain
 from scanEngine.models import EngineType
+from django.contrib.auth.models import User
+from rest_framework.test import APIClient
 
 
 class TestExtractAuthForURLActivity(TestCase):
@@ -80,3 +82,88 @@ class TestExtractAuthForURLActivity(TestCase):
                 'url': 'http://example.com/login',
                 'scan_id': self.scan.id,
             })
+
+
+class TestDirectoryFileDispatchView(TestCase):
+
+    def setUp(self):
+        self.user = User.objects.create_user('dispatchuser', password='testpass')
+        self.client = APIClient()
+        self.client.force_authenticate(user=self.user)
+
+    @patch('api.views.run_and_close')
+    @patch('api.views.TemporalClientProvider')
+    def test_dispatch_scan_vuln_returns_dispatched(self, mock_tc, mock_run):
+        mock_run.return_value = 'wf-test-123'
+        response = self.client.post('/api/action/directory-file/dispatch/', {
+            'url': 'http://example.com/admin/',
+            'action': 'scan_vuln',
+            'scan_id': 1,
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], 'dispatched')
+        self.assertIn('workflow_id', response.data)
+
+    @patch('api.views.run_and_close')
+    @patch('api.views.TemporalClientProvider')
+    def test_dispatch_extract_auth_returns_dispatched(self, mock_tc, mock_run):
+        mock_run.return_value = 'wf-auth-123'
+        response = self.client.post('/api/action/directory-file/dispatch/', {
+            'url': 'http://example.com/login.php',
+            'action': 'extract_auth',
+            'scan_id': 1,
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], 'dispatched')
+
+    def test_dispatch_unknown_action_returns_400(self):
+        response = self.client.post('/api/action/directory-file/dispatch/', {
+            'url': 'http://example.com/',
+            'action': 'do_something_invalid',
+            'scan_id': 1,
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('error', response.data)
+
+    def test_dispatch_missing_fields_returns_400(self):
+        response = self.client.post('/api/action/directory-file/dispatch/', {
+            'url': 'http://example.com/',
+        }, format='json')
+        self.assertEqual(response.status_code, 400)
+
+    def test_dispatch_brute_test_without_plugin_returns_403(self):
+        response = self.client.post('/api/action/directory-file/dispatch/', {
+            'url': 'http://example.com/login',
+            'action': 'brute_test',
+            'scan_id': 1,
+        }, format='json')
+        self.assertEqual(response.status_code, 403)
+
+    @patch('api.views.run_and_close')
+    @patch('api.views.TemporalClientProvider')
+    def test_dispatch_brute_test_with_plugin_enabled(self, mock_tc, mock_run):
+        from plugins.models import Plugin
+        Plugin.objects.create(
+            name='Credential Intelligence',
+            slug='credential_intelligence',
+            version='1.4.0',
+            is_enabled=True,
+            anchor_step='web_api_discovery',
+        )
+        mock_run.return_value = 'wf-brute-123'
+        response = self.client.post('/api/action/directory-file/dispatch/', {
+            'url': 'http://example.com/login',
+            'action': 'brute_test',
+            'scan_id': 1,
+        }, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['status'], 'dispatched')
+
+    def test_dispatch_requires_authentication(self):
+        unauthenticated = APIClient()
+        response = unauthenticated.post('/api/action/directory-file/dispatch/', {
+            'url': 'http://example.com/',
+            'action': 'scan_vuln',
+            'scan_id': 1,
+        }, format='json')
+        self.assertIn(response.status_code, [401, 403])
