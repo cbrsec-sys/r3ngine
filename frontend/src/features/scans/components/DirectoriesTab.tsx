@@ -880,7 +880,7 @@ export const DirectoriesTab: React.FC<DirectoriesTabProps> = ({ projectSlug, sca
         }}
         open={dispatchMutation.isPending || deleteMutation.isPending}
       >
-        <Stack spacing={2} alignItems="center">
+        <Stack spacing={2} sx={{ alignItems: 'center' }}>
           <CircularProgress color="inherit" size={60} thickness={2} />
           <Typography sx={{ fontFamily: isLight ? 'var(--r3-heading-font)' : 'Orbitron', letterSpacing: 2, fontSize: '0.9rem' }}>
             {deleteMutation.isPending ? 'DELETING RECORD...' : 'DISPATCHING ACTION...'}
