@@ -1108,6 +1108,9 @@ def create_report(request, id):
     is_ignore_info_vuln = request.GET.get('ignore_info_vuln', 'False') == 'True'
     include_attack_surface_map = request.GET.get('include_attack_surface_map', 'False') == 'True'
     include_attack_paths = request.GET.get('include_attack_paths', 'False') == 'True'
+    # Default True for backward-compat — older callers that don't send this param
+    # should still include parameters (preserving prior behaviour).
+    include_found_parameters = request.GET.get('include_found_parameters', 'True') == 'True'
     comments = request.GET.get('comments', '')
 
     scan = get_object_or_404(ScanHistory, id=id)
@@ -1121,6 +1124,7 @@ def create_report(request, id):
             'ignore_info_vuln': is_ignore_info_vuln,
             'include_attack_surface_map': include_attack_surface_map,
             'include_attack_paths': include_attack_paths,
+            'include_found_parameters': include_found_parameters,
             'comments': comments
         }
     )
