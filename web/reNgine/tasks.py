@@ -24,6 +24,7 @@ from redis import Redis
 
 
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from api.serializers import SubdomainSerializer
 import logging
@@ -3273,8 +3274,10 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
+	timeout = config.get(TIMEOUT) or self.yaml_configuration.get(TIMEOUT, DEFAULT_HTTP_TIMEOUT)
 	arjun_methods = config.get(ARJUN_METHODS, ARJUN_DEFAULT_METHODS)
 	proxy = None
+	kr_proxy = 'socks5://tor:9050' if ctx.get('use_tor') else None
 
 	logger.warning("[WEB_API] Starting Web API Discovery | scan_id=%s | tools=%s", scan_id, uses_tools)
 
@@ -3320,7 +3323,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			continue
 
 		if subdomain_name not in subdomain_targets:
-			base_url = f"{parsed.scheme}://{subdomain_name}/"
+			base_url = f"{parsed.scheme}://{parsed.netloc}/"
 			subdomain_targets[subdomain_name] = (subdomain, base_url)
 
 		url_subdomain_map.append((url, subdomain_name, subdomain))
@@ -3330,25 +3333,85 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		len(subdomain_targets), len(url_subdomain_map), skipped_no_subdomain,
 	)
 
-	# ── Kiterunner: one scan per subdomain against base URL ───────────────────
-	# Running against the root of each subdomain (not individual endpoints)
-	# covers the full route space in a single wordlist pass and avoids
-	# multiplying the 35k-route scan by every discovered endpoint.
-	# The output file is the idempotency guard — if it exists and is non-empty
-	# the scan already ran (e.g. from a prior Temporal retry) and we skip to
-	# parsing, preserving all previously discovered routes.
+	# ── Kiterunner: batched scan across subdomains ───────────────────────────
+	# Subdomains are batched in groups of `threads` and written to a hosts file
+	# so that -j (max-parallel-hosts) is actually utilised rather than wasted
+	# on a single host per call.
+	# Per-subdomain .json files act as the idempotency guard for Temporal retries:
+	# any subdomain with a non-empty file is skipped; the rest form the next batch.
 	if 'kiterunner' in uses_tools:
-		logger.warning('[WEB_API] Kiterunner: scanning %d subdomains | wordlist=%s', len(subdomain_targets), kr_wordlist)
-		for subdomain_name, (subdomain, base_url) in subdomain_targets.items():
-			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
-			if os.path.exists(kr_output) and os.path.getsize(kr_output) > 0:
-				logger.warning('[WEB_API] Kiterunner: cache hit for %s — loading existing results', subdomain_name)
-			else:
-				cmd = f"kr scan {base_url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json | tee {kr_output}"
-				logger.warning('[WEB_API] Kiterunner: running on %s | cmd: %s', subdomain_name, cmd)
-				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
-				logger.warning('[WEB_API] Kiterunner: finished on %s', subdomain_name)
-			if os.path.exists(kr_output):
+		# Task 6: Validate wordlist path to prevent traversal (Rule 1.1/1.2)
+		_kr_base_dir = Path('/usr/src/wordlist/kr').resolve()
+		_kr_wordlist_path = (_kr_base_dir / kr_wordlist).resolve()
+		if not str(_kr_wordlist_path).startswith(str(_kr_base_dir)):
+			logger.error('[WEB_API] Kiterunner: wordlist path %s escapes base dir — skipping', kr_wordlist)
+		else:
+			logger.warning('[WEB_API] Kiterunner: scanning %d subdomains | wordlist=%s | batch_size=%d', len(subdomain_targets), kr_wordlist, threads)
+
+			# Separate cached subdomains from those that still need scanning
+			to_scan = {
+				name: (sub, base_url)
+				for name, (sub, base_url) in subdomain_targets.items()
+				if not (os.path.exists(f"{results_dir}/kr_{name}.json") and os.path.getsize(f"{results_dir}/kr_{name}.json") > 0)
+			}
+			cached_count = len(subdomain_targets) - len(to_scan)
+			if cached_count:
+				logger.warning('[WEB_API] Kiterunner: %d subdomains cached, scanning %d new', cached_count, len(to_scan))
+
+			# Scan phase: batch uncached subdomains so -j is utilised
+			scan_items = list(to_scan.items())
+			for batch_start in range(0, len(scan_items), threads):
+				batch = dict(scan_items[batch_start:batch_start + threads])
+				batch_idx = batch_start // threads
+
+				hosts_file = f"{results_dir}/kr_hosts_batch_{batch_idx}.txt"
+				with open(hosts_file, 'w') as hf:
+					for _name, (_sub, _base_url) in batch.items():
+						hf.write(_base_url + '\n')
+
+				combined_output = f"{results_dir}/kr_batch_{batch_idx}.json"
+				cmd = (
+					f"kr scan {hosts_file}"
+					f" -w {_kr_wordlist_path}"
+					f" -j {threads}"
+					f" --timeout {timeout}s"
+					f" --fail-status-codes 404"
+					f" -o json -q"
+					f" | tee {combined_output}"
+				)
+				logger.warning('[WEB_API] Kiterunner: batch %d — %d hosts | cmd: %s', batch_idx, len(batch), cmd)
+				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=kr_proxy)
+				logger.warning('[WEB_API] Kiterunner: batch %d finished', batch_idx)
+
+				# Split combined JSON output into per-subdomain files for caching
+				if os.path.exists(combined_output):
+					subdomain_lines: dict = {name: [] for name in batch}
+					with open(combined_output, 'r') as f:
+						for line in f:
+							line = line.strip()
+							if not line:
+								continue
+							try:
+								entry = json.loads(line)
+								target_host = urlparse(entry.get('target', '')).hostname or ''
+								if target_host in subdomain_lines:
+									subdomain_lines[target_host].append(line)
+							except (json.JSONDecodeError, Exception):
+								continue
+					for _name, lines in subdomain_lines.items():
+						if lines:
+							_kr_out = f"{results_dir}/kr_{_name}.json"
+							with open(_kr_out, 'w') as f:
+								f.write('\n'.join(lines) + '\n')
+				else:
+					logger.warning('[WEB_API] Kiterunner: combined output missing for batch %d', batch_idx)
+
+			# Parse pass: read all per-subdomain files (cached + newly written)
+			for subdomain_name, (subdomain, base_url) in subdomain_targets.items():
+				kr_output = f"{results_dir}/kr_{subdomain_name}.json"
+				if not os.path.exists(kr_output):
+					logger.warning('[WEB_API] Kiterunner: output file missing for %s', subdomain_name)
+					continue
 				try:
 					kr_parsed = urlparse(base_url)
 					kr_endpoints = 0
@@ -3359,20 +3422,25 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 								continue
 							entry = json.loads(line)
 							found_path = entry.get('path', '')
-							if found_path:
-								full_url = f"{kr_parsed.scheme}://{kr_parsed.netloc}{found_path}"
-								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain, http_status=entry.get('status'))
-								kr_endpoints += 1
-								if endpoint and '?' in full_url:
-									params = extract_params_from_url(full_url)
-									for p in params:
-										save_parameter(endpoint, p['name'], param_type='Kiterunner', value=p['value'])
-										kr_params += 1
+							if not found_path:
+								continue
+							# Use correct status field from responses array
+							responses = entry.get('responses', [])
+							http_status = responses[0].get('sc') if responses else None
+							# Skip 404s as defence-in-depth (--fail-status-codes 404 handles most)
+							if http_status == 404:
+								continue
+							full_url = f"{kr_parsed.scheme}://{kr_parsed.netloc}{found_path}"
+							endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain, http_status=http_status)
+							kr_endpoints += 1
+							if endpoint and '?' in full_url:
+								params = extract_params_from_url(full_url)
+								for p in params:
+									save_parameter(endpoint, p['name'], param_type='Kiterunner', value=p['value'])
+									kr_params += 1
 					logger.warning('[WEB_API] Kiterunner: %s → %d endpoints, %d params saved', subdomain_name, kr_endpoints, kr_params)
 				except Exception as e:
 					logger.error('[WEB_API] Kiterunner: error parsing output for %s: %s', subdomain_name, e)
-			else:
-				logger.warning('[WEB_API] Kiterunner: output file missing for %s', subdomain_name)
 	else:
 		logger.warning('[WEB_API] Kiterunner: skipped (not in uses_tools)')
 
