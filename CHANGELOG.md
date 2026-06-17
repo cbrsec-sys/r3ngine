@@ -38,6 +38,21 @@
   and every individual network probe (URL, status code or exception) so any future slowdown
   is immediately visible in the orchestrator log rather than appearing as a silent hang.
 
+### CPDE Enhancements (Parameter Discovery)
+- Added `url_param_collector.py` sub-module to `web/reNgine/cpde/`:
+  reads `urls_*.txt` (Katana/gau/gospider/waybackurls), `arjun_*.json`,
+  `ps_*.txt` (ParamSpider), `kr_*.json` (Kiterunner), and `lf_*.txt`
+  (LinkFinder) output files from the scan results directory and converts
+  them to CPDE-format findings for the correlation engine.
+- Added noise blocklist to `correlation_engine.py`: Google Analytics
+  `utm_*`, `_ga`/`_gl`/`_gid`, ad click IDs (`fbclid`, `gclid`,
+  `msclkid`), and Cloudflare challenge tokens are now filtered from output
+  regardless of confidence score. Blocklist can be disabled per-call with
+  `apply_noise_filter=False`.
+- CPDE `param_discovery` now correlates parameters from all discovered
+  sources (JS AST, OpenAPI, + all tool output files) instead of only
+  JavaScript files and OpenAPI schemas.
+
 ---
 
 ### [v3.6.2]
