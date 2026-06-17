@@ -5576,6 +5576,8 @@ class DirectoryFileDispatchView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        workflow_name: str = '<unknown>'
+        ctx: dict = {}
         wf_id = f"dir-file-{action}-{scan_id}-{uuid.uuid4().hex[:8]}"
 
         if action in self._WORKFLOW_MAP:
