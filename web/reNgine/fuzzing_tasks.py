@@ -272,7 +272,6 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 		ffuf_base_cmd += ' -se' if stop_on_error else ''
 		ffuf_base_cmd += ' -r' if follow_redirect else ''
 		ffuf_base_cmd += ' -ac' if auto_calibration else ''
-		ffuf_base_cmd += f' -x {proxy}' if proxy else ''
 		if not auto_calibration and mc:
 			ffuf_base_cmd += f' -mc {mc}'
 
