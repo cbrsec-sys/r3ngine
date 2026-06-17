@@ -45,7 +45,8 @@ from reNgine.definitions import (
 	PERM_MODIFY_SCAN_CONFIGURATIONS,
 	PERM_MODIFY_WORDLISTS,
 	PERM_INITATE_SCANS_SUBSCANS,
-	PERM_MODIFY_SCAN_REPORT
+	PERM_MODIFY_SCAN_REPORT,
+	PERM_MODIFY_SCAN_RESULTS,
 )
 from reNgine.tasks import *
 from reNgine.llm import *
@@ -5558,7 +5559,8 @@ class DirectoryFileDispatchView(APIView):
     Body: { url: str, action: str, scan_id: int }
     Returns: { status: "dispatched", workflow_id: str }
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [HasPermission]
+    permission_required = PERM_MODIFY_SCAN_RESULTS
 
     _WORKFLOW_MAP = {
         'scan_vuln':   ('URLVulnWorkflow',     {}),
@@ -5581,6 +5583,20 @@ class DirectoryFileDispatchView(APIView):
             return Response(
                 {'error': 'url, action, and scan_id are required'},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from urllib.parse import urlparse
+        if urlparse(url).scheme not in ('http', 'https'):
+            return Response(
+                {'error': 'url must use http or https scheme'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from startScan.models import ScanHistory
+        if not ScanHistory.objects.filter(id=scan_id).exists():
+            return Response(
+                {'error': f'Scan {scan_id} does not exist'},
+                status=status.HTTP_404_NOT_FOUND,
             )
 
         workflow_name: str = '<unknown>'
@@ -5651,7 +5667,8 @@ class DirectoryFileDeleteView(APIView):
     Body: { directory_file_ids: [int] }
     Returns: { deleted: int }
     """
-    permission_classes = [IsAuthenticated]
+    permission_classes = [HasPermission]
+    permission_required = PERM_MODIFY_SCAN_RESULTS
 
     def post(self, request) -> Response:
         from startScan.models import DirectoryFile
@@ -5660,6 +5677,11 @@ class DirectoryFileDeleteView(APIView):
         if not ids:
             return Response(
                 {'error': 'directory_file_ids is required and must not be empty'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(ids) > 500:
+            return Response(
+                {'error': 'directory_file_ids must not exceed 500 entries'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
