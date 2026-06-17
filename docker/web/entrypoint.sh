@@ -24,7 +24,9 @@ cd /usr/src/app
 echo "Collecting static files..."
 python3 manage.py collectstatic --noinput --clear
 
-# Run migrations
+# Create any pending migrations then apply them
+echo "Making migrations..."
+python3 manage.py makemigrations --noinput
 echo "Running migrations..."
 python3 manage.py migrate --noinput
 
