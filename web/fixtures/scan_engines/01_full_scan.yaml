@@ -191,6 +191,7 @@
         fetch_gpt_report: true
         nuclei:
           use_nuclei_config: false
+          max_templates_per_batch: 100
           auto_update_templates: true
           severities:
             - unknown

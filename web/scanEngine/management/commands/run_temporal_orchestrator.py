@@ -96,6 +96,7 @@ from reNgine.temporal_activities import (
     load_checkpoint_activity,
     save_checkpoint_activity,
     target_profiling_activity,
+    check_scan_alive_activity,
     check_scan_queue_status_activity,
     get_enabled_plugins_for_tier_activity,
 
@@ -421,6 +422,7 @@ class Command(BaseCommand):
                 load_checkpoint_activity,
                 save_checkpoint_activity,
                 target_profiling_activity,
+                check_scan_alive_activity,
                 check_scan_queue_status_activity,
                 get_enabled_plugins_for_tier_activity,
 

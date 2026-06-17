@@ -257,7 +257,9 @@
   - Fixed with a two-layer guard using Temporal's `ApplicationError(non_retryable=True)`:
     - **Layer 1 — `TargetProfilingActivity`**: Acts as the primary lifecycle guard (first real activity every workflow runs). If `ScanHistory` does not exist or has `scan_status=ABORTED_TASK`, raises a non-retryable error to permanently terminate the workflow before any work is attempted. The unconditional re-arm of `ABORTED_TASK` status has been removed; only `FAILED_TASK`/other states are re-armed to `RUNNING_TASK`.
     - **Layer 2 — `_run_task` helper**: Pre-flight guard at the entry point of every activity function. Catches activities that were in-flight mid-scan at the time of abort/delete, preventing them from proceeding and entering retry loops.
+    - **Layer 3 — `CheckScanAliveActivity` (child workflow guard)**: Child workflows (`NucleiPlannerWorkflow`, `SubScanWorkflow`) are replayed by Temporal independently of `MasterScanWorkflow` after a container restart, so they skip Layer 1 entirely. A new `CheckScanAliveActivity` is now called as the **first activity** in both child workflows. It performs the same abort/delete check and raises `ApplicationError(non_retryable=True)` to terminate the child workflow cleanly before any scan data is accessed. This closes the remaining gap in lifecycle guard coverage for replayed child workflows.
   - Orphaned `TemporalWorkflowExecution` DB records for aborted scans (scans 4 and 8) were reconciled and marked `CANCELLED`/`TERMINATED`. The actively-looping workflow for deleted scan 32 (`master-scan-32-run-0-f36d62b1-nuclei`) was cancelled directly via the Temporal API.
+
 
 
 
