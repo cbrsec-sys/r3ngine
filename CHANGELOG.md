@@ -4,6 +4,9 @@
 
 #### Fixed
 
+- **Scan History drawer theme compatibility**:
+  Removed hardcoded dark backgrounds and hex colors from `ScanHistoryDrawer.tsx` and updated components to use theme tokens and values. The drawer now displays with correct light/dark theme compliance and proper contrast.
+
 - **`run_param_discovery_activity` (CPDE) — ScanActivity permanently stuck at RUNNING**:
   Refactored to use `_run_task`, which provides heartbeating, pre-flight abort-guard, and
   `SUCCESS_TASK`/`FAILED_TASK` status updates identical to every other activity. Previously the
