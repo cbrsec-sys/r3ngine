@@ -15,6 +15,7 @@ from django.utils import timezone
 from packaging import version
 from django.template.defaultfilters import slugify
 from datetime import datetime
+from django.db.models.functions import Lower
 from rest_framework import viewsets, serializers, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework_datatables.pagination import DatatablesPageNumberPagination
@@ -4027,6 +4028,16 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 	queryset = Subdomain.objects.none()
 	serializer_class = SubdomainSerializer
 
+	def _latest_subdomain_rows_by_name(self, queryset):
+		latest_ids = (
+			queryset
+			.annotate(norm_name=Lower('name'))
+			.order_by('norm_name', '-discovered_date', '-id')
+			.distinct('norm_name')
+			.values_list('id', flat=True)
+		)
+		return Subdomain.objects.filter(id__in=latest_ids)
+
 	def get_queryset(self):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -4054,9 +4065,9 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 
 		if target_id:
 			self.queryset = (
-				subdomains
-				.filter(target_domain__id=target_id)
-				.distinct()
+				self._latest_subdomain_rows_by_name(
+					subdomains.filter(target_domain__id=target_id)
+				)
 			)
 		elif url_query:
 			self.queryset = (
