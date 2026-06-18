@@ -30,6 +30,31 @@ import { TacticalPanel } from '../../../components/TacticalPanel';
 import { ProxyValidationModal } from './ProxyValidationModal';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 
+const KNOWN_SCHEMES = /^(https?|socks[45]):\/\//i;
+const HOST_PORT_RE = /^[\w.\-]+:\d{1,5}$/;
+
+/**
+ * Validates a single line from a fetched proxy list.
+ * Returns the bare "host:port" string, or null if the line is malformed.
+ * Exported for unit testing.
+ */
+export function parseProxyLine(line: string): string | null {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) return null;
+
+  const bare = trimmed.replace(KNOWN_SCHEMES, '');
+
+  // Credentials (user:pass@) or a path after the port are both invalid.
+  if (bare.includes('@') || bare.includes('/')) return null;
+
+  if (!HOST_PORT_RE.test(bare)) return null;
+
+  const port = parseInt(bare.slice(bare.lastIndexOf(':') + 1), 10);
+  if (port < 1 || port > 65535) return null;
+
+  return bare;
+}
+
 export const ProxySettingsPage: React.FC = () => {
   const { tokens } = useThemeTokens();
   const { projectSlug = 'default' } = useParams({ strict: false }) as any;
@@ -178,16 +203,12 @@ export const ProxySettingsPage: React.FC = () => {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       const text = await response.text();
-      const cleanProxies = text
+      const parsedLines = text
         .split('\n')
-        .map(line => line.trim())
-        .filter(line => {
-          if (!line) return false;
-          if (line.startsWith('#') || line.startsWith('//')) return false;
-          return line.includes(':');
-        });
+        .map(line => parseProxyLine(line))
+        .filter((p): p is string => p !== null);
 
-      if (cleanProxies.length === 0) {
+      if (parsedLines.length === 0) {
         setSnackbar({
           open: true,
           message: `No valid proxies found in ${label}.`,
@@ -196,25 +217,24 @@ export const ProxySettingsPage: React.FC = () => {
         return;
       }
 
-      const formatted = cleanProxies.map(p => {
-        const prefix = `${protocol}://`;
-        if (p.startsWith('http://') || p.startsWith('https://') || p.startsWith('socks4://') || p.startsWith('socks5://')) {
-          return p;
-        }
-        return `${prefix}${p}`;
-      });
+      const prefix = `${protocol}://`;
+      const formatted = parsedLines.map(p => `${prefix}${p}`);
 
+      let addedCount = 0;
       setProxyList(prev => {
-        const existingLines = prev.split('\n').map(l => l.trim()).filter(Boolean);
-        const combined = [...existingLines, ...formatted];
-        const unique = Array.from(new Set(combined));
-        return unique.join('\n');
+        const existingSet = new Set(prev.split('\n').map(l => l.trim()).filter(Boolean));
+        const newEntries = formatted.filter(p => !existingSet.has(p));
+        addedCount = newEntries.length;
+        if (newEntries.length === 0) return prev;
+        return [...existingSet, ...newEntries].join('\n');
       });
 
       setSnackbar({
         open: true,
-        message: `Successfully fetched and added ${formatted.length} proxies from ${label}.`,
-        severity: 'success'
+        message: addedCount > 0
+          ? `Added ${addedCount} new proxies from ${label}.`
+          : `No new proxies from ${label} — all already present.`,
+        severity: addedCount > 0 ? 'success' : 'info'
       });
       setUseProxy(true);
     } catch (error: any) {
@@ -505,6 +525,13 @@ export const ProxySettingsPage: React.FC = () => {
               >
                 {isFetchingQuick === 'vpslab(s5)' ? 'LOADING...' : 'VPSLAB(S5)'}
               </Button>
+
+              <Typography
+                variant="caption"
+                sx={{ color: 'text.disabled', fontSize: '0.6rem', width: '100%', mt: 0.5 }}
+              >
+                Unvetted public lists — review all entries before saving.
+              </Typography>
             </Box>
 
             <Typography variant="body2" sx={{ color: 'text.secondary', mt: 2, mb: 1, fontWeight: 600 }}>
