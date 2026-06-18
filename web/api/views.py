@@ -45,7 +45,8 @@ from reNgine.definitions import (
 	PERM_MODIFY_SCAN_CONFIGURATIONS,
 	PERM_MODIFY_WORDLISTS,
 	PERM_INITATE_SCANS_SUBSCANS,
-	PERM_MODIFY_SCAN_REPORT
+	PERM_MODIFY_SCAN_REPORT,
+	PERM_MODIFY_SCAN_RESULTS,
 )
 from reNgine.tasks import *
 from reNgine.llm import *
@@ -61,6 +62,8 @@ from reNgine.utils.graph import Neo4jManager
 
 
 logger = logging.getLogger(__name__)
+
+from reNgine.temporal_client import TemporalClientProvider, run_and_close
 
 
 class ToggleBugBountyModeView(APIView):
@@ -2430,6 +2433,7 @@ class InitiateSubTask(APIView):
 			if single:
 				subdomain_ids = [single]
 		subdomain_ids = list(dict.fromkeys(int(subdomain_id) for subdomain_id in subdomain_ids))
+		errors = []
 		for subdomain_id in subdomain_ids:
 			logger.info(f'Running subscans {scan_types} on subdomain "{subdomain_id}" ...')
 			ctx = {
@@ -2441,10 +2445,17 @@ class InitiateSubTask(APIView):
 			}
 			res = initiate_subscan_temporal(**ctx)
 			if not res.get('success'):
-				return Response({
-					'status': False,
-					'message': res.get('error', 'Failed to initiate subscan')
-				}, status=status.HTTP_400_BAD_REQUEST)
+				errors.append({
+					'subdomain_id': subdomain_id,
+					'error': res.get('error', 'Failed to initiate subscan'),
+				})
+
+		if errors:
+			return Response({
+				'status': False,
+				'message': f'Failed to initiate {len(errors)} subscan(s)',
+				'errors': errors,
+			}, status=status.HTTP_400_BAD_REQUEST)
 		return Response({'status': True})
 
 
@@ -5547,6 +5558,143 @@ class StartWorkflowView(APIView):
                 {'error': 'Failed to start workflow'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class DirectoryFileDispatchView(APIView):
+    """Dispatch a security testing action against a specific directory file URL.
+
+    POST /api/action/directory-file/dispatch/
+    Body: { url: str, action: str, scan_id: int }
+    Returns: { status: "dispatched", workflow_id: str }
+    """
+    permission_classes = [HasPermission]
+    permission_required = PERM_MODIFY_SCAN_RESULTS
+
+    _WORKFLOW_MAP = {
+        'scan_vuln':   ('URLVulnWorkflow',     {}),
+        'deep_fuzz':   ('URLFuzzWorkflow',      {}),
+        'bypass_waf':  ('URLBypassWorkflow',    {}),
+        'secret_scan': ('URLDirSearchWorkflow', {'url_dirsearch': {'hunt_secrets': True}}),
+    }
+    _AUTH_WORKFLOW = 'URLAuthExtractWorkflow'
+
+    def post(self, request) -> Response:
+        import asyncio
+        import uuid
+        from datetime import timedelta
+
+        url: str = request.data.get('url')
+        action: str = request.data.get('action')
+        scan_id = request.data.get('scan_id')
+
+        if not url or not action or scan_id is None:
+            return Response(
+                {'error': 'url, action, and scan_id are required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from urllib.parse import urlparse
+        if urlparse(url).scheme not in ('http', 'https'):
+            return Response(
+                {'error': 'url must use http or https scheme'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from startScan.models import ScanHistory
+        if not ScanHistory.objects.filter(id=scan_id).exists():
+            return Response(
+                {'error': f'Scan {scan_id} does not exist'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        workflow_name: str = '<unknown>'
+        ctx: dict = {}
+        wf_id = f"dir-file-{action}-{scan_id}-{uuid.uuid4().hex[:8]}"
+
+        if action in self._WORKFLOW_MAP:
+            workflow_name, extra_yaml = self._WORKFLOW_MAP[action]
+            ctx = {
+                'urls': [url],
+                'yaml_configuration': extra_yaml,
+                'scan_history_id': scan_id,
+            }
+        elif action == 'extract_auth':
+            workflow_name = self._AUTH_WORKFLOW
+            ctx = {'url': url, 'scan_id': scan_id}
+        elif action == 'brute_test':
+            from plugins.models import Plugin
+            plugin = Plugin.objects.filter(
+                slug='credential_intelligence', is_enabled=True
+            ).first()
+            if not plugin:
+                return Response(
+                    {'error': 'Credential Intelligence plugin not installed or disabled'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            workflow_name = 'CredentialIntelligenceWorkflow'
+            ctx = {'url': url, 'scan_id': scan_id}
+        else:
+            return Response(
+                {'error': f'Unknown action: {action}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            async def _start():
+                client = await TemporalClientProvider.get_client()
+                handle = await client.start_workflow(
+                    workflow_name,
+                    ctx,
+                    id=wf_id,
+                    task_queue='python-orchestrator-queue',
+                    execution_timeout=timedelta(hours=1),
+                )
+                return handle.id
+
+            loop = asyncio.new_event_loop()
+            started_id = run_and_close(loop, _start())
+            return Response(
+                {'status': 'dispatched', 'workflow_id': started_id or wf_id},
+                status=status.HTTP_200_OK,
+            )
+        except Exception as exc:
+            logger.error(
+                "[DirectoryFileDispatchView] failed to start %s: %s",
+                workflow_name, str(exc),
+            )
+            return Response(
+                {'error': 'Failed to dispatch action'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class DirectoryFileDeleteView(APIView):
+    """Delete DirectoryFile records by primary key.
+
+    POST /api/action/directory-file/delete/
+    Body: { directory_file_ids: [int] }
+    Returns: { deleted: int }
+    """
+    permission_classes = [HasPermission]
+    permission_required = PERM_MODIFY_SCAN_RESULTS
+
+    def post(self, request) -> Response:
+        from startScan.models import DirectoryFile
+
+        ids = request.data.get('directory_file_ids')
+        if not ids:
+            return Response(
+                {'error': 'directory_file_ids is required and must not be empty'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(ids) > 500:
+            return Response(
+                {'error': 'directory_file_ids must not exceed 500 entries'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        deleted_count, _ = DirectoryFile.objects.filter(id__in=ids).delete()
+        return Response({'deleted': deleted_count}, status=status.HTTP_200_OK)
 
 
 # ---------------------------------------------------------------------------

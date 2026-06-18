@@ -16,6 +16,10 @@ from temporalio.client import Client
 logger = logging.getLogger(__name__)
 
 
+class TemporalConnectionError(RuntimeError):
+    """Raised when the Temporal client cannot connect within the timeout."""
+
+
 def run_and_close(loop: asyncio.AbstractEventLoop, coro):
     """Run coro synchronously from a non-async context (Django view, activity thread).
 
@@ -54,8 +58,12 @@ class TemporalClientProvider:
                 timeout=10.0
             )
         except asyncio.TimeoutError:
-            logger.error(f"Connection to Temporal host '{temporal_host}' timed out after 10 seconds.")
-            raise ConnectionError(f"Connection to Temporal host '{temporal_host}' timed out.")
+            logger.error(
+                f"Connection to Temporal host '{temporal_host}' timed out after 10 seconds."
+            )
+            raise TemporalConnectionError(
+                f"Temporal connection to '{temporal_host}' timed out after 10s."
+            )
 
     @classmethod
     def cancel_workflow(cls, workflow_id: str) -> None:

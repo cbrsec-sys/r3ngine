@@ -91,6 +91,8 @@ def generate_report_task(report_id):
         is_ignore_info_vuln = params.get('ignore_info_vuln', False)
         include_attack_surface_map = params.get('include_attack_surface_map', False)
         include_attack_paths = params.get('include_attack_paths', False)
+        # Default True for backward-compat with reports created before this flag was stored.
+        include_found_parameters = params.get('include_found_parameters', True)
         comments = params.get('comments', '')
 
         show_recon = True
@@ -166,9 +168,10 @@ def generate_report_task(report_id):
             .distinct()
         )
 
-        # CPDE parameters — omit for stress-test-only reports
+        # CPDE parameters — omit for stress-test-only reports or when the user
+        # explicitly unchecked 'Include Found Parameters' in the report modal.
         parameters = Parameter.objects.none()
-        if report_type != 'stress_test':
+        if report_type != 'stress_test' and include_found_parameters:
             parameters = (
                 Parameter.objects
                 .filter(scan_history=scan)
