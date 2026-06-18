@@ -29,23 +29,13 @@ from reNgine.auth_discovery_tasks import (
     _fetch_with_proxy_retry,
     _extract_login_forms,
 )
-from reNgine.common_func import get_proxy_list, get_random_proxy
+from reNgine.common_func import get_proxy_list, get_random_proxy, merge_imported_subdomains
 from targetApp.models import normalize_manual_subdomains
 from reNgine.utils.task import activity_heartbeat_safe
 from startScan.models import Subdomain
 
 logger = get_module_logger(__name__)
 
-
-def _merge_imported_subdomains(domain, imported_subdomains):
-    merged = []
-    seen = set()
-    for name in domain.get_manual_subdomains() + normalize_manual_subdomains(imported_subdomains):
-        if name in seen:
-            continue
-        seen.add(name)
-        merged.append(name)
-    return merged
 
 
 # ---------------------------------------------------------------------------
@@ -2521,7 +2511,7 @@ def setup_scheduled_scan_activity(params: dict) -> dict:
 
     engine = EngineType.objects.get(pk=engine_id)
     domain = Domain.objects.get(pk=domain_id)
-    imported_subdomains = _merge_imported_subdomains(domain, imported_subdomains)
+    imported_subdomains = merge_imported_subdomains(domain, imported_subdomains)
     config = yaml.safe_load(engine.yaml_configuration) or {}
 
     scan_history_id = create_scan_object(

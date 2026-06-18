@@ -79,17 +79,6 @@ Celery tasks.
 logger = get_task_logger(__name__)
 
 
-def _merge_imported_subdomains(domain, imported_subdomains):
-	"""Merge target-persisted manual subdomains with request/imported ones."""
-	merged = []
-	seen = set()
-	for name in domain.get_manual_subdomains() + normalize_manual_subdomains(imported_subdomains):
-		if name in seen:
-			continue
-		seen.add(name)
-		merged.append(name)
-	return merged
-
 
 SCAN_PIPELINE_DEFINITION = [
     {
@@ -248,7 +237,7 @@ def initiate_scan_temporal(
 		domain = Domain.objects.get(pk=domain_id)
 		domain.last_scan_date = timezone.now()
 		domain.save()
-		imported_subdomains = _merge_imported_subdomains(domain, imported_subdomains)
+		imported_subdomains = merge_imported_subdomains(domain, imported_subdomains)
 
 		starting_point_path = starting_point_path.rstrip('/')
 

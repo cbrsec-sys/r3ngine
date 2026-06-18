@@ -926,6 +926,18 @@ def check_proxy_robust(proxy_url, timeout=5):
 	return False
 
 
+def merge_imported_subdomains(domain, imported_subdomains):
+	"""Merge target-persisted manual subdomains with imported ones, deduplicating."""
+	merged = []
+	seen = set()
+	for name in domain.get_manual_subdomains() + normalize_manual_subdomains(imported_subdomains):
+		if name in seen:
+			continue
+		seen.add(name)
+		merged.append(name)
+	return merged
+
+
 def validate_single_proxy(proxy_name):
 	"""Helper to validate a single proxy string.
 	Returns (proxy_name, True) if valid, otherwise (proxy_name, False).
