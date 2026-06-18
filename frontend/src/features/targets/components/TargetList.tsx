@@ -66,6 +66,14 @@ const ScanStatusCell: React.FC<{ status?: string, progress?: number }> = ({ stat
     );
   }
 
+  if (status === 'NEVER_SCANNED') {
+    return (
+      <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 800, letterSpacing: 0.2 }}>
+        Never scanned
+      </Typography>
+    );
+  }
+
   if (status === 'RUNNING' || status === 'INITITATED') {
     return (
       <Box sx={{ minWidth: 100, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
