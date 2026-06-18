@@ -54,6 +54,7 @@ import type { Domain } from '../types';
 import type { ExtendedDomain } from './EditTargetModal';
 import { useThemeTokens } from '../../../theme/useThemeTokens';
 import { useTheme } from '@mui/material/styles';
+import { getFieldSx, getMenuPaperSx, getSurfaceSx } from '../../../theme/semanticColors';
 
 const ScanStatusCell: React.FC<{ status?: string, progress?: number }> = ({ status, progress = 0 }) => {
   const { tokens } = useThemeTokens();
@@ -163,7 +164,7 @@ const ScanStatusCell: React.FC<{ status?: string, progress?: number }> = ({ stat
 
 export const TargetList: React.FC = () => {
   const theme = useTheme();
-  const { tokens } = useThemeTokens();
+  const { tokens, isLight } = useThemeTokens();
   const headerStyles = {
     color: theme.palette.text.secondary,
     fontWeight: 800,
@@ -238,7 +239,7 @@ export const TargetList: React.FC = () => {
     }
   };
 
-  if (isLoading) return <LinearProgress sx={{ bgcolor: 'rgba(0, 243, 255, 0.1)', '& .MuiLinearProgress-bar': { bgcolor: '#00f3ff' } }} />;
+  if (isLoading) return <LinearProgress sx={{ bgcolor: `${tokens.accent.primary}1A`, '& .MuiLinearProgress-bar': { bgcolor: tokens.accent.primary } }} />;
 
   return (
     <Box sx={{ p: 3 }}>
@@ -254,8 +255,7 @@ export const TargetList: React.FC = () => {
 
       {/* Action Bar */}
       <Card sx={{ 
-        bgcolor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'rgba(20, 20, 35, 0.4)', 
-        border: `1px solid ${theme.palette.mode === 'light' ? theme.palette.divider : 'rgba(255,255,255,0.05)'}`,
+        ...getSurfaceSx(isLight, tokens, theme),
         borderRadius: 2,
         p: 1.5,
         mb: 3,
@@ -311,8 +311,8 @@ export const TargetList: React.FC = () => {
               fontSize: '0.75rem',
               '&:hover': { bgcolor: alpha(tokens.accent.primary, 0.25) },
               '&.Mui-disabled': { 
-                bgcolor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.02)', 
-                color: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' 
+                bgcolor: 'action.hover', 
+                color: 'text.disabled' 
               }
             }}
           >
@@ -330,8 +330,8 @@ export const TargetList: React.FC = () => {
               fontSize: '0.75rem',
               '&:hover': { bgcolor: alpha(tokens.accent.error, 0.25) },
               '&.Mui-disabled': { 
-                bgcolor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.03)' : 'rgba(255,255,255,0.02)', 
-                color: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.2)' : 'rgba(255,255,255,0.1)' 
+                bgcolor: 'action.hover', 
+                color: 'text.disabled' 
               }
             }}
           >
@@ -342,9 +342,7 @@ export const TargetList: React.FC = () => {
 
       {/* Main Content Card */}
       <Card sx={{ 
-        bgcolor: theme.palette.mode === 'light' ? theme.palette.background.paper : 'rgba(10, 10, 25, 0.8)', 
-        backdropFilter: 'blur(10px)', 
-        border: `1px solid ${theme.palette.mode === 'light' ? theme.palette.divider : 'rgba(255,255,255,0.05)'}`,
+        ...getSurfaceSx(isLight, tokens, theme),
         borderRadius: 3,
         overflow: 'hidden'
       }}>
@@ -354,7 +352,7 @@ export const TargetList: React.FC = () => {
           display: 'flex', 
           justifyContent: 'space-between', 
           alignItems: 'center', 
-          bgcolor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.01)' : 'rgba(255,255,255,0.02)',
+          bgcolor: 'action.hover',
           borderBottom: `1px solid ${theme.palette.divider}`
         }}>
           <TextField 
@@ -368,17 +366,14 @@ export const TargetList: React.FC = () => {
             }}
             sx={{ 
               width: 280,
-              '& .MuiOutlinedInput-root': {
-                color: 'text.primary',
-                bgcolor: 'action.hover',
-                '& fieldset': { borderColor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.1)' },
-              }
+              ...getFieldSx(isLight, tokens),
+              '& .MuiOutlinedInput-root': { bgcolor: 'action.hover' }
             }}
             slotProps={{
               input: {
                 startAdornment: (
                   <InputAdornment position="start">
-                    <Search size={16} style={{ color: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.3)' }} />
+                    <Search size={16} style={{ color: theme.palette.text.secondary }} />
                   </InputAdornment>
                 ),
               }
@@ -399,7 +394,7 @@ export const TargetList: React.FC = () => {
                 height: 32,
                 fontSize: '0.75rem',
                 fontFamily: 'Orbitron',
-                '& .MuiOutlinedInput-notchedOutline': { borderColor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.1)' }
+                '& .MuiOutlinedInput-notchedOutline': { borderColor: tokens.border.subtle }
               }}
             >
               <MenuItem value={10}>10</MenuItem>
@@ -412,14 +407,14 @@ export const TargetList: React.FC = () => {
 
         <TableContainer>
           <Table>
-            <TableHead sx={{ bgcolor: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.03)' : 'rgba(50, 20, 80, 0.3)' }}>
+            <TableHead sx={{ bgcolor: 'action.hover' }}>
               <TableRow>
                 <TableCell padding="checkbox" sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
                   <Checkbox 
                     indeterminate={selectedIds.length > 0 && selectedIds.length < (domains?.length || 0)}
                     checked={selectedIds.length > 0 && selectedIds.length === (domains?.length || 0)}
                     onChange={handleSelectAll}
-                    sx={{ color: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: tokens.accent.primary } }} 
+                    sx={{ color: theme.palette.text.secondary, '&.Mui-checked': { color: tokens.accent.primary } }} 
                   />
                 </TableCell>
                 <TableCell sx={headerStyles}>TARGET</TableCell>
@@ -445,7 +440,7 @@ export const TargetList: React.FC = () => {
                     <Checkbox 
                       checked={selectedIds.includes(domain.id!)}
                       onChange={() => handleSelectOne(domain.id!)}
-                      sx={{ color: theme.palette.mode === 'light' ? 'rgba(0,0,0,0.3)' : 'rgba(255,255,255,0.3)', '&.Mui-checked': { color: tokens.accent.primary } }} 
+                      sx={{ color: theme.palette.text.secondary, '&.Mui-checked': { color: tokens.accent.primary } }} 
                     />
                   </TableCell>
                   <TableCell sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
@@ -460,7 +455,7 @@ export const TargetList: React.FC = () => {
                           href={`/${projectSlug}/detail/${domain.most_recent_scan}`}
                           target="_blank"
                           sx={{ 
-                            color: '#00aaff', 
+                            color: tokens.accent.info, 
                             display: 'flex', 
                             alignItems: 'center', 
                             gap: 0.5, 
@@ -489,38 +484,38 @@ export const TargetList: React.FC = () => {
                       label={domain.insert_date_humanized} 
                       size="small"
                       sx={{ 
-                        bgcolor: 'rgba(0, 170, 255, 0.15)', 
-                        color: '#00aaff', 
+                        bgcolor: `${tokens.accent.info}26`, 
+                        color: tokens.accent.info, 
                         fontWeight: 700,
                         fontSize: '0.65rem',
                         borderRadius: 1,
                         height: 24,
-                        border: '1px solid rgba(0, 170, 255, 0.3)'
+                        border: `1px solid ${tokens.accent.info}4D`
                       }}
                     />
                   </TableCell>
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <TableCell sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
                     <Chip 
                       label={domain.start_scan_date_humanized || 'Never scanned'} 
                       size="small"
                       sx={{ 
-                        bgcolor: 'rgba(0, 170, 255, 0.1)', 
-                        color: '#00aaff', 
+                        bgcolor: `${tokens.accent.info}1A`, 
+                        color: tokens.accent.info, 
                         fontWeight: 700,
                         fontSize: '0.65rem',
                         borderRadius: 1,
                         height: 24,
-                        border: '1px solid rgba(0, 170, 255, 0.2)'
+                        border: `1px solid ${tokens.accent.info}33`
                       }}
                     />
                   </TableCell>
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+                  <TableCell sx={{ borderBottom: `1px solid ${theme.palette.divider}` }}>
                     <ScanStatusCell 
                       status={(domain as any).most_recent_scan_status} 
                       progress={(domain as any).most_recent_scan_progress} 
                     />
                   </TableCell>
-                  <TableCell sx={{ borderBottom: '1px solid rgba(255,255,255,0.05)', textAlign: 'right' }}>
+                  <TableCell sx={{ borderBottom: `1px solid ${theme.palette.divider}`, textAlign: 'right' }}>
                     <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
                       <Button
                         size="small"
@@ -559,10 +554,10 @@ export const TargetList: React.FC = () => {
                         size="small"
                         onClick={() => setEditTarget(domain as ExtendedDomain)}
                         sx={{
-                          color: 'rgba(255, 165, 0, 0.6)',
-                          bgcolor: 'rgba(255, 165, 0, 0.05)',
+                          color: tokens.accent.warning,
+                          bgcolor: alpha(tokens.accent.warning, 0.08),
                           borderRadius: 1,
-                          '&:hover': { color: '#ffa500', bgcolor: 'rgba(255, 165, 0, 0.12)' },
+                          '&:hover': { color: tokens.accent.warning, bgcolor: alpha(tokens.accent.warning, 0.16) },
                         }}
                       >
                         <Pencil size={16} />
@@ -570,7 +565,7 @@ export const TargetList: React.FC = () => {
                       <IconButton
                         size="small"
                         onClick={(e) => handleMenuOpen(e, { id: domain.id!, name: domain.name })}
-                        sx={{ color: 'rgba(0, 170, 255, 0.5)', bgcolor: 'rgba(0, 170, 255, 0.05)', borderRadius: 1 }}
+                        sx={{ color: tokens.accent.info, bgcolor: alpha(tokens.accent.info, 0.08), borderRadius: 1 }}
                       >
                         <MoreVertical size={18} />
                       </IconButton>
@@ -608,20 +603,18 @@ export const TargetList: React.FC = () => {
         slotProps={{
           paper: {
             sx: {
-              bgcolor: '#0d0c14',
-              border: '1px solid rgba(0, 170, 255, 0.2)',
+              ...getMenuPaperSx(isLight, theme, tokens),
               borderRadius: 0,
-              boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
               minWidth: 180,
               '& .MuiMenuItem-root': {
                 fontFamily: 'Orbitron',
                 fontSize: '0.7rem',
                 fontWeight: 700,
-                color: 'rgba(255,255,255,0.8)',
+                color: theme.palette.text.primary,
                 gap: 1.5,
                 py: 1.2,
-                '&:hover': { bgcolor: 'rgba(0, 170, 255, 0.05)', color: '#00f3ff' },
-                '& svg': { color: 'rgba(0, 170, 255, 0.5)' }
+                '&:hover': { bgcolor: alpha(tokens.accent.info, 0.08), color: tokens.accent.info },
+                '& svg': { color: tokens.accent.info }
               }
             }
           }
@@ -633,7 +626,7 @@ export const TargetList: React.FC = () => {
             if (domain) setEditTarget(domain as ExtendedDomain);
           }
           handleMenuClose();
-        }} sx={{ color: '#ffa500 !important', '& svg': { color: '#ffa500 !important' } }}>
+        }} sx={{ color: `${tokens.accent.warning} !important`, '& svg': { color: `${tokens.accent.warning} !important` } }}>
           <Pencil size={14} /> EDIT TARGET
         </MenuItem>
         <MenuItem onClick={() => {
@@ -649,7 +642,7 @@ export const TargetList: React.FC = () => {
             pauseScanMutation.mutate({ target_id: activeTarget.id });
           }
           handleMenuClose();
-        }} sx={{ color: '#ffab00 !important', '& svg': { color: '#ffab00 !important' } }}>
+        }} sx={{ color: `${tokens.accent.warning} !important`, '& svg': { color: `${tokens.accent.warning} !important` } }}>
           <PauseCircle size={14} /> PAUSE ALL SCANS
         </MenuItem>
         <MenuItem onClick={() => {
@@ -657,7 +650,7 @@ export const TargetList: React.FC = () => {
             unpauseScanMutation.mutate({ target_id: activeTarget.id });
           }
           handleMenuClose();
-        }} sx={{ color: '#00ff62 !important', '& svg': { color: '#00ff62 !important' } }}>
+        }} sx={{ color: `${tokens.accent.success} !important`, '& svg': { color: `${tokens.accent.success} !important` } }}>
           <Play size={14} /> RESUME ALL SCANS
         </MenuItem>
         <MenuItem onClick={() => {
@@ -667,7 +660,7 @@ export const TargetList: React.FC = () => {
             }
           }
           handleMenuClose();
-        }} sx={{ color: '#ff003c !important', '& svg': { color: '#ff003c !important' } }}>
+        }} sx={{ color: `${tokens.accent.error} !important`, '& svg': { color: `${tokens.accent.error} !important` } }}>
           <Trash2 size={14} /> DELETE TARGET
         </MenuItem>
       </Menu>
