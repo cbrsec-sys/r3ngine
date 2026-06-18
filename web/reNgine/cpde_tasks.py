@@ -45,9 +45,9 @@ def param_discovery(self, urls=[], ctx={}, description=None):
     session = requests.Session()
     session.headers['User-Agent'] = 'r3ngine-cpde/1.0'
 
-    # 1. Load JS output from Katana
+    # 1. Load JS output from all fetch_url tools
     activity_heartbeat_safe("Collecting JavaScript sources")
-    js_urls = js_collector.get_js_urls_from_katana_output(results_dir)
+    js_urls = js_collector.get_js_urls_from_results_dir(results_dir)
     
     # 2. Download JS files
     activity_heartbeat_safe(f"Downloading {len(js_urls)} JS bundles")

@@ -1,14 +1,15 @@
 """
 js_collector.py — JavaScript File Collection
 
-Reads the Katana URL output file produced by fetch_url and downloads any
-discovered .js files for downstream AST analysis. Deduplicates by SHA-256
-so each unique bundle is only analysed once per scan.
+Reads all urls_*.txt files produced by fetch_url and downloads any discovered
+.js files for downstream AST analysis. Deduplicates by SHA-256 so each unique
+bundle is only analysed once per scan.
 
 This module does NOT re-run Katana or any other crawler. It is a pure
 post-processing step on files already produced by fetch_url.
 """
 
+import glob
 import hashlib
 import logging
 import os
@@ -17,9 +18,6 @@ import re
 import requests
 
 logger = logging.getLogger(__name__)
-
-# Katana output file name (relative to results_dir) — matches fetch_url task
-KATANA_OUTPUT_FILENAME = 'urls_katana.txt'
 
 # Request timeout for downloading individual JS files
 _JS_DOWNLOAD_TIMEOUT = 20  # seconds
@@ -31,33 +29,38 @@ _MAX_JS_SIZE_BYTES = 10 * 1024 * 1024
 _JS_URL_RE = re.compile(r'https?://[^\s]+\.(?:js|mjs|jsx|ts|tsx)(?:\?[^\s]*)?$', re.IGNORECASE)
 
 
-def get_js_urls_from_katana_output(results_dir: str) -> list[str]:
-    """Read the Katana output file and return all discovered JS file URLs.
+def get_js_urls_from_results_dir(results_dir: str) -> list[str]:
+    """Read all urls_*.txt files in results_dir and return discovered JS file URLs.
+
+    Covers output from every fetch_url tool (katana, gau, gospider, waybackurls,
+    hakrawler). Deduplicates by URL string; download_js_files deduplicates further
+    by SHA-256 content hash.
 
     Args:
         results_dir (str): Path to the scan results directory.
 
     Returns:
-        list[str]: Deduplicated list of JS file URLs found in Katana output.
+        list[str]: Deduplicated list of JS file URLs found across all tool outputs.
     """
-    katana_file = os.path.join(results_dir, KATANA_OUTPUT_FILENAME)
-    if not os.path.isfile(katana_file):
-        logger.warning('[CPDE:js_collector] Katana output not found at %s', katana_file)
-        return []
+    file_paths = glob.glob(os.path.join(results_dir, 'urls_*.txt'))
 
-    js_urls = []
-    seen = set()
-    try:
-        with open(katana_file, encoding='utf-8', errors='replace') as fh:
-            for line in fh:
-                url = line.strip()
-                if url and url not in seen and _JS_URL_RE.match(url):
-                    seen.add(url)
-                    js_urls.append(url)
-    except OSError as exc:
-        logger.error('[CPDE:js_collector] Failed to read Katana output: %s', exc)
+    js_urls: list[str] = []
+    seen: set[str] = set()
+    for filepath in file_paths:
+        try:
+            with open(filepath, encoding='utf-8', errors='replace') as fh:
+                for line in fh:
+                    url = line.strip()
+                    if url and url not in seen and _JS_URL_RE.match(url):
+                        seen.add(url)
+                        js_urls.append(url)
+        except OSError as exc:
+            logger.error('[CPDE:js_collector] Failed to read %s: %s', filepath, exc)
 
-    logger.info('[CPDE:js_collector] Found %d unique JS URLs in Katana output', len(js_urls))
+    logger.info(
+        '[CPDE:js_collector] Found %d unique JS URLs across %d url file(s)',
+        len(js_urls), len(file_paths),
+    )
     return js_urls
 
 
