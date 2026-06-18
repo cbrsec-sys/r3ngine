@@ -191,15 +191,36 @@ export const TargetSummary = () => {
                 Target <Chip label={data.target_info.name} size="small" sx={{ height: 16, fontSize: '0.6rem', bgcolor: alpha(cPrimary, 0.1), color: cPrimary }} /> has been scanned <b>{data.scan_count}</b> times.
               </Typography>
               <List sx={{ p: 0 }}>
-                {data.recent_scans?.map((scan: any) => (
+                {(() => {
+                  const SCAN_STATUS_LABEL: Record<number, string> = {
+                    [-1]: 'Pending',
+                    [0]: 'Failed',
+                    [1]: 'Scanning',
+                    [2]: 'Completed',
+                    [3]: 'Aborted',
+                    [4]: 'Partial',
+                    [5]: 'Paused',
+                  };
+                  const getScanChipColor = (status: number): string => {
+                    if (status === 2) return cGreen;
+                    if (status === 1 || status === -1) return cPrimary;
+                    return cRed;
+                  };
+                  return data.recent_scans?.map((scan: any) => (
                   <Box key={scan.id} sx={{ mb: 2, pl: 2, borderLeft: `2px solid ${alpha(cPrimary, 0.2)}`, position: 'relative' }}>
                     <Box sx={{ position: 'absolute', left: -5, top: 0, width: 8, height: 8, borderRadius: '50%', bgcolor: cPrimary }} />
                     <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 0.5 }}>
                       <Typography sx={{ fontSize: '0.75rem', fontWeight: 900, color: theme.palette.text.primary }}>{scan.engine_name}</Typography>
                       <Chip
-                        label={scan.scan_status === 2 ? 'Completed' : 'Scanning'}
+                        label={SCAN_STATUS_LABEL[scan.scan_status] ?? 'Unknown'}
                         size="small"
-                        sx={{ height: 16, fontSize: '0.55rem', fontWeight: 900, bgcolor: scan.scan_status === 2 ? alpha(cGreen, 0.1) : alpha(cPrimary, 0.1), color: scan.scan_status === 2 ? cGreen : cPrimary }}
+                        sx={{
+                          height: 16,
+                          fontSize: '0.55rem',
+                          fontWeight: 900,
+                          bgcolor: alpha(getScanChipColor(scan.scan_status), 0.1),
+                          color: getScanChipColor(scan.scan_status),
+                        }}
                       />
                     </Stack>
                     <Typography variant="caption" sx={{ color: theme.palette.text.secondary, display: 'block', mb: 1 }}>{scan.completed_ago}</Typography>
@@ -213,7 +234,8 @@ export const TargetSummary = () => {
                       )}
                     </Stack>
                   </Box>
-                ))}
+                  ));
+                })()}
               </List>
             </Box>
           </TacticalPanel>
@@ -697,13 +719,13 @@ export const TargetSummary = () => {
             </Button>
 
             {/* Stop Scan Button */}
-            {data.recent_scans?.find((scan: any) => [1, -1, 5].includes(scan.scan_status)) && (
+            {data.recent_scans?.find((scan: any) => [1, -1, 4, 5].includes(scan.scan_status)) && (
               <Button
                 variant="outlined"
                 size="small"
                 startIcon={stopScanMutation.isPending ? <CircularProgress size={12} color="inherit" /> : <Square size={14} />}
                 onClick={() => {
-                  const running = data.recent_scans?.find((scan: any) => [1, -1, 5].includes(scan.scan_status));
+                  const running = data.recent_scans?.find((scan: any) => [1, -1, 4, 5].includes(scan.scan_status));
                   if (running) stopScanMutation.mutate(running.id);
                 }}
                 disabled={stopScanMutation.isPending}
