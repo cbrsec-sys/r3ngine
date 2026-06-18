@@ -3564,7 +3564,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 									full_url = line
 								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain)
 								lf_endpoints += 1
-								if '?' in full_url:
+								if endpoint is not None and '?' in full_url:
 									params = extract_params_from_url(full_url)
 									for p in params:
 										save_parameter(endpoint, p['name'], param_type='LinkFinder', value=p['value'])
@@ -3916,6 +3916,22 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	concurrency = config.get(NUCLEI_CONCURRENCY) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
 	intensity = config.get(INTENSITY) or self.yaml_configuration.get(INTENSITY, DEFAULT_SCAN_INTENSITY)
 	rate_limit = config.get(RATE_LIMIT) or self.yaml_configuration.get(RATE_LIMIT, DEFAULT_RATE_LIMIT)
+	# Cap concurrency and rate when routing through a proxy file.
+	# nuclei v3.9.0 AdaptiveWaitGroup deadlocks at high concurrency under proxy
+	# error rates of 60%+. See: scan 37 post-mortem / nuclei-stacktrace-*.dump.
+	if proxies_file_path and os.path.exists(proxies_file_path):
+		if concurrency > NUCLEI_PROXY_MAX_CONCURRENCY:
+			logger.warning(
+				'nuclei proxy mode: capping concurrency %s -> %s to prevent semaphore deadlock',
+				concurrency, NUCLEI_PROXY_MAX_CONCURRENCY,
+			)
+			concurrency = NUCLEI_PROXY_MAX_CONCURRENCY
+		if rate_limit > NUCLEI_PROXY_MAX_RATE_LIMIT:
+			logger.warning(
+				'nuclei proxy mode: capping rate_limit %s -> %s req/s',
+				rate_limit, NUCLEI_PROXY_MAX_RATE_LIMIT,
+			)
+			rate_limit = NUCLEI_PROXY_MAX_RATE_LIMIT
 	retries = config.get(RETRIES) or self.yaml_configuration.get(RETRIES, DEFAULT_RETRIES)
 	timeout = config.get(TIMEOUT) or self.yaml_configuration.get(TIMEOUT, DEFAULT_HTTP_TIMEOUT)
 	custom_headers = self.yaml_configuration.get(CUSTOM_HEADERS, [])
@@ -6712,7 +6728,7 @@ def fetch_proxies_task(limit=1000, job_id=None):
     MAX_WORKERS = min(1000, max(1, total))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        future_map = {pool.submit(check_proxy_robust, p): p for p in unique_proxies}
+        future_map = {pool.submit(check_proxy_robust, p, 10): p for p in unique_proxies}
         for future in concurrent.futures.as_completed(future_map):
             proxy_str = future_map[future]
             try:
@@ -6750,8 +6766,12 @@ def fetch_proxies_task(limit=1000, job_id=None):
             proxy_obj = Proxy.objects.create()
         proxy_obj.proxies = proxy_str
         proxy_obj.use_proxy = True
+        # Record the timestamp of this batch verification so that get_random_proxy()
+        # can short-circuit individual re-validation while the list is still fresh.
+        from django.utils import timezone as _dj_tz
+        proxy_obj.proxies_verified_at = _dj_tz.now()
         proxy_obj.save()
-        logger.info("Automatically saved live proxies to database.")
+        logger.info("Automatically saved live proxies to database (verified_at=%s).", proxy_obj.proxies_verified_at)
     except Exception as e:
         logger.error(f"Failed to auto-save proxies: {e}")
 

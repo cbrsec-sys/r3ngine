@@ -619,20 +619,31 @@ class MasterScanWorkflow:
             # activity (not child workflow) so gather is safe for it.
             # ------------------------------------------------------------------
             ran_t6 = False
+            nuclei_failed = False
 
             if "vulnerability_scan" in tasks:
                 # Spawn as a child workflow so Nuclei execution has its own
                 # independent Temporal history and can be tracked separately.
                 ran_t6 = True
-                await workflow.execute_child_workflow(
-                    "NucleiPlannerWorkflow",
-                    ctx,
-                    id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
-                    task_queue="python-orchestrator-queue",
-                    execution_timeout=timedelta(hours=24),
-                    run_timeout=timedelta(hours=24),
-                    retry_policy=RetryPolicy(maximum_attempts=1),
-                )
+                try:
+                    await workflow.execute_child_workflow(
+                        "NucleiPlannerWorkflow",
+                        ctx,
+                        id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
+                        task_queue="python-orchestrator-queue",
+                        execution_timeout=timedelta(hours=24),
+                        run_timeout=timedelta(hours=24),
+                        retry_policy=RetryPolicy(maximum_attempts=1),
+                    )
+                except Exception as nuclei_err:
+                    # Nuclei failure is non-fatal: completed batches are already in DB.
+                    # Tier 7 (correlation, risk scoring, Neo4j) will still run on partial
+                    # results. Failure is logged and the scan continues.
+                    workflow.logger.error(
+                        "NucleiPlannerWorkflow failed for scan_id=%s — continuing to Tier 7. error=%s",
+                        ctx.get('scan_history_id'), str(nuclei_err),
+                    )
+                    nuclei_failed = True
 
             other_t6_futures = []
             if "waf_bypass" in tasks:

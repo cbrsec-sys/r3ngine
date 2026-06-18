@@ -1,6 +1,38 @@
 # Changelog
 
-### [v3.7.0] — unreleased
+### [v3.6.2]
+
+#### Enhanced
+
+- **Proxy Fetching & Validation System — Comprehensive Overhaul**:
+  Fixed two compounding problems that caused many proxies to appear live at fetch time but be dead by scan time:
+
+  **`check_proxy_robust` (reNgine/common_func.py)**:
+  - Both IP-reflection endpoints (`api.ipify.org` + `ip-api.com`) are now checked in **parallel** via `ThreadPoolExecutor`, halving worst-case validation latency (the first success short-circuits the other).
+  - Added **IPv4/IPv6 format validation** on the returned IP string using `ipaddress.ip_address()`. Captive-portal pages that return `{"ip": "Login Required"}` or HTML bodies no longer produce false positives.
+  - Added opt-in **transparent-proxy detection**: when `OpSec.enable_transparent_proxy_detection=True`, the server's own outbound IP is detected once and any proxy that reports the same IP is rejected.
+  - Default timeout raised from 5 s → **10 s** to reduce false negatives on slow SOCKS5 proxies.
+
+  **`get_random_proxy` (reNgine/common_func.py)**:
+  - **Freshness short-circuit**: if `Proxy.proxies_verified_at` is within the configured TTL (default 120 min), the batch-verified list is trusted directly and a random entry is returned with **zero re-validation overhead**. Previously every tool call triggered up to 125 s of sequential blocking.
+  - When the list is stale, re-validation is now **fully parallel** (up to 50 workers; first live proxy wins, rest cancelled) instead of sequential with an arbitrary 25-cap.
+  - Added module-level **`_failed_proxy_cache`** (in-process set): proxies that fail during a scan session are cached and skipped on subsequent calls within the same Celery worker, eliminating repeated timeout waits against already-dead entries.
+
+  **`fetch_proxies_task` (reNgine/tasks.py)**:
+  - Batch verification now passes `timeout=10` explicitly to `check_proxy_robust`.
+  - After saving the live proxy list, `proxy_obj.proxies_verified_at = now()` is stamped so the freshness short-circuit in `get_random_proxy` is immediately active.
+
+  **`ProxychainsWrapper.get_random_proxy` (reNgine/utils/opsec.py)**:
+  - Replaced the old sequential 5-proxy cap with the same **parallel `ThreadPoolExecutor`** pattern used in `get_random_proxy`. All candidates are checked concurrently; first live line wins.
+
+  **`Proxy` model (scanEngine/models.py)**:
+  - Added `proxies_verified_at` (`DateTimeField`, nullable) — records when the stored list was last batch-verified.
+  - Added `proxy_ttl_minutes` (`IntegerField`, default 120) — configurable TTL for the freshness short-circuit.
+
+  **`OpSec` model (scanEngine/models.py)**:
+  - Added `enable_transparent_proxy_detection` (`BooleanField`, default False) — opt-in transparent-proxy rejection.
+
+  **Migration**: `scanEngine/migrations/0015_proxy_verified_at_opsec_transparent.py`
 
 #### Fixed
 
@@ -44,7 +76,36 @@
   and every individual network probe (URL, status code or exception) so any future slowdown
   is immediately visible in the orchestrator log rather than appearing as a silent hang.
 
-### CPDE Enhancements (Parameter Discovery)
+- **`nuclei_scan` — proxy concurrency cap prevents AdaptiveWaitGroup deadlock**:
+  nuclei v3.9.0 deadlocks when concurrency is high and the proxy error rate exceeds ~60%.
+  The scan 37 post-mortem confirmed this via a `nuclei-stacktrace-*.dump` showing goroutine 1
+  stuck in `semaphore.Acquire` for 9 minutes during the `wordpress,wp,wp-plugin` batch.
+  Added `NUCLEI_PROXY_MAX_CONCURRENCY = 10` and `NUCLEI_PROXY_MAX_RATE_LIMIT = 10` constants to
+  `definitions.py`. When `proxies_file_path` is set and the file exists, `nuclei_scan()` now
+  caps both values before building the command, logging a warning when a cap is applied.
+
+- **`MasterScanWorkflow` — NucleiPlannerWorkflow failure is now isolated**:
+  Previously, any failure in `NucleiPlannerWorkflow` (e.g. nuclei deadlock exhausting all
+  retries) propagated as an unhandled exception, setting `success = False` and skipping all
+  of Tier 7 (vulnerability correlation, risk scoring, Neo4j sync, notification). Scan 37
+  had 8 of 9 nuclei batches complete successfully — those findings were never correlated.
+  The `execute_child_workflow("NucleiPlannerWorkflow")` call is now wrapped in
+  `try/except Exception`, with a `nuclei_failed` flag set on failure. Tier 7 runs
+  regardless, processing whatever findings the completed batches wrote to the database.
+
+- **`web_api_discovery` — null `endpoint_id` constraint violation from LinkFinder**:
+  `save_endpoint()` returns `(None, False)` for off-domain URLs discovered by LinkFinder
+  (CDN links, third-party assets). When such a URL also contained `?`, `save_parameter(None, …)`
+  was called, hitting the `NOT NULL` constraint on `Parameter.endpoint_id`. The parameter loop
+  now guards with `if endpoint is not None and '?' in full_url:`.
+
+- **`web/.gitignore` — nuclei hang-monitor crash dumps no longer tracked**:
+  nuclei's `-hang-monitor` flag writes `*-stacktrace-*.dump` and `crash-resume-file-*.dump`
+  to the working directory on deadlock detection. Added three patterns (`*-stacktrace-*.dump`,
+  `crash-resume-file-*.dump`, `*.dump`) to `web/.gitignore` so these diagnostic artifacts
+  are never accidentally staged or committed.
+
+#### CPDE Enhancements (Parameter Discovery)
 - Added `url_param_collector.py` sub-module to `web/reNgine/cpde/`:
   reads `urls_*.txt` (Katana/gau/gospider/waybackurls), `arjun_*.json`,
   `ps_*.txt` (ParamSpider), `kr_*.json` (Kiterunner), and `lf_*.txt`
@@ -58,10 +119,6 @@
 - CPDE `param_discovery` now correlates parameters from all discovered
   sources (JS AST, OpenAPI, + all tool output files) instead of only
   JavaScript files and OpenAPI schemas.
-
----
-
-### [v3.6.2]
 
 - **Intelligent Auth Form Extraction — Full Rewrite (`auth_discovery_tasks.py`)**:
   - Replaced the single-attempt, regex-based implementation with a robust two-helper architecture:
@@ -265,10 +322,7 @@
     - **Layer 2 — `_run_task` helper**: Pre-flight guard at the entry point of every activity function. Catches activities that were in-flight mid-scan at the time of abort/delete, preventing them from proceeding and entering retry loops.
     - **Layer 3 — `CheckScanAliveActivity` (child workflow guard)**: Child workflows (`NucleiPlannerWorkflow`, `SubScanWorkflow`) are replayed by Temporal independently of `MasterScanWorkflow` after a container restart, so they skip Layer 1 entirely. A new `CheckScanAliveActivity` is now called as the **first activity** in both child workflows. It performs the same abort/delete check and raises `ApplicationError(non_retryable=True)` to terminate the child workflow cleanly before any scan data is accessed. This closes the remaining gap in lifecycle guard coverage for replayed child workflows.
   - Orphaned `TemporalWorkflowExecution` DB records for aborted scans (scans 4 and 8) were reconciled and marked `CANCELLED`/`TERMINATED`. The actively-looping workflow for deleted scan 32 (`master-scan-32-run-0-f36d62b1-nuclei`) was cancelled directly via the Temporal API.
-
-
-
-
+---
 
 ### [v3.5.0] - 2026-06-04
 
