@@ -642,7 +642,7 @@ def check_proxy_single(request, slug):
     if not proxy_url:
         return http.JsonResponse({'error': 'No proxy provided'}, status=400)
     from reNgine.common_func import check_proxy_robust
-    is_valid = check_proxy_robust(proxy_url, timeout=10)
+    is_valid = check_proxy_robust(proxy_url)
     return http.JsonResponse({'proxy': proxy_url, 'valid': bool(is_valid)})
 
 
