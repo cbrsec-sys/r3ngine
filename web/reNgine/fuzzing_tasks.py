@@ -424,7 +424,7 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 									history_file=self.history_file,
 									scan_id=self.scan_id,
 									activity_id=self.activity_id,
-									route_to_executor=False):
+									route_to_executor=True):
 								if not isinstance(line, dict):
 									continue
 								batch.append(line)
@@ -450,10 +450,15 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 							return
 						dirsearch_output = f'{self.results_dir}/dirsearch_{subdomain_name}.json'
 						target_url_stripped = target_url.rstrip('/')
-						dcmd = f'{dirsearch_base_cmd} -u {target_url_stripped} --format=json -o {dirsearch_output} --no-color'
-						if proxy:
-							dcmd += f' --proxy {proxy}'
-						dcmd = opsec.apply_stealth('dirsearch', dcmd, proxy=proxy)
+
+						def _build_dcmd(p):
+							cmd = f'{dirsearch_base_cmd} -u {target_url_stripped} --format=json -o {dirsearch_output} --no-color'
+							if p:
+								cmd += f' --proxy {p}'
+							return opsec.apply_stealth('dirsearch', cmd, proxy=p)
+
+						current_proxy = proxy
+						dcmd = _build_dcmd(current_proxy)
 
 						dirscan_ds = DirectoryScan.objects.create(
 							scanned_date=timezone.now(),
@@ -466,13 +471,50 @@ def dir_file_fuzz(self, ctx=None, description=None, prepare_only=False, parse_on
 						logger.warning(f'dirsearch command: {dcmd}')
 
 						if parse_only is None:
-							run_command(
-								dcmd,
-								shell=True,
-								history_file=self.history_file,
-								scan_id=self.scan_id,
-								activity_id=self.activity_id
-							)
+							_PROXY_ERROR = 'Error with the proxy:'
+							_max_proxy_retries = 2
+							_attempt = 0
+							while True:
+								_, ds_output = run_command(
+									dcmd,
+									shell=True,
+									history_file=self.history_file,
+									scan_id=self.scan_id,
+									activity_id=self.activity_id
+								)
+								if _PROXY_ERROR not in ds_output:
+									break
+								if _attempt < _max_proxy_retries:
+									_attempt += 1
+									current_proxy = get_random_proxy()
+									if current_proxy and not any(
+										current_proxy.startswith(s)
+										for s in ['http://', 'https://', 'socks4://', 'socks5://']
+									):
+										current_proxy = 'http://' + current_proxy
+									logger.warning(
+										'dirsearch proxy error (attempt %d/%d), retrying with new proxy',
+										_attempt, _max_proxy_retries
+									)
+									dcmd = _build_dcmd(current_proxy)
+									dirscan_ds.command_line = dcmd
+									dirscan_ds.save()
+								else:
+									logger.warning(
+										'dirsearch proxy error after %d retries, retrying without proxy',
+										_max_proxy_retries
+									)
+									dcmd = _build_dcmd(None)
+									dirscan_ds.command_line = dcmd
+									dirscan_ds.save()
+									run_command(
+										dcmd,
+										shell=True,
+										history_file=self.history_file,
+										scan_id=self.scan_id,
+										activity_id=self.activity_id
+									)
+									break
 
 						if os.path.exists(dirsearch_output):
 							try:

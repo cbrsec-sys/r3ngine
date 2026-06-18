@@ -77,7 +77,6 @@ import { useUnreadCount } from '../../features/notifications/api';
 import { ScanHistoryDrawer } from '../../features/scans/components/ScanHistoryDrawer';
 import { CheckForUpdateModal } from '../../features/settings/components/CheckForUpdateModal';
 import { useRengineUpdateCheck, useTorStatus, useTorExitIP } from '../../features/settings/api';
-import { useAppTheme } from '../../context/ThemeContext';
 import { HeaderThemeSwitcher } from './HeaderThemeSwitcher';
 
 const drawerWidth = 260;
@@ -94,7 +93,6 @@ interface NavItem {
 export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { tokens, isLight, isCyber } = useThemeTokens();
   const theme = useTheme();
-  const { themeName } = useAppTheme();
   const { version, projectName, setVersion } = useAppContext();
   const [isHovered, setIsHovered] = useState(false);
   const [openItems, setOpenItems] = useState<string[]>([]);
@@ -630,24 +628,20 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               slotProps={{
                 paper: {
                   sx: {
-                    bgcolor: isLight ? theme.palette.background.paper : 'rgba(10, 10, 15, 0.95)',
-                    backdropFilter: 'blur(12px)',
-                    border: isLight ? `1px solid ${theme.palette.divider}` : '1px solid rgba(0, 243, 255, 0.2)',
-                    borderRadius: 2,
+                    ...getMenuPaperSx(isLight, theme, tokens),
                     minWidth: 200,
                     mt: 1.5,
-                    boxShadow: isLight ? theme.shadows[4] : '0 8px 32px rgba(0,0,0,0.8)',
                     '& .MuiMenuItem-root': {
                       py: 1.5,
                       px: 2.5,
                       gap: 2,
-                      color: isLight ? theme.palette.text.primary : 'rgba(255,255,255,0.7)',
+                      color: tokens.text.primary,
                       fontFamily: 'var(--r3-heading-font)',
                       fontSize: '0.75rem',
                       letterSpacing: '1px',
                       '&:hover': {
-                        bgcolor: isLight ? alpha(theme.palette.primary.main, 0.08) : 'rgba(0, 243, 255, 0.1)',
-                        color: isLight ? theme.palette.primary.main : tokens.accent.primary,
+                        bgcolor: isLight ? alpha(tokens.accent.primary, 0.08) : alpha(tokens.accent.primary, 0.15),
+                        color: tokens.accent.primary,
                       }
                     }
                   }
@@ -679,14 +673,11 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
               slotProps={{
                 paper: {
                   sx: {
-                    bgcolor: isLight ? theme.palette.background.paper : 'rgba(10, 10, 15, 0.98)',
-                    backdropFilter: 'blur(15px)',
-                    border: isLight ? `1px solid ${theme.palette.divider}` : '1px solid rgba(0, 243, 255, 0.2)',
+                    ...getMenuPaperSx(isLight, theme, tokens),
                     borderRadius: 3,
                     p: 2.5,
                     width: 320,
                     mt: 1.5,
-                    boxShadow: isLight ? theme.shadows[4] : '0 10px 40px rgba(0,0,0,0.9)',
                     overflow: 'hidden',
                     '&::before': {
                       content: '""',
@@ -735,17 +726,17 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                         transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                         border: '1px solid transparent',
                         '&:hover': {
-                          bgcolor: isLight ? alpha(theme.palette.primary.main, 0.08) : 'rgba(255, 255, 255, 0.03)',
-                          borderColor: isLight ? alpha(theme.palette.primary.main, 0.2) : 'rgba(255, 255, 255, 0.05)',
+                          bgcolor: isLight ? alpha(tokens.accent.primary, 0.08) : alpha(tokens.text.primary, 0.03),
+                          borderColor: isLight ? alpha(tokens.accent.primary, 0.2) : tokens.border.subtle,
                           transform: 'translateY(-4px)',
-                          boxShadow: isLight ? `0 4px 20px ${theme.palette.primary.main}15` : `0 4px 20px ${item.color}15`,
+                          boxShadow: isLight ? `0 4px 20px ${alpha(tokens.accent.primary, 0.15)}` : `0 4px 20px ${alpha(item.color, 0.15)}`,
                           '& .icon-box': {
-                            color: isLight ? theme.palette.primary.main : item.color,
-                            filter: isLight ? 'none' : `drop-shadow(0 0 12px ${item.color}cc)`
+                            color: isLight ? tokens.accent.primary : item.color,
+                            filter: isLight ? 'none' : `drop-shadow(0 0 12px ${alpha(item.color, 0.8)})`
                           },
                           '& .item-text': {
-                            color: isLight ? theme.palette.primary.main : theme.palette.text.primary,
-                            textShadow: isLight ? 'none' : `0 0 8px ${item.color}aa`
+                            color: isLight ? tokens.accent.primary : theme.palette.text.primary,
+                            textShadow: isLight ? 'none' : `0 0 8px ${alpha(item.color, 0.67)}`
                           }
                         }
                       }}
@@ -754,12 +745,12 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                         className="icon-box"
                         sx={{
                           mb: 2,
-                          color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.3)',
+                          color: tokens.text.secondary,
                           transition: 'all 0.3s',
                           display: 'flex',
                           transform: 'scale(1)',
                           '& svg': {
-                            filter: isLight ? 'none' : 'drop-shadow(0 0 2px rgba(255,255,255,0.1))'
+                            filter: isLight ? 'none' : `drop-shadow(0 0 2px ${alpha(tokens.text.primary, 0.1)})`
                           }
                         }}
                       >
@@ -767,7 +758,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       </Box>
                       <Typography className="item-text" sx={{
                         fontSize: '0.7rem',
-                        color: isLight ? theme.palette.text.secondary : 'rgba(255,255,255,0.4)',
+                        color: tokens.text.muted,
                         fontFamily: 'var(--r3-heading-font)',
                         textAlign: 'center',
                         fontWeight: 700,
@@ -989,7 +980,7 @@ export const Shell: React.FC<{ children: React.ReactNode }> = ({ children }) => 
                       letterSpacing: '1px',
                       transition: 'all 0.2s',
                       '&:hover': {
-                        bgcolor: alpha(theme.palette.primary.main, 0.1),
+                        bgcolor: alpha(tokens.accent.primary, 0.1),
                         color: tokens.accent.primary,
                         '& .menu-icon': {
                           color: tokens.accent.primary,

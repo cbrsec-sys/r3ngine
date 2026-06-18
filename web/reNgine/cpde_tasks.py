@@ -11,6 +11,7 @@ from reNgine.cpde import ast_analyzer
 from reNgine.cpde import openapi_discoverer
 from reNgine.cpde import correlation_engine
 from reNgine.cpde import graph_writer
+from reNgine.cpde import url_param_collector
 
 logger = logging.getLogger(__name__)
 
@@ -44,9 +45,9 @@ def param_discovery(self, urls=[], ctx={}, description=None):
     session = requests.Session()
     session.headers['User-Agent'] = 'r3ngine-cpde/1.0'
 
-    # 1. Load JS output from Katana
+    # 1. Load JS output from all fetch_url tools
     activity_heartbeat_safe("Collecting JavaScript sources")
-    js_urls = js_collector.get_js_urls_from_katana_output(results_dir)
+    js_urls = js_collector.get_js_urls_from_results_dir(results_dir)
     
     # 2. Download JS files
     activity_heartbeat_safe(f"Downloading {len(js_urls)} JS bundles")
@@ -67,9 +68,14 @@ def param_discovery(self, urls=[], ctx={}, description=None):
         logger.info('[CPDE] No OpenAPI spec reachable at probe paths, skipping OpenAPI discovery')
         openapi_findings = []
     
-    # 5. Correlate Findings
+    # 5. Collect from tool output files (Arjun, ParamSpider, Kiterunner, LinkFinder, URL files)
+    activity_heartbeat_safe("Collecting parameters from tool output files")
+    tool_file_findings = url_param_collector.collect_all(results_dir)
+    logger.info('[CPDE] Tool file collector: %d findings', len(tool_file_findings))
+
+    # 6. Correlate Findings
     activity_heartbeat_safe("Correlating parameter evidence")
-    all_findings = ast_findings + openapi_findings
+    all_findings = ast_findings + openapi_findings + tool_file_findings
     
     # Get user confidence threshold
     cpde_cfg = ctx.get('yaml_configuration', {}).get('param_discovery', {})
@@ -80,7 +86,7 @@ def param_discovery(self, urls=[], ctx={}, description=None):
         min_confidence=min_confidence
     )
 
-    # 6. Bulk Persist to DB
+    # 7. Bulk Persist to DB
     activity_heartbeat_safe(f"Persisting {len(correlated_params)} parameters")
     
     # We need a fallback endpoint if we don't have a specific one for the parameter.
@@ -176,7 +182,7 @@ def param_discovery(self, urls=[], ctx={}, description=None):
     
     logger.info('[CPDE] Persisted %d new, updated %d existing parameters', created_count, updated_count)
     
-    # 7. Write to Neo4j graph
+    # 8. Write to Neo4j graph
     activity_heartbeat_safe("Enriching graph with CPDE findings")
     
     # We need Neo4j driver

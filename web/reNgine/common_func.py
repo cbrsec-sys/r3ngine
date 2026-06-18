@@ -856,63 +856,163 @@ def get_chaos_api_key():
 	return key_obj.key if key_obj else ''
 
 
-def check_proxy_robust(proxy_url, timeout=5):
-	"""Test if a proxy is truly working.
-	Avoids false positives from captive portals, ISP redirects, or proxy auth/block pages
-	by making a request to a public API returning a JSON payload with client IP.
-	
-	Args:
-		proxy_url (str): The proxy connection string (e.g., http://1.2.3.4:8080)
-		timeout (int): Timeout in seconds. Defaults to 5.
-		
-	Returns:
-		bool: True if proxy forwards traffic and responds successfully, False otherwise.
+# ---------------------------------------------------------------------------
+# Module-level cache of proxies known to be dead within this process lifetime.
+# Cleared between scans automatically because Celery workers restart between
+# tasks. Prevents wasting timeout budget re-checking proxies that already
+# failed during the same scan session.
+# ---------------------------------------------------------------------------
+_failed_proxy_cache: set = set()
+
+
+def _detect_server_ip(timeout: int = 5) -> str:
+	"""Return the server's own outbound IP by hitting an IP-reflection API
+	without a proxy. Returns '' on any failure.
+
+	Used only when OpSec transparent-proxy detection is enabled.
 	"""
+	try:
+		resp = requests.get(
+			'https://api.ipify.org?format=json',
+			timeout=timeout,
+			headers={'User-Agent': 'Mozilla/5.0'},
+		)
+		if resp.status_code == 200:
+			return resp.json().get('ip', '')
+	except Exception:
+		pass
+	return ''
+
+
+def _is_valid_ip(value: str) -> bool:
+	"""Return True if *value* looks like a valid IPv4 or IPv6 address.
+
+	This filters out captive-portal strings like 'Login Required' that could
+	otherwise fool a simple 200-OK JSON check.
+	"""
+	import ipaddress
+	try:
+		ipaddress.ip_address(value)
+		return True
+	except ValueError:
+		return False
+
+
+def check_proxy_robust(proxy_url, timeout=10, server_ip=''):
+	"""Test if a proxy is truly working and not a transparent/captive-portal proxy.
+
+	Improvements over the old implementation:
+	  - Both IP-reflection endpoints are checked in *parallel* (short-circuit on
+	    first success) rather than sequentially, halving worst-case latency.
+	  - The returned IP value is validated as a real IPv4 / IPv6 address so that
+	    captive-portal HTML strings cannot produce a false positive.
+	  - When ``server_ip`` is provided (and OpSec transparent-proxy detection is
+	    enabled), the proxy is rejected if its reported IP matches the server's own
+	    outbound IP (i.e. the proxy is transparent and exposes the real source).
+
+	Args:
+		proxy_url (str): The proxy connection string (e.g., http://1.2.3.4:8080).
+		timeout (int): Per-request timeout in seconds. Defaults to 10.
+		server_ip (str): The server's own outbound IP string (for transparent-proxy
+			detection). Pass '' to disable the check.
+
+	Returns:
+		bool: True if the proxy forwards traffic correctly, False otherwise.
+	"""
+	import ipaddress as _ipaddr
+	from concurrent.futures import ThreadPoolExecutor, as_completed
+
 	try:
 		proxy_url = proxy_url.strip()
 		if not proxy_url:
 			return False
+		# Normalise – ensure a scheme is present so requests can route correctly
 		test_proxy = proxy_url
 		if not any(test_proxy.startswith(s) for s in ['http://', 'https://', 'socks4://', 'socks5://']):
 			test_proxy = 'http://' + test_proxy
-			
-		proxies = {
-			'http': test_proxy,
-			'https': test_proxy,
+
+		proxies = {'http': test_proxy, 'https': test_proxy}
+		headers = {
+			'User-Agent': (
+				'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 '
+				'(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+			)
 		}
-		
-		# Try up to 2 different reliable JSON APIs to avoid single-point failure (e.g. rate limits)
+
+		# Two independent IP-reflection endpoints checked in parallel.
 		check_targets = [
-			("https://api.ipify.org?format=json", "ip"),
-			("http://ip-api.com/json", "query")
+			('https://api.ipify.org?format=json', 'ip'),
+			('http://ip-api.com/json',            'query'),
 		]
-		
-		for url, expected_key in check_targets:
-			try:
-				response = requests.get(
-					url,
-					proxies=proxies,
-					headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"},
-					timeout=timeout,
-					allow_redirects=True
-				)
-				if response.status_code == 200:
-					# Verify response contains valid JSON with the expected key
-					data = response.json()
-					if expected_key in data:
-						return True
-			except Exception:
-				continue
-		return False
+
+		def _try_endpoint(url, key):
+			"""Return the reported IP string or raise on failure."""
+			resp = requests.get(
+				url,
+				proxies=proxies,
+				headers=headers,
+				timeout=timeout,
+				allow_redirects=True,
+			)
+			if resp.status_code != 200:
+				raise ValueError(f'HTTP {resp.status_code}')
+			data = resp.json()
+			ip_str = data.get(key, '')
+			if not ip_str:
+				raise ValueError('empty IP field in response')
+			if not _is_valid_ip(ip_str):
+				raise ValueError(f'response IP is not a valid IP address: {ip_str!r}')
+			return ip_str
+
+		reported_ip = None
+		with ThreadPoolExecutor(max_workers=2) as _pool:
+			future_map = {_pool.submit(_try_endpoint, u, k): (u, k) for u, k in check_targets}
+			for fut in as_completed(future_map):
+				try:
+					reported_ip = fut.result()
+					# Cancel the sibling future – we have our answer
+					for other in future_map:
+						if other is not fut:
+							other.cancel()
+					break
+				except Exception:
+					continue  # try the other endpoint
+
+		if not reported_ip:
+			# Both endpoints failed – proxy is dead or blocking check requests
+			return False
+
+		# Optional transparent-proxy detection: reject if the proxy simply
+		# forwards our real IP without changing it.
+		if server_ip and reported_ip == server_ip:
+			logger.warning(
+				'Proxy %s is transparent – reported IP %s matches server IP. Rejecting.',
+				proxy_url, reported_ip,
+			)
+			return False
+
+		return True
 	except Exception:
 		return False
+
+
+def merge_imported_subdomains(domain, imported_subdomains):
+	"""Merge target-persisted manual subdomains with imported ones, deduplicating."""
+	merged = []
+	seen = set()
+	for name in domain.get_manual_subdomains() + normalize_manual_subdomains(imported_subdomains):
+		if name in seen:
+			continue
+		seen.add(name)
+		merged.append(name)
+	return merged
 
 
 def validate_single_proxy(proxy_name):
 	"""Helper to validate a single proxy string.
 	Returns (proxy_name, True) if valid, otherwise (proxy_name, False).
 	"""
-	is_valid = check_proxy_robust(proxy_name, timeout=5)
+	is_valid = check_proxy_robust(proxy_name)
 	return proxy_name, is_valid
 
 
@@ -929,7 +1029,7 @@ def validate_proxies(proxy_text):
 	valid_proxies = []
 	max_workers = min(1000, max(1, len(raw_proxies)))
 	with ThreadPoolExecutor(max_workers=max_workers) as executor:
-		future_to_proxy = {executor.submit(check_proxy_robust, p, 15): p for p in raw_proxies}
+		future_to_proxy = {executor.submit(check_proxy_robust, p, PROXY_VALIDATION_TIMEOUT): p for p in raw_proxies}
 		for future in as_completed(future_to_proxy):
 			proxy_name = future_to_proxy[future]
 			try:
@@ -939,6 +1039,7 @@ def validate_proxies(proxy_text):
 			if is_valid:
 				valid_proxies.append(proxy_name)
 	return '\n'.join(valid_proxies)
+
 
 
 # Curated pool of modern desktop browser user agents for realistic request spoofing.
@@ -981,58 +1082,141 @@ def get_random_user_agent():
 
 
 def get_random_proxy():
-	"""Get a random proxy from the list of proxies input by user in the UI,
-	validating that it is alive and does not require authentication.
+	"""Get a random proxy from the list stored in the database.
+
+	Enhancements over the old implementation:
+	  - **Freshness short-circuit**: if the proxy list was batch-verified by
+	    ``fetch_proxies_task`` within the configured TTL (default 120 min) it is
+	    trusted directly and a random entry is returned without re-validation.
+	    This prevents hundreds of milliseconds of blocking overhead on every tool
+	    call during a scan.
+	  - **Parallel re-validation**: when the list is stale, all candidate proxies
+	    are checked concurrently (up to 50 workers) instead of sequentially.
+	    The first live one wins; the rest are cancelled.
+	  - **In-process failure cache**: proxies that fail during the current scan
+	    session are recorded in ``_failed_proxy_cache`` and skipped on subsequent
+	    calls, avoiding repeated timeouts against already-dead entries.
+	  - **Transparent-proxy detection**: when the OpSec setting
+	    ``enable_transparent_proxy_detection`` is True the server's own outbound IP
+	    is detected once per call and passed to ``check_proxy_robust`` so that
+	    transparent proxies are rejected.
 
 	Returns:
-		str: Proxy name or '' if no proxy defined in db or use_proxy is False.
+		str: Proxy URL string, 'socks5://tor:9050' when TOR is enabled, or '' if
+			 no valid proxy is available.
 	"""
-	# TOR mode: when use_tor is enabled, route all scan traffic through the TOR
-	# SOCKS5 proxy. Returning a non-empty proxy string ensures run_command /
-	# stream_command enter their proxychains wrapping branch; ProxychainsWrapper
-	# then builds the 'socks5 tor 9050' config via should_wrap()/wrap_command().
-	_tor_proxy_obj = Proxy.objects.first()
-	if _tor_proxy_obj and _tor_proxy_obj.use_tor:
+	from concurrent.futures import ThreadPoolExecutor, as_completed
+	from datetime import timezone as _tz
+	import datetime as _dt
+
+	# ------------------------------------------------------------------
+	# TOR mode: bypass all proxy logic and return the TOR SOCKS5 address
+	# ------------------------------------------------------------------
+	_proxy_obj = Proxy.objects.first()
+	if _proxy_obj and _proxy_obj.use_tor:
 		return 'socks5://tor:9050'
 
-	# Check if any Proxy records exist in the database
-	if not Proxy.objects.all().exists():
-		return ''
-	
-	# Retrieve the global proxy configuration
-	proxy = Proxy.objects.first()
-	if not proxy.use_proxy:
+	if not _proxy_obj or not _proxy_obj.use_proxy:
 		return ''
 
 	# Parse and clean the newline-separated proxy lines
-	proxies = [p.strip() for p in proxy.proxies.splitlines() if p.strip()]
-	if not proxies:
+	raw_proxies = [p.strip() for p in (_proxy_obj.proxies or '').splitlines() if p.strip()]
+	if not raw_proxies:
 		return ''
 
-	# Shuffle the proxies to distribute traffic randomly
-	random.shuffle(proxies)
+	# Normalise – ensure every entry has a scheme
+	proxies = []
+	for p in raw_proxies:
+		if not p.startswith('http') and not p.startswith('socks'):
+			p = f'http://{p}'
+		proxies.append(p)
 
-	# Validate each proxy sequentially until we find a working one.
-	# Limit to 25 checks to cap worst-case wait (25 × timeout = 125 s).
-	checked_count = 0
-	for proxy_name in proxies:
-		if checked_count >= 25:
-			logger.warning('Reached maximum sequential proxy validation limit (25). Stopping checks.')
-			break
-		checked_count += 1
-		
-		# Ensure the proxy has a valid scheme before usage
-		if not proxy_name.startswith('http') and not proxy_name.startswith('socks'):
-			proxy_name = f"http://{proxy_name}"
-			
-		logger.info("Validating proxy: %s", proxy_name)
-		if check_proxy_robust(proxy_name, timeout=5):
-			logger.warning("Using valid proxy: %s", proxy_name)
-			return proxy_name
-		logger.warning("Proxy %s validation failed.", proxy_name)
+	# Remove entries that have already failed this session
+	candidates = [p for p in proxies if p not in _failed_proxy_cache]
+	if not candidates:
+		# All known proxies have failed – clear the cache and try again fresh
+		logger.warning('All cached proxies failed this session. Clearing failure cache.')
+		_failed_proxy_cache.clear()
+		candidates = proxies
 
-	logger.error('No valid proxies found in the list!')
+	# ------------------------------------------------------------------
+	# Freshness short-circuit
+	# If the batch verification is recent enough, trust it and return a
+	# random candidate without any individual re-validation.
+	# ------------------------------------------------------------------
+	ttl_minutes = getattr(_proxy_obj, 'proxy_ttl_minutes', 120) or 120
+	verified_at = getattr(_proxy_obj, 'proxies_verified_at', None)
+	if verified_at is not None:
+		now_utc = _dt.datetime.now(_tz.utc)
+		age_minutes = (now_utc - verified_at).total_seconds() / 60
+		if age_minutes <= ttl_minutes:
+			chosen = random.choice(candidates)
+			logger.info(
+				'Proxy list is fresh (%.1f min old, TTL %d min). '
+				'Returning %s without re-validation.',
+				age_minutes, ttl_minutes, chosen,
+			)
+			return chosen
+		logger.info(
+			'Proxy list is stale (%.1f min old, TTL %d min). '
+			'Falling back to parallel re-validation.',
+			age_minutes, ttl_minutes,
+		)
+	else:
+		logger.info('No proxies_verified_at timestamp found. Performing parallel re-validation.')
+
+	# ------------------------------------------------------------------
+	# Optional transparent-proxy detection (opt-in via OpSec setting)
+	# ------------------------------------------------------------------
+	server_ip = ''
+	try:
+		from scanEngine.models import OpSec as _OpSec
+		_opsec = _OpSec.objects.first()
+		if _opsec and getattr(_opsec, 'enable_transparent_proxy_detection', False):
+			server_ip = _detect_server_ip(timeout=5)
+			if server_ip:
+				logger.info('Transparent proxy detection enabled. Server IP: %s', server_ip)
+	except Exception as _e:
+		logger.warning('Could not read OpSec settings for transparent proxy detection: %s', _e)
+
+	# ------------------------------------------------------------------
+	# Parallel re-validation – first live proxy wins
+	# ------------------------------------------------------------------
+	random.shuffle(candidates)
+	# Cap workers to avoid spawning thousands of threads for a huge list
+	max_workers = min(50, len(candidates))
+
+	result_holder = [None]  # thread-safe single-slot via GIL
+
+	def _check(proxy_url):
+		"""Check a single proxy; mark it failed on the cache if dead."""
+		if check_proxy_robust(proxy_url, timeout=10, server_ip=server_ip):
+			return proxy_url
+		_failed_proxy_cache.add(proxy_url)
+		return None
+
+	with ThreadPoolExecutor(max_workers=max_workers) as pool:
+		future_map = {pool.submit(_check, p): p for p in candidates}
+		for fut in as_completed(future_map):
+			try:
+				live = fut.result()
+			except Exception:
+				live = None
+			if live:
+				result_holder[0] = live
+				# Cancel remaining futures to stop wasting resources
+				for other in future_map:
+					if other is not fut:
+						other.cancel()
+				break
+
+	if result_holder[0]:
+		logger.info('Using valid proxy (parallel validation): %s', result_holder[0])
+		return result_holder[0]
+
+	logger.error('No valid proxies found after parallel re-validation!')
 	return ''
+
 
 def get_proxy_list():
 	"""Get a list of all proxies input by the user in the UI.
@@ -2556,11 +2740,15 @@ def has_graphql_endpoint(scan_id, url, proxy=None):
 	Checks existing EndPoint records first (zero network cost). Falls back to
 	HEAD-probing common GraphQL paths if the DB has no evidence.
 	"""
-	if EndPoint.objects.filter(
+	logger.info('[GATE] has_graphql_endpoint: DB query — scan_id=%s url=%s', scan_id, url)
+	db_match = EndPoint.objects.filter(
 		scan_history_id=scan_id,
 		http_url__iregex=r'/graphi?ql',
-	).exists():
+	).exists()
+	if db_match:
+		logger.info('[GATE] has_graphql_endpoint: DB hit — GraphQL endpoint already recorded for scan %s', scan_id)
 		return True
+	logger.info('[GATE] has_graphql_endpoint: DB miss — probing %d paths for %s (timeout=%ds each)', len(_GRAPHQL_PROBE_PATHS), url, _PROBE_TIMEOUT)
 
 	from urllib.parse import urlparse as _urlparse
 	parsed = _urlparse(url)
@@ -2569,6 +2757,7 @@ def has_graphql_endpoint(scan_id, url, proxy=None):
 
 	for path in _GRAPHQL_PROBE_PATHS:
 		probe_url = base + path
+		logger.info('[GATE] has_graphql_endpoint: probing %s', probe_url)
 		try:
 			resp = requests.head(
 				probe_url,
@@ -2577,12 +2766,15 @@ def has_graphql_endpoint(scan_id, url, proxy=None):
 				allow_redirects=True,
 				headers=_PROBE_HEADERS,
 			)
+			logger.info('[GATE] has_graphql_endpoint: %s → HTTP %d', probe_url, resp.status_code)
 			if resp.status_code not in (400, 404, 410):
 				logger.info('[GATE] GraphQL endpoint candidate at %s (HTTP %d)', probe_url, resp.status_code)
 				return True
-		except requests.RequestException:
+		except requests.RequestException as e:
+			logger.info('[GATE] has_graphql_endpoint: %s → error (%s)', probe_url, e)
 			continue
 
+	logger.info('[GATE] has_graphql_endpoint: no GraphQL endpoint found for %s', url)
 	return False
 
 
@@ -2599,8 +2791,10 @@ def has_openapi_spec(url, proxy=None):
 	base = '%s://%s' % (parsed.scheme, parsed.netloc)
 	proxies = {'http': proxy, 'https': proxy} if proxy else None
 
+	logger.info('[GATE] has_openapi_spec: probing %d paths for %s (timeout=%ds each)', len(_OPENAPI_PROBE_PATHS), url, _PROBE_TIMEOUT)
 	for path in _OPENAPI_PROBE_PATHS:
 		probe_url = base + path
+		logger.info('[GATE] has_openapi_spec: probing %s', probe_url)
 		try:
 			resp = requests.head(
 				probe_url,
@@ -2609,6 +2803,7 @@ def has_openapi_spec(url, proxy=None):
 				allow_redirects=True,
 				headers=_PROBE_HEADERS,
 			)
+			logger.info('[GATE] has_openapi_spec: %s → HTTP %d', probe_url, resp.status_code)
 			if resp.status_code != 200:
 				continue
 			# HEAD returned 200 — accept json/yaml content types directly
@@ -2617,6 +2812,7 @@ def has_openapi_spec(url, proxy=None):
 				logger.info('[GATE] OpenAPI spec found at %s (Content-Type: %s)', probe_url, ct)
 				return True
 			# For ambiguous content types confirm with a lightweight GET
+			logger.info('[GATE] has_openapi_spec: ambiguous Content-Type %r — issuing GET %s', ct, probe_url)
 			get_resp = requests.get(
 				probe_url,
 				timeout=_PROBE_TIMEOUT * 2,
@@ -2633,9 +2829,11 @@ def has_openapi_spec(url, proxy=None):
 					return True
 			except Exception:
 				continue
-		except requests.RequestException:
+		except requests.RequestException as e:
+			logger.info('[GATE] has_openapi_spec: %s → error (%s)', probe_url, e)
 			continue
 
+	logger.info('[GATE] has_openapi_spec: no OpenAPI spec found for %s', url)
 	return False
 
 
@@ -2648,6 +2846,8 @@ def has_jwt_tokens(scan_id, subdomain=None):
 	scoped to that subdomain; SecretLeak always covers the full scan so
 	that scan-wide secret discoveries gate per-subdomain runs correctly.
 	"""
+	subdomain_label = subdomain.name if subdomain is not None else 'scan-wide'
+	logger.info('[GATE] has_jwt_tokens: querying auth parameters — scan_id=%s scope=%s', scan_id, subdomain_label)
 	param_qs = Parameter.objects.filter(
 		endpoint__scan_history_id=scan_id,
 		is_auth_related=True,
@@ -2656,10 +2856,14 @@ def has_jwt_tokens(scan_id, subdomain=None):
 		param_qs = param_qs.filter(endpoint__subdomain=subdomain)
 	for name in param_qs.values_list('name', flat=True):
 		if _JWT_PARAM_RE.search(name):
+			logger.info('[GATE] has_jwt_tokens: JWT param match on %r — scan_id=%s scope=%s', name, scan_id, subdomain_label)
 			return True
 
+	logger.info('[GATE] has_jwt_tokens: no JWT params found, querying SecretLeak — scan_id=%s', scan_id)
 	for secret_type in SecretLeak.objects.filter(scan_history_id=scan_id).values_list('secret_type', flat=True):
 		if _JWT_SECRET_TYPE_RE.search(secret_type):
+			logger.info('[GATE] has_jwt_tokens: JWT secret match on %r — scan_id=%s', secret_type, scan_id)
 			return True
 
+	logger.info('[GATE] has_jwt_tokens: no JWT tokens found — scan_id=%s scope=%s', scan_id, subdomain_label)
 	return False

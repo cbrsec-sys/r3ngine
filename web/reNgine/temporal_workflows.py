@@ -1,4 +1,4 @@
-﻿"""
+"""
 Temporal Workflow definitions for the r3ngine scan pipeline.
 
 Workflows define the durable orchestration logic — the "what runs when" in the
@@ -463,7 +463,27 @@ class MasterScanWorkflow:
                 )
 
             # ------------------------------------------------------------------
-            # TIER 3b: Custom Parameter Discovery Engine (CPDE)
+            # TIER 3b: Web API Discovery
+            # Moved here from Tier 5 so kiterunner output (kr_*.json) is ready
+            # before CPDE reads it. Guarded with workflow.patched() so that
+            # in-flight workflows replaying recorded history (where this activity
+            # ran at Tier 5) skip this block and still execute at Tier 5 below.
+            # ------------------------------------------------------------------
+            if "web_api_discovery" in tasks and workflow.patched("web-api-to-tier-3b"):
+                await workflow.execute_activity(
+                    "RunWebAPIDiscoveryActivity",
+                    ctx,
+                    start_to_close_timeout=timedelta(hours=4),
+                    heartbeat_timeout=timedelta(minutes=10),
+                    retry_policy=_RETRY_NETWORK_SCAN,
+                    task_queue="python-orchestrator-queue"
+                )
+
+            # ------------------------------------------------------------------
+            # TIER 3c: Custom Parameter Discovery Engine (CPDE)
+            # Reads kiterunner (kr_*.json), arjun, paramspider, linkfinder, and
+            # JS bundles discovered by Tier 3. Runs after web_api_discovery so
+            # all tool output files are present.
             # ------------------------------------------------------------------
             if "param_discovery" in tasks:
                 await workflow.execute_activity(
@@ -519,10 +539,13 @@ class MasterScanWorkflow:
 
             await self._check_paused()
             # ------------------------------------------------------------------
-            # TIER 5: Analysis (parallel — API discovery, WAF detection, secrets)
+            # TIER 5: Analysis (parallel — WAF detection, secrets, vigolium)
+            # web_api_discovery is only included here for old in-flight workflows
+            # replaying history recorded before the "web-api-to-tier-3b" patch.
+            # New workflows execute web_api_discovery at Tier 3b instead.
             # ------------------------------------------------------------------
             analysis_futures = []
-            if "web_api_discovery" in tasks:
+            if "web_api_discovery" in tasks and not workflow.patched("web-api-to-tier-3b"):
                 analysis_futures.append(
                     workflow.execute_activity(
                         "RunWebAPIDiscoveryActivity",
@@ -596,20 +619,31 @@ class MasterScanWorkflow:
             # activity (not child workflow) so gather is safe for it.
             # ------------------------------------------------------------------
             ran_t6 = False
+            nuclei_failed = False
 
             if "vulnerability_scan" in tasks:
                 # Spawn as a child workflow so Nuclei execution has its own
                 # independent Temporal history and can be tracked separately.
                 ran_t6 = True
-                await workflow.execute_child_workflow(
-                    "NucleiPlannerWorkflow",
-                    ctx,
-                    id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
-                    task_queue="python-orchestrator-queue",
-                    execution_timeout=timedelta(hours=24),
-                    run_timeout=timedelta(hours=24),
-                    retry_policy=RetryPolicy(maximum_attempts=1),
-                )
+                try:
+                    await workflow.execute_child_workflow(
+                        "NucleiPlannerWorkflow",
+                        ctx,
+                        id=f"{workflow.info().workflow_id}-{workflow.info().run_id[:8]}-nuclei",
+                        task_queue="python-orchestrator-queue",
+                        execution_timeout=timedelta(hours=24),
+                        run_timeout=timedelta(hours=24),
+                        retry_policy=RetryPolicy(maximum_attempts=1),
+                    )
+                except Exception as nuclei_err:
+                    # Nuclei failure is non-fatal: completed batches are already in DB.
+                    # Tier 7 (correlation, risk scoring, Neo4j) will still run on partial
+                    # results. Failure is logged and the scan continues.
+                    workflow.logger.error(
+                        "NucleiPlannerWorkflow failed for scan_id=%s — continuing to Tier 7. error=%s",
+                        ctx.get('scan_history_id'), str(nuclei_err),
+                    )
+                    nuclei_failed = True
 
             other_t6_futures = []
             if "waf_bypass" in tasks:
@@ -863,11 +897,28 @@ class NucleiPlannerWorkflow:
         workflow.logger.info(
             f"Starting NucleiPlannerWorkflow for scan_id={ctx.get('scan_history_id')}"
         )
-        
+
+        # -----------------------------------------------------------------------
+        # Lifecycle guard — child workflow abort/delete check
+        # When Temporal replays this child workflow after a container restart, it
+        # skips MasterScanWorkflow's TargetProfilingActivity guard entirely.
+        # CheckScanAliveActivity mirrors that guard here at the earliest possible
+        # point, raising non_retryable ApplicationError if the scan was deleted or
+        # aborted so the child workflow terminates cleanly without retry loops.
+        # -----------------------------------------------------------------------
+        await workflow.execute_activity(
+            "CheckScanAliveActivity",
+            args=[ctx.get('scan_history_id')],
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+
         yaml_config = ctx.get('yaml_configuration', {})
         vuln_config = yaml_config.get('vulnerability_scan', {})
-        
+
         # --- Stage 1: Primary scanners ---
+
         if vuln_config.get('run_nuclei', True):
             nuclei_specific_config = vuln_config.get('nuclei', {})
             severities = nuclei_specific_config.get('severity') or NUCLEI_DEFAULT_SEVERITIES
@@ -883,22 +934,18 @@ class NucleiPlannerWorkflow:
                         task_queue="python-orchestrator-queue",
                     )
 
-                    # Gather tags via activity (DB + tech_mapping work is not allowed in workflows).
-                    all_tags = await workflow.execute_activity(
+                    # Gather tags and pre-built batches via activity.
+                    # Activity counts templates per tag so each batch is bounded by
+                    # template count rather than tag count — prevents 2-hour timeouts
+                    # on WordPress-heavy scans with 2000+ templates.
+                    nuclei_tag_result = await workflow.execute_activity(
                         "GatherNucleiTagsActivity",
                         args=[ctx],
-                        start_to_close_timeout=timedelta(minutes=5),
+                        start_to_close_timeout=timedelta(minutes=10),
                         retry_policy=_RETRY_INTERNAL,
                         task_queue="python-orchestrator-queue",
                     )
-
-                    # Group into batches of 3 so each Nuclei call is bounded and provides
-                    # granular Temporal history entries.  An empty list → single pass with
-                    # no tag filter (preserves current behaviour when no tech is detected).
-                    if all_tags:
-                        tag_batches = [all_tags[i:i + 3] for i in range(0, len(all_tags), 3)]
-                    else:
-                        tag_batches = [None]  # sentinel: no -tags flag
+                    tag_batches = nuclei_tag_result.get('batches') or [None]
 
                     for severity in severities:
                         for batch in tag_batches:
@@ -926,22 +973,18 @@ class NucleiPlannerWorkflow:
                             task_queue="python-orchestrator-queue",
                         )
             else:
-                # Gather tags via activity (DB + tech_mapping work is not allowed in workflows).
-                all_tags = await workflow.execute_activity(
+                # Gather tags and pre-built batches via activity.
+                # Activity counts templates per tag so each batch is bounded by
+                # template count rather than tag count — prevents 2-hour timeouts
+                # on WordPress-heavy scans with 2000+ templates.
+                nuclei_tag_result = await workflow.execute_activity(
                     "GatherNucleiTagsActivity",
                     args=[ctx],
-                    start_to_close_timeout=timedelta(minutes=5),
+                    start_to_close_timeout=timedelta(minutes=10),
                     retry_policy=_RETRY_INTERNAL,
                     task_queue="python-orchestrator-queue",
                 )
-
-                # Group into batches of 3 so each Nuclei call is bounded and provides
-                # granular Temporal history entries.  An empty list → single pass with
-                # no tag filter (preserves current behaviour when no tech is detected).
-                if all_tags:
-                    tag_batches = [all_tags[i:i + 3] for i in range(0, len(all_tags), 3)]
-                else:
-                    tag_batches = [None]  # sentinel: no -tags flag
+                tag_batches = nuclei_tag_result.get('batches') or [None]
 
                 for severity in severities:
                     for batch in tag_batches:
@@ -1325,7 +1368,25 @@ class SubScanWorkflow:
                     f"Add it to _PERMITTED_GENERIC_TASKS in temporal_activities.py to enable dispatch."
                 )
 
+        # -----------------------------------------------------------------------
+        # Lifecycle guard — child workflow abort/delete check
+        # SubScanWorkflow is spawned after MasterScanWorkflow has run
+        # TargetProfilingActivity. When Temporal replays this child workflow after
+        # a container restart it skips the parent's guard entirely. This call
+        # mirrors that guard at the earliest point before any task dispatch,
+        # raising a non_retryable ApplicationError if the scan was deleted or
+        # aborted so the child workflow terminates cleanly without retry loops.
+        # -----------------------------------------------------------------------
+        await workflow.execute_activity(
+            "CheckScanAliveActivity",
+            args=[ctx.get('scan_history_id'), ctx.get('subscan_id')],
+            start_to_close_timeout=timedelta(seconds=30),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
+
         is_cancelled = False
+
         success = False
         task_success = {}
 
@@ -1437,13 +1498,14 @@ class SubScanWorkflow:
                 [t for t in active_tasks if t in {"fetch_url", "screenshot"}],
                 # TIER 3a: HTTP Crawl Bridge — crawls new/dead endpoints from fetch_url
                 [t for t in active_tasks if t == "http_crawl_bridge"],
-                # TIER 3b: Custom Parameter Discovery Engine (CPDE) — needs Tier 3 JS bundles.
+                # TIER 3b: Web API Discovery — runs before CPDE so kiterunner output is available.
+                [t for t in active_tasks if t == "web_api_discovery"],
+                # TIER 3c: Custom Parameter Discovery Engine (CPDE) — reads kiterunner/arjun/JS output.
                 [t for t in active_tasks if t == "param_discovery"],
                 # TIER 4: Directory & File Fuzzing — needs Tier 3 URLs.
                 [t for t in active_tasks if t == "dir_file_fuzz"],
-                # TIER 5: Analysis — API discovery, WAF detection, secret scanning.
-                # vigolium_analysis runs alongside web_api_discovery as in MasterScanWorkflow.
-                [t for t in active_tasks if t in {"web_api_discovery", "waf_detection", "secret_scanning", "vigolium_analysis"}],
+                # TIER 5: Analysis — WAF detection, secret scanning, vigolium.
+                [t for t in active_tasks if t in {"waf_detection", "secret_scanning", "vigolium_analysis"}],
                 # TIER 6: Security Assessment — explicit inclusion, mirrors MasterScanWorkflow Tier 6.
                 # vigolium_scan runs alongside vulnerability_scan at Tier 6.
                 [t for t in active_tasks if t in {
@@ -2460,7 +2522,10 @@ class CodeScanWorkflow:
 
         if audit_config.get('run_vigolium_audit', True):
             # Timeout from config (seconds), default 1 hour; cap at 4 hours.
-            audit_timeout_s = min(int(audit_config.get('timeout', 3600)), 14400)
+            try:
+                audit_timeout_s = min(int(audit_config.get('timeout', 3600)), 14400)
+            except (ValueError, TypeError):
+                audit_timeout_s = 3600
             activities.append(
                 workflow.execute_activity(
                     "RunVigoliumAuditActivity",
@@ -2953,6 +3018,25 @@ class URLVulnWorkflow:
                 task_queue="python-orchestrator-queue",
             )
         return True
+
+
+@workflow.defn(name="URLAuthExtractWorkflow")
+class URLAuthExtractWorkflow:
+    """Extract authentication form candidates from a single URL.
+
+    Expects ctx: {'url': str, 'scan_id': int}.
+    Delegates to ExtractAuthForURLActivity with a 10-minute timeout.
+    """
+
+    @workflow.run
+    async def run(self, ctx: dict) -> dict:
+        return await workflow.execute_activity(
+            "ExtractAuthForURLActivity",
+            ctx,
+            start_to_close_timeout=timedelta(minutes=10),
+            retry_policy=_RETRY_INTERNAL,
+            task_queue="python-orchestrator-queue",
+        )
 
 
 @workflow.defn(name="RecalculateApmeWorkflow")

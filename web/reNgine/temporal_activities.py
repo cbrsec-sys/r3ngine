@@ -25,8 +25,17 @@ from django.utils import timezone
 
 from reNgine.scan_context import ScanContext
 from reNgine.utils.logger import get_module_logger, format_exception_for_log
+from reNgine.auth_discovery_tasks import (
+    _fetch_with_proxy_retry,
+    _extract_login_forms,
+)
+from reNgine.common_func import get_proxy_list, get_random_proxy, merge_imported_subdomains
+from targetApp.models import normalize_manual_subdomains
+from reNgine.utils.task import activity_heartbeat_safe
+from startScan.models import Subdomain
 
 logger = get_module_logger(__name__)
+
 
 
 # ---------------------------------------------------------------------------
@@ -262,9 +271,35 @@ def _run_task(task_func, ctx: dict, task_name: str, description: str = None, db_
         Exception: Re-raises any exception from the underlying task so Temporal
                    can retry or fail the activity appropriately.
     """
-    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK
+    from reNgine.definitions import SUCCESS_TASK, FAILED_TASK, ABORTED_TASK
+    from temporalio.exceptions import ApplicationError
     import contextvars
     import time
+
+    # ---------------------------------------------------------------------------
+    # Pre-flight guard: abort/delete check
+    # If the scan has been deleted or aborted in Django DB, raise a
+    # non-retryable ApplicationError so Temporal permanently fails this activity
+    # and bubbles the failure up to the workflow without retrying.
+    # This prevents infinite retry loops when a scan is deleted or aborted while
+    # Temporal replays the workflow after a container restart.
+    # ---------------------------------------------------------------------------
+    scan_id_check = ctx.get('scan_history_id')
+    if scan_id_check:
+        from startScan.models import ScanHistory as _ScanHistory
+        _scan = _ScanHistory.objects.filter(pk=scan_id_check).first()
+        if not _scan:
+            raise ApplicationError(
+                f"[{task_name}] ScanHistory {scan_id_check} no longer exists — "
+                f"scan was deleted. Workflow cancelled.",
+                non_retryable=True,
+            )
+        if _scan.scan_status == ABORTED_TASK:
+            raise ApplicationError(
+                f"[{task_name}] Scan {scan_id_check} was aborted by the user. "
+                f"Workflow cancelled.",
+                non_retryable=True,
+            )
 
     proxy = TemporalTaskProxy(ctx, db_task_name or task_name, description)
 
@@ -473,6 +508,13 @@ def target_profiling_activity(ctx: dict) -> dict:
     Reads the ScanHistory record, resolves the domain, loads and caches the
     engine YAML configuration into ctx, and creates the scan results directory.
 
+    This activity is the first real activity every scan workflow executes. It
+    acts as the primary lifecycle guard: if the scan has been deleted or aborted
+    in Django's DB (e.g. the user aborted/deleted the scan and the container
+    restarted with Temporal replaying the workflow from its own history), this
+    activity raises a non-retryable ApplicationError to permanently terminate
+    the workflow without further retries.
+
     Args:
         ctx (dict): Temporal workflow context. Must contain 'scan_history_id'
                     and 'engine_id'.
@@ -484,25 +526,48 @@ def target_profiling_activity(ctx: dict) -> dict:
     from startScan.models import ScanHistory
     from scanEngine.models import EngineType
     from reNgine.settings import RENGINE_RESULTS
-    from reNgine.definitions import RUNNING_TASK, SUCCESS_TASK, FAILED_TASK
+    from reNgine.definitions import RUNNING_TASK, SUCCESS_TASK, FAILED_TASK, ABORTED_TASK
+    from temporalio.exceptions import ApplicationError
 
     scan_id = ctx.get('scan_history_id')
     activity.logger.info(f"[TargetProfilingActivity] Profiling scan_history_id={scan_id}")
     logger.log_line("[TEMPORAL]", "START", "task=target_profiling scan_id=%s" % scan_id)
 
+    # ---------------------------------------------------------------------------
+    # Lifecycle guard — abort/delete check
+    # Temporal replays workflows from its own durable history after a container
+    # restart, independently of Django's DB state. If the scan was deleted or
+    # aborted while the container was down, we must terminate the workflow here
+    # (the earliest possible point) rather than letting it run and crash later
+    # with FK violations or silently overwrite the ABORTED status.
+    # ApplicationError(non_retryable=True) tells Temporal to mark this activity
+    # as permanently failed and propagate to the workflow without retrying.
+    # ---------------------------------------------------------------------------
+    scan = ScanHistory.objects.filter(pk=scan_id).first()
+    if not scan:
+        raise ApplicationError(
+            f"[TargetProfilingActivity] ScanHistory {scan_id} no longer exists — "
+            f"scan was deleted. Workflow cancelled.",
+            non_retryable=True,
+        )
+    if scan.scan_status == ABORTED_TASK:
+        raise ApplicationError(
+            f"[TargetProfilingActivity] Scan {scan_id} was aborted by the user. "
+            f"Workflow cancelled.",
+            non_retryable=True,
+        )
+
     proxy = TemporalTaskProxy(ctx, 'target_profiling', 'Target Profiling')
     try:
-        scan = ScanHistory.objects.filter(pk=scan_id).first()
-        if not scan:
-            raise ValueError(f"ScanHistory with id={scan_id} not found.")
-
         engine_id = ctx.get('engine_id') or (scan.scan_type.id if scan.scan_type else None)
         engine = EngineType.objects.filter(pk=engine_id).first()
         if not engine:
             raise ValueError(f"EngineType with id={engine_id} not found.")
 
         # Re-arm status to RUNNING so the Django DB reflects reality when a
-        # workflow is restarted after a prior run set it to FAILED or ABORTED.
+        # workflow is restarted after a prior run set it to FAILED.
+        # Note: ABORTED_TASK is already blocked above — only FAILED/other non-running
+        # states reach here (e.g. a legitimately failed scan being re-tried).
         if scan.scan_status != RUNNING_TASK:
             scan.scan_status = RUNNING_TASK
             scan.save(update_fields=['scan_status'])
@@ -537,6 +602,81 @@ def target_profiling_activity(ctx: dict) -> dict:
         logger.log_line("[TEMPORAL]", "ERROR", "task=target_profiling scan_id=%s error=%s" % (scan_id, format_exception_for_log(exc)), level="error")
         proxy.update_scan_activity(FAILED_TASK, error_message=repr(exc))
         raise
+
+
+# ===========================================================================
+# Child Workflow Lifecycle Guard
+# ===========================================================================
+
+@activity.defn(name="CheckScanAliveActivity")
+def check_scan_alive_activity(scan_id: int, subscan_id: int = None) -> bool:
+    """Entry-point lifecycle guard for child workflows (NucleiPlannerWorkflow, SubScanWorkflow).
+
+    Child workflows are launched after TargetProfilingActivity has already
+    completed in the parent MasterScanWorkflow. When Temporal replays a child
+    workflow after a container restart, it skips the parent's TargetProfiling
+    guard entirely and begins executing inside the child workflow directly.
+    This activity acts as a matching guard at the start of every child workflow.
+
+    Raises ApplicationError(non_retryable=True) if:
+      - ScanHistory with scan_id no longer exists (scan was deleted by the user)
+      - ScanHistory.scan_status is ABORTED_TASK (scan was aborted by the user)
+
+    Using non_retryable=True ensures Temporal permanently marks the activity
+    as failed and propagates the failure to the child workflow without any
+    retry loop, which in turn cancels the child workflow cleanly.
+
+    Args:
+        scan_id (int): ScanHistory PK to check.
+        subscan_id (int, optional): SubScan PK — used only for richer log context.
+
+    Returns:
+        bool: True if the scan is alive and the child workflow may proceed.
+
+    Raises:
+        ApplicationError: non_retryable if the scan is deleted or aborted.
+    """
+    from startScan.models import ScanHistory
+    from reNgine.definitions import ABORTED_TASK
+    from temporalio.exceptions import ApplicationError
+
+    logger.log_line("[TEMPORAL]", "START", "task=check_scan_alive scan_id=%s subscan_id=%s" % (scan_id, subscan_id or ""))
+
+    # -------------------------------------------------------------------------
+    # Guard 1 — Deleted scan: ScanHistory no longer exists
+    # -------------------------------------------------------------------------
+    scan = ScanHistory.objects.filter(pk=scan_id).first()
+    if not scan:
+        activity.logger.warning(
+            "[CheckScanAliveActivity] scan_id=%s — ScanHistory not found (scan deleted). "
+            "Raising non-retryable error to terminate child workflow.", scan_id
+        )
+        raise ApplicationError(
+            "[CheckScanAliveActivity] ScanHistory %s no longer exists — "
+            "scan was deleted. Child workflow cancelled." % scan_id,
+            non_retryable=True,
+        )
+
+    # -------------------------------------------------------------------------
+    # Guard 2 — Aborted scan: user explicitly aborted this scan
+    # -------------------------------------------------------------------------
+    if scan.scan_status == ABORTED_TASK:
+        activity.logger.warning(
+            "[CheckScanAliveActivity] scan_id=%s — scan is ABORTED. "
+            "Raising non-retryable error to terminate child workflow.", scan_id
+        )
+        raise ApplicationError(
+            "[CheckScanAliveActivity] Scan %s was aborted by the user. "
+            "Child workflow cancelled." % scan_id,
+            non_retryable=True,
+        )
+
+    activity.logger.info(
+        "[CheckScanAliveActivity] scan_id=%s — scan is alive (status=%s). Child workflow may proceed.",
+        scan_id, scan.scan_status,
+    )
+    logger.log_line("[TEMPORAL]", "COMPLETE", "task=check_scan_alive scan_id=%s alive=True" % scan_id)
+    return True
 
 
 # ===========================================================================
@@ -1139,26 +1279,22 @@ def cleanup_proxy_list_activity(file_path: str) -> bool:
     return True
 
 @activity.defn(name="GatherNucleiTagsActivity")
-def gather_nuclei_tags_activity(ctx: dict) -> list:
-    """Pre-compute Nuclei tags from YAML config + detected technologies.
+def gather_nuclei_tags_activity(ctx: dict) -> dict:
+    """Pre-compute Nuclei tags and build template-count-aware batches.
 
-    Called once by NucleiPlannerWorkflow before the severity loop so that
-    the workflow can split tags into batches of 3 without performing any
-    DB work itself (which would violate Temporal determinism rules).
-
-    Returns a sorted, deduplicated list of tag strings.  An empty list
-    signals that no tag filter should be applied — Nuclei will run against
-    all default templates for that severity.
-
-    Args:
-        ctx (dict): Temporal workflow context (scan_history_id, yaml_configuration,
-                    and optionally subdomain_id for subscans).
+    Counts templates per detected tag via ``nuclei -tl`` so the workflow can
+    dispatch bounded nuclei invocations without violating Temporal determinism.
 
     Returns:
-        list[str]: Merged and sorted Nuclei tag strings.
+        dict with keys:
+          - ``tags``: sorted deduplicated list of all detected tag strings
+          - ``batches``: list of tag-lists, each batch's total template count
+                         <= max_templates_per_batch; empty list when no tags
+                         detected (caller falls back to unfiltered scan).
     """
     from reNgine.tech_mapping import get_nuclei_tags_from_techs
-    from startScan.models import Subdomain
+    from reNgine.nuclei_batch_utils import count_templates_for_tag, build_tag_batches
+    from reNgine.definitions import NUCLEI_MAX_TEMPLATES_PER_BATCH, NUCLEI_DEFAULT_TEMPLATES_PATH
 
     scan_id = ctx.get('scan_history_id')
     subdomain_id = ctx.get('subdomain_id')
@@ -1171,6 +1307,8 @@ def gather_nuclei_tags_activity(ctx: dict) -> list:
     if isinstance(user_tags, str):
         user_tags = [t.strip() for t in user_tags.split(',') if t.strip()]
 
+    max_per_batch = int(nuclei_cfg.get(NUCLEI_MAX_TEMPLATES_PER_BATCH, 100))
+
     qs = Subdomain.objects.filter(scan_history_id=scan_id)
     if subdomain_id:
         qs = qs.filter(pk=subdomain_id)
@@ -1180,14 +1318,29 @@ def gather_nuclei_tags_activity(ctx: dict) -> list:
         all_techs.update(sub.technologies.values_list('name', flat=True))
 
     tech_tags = get_nuclei_tags_from_techs(list(all_techs)) if all_techs else []
-
     merged = sorted(set(user_tags) | set(tech_tags))
+
+    # Count templates per tag so batches are bounded by template count not tag count.
+    template_dirs = [NUCLEI_DEFAULT_TEMPLATES_PATH]
+    tag_counts: dict = {}
+    for tag in merged:
+        tag_counts[tag] = count_templates_for_tag(tag, template_dirs)
+        logger.log_line(
+            "[TEMPORAL]", "INFO",
+            "task=gather_nuclei_tags scan_id=%s tag=%s templates=%d" % (scan_id, tag, tag_counts[tag])
+        )
+
+    batches = build_tag_batches(merged, tag_counts, max_per_batch=max_per_batch)
+
     activity.logger.info(
-        "[GatherNucleiTagsActivity] scan_id=%s subdomain_id=%s tags=%s",
-        scan_id, subdomain_id, merged,
+        "[GatherNucleiTagsActivity] scan_id=%s tags=%s batches=%d max_per_batch=%d",
+        scan_id, merged, len(batches), max_per_batch,
     )
-    logger.log_line("[TEMPORAL]", "COMPLETE", "task=gather_nuclei_tags scan_id=%s tags=%d" % (scan_id, len(merged)))
-    return merged
+    logger.log_line(
+        "[TEMPORAL]", "COMPLETE",
+        "task=gather_nuclei_tags scan_id=%s tags=%d batches=%d" % (scan_id, len(merged), len(batches))
+    )
+    return {'tags': merged, 'batches': batches}
 
 
 @activity.defn(name="RunNucleiActivity")
@@ -2358,6 +2511,7 @@ def setup_scheduled_scan_activity(params: dict) -> dict:
 
     engine = EngineType.objects.get(pk=engine_id)
     domain = Domain.objects.get(pk=domain_id)
+    imported_subdomains = merge_imported_subdomains(domain, imported_subdomains)
     config = yaml.safe_load(engine.yaml_configuration) or {}
 
     scan_history_id = create_scan_object(
@@ -2792,17 +2946,18 @@ def run_search_vulns_activity(ctx: dict) -> bool:
     MasterScanWorkflow Tier 2 after port scan returns.
     """
     from reNgine.recon_tasks import search_vulns_scan
-    scan_id = ctx.get('scan_history_id')
-    logger.log_line("[TEMPORAL]", "START", "task=search_vulns_scan service=%s host=%s scan_id=%s" % (ctx.get('service', ''), ctx.get('host', ''), scan_id))
     activity.logger.info(
         "[RunSearchVulnsActivity] service=%s host=%s scan_id=%s",
-        ctx.get('service'), ctx.get('host'), scan_id,
+        ctx.get('service'), ctx.get('host'), ctx.get('scan_history_id'),
     )
-    proxy = TemporalTaskProxy(ctx, task_name='search_vulns_scan',
-                              description='Per-service CVE Lookup (vulners.com)')
-    result = search_vulns_scan(
-        proxy,
-        scan_history_id=scan_id,
+    # _run_task provides heartbeating, pre-flight abort-guard, and correct
+    # SUCCESS_TASK / FAILED_TASK status updates — matching all other activities.
+    return _run_task(
+        search_vulns_scan,
+        ctx,
+        task_name='search_vulns_scan',
+        description='Per-service CVE Lookup (vulners.com)',
+        scan_history_id=ctx.get('scan_history_id'),
         service=ctx.get('service', ''),
         version=ctx.get('version'),
         host=ctx.get('host', ''),
@@ -2810,8 +2965,6 @@ def run_search_vulns_activity(ctx: dict) -> bool:
         subdomain_id=ctx.get('subdomain_id'),
         domain_id=ctx.get('domain_id'),
     )
-    logger.log_line("[TEMPORAL]", "COMPLETE", "task=search_vulns_scan service=%s scan_id=%s" % (ctx.get('service', ''), scan_id))
-    return result
 
 
 @activity.defn(name="RunXURLFind3rActivity")
@@ -3018,13 +3171,13 @@ def run_bbot_activity(ctx: dict) -> bool:
 def run_param_discovery_activity(ctx: dict) -> dict:
     """Run the Custom Parameter Discovery Engine (CPDE)."""
     from reNgine.cpde_tasks import param_discovery
+    from reNgine.definitions import SUCCESS_TASK
     scan_id = ctx.get('scan_history_id')
-    logger.log_line("[TEMPORAL]", "START", "task=param_discovery scan_id=%s" % scan_id)
-    activity.logger.info(
-        "[RunParamDiscoveryActivity] Starting CPDE for scan_id=%s",
-        scan_id,
-    )
-    proxy = TemporalTaskProxy(ctx, task_name='param_discovery', description='Custom Parameter Discovery (CPDE)')
+    activity.logger.info("[RunParamDiscoveryActivity] Starting CPDE for scan_id=%s", scan_id)
+
+    # Derive seed URLs before TemporalTaskProxy sets status=RUNNING — these are
+    # fast DB queries and must complete first so the skip path can mark SUCCESS
+    # without ever having set the row to RUNNING.
     urls = ctx.get('urls') or []
     if not urls:
         # Prefer a real endpoint URL (preserves correct scheme) from a prior http_crawl
@@ -3048,15 +3201,21 @@ def run_param_discovery_activity(ctx: dict) -> dict:
 
     if not urls:
         logger.log_line("[CPDE]", "WARN", "No seed URLs available for scan_id=%s — skipping CPDE" % scan_id)
-        logger.log_line("[TEMPORAL]", "COMPLETE", "task=param_discovery scan_id=%s (skipped)" % scan_id)
+        # Mark the ScanActivity row SUCCESS so it does not stay permanently RUNNING.
+        proxy = TemporalTaskProxy(ctx, task_name='param_discovery', description='Custom Parameter Discovery (CPDE)')
+        proxy.update_scan_activity(SUCCESS_TASK)
         return {}
-    result = param_discovery(
-        proxy,
+
+    # _run_task provides heartbeating, pre-flight abort-guard, and correct
+    # SUCCESS_TASK / FAILED_TASK status updates — matching all other activities.
+    _run_task(
+        param_discovery,
+        ctx,
+        task_name='param_discovery',
+        description='Custom Parameter Discovery (CPDE)',
         urls=urls,
-        ctx=ctx,
     )
-    logger.log_line("[TEMPORAL]", "COMPLETE", "task=param_discovery scan_id=%s" % scan_id)
-    return result
+    return {}
 
 
 @activity.defn(name="RunGrypeScanActivity")
@@ -3133,4 +3292,74 @@ def recalculate_apme_activity(scan_history_id: int, job_id: str = None) -> dict:
     except Exception as e:
         update_job(job_id, "FAILED", 100, f"Error: {str(e)}") if job_id else None
         logger.log_line("[TEMPORAL]", "ERROR", "task=recalculate_apme scan_id=%s error=%s" % (scan_history_id, format_exception_for_log(e)), level="error")
+        raise
+
+
+@activity.defn(name="ExtractAuthForURLActivity")
+def extract_auth_for_url_activity(ctx: dict) -> dict:
+    from startScan.models import ScanHistory
+    from urllib.parse import urlparse
+
+    url = ctx.get('url')
+    scan_id = ctx.get('scan_id')
+
+    activity_heartbeat_safe("ExtractAuthForURLActivity starting for %s" % url)
+    logger.log_line("[AUTH_EXTRACT]", "START", "extracting auth from %s (scan %s)" % (url, scan_id))
+
+    try:
+        scan = ScanHistory.objects.get(id=scan_id)
+
+        proxy_list = get_proxy_list()
+        if not proxy_list:
+            tor_or_single = get_random_proxy()
+            if tor_or_single:
+                proxy_list = [tor_or_single]
+
+        parsed_url = urlparse(url)
+        if parsed_url.scheme not in ('http', 'https'):
+            logger.log_line("[AUTH_EXTRACT]", "COMPLETE", "skipped non-HTTP URL %s" % url)
+            return {'found': 0}
+
+        response, _ = _fetch_with_proxy_retry(url, proxy_list)
+        forms = _extract_login_forms(response.text, url)
+
+        if not forms:
+            logger.log_line("[AUTH_EXTRACT]", "COMPLETE", "no auth forms found at %s" % url)
+            return {'found': 0}
+
+        raw_scheme = parsed_url.scheme.lower()
+        protocol = raw_scheme
+        port = parsed_url.port or (443 if raw_scheme == 'https' else 80)
+
+        saved = 0
+        for form in forms:
+            from startScan.models import AuthCandidate
+            _, created = AuthCandidate.objects.get_or_create(
+                scan_history=scan,
+                target=form.get('action', url),
+                protocol=protocol,
+                port=port,
+                defaults={
+                    'source_tool': 'ExtractAuthForURLActivity',
+                    'metadata': {
+                        'type': 'form',
+                        'method': form.get('method', 'POST'),
+                        'user_field': form.get('user_field', ''),
+                        'pass_field': form.get('pass_field', ''),
+                        'hidden_fields': form.get('hidden_fields', {}),
+                        'all_fields': form.get('all_fields', []),
+                    },
+                    'status': 'pending',
+                },
+            )
+            if created:
+                saved += 1
+
+        logger.log_line("[AUTH_EXTRACT]", "COMPLETE",
+                        "found %d new auth candidates from %s" % (saved, url))
+        return {'found': saved}
+
+    except Exception as exc:
+        logger.log_line("[AUTH_EXTRACT]", "ERROR", format_exception_for_log(exc),
+                        level="error", exc_info=True)
         raise

@@ -24,6 +24,7 @@ from redis import Redis
 
 
 from datetime import datetime
+from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from api.serializers import SubdomainSerializer
 import logging
@@ -46,7 +47,7 @@ from reNgine.utils.waf import OriginDiscoveryManager, WafBypassOrchestrator
 from scanEngine.models import (EngineType, InstalledExternalTool, Notification, Proxy, OpSec)
 from startScan.models import *
 from startScan.models import EndPoint, Subdomain, Vulnerability, Parameter
-from targetApp.models import Domain
+from targetApp.models import Domain, normalize_manual_subdomains
 from dashboard.models import AcunetixAPIKey
 from reNgine.monitor_tasks import *
 from reNgine.utils.graph import Neo4jManager
@@ -76,6 +77,7 @@ Celery tasks.
 """
 
 logger = get_task_logger(__name__)
+
 
 
 SCAN_PIPELINE_DEFINITION = [
@@ -235,6 +237,7 @@ def initiate_scan_temporal(
 		domain = Domain.objects.get(pk=domain_id)
 		domain.last_scan_date = timezone.now()
 		domain.save()
+		imported_subdomains = merge_imported_subdomains(domain, imported_subdomains)
 
 		starting_point_path = starting_point_path.rstrip('/')
 
@@ -3273,8 +3276,10 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	kr_wordlist = ctx.get('kr_wordlist') or config.get(KITERUNNER_WORDLIST, 'routes-small.kite')
 	scan_only_active = config.get(SCAN_ONLY_ACTIVE, True)
 	threads = config.get(THREADS) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
+	timeout = config.get(TIMEOUT) or self.yaml_configuration.get(TIMEOUT, DEFAULT_HTTP_TIMEOUT)
 	arjun_methods = config.get(ARJUN_METHODS, ARJUN_DEFAULT_METHODS)
 	proxy = None
+	kr_proxy = 'socks5://tor:9050' if ctx.get('use_tor') else None
 
 	logger.warning("[WEB_API] Starting Web API Discovery | scan_id=%s | tools=%s", scan_id, uses_tools)
 
@@ -3320,7 +3325,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			continue
 
 		if subdomain_name not in subdomain_targets:
-			base_url = f"{parsed.scheme}://{subdomain_name}/"
+			base_url = f"{parsed.scheme}://{parsed.netloc}/"
 			subdomain_targets[subdomain_name] = (subdomain, base_url)
 
 		url_subdomain_map.append((url, subdomain_name, subdomain))
@@ -3330,25 +3335,85 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 		len(subdomain_targets), len(url_subdomain_map), skipped_no_subdomain,
 	)
 
-	# ── Kiterunner: one scan per subdomain against base URL ───────────────────
-	# Running against the root of each subdomain (not individual endpoints)
-	# covers the full route space in a single wordlist pass and avoids
-	# multiplying the 35k-route scan by every discovered endpoint.
-	# The output file is the idempotency guard — if it exists and is non-empty
-	# the scan already ran (e.g. from a prior Temporal retry) and we skip to
-	# parsing, preserving all previously discovered routes.
+	# ── Kiterunner: batched scan across subdomains ───────────────────────────
+	# Subdomains are batched in groups of `threads` and written to a hosts file
+	# so that -j (max-parallel-hosts) is actually utilised rather than wasted
+	# on a single host per call.
+	# Per-subdomain .json files act as the idempotency guard for Temporal retries:
+	# any subdomain with a non-empty file is skipped; the rest form the next batch.
 	if 'kiterunner' in uses_tools:
-		logger.warning('[WEB_API] Kiterunner: scanning %d subdomains | wordlist=%s', len(subdomain_targets), kr_wordlist)
-		for subdomain_name, (subdomain, base_url) in subdomain_targets.items():
-			kr_output = f"{results_dir}/kr_{subdomain_name}.json"
-			if os.path.exists(kr_output) and os.path.getsize(kr_output) > 0:
-				logger.warning('[WEB_API] Kiterunner: cache hit for %s — loading existing results', subdomain_name)
-			else:
-				cmd = f"kr scan {base_url} -w /usr/src/wordlist/kr/{kr_wordlist} -j {threads} -o json | tee {kr_output}"
-				logger.warning('[WEB_API] Kiterunner: running on %s | cmd: %s', subdomain_name, cmd)
-				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id)
-				logger.warning('[WEB_API] Kiterunner: finished on %s', subdomain_name)
-			if os.path.exists(kr_output):
+		# Task 6: Validate wordlist path to prevent traversal (Rule 1.1/1.2)
+		_kr_base_dir = Path('/usr/src/wordlist/kr').resolve()
+		_kr_wordlist_path = (_kr_base_dir / kr_wordlist).resolve()
+		if not str(_kr_wordlist_path).startswith(str(_kr_base_dir)):
+			logger.error('[WEB_API] Kiterunner: wordlist path %s escapes base dir — skipping', kr_wordlist)
+		else:
+			logger.warning('[WEB_API] Kiterunner: scanning %d subdomains | wordlist=%s | batch_size=%d', len(subdomain_targets), kr_wordlist, threads)
+
+			# Separate cached subdomains from those that still need scanning
+			to_scan = {
+				name: (sub, base_url)
+				for name, (sub, base_url) in subdomain_targets.items()
+				if not (os.path.exists(f"{results_dir}/kr_{name}.json") and os.path.getsize(f"{results_dir}/kr_{name}.json") > 0)
+			}
+			cached_count = len(subdomain_targets) - len(to_scan)
+			if cached_count:
+				logger.warning('[WEB_API] Kiterunner: %d subdomains cached, scanning %d new', cached_count, len(to_scan))
+
+			# Scan phase: batch uncached subdomains so -j is utilised
+			scan_items = list(to_scan.items())
+			for batch_start in range(0, len(scan_items), threads):
+				batch = dict(scan_items[batch_start:batch_start + threads])
+				batch_idx = batch_start // threads
+
+				hosts_file = f"{results_dir}/kr_hosts_batch_{batch_idx}.txt"
+				with open(hosts_file, 'w') as hf:
+					for _name, (_sub, _base_url) in batch.items():
+						hf.write(_base_url + '\n')
+
+				combined_output = f"{results_dir}/kr_batch_{batch_idx}.json"
+				cmd = (
+					f"kr scan {hosts_file}"
+					f" -w {_kr_wordlist_path}"
+					f" -j {threads}"
+					f" --timeout {timeout}s"
+					f" --fail-status-codes 404"
+					f" -o json -q"
+					f" | tee {combined_output}"
+				)
+				logger.warning('[WEB_API] Kiterunner: batch %d — %d hosts | cmd: %s', batch_idx, len(batch), cmd)
+				run_command(cmd, shell=True, scan_id=self.scan_id, activity_id=self.activity_id, proxy=kr_proxy)
+				logger.warning('[WEB_API] Kiterunner: batch %d finished', batch_idx)
+
+				# Split combined JSON output into per-subdomain files for caching
+				if os.path.exists(combined_output):
+					subdomain_lines: dict = {name: [] for name in batch}
+					with open(combined_output, 'r') as f:
+						for line in f:
+							line = line.strip()
+							if not line:
+								continue
+							try:
+								entry = json.loads(line)
+								target_host = urlparse(entry.get('target', '')).hostname or ''
+								if target_host in subdomain_lines:
+									subdomain_lines[target_host].append(line)
+							except (json.JSONDecodeError, Exception):
+								continue
+					for _name, lines in subdomain_lines.items():
+						if lines:
+							_kr_out = f"{results_dir}/kr_{_name}.json"
+							with open(_kr_out, 'w') as f:
+								f.write('\n'.join(lines) + '\n')
+				else:
+					logger.warning('[WEB_API] Kiterunner: combined output missing for batch %d', batch_idx)
+
+			# Parse pass: read all per-subdomain files (cached + newly written)
+			for subdomain_name, (subdomain, base_url) in subdomain_targets.items():
+				kr_output = f"{results_dir}/kr_{subdomain_name}.json"
+				if not os.path.exists(kr_output):
+					logger.warning('[WEB_API] Kiterunner: output file missing for %s', subdomain_name)
+					continue
 				try:
 					kr_parsed = urlparse(base_url)
 					kr_endpoints = 0
@@ -3359,20 +3424,25 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 								continue
 							entry = json.loads(line)
 							found_path = entry.get('path', '')
-							if found_path:
-								full_url = f"{kr_parsed.scheme}://{kr_parsed.netloc}{found_path}"
-								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain, http_status=entry.get('status'))
-								kr_endpoints += 1
-								if endpoint and '?' in full_url:
-									params = extract_params_from_url(full_url)
-									for p in params:
-										save_parameter(endpoint, p['name'], param_type='Kiterunner', value=p['value'])
-										kr_params += 1
+							if not found_path:
+								continue
+							# Use correct status field from responses array
+							responses = entry.get('responses', [])
+							http_status = responses[0].get('sc') if responses else None
+							# Skip 404s as defence-in-depth (--fail-status-codes 404 handles most)
+							if http_status == 404:
+								continue
+							full_url = f"{kr_parsed.scheme}://{kr_parsed.netloc}{found_path}"
+							endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain, http_status=http_status)
+							kr_endpoints += 1
+							if endpoint and '?' in full_url:
+								params = extract_params_from_url(full_url)
+								for p in params:
+									save_parameter(endpoint, p['name'], param_type='Kiterunner', value=p['value'])
+									kr_params += 1
 					logger.warning('[WEB_API] Kiterunner: %s → %d endpoints, %d params saved', subdomain_name, kr_endpoints, kr_params)
 				except Exception as e:
 					logger.error('[WEB_API] Kiterunner: error parsing output for %s: %s', subdomain_name, e)
-			else:
-				logger.warning('[WEB_API] Kiterunner: output file missing for %s', subdomain_name)
 	else:
 		logger.warning('[WEB_API] Kiterunner: skipped (not in uses_tools)')
 
@@ -3381,6 +3451,13 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 	# that already completed in a previous attempt.
 	processed_paramspider_subdomains = set()
 	processed_arjun_subdomains = set()
+	processed_linkfinder_subdomains = set()
+	# Gate-check caches: has_graphql_endpoint probes up to 6 network paths with a
+	# 5s timeout each, and has_jwt_tokens issues 2 DB queries — both return the
+	# same result for every URL sharing a subdomain.  Evaluate each gate once per
+	# subdomain and reuse the cached bool for subsequent URLs.
+	_graphql_gate_cache: dict = {}  # subdomain_name -> bool
+	_jwt_gate_cache: dict = {}      # subdomain_name -> bool
 	logger.warning('[WEB_API] Starting per-URL tool phase for %d URLs', len(url_subdomain_map))
 
 	for url, subdomain_name, subdomain in url_subdomain_map:
@@ -3456,15 +3533,22 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			else:
 				logger.warning('[WEB_API] ParamSpider: output file missing for %s', subdomain_name)
 
-		# LinkFinder - per URL (fast; fetches and extracts JS links)
-		if 'linkfinder' in uses_tools:
+		# LinkFinder - once per subdomain (JS endpoint and parameter extraction).
+		# processed_linkfinder_subdomains is the primary dedup guard so the tool
+		# runs at most once per subdomain regardless of whether its output file is
+		# empty (empty output = no JS found, not an error requiring a retry).
+		# os.path.exists is the Temporal retry guard: a file written by a prior
+		# activity attempt is loaded directly without re-running the tool.
+		if 'linkfinder' in uses_tools and subdomain_name not in processed_linkfinder_subdomains:
+			processed_linkfinder_subdomains.add(subdomain_name)
 			lf_output = f"{results_dir}/lf_{subdomain_name}.txt"
-			if os.path.exists(lf_output) and os.path.getsize(lf_output) > 0:
+			if os.path.exists(lf_output):
 				logger.warning('[WEB_API] LinkFinder: cache hit for %s — loading existing results', subdomain_name)
 			else:
 				cmd = f"python3 /usr/src/github/LinkFinder/linkfinder.py -d -i {url} -o cli | tee {lf_output}"
 				logger.warning('[WEB_API] LinkFinder: running on %s | cmd: %s', subdomain_name, cmd)
 				run_command(cmd, shell=True, cwd=results_dir, scan_id=self.scan_id, activity_id=self.activity_id)
+				logger.warning('[WEB_API] LinkFinder: finished on %s', subdomain_name)
 			if os.path.exists(lf_output):
 				try:
 					lf_endpoints = 0
@@ -3480,7 +3564,7 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 									full_url = line
 								endpoint, _ = save_endpoint(full_url, ctx=ctx, subdomain=subdomain)
 								lf_endpoints += 1
-								if '?' in full_url:
+								if endpoint is not None and '?' in full_url:
 									params = extract_params_from_url(full_url)
 									for p in params:
 										save_parameter(endpoint, p['name'], param_type='LinkFinder', value=p['value'])
@@ -3491,9 +3575,15 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			else:
 				logger.warning('[WEB_API] LinkFinder: output file missing for %s', subdomain_name)
 
-		# InQL - GraphQL Discovery (only when a GraphQL endpoint is detected)
+		# InQL - GraphQL Discovery (only when a GraphQL endpoint is detected).
+		# _graphql_gate_cache[subdomain_name] is populated on first visit so that
+		# has_graphql_endpoint (which issues a DB iregex query + up to 6 network
+		# probes × 5 s each) is called at most once per subdomain, not per URL.
 		if 'inql' in uses_tools:
-			if not has_graphql_endpoint(self.scan_id, url):
+			if subdomain_name not in _graphql_gate_cache:
+				logger.warning('[WEB_API] InQL: checking GraphQL gate for %s (first visit)', subdomain_name)
+				_graphql_gate_cache[subdomain_name] = has_graphql_endpoint(self.scan_id, url)
+			if not _graphql_gate_cache[subdomain_name]:
 				logger.warning('[WEB_API] InQL: no GraphQL endpoint detected, skipping %s', subdomain_name)
 			else:
 				inql_output = f"{results_dir}/inql_{subdomain_name}"
@@ -3516,9 +3606,14 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 				else:
 					logger.warning('[WEB_API] InQL: no output directory found for %s', subdomain_name)
 
-		# jwt_tool - JWT security testing (only when JWT tokens have been found)
+		# jwt_tool - JWT security testing (only when JWT tokens have been found).
+		# _jwt_gate_cache[subdomain_name] is populated on first visit so that
+		# has_jwt_tokens (2 DB queries per call) runs at most once per subdomain.
 		if JWT_TOOL in uses_tools:
-			if has_jwt_tokens(self.scan_id, subdomain=subdomain):
+			if subdomain_name not in _jwt_gate_cache:
+				logger.warning('[WEB_API] jwt_tool: checking JWT gate for %s (first visit)', subdomain_name)
+				_jwt_gate_cache[subdomain_name] = has_jwt_tokens(self.scan_id, subdomain=subdomain)
+			if _jwt_gate_cache[subdomain_name]:
 				logger.warning('[WEB_API] jwt_tool: JWT tokens found, running on %s', subdomain_name)
 				from reNgine.api_tasks import run_jwt_scan
 				run_jwt_scan(self, ctx, url, subdomain, results_dir)
@@ -3526,9 +3621,13 @@ def web_api_discovery(self, urls=[], ctx={}, description=None):
 			else:
 				logger.warning('[WEB_API] jwt_tool: no JWT tokens detected, skipping %s', subdomain_name)
 
-		# graphql-cop - GraphQL security audit (only when a GraphQL endpoint is detected)
+		# graphql-cop - GraphQL security audit (only when a GraphQL endpoint is detected).
+		# Shares _graphql_gate_cache with InQL — no second round of probes needed.
 		if GRAPHQL_COP in uses_tools:
-			if not has_graphql_endpoint(self.scan_id, url):
+			if subdomain_name not in _graphql_gate_cache:
+				logger.warning('[WEB_API] graphql-cop: checking GraphQL gate for %s (first visit)', subdomain_name)
+				_graphql_gate_cache[subdomain_name] = has_graphql_endpoint(self.scan_id, url)
+			if not _graphql_gate_cache[subdomain_name]:
 				logger.warning('[WEB_API] graphql-cop: no GraphQL endpoint detected, skipping %s', subdomain_name)
 			else:
 				logger.warning('[WEB_API] graphql-cop: running on %s', subdomain_name)
@@ -3817,6 +3916,22 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 	concurrency = config.get(NUCLEI_CONCURRENCY) or self.yaml_configuration.get(THREADS, DEFAULT_THREADS)
 	intensity = config.get(INTENSITY) or self.yaml_configuration.get(INTENSITY, DEFAULT_SCAN_INTENSITY)
 	rate_limit = config.get(RATE_LIMIT) or self.yaml_configuration.get(RATE_LIMIT, DEFAULT_RATE_LIMIT)
+	# Cap concurrency and rate when routing through a proxy file.
+	# nuclei v3.9.0 AdaptiveWaitGroup deadlocks at high concurrency under proxy
+	# error rates of 60%+. See: scan 37 post-mortem / nuclei-stacktrace-*.dump.
+	if proxies_file_path and os.path.exists(proxies_file_path):
+		if concurrency > NUCLEI_PROXY_MAX_CONCURRENCY:
+			logger.warning(
+				'nuclei proxy mode: capping concurrency %s -> %s to prevent semaphore deadlock',
+				concurrency, NUCLEI_PROXY_MAX_CONCURRENCY,
+			)
+			concurrency = NUCLEI_PROXY_MAX_CONCURRENCY
+		if rate_limit > NUCLEI_PROXY_MAX_RATE_LIMIT:
+			logger.warning(
+				'nuclei proxy mode: capping rate_limit %s -> %s req/s',
+				rate_limit, NUCLEI_PROXY_MAX_RATE_LIMIT,
+			)
+			rate_limit = NUCLEI_PROXY_MAX_RATE_LIMIT
 	retries = config.get(RETRIES) or self.yaml_configuration.get(RETRIES, DEFAULT_RETRIES)
 	timeout = config.get(TIMEOUT) or self.yaml_configuration.get(TIMEOUT, DEFAULT_HTTP_TIMEOUT)
 	custom_headers = self.yaml_configuration.get(CUSTOM_HEADERS, [])
@@ -3920,28 +4035,15 @@ def nuclei_scan(self, urls=[], ctx={}, description=None, prepare_only=False, par
 		) if all_techs else False
 	wordfence_exists = False
 	if is_wordpress_detected:
-		logger.info("WordPress detected. Preparing Wordfence Nuclei Templates...")
-		os.environ['GITHUB_TEMPLATE_REPO'] = 'topscoder/nuclei-wordfence-cve'
-
 		wordfence_dir = '/root/nuclei-templates/wordfence'
-		if not os.path.exists(wordfence_dir) or not os.listdir(wordfence_dir):
-			os.makedirs(os.path.dirname(wordfence_dir), exist_ok=True)
-			logger.info("Cloning topscoder/nuclei-wordfence-cve templates from GitHub...")
-			try:
-				import subprocess
-				subprocess.run(
-					["git", "clone", "--depth", "1", "https://github.com/topscoder/nuclei-wordfence-cve.git", wordfence_dir],
-					timeout=120,
-					check=True,
-					stdout=subprocess.PIPE,
-					stderr=subprocess.PIPE
-				)
-				logger.info("Successfully cloned Wordfence templates.")
-				wordfence_exists = True
-			except Exception as e:
-				logger.warning(f"Could not clone Wordfence templates: {str(e)}")
-		else:
+		if os.path.isdir(wordfence_dir) and os.listdir(wordfence_dir):
+			logger.info('WordPress detected; Wordfence templates present at %s', wordfence_dir)
 			wordfence_exists = True
+		else:
+			logger.warning(
+				'WordPress detected but Wordfence templates missing at %s; '
+				'templates should be pre-loaded at container startup', wordfence_dir
+			)
 
 	if auto_update_templates:
 		run_command(
@@ -6626,7 +6728,7 @@ def fetch_proxies_task(limit=1000, job_id=None):
     MAX_WORKERS = min(1000, max(1, total))
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as pool:
-        future_map = {pool.submit(check_proxy_robust, p): p for p in unique_proxies}
+        future_map = {pool.submit(check_proxy_robust, p, 10): p for p in unique_proxies}
         for future in concurrent.futures.as_completed(future_map):
             proxy_str = future_map[future]
             try:
@@ -6664,8 +6766,12 @@ def fetch_proxies_task(limit=1000, job_id=None):
             proxy_obj = Proxy.objects.create()
         proxy_obj.proxies = proxy_str
         proxy_obj.use_proxy = True
+        # Record the timestamp of this batch verification so that get_random_proxy()
+        # can short-circuit individual re-validation while the list is still fresh.
+        from django.utils import timezone as _dj_tz
+        proxy_obj.proxies_verified_at = _dj_tz.now()
         proxy_obj.save()
-        logger.info("Automatically saved live proxies to database.")
+        logger.info("Automatically saved live proxies to database (verified_at=%s).", proxy_obj.proxies_verified_at)
     except Exception as e:
         logger.error(f"Failed to auto-save proxies: {e}")
 

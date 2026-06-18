@@ -369,6 +369,7 @@ def proxy_settings(request, slug):
 
     if request.method == "POST":
         old_use_tor = proxy.use_tor if proxy else False
+        skip_validation = str(request.POST.get('skip_validation', '')).lower() == 'true'
         if proxy:
             form = ProxyForm(request.POST, instance=proxy)
         else:
@@ -376,13 +377,15 @@ def proxy_settings(request, slug):
 
         if form.is_valid():
             proxy_instance = form.save(commit=False)
-            if proxy_instance.use_proxy and proxy_instance.proxies:
+            if proxy_instance.use_proxy and proxy_instance.proxies and not skip_validation:
                 from reNgine.common_func import validate_proxies
                 original_count = len([line for line in proxy_instance.proxies.splitlines() if line.strip()])
                 validated = validate_proxies(proxy_instance.proxies)
                 proxy_instance.proxies = validated
                 saved_count = len([line for line in validated.splitlines() if line.strip()])
                 message = f'Proxies updated. Validated {saved_count}/{original_count} live proxies.'
+            elif proxy_instance.use_proxy and proxy_instance.proxies and skip_validation:
+                message = 'Proxies updated without server-side validation.'
             else:
                 message = 'Proxies updated.'
             proxy_instance.save()
@@ -642,7 +645,7 @@ def check_proxy_single(request, slug):
     if not proxy_url:
         return http.JsonResponse({'error': 'No proxy provided'}, status=400)
     from reNgine.common_func import check_proxy_robust
-    is_valid = check_proxy_robust(proxy_url, timeout=10)
+    is_valid = check_proxy_robust(proxy_url)
     return http.JsonResponse({'proxy': proxy_url, 'valid': bool(is_valid)})
 
 

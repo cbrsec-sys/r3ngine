@@ -10,11 +10,12 @@ import validators
 from django.conf import settings
 
 from ipaddress import IPv4Network
-from django.db.models import CharField, Count, F, Q, Value
+from django.db.models import CharField, Count, F, Max, Q, Value
 from django.utils import timezone
 from packaging import version
 from django.template.defaultfilters import slugify
 from datetime import datetime
+from django.db.models.functions import Lower
 from rest_framework import viewsets, serializers, status
 from rest_framework.pagination import PageNumberPagination
 from rest_framework_datatables.pagination import DatatablesPageNumberPagination
@@ -45,7 +46,8 @@ from reNgine.definitions import (
 	PERM_MODIFY_SCAN_CONFIGURATIONS,
 	PERM_MODIFY_WORDLISTS,
 	PERM_INITATE_SCANS_SUBSCANS,
-	PERM_MODIFY_SCAN_REPORT
+	PERM_MODIFY_SCAN_REPORT,
+	PERM_MODIFY_SCAN_RESULTS,
 )
 from reNgine.tasks import *
 from reNgine.llm import *
@@ -61,6 +63,8 @@ from reNgine.utils.graph import Neo4jManager
 
 
 logger = logging.getLogger(__name__)
+
+from reNgine.temporal_client import TemporalClientProvider, run_and_close
 
 
 class ToggleBugBountyModeView(APIView):
@@ -1471,6 +1475,140 @@ class ToggleSubdomainImportantStatus(APIView):
 		return Response(response)
 
 
+class AddManualSubdomain(APIView):
+	permission_classes = [HasPermission]
+	permission_required = PERM_MODIFY_TARGETS
+
+	def post(self, request):
+		data = request.data
+		subdomain_input = data.get('subdomain_name')
+		target_id = data.get('target_id')
+		scan_id = data.get('scan_id')
+
+		if not subdomain_input:
+			return Response({'status': False, 'message': 'Subdomain name or list is required.'}, status=400)
+
+		# Resolve target domain
+		domain = None
+		if target_id:
+			domain = Domain.objects.filter(id=target_id).first()
+		elif scan_id:
+			scan = ScanHistory.objects.filter(id=scan_id).first()
+			if scan:
+				domain = scan.domain
+
+		if not domain:
+			return Response({'status': False, 'message': 'Target domain not found.'}, status=404)
+
+		if domain.target_type not in ['domain', 'subdomain']:
+			return Response(
+				{'status': False, 'message': 'Manual subdomains are only supported for domain-based targets.'},
+				status=400
+			)
+
+		subdomains_to_process = normalize_manual_subdomains(subdomain_input)
+
+		if not subdomains_to_process:
+			return Response({'status': False, 'message': 'No valid subdomain names found in input.'}, status=400)
+
+		# Filter out duplicates within the input itself
+		subdomains_to_process = list(dict.fromkeys(subdomains_to_process))
+
+		MAX_SUBDOMAINS_PER_REQUEST = 500
+		if len(subdomains_to_process) > MAX_SUBDOMAINS_PER_REQUEST:
+			return Response(
+				{'status': False, 'message': f'Too many subdomains. Maximum {MAX_SUBDOMAINS_PER_REQUEST} per request.'},
+				status=400
+			)
+
+		added_count = 0
+		duplicate_count = 0
+		invalid_count = 0
+		out_of_scope_count = 0
+		materialized_count = 0
+
+		# Find the latest scan history for immediate visibility in current views.
+		scan = ScanHistory.objects.filter(domain=domain).order_by('-start_scan_date').first()
+
+		existing_manual_subdomains = domain.get_manual_subdomains()
+		existing_manual_subdomains_set = set(existing_manual_subdomains)
+		subdomains_to_create = []
+
+		for sub_name in subdomains_to_process:
+			# Basic validation
+			if not validators.domain(sub_name):
+				invalid_count += 1
+				continue
+
+			domain_name = domain.name.lower().strip()
+			if sub_name != domain_name and not sub_name.endswith('.' + domain_name):
+				out_of_scope_count += 1
+				continue
+
+			if sub_name in existing_manual_subdomains_set:
+				duplicate_count += 1
+				continue
+
+			subdomains_to_create.append(sub_name)
+			existing_manual_subdomains.append(sub_name)
+			existing_manual_subdomains_set.add(sub_name)
+
+		if subdomains_to_create:
+			domain.set_manual_subdomains(existing_manual_subdomains)
+			domain.save(update_fields=['manual_subdomains'])
+			added_count = len(subdomains_to_create)
+
+			if scan:
+				existing_in_scan = set(
+					Subdomain.objects.filter(
+						target_domain=domain,
+						scan_history=scan,
+						name__in=[s.lower() for s in subdomains_to_create],
+					).values_list('name', flat=True)
+				)
+				existing_lower = {n.lower() for n in existing_in_scan}
+				objs = [
+					Subdomain(
+						scan_history=scan,
+						target_domain=domain,
+						name=sub_name,
+						is_imported_subdomain=True,
+						discovered_date=timezone.now()
+					)
+					for sub_name in subdomains_to_create
+					if sub_name.lower() not in existing_lower
+				]
+				if objs:
+					Subdomain.objects.bulk_create(objs, ignore_conflicts=True)
+					materialized_count = len(objs)
+
+		# Build response message
+		msg_parts = []
+		if added_count > 0:
+			msg_parts.append(f'Successfully saved {added_count} subdomain(s) for future scans.')
+		if materialized_count > 0:
+			msg_parts.append(f'{materialized_count} added to the latest scan now.')
+		if duplicate_count > 0:
+			msg_parts.append(f'{duplicate_count} already existed in target scope.')
+		if invalid_count > 0:
+			msg_parts.append(f'{invalid_count} had invalid format.')
+		if out_of_scope_count > 0:
+			msg_parts.append(f'{out_of_scope_count} did not belong to target {domain.name}.')
+		if not scan and added_count > 0:
+			msg_parts.append('They will appear in the next scan for this target.')
+
+		message = ' '.join(msg_parts)
+		return Response({
+			'status': added_count > 0,
+			'message': message,
+			'added_count': added_count,
+			'materialized_count': materialized_count,
+			'duplicate_count': duplicate_count,
+			'invalid_count': invalid_count,
+			'out_of_scope_count': out_of_scope_count
+		})
+
+
 class AddTarget(APIView):
 	permission_classes = [HasPermission]
 	permission_required = PERM_MODIFY_TARGETS
@@ -2240,7 +2378,9 @@ class InitiateScan(APIView):
 						'selected_plugin_slugs': selected_plugins,
 						'profile_ctx': _profile_ctx,
 					}
-					initiate_scan_temporal(**kwargs)
+					res = initiate_scan_temporal(**kwargs)
+					if not res.get('success'):
+						raise Exception(res.get('error', 'Failed to initiate scan'))
 					results.append({'domain': domain.name, 'scan_id': scan.id})
 					
 				except Exception as e:
@@ -2296,6 +2436,7 @@ class InitiateSubTask(APIView):
 			if single:
 				subdomain_ids = [single]
 		subdomain_ids = list(dict.fromkeys(int(subdomain_id) for subdomain_id in subdomain_ids))
+		errors = []
 		for subdomain_id in subdomain_ids:
 			logger.info(f'Running subscans {scan_types} on subdomain "{subdomain_id}" ...')
 			ctx = {
@@ -2305,7 +2446,19 @@ class InitiateSubTask(APIView):
 				'engine_id': engine_id,
 				'selected_plugin_slugs': selected_plugins,
 			}
-			initiate_subscan_temporal(**ctx)
+			res = initiate_subscan_temporal(**ctx)
+			if not res.get('success'):
+				errors.append({
+					'subdomain_id': subdomain_id,
+					'error': res.get('error', 'Failed to initiate subscan'),
+				})
+
+		if errors:
+			return Response({
+				'status': False,
+				'message': f'Failed to initiate {len(errors)} subscan(s)',
+				'errors': errors,
+			}, status=status.HTTP_400_BAD_REQUEST)
 		return Response({'status': True})
 
 
@@ -3879,6 +4032,16 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 	queryset = Subdomain.objects.none()
 	serializer_class = SubdomainSerializer
 
+	def _latest_subdomain_rows_by_name(self, queryset):
+		latest_ids = (
+			queryset
+			.annotate(norm_name=Lower('name'))
+			.values('norm_name')
+			.annotate(latest_id=Max('id'))
+			.values_list('latest_id', flat=True)
+		)
+		return Subdomain.objects.filter(id__in=latest_ids)
+
 	def get_queryset(self):
 		req = self.request
 		scan_id = req.query_params.get('scan_id')
@@ -3906,9 +4069,9 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 
 		if target_id:
 			self.queryset = (
-				subdomains
-				.filter(target_domain__id=target_id)
-				.distinct()
+				self._latest_subdomain_rows_by_name(
+					subdomains.filter(target_domain__id=target_id)
+				)
 			)
 		elif url_query:
 			self.queryset = (
@@ -5410,6 +5573,143 @@ class StartWorkflowView(APIView):
             )
 
 
+class DirectoryFileDispatchView(APIView):
+    """Dispatch a security testing action against a specific directory file URL.
+
+    POST /api/action/directory-file/dispatch/
+    Body: { url: str, action: str, scan_id: int }
+    Returns: { status: "dispatched", workflow_id: str }
+    """
+    permission_classes = [HasPermission]
+    permission_required = PERM_MODIFY_SCAN_RESULTS
+
+    _WORKFLOW_MAP = {
+        'scan_vuln':   ('URLVulnWorkflow',     {}),
+        'deep_fuzz':   ('URLFuzzWorkflow',      {}),
+        'bypass_waf':  ('URLBypassWorkflow',    {}),
+        'secret_scan': ('URLDirSearchWorkflow', {'url_dirsearch': {'hunt_secrets': True}}),
+    }
+    _AUTH_WORKFLOW = 'URLAuthExtractWorkflow'
+
+    def post(self, request) -> Response:
+        import asyncio
+        import uuid
+        from datetime import timedelta
+
+        url: str = request.data.get('url')
+        action: str = request.data.get('action')
+        scan_id = request.data.get('scan_id')
+
+        if not url or not action or scan_id is None:
+            return Response(
+                {'error': 'url, action, and scan_id are required'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from urllib.parse import urlparse
+        if urlparse(url).scheme not in ('http', 'https'):
+            return Response(
+                {'error': 'url must use http or https scheme'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from startScan.models import ScanHistory
+        if not ScanHistory.objects.filter(id=scan_id).exists():
+            return Response(
+                {'error': f'Scan {scan_id} does not exist'},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        workflow_name: str = '<unknown>'
+        ctx: dict = {}
+        wf_id = f"dir-file-{action}-{scan_id}-{uuid.uuid4().hex[:8]}"
+
+        if action in self._WORKFLOW_MAP:
+            workflow_name, extra_yaml = self._WORKFLOW_MAP[action]
+            ctx = {
+                'urls': [url],
+                'yaml_configuration': extra_yaml,
+                'scan_history_id': scan_id,
+            }
+        elif action == 'extract_auth':
+            workflow_name = self._AUTH_WORKFLOW
+            ctx = {'url': url, 'scan_id': scan_id}
+        elif action == 'brute_test':
+            from plugins.models import Plugin
+            plugin = Plugin.objects.filter(
+                slug='credential_intelligence', is_enabled=True
+            ).first()
+            if not plugin:
+                return Response(
+                    {'error': 'Credential Intelligence plugin not installed or disabled'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
+            workflow_name = 'CredentialIntelligenceWorkflow'
+            ctx = {'url': url, 'scan_id': scan_id}
+        else:
+            return Response(
+                {'error': f'Unknown action: {action}'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            async def _start():
+                client = await TemporalClientProvider.get_client()
+                handle = await client.start_workflow(
+                    workflow_name,
+                    ctx,
+                    id=wf_id,
+                    task_queue='python-orchestrator-queue',
+                    execution_timeout=timedelta(hours=1),
+                )
+                return handle.id
+
+            loop = asyncio.new_event_loop()
+            started_id = run_and_close(loop, _start())
+            return Response(
+                {'status': 'dispatched', 'workflow_id': started_id or wf_id},
+                status=status.HTTP_200_OK,
+            )
+        except Exception as exc:
+            logger.error(
+                "[DirectoryFileDispatchView] failed to start %s: %s",
+                workflow_name, str(exc),
+            )
+            return Response(
+                {'error': 'Failed to dispatch action'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class DirectoryFileDeleteView(APIView):
+    """Delete DirectoryFile records by primary key.
+
+    POST /api/action/directory-file/delete/
+    Body: { directory_file_ids: [int] }
+    Returns: { deleted: int }
+    """
+    permission_classes = [HasPermission]
+    permission_required = PERM_MODIFY_SCAN_RESULTS
+
+    def post(self, request) -> Response:
+        from startScan.models import DirectoryFile
+
+        ids = request.data.get('directory_file_ids')
+        if not ids:
+            return Response(
+                {'error': 'directory_file_ids is required and must not be empty'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if len(ids) > 500:
+            return Response(
+                {'error': 'directory_file_ids must not exceed 500 entries'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        deleted_count, _ = DirectoryFile.objects.filter(id__in=ids).delete()
+        return Response({'deleted': deleted_count}, status=status.HTTP_200_OK)
+
+
 # ---------------------------------------------------------------------------
 # Phase 4 — ScanProfile CRUD API
 # ---------------------------------------------------------------------------
@@ -5605,4 +5905,3 @@ class RunSearchsploitAction(APIView):
             return Response({'status': True, 'results': exploits})
         except Exception as e:
             return Response({'status': False, 'message': str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-

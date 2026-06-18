@@ -40,6 +40,7 @@ DEFAULT_HTTP_TIMEOUT = env.int('DEFAULT_HTTP_TIMEOUT', default=5) # seconds
 DEFAULT_RETRIES = env.int('DEFAULT_RETRIES', default=1)
 DEFAULT_THREADS = env.int('DEFAULT_THREADS', default=30)
 DEFAULT_GET_GPT_REPORT = env.bool('DEFAULT_GET_GPT_REPORT', default=True)
+PROXY_VALIDATION_TIMEOUT = env.int('PROXY_VALIDATION_TIMEOUT', default=10) # seconds
 
 # Acunetix (AWVS) Configuration
 ACUNETIX_POLL_INTERVAL = env.int('ACUNETIX_POLL_INTERVAL', default=30)  # seconds
@@ -57,6 +58,7 @@ NEO4J_PASSWORD = env('NEO4J_PASSWORD', default='')
 # In production set ALLOWED_HOSTS=your.domain.com,other.host in the environment.
 # The DOMAIN_NAME block below additionally appends the configured domain host at startup.
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=['localhost', '127.0.0.1', 'web', 'nginx'])
+
 
 # Automatically extract host from DOMAIN_NAME and add it to ALLOWED_HOSTS
 # to ensure out-of-the-box support for the configured domain name.
@@ -503,7 +505,24 @@ CSRF_COOKIE_SECURE = True  # HTTPS only
 SECURE_SSL_REDIRECT = False
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
-CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=['https://localhost', 'https://127.0.0.1', 'http://localhost:5173'])
+CSRF_TRUSTED_ORIGINS = env.list('CSRF_TRUSTED_ORIGINS', default=[
+    # Web frontend (dev + prod)
+    'https://localhost',
+    'https://127.0.0.1',
+    'http://localhost:5173',
+    'https://localhost:5173',
+    # r3ngine-mobile — Android emulator routes host machine via 10.0.2.2
+    'http://10.0.2.2',
+    'http://10.0.2.2:8000',
+    # r3ngine-mobile — iOS simulator and physical devices on local networks
+    'http://10.0.0.0',
+    'http://10.0.1.0',
+    'http://192.168.0.0',
+    'http://192.168.1.0',
+    'http://192.168.88.0',
+    # Add additional origins via CSRF_TRUSTED_ORIGINS env var, e.g.:
+    # CSRF_TRUSTED_ORIGINS=http://192.168.10.5:8000,https://my.rengine.host
+])
 
 
 # HSTS — tell browsers to always use HTTPS for this domain (1 year)
@@ -546,4 +565,3 @@ SIMPLE_JWT = {
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = env.list('CORS_ALLOWED_ORIGINS', default=['http://localhost:5173', 'http://127.0.0.1:5173', 'https://localhost:5173', 'https://127.0.0.1:5173'])
 CORS_ALLOW_CREDENTIALS = True
-
