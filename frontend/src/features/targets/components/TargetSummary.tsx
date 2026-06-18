@@ -59,9 +59,13 @@ import {
   Eye,
   Folder,
   Camera,
-  BarChart2 as BarChartIcon
+  BarChart2 as BarChartIcon,
+  Play,
+  Square
 } from 'lucide-react';
 import { useTargetSummary } from '../api';
+import { StartScanModal } from '../../scans/components/StartScanModal';
+import { useStopScan } from '../../scans/api';
 import Chart from 'react-apexcharts';
 import { GeoMap } from '../../dashboard/components/GeoMap';
 import { KpiCard } from '../../../components/KpiCard';
@@ -127,6 +131,8 @@ export const TargetSummary = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [infoTab, setInfoTab] = useState(0);
   const [aiExportModalOpen, setAiExportModalOpen] = useState(false);
+  const [startScanTargets, setStartScanTargets] = useState<{ ids: number[]; names: string[] } | null>(null);
+  const stopScanMutation = useStopScan(projectSlug || 'default');
   const theme = useTheme();
   const isLight = theme.palette.mode === 'light';
 
@@ -664,8 +670,69 @@ export const TargetSummary = () => {
             <Typography variant="h5" sx={{ fontWeight: 900, fontFamily: 'var(--r3-heading-font)', color: theme.palette.text.primary, letterSpacing: 2 }}>TARGET SUMMARY</Typography>
             <Typography sx={{ fontSize: '0.7rem', color: theme.palette.text.secondary, fontWeight: 600 }}>IDENTIFIER: {targetId} | TARGET: {data.target_info.name}</Typography>
           </Box>
-          <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary, opacity: 0.8, fontFamily: 'monospace' }}>
-            <span>TARGETS</span> / <span>SUMMARY</span> / <span style={{ color: theme.palette.primary.main }}>{data.target_info.name}</span>
+          
+          <Stack direction="row" spacing={2} sx={{ alignItems: 'center' }}>
+            {/* Start Scan Button */}
+            <Button
+              variant="outlined"
+              size="small"
+              startIcon={<Play size={14} />}
+              onClick={() => setStartScanTargets({ ids: [data.target_info.id], names: [data.target_info.name] })}
+              sx={{
+                borderColor: alpha(cGreen, 0.4),
+                color: cGreen,
+                fontWeight: 900,
+                fontFamily: 'Orbitron',
+                fontSize: '0.65rem',
+                letterSpacing: 1,
+                px: 2,
+                '&:hover': {
+                  borderColor: cGreen,
+                  bgcolor: alpha(cGreen, 0.05),
+                  boxShadow: `0 0 12px ${alpha(cGreen, 0.2)}`
+                }
+              }}
+            >
+              START SCAN
+            </Button>
+
+            {/* Stop Scan Button */}
+            {data.recent_scans?.find((scan: any) => [1, -1, 5].includes(scan.scan_status)) && (
+              <Button
+                variant="outlined"
+                size="small"
+                startIcon={stopScanMutation.isPending ? <CircularProgress size={12} color="inherit" /> : <Square size={14} />}
+                onClick={() => {
+                  const running = data.recent_scans?.find((scan: any) => [1, -1, 5].includes(scan.scan_status));
+                  if (running) stopScanMutation.mutate(running.id);
+                }}
+                disabled={stopScanMutation.isPending}
+                sx={{
+                  borderColor: alpha(cRed, 0.4),
+                  color: cRed,
+                  fontWeight: 900,
+                  fontFamily: 'Orbitron',
+                  fontSize: '0.65rem',
+                  letterSpacing: 1,
+                  px: 2,
+                  '&:hover': {
+                    borderColor: cRed,
+                    bgcolor: alpha(cRed, 0.05),
+                    boxShadow: `0 0 12px ${alpha(cRed, 0.2)}`
+                  },
+                  '&.Mui-disabled': {
+                    borderColor: alpha(theme.palette.action.disabled, 0.1),
+                    color: theme.palette.action.disabled
+                  }
+                }}
+              >
+                STOP SCAN
+              </Button>
+            )}
+
+            <Stack direction="row" spacing={1} sx={{ fontSize: '0.65rem', color: theme.palette.text.secondary, opacity: 0.8, fontFamily: 'monospace' }}>
+              <span>TARGETS</span> / <span>SUMMARY</span> / <span style={{ color: theme.palette.primary.main }}>{data.target_info.name}</span>
+            </Stack>
           </Stack>
         </Stack>
       </Box>
@@ -763,6 +830,14 @@ export const TargetSummary = () => {
         {tabs[activeTab]?.label === 'MONITORING' && renderMonitoring()}
         {tabs[activeTab]?.label === 'VISUALIZATION' && <VisualizationTab projectSlug={projectSlug || 'default'} targetId={parseInt(targetId || '0')} />}
       </Box>
+      {startScanTargets && (
+        <StartScanModal
+          open={!!startScanTargets}
+          onClose={() => setStartScanTargets(null)}
+          domainIds={startScanTargets.ids}
+          domainNames={startScanTargets.names}
+        />
+      )}
     </Box>
   );
 };
