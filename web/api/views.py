@@ -10,7 +10,7 @@ import validators
 from django.conf import settings
 
 from ipaddress import IPv4Network
-from django.db.models import CharField, Count, F, Q, Value
+from django.db.models import CharField, Count, F, Max, Q, Value
 from django.utils import timezone
 from packaging import version
 from django.template.defaultfilters import slugify
@@ -1559,6 +1559,14 @@ class AddManualSubdomain(APIView):
 			added_count = len(subdomains_to_create)
 
 			if scan:
+				existing_in_scan = set(
+					Subdomain.objects.filter(
+						target_domain=domain,
+						scan_history=scan,
+						name__in=[s.lower() for s in subdomains_to_create],
+					).values_list('name', flat=True)
+				)
+				existing_lower = {n.lower() for n in existing_in_scan}
 				objs = [
 					Subdomain(
 						scan_history=scan,
@@ -1568,11 +1576,7 @@ class AddManualSubdomain(APIView):
 						discovered_date=timezone.now()
 					)
 					for sub_name in subdomains_to_create
-					if not Subdomain.objects.filter(
-						target_domain=domain,
-						scan_history=scan,
-						name__iexact=sub_name
-					).exists()
+					if sub_name.lower() not in existing_lower
 				]
 				if objs:
 					Subdomain.objects.bulk_create(objs, ignore_conflicts=True)
@@ -4032,9 +4036,9 @@ class SubdomainDatatableViewSet(viewsets.ModelViewSet):
 		latest_ids = (
 			queryset
 			.annotate(norm_name=Lower('name'))
-			.order_by('norm_name', '-discovered_date', '-id')
-			.distinct('norm_name')
-			.values_list('id', flat=True)
+			.values('norm_name')
+			.annotate(latest_id=Max('id'))
+			.values_list('latest_id', flat=True)
 		)
 		return Subdomain.objects.filter(id__in=latest_ids)
 
