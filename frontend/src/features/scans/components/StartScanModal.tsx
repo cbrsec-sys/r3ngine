@@ -28,8 +28,8 @@ import { usePlugins } from '../../plugins/api/pluginsApi';
 import { useInitiateScan } from '../api';
 import { useNavigate } from '@tanstack/react-router';
 import { generateDorks } from '../utils/dorkUtils';
-import { useThemeTokens } from '../../theme/useThemeTokens';
-import { getDialogPaperSx, getFieldSx } from '../../theme/semanticColors';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { getDialogPaperSx, getFieldSx } from '../../../theme/semanticColors';
 import { WorkflowLauncher } from '../../workflows/components/WorkflowLauncher';
 
 interface StartScanModalProps {

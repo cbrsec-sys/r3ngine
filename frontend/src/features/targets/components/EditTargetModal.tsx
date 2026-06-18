@@ -38,8 +38,8 @@ import {
 } from 'lucide-react';
 import { useUpdateTarget, useOrganizations, useEngines } from '../api';
 import type { Domain } from '../types';
-import { useThemeTokens } from '../../theme/useThemeTokens';
-import { getDialogPaperSx, getFieldSx } from '../../theme/semanticColors';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { getDialogPaperSx, getFieldSx } from '../../../theme/semanticColors';
 
 // The generated OpenAPI schema omits several fields that the backend serializes.
 // Extend locally so we can read them without casting everywhere.

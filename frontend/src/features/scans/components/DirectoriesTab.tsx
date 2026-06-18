@@ -52,6 +52,7 @@ import type { DirectoryFile } from '../../subdomains/types';
 import { ConfirmDialog } from '../../../components/ConfirmDialog';
 import { usePlugins } from '../../plugins/api/pluginsApi';
 import { useDirectoryFileDispatch, useDirectoryFileDelete } from '../api';
+import { getMenuPaperSx } from '../../../theme/semanticColors';
 
 interface DirectoriesTabProps {
   projectSlug: string;

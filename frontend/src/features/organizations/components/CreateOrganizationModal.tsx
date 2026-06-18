@@ -20,8 +20,8 @@ import {
 } from '@mui/material';
 import { useTargetsWithoutOrganization, useCreateOrganization, useUpdateOrganization } from '../api';
 import type { Organization } from '../orgTypes';
-import { useThemeTokens } from '../../theme/useThemeTokens';
-import { getDialogPaperSx, getMenuPaperSx, getFieldSx } from '../../theme/semanticColors';
+import { useThemeTokens } from '../../../theme/useThemeTokens';
+import { getDialogPaperSx, getMenuPaperSx, getFieldSx } from '../../../theme/semanticColors';
 
 interface CreateOrganizationModalProps {
   open: boolean;
